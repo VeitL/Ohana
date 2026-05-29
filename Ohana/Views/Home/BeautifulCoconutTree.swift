@@ -69,6 +69,7 @@ struct BeautifulCoconutTree: View {
     var growthProgress: Double = 0
     var injectionPulseToken: Int = 0
     var pendingUpgradeCoconutCount: Int = 0
+    var dailyCoconutCount: Int? = nil
     var allowsAmbientMotion: Bool = true
     var harvestedCoconuts: Set<Int> = []        // 已采摘的椰子索引
     var onHarvest: ((Int) -> Void)? = nil       // 采摘回调
@@ -85,10 +86,17 @@ struct BeautifulCoconutTree: View {
     private var isMax: Bool { level >= 10 }
     private var glowColor: Color { isMax ? Color(hex: "FBBF24") : Color.goPrimary }
     private var sproutCount: Int { max(1, min(level, 4)) }
+    private var displayedCoconutCount: Int {
+        min(cfg.coconutCount, max(0, dailyCoconutCount ?? cfg.coconutCount))
+    }
 
     private var trunkH: CGFloat { cfg.trunkHeight }
     private var trunkW: CGFloat { cfg.trunkWidth }
     private var bend: CGFloat { CGFloat(12 + min(level, 9) * 3) }
+
+    static func coconutCapacity(for level: Int) -> Int {
+        treeLevelConfigs[max(0, min(level - 1, 9))].coconutCount
+    }
 
     private func leafColor(index i: Int) -> Color {
         if isMax { return i % 2 == 0 ? Color(hex: "00FFD1") : Color(hex: "0284C7") }
@@ -269,7 +277,7 @@ struct BeautifulCoconutTree: View {
 
                 // 椰子（固定坐标）
                 ForEach(0..<cocoPositions.count, id: \.self) { i in
-                    if i < cfg.coconutCount {
+                    if i < displayedCoconutCount {
                         let pos = cocoPositions[i]
                         let isHarvested = harvestedCoconuts.contains(i)
                         let positionScale = min(CGFloat(1.22), max(CGFloat(0.72), cfg.leafWidth / 108))
@@ -284,7 +292,7 @@ struct BeautifulCoconutTree: View {
                         .animation(
                             GoMotion.fab
                                 .delay(0.5 + Double(i) * 0.1),
-                            value: cfg.coconutCount
+                            value: displayedCoconutCount
                         )
                     }
                 }
@@ -310,9 +318,9 @@ struct BeautifulCoconutTree: View {
                     : nil,
                 value: isSwaying
             )
-            // 注入能量脉冲保持克制，避免树冠在短时间内猛放大再回弹。
-            .scaleEffect(isInjecting ? 1.045 : 1.0)
-            .animation(GoMotion.stateChange, value: isInjecting)
+            // 注入能量只给轻微局部反馈；主脉冲由外层稳定场景统一驱动。
+            .scaleEffect(isInjecting ? 1.018 : 1.0)
+            .animation(GoMotion.feedback, value: isInjecting)
         }
         // 整体 scale 随等级变化（React 源码 animate.scale）
         .scaleEffect(CGFloat(cfg.scale))
@@ -562,12 +570,20 @@ private struct InteractiveCoconut: View {
                     value: visuallyHarvested
                 )
         }
+        .frame(width: 44, height: 44)
+        .contentShape(Circle())
+        .allowsHitTesting(!visuallyHarvested)
         .onTapGesture {
             guard !visuallyHarvested else { return }
             withAnimation(GoMotion.feedback) {
                 isLocallyHarvested = true
             }
             onTap()
+        }
+        .onChange(of: isHarvested) { _, isHarvested in
+            if !isHarvested {
+                isLocallyHarvested = false
+            }
         }
     }
 

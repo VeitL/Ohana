@@ -108,7 +108,7 @@ private struct OasisRewardMakeupConfirmationModifier: ViewModifier {
 }
 
 private final class OasisTreeHarvestBuffer {
-    var pendingCount = 0
+    var pendingIndices: Set<Int> = []
     var commitTask: Task<Void, Never>?
 }
 
@@ -158,16 +158,13 @@ struct OasisRewardView: View {
     @State private var injectionPulseToken = 0
     @State private var levelUpPulse         = false
     @State private var levelUpBadgeVisible  = false
-    @State private var harvestBubbleBounce  = false
-    @State private var justHarvested        = false
     @State private var openingUpgradeCoconutId: UUID?
     @State private var critterActionPulseId: UUID?
     @State private var lastCritterInteractionOutcome: OasisCritterInteractionOutcome?
     @State private var rescuingCritterId: UUID?
-    // 任务7：环境光晕 + 采摘飞出
+    // 任务7：环境光晕 + 树上每日椰子
     @State private var glowBreathing: Bool  = false
-    @State private var flyCoconut: Bool     = false
-    @State private var flyOpacity: Double   = 0
+    @State private var dailyTreeCoconutCount = 0
     @State private var harvestedCoconutIndices: Set<Int> = []
     @State private var treeVisualEnergyOverride: Int?
     @State private var coconutBalanceVisualOverride: Int?
@@ -176,7 +173,6 @@ struct OasisRewardView: View {
     @State private var actionSnapshot = OasisRewardActionSnapshot()
     @State private var bentoSnapshot = OasisBentoSnapshot()
     @State private var critterRenderSnapshots: [UUID: OasisCritterRenderSnapshot] = [:]
-    @State private var canHarvestTreeToday = false
     @State private var treePassiveIncomeAmount = 0
     @State private var preparedWorkTask: Task<Void, Never>?
     @State private var visibleWorkTask: Task<Void, Never>?
@@ -551,7 +547,6 @@ struct OasisRewardView: View {
         isVisible = shouldTreatEmbeddedAsVisible
         lastLevel = treeMgr.treeLevel
         refreshTreeHarvestSnapshot()
-        justHarvested = !canHarvestTreeToday
         markVisibleStatePrepared()
         schedulePreparedVisualWork()
     }
@@ -575,8 +570,8 @@ struct OasisRewardView: View {
         treeCommandTask?.cancel()
         treeCommandTask = nil
         treeHarvestBuffer.commitTask?.cancel()
+        commitPendingTreeHarvests(reconcile: false)
         treeHarvestBuffer.commitTask = nil
-        treeHarvestBuffer.pendingCount = 0
         renderSnapshotTask?.cancel()
         renderSnapshotTask = nil
         critterNestCloseTask?.cancel()
@@ -660,7 +655,6 @@ struct OasisRewardView: View {
         isVisibleStatePrepared = true
         if wasPrepared {
             updateGlowMotion()
-            updateHarvestBubbleMotion()
         } else {
             startAmbientMotionIfNeeded()
         }
@@ -699,8 +693,11 @@ struct OasisRewardView: View {
     }
 
     private func refreshTreeHarvestSnapshot() {
-        canHarvestTreeToday = treeMgr.canHarvestToday
-        treePassiveIncomeAmount = treeMgr.passiveIncomeAmount
+        let capacity = BeautifulCoconutTree.coconutCapacity(for: treeVisualLevel.rawValue)
+        let snapshot = treeMgr.dailyTreeCoconutSnapshot(maxCoconutCount: capacity)
+        dailyTreeCoconutCount = snapshot.coconutCount
+        harvestedCoconutIndices = snapshot.harvestedIndices.union(treeHarvestBuffer.pendingIndices)
+        treePassiveIncomeAmount = snapshot.coconutCount
     }
 
     // MARK: - Navy Background
@@ -827,23 +824,18 @@ struct OasisRewardView: View {
                         growthProgress: treeVisualProgressToNextLevel,
                         injectionPulseToken: injectionPulseToken,
                         pendingUpgradeCoconutCount: pendingUpgradeCoconuts.count,
+                        dailyCoconutCount: dailyTreeCoconutCount,
                         allowsAmbientMotion: shouldRunAmbientMotion,
                         harvestedCoconuts: harvestedCoconutIndices,
                         onHarvest: { harvestTreeCoconut($0) }
                     )
                     .shadow(color: Color.goPrimary.opacity(glowBreathing ? 0.42 : 0.16), radius: glowBreathing ? 22 : 10, x: 0, y: 0) // ui-v4: allow Oasis tree focus glow
-                    .scaleEffect((levelUpPulse ? 1.18 : treeScale) * treeInjectionScale)
-                    .animation(GoMotion.fab, value: levelUpPulse)
+                    .scaleEffect((levelUpPulse ? 1.10 : treeScale) * treeInjectionScale)
+                    .animation(GoMotion.rewardPop, value: levelUpPulse)
                     .animation(GoMotion.hero, value: treeScale)
                     .animation(GoMotion.stateChange, value: treeInjectionScale)
                     .frame(height: 300)
                     .padding(.bottom, 16)
-
-                    if canHarvestTreeToday && !justHarvested {
-                        stageHarvestButton
-                            .padding(.bottom, 2)
-                            .transition(.scale(scale: 0.94).combined(with: .opacity))
-                    }
 
                     treeCritterEntryButton
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -879,14 +871,6 @@ struct OasisRewardView: View {
                     .transition(.scale(scale: 0.94).combined(with: .opacity))
             }
 
-            if flyOpacity > 0 {
-                Text("🥥")
-                    .font(.system(size: 28))
-                    .offset(y: flyCoconut ? -220 : -60)
-                    .opacity(flyOpacity)
-                    .allowsHitTesting(false)
-            }
-
             if levelUpBadgeVisible {
                 stageLevelUpBadge
             }
@@ -897,12 +881,10 @@ struct OasisRewardView: View {
         .contentShape(stageShape)
         .onAppear {
             refreshTreeHarvestSnapshot()
-            justHarvested = !canHarvestTreeToday
             updateGlowMotion()
         }
         .onChange(of: treeVisualLevel) { oldLevel, newLevel in
             refreshTreeHarvestSnapshot()
-            justHarvested = !canHarvestTreeToday
             if newLevel.rawValue > oldLevel.rawValue {
                 triggerLevelUpFeedback()
             }
@@ -1225,6 +1207,7 @@ struct OasisRewardView: View {
             }
         }
         .buttonStyle(ScaleButtonStyle())
+        .animation(GoMotion.feedback, value: isOpening)
         .accessibilityLabel("\(coconut.title(l)) \(l.tr(zh: "敲开", en: "Open", de: "Öffnen"))")
     }
 
@@ -1281,34 +1264,6 @@ struct OasisRewardView: View {
         .opacity(canInject ? 1 : 0.55)
     }
 
-    private var stageHarvestButton: some View {
-        Button {
-            harvestDailyTreeCoconuts()
-        } label: {
-            HStack(spacing: 6) {
-                Text("🥥")
-                    .font(.system(size: 17))
-                Text("+\(treePassiveIncomeAmount)")
-                    .font(OhanaFont.caption(.black))
-                    .monospacedDigit()
-            }
-            .foregroundStyle(Color.arkInk)
-            .padding(.horizontal, 14)
-            .frame(height: 38)
-            .background(Color.goYellow, in: Capsule())
-            .shadow(color: Color.goYellow.opacity(harvestBubbleBounce ? 0.58 : 0.24), radius: harvestBubbleBounce ? 14 : 7, x: 0, y: 5) // ui-v4: allow tappable Oasis harvest reward glow
-            .scaleEffect(harvestBubbleBounce ? 1.045 : 1.0)
-            .animation(
-                shouldRunAmbientMotion
-                ? .easeInOut(duration: 0.85).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated harvest affordance
-                : nil,
-                value: harvestBubbleBounce
-            )
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .onAppear { updateHarvestBubbleMotion() }
-    }
-
     private var stageLevelUpBadge: some View {
         HStack(spacing: 6) {
             Image(systemName: "sparkles")
@@ -1344,50 +1299,60 @@ struct OasisRewardView: View {
     }
 
     private func harvestTreeCoconut(_ idx: Int) {
-        guard !harvestedCoconutIndices.contains(idx) else { return }
+        guard idx >= 0,
+              idx < dailyTreeCoconutCount,
+              !harvestedCoconutIndices.contains(idx),
+              !treeHarvestBuffer.pendingIndices.contains(idx) else { return }
         OhanaFeedback.medium()
         withAnimation(GoMotion.feedback) {
             _ = harvestedCoconutIndices.insert(idx)
         }
         applyCoconutBalanceVisualDelta(1)
-        treeHarvestBuffer.pendingCount += 1
+        treeHarvestBuffer.pendingIndices.insert(idx)
         treeHarvestBuffer.commitTask?.cancel()
-        treeHarvestBuffer.commitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 760) {
-            let amount = treeHarvestBuffer.pendingCount
-            treeHarvestBuffer.pendingCount = 0
-            commandExecutor.awardHarvestedTreeCoconuts(amount)
-            reconcileCoconutBalanceAfterCommand()
-            treeHarvestBuffer.commitTask = nil
+        treeHarvestBuffer.commitTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
+            commitPendingTreeHarvests()
         }
     }
 
-    private func harvestDailyTreeCoconuts() {
-        guard canHarvestTreeToday else { return }
-        let amount = treePassiveIncomeAmount
-        guard amount > 0 else { return }
-        OhanaFeedback.strong()
-        withAnimation(GoMotion.feedback) {
-            justHarvested = true
-            canHarvestTreeToday = false
+    private func commitPendingTreeHarvests(reconcile: Bool = true) {
+        let pendingIndices = treeHarvestBuffer.pendingIndices
+        guard !pendingIndices.isEmpty else {
+            treeHarvestBuffer.commitTask = nil
+            return
         }
-        applyCoconutBalanceVisualDelta(amount)
-        flyCoconut = false
-        flyOpacity = 0
-        treeCommandTask?.cancel()
-        treeCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
-            if commandExecutor.harvestDailyTreeCoconuts(treeManager: treeMgr) {
-                reconcileCoconutBalanceAfterCommand()
-            } else {
-                OhanaFeedback.error()
-                withAnimation(GoMotion.feedback) {
-                    justHarvested = false
-                    canHarvestTreeToday = true
-                    coconutBalanceVisualOverride = nil
-                }
-                rebuildOasisRenderSnapshots()
+
+        let capacity = BeautifulCoconutTree.coconutCapacity(for: treeVisualLevel.rawValue)
+        var awardedCount = 0
+        var latestSnapshot: OasisDailyTreeCoconutSnapshot?
+        for index in pendingIndices.sorted() {
+            let before = treeMgr.dailyTreeCoconutSnapshot(maxCoconutCount: capacity)
+            guard !before.harvestedIndices.contains(index) else {
+                latestSnapshot = before
+                continue
             }
-            treeCommandTask = nil
+            let after = treeMgr.markDailyTreeCoconutHarvested(index, maxCoconutCount: capacity)
+            latestSnapshot = after
+            if after.harvestedIndices.contains(index) {
+                awardedCount += 1
+            }
         }
+
+        treeHarvestBuffer.pendingIndices.removeAll()
+        if let latestSnapshot {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                harvestedCoconutIndices = latestSnapshot.harvestedIndices
+            }
+        }
+        if awardedCount > 0 {
+            commandExecutor.awardHarvestedTreeCoconuts(awardedCount)
+        }
+        if reconcile {
+            reconcileCoconutBalanceAfterCommand()
+        }
+        treeHarvestBuffer.commitTask = nil
     }
 
     private func applyCoconutBalanceVisualDelta(_ amount: Int) {
@@ -1434,39 +1399,36 @@ struct OasisRewardView: View {
         guard !isInjecting else { return }
 
         let motionBudget = interactionMotionBudget
-        let visualAnimation = motionBudget.allowsMotion ? GoMotion.stateChange : GoMotion.reduced
-        let commandDelay: UInt64 = motionBudget.usesFullMotion ? 420 : 140
-        let resetDelay: UInt64 = motionBudget.usesFullMotion ? 560 : 180
-        let pulseScale: CGFloat = motionBudget.usesFullMotion ? 1.055 : 1.015
+        let visualAnimation = motionBudget.allowsMotion ? GoMotion.feedback : GoMotion.reduced
+        let commandDelay: UInt64 = motionBudget.usesFullMotion ? 96 : 48
+        let resetDelay: UInt64 = motionBudget.usesFullMotion ? 190 : 120
         let beforeLevel = treeVisualLevel
         let beforeBalance = activeHumanCoconutBalance
         let targetBalance = max(0, beforeBalance - 10)
         let targetEnergy = treeMgr.totalEnergy + 10
         let targetLevel = OasisTreeManager.treeLevel(forTotalEnergy: targetEnergy)
+        let isLevelUp = targetLevel.rawValue > beforeLevel.rawValue
+        let pulseScale: CGFloat = motionBudget.usesFullMotion ? (isLevelUp ? 1.045 : 1.026) : 1.01
         injectionPulseToken += 1
         let pulseToken = injectionPulseToken
         OhanaFeedback.light()
-        withAnimation(GoMotion.feedback) {
+        withAnimation(visualAnimation) {
             coconutBalanceVisualOverride = targetBalance
             actionSnapshot.activeCoconutBalance = targetBalance
             actionSnapshot.canInjectCoconuts = targetBalance >= 10
             bentoSnapshot.shopMetric = "\(targetBalance)"
-        }
-        withAnimation(GoMotion.hero) {
             treeVisualEnergyOverride = targetEnergy
-        }
-        withAnimation(visualAnimation) {
             isInjecting = true
             treeInjectionScale = pulseScale
+        }
+        if isLevelUp {
+            triggerLevelUpFeedback()
         }
 
         treeCommandTask?.cancel()
         treeCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: commandDelay) {
             let didInject = commandExecutor.injectTreeEnergy(treeManager: treeMgr)
             if didInject {
-                if targetLevel != beforeLevel, treeVisualLevel == beforeLevel {
-                    triggerLevelUpFeedback()
-                }
                 var transaction = Transaction(animation: nil)
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
@@ -2088,13 +2050,13 @@ struct OasisRewardView: View {
 
     private func openUpgradeCoconut(_ coconut: OasisUpgradeCoconut) {
         guard openingUpgradeCoconutId == nil else { return }
-        openingUpgradeCoconutId = coconut.id
         OhanaFeedback.medium()
         withAnimation(GoMotion.feedback) {
+            openingUpgradeCoconutId = coconut.id
             dismissUpgradeReward()
         }
         upgradeRewardTask?.cancel()
-        upgradeRewardTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 220) {
+        upgradeRewardTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
             do {
                 let result = try commandExecutor.openUpgradeCoconut(coconut)
                 result.isMilestoneCritter ? OhanaFeedback.success() : OhanaFeedback.warning()
@@ -2438,23 +2400,17 @@ struct OasisRewardView: View {
 
     private func startAmbientMotionIfNeeded() {
         updateGlowMotion()
-        updateHarvestBubbleMotion()
         startBreathing()
     }
 
     private func stopAmbientMotion() {
         glowBreathing = false
-        harvestBubbleBounce = false
         treeScale = 1.0
         treeGlow = 0.4
     }
 
     private func updateGlowMotion() {
         glowBreathing = shouldRunAmbientMotion
-    }
-
-    private func updateHarvestBubbleMotion() {
-        harvestBubbleBounce = shouldRunAmbientMotion
     }
 
     private func startBreathing() {
@@ -2473,16 +2429,16 @@ struct OasisRewardView: View {
         guard !levelUpPulse else { return }
         OhanaFeedback.success()
         spawnEnergyParticles(count: 22)
-        withAnimation(GoMotion.fab) {
+        withAnimation(GoMotion.rewardPop) {
             levelUpPulse = true
             levelUpBadgeVisible = true
         }
         levelUpFeedbackTask?.cancel()
-        levelUpFeedbackTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 700) {
-            withAnimation(GoMotion.hero) {
+        levelUpFeedbackTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 280) {
+            withAnimation(GoMotion.stateChange) {
                 levelUpPulse = false
             }
-            levelUpFeedbackTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 650) {
+            levelUpFeedbackTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 920) {
                 withAnimation(GoMotion.quick) {
                     levelUpBadgeVisible = false
                 }

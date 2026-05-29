@@ -110,12 +110,16 @@ extension QuickFeedDetailContent {
     func planEditorFooter(kind: FeedRuleKind, tint: Color, hasExistingPlan: Bool) -> some View {
         VStack(spacing: 10) {
             FoodPrimaryButton(
-                title: kind == .manualReminder ? l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern") : l.tr(zh: "保存自动记录", en: "Save auto feeder", de: "Automat speichern"),
-                icon: "checkmark",
+                title: draftStore.isSavingFeedPlan
+                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+                    : (kind == .manualReminder ? l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern") : l.tr(zh: "保存自动记录", en: "Save auto feeder", de: "Automat speichern")),
+                icon: draftStore.isSavingFeedPlan ? "hourglass" : "checkmark",
                 tint: tint
             ) {
                 savePlan(kind)
             }
+            .disabled(draftStore.isSavingFeedPlan)
+            .opacity(draftStore.isSavingFeedPlan ? 0.72 : 1)
 
             if hasExistingPlan {
                 Button(role: .destructive) {
@@ -129,6 +133,8 @@ extension QuickFeedDetailContent {
                         .feedFlatBlockSurface(cornerRadius: 16)
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .disabled(draftStore.isSavingFeedPlan)
+                .opacity(draftStore.isSavingFeedPlan ? 0.72 : 1)
             }
         }
         .padding(.horizontal, 18)

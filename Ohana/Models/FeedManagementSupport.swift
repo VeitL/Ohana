@@ -120,6 +120,42 @@ enum FeedLogSource: String {
     case treat
 }
 
+enum FeedStockCalculationMode: String, CaseIterable, Identifiable {
+    case manualOrPlan
+    case autoFeeder
+
+    var id: String { rawValue }
+}
+
+enum FeedStockRecordMetadata {
+    private static let calculationModePrefix = "stockCalculationMode:"
+
+    static func calculationMode(from notes: String) -> FeedStockCalculationMode? {
+        notes
+            .components(separatedBy: "\n")
+            .compactMap { line -> FeedStockCalculationMode? in
+                guard line.hasPrefix(calculationModePrefix) else { return nil }
+                return FeedStockCalculationMode(rawValue: String(line.dropFirst(calculationModePrefix.count)))
+            }
+            .first
+    }
+
+    static func calculationMode(for record: PetFoodRecord?) -> FeedStockCalculationMode {
+        guard let record else { return .manualOrPlan }
+        return calculationMode(from: record.notes) ?? .manualOrPlan
+    }
+
+    static func notesWithCalculationMode(_ notes: String, mode: FeedStockCalculationMode) -> String {
+        let visible = notes
+            .components(separatedBy: "\n")
+            .filter { !$0.hasPrefix(calculationModePrefix) }
+            .joined(separator: "\n")
+        return [visible, "\(calculationModePrefix)\(mode.rawValue)"]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+    }
+}
+
 enum FeedLogMetadata {
     static let autoFeedNotePrefix = "ohana_auto_feed:"
     static let treatFeedNoteMarker = "ohana_treat_feed"
@@ -164,6 +200,29 @@ enum FeedRuleKind: String, CaseIterable {
         case .manualReminder: return "bell.badge.fill"
         case .autoFeeder: return "dot.radiowaves.left.and.right"
         }
+    }
+}
+
+enum FeedPlanCatchUpPolicy {
+    static let catchUpWindowHours = 6
+    static let catchUpWindow: TimeInterval = TimeInterval(catchUpWindowHours * 60 * 60)
+
+    static func isCatchUpEligible(scheduledAt: Date, now: Date) -> Bool {
+        scheduledAt < now && now.timeIntervalSince(scheduledAt) <= catchUpWindow
+    }
+
+    static func isExpiredMiss(scheduledAt: Date, now: Date) -> Bool {
+        scheduledAt < now && now.timeIntervalSince(scheduledAt) > catchUpWindow
+    }
+
+    static func isCatchUpEligible(_ reminder: Reminder, now: Date) -> Bool {
+        guard !reminder.isCompleted, reminder.isPending || reminder.isFailed else { return false }
+        return isCatchUpEligible(scheduledAt: reminder.scheduledAt, now: now)
+    }
+
+    static func isExpiredMiss(_ reminder: Reminder, now: Date) -> Bool {
+        guard !reminder.isCompleted, reminder.isPending || reminder.isFailed else { return false }
+        return isExpiredMiss(scheduledAt: reminder.scheduledAt, now: now)
     }
 }
 
@@ -213,15 +272,32 @@ enum FeedRuleMetadata {
     static let autoFeederEntityType = "pet_auto_feeder"
 
     static func isManualReminderEvent(_ event: Event, pet: Pet) -> Bool {
-        (event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet") &&
+        guard (event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet"),
+              event.relatedEntityId == pet.id.uuidString,
+              event.eventType == EventType.foodChange.rawValue
+        else { return false }
+        if event.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue {
+            return true
+        }
+        guard event.feedRuleKindRaw.isEmpty,
+              event.recurrenceDays > 0,
+              !event.reminders.isEmpty
+        else { return false }
+        return hasLegacyManualReminderTitle(event.title)
+    }
+
+    static func isAutoFeederEvent(_ event: Event, pet: Pet) -> Bool {
+        (event.feedRuleKindRaw == FeedRuleKind.autoFeeder.rawValue || event.feedRuleKindRaw.isEmpty) &&
+            event.relatedEntityType == autoFeederEntityType &&
             event.relatedEntityId == pet.id.uuidString &&
             event.eventType == EventType.foodChange.rawValue
     }
 
-    static func isAutoFeederEvent(_ event: Event, pet: Pet) -> Bool {
-        event.relatedEntityType == autoFeederEntityType &&
-            event.relatedEntityId == pet.id.uuidString &&
-            event.eventType == EventType.foodChange.rawValue
+    private static func hasLegacyManualReminderTitle(_ title: String) -> Bool {
+        let normalized = title.lowercased()
+        let mealNames = ["早餐", "午餐", "下午餐", "晚餐", "夜宵"]
+        if mealNames.contains(where: { title.contains($0) }) { return true }
+        return ["feed", "food", "meal", "干粮", "湿粮"].contains { normalized.contains($0) }
     }
 
     static func amountGrams(from event: Event, fallback: Double = 0) -> Double {
@@ -357,11 +433,13 @@ enum FeedStockCalculator {
         foodKind: FeedFoodKind,
         careLogs: [PetCareLog]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
-        now: Date = Date()
+        now: Date = Date(),
+        calculationMode: FeedStockCalculationMode? = nil
     ) -> Double {
         let stock = activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: now)
         let startDate = stock.map { stockOpenDay(for: $0) } ?? (foodKind == .dry ? pet.restockDate : nil)
-        return mainFoodLogs(for: pet, foodKind: foodKind, since: startDate, careLogs: careLogs)
+        let mode = calculationMode ?? stock.map { FeedStockRecordMetadata.calculationMode(for: $0) }
+        return stockConsumptionLogs(for: pet, foodKind: foodKind, since: startDate, careLogs: careLogs, calculationMode: mode)
             .reduce(0) { total, log in
                 total + stockDeductionAmount(for: log, pet: pet)
             }
@@ -389,13 +467,14 @@ enum FeedStockCalculator {
         careLogs: [PetCareLog]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        calculationMode: FeedStockCalculationMode? = nil
     ) -> Double? {
         guard let windowStart = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now)) else { return nil }
-        let restockStart = foodKind
-            .flatMap { activeStockRecord(for: pet, foodKind: $0, foodRecords: foodRecords, now: now) }
-            .map { stockOpenDay(for: $0, calendar: calendar) } ?? pet.restockDate
-        let logs = mainFoodLogs(for: pet, foodKind: foodKind, since: maxDate(windowStart, restockStart), careLogs: careLogs)
+        let activeRecord = foodKind.flatMap { activeStockRecord(for: pet, foodKind: $0, foodRecords: foodRecords, now: now) }
+        let restockStart = activeRecord.map { stockOpenDay(for: $0, calendar: calendar) } ?? pet.restockDate
+        let mode = calculationMode ?? activeRecord.map { FeedStockRecordMetadata.calculationMode(for: $0) }
+        let logs = stockConsumptionLogs(for: pet, foodKind: foodKind, since: maxDate(windowStart, restockStart), careLogs: careLogs, calculationMode: mode)
             .filter { $0.date <= now }
         let grouped = Dictionary(grouping: logs) { calendar.startOfDay(for: $0.date) }
         let dayTotals = grouped.values.map { logs in
@@ -410,20 +489,45 @@ enum FeedStockCalculator {
     }
 
     static func autoRuleDailyTotalGrams(for pet: Pet, events: [Event], foodKind: FeedFoodKind?) -> Double {
-        events
-            .filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }
-            .filter { event in foodKind.map { $0 == event.foodKind } ?? true }
-            .reduce(0) { total, event in
-                total + max(0, FeedRuleMetadata.amountGrams(from: event))
-            }
+        dailyTotalGrams(
+            for: events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) },
+            foodKind: foodKind
+        )
     }
 
     static func planRuleDailyTotalGrams(for pet: Pet, events: [Event], foodKind: FeedFoodKind?) -> Double {
-        events
-            .filter {
+        dailyTotalGrams(
+            for: events.filter {
                 FeedRuleMetadata.isManualReminderEvent($0, pet: pet) ||
                     FeedRuleMetadata.isAutoFeederEvent($0, pet: pet)
+            },
+            foodKind: foodKind
+        )
+    }
+
+    static func activePlanRuleDailyTotalGrams(
+        for pet: Pet,
+        events: [Event],
+        foodKind: FeedFoodKind?,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Double {
+        let mode = FeedOperatingMode.resolved(pet: pet, allEvents: events, now: now, calendar: calendar)
+        let activeEvents = events.filter { event in
+            switch mode {
+            case .manual:
+                return false
+            case .manualReminder:
+                return FeedRuleMetadata.isManualReminderEvent(event, pet: pet)
+            case .autoFeeder:
+                return FeedRuleMetadata.isAutoFeederEvent(event, pet: pet)
             }
+        }
+        return dailyTotalGrams(for: activeEvents, foodKind: foodKind)
+    }
+
+    private static func dailyTotalGrams(for events: [Event], foodKind: FeedFoodKind?) -> Double {
+        events
             .filter { event in foodKind.map { $0 == event.foodKind } ?? true }
             .reduce(0) { total, event in
                 total + max(0, FeedRuleMetadata.amountGrams(from: event))
@@ -437,13 +541,24 @@ enum FeedStockCalculator {
         careLogs: [PetCareLog]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        calculationMode: FeedStockCalculationMode? = nil
     ) -> (Double, FeedStockDailyBasis) {
-        if let average = recentDailyAverageGrams(for: pet, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar), average > 0 {
+        if calculationMode == .autoFeeder {
+            let planTotal = activePlanRuleDailyTotalGrams(for: pet, events: events, foodKind: foodKind, now: now, calendar: calendar)
+            if planTotal > 0 { return (planTotal, .autoRules) }
+            if let average = recentDailyAverageGrams(for: pet, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar, calculationMode: calculationMode), average > 0 {
+                return (average, .recentAverage)
+            }
+            return (0, .unavailable)
+        }
+        if let average = recentDailyAverageGrams(for: pet, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar, calculationMode: calculationMode), average > 0 {
             return (average, .recentAverage)
         }
-        let planTotal = planRuleDailyTotalGrams(for: pet, events: events, foodKind: foodKind)
-        if planTotal > 0 { return (planTotal, .autoRules) }
+        if calculationMode == nil {
+            let planTotal = activePlanRuleDailyTotalGrams(for: pet, events: events, foodKind: foodKind, now: now, calendar: calendar)
+            if planTotal > 0 { return (planTotal, .autoRules) }
+        }
         if foodKind == nil || foodKind == .dry, pet.dailyPortionGrams > 0 { return (pet.dailyPortionGrams, .defaultPortion) }
         return (0, .unavailable)
     }
@@ -469,6 +584,7 @@ enum FeedStockCalculator {
         calendar: Calendar = .current
     ) -> FeedStockSnapshot {
         let stockRecord = activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: now)
+        let calculationMode = FeedStockRecordMetadata.calculationMode(for: stockRecord)
         let sourceRecords = foodRecords ?? pet.foodRecords
         let hasModernRecord = sourceRecords.contains { record in
             (foodRecords == nil || record.pet?.id == pet.id) &&
@@ -481,15 +597,15 @@ enum FeedStockCalculator {
            let correctionGrams = stockRecord.remainingCorrectionGrams,
            let correctionDate = stockRecord.remainingCorrectionDate
         {
-            consumed = mainFoodLogs(for: pet, foodKind: foodKind, since: correctionDate, careLogs: careLogs)
+            consumed = stockConsumptionLogs(for: pet, foodKind: foodKind, since: correctionDate, careLogs: careLogs, calculationMode: calculationMode)
                 .filter { $0.date <= now }
                 .reduce(0) { $0 + stockDeductionAmount(for: $1, pet: pet) }
             remaining = max(0, correctionGrams - consumed)
         } else {
-            consumed = mainConsumedSinceRestock(for: pet, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now)
+            consumed = mainConsumedSinceRestock(for: pet, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now, calculationMode: calculationMode)
             remaining = max(0, total - consumed)
         }
-        let estimate = estimatedDailyMainFoodGrams(for: pet, events: events, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar)
+        let estimate = estimatedDailyMainFoodGrams(for: pet, events: events, foodKind: foodKind, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar, calculationMode: calculationMode)
         let days = estimate.0 > 0 ? Int(remaining / estimate.0) : 0
         let runOut = days > 0 ? calendar.date(byAdding: .day, value: days, to: now) : nil
         return FeedStockSnapshot(
@@ -506,6 +622,27 @@ enum FeedStockCalculator {
     private static func maxDate(_ lhs: Date, _ rhs: Date?) -> Date {
         guard let rhs else { return lhs }
         return max(lhs, rhs)
+    }
+
+    private static func stockConsumptionLogs(
+        for pet: Pet,
+        foodKind: FeedFoodKind? = nil,
+        since startDate: Date? = nil,
+        careLogs: [PetCareLog]? = nil,
+        calculationMode: FeedStockCalculationMode?
+    ) -> [PetCareLog] {
+        let logs = mainFoodLogs(for: pet, foodKind: foodKind, since: startDate, careLogs: careLogs)
+        guard let calculationMode else { return logs }
+        return logs.filter { logMatchesStockCalculationMode($0, mode: calculationMode) }
+    }
+
+    private static func logMatchesStockCalculationMode(_ log: PetCareLog, mode: FeedStockCalculationMode) -> Bool {
+        switch mode {
+        case .manualOrPlan:
+            return FeedLogMetadata.source(for: log) != .autoMain
+        case .autoFeeder:
+            return FeedLogMetadata.source(for: log) == .autoMain
+        }
     }
 
     static func activeStockRecord(
@@ -571,9 +708,14 @@ struct FeedRuleState {
     }
 
     var todayManualReminders: [Reminder] {
+        allManualReminders
+            .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+    }
+
+    var allManualReminders: [Reminder] {
         manualReminderEvents
             .flatMap(\.reminders)
-            .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
             .sorted { $0.scheduledAt < $1.scheduledAt }
     }
 
@@ -585,12 +727,25 @@ struct FeedRuleState {
         todayManualReminders.filter { $0.isFailed || ($0.isPending && $0.scheduledAt < now) }
     }
 
+    var missedManualReminders: [Reminder] {
+        allManualReminders.filter { !$0.isCompleted && ($0.isPending || $0.isFailed) && $0.scheduledAt <= now }
+    }
+
+    var catchUpManualReminders: [Reminder] {
+        allManualReminders.filter { FeedPlanCatchUpPolicy.isCatchUpEligible($0, now: now) }
+    }
+
+    var expiredMissedManualReminders: [Reminder] {
+        allManualReminders.filter { FeedPlanCatchUpPolicy.isExpiredMiss($0, now: now) }
+    }
+
     var completedTodayManualReminders: [Reminder] {
         todayManualReminders.filter { $0.isCompleted }
     }
 
     var nextPendingManualReminder: Reminder? {
-        pendingTodayManualReminders.first
+        guard expiredMissedManualReminders.isEmpty else { return nil }
+        return catchUpManualReminders.first ?? pendingTodayManualReminders.first
     }
 
     var autoDailyTotalGrams: Double {
@@ -725,11 +880,15 @@ struct FeedingDashboardState {
     }
 
     var todayManualPlanMissedCount: Int {
-        today.missedTodayPlanReminders.count
+        today.expiredMissedPlanReminders.isEmpty ? today.catchUpPlanReminders.count : 0
     }
 
     var hasMissedManualPlan: Bool {
-        todayManualPlanMissedCount > 0
+        today.expiredMissedPlanReminders.isEmpty && !today.catchUpPlanReminders.isEmpty
+    }
+
+    var lastExpiredManualPlanDate: Date? {
+        today.lastExpiredPlanReminderDate
     }
 
     var todayManualPlanCompletionText: String {
@@ -850,7 +1009,7 @@ enum FeedingPlanWriter {
         calendar: Calendar = .current
     ) -> FeedingPlanWriteResult {
         CarePlanCalendarSync.suppressDefaultPlan(kind: "feed", pet: pet, context: context)
-        deletePlan(pet: pet, kind: draft.kind, allEvents: allEvents, context: context)
+        deletePlan(pet: pet, kind: draft.kind, allEvents: allEvents, context: context, save: false)
 
         let meals = FeedPlanDraft.normalizedMeals(draft.meals, count: draft.dailyCount, now: now, calendar: calendar)
         var createdEvents: [Event] = []
@@ -890,12 +1049,17 @@ enum FeedingPlanWriter {
         pet: Pet,
         kind: FeedRuleKind,
         allEvents: [Event],
-        context: ModelContext
+        context: ModelContext,
+        save: Bool = true
     ) {
+        var didDelete = false
         for event in planEvents(pet: pet, kind: kind, allEvents: allEvents) {
             deleteEvent(event, context: context)
+            didDelete = true
         }
-        context.safeSave()
+        if save && didDelete {
+            context.safeSave()
+        }
     }
 
     @MainActor
@@ -974,6 +1138,7 @@ enum FeedingPlanWriter {
         openDate: Date? = nil,
         dailyGrams: Double?,
         foodKind: FeedFoodKind = .dry,
+        calculationMode: FeedStockCalculationMode = .manualOrPlan,
         reminderEnabled: Bool,
         reminderAdvanceDays: Int,
         executorId: String?,
@@ -1015,7 +1180,10 @@ enum FeedingPlanWriter {
             record.remainingCorrectionGrams = nil
             record.remainingCorrectionDate = nil
         }
-        record.notes = "\(foodKind == .dry ? "干粮" : "湿粮")补粮 · \(Int(sanitizedTotal.rounded()))g"
+        record.notes = FeedStockRecordMetadata.notesWithCalculationMode(
+            "\(foodKind == .dry ? "干粮" : "湿粮")补粮 · \(Int(sanitizedTotal.rounded()))g",
+            mode: calculationMode
+        )
         if recordToUpdate == nil {
             context.insert(record)
         }
@@ -1320,7 +1488,7 @@ enum WaterPlanWriter {
         calendar: Calendar = .current
     ) -> [Reminder] {
         CarePlanCalendarSync.suppressDefaultPlan(kind: "drink", pet: pet, context: context)
-        deletePlan(pet: pet, allEvents: allEvents, context: context)
+        deletePlan(pet: pet, allEvents: allEvents, context: context, save: false)
 
         var createdReminders: [Reminder] = []
         for time in normalizedTimes(times, count: times.count, now: now, calendar: calendar) {
@@ -1343,11 +1511,20 @@ enum WaterPlanWriter {
     }
 
     @MainActor
-    static func deletePlan(pet: Pet, allEvents: [Event], context: ModelContext) {
+    static func deletePlan(
+        pet: Pet,
+        allEvents: [Event],
+        context: ModelContext,
+        save: Bool = true
+    ) {
+        var didDelete = false
         for event in planEvents(pet: pet, allEvents: allEvents) {
             deleteEvent(event, context: context)
+            didDelete = true
         }
-        context.safeSave()
+        if save && didDelete {
+            context.safeSave()
+        }
     }
 
     @MainActor

@@ -14,6 +14,7 @@ struct ManualFeedCommandResult {
     let targetCount: Int
     let affectsStock: Bool
     let stockReminders: [Reminder]
+    let didRecord: Bool
 }
 
 enum ManualFeedCommand {
@@ -79,7 +80,8 @@ enum ManualFeedCommand {
                 pet: pet,
                 allEvents: allEvents,
                 context: context
-            )
+            ),
+            didRecord: true
         )
     }
 
@@ -95,7 +97,7 @@ enum ManualFeedCommand {
         let event = reminder.event
         let foodKind = event?.foodKind ?? pet.mainFoodKind
         let grams = event.map { FeedRuleMetadata.amountGrams(from: $0, fallback: pet.dailyPortionGrams) } ?? pet.dailyPortionGrams
-        _ = CareEventService.completePlannedFeed(
+        let reward = CareEventService.completePlannedFeed(
             pet: pet,
             reminder: reminder,
             context: context,
@@ -111,7 +113,8 @@ enum ManualFeedCommand {
                 pet: pet,
                 allEvents: allEvents,
                 context: context
-            )
+            ),
+            didRecord: reward != nil
         )
     }
 }
@@ -180,6 +183,16 @@ enum SaveFeedPlanCommand {
                     }
                 } + result.events
 
+            if kind == .manualReminder {
+                FeedingPlanWriter.deletePlan(
+                    pet: target,
+                    kind: .autoFeeder,
+                    allEvents: latestEvents,
+                    context: context
+                )
+                latestEvents = FeedCommandFetch.latestEvents(context: context, fallback: latestEvents)
+            }
+
             SetFeedModeCommand.run(targetMode, pet: target)
 
             if kind == .manualReminder {
@@ -231,6 +244,7 @@ enum SaveFoodStockCommand {
         openDate: Date?,
         dailyGrams: Double?,
         foodKind: FeedFoodKind,
+        calculationMode: FeedStockCalculationMode = .manualOrPlan,
         reminderEnabled: Bool,
         reminderAdvanceDays: Int,
         executorId: String?,
@@ -251,6 +265,7 @@ enum SaveFoodStockCommand {
             openDate: openDate,
             dailyGrams: dailyGrams,
             foodKind: foodKind,
+            calculationMode: calculationMode,
             reminderEnabled: reminderEnabled,
             reminderAdvanceDays: reminderAdvanceDays,
             executorId: executorId,
@@ -603,6 +618,12 @@ enum SwitchFeedModeCommand {
             allEvents: allEvents,
             context: context
         )
+        FeedingPlanWriter.deletePlan(
+            pet: pet,
+            kind: .autoFeeder,
+            allEvents: allEvents,
+            context: context
+        )
     }
 
     @MainActor
@@ -619,6 +640,12 @@ enum SwitchFeedModeCommand {
         SetFeedModeCommand.run(targetMode, pet: pet)
         switch kind {
         case .manualReminder:
+            FeedingPlanWriter.deletePlan(
+                pet: pet,
+                kind: .autoFeeder,
+                allEvents: allEvents,
+                context: context
+            )
             let reminders = FeedingPlanWriter.ensureUpcomingManualReminders(
                 pet: pet,
                 allEvents: targetEvents,

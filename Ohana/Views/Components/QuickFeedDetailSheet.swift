@@ -18,6 +18,7 @@ enum ManualFeedSheetMode {
 struct QuickFeedDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
+    var onClose: (() -> Void)? = nil
     var showsRemoveQuickActionFooter: Bool = true
     var showsCloseButton: Bool = true
     var opensManualSheetOnAppear: Bool = false
@@ -34,12 +35,14 @@ struct QuickFeedDetailSheet: View {
     init(
         pet: Pet,
         onRemove: @escaping () -> Void,
+        onClose: (() -> Void)? = nil,
         showsRemoveQuickActionFooter: Bool = true,
         showsCloseButton: Bool = true,
         opensManualSheetOnAppear: Bool = false
     ) {
         self.pet = pet
         self.onRemove = onRemove
+        self.onClose = onClose
         self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
         self.showsCloseButton = showsCloseButton
         self.opensManualSheetOnAppear = opensManualSheetOnAppear
@@ -85,6 +88,7 @@ struct QuickFeedDetailSheet: View {
         QuickFeedDetailContent(
             pet: pet,
             onRemove: onRemove,
+            onClose: onClose,
             showsRemoveQuickActionFooter: showsRemoveQuickActionFooter,
             showsCloseButton: showsCloseButton,
             opensManualSheetOnAppear: opensManualSheetOnAppear,
@@ -103,6 +107,7 @@ struct QuickFeedDetailSheet: View {
 struct QuickFeedDetailContent: View {
     let pet: Pet
     let onRemove: () -> Void
+    var onClose: (() -> Void)? = nil
     var showsRemoveQuickActionFooter: Bool = true
     var showsCloseButton: Bool = true
     var opensManualSheetOnAppear: Bool = false
@@ -137,6 +142,7 @@ struct QuickFeedDetailContent: View {
     @State var feedModeTransitionTask: Task<Void, Never>?
     @State var feedModeMaintenanceTask: Task<Void, Never>?
     @State var feedRefreshTask: Task<Void, Never>?
+    @State var feedPlanSaveTask: Task<Void, Never>?
     @State var feedPlanReminderSchedulingTask: Task<Void, Never>?
     @State var feedStockReminderSchedulingTask: Task<Void, Never>?
     @State var pendingFeedRefreshRequest = QuickFeedRefreshRequest()
@@ -156,6 +162,7 @@ struct QuickFeedDetailContent: View {
     init(
         pet: Pet,
         onRemove: @escaping () -> Void,
+        onClose: (() -> Void)? = nil,
         showsRemoveQuickActionFooter: Bool = true,
         showsCloseButton: Bool = true,
         opensManualSheetOnAppear: Bool = false,
@@ -170,6 +177,7 @@ struct QuickFeedDetailContent: View {
     ) {
         self.pet = pet
         self.onRemove = onRemove
+        self.onClose = onClose
         self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
         self.showsCloseButton = showsCloseButton
         self.opensManualSheetOnAppear = opensManualSheetOnAppear
@@ -576,8 +584,10 @@ struct QuickFeedDetailContent: View {
         feedModeMaintenanceTask?.cancel()
         feedDetailDataTask?.cancel()
         feedRefreshTask?.cancel()
+        feedPlanSaveTask?.cancel()
         feedPlanReminderSchedulingTask?.cancel()
         feedStockReminderSchedulingTask?.cancel()
+        draftStore.isSavingFeedPlan = false
         feedHomeController.cancel()
     }
 
@@ -611,6 +621,9 @@ struct QuickFeedDetailContent: View {
         guard minute != lastFeedClockMinute else { return }
         lastFeedClockMinute = minute
         clockTick = date
+        if activeFeedingMode == .autoFeeder, !autoFeederEvents.isEmpty {
+            materializeAutoFeedLogs()
+        }
         scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode])
     }
 
@@ -742,7 +755,7 @@ struct QuickFeedDetailContent: View {
             Spacer()
             if showsCloseButton {
                 Button {
-                    dismiss()
+                    closeDetail()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .black))
@@ -753,6 +766,14 @@ struct QuickFeedDetailContent: View {
                 .frame(width: 44, height: 44)
                 .buttonStyle(ScaleButtonStyle())
             }
+        }
+    }
+
+    private func closeDetail() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 

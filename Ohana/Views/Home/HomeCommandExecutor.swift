@@ -83,6 +83,40 @@ struct HomeCommandExecutor {
         )
     }
 
+    func applyGroomCheckIn(
+        raw: String,
+        pet: Pet,
+        executorId: String?,
+        showSingleUseNotice: (String, String) -> Void,
+        feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
+    ) {
+        ExpandedQuickActionExecutor.applyGroomCheckIn(
+            raw: raw,
+            pet: pet,
+            executorId: executorId,
+            modelContext: modelContext,
+            showSingleUseNotice: showSingleUseNotice,
+            feedback: feedback
+        )
+    }
+
+    func applyHealthCheckIn(
+        raw: String,
+        pet: Pet,
+        executorId: String?,
+        openHealth: (Pet) -> Void,
+        feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
+    ) {
+        ExpandedQuickActionExecutor.applyHealthCheckIn(
+            raw: raw,
+            pet: pet,
+            executorId: executorId,
+            modelContext: modelContext,
+            openHealth: openHealth,
+            feedback: feedback
+        )
+    }
+
     func recordMedicationDose(medication: PetMedication, pet: Pet) {
         PetMedicationDoseLogging.recordDose(
             medication: medication,

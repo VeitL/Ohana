@@ -20,7 +20,8 @@ fi
 SAFE_BRANCH="$(printf '%s' "${BRANCH_NAME}" | tr -c '[:alnum:]_.-' '-' | sed 's/-\{1,\}/-/g; s/^-//; s/-$//')"
 WORKTREE_HASH="$(printf '%s' "${REPO_ROOT}" | shasum -a 256 | awk '{ print substr($1, 1, 12) }')"
 BUILD_ID="${SAFE_BRANCH:-detached}-${WORKTREE_HASH}"
-DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-${REPO_ROOT}/.build/DerivedData/${BUILD_ID}}"
+DEFAULT_DERIVED_DATA_ROOT="${OHANA_DERIVED_DATA_ROOT:-/tmp/OhanaCodexDerived}"
+DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-${DEFAULT_DERIVED_DATA_ROOT}/${BUILD_ID}}"
 LOCK_ROOT="${LOCK_ROOT:-${REPO_ROOT}/.build/locks}"
 LOCK_DIR="${LOCK_DIR:-${LOCK_ROOT}/build-${BUILD_ID}.lock}"
 LOCK_ACQUIRED=0

@@ -80,9 +80,19 @@ extension QuickFeedDetailContent {
                 allEvents: allEvents,
                 executorId: currentUserId
             )
+            guard result.didRecord else {
+                reloadFeedSnapshots(forceSnapshot: true)
+                triggerToast(
+                    l.tr(zh: "补录窗口已过", en: "Catch-up window closed", de: "Nachtrag nicht mehr möglich"),
+                    tint: Color.goRed
+                )
+                return
+            }
             triggerFeedCheckInFeedback(foodKind: result.foodKind, grams: result.grams, affectsStock: result.affectsStock)
             afterFoodLogSaved(
-                message: l.tr(zh: "计划餐已完成", en: "Planned meal done", de: "Planmahlzeit erledigt"),
+                message: reminder.scheduledAt < clockTick
+                    ? l.tr(zh: "计划餐已补录", en: "Planned meal caught up", de: "Planmahlzeit nachgetragen")
+                    : l.tr(zh: "计划餐已完成", en: "Planned meal done", de: "Planmahlzeit erledigt"),
                 tint: Color.goPurple,
                 stockReminders: result.stockReminders
             )

@@ -110,17 +110,3 @@ private struct HomeHeroTopRevealShape: Shape {
         return Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: visibleHeight))
     }
 }
-
-enum ExpandedQuickActionMenuTarget: Identifiable {
-    case pet(QuickActionItem, Pet)
-    case human(QuickActionItem, Human)
-
-    var id: String {
-        switch self {
-        case .pet(let item, let pet):
-            return "pet:\(pet.id.uuidString):\(item.id)"
-        case .human(let item, let human):
-            return "human:\(human.id.uuidString):\(item.id)"
-        }
-    }
-}

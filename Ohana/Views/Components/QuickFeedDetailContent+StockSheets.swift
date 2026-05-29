@@ -13,6 +13,7 @@ extension QuickFeedDetailContent {
                     tint: stockTint
                 )
                 foodKindPicker(selection: $draftStore.selectedStockFoodKind)
+                stockCalculationModePicker
                 VStack(spacing: 12) {
                     TextField(l.tr(zh: "品牌，可选", en: "Brand, optional", de: "Marke, optional"), text: $draftStore.stockBrandText)
                         .textInputAutocapitalization(.words)
@@ -88,6 +89,103 @@ extension QuickFeedDetailContent {
             draftStore.stockExpenseAmountKeypadVisible = false
         }
         .navigationTitle(l.tr(zh: "余粮", en: "Stock", de: "Vorrat"))
+    }
+
+    var stockCalculationModePicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(l.tr(zh: "粮仓计算", en: "Stock calculation", de: "Vorratsberechnung"))
+                .font(.system(size: 12, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    ForEach(FeedStockCalculationMode.allCases) { mode in
+                        stockCalculationModeButton(mode)
+                    }
+                }
+                VStack(spacing: 10) {
+                    ForEach(FeedStockCalculationMode.allCases) { mode in
+                        stockCalculationModeButton(mode)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .feedFlatBlockSurface(cornerRadius: 18)
+    }
+
+    func stockCalculationModeButton(_ mode: FeedStockCalculationMode) -> some View {
+        let isSelected = draftStore.stockCalculationMode == mode
+        let tint = stockCalculationModeTint(mode)
+        return Button {
+            guard draftStore.stockCalculationMode != mode else {
+                UISelectionFeedbackGenerator().selectionChanged()
+                return
+            }
+            withAnimation(GoMotion.feedback) {
+                draftStore.stockCalculationMode = mode
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: stockCalculationModeIcon(mode))
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(isSelected ? Color.arkInk : tint)
+                    .frame(width: 28, height: 28)
+                    .background(isSelected ? Color.arkInk.opacity(0.14) : tint.opacity(0.12), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stockCalculationModeTitle(mode))
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                    Text(stockCalculationModeSubtitle(mode))
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 54)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isSelected ? tint : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(stockCalculationModeTitle(mode))
+    }
+
+    func stockCalculationModeTitle(_ mode: FeedStockCalculationMode) -> String {
+        switch mode {
+        case .manualOrPlan:
+            return l.tr(zh: "手动/计划", en: "Manual/Plan", de: "Manuell/Plan")
+        case .autoFeeder:
+            return l.tr(zh: "自动模式", en: "Auto mode", de: "Automatik")
+        }
+    }
+
+    func stockCalculationModeSubtitle(_ mode: FeedStockCalculationMode) -> String {
+        switch mode {
+        case .manualOrPlan:
+            return l.tr(zh: "按打卡扣粮", en: "Logged meals", de: "Einträge")
+        case .autoFeeder:
+            return l.tr(zh: "按自动扣粮", en: "Auto deduct", de: "Auto-Abzug")
+        }
+    }
+
+    func stockCalculationModeIcon(_ mode: FeedStockCalculationMode) -> String {
+        switch mode {
+        case .manualOrPlan: return "hand.tap.fill"
+        case .autoFeeder: return "dot.radiowaves.left.and.right"
+        }
+    }
+
+    func stockCalculationModeTint(_ mode: FeedStockCalculationMode) -> Color {
+        switch mode {
+        case .manualOrPlan: return Color.goPurple
+        case .autoFeeder: return Color.goTeal
+        }
     }
 
     var stockSheetFooter: some View {

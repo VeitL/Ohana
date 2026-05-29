@@ -26,6 +26,7 @@ struct VerticalSolidHomeDataContainer: View {
     @Query private var walkLogs: [PetWalkLog]
     @Query private var pottyLogs: [PetPottyLog]
     @Query private var humanWeightLogs: [HumanWeightLog]
+    @Query private var expenseLogs: [PetExpenseLog]
     @Query private var familyTasks: [FamilyCollaborationTask]
     @Query private var exchangeRequests: [CoconutExchangeRequest]
 
@@ -41,6 +42,9 @@ struct VerticalSolidHomeDataContainer: View {
         _selectedPetTab = selectedPetTab
 
         let todayStart = Calendar.current.startOfDay(for: Date())
+        let monthStart = Calendar.current.date(
+            from: Calendar.current.dateComponents([.year, .month], from: Date())
+        ) ?? todayStart
         let activeStatus = FamilyCollaborationTaskStatus.active.rawValue
         let claimedStatus = FamilyCollaborationTaskStatus.claimed.rawValue
         let pendingReviewStatus = FamilyCollaborationTaskStatus.pendingReview.rawValue
@@ -62,6 +66,11 @@ struct VerticalSolidHomeDataContainer: View {
         )
         _humanWeightLogs = Query(
             filter: #Predicate<HumanWeightLog> { $0.date >= todayStart },
+            sort: \.date,
+            order: .reverse
+        )
+        _expenseLogs = Query(
+            filter: #Predicate<PetExpenseLog> { $0.date >= monthStart },
             sort: \.date,
             order: .reverse
         )
@@ -97,6 +106,7 @@ struct VerticalSolidHomeDataContainer: View {
             walkLogs: walkLogs,
             pottyLogs: pottyLogs,
             humanWeightLogs: humanWeightLogs,
+            expenseLogs: expenseLogs,
             familyTasks: familyTasks,
             exchangeRequests: exchangeRequests
         )

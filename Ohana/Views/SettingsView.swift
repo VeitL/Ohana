@@ -11,6 +11,11 @@ import UniformTypeIdentifiers
 import PhotosUI
 
 struct SettingsView: View {
+    var onClose: (() -> Void)? = nil
+    private let homePets: [Pet]?
+    private let homeHumans: [Human]?
+    private let homeElectronicPets: [OasisElectronicPet]?
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
@@ -23,12 +28,9 @@ struct SettingsView: View {
     @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
+    @AppStorage("goFocusHomeCardOrder.v1") private var homeCardOrderRaw = ""
     @State private var showingClearDataAlert = false
-    @State private var showingDeletePetSheet = false
-    @State private var petToDelete: Pet? = nil
-    @State private var deleteConfirmName = ""
-    @State private var showingResetPetData = false
-    @State private var petToReset: Pet? = nil
     // TASK 1：JSON 备份
     @State private var exportedJSONURL: URL? = nil
     @State private var isExporting = false
@@ -40,10 +42,23 @@ struct SettingsView: View {
     @State private var showingOnboardingReplay = false
     @State private var showingAccountSwitcher = false
     @State private var showingBackgroundPicker = false
+    @State private var showingPetManagement = false
     @State private var quickSwitchHuman: Human? = nil
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-    
+    @State private var areDataSectionsMounted = false
+    @State private var dataSectionsMountTask: Task<Void, Never>?
+
+    init(
+        homePets: [Pet]? = nil,
+        homeHumans: [Human]? = nil,
+        homeElectronicPets: [OasisElectronicPet]? = nil,
+        onClose: (() -> Void)? = nil
+    ) {
+        self.homePets = homePets
+        self.homeHumans = homeHumans
+        self.homeElectronicPets = homeElectronicPets
+        self.onClose = onClose
+    }
+
     private var preferredScheme: ColorScheme? {
         switch appThemePreference {
         case "light": return .light
@@ -51,7 +66,7 @@ struct SettingsView: View {
         default:      return nil
         }
     }
-    
+
     private var primaryText: Color {
         Color.ohanaPrimaryText
     }
@@ -82,16 +97,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                OhanaAppBackground()
+                OhanaStaticAppBackground()
                 
                 ScrollView {
-                    VStack(spacing: 14) {
+                    LazyVStack(spacing: 14) {
                         settingsHeader
 
-                        // 设备身份绑定
-                        if !humans.isEmpty {
-                            deviceIdentitySection
-                        }
+                        settingsDataSections
                         
                         // 国家 / 语言 / 单位 / 货币
                         settingsSection(title: l.preferences) {
@@ -291,88 +303,6 @@ struct SettingsView: View {
                             }
                         }
                         
-                        // 宠物管理
-                        if !pets.isEmpty {
-                            settingsSection(title: "宠物管理") {
-                                VStack(spacing: 0) {
-                                    ForEach(Array(pets.enumerated()), id: \.element.id) { i, pet in
-                                        if i > 0 { OhanaDashedDivider(color: dividerLine).padding(.leading, 44) }
-                                        HStack(spacing: 10) {
-                                            ZStack {
-                                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                    .fill(Color.ohanaControlFill)
-                                                    .frame(width: 32, height: 32)
-                                                Text(pet.avatarEmoji)
-                                                    .font(.system(size: 16))
-                                            }
-                                            Text(pet.name)
-                                                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                                .foregroundStyle(primaryText)
-                                            Spacer()
-                                            // 重置数据（保留基础信息）
-                                            Button {
-                                                petToReset = pet
-                                                showingResetPetData = true
-                                            } label: {
-                                                Text("重置")
-                                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                                    .foregroundStyle(Color.goYellow.opacity(0.8))
-                                                    .frame(minHeight: 32)
-                                                    .padding(.horizontal, 10)
-                                                    .background(Color.goYellow.opacity(0.1), in: Capsule())
-                                            }
-                                            .buttonStyle(ScaleButtonStyle())
-                                            // 删除宠物
-                                            Button {
-                                                petToDelete = pet
-                                                deleteConfirmName = ""
-                                                showingDeletePetSheet = true
-                                            } label: {
-                                                Text("删除")
-                                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                                    .foregroundStyle(Color.goRed.opacity(0.8))
-                                                    .frame(minHeight: 32)
-                                                    .padding(.horizontal, 10)
-                                                    .background(Color.goRed.opacity(0.1), in: Capsule())
-                                            }
-                                            .buttonStyle(ScaleButtonStyle())
-                                        }
-                                        .frame(minHeight: 44)
-                                    }
-                                }
-                            }
-                            .alert("删除 \(petToDelete?.name ?? "")", isPresented: $showingDeletePetSheet) {
-                                TextField("输入宠物名字确认", text: $deleteConfirmName)
-                                Button("取消", role: .cancel) { deleteConfirmName = "" }
-                                Button("删除", role: .destructive) {
-                                    if let p = petToDelete, ConfirmationNameMatcher.matches(deleteConfirmName, expectedName: p.name) {
-                                        let petIdStr = p.id.uuidString
-                                        if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
-                                            for event in allEvents where event.relatedEntityId == petIdStr {
-                                                modelContext.delete(event)
-                                            }
-                                        }
-                                        removeQuickAccessItems(for: p.id)
-                                        modelContext.delete(p)
-                                        modelContext.safeSave()
-                                    }
-                                    deleteConfirmName = ""
-                                }
-                            } message: {
-                                let n = petToDelete?.name ?? ""
-                                Text("请输入「\(n)」确认删除。此操作不可撤销。")
-                            }
-                            .alert("重置 \(petToReset?.name ?? "") 的数据", isPresented: $showingResetPetData) {
-                                Button("取消", role: .cancel) { petToReset = nil }
-                                Button("重置记录", role: .destructive) {
-                                    if let p = petToReset { resetPetLogs(p) }
-                                    petToReset = nil
-                                }
-                            } message: {
-                                Text("将清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。此操作不可撤销。")
-                            }
-                        }
-
                         // 开发者工具
                         settingsSection(title: "开发者工具") {
                             NavigationLink {
@@ -598,11 +528,11 @@ struct SettingsView: View {
         }
         .preferredColorScheme(preferredScheme)
         .onAppear {
-            AppCountry.ensureInitialized()
-            appCountry = AppCountry.code
-            appMeasurementSystem = AppMeasurementSystem.code
-            appCurrency = AppCurrency.code
-            appLanguage = AppLanguage.code
+            syncStoredRegionalDefaultsIfNeeded()
+            scheduleDataSectionsMount()
+        }
+        .onDisappear {
+            dataSectionsMountTask?.cancel()
         }
         .fullScreenCover(isPresented: $showingOnboardingReplay) {
             ZStack(alignment: .topTrailing) {
@@ -625,24 +555,44 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: $showingAccountSwitcher) {
-            HumanAccountSwitcherSheet()
+            HumanAccountSwitcherSheet(
+                homePets: homePets,
+                homeHumans: homeHumans,
+                homeElectronicPets: homeElectronicPets
+            )
                 .ohanaCompactSheetPresentation(detents: [.medium, .large])
         }
         .sheet(isPresented: $showingBackgroundPicker) {
             AppBackgroundPickerSheet()
                 .ohanaSheetPagePresentation() // ui-v4: allow background picker is a long visual chooser
         }
+        .sheet(isPresented: $showingPetManagement) {
+            SettingsPetManagementSheet(pets: homePets ?? [])
+                .ohanaCompactSheetPresentation(detents: [.medium, .large])
+        }
         .sheet(item: $quickSwitchHuman) { human in
             HumanQuickSwitchPasscodeSheet(human: human) {
-                currentActiveHumanId = human.id.uuidString
+                switchActiveHuman(to: human, emitSuccessFeedback: false)
                 quickSwitchHuman = nil
             }
             .ohanaCompactSheetPresentation(detents: [.height(420)])
         }
     }
+
+    @ViewBuilder
+    private var settingsDataSections: some View {
+        if areDataSectionsMounted {
+            if let homeHumans, !homeHumans.isEmpty {
+                deviceIdentitySection(homeHumans)
+            }
+            if let homePets, !homePets.isEmpty {
+                petManagementEntrySection(homePets)
+            }
+        }
+    }
     
     // MARK: - 设备身份绑定卡
-    private var deviceIdentitySection: some View {
+    private func deviceIdentitySection(_ humans: [Human]) -> some View {
         settingsSection(title: "设备身份") {
             VStack(alignment: .leading, spacing: 12) {
                 Button {
@@ -681,17 +631,10 @@ struct SettingsView: View {
                             } label: {
                                 VStack(spacing: 4) {
                                     ZStack {
-                                        Circle()
-                                            .fill(isSelected ? Color.goPrimary.opacity(0.20) : Color.ohanaControlFill)
-                                            .frame(width: 44, height: 44)
-                                            .overlay(Circle().strokeBorder(isSelected ? Color.goPrimary : Color.clear, lineWidth: 2))
-                                        if let data = human.avatarImageData, let img = UIImage(data: data) {
-                                            Image(uiImage: img)
-                                                .resizable().scaledToFill()
-                                                .frame(width: 44, height: 44).clipShape(Circle())
-                                        } else {
-                                            Text(human.avatarEmoji).font(.system(size: 20))
-                                        }
+                                        SettingsHumanIdentityAvatar(
+                                            human: human,
+                                            isSelected: isSelected
+                                        )
                                         if HumanPasscodeService.hasPasscode(human) {
                                             Image(systemName: "lock.fill")
                                                 .font(.system(size: 8, weight: .black))
@@ -727,6 +670,35 @@ struct SettingsView: View {
         }
     }
 
+    private func petManagementEntrySection(_ pets: [Pet]) -> some View {
+        settingsSection(title: "宠物管理") {
+            Button {
+                UISelectionFeedbackGenerator().selectionChanged()
+                withAnimation(GoMotion.page) {
+                    showingPetManagement = true
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    settingsIcon("pawprint.fill", color: Color.goPrimary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("管理宠物")
+                            .font(OhanaFont.body(.semibold))
+                            .foregroundStyle(primaryText)
+                        Text("\(pets.count) 位成员，可重置或删除")
+                            .font(OhanaFont.footnote())
+                            .foregroundStyle(tertiaryText)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(tertiaryText.opacity(0.6))
+                }
+                .frame(minHeight: 44)
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
     private var currentBackgroundStyle: AppBackgroundStyle {
         AppBackgroundStyle(rawValue: appBackgroundStyle) ?? .goIsland
     }
@@ -737,8 +709,73 @@ struct SettingsView: View {
         if HumanPasscodeService.hasPasscode(human) {
             quickSwitchHuman = human
         } else {
-            currentActiveHumanId = human.id.uuidString
+            switchActiveHuman(to: human)
+        }
+    }
+
+    private func switchActiveHuman(to human: Human, emitSuccessFeedback: Bool = true) {
+        let oldHumanIdRaw = currentActiveHumanId
+        guard oldHumanIdRaw != human.id.uuidString else { return }
+        currentActiveHumanId = human.id.uuidString
+        syncHomeCardStackAfterAccountSwitch(from: oldHumanIdRaw, to: human)
+        if emitSuccessFeedback {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
+    private func syncHomeCardStackAfterAccountSwitch(from oldHumanIdRaw: String, to human: Human) {
+        guard let homePets, let homeHumans else { return }
+        var updatedOrderRaw = homeCardOrderRaw
+        var didChange = false
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            didChange = HomeActiveHumanCardSync.applyAfterAccountSwitch(
+                from: oldHumanIdRaw,
+                to: human,
+                pets: homePets,
+                humans: homeHumans,
+                electronicPets: homeElectronicPets ?? [],
+                hiddenPetIDsRaw: hiddenHomePetIDsRaw,
+                homeCardOrderRaw: &updatedOrderRaw
+            )
+            if updatedOrderRaw != homeCardOrderRaw {
+                homeCardOrderRaw = updatedOrderRaw
+            }
+        }
+        guard didChange else { return }
+        modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": human.id.uuidString, "kind": "human", "reason": "activeHumanSwitch"]
+        )
+    }
+
+    private struct SettingsHumanIdentityAvatar: View {
+        let human: Human
+        let isSelected: Bool
+
+        var body: some View {
+            let avatarEntry = FocusWalletAvatarCache.entry(for: human.id, data: human.avatarImageData)
+
+            ZStack {
+                Circle()
+                    .fill(isSelected ? Color.goPrimary.opacity(0.20) : Color.ohanaControlFill)
+                    .frame(width: 44, height: 44)
+                    .overlay(Circle().strokeBorder(isSelected ? Color.goPrimary : Color.clear, lineWidth: 2))
+
+                if let image = avatarEntry.image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 44, height: 44)
+                        .clipShape(Circle())
+                } else {
+                    Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
+                        .font(.system(size: 20))
+                }
+            }
         }
     }
 
@@ -906,6 +943,33 @@ struct SettingsView: View {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
+    private func syncStoredRegionalDefaultsIfNeeded() {
+        AppCountry.ensureInitialized()
+        if appCountry != AppCountry.code {
+            appCountry = AppCountry.code
+        }
+        if appMeasurementSystem != AppMeasurementSystem.code {
+            appMeasurementSystem = AppMeasurementSystem.code
+        }
+        if appCurrency != AppCurrency.code {
+            appCurrency = AppCurrency.code
+        }
+        if appLanguage != AppLanguage.code {
+            appLanguage = AppLanguage.code
+        }
+    }
+
+    private func scheduleDataSectionsMount() {
+        guard !areDataSectionsMounted else { return }
+        dataSectionsMountTask?.cancel()
+        dataSectionsMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
+            withAnimation(GoMotion.quick) {
+                areDataSectionsMounted = true
+            }
+            dataSectionsMountTask = nil
+        }
+    }
+
     // MARK: - Header
     private var settingsHeader: some View {
         HStack(spacing: 12) {
@@ -913,7 +977,7 @@ struct SettingsView: View {
                 .font(OhanaFont.largeTitle(.black))
                 .foregroundStyle(primaryText)
             Spacer()
-            Button { dismiss() } label: {
+            Button { closeSettings() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .black))
                     .foregroundStyle(primaryText)
@@ -926,28 +990,23 @@ struct SettingsView: View {
         .padding(.top, 2)
         .padding(.bottom, 4)
     }
-    
-    // MARK: - Settings Section
-    private func settingsSection<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Color.goPrimary)
-                    .frame(width: 3, height: 14)
-                Text(title.uppercased())
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(tertiaryText)
-                    .tracking(1.2)
-            }
-            .padding(.leading, 2)
 
-            glassCard {
-                VStack(spacing: 0) {
-                    content()
-                }
-                .padding(14)
-            }
+    private func closeSettings() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
+    }
+
+    // MARK: - Settings Section
+    private func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        SettingsSectionCard(
+            title: title,
+            tertiaryText: tertiaryText,
+            reduceTransparency: reduceTransparency,
+            content: content
+        )
     }
 
     private func settingsRow(icon: String, title: String, subtitle: String, iconColor: Color = Color.goPrimary, action: @escaping () -> Void) -> some View {
@@ -1020,23 +1079,6 @@ struct SettingsView: View {
         .frame(minHeight: 44)
     }
 
-    private func removeQuickAccessItems(for petId: UUID) {
-        let key = "quickActionItems_v2"
-        guard let json = UserDefaults.standard.string(forKey: key),
-              let data = json.data(using: .utf8),
-              var items = try? JSONDecoder().decode([QuickActionItem].self, from: data) else { return }
-        items.removeAll { $0.petId == petId }
-        if let newData = try? JSONEncoder().encode(items),
-           let newJSON = String(data: newData, encoding: .utf8) {
-            UserDefaults.standard.set(newJSON, forKey: key)
-        }
-    }
-
-    private func resetPetLogs(_ pet: Pet) {
-        pet.clearAllActivityRecords(in: modelContext)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-    }
-
     private func clearAllData() {
         do {
             try modelContext.delete(model: Pet.self)
@@ -1053,10 +1095,50 @@ struct SettingsView: View {
         }
     }
     
-    // MARK: - Glass Card Helper
-    @ViewBuilder
-    private func glassCard<C: View>(@ViewBuilder content: () -> C) -> some View {
-        content()
+    private func settingsIcon(_ icon: String, color: Color) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Color.ohanaFunctionalIcon)
+            .frame(width: 32, height: 32)
+            .contentShape(Rectangle())
+    }
+}
+
+private struct SettingsSectionCard<Content: View>: View {
+    let title: String
+    let tertiaryText: Color
+    let reduceTransparency: Bool
+    private let content: Content
+
+    init(
+        title: String,
+        tertiaryText: Color,
+        reduceTransparency: Bool,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.tertiaryText = tertiaryText
+        self.reduceTransparency = reduceTransparency
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.goPrimary)
+                    .frame(width: 3, height: 14)
+                Text(title.uppercased())
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(tertiaryText)
+                    .tracking(1.2)
+            }
+            .padding(.leading, 2)
+
+            VStack(spacing: 0) {
+                content
+            }
+            .padding(14)
             .background(
                 reduceTransparency ? Color.ohanaCardSurfaceElevated : Color.ohanaCardSurface,
                 in: RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -1065,14 +1147,208 @@ struct SettingsView: View {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
+        }
+    }
+}
+
+private struct SettingsPetManagementSheet: View {
+    let pets: [Pet]
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @State private var showingDeletePetAlert = false
+    @State private var petToDelete: Pet? = nil
+    @State private var deleteConfirmName = ""
+    @State private var showingResetPetData = false
+    @State private var petToReset: Pet? = nil
+
+    private var primaryText: Color { Color.ohanaPrimaryText }
+    private var secondaryText: Color { Color.ohanaSecondaryText }
+    private var tertiaryText: Color { Color.ohanaTertiaryText }
+    private var dividerLine: Color { Color.ohanaDivider }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                OhanaStaticAppBackground()
+
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 14) {
+                        header
+                        petList
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 18)
+                    .padding(.bottom, 26)
+                }
+            }
+            .toolbar(.hidden, for: .navigationBar)
+        }
+        .alert("删除 \(petToDelete?.name ?? "")", isPresented: $showingDeletePetAlert) {
+            TextField("输入宠物名字确认", text: $deleteConfirmName)
+            Button("取消", role: .cancel) {
+                petToDelete = nil
+                deleteConfirmName = ""
+            }
+            Button("删除", role: .destructive) {
+                deleteSelectedPetIfConfirmed()
+            }
+        } message: {
+            let name = petToDelete?.name ?? ""
+            Text("请输入「\(name)」确认删除。此操作不可撤销。")
+        }
+        .alert("重置 \(petToReset?.name ?? "") 的数据", isPresented: $showingResetPetData) {
+            Button("取消", role: .cancel) { petToReset = nil }
+            Button("重置记录", role: .destructive) {
+                if let pet = petToReset {
+                    resetPetLogs(pet)
+                }
+                petToReset = nil
+            }
+        } message: {
+            Text("将清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。此操作不可撤销。")
+        }
     }
 
-    private func settingsIcon(_ icon: String, color: Color) -> some View {
-        Image(systemName: icon)
-            .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(Color.ohanaFunctionalIcon)
-            .frame(width: 32, height: 32)
-            .contentShape(Rectangle())
+    private var header: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("宠物管理")
+                    .font(OhanaFont.title2(.black))
+                    .foregroundStyle(primaryText)
+                Text("重置记录或删除成员")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(secondaryText)
+            }
+            Spacer()
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(primaryText)
+                    .frame(width: 38, height: 34)
+                    .background(Color.ohanaControlFill, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    private var petList: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.goPrimary)
+                    .frame(width: 3, height: 14)
+                Text("成员")
+                    .font(OhanaFont.caption2(.bold))
+                    .foregroundStyle(tertiaryText)
+                    .tracking(1.2)
+            }
+            .padding(.leading, 2)
+
+            VStack(spacing: 0) {
+                ForEach(Array(pets.enumerated()), id: \.element.id) { index, pet in
+                    if index > 0 {
+                        OhanaDashedDivider(color: dividerLine)
+                            .padding(.leading, 44)
+                    }
+                    petRow(pet)
+                }
+            }
+            .padding(14)
+            .background(
+                reduceTransparency ? Color.ohanaCardSurfaceElevated : Color.ohanaCardSurface,
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+            }
+        }
+    }
+
+    private func petRow(_ pet: Pet) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.ohanaControlFill)
+                    .frame(width: 32, height: 32)
+                Text(pet.avatarEmoji)
+                    .font(.system(size: 16))
+            }
+            Text(pet.name)
+                .font(OhanaFont.body(.semibold))
+                .foregroundStyle(primaryText)
+                .lineLimit(1)
+            Spacer()
+            Button {
+                UISelectionFeedbackGenerator().selectionChanged()
+                petToReset = pet
+                showingResetPetData = true
+            } label: {
+                petActionPill("重置", color: Color.goYellow)
+            }
+            .buttonStyle(ScaleButtonStyle())
+            Button {
+                UISelectionFeedbackGenerator().selectionChanged()
+                petToDelete = pet
+                deleteConfirmName = ""
+                showingDeletePetAlert = true
+            } label: {
+                petActionPill("删除", color: Color.goRed)
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+        .frame(minHeight: 48)
+    }
+
+    private func petActionPill(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(OhanaFont.caption(.bold))
+            .foregroundStyle(color.opacity(0.86))
+            .frame(minHeight: 34)
+            .padding(.horizontal, 10)
+            .background(color.opacity(0.12), in: Capsule())
+    }
+
+    private func deleteSelectedPetIfConfirmed() {
+        guard let pet = petToDelete,
+              ConfirmationNameMatcher.matches(deleteConfirmName, expectedName: pet.name) else {
+            deleteConfirmName = ""
+            return
+        }
+
+        let petId = pet.id
+        let petIdString = petId.uuidString
+        if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
+            for event in allEvents where event.relatedEntityId == petIdString {
+                modelContext.delete(event)
+            }
+        }
+        removeQuickAccessItems(for: petId)
+        modelContext.delete(pet)
+        modelContext.safeSave()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        petToDelete = nil
+        deleteConfirmName = ""
+    }
+
+    private func removeQuickAccessItems(for petId: UUID) {
+        let key = "quickActionItems_v2"
+        guard let json = UserDefaults.standard.string(forKey: key),
+              let data = json.data(using: .utf8),
+              var items = try? JSONDecoder().decode([QuickActionItem].self, from: data) else { return }
+        items.removeAll { $0.petId == petId }
+        if let newData = try? JSONEncoder().encode(items),
+           let newJSON = String(data: newData, encoding: .utf8) {
+            UserDefaults.standard.set(newJSON, forKey: key)
+        }
+    }
+
+    private func resetPetLogs(_ pet: Pet) {
+        pet.clearAllActivityRecords(in: modelContext)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }
 

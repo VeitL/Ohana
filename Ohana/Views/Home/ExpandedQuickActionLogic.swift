@@ -147,6 +147,9 @@ enum ExpandedQuickActionLogic {
             if WaterCareCycleStatusCalculator.mostUrgentWaterWarning(for: pet, now: now) != nil {
                 return true
             }
+        case "feed":
+            let dashboard = feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now)
+            return dashboard.operatingMode == .manualReminder && dashboard.hasMissedManualPlan
         default:
             break
         }
@@ -160,9 +163,7 @@ enum ExpandedQuickActionLogic {
             let todayDone = pet.careLogs.contains { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }
             return !todayDone && cal.startOfDay(for: event.startDate) <= cal.startOfDay(for: now)
         }
-        guard item.actionType == "feed" else { return false }
-        let dashboard = feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now)
-        return dashboard.operatingMode == .manualReminder && dashboard.hasMissedManualPlan
+        return false
     }
 
     static func isCompleted(
@@ -233,9 +234,6 @@ enum ExpandedQuickActionLogic {
     ) -> String? {
         switch item.actionType {
         case "feed":
-            if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
-                return overdue
-            }
             let dashboard = feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now)
             switch dashboard.operatingMode {
             case .manual:
@@ -247,6 +245,12 @@ enum ExpandedQuickActionLogic {
             case .manualReminder:
                 if dashboard.hasMissedManualPlan {
                     return "未打卡 \(dashboard.todayManualPlanMissedCount)餐"
+                }
+                if let lastExpired = dashboard.lastExpiredManualPlanDate {
+                    return "最后逾期 \(quickPlanTimeText(lastExpired, now: now, calendar: cal))"
+                }
+                if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
+                    return overdue
                 }
                 return "计划 \(dashboard.todayManualPlanCompletionText)"
             case .autoFeeder:
@@ -665,6 +669,13 @@ enum ExpandedQuickActionLogic {
             return nil
         }
         return warning.compactText
+    }
+
+    private static func quickPlanTimeText(_ date: Date, now: Date, calendar: Calendar) -> String {
+        if calendar.isDate(date, inSameDayAs: now) {
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+        return date.formatted(date: .abbreviated, time: .shortened)
     }
 
     private static func latestCareAgeText(_ type: CareType, pet: Pet, calendar cal: Calendar, todayDone: String) -> String? {

@@ -3,6 +3,7 @@ import UIKit
 
 extension QuickFeedDetailContent {
     func savePlan(_ kind: FeedRuleKind) {
+        guard !draftStore.isSavingFeedPlan else { return }
         dismissFeedKeyboard()
         let normalizedMeals = FeedPlanDraft.normalizedMeals(draftStore.planMeals, count: draftStore.planCount)
         guard normalizedMeals.allSatisfy({ $0.grams > 0 }) else {
@@ -11,35 +12,67 @@ extension QuickFeedDetailContent {
         }
         let draft = FeedPlanDraft(kind: kind, meals: normalizedMeals)
         let targets = selectedPlanTargets
-        let result = commandExecutor.savePlan(
-            pet: pet,
-            targets: targets,
-            kind: kind,
-            draft: draft,
-            allEvents: targets.count > 1 ? latestAllEvents() : allEvents
-        )
+        let targetMode: FeedOperatingMode = kind == .manualReminder ? .manualReminder : .autoFeeder
+        let savingTint = kind == .manualReminder ? Color.goPurple : Color.goTeal
 
-        if kind == .manualReminder {
-            scheduleReminders(result.planReminders)
-        }
-        scheduleStockReminders(result.stockReminders)
-        reloadFeedSnapshots()
+        draftStore.inputError = nil
+        draftStore.isSavingFeedPlan = true
+        feedPlanSaveTask?.cancel()
         collapseEmbeddedPanel()
         closeActiveFeedSheet()
         performFeedModeUpdatesWithoutAnimation {
-            feedHomeController.setModeImmediately(result.mode, pet: pet)
+            feedHomeController.setModeImmediately(targetMode, pet: pet)
         }
         UISelectionFeedbackGenerator().selectionChanged()
-        triggerToast(
-            result.targetCount > 1
-                ? (kind == .manualReminder
-                    ? l.tr(zh: "共同计划已保存 · \(result.targetCount)只", en: "Shared plan saved · \(result.targetCount)", de: "Gemeinsamer Plan · \(result.targetCount)")
-                    : l.tr(zh: "共同自动记录已保存 · \(result.targetCount)只", en: "Shared auto saved · \(result.targetCount)", de: "Gemeinsame Auto-Regel · \(result.targetCount)"))
-                : (kind == .manualReminder
-                    ? l.tr(zh: "喂食计划已保存", en: "Plan saved", de: "Plan gespeichert")
-                    : l.tr(zh: "自动记录已保存", en: "Auto feeder saved", de: "Automat gespeichert")),
-            tint: kind == .manualReminder ? Color.goPurple : Color.goTeal
-        )
+
+        feedPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: feedPlanSaveDelayMilliseconds) {
+            let sourceEvents = targets.count > 1 ? latestAllEvents() : allEvents
+            let result = FeedHomePerformance.measure("plan.save") {
+                commandExecutor.savePlan(
+                    pet: pet,
+                    targets: targets,
+                    kind: kind,
+                    draft: draft,
+                    allEvents: sourceEvents
+                )
+            }
+
+            if kind == .manualReminder {
+                scheduleReminders(result.planReminders)
+            }
+            scheduleStockReminders(result.stockReminders)
+            var refreshRequest: QuickFeedRefreshRequest = [
+                .reloadSnapshots,
+                .syncDisplayedMode,
+                .forceDisplayedMode,
+            ]
+            if kind == .manualReminder {
+                refreshRequest.insert(.ensurePlanReminders)
+            }
+            scheduleDeferredFeedRefresh(refreshRequest, milliseconds: feedPlanPostSaveRefreshDelayMilliseconds)
+            triggerToast(feedPlanSavedMessage(kind: kind, targetCount: result.targetCount), tint: savingTint)
+            draftStore.isSavingFeedPlan = false
+            feedPlanSaveTask = nil
+        }
+    }
+
+    var feedPlanSaveDelayMilliseconds: UInt64 {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 120 : 40
+    }
+
+    var feedPlanPostSaveRefreshDelayMilliseconds: UInt64 {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 110 : 40
+    }
+
+    func feedPlanSavedMessage(kind: FeedRuleKind, targetCount: Int) -> String {
+        if targetCount > 1 {
+            return kind == .manualReminder
+                ? l.tr(zh: "共同计划已保存 · \(targetCount)只", en: "Shared plan saved · \(targetCount)", de: "Gemeinsamer Plan · \(targetCount)")
+                : l.tr(zh: "共同自动记录已保存 · \(targetCount)只", en: "Shared auto saved · \(targetCount)", de: "Gemeinsame Auto-Regel · \(targetCount)")
+        }
+        return kind == .manualReminder
+            ? l.tr(zh: "喂食计划已保存", en: "Plan saved", de: "Plan gespeichert")
+            : l.tr(zh: "自动记录已保存", en: "Auto feeder saved", de: "Automat gespeichert")
     }
 
     func switchToManualFeedMode() {
@@ -219,18 +252,30 @@ extension QuickFeedDetailContent {
     }
 
     func deletePlan(_ kind: FeedRuleKind) {
-        let result = commandExecutor.deletePlan(
-            pet: pet,
-            kind: kind,
-            activeMode: activeFeedingMode,
-            allEvents: allEvents
-        )
-        scheduleStockReminders(result.stockReminders)
-        if result.shouldSwitchToManual {
-            setActiveFeedMode(.manual)
-        }
+        guard !draftStore.isSavingFeedPlan else { return }
+        draftStore.isSavingFeedPlan = true
+        feedPlanSaveTask?.cancel()
         collapseEmbeddedPanel()
         closeActiveFeedSheet()
-        triggerToast(l.tr(zh: "计划已删除", en: "Plan deleted", de: "Plan gelöscht"), tint: Color.goRed)
+        UISelectionFeedbackGenerator().selectionChanged()
+
+        feedPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: feedPlanSaveDelayMilliseconds) {
+            let result = FeedHomePerformance.measure("plan.delete") {
+                commandExecutor.deletePlan(
+                    pet: pet,
+                    kind: kind,
+                    activeMode: activeFeedingMode,
+                    allEvents: allEvents
+                )
+            }
+            scheduleStockReminders(result.stockReminders)
+            if result.shouldSwitchToManual {
+                setActiveFeedMode(.manual)
+            }
+            scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode])
+            triggerToast(l.tr(zh: "计划已删除", en: "Plan deleted", de: "Plan gelöscht"), tint: Color.goRed)
+            draftStore.isSavingFeedPlan = false
+            feedPlanSaveTask = nil
+        }
     }
 }

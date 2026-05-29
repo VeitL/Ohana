@@ -38,10 +38,14 @@ struct CoconutLogView: View {
     // N10: member filter
     @State private var selectedActorId: String? = nil
     @State private var showingWealthDashboard = false
+    @State private var isHistoryContentReady = false
+    @State private var historyContentMountTask: Task<Void, Never>?
     private let subject: CoconutLogSubject?
+    private let onClose: (() -> Void)?
 
-    init(subject: CoconutLogSubject? = nil) {
+    init(subject: CoconutLogSubject? = nil, onClose: (() -> Void)? = nil) {
         self.subject = subject
+        self.onClose = onClose
         _selectedActorId = State(initialValue: subject?.actorId)
     }
 
@@ -137,70 +141,12 @@ struct CoconutLogView: View {
                     .padding(.top, 16)
                     .padding(.bottom, 16)
 
-                // 余额大字
-                HStack(spacing: 10) {
-                    Text("🥥").font(.system(size: 44))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(visibleCoconutTotal)")
-                            .font(.system(size: 52, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.goPrimary)
-                            .contentTransition(.numericText())
-                            .animation(GoMotion.feedback, value: visibleCoconutTotal)
-                        Text(l.tr(zh: "当前椰子余额", en: "Current coconut balance", de: "Aktueller Kokosnussstand"))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
-
-                GoDashedDivider().padding(.horizontal, 20)
-
-                // N10: 成员筛选胶囊
-                if subject == nil && !knownActors.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            filterChip(id: nil, emoji: "🌴", name: l.tr(zh: "全部", en: "All", de: "Alle"))
-                            ForEach(knownActors, id: \.id) { actor in
-                                filterChip(id: actor.id, emoji: actor.emoji, name: actor.name)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                    .padding(.vertical, 12)
-                }
-
-                // 记录列表
-                if filteredLogs.isEmpty {
-                    VStack(spacing: 12) {
-                        Text("🥥").font(.system(size: 48))
-                        Text((subject == nil && selectedActorId == nil)
-                             ? l.tr(zh: "还没有椰子记录", en: "No coconut history yet", de: "Noch keine Kokosnuss-Historie")
-                             : l.tr(zh: "该成员暂无椰子记录", en: "No history for this member", de: "Keine Historie für dieses Mitglied"))
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                        Text(l.tr(zh: "完成打卡后，椰子收支会出现在这里", en: "Coconut changes appear here after check-ins", de: "Kokosnuss-Bewegungen erscheinen hier nach Check-ins"))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, 60)
+                if isHistoryContentReady {
+                    historyContent
+                        .transition(.opacity)
                 } else {
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 0) {
-                            ForEach(Array(filteredLogs.enumerated()), id: \.element.id) { idx, log in
-                                logRow(log: log)
-                                if idx < filteredLogs.count - 1 {
-                                    Divider()
-                                        .background(Color.ohanaCardStroke)
-                                        .padding(.leading, 78)
-                                }
-                            }
-                        }
-                        .padding(.bottom, 40)
-                    }
+                    historyOpeningPlaceholder
+                        .transition(.opacity)
                 }
             }
         }
@@ -209,7 +155,11 @@ struct CoconutLogView: View {
             IslandWealthDashboardView()
         }
         .onAppear {
+            scheduleHistoryContentMount()
             seedDefaultActorFilterIfNeeded()
+        }
+        .onDisappear {
+            historyContentMountTask?.cancel()
         }
         .onChange(of: activeHumanIdStr) { oldValue, newValue in
             guard subject == nil else { return }
@@ -219,6 +169,108 @@ struct CoconutLogView: View {
                     selectedActorId = next
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var historyContent: some View {
+        balanceHeader
+
+        GoDashedDivider().padding(.horizontal, 20)
+
+        if subject == nil && !knownActors.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    filterChip(id: nil, emoji: "🌴", name: l.tr(zh: "全部", en: "All", de: "Alle"))
+                    ForEach(knownActors, id: \.id) { actor in
+                        filterChip(id: actor.id, emoji: actor.emoji, name: actor.name)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+            .padding(.vertical, 12)
+        }
+
+        if filteredLogs.isEmpty {
+            emptyState
+        } else {
+            logList
+        }
+    }
+
+    private var balanceHeader: some View {
+        HStack(spacing: 10) {
+            Text("🥥").font(.system(size: 44))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(visibleCoconutTotal)")
+                    .font(.system(size: 52, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goPrimary)
+                    .contentTransition(.numericText())
+                    .animation(GoMotion.feedback, value: visibleCoconutTotal)
+                Text(l.tr(zh: "当前椰子余额", en: "Current coconut balance", de: "Aktueller Kokosnussstand"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 16)
+    }
+
+    private var historyOpeningPlaceholder: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .tint(Color.goPrimary)
+                .scaleEffect(0.88)
+            Text(l.tr(zh: "正在整理椰子历史", en: "Preparing coconut history", de: "Kokosnuss-Historie wird vorbereitet"))
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.ohanaSecondaryText)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 80)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Text("🥥").font(.system(size: 48))
+            Text((subject == nil && selectedActorId == nil)
+                 ? l.tr(zh: "还没有椰子记录", en: "No coconut history yet", de: "Noch keine Kokosnuss-Historie")
+                 : l.tr(zh: "该成员暂无椰子记录", en: "No history for this member", de: "Keine Historie für dieses Mitglied"))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+            Text(l.tr(zh: "完成打卡后，椰子收支会出现在这里", en: "Coconut changes appear here after check-ins", de: "Kokosnuss-Bewegungen erscheinen hier nach Check-ins"))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 60)
+    }
+
+    private var logList: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(spacing: 0) {
+                ForEach(Array(filteredLogs.enumerated()), id: \.element.id) { idx, log in
+                    logRow(log: log)
+                    if idx < filteredLogs.count - 1 {
+                        Divider()
+                            .background(Color.ohanaCardStroke)
+                            .padding(.leading, 78)
+                    }
+                }
+            }
+            .padding(.bottom, 40)
+        }
+    }
+
+    private func scheduleHistoryContentMount() {
+        guard !isHistoryContentReady else { return }
+        historyContentMountTask?.cancel()
+        historyContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 70) {
+            withAnimation(GoMotion.quick) {
+                isHistoryContentReady = true
+            }
+            historyContentMountTask = nil
         }
     }
 
@@ -238,7 +290,7 @@ struct CoconutLogView: View {
                         .font(.system(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
-                Text(subjectName ?? l.tr(zh: "每一笔收支", en: "Every coconut change", de: "Jede Bewegung"))
+                Text((isHistoryContentReady ? subjectName : nil) ?? l.tr(zh: "每一笔收支", en: "Every coconut change", de: "Jede Bewegung"))
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -255,7 +307,7 @@ struct CoconutLogView: View {
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.tr(zh: "打开财富分析", en: "Open wealth analysis", de: "Vermögensanalyse öffnen"))
 
-            Button { dismiss() } label: {
+            Button { closeLog() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -264,6 +316,14 @@ struct CoconutLogView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+        }
+    }
+
+    private func closeLog() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 

@@ -44,42 +44,6 @@ enum VerticalSolidHomeTab: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-enum VerticalSolidHomeQuickAction: CaseIterable, Identifiable {
-    case feed
-    case water
-    case potty
-    case play
-
-    var id: String { String(describing: self) }
-
-    var icon: String {
-        switch self {
-        case .feed: return "fork.knife"
-        case .water: return "drop.fill"
-        case .potty: return "tray.full.fill"
-        case .play: return "sparkles"
-        }
-    }
-
-    var tint: Color {
-        switch self {
-        case .feed: return Color.goOrange
-        case .water: return Color.goTeal
-        case .potty: return Color.goBlue
-        case .play: return Color.goPrimary
-        }
-    }
-
-    func title(_ l: L10n) -> String {
-        switch self {
-        case .feed: return l.tr(zh: "喂食", en: "Feed", de: "Füttern")
-        case .water: return l.tr(zh: "喂水", en: "Water", de: "Wasser")
-        case .potty: return l.tr(zh: "便便", en: "Potty", de: "Toilette")
-        case .play: return l.tr(zh: "玩耍", en: "Play", de: "Spiel")
-        }
-    }
-}
-
 struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable {
     let id: UUID
     let name: String

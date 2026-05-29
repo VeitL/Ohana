@@ -88,22 +88,41 @@ enum CarePlanCalendarSync {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> Bool {
-        guard calendar.startOfDay(for: occurrenceDate) >= calendar.startOfDay(for: now),
-              let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else {
+        guard let pet = pets.first(where: { $0.id.uuidString == event.relatedEntityId }) else {
             return true
+        }
+
+        if FeedRuleMetadata.isAutoFeederEvent(event, pet: pet) {
+            guard FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: now, calendar: calendar) == .autoFeeder else {
+                return false
+            }
+            return occurrenceMoment(for: event, occurrenceDate: occurrenceDate, calendar: calendar) > now
         }
 
         if FeedRuleMetadata.isManualReminderEvent(event, pet: pet) {
             return FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: now, calendar: calendar) == .manualReminder
         }
-        if FeedRuleMetadata.isAutoFeederEvent(event, pet: pet) {
-            return FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: now, calendar: calendar) == .autoFeeder
+
+        guard calendar.startOfDay(for: occurrenceDate) >= calendar.startOfDay(for: now) else {
+            return true
         }
+
         if WaterPlanWriter.isPlanEvent(event, pet: pet) {
             return WaterRuleState(pet: pet, allEvents: allEvents, now: now, calendar: calendar).operatingMode == .reminder
         }
 
         return true
+    }
+
+    private static func occurrenceMoment(for event: Event, occurrenceDate: Date, calendar: Calendar) -> Date {
+        guard event.recurrenceDays > 0 else { return event.startDate }
+        let time = calendar.dateComponents([.hour, .minute, .second], from: event.startDate)
+        return calendar.date(
+            bySettingHour: time.hour ?? 0,
+            minute: time.minute ?? 0,
+            second: time.second ?? 0,
+            of: calendar.startOfDay(for: occurrenceDate)
+        ) ?? occurrenceDate
     }
 
     private static func shouldSkipDefaultPlan(kind: String, petKey: String, context: ModelContext) -> Bool {

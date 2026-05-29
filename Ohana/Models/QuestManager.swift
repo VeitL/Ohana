@@ -692,17 +692,21 @@ final class QuestManager {
         emoji: String = "🥥",
         title: String,
         actorId: String? = nil,
-        actorName: String? = nil
+        actorName: String? = nil,
+        postsRewardFeedback: Bool = true
     ) {
         guard amount != 0 else { return }
         coconutCount += amount
-        appendLog(CoconutLogEntry(
-            emoji: emoji,
-            title: title,
-            amount: amount,
-            actorId: actorId,
-            actorName: actorName
-        ))
+        appendLog(
+            CoconutLogEntry(
+                emoji: emoji,
+                title: title,
+                amount: amount,
+                actorId: actorId,
+                actorName: actorName
+            ),
+            postsRewardFeedback: postsRewardFeedback
+        )
         flushToDefaults()
     }
 
@@ -862,10 +866,10 @@ final class QuestManager {
         return (finalHuman, petTotal)
     }
 
-    private func appendLog(_ entry: CoconutLogEntry) {
+    private func appendLog(_ entry: CoconutLogEntry, postsRewardFeedback: Bool = true) {
         coconutLogs.insert(entry, at: 0)
         if coconutLogs.count > 200 { coconutLogs = Array(coconutLogs.prefix(200)) }
-        if entry.amount > 0 {
+        if entry.amount > 0, postsRewardFeedback {
             NotificationCenter.default.post(
                 name: .ohanaCoconutRewardEvent,
                 object: OhanaCoconutRewardEvent(entry: entry)

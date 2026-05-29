@@ -10,8 +10,9 @@ import SwiftUI
 struct QuickLitterDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
+    var onClose: (() -> Void)? = nil
 
     var body: some View {
-        QuickPottyDetailSheet(pet: pet, onRemove: onRemove)
+        QuickPottyDetailSheet(pet: pet, onRemove: onRemove, onClose: onClose)
     }
 }

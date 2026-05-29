@@ -18,6 +18,8 @@ struct FocusHomeWalletCardContent: View {
     let walkTrackingPet: Pet?
     var usesMatchedGeometry: Bool = true
     var reduceMotion: Bool = false
+    var presentation: FocusWalletCardPresentation = .home
+    var expandedCardHeight: CGFloat = K.expandedCardH
 
     var body: some View {
         FocusHomeWalkCardFlip(
@@ -33,7 +35,9 @@ struct FocusHomeWalletCardContent: View {
                 isHeroExpanded: isHeroExpanded,
                 heroProgress: heroProgress,
                 avatarCacheRevision: avatarCacheRevision,
-                usesMatchedGeometry: usesMatchedGeometry
+                usesMatchedGeometry: usesMatchedGeometry,
+                presentation: presentation,
+                expandedCardHeight: expandedCardHeight
             )
         }
     }

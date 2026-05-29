@@ -10,6 +10,8 @@ import SwiftData
 import UIKit
 
 struct AddEventView: View {
+    var onClose: (() -> Void)? = nil
+
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
@@ -187,7 +189,7 @@ struct AddEventView: View {
             Spacer()
 
             Button {
-                dismiss()
+                closeEditor()
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .black))
@@ -764,6 +766,14 @@ struct AddEventView: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         withAnimation(GoMotion.feedback) { didSave = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            closeEditor()
+        }
+    }
+
+    private func closeEditor() {
+        if let onClose {
+            onClose()
+        } else {
             dismiss()
         }
     }

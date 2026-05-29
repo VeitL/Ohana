@@ -137,7 +137,7 @@ struct QuickFeedPlanCalendarSnapshot {
         let currentMonthDays: [FeedPlanCalendarDaySummary] = dayRange.compactMap { dayNumber in
             guard let day = calendar.date(byAdding: .day, value: dayNumber - 1, to: monthStart) else { return nil }
             let markers = (occurrencesByDay[calendar.startOfDay(for: day)] ?? []).map { occurrence in
-                FeedPlanCalendarMarker(status: markerStatus(for: occurrence, now: now, calendar: calendar))
+                FeedPlanCalendarMarker(status: markerStatus(for: occurrence, activeMode: activeMode, now: now, calendar: calendar))
             }
             return FeedPlanCalendarDaySummary(
                 date: day,
@@ -190,10 +190,15 @@ struct QuickFeedPlanCalendarSnapshot {
 
     private static func markerStatus(
         for occurrence: FeedPlanCalendarOccurrence,
+        activeMode: FeedOperatingMode,
         now: Date,
         calendar: Calendar
     ) -> FeedPlanCalendarMarker.Status {
         if occurrence.isCompleted { return .completed }
+        if activeMode == .autoFeeder {
+            if !calendar.isDateInToday(occurrence.date) { return .planned }
+            return .pending
+        }
         if occurrence.date < now { return .missed }
         if !calendar.isDateInToday(occurrence.date) { return .planned }
         return .pending

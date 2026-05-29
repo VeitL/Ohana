@@ -83,9 +83,22 @@ private let energyThresholds: [Int] = [0, 50, 150, 300, 500, 800, 1200, 1800, 26
 
 // MARK: - OasisTreeManager
 
+struct OasisDailyTreeCoconutSnapshot: Equatable {
+    let dayKey: String
+    let coconutCount: Int
+    let harvestedIndices: Set<Int>
+
+    var isFullyHarvested: Bool {
+        coconutCount > 0 && harvestedIndices.count >= coconutCount
+    }
+}
+
 @Observable
 final class OasisTreeManager {
     static let shared = OasisTreeManager()
+    private static let dailyTreeCoconutDayKey = "oasis_dailyTreeCoconutDay"
+    private static let dailyTreeCoconutCountKey = "oasis_dailyTreeCoconutCount"
+    private static let dailyTreeCoconutHarvestedKey = "oasis_dailyTreeCoconutHarvestedIndices"
 
     // 基础繁荣度（来自数据库活动）
     var islandEnergy: Int = 0
@@ -175,6 +188,33 @@ final class OasisTreeManager {
         return !Calendar.current.isDateInToday(last)
     }
 
+    func dailyTreeCoconutSnapshot(maxCoconutCount: Int, date: Date = Date()) -> OasisDailyTreeCoconutSnapshot {
+        Self.dailyTreeCoconutSnapshot(maxCoconutCount: maxCoconutCount, date: date)
+    }
+
+    @discardableResult
+    func markDailyTreeCoconutHarvested(
+        _ index: Int,
+        maxCoconutCount: Int,
+        date: Date = Date()
+    ) -> OasisDailyTreeCoconutSnapshot {
+        var snapshot = dailyTreeCoconutSnapshot(maxCoconutCount: maxCoconutCount, date: date)
+        guard index >= 0, index < snapshot.coconutCount else { return snapshot }
+        var harvested = snapshot.harvestedIndices
+        harvested.insert(index)
+        Self.storeDailyTreeCoconutState(
+            dayKey: snapshot.dayKey,
+            coconutCount: snapshot.coconutCount,
+            harvestedIndices: harvested
+        )
+        snapshot = OasisDailyTreeCoconutSnapshot(
+            dayKey: snapshot.dayKey,
+            coconutCount: snapshot.coconutCount,
+            harvestedIndices: harvested
+        )
+        return snapshot
+    }
+
     @discardableResult
     func harvestDailyPassiveIncome() -> Bool {
         guard canHarvestToday else { return false }
@@ -187,6 +227,69 @@ final class OasisTreeManager {
     private init() {
         injectedEnergy = UserDefaults.standard.integer(forKey: "oasis_injectedEnergy")
         if lastRewardedLevel == 0 { lastRewardedLevel = 1 }
+    }
+
+    private static func dailyTreeCoconutSnapshot(
+        maxCoconutCount: Int,
+        date: Date
+    ) -> OasisDailyTreeCoconutSnapshot {
+        let dayKey = localDayKey(for: date)
+        let defaults = UserDefaults.standard
+        let storedDay = defaults.string(forKey: dailyTreeCoconutDayKey)
+        var storedCount = defaults.integer(forKey: dailyTreeCoconutCountKey)
+        var harvested = Set((defaults.array(forKey: dailyTreeCoconutHarvestedKey) as? [Int]) ?? [])
+        let maxCount = max(0, maxCoconutCount)
+
+        guard maxCount > 0 else {
+            if storedDay != dayKey || storedCount != 0 || !harvested.isEmpty {
+                storeDailyTreeCoconutState(dayKey: dayKey, coconutCount: 0, harvestedIndices: [])
+            }
+            return OasisDailyTreeCoconutSnapshot(dayKey: dayKey, coconutCount: 0, harvestedIndices: [])
+        }
+
+        if storedDay != dayKey || storedCount <= 0 {
+            storedCount = Int.random(in: 1...maxCount)
+            harvested = []
+            storeDailyTreeCoconutState(
+                dayKey: dayKey,
+                coconutCount: storedCount,
+                harvestedIndices: harvested
+            )
+        } else if storedCount > maxCount || harvested.contains(where: { $0 >= storedCount }) {
+            storedCount = min(storedCount, maxCount)
+            harvested = harvested.filter { $0 >= 0 && $0 < storedCount }
+            storeDailyTreeCoconutState(
+                dayKey: dayKey,
+                coconutCount: storedCount,
+                harvestedIndices: harvested
+            )
+        }
+
+        return OasisDailyTreeCoconutSnapshot(
+            dayKey: dayKey,
+            coconutCount: storedCount,
+            harvestedIndices: harvested
+        )
+    }
+
+    private static func storeDailyTreeCoconutState(
+        dayKey: String,
+        coconutCount: Int,
+        harvestedIndices: Set<Int>
+    ) {
+        UserDefaults.standard.set(dayKey, forKey: dailyTreeCoconutDayKey)
+        UserDefaults.standard.set(coconutCount, forKey: dailyTreeCoconutCountKey)
+        UserDefaults.standard.set(harvestedIndices.sorted(), forKey: dailyTreeCoconutHarvestedKey)
+    }
+
+    private static func localDayKey(for date: Date) -> String {
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(
+            format: "%04d-%02d-%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
     }
 
     // MARK: - Load Energy from ModelContext

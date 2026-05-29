@@ -417,16 +417,17 @@ struct AddWizardCardCloseButton: View {
                 .font(.system(size: 14, weight: .black, design: .rounded))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 44, height: 44)
+                .frame(width: 36, height: 36)
                 .background(
                     Circle()
-                        .fill(Color.goPrimary)
+                        .fill(Color.goCardWhite.opacity(0.76))
                         .overlay(
                             Circle()
-                                .stroke(Color.goCardWhite.opacity(0.18), lineWidth: 1)
+                                .stroke(Color.arkInk.opacity(0.10), lineWidth: 1)
                         )
                 )
-                .contentShape(Circle())
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(L10n(appLanguage).tr(zh: "关闭", en: "Close", de: "Schließen"))

@@ -42,7 +42,6 @@ struct CrewRosterPresentationModifier: ViewModifier {
                 onHumanSaved: onHumanSaved
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea()
             .background(OhanaAppBackground())
         }
     }

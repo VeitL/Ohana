@@ -79,6 +79,41 @@ struct QuickFeedPlanCalendarSnapshotStoreTests {
         #expect(snapshot.selectedDateOccurrences.first?.isCompleted == true)
     }
 
+    @Test func autoPlanCalendarDoesNotMarkPastOccurrencesMissed() {
+        let pet = Pet(name: "Momo", species: "猫")
+        let calendar = Calendar(identifier: .gregorian)
+        let now = fixedDate()
+        let today = calendar.startOfDay(for: now)
+        let event = Event(
+            title: "Auto",
+            startDate: calendar.date(bySettingHour: 7, minute: 30, second: 0, of: today) ?? today,
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.recurrenceDays = 1
+        event.feedRuleKindRaw = FeedRuleKind.autoFeeder.rawValue
+
+        let snapshot = QuickFeedPlanCalendarSnapshot.build(
+            manualEvents: [],
+            autoEvents: [event],
+            careLogs: [],
+            activeMode: .autoFeeder,
+            month: today,
+            selectedDate: today,
+            now: now,
+            calendar: calendar
+        )
+
+        let todayMarkers = snapshot.daySummaries
+            .filter { calendar.isDate($0.date, inSameDayAs: today) }
+            .flatMap(\.markers)
+        #expect(!todayMarkers.contains { marker in
+            if case .missed = marker.status { return true }
+            return false
+        })
+    }
+
     private func fixedDate() -> Date {
         Date(timeIntervalSince1970: 1_800_000_000)
     }

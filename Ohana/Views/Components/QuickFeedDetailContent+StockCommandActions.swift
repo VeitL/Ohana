@@ -22,6 +22,7 @@ extension QuickFeedDetailContent {
             purchaseDate: draftStore.stockHasPurchaseDate ? draftStore.stockPurchaseDate : nil,
             openDate: draftStore.stockHasOpenDate ? draftStore.stockOpenDate : nil,
             foodKind: draftStore.selectedStockFoodKind,
+            calculationMode: draftStore.stockCalculationMode,
             reminderEnabled: draftStore.stockReminderEnabled,
             reminderAdvanceDays: draftStore.stockReminderAdvanceDays,
             executorId: currentUserId,

@@ -233,7 +233,7 @@ extension QuickFeedDetailContent {
                 emptyInlineState(icon: "clock.badge.questionmark", text: l.tr(zh: "今天还没有计划记录", en: "No plan check-ins today", de: "Heute keine Plan-Check-ins"), solid: true)
             } else {
                 ForEach(reminders, id: \.id) { reminder in
-                    planReminderHistoryRow(reminder, allowsCatchUp: true)
+                    planReminderHistoryRow(reminder, allowsCatchUp: canCatchUpPlanReminder(reminder))
                 }
             }
         case .autoFeeder:

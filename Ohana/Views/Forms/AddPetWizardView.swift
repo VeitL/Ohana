@@ -22,6 +22,7 @@ struct AddPetWizardView: View {
     @Query(sort: \Human.createdAt) private var existingHumans: [Human]
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
 
+    @State private var memberCreationSessionId = UUID()
     @State private var isSaving = false
     @State private var name = ""
     @State private var species = "狗"
@@ -798,7 +799,8 @@ struct AddPetWizardView: View {
             kind: .pet,
             onComplete: onComplete,
             onCancel: onCancel,
-            onPetSaved: onPetSaved
+            onPetSaved: onPetSaved,
+            recoverySessionId: memberCreationSessionId
         )
     }
 
@@ -1108,15 +1110,16 @@ struct AddPetWizardView: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: sp))
                                         .font(.system(size: 20, weight: .bold)).symbolRenderingMode(.monochrome)
-                                        .foregroundStyle(species == sp ? Color.arkInk : Color.primary.opacity(0.85))
+                                        .foregroundStyle(species == sp ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.85))
                                     Text(l.petSpeciesLabel(sp))
                                         .font(.system(size: 11, weight: species == sp ? .bold : .medium, design: .rounded))
-                                        .foregroundStyle(species == sp ? Color.arkInk : .secondary)
+                                        .foregroundStyle(species == sp ? Color.arkInk : Color.ohanaSecondaryText)
                                 }
-                                .frame(maxWidth: .infinity).padding(.vertical, 10)
+                                .frame(maxWidth: .infinity)
+                                .frame(minHeight: 44)
                                 .background(
-                                    species == sp ? Color.goPrimary : Color.primary.opacity(0.07),
-                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    species == sp ? Color.goPrimary : Color.ohanaCardSurfaceElevated,
+                                    in: Capsule()
                                 )
                                 .scaleEffect(species == sp ? 0.96 : 1.0)
                                 .animation(GoMotion.feedback, value: species)
@@ -1150,11 +1153,11 @@ struct AddPetWizardView: View {
                     HStack {
                         Image(systemName: "list.bullet").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaSecondaryText)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(l.petWizBentoBreed).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.55))
+                            Text(l.petWizBentoBreed).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
                             Text(breedCollapseSummary).font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
                         }
                         Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.primary.opacity(0.45))
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaTertiaryText)
                     }
                     .padding(.horizontal, 14).padding(.vertical, 12)
                     .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -1169,9 +1172,10 @@ struct AddPetWizardView: View {
                         ForEach([("male", l.petWizGenderBoy), ("female", l.petWizGenderGirl), ("unknown", l.petWizGenderUnknown)], id: \.0) { val, label in
                             Button { UIImpactFeedbackGenerator(style: .light).impactOccurred(); gender = val } label: {
                                 Text(label).font(.system(size: 13, weight: gender == val ? .bold : .medium, design: .rounded))
-                                    .foregroundStyle(gender == val ? Color.arkInk : Color.primary.opacity(0.85))
-                                    .frame(maxWidth: .infinity).padding(.vertical, 10)
-                                    .background(gender == val ? Color.goPrimary : Color.primary.opacity(0.07), in: Capsule())
+                                    .foregroundStyle(gender == val ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.85))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(minHeight: 44)
+                                    .background(gender == val ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
                             }.buttonStyle(ScaleButtonStyle())
                         }
                     }
@@ -1256,9 +1260,10 @@ struct AddPetWizardView: View {
                         Image(systemName: "photo.on.rectangle.angled").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome)
                         Text(l.humanWizPhotoLibrary).font(.system(size: 12, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(Color.primary.opacity(0.85))
-                    .frame(maxWidth: .infinity).padding(.vertical, 11)
-                    .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
+                    .background(Color.ohanaCardSurfaceElevated, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(isAvatarMediaTransitioning)
@@ -1268,9 +1273,10 @@ struct AddPetWizardView: View {
                         Image(systemName: "camera.fill").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome)
                         Text(l.humanWizCamera).font(.system(size: 12, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(Color.primary.opacity(0.85))
-                    .frame(maxWidth: .infinity).padding(.vertical, 11)
-                    .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 44)
+                    .background(Color.ohanaCardSurfaceElevated, in: Capsule())
                 }.buttonStyle(ScaleButtonStyle())
                     .disabled(isAvatarMediaTransitioning)
             }
@@ -1599,7 +1605,7 @@ struct AddPetWizardView: View {
                     HStack(spacing: 6) {
                         ForEach(selectedPersonalityTagIds, id: \.self) { tid in
                             Text(PetPersonalityTag.displayTitle(for: tid, isEnglish: wizardL10n.isEn))
-                                .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.85))
+                                .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
                                 .padding(.horizontal, 8).padding(.vertical, 4)
                                 .background(Color.primary.opacity(0.08), in: Capsule())
                         }
@@ -1622,7 +1628,7 @@ struct AddPetWizardView: View {
                                 .font(.system(size: 15, weight: .bold)).symbolRenderingMode(.monochrome)
                         }
                     }
-                    .foregroundStyle(confirmNameOk ? Color.arkInk : .secondary)
+                    .foregroundStyle(confirmNameOk ? Color.arkInk : Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity).padding(.vertical, 15)
                     .background(confirmNameOk ? Color.goPrimary : Color.primary.opacity(0.12), in: Capsule())
                 }
@@ -1671,19 +1677,20 @@ struct AddPetWizardView: View {
                         Circle().fill(Color(hex: hex)).frame(width: 34, height: 34)
                         if selected.wrappedValue == colorName {
                             Circle().strokeBorder(Color.primary.opacity(0.45), lineWidth: 2)
-                            Image(systemName: "checkmark").font(.system(size: 10, weight: .black)).foregroundStyle(Color.primary)
+                            Image(systemName: "checkmark").font(.system(size: 10, weight: .black)).foregroundStyle(Color.ohanaPrimaryText)
                         }
                     }
                     .frame(width: 34, height: 34)
                     Text(l.petCoatOrEyeDisplay(colorName))
                         .font(.system(size: 9, weight: selected.wrappedValue == colorName ? .bold : .medium))
-                        .foregroundStyle(selected.wrappedValue == colorName ? Color.primary : Color.primary.opacity(0.55))
+                        .foregroundStyle(selected.wrappedValue == colorName ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
                         .frame(width: 48, height: 28, alignment: .top)
                 }
                 .frame(width: 50)
             }
+            .buttonStyle(ScaleButtonStyle())
         }
         ForEach(patternItems, id: \.rawValue) { pattern in
             Button { selected.wrappedValue = pattern.displayName } label: {
@@ -1692,19 +1699,20 @@ struct AddPetWizardView: View {
                         Circle().fill(pattern.gradient).frame(width: 34, height: 34)
                         if selected.wrappedValue == pattern.displayName {
                             Circle().strokeBorder(Color.primary.opacity(0.45), lineWidth: 2)
-                            Image(systemName: "checkmark").font(.system(size: 10, weight: .black)).foregroundStyle(Color.primary)
+                            Image(systemName: "checkmark").font(.system(size: 10, weight: .black)).foregroundStyle(Color.ohanaPrimaryText)
                         }
                     }
                     .frame(width: 34, height: 34)
                     Text(l.petCoatPatternDisplay(pattern.displayName))
                         .font(.system(size: 9, weight: selected.wrappedValue == pattern.displayName ? .bold : .medium))
-                        .foregroundStyle(selected.wrappedValue == pattern.displayName ? Color.primary : Color.primary.opacity(0.55))
+                        .foregroundStyle(selected.wrappedValue == pattern.displayName ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
                         .frame(width: 48, height: 28, alignment: .top)
                 }
                 .frame(width: 50)
             }
+            .buttonStyle(ScaleButtonStyle())
         }
         Button { showCustomPicker.wrappedValue = true } label: {
             VStack(spacing: 4) {
@@ -1712,7 +1720,7 @@ struct AddPetWizardView: View {
                     if selected.wrappedValue == "自定义" {
                         Circle().fill(customColor.wrappedValue).frame(width: 34, height: 34)
                         Circle().strokeBorder(Color.primary.opacity(0.45), lineWidth: 2).frame(width: 34, height: 34)
-                        Image(systemName: "checkmark").font(.system(size: 10, weight: .black)).foregroundStyle(Color.primary)
+                        Image(systemName: "checkmark").font(.system(size: 10, weight: .black)).foregroundStyle(Color.ohanaPrimaryText)
                     } else {
                         Circle().fill(LinearGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 34, height: 34)
                     }
@@ -1720,12 +1728,13 @@ struct AddPetWizardView: View {
                 .frame(width: 34, height: 34)
                 Text(l.petCustomSwatch)
                     .font(.system(size: 9, weight: selected.wrappedValue == "自定义" ? .bold : .medium))
-                    .foregroundStyle(selected.wrappedValue == "自定义" ? Color.primary : Color.primary.opacity(0.55))
+                    .foregroundStyle(selected.wrappedValue == "自定义" ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .frame(width: 48, height: 28, alignment: .top)
             }
             .frame(width: 50)
         }
+        .buttonStyle(ScaleButtonStyle())
     }
 
     // MARK: - Color section for mesh cards
@@ -1875,6 +1884,7 @@ struct AddPetWizardView: View {
                         .font(.system(size: 15, weight: .semibold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -1937,20 +1947,21 @@ struct AddPetWizardView: View {
         HStack(spacing: 10) {
             Text(title)
                 .font(.system(size: 15, weight: isSelected ? .bold : .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
+                .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
             Spacer()
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 17, weight: .bold))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(Color.goPrimary)
+                    .foregroundStyle(Color.arkInk)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .frame(minHeight: 44)
         .background(
-            isSelected ? Color.goPrimary.opacity(0.12) : Color.primary.opacity(0.045),
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            isSelected ? Color.goPrimary : Color.ohanaCardSurfaceElevated,
+            in: Capsule()
         )
     }
 
@@ -2664,8 +2675,8 @@ struct PetImageCropView: View {
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.goCardWhite.opacity(0.75))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color.goCardWhite.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+                        .frame(minHeight: 50)
+                        .background(Color.arkCardDark, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
 
@@ -2674,8 +2685,8 @@ struct PetImageCropView: View {
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
+                        .frame(minHeight: 50)
+                        .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
             }

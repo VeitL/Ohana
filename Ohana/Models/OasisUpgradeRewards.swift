@@ -897,7 +897,13 @@ enum OasisCritterEconomyService {
         return true
     }
 
-    static func awardCurrentHumanCoconuts(_ amount: Int, emoji: String, title: String, context: ModelContext) {
+    static func awardCurrentHumanCoconuts(
+        _ amount: Int,
+        emoji: String,
+        title: String,
+        context: ModelContext,
+        postsRewardFeedback: Bool = true
+    ) {
         guard amount > 0 else { return }
         if let human = currentHuman(context: context) {
             human.coconutBalance += amount
@@ -906,10 +912,18 @@ enum OasisCritterEconomyService {
                 emoji: emoji,
                 title: title,
                 actorId: human.id.uuidString,
-                actorName: human.name
+                actorName: human.name,
+                postsRewardFeedback: postsRewardFeedback
             )
         } else {
-            QuestManager.shared.recordCoconutDelta(amount, emoji: emoji, title: title, actorId: "system", actorName: "Oasis")
+            QuestManager.shared.recordCoconutDelta(
+                amount,
+                emoji: emoji,
+                title: title,
+                actorId: "system",
+                actorName: "Oasis",
+                postsRewardFeedback: postsRewardFeedback
+            )
         }
     }
 }

@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-struct VerticalSolidHomePageLifecycle {
+struct VerticalSolidHomePageLifecycle: Equatable {
     let isPrepared: Bool
     let isVisible: Bool
     let isLive: Bool
@@ -73,16 +73,24 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
 struct VerticalSolidHomeDashboardPage: View {
     let snapshot: VerticalSolidHomeSnapshot
     let pets: [Pet]
+    let humans: [Human]
+    let allEvents: [Event]
+    let humanMedications: [HumanMedication]
+    let humanMedicationLogs: [HumanMedicationLog]
+    let expenseLogs: [PetExpenseLog]
     let avatarCacheRevision: Int
     let isLive: Bool
     let collapsedTopInset: CGFloat
+    @Binding var quickActionItemsRaw: String
     @Binding var headerContextCardId: UUID?
     @Binding var isCardExpandedOrTransitioning: Bool
     @Binding var isCardHeroAnimating: Bool
     @Binding var cardHeroProgress: CGFloat
     let arrivingCardId: UUID?
     let onOpenCard: (FocusCard) -> Void
-    let onQuickActionForCard: (VerticalSolidHomeQuickAction, FocusCard, Bool) -> Void
+    let onQuickActionForCard: (QuickActionItem, FocusCard, Bool) -> Void
+    let onQuickActionOptionForCard: (QuickActionItem, FocusCard, String) -> Void
+    let onQuickActionLimitReached: () -> Void
     let onAddPet: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -120,9 +128,23 @@ struct VerticalSolidHomeDashboardPage: View {
                         embedsQuickActionsInCard: true,
                         collapsedTopInset: collapsedTopInset,
                         quickActions: { card in
-                            VerticalSolidHomeExpandedCardActions(card: card) { action, opensQuickSheet in
-                                onQuickActionForCard(action, card, opensQuickSheet)
-                            }
+                            VerticalSolidHomeExpandedCardActions(
+                                card: card,
+                                pets: pets,
+                                humans: humans,
+                                allEvents: allEvents,
+                                humanMedications: humanMedications,
+                                humanMedicationLogs: humanMedicationLogs,
+                                expenseLogs: expenseLogs,
+                                quickActionItemsRaw: $quickActionItemsRaw,
+                                onAction: { item, usesPrimaryAction in
+                                    onQuickActionForCard(item, card, usesPrimaryAction)
+                                },
+                                onOptionAction: { item, optionId in
+                                    onQuickActionOptionForCard(item, card, optionId)
+                                },
+                                onLimitReached: onQuickActionLimitReached
+                            )
                         },
                         contextMenu: { _ in EmptyView() },
                         onSelect: expandCard,
@@ -375,25 +397,32 @@ struct VerticalSolidHomeTodayFocusChrome: View {
 
 private struct VerticalSolidHomeExpandedCardActions: View {
     let card: FocusCard
-    let onAction: (VerticalSolidHomeQuickAction, Bool) -> Void
+    let pets: [Pet]
+    let humans: [Human]
+    let allEvents: [Event]
+    let humanMedications: [HumanMedication]
+    let humanMedicationLogs: [HumanMedicationLog]
+    let expenseLogs: [PetExpenseLog]
+    @Binding var quickActionItemsRaw: String
+    let onAction: (QuickActionItem, Bool) -> Void
+    let onOptionAction: (QuickActionItem, String) -> Void
+    let onLimitReached: () -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var isEditMode = false
     @State private var jiggle = false
     @State private var draggingItemId: String?
-    @State private var visibleActionIds: [String] = []
-    @State private var didLoadActionIds = false
-    @State private var persistTask: Task<Void, Never>?
 
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VerticalHomeEmbeddedQuickActions(
             title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
-            items: activeActions.map(makeEmbeddedAction),
-            addItems: addableActions.map(makeEmbeddedAction),
+            items: visibleItems.map(makeEmbeddedAction),
+            addItems: candidateItems.map(makeAddEmbeddedAction),
             isEditMode: isEditMode,
             jiggle: jiggle,
             shouldReduceWork: reduceMotion || workloadPolicy.interactionMotionBudget(isVisible: true) != .full,
@@ -405,52 +434,143 @@ private struct VerticalSolidHomeExpandedCardActions: View {
             onAdd: addAction
         )
         .onAppear {
-            loadActionIdsIfNeeded()
+            normalizeStoredItemsIfNeeded()
         }
         .onChange(of: card.id) { _, _ in
-            loadActionIdsIfNeeded(force: true)
-        }
-        .onDisappear {
-            persistTask?.cancel()
-            persistActionIds()
+            exitEditMode(persists: false)
+            normalizeStoredItemsIfNeeded()
         }
     }
 
-    private var activeActions: [VerticalSolidHomeQuickAction] {
-        let ids = didLoadActionIds ? visibleActionIds : allActionIds
-        return ids.compactMap(action(for:))
+    private var visibleItems: [QuickActionItem] {
+        Array(currentItems.prefix(QuickActionLimit.maxItemsPerEntity))
     }
 
-    private var addableActions: [VerticalSolidHomeQuickAction] {
+    private var currentItems: [QuickActionItem] {
+        if let pet = currentPet {
+            return stableItems(
+                ExpandedQuickActionStore.petItems(
+                    raw: quickActionItemsRaw,
+                    pet: pet,
+                    localization: l,
+                    waterLabel: l.homeQAWater,
+                    managementLabel: waterManagementLabel
+                ),
+                entityID: pet.id,
+                kind: .pet
+            )
+        }
+        if let human = currentHuman {
+            return stableItems(
+                ExpandedQuickActionStore.humanItems(
+                    raw: quickActionItemsRaw,
+                    human: human,
+                    localization: l
+                ),
+                entityID: human.id,
+                kind: .human
+            )
+        }
+        return fallbackItems
+    }
+
+    private var candidateItems: [QuickActionItem] {
         guard isEditMode else { return [] }
-        let visible = Set(activeActions.map(\.id))
-        return VerticalSolidHomeQuickAction.allCases.filter { !visible.contains($0.id) }
+        if let pet = currentPet {
+            return stableItems(
+                QuickActionPickerCatalog.options(for: pet).map { option in
+                    QuickActionItem(
+                        id: "\(EntityKind.pet.rawValue)-\(pet.id.uuidString)-\(option.id)",
+                        label: option.label,
+                        icon: option.icon,
+                        colorHex: option.colorHex,
+                        petId: pet.id,
+                        actionType: option.id,
+                        entityId: pet.id,
+                        entityKind: .pet
+                    )
+                },
+                entityID: pet.id,
+                kind: .pet
+            )
+        }
+        if let human = currentHuman {
+            return stableItems(
+                ExpandedQuickActionDefaults.humanItems(for: human, localization: l),
+                entityID: human.id,
+                kind: .human
+            )
+        }
+        return []
     }
 
-    private var allActionIds: [String] {
-        VerticalSolidHomeQuickAction.allCases.map(\.id)
+    private var currentPet: Pet? {
+        guard !card.isHuman, !card.isElectronicPet else { return nil }
+        return pets.first { $0.id == card.id && !$0.hasPassedAway }
     }
 
-    private var storageKey: String {
-        "verticalSolidHome.expandedQuickActions.\(card.id.uuidString).v1"
+    private var currentHuman: Human? {
+        guard card.isHuman else { return nil }
+        return humans.first { $0.id == card.id }
     }
 
-    private func makeEmbeddedAction(_ action: VerticalSolidHomeQuickAction) -> VerticalHomeEmbeddedAction {
-        VerticalHomeEmbeddedAction(
-            id: action.id,
-            title: action.title(l),
-            icon: action.icon,
-            isCompleted: false,
-            quickAccessibilityLabel: action.title(l),
+    private var waterManagementLabel: String {
+        l.tr(zh: "管理", en: "Manage", de: "Verwalten")
+    }
+
+    private var fallbackItems: [QuickActionItem] {
+        let entityID = card.id
+        if card.isHuman {
+            return [
+                QuickActionItem(id: "human-\(entityID)-weight", label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA", actionType: "humanWeight", entityId: entityID, entityKind: .human),
+                QuickActionItem(id: "human-\(entityID)-expense", label: l.expense, icon: "creditcard.fill", colorHex: "F59E0B", actionType: "humanExpense", entityId: entityID, entityKind: .human),
+                QuickActionItem(id: "human-\(entityID)-medication", label: l.homeQAMeds, icon: "pill.fill", colorHex: "FF6B8A", actionType: "humanMedication", entityId: entityID, entityKind: .human),
+            ]
+        }
+        return [
+            QuickActionItem(id: "pet-\(entityID)-feed", label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44", petId: entityID, actionType: "feed", entityId: entityID, entityKind: .pet),
+            QuickActionItem(id: "pet-\(entityID)-water", label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA", petId: entityID, actionType: "water", entityId: entityID, entityKind: .pet),
+            QuickActionItem(id: "pet-\(entityID)-play", label: l.homeQAPlay, icon: "tennisball.fill", colorHex: "FF6B6B", petId: entityID, actionType: "play", entityId: entityID, entityKind: .pet),
+        ]
+    }
+
+    private func makeEmbeddedAction(_ item: QuickActionItem) -> VerticalHomeEmbeddedAction {
+        let state = quickActionState(for: item)
+        return VerticalHomeEmbeddedAction(
+            id: item.id,
+            title: item.label,
+            icon: item.icon,
+            statusText: state.status,
+            isCompleted: state.isCompleted,
+            showsAttention: state.showsAttention,
+            isLocked: state.isLocked,
+            primaryIcon: primaryIcon(for: item),
+            isPrimaryDisabled: isPrimaryDisabled(item: item, state: state),
+            detailIcon: detailIcon(for: item.actionType, isHuman: card.isHuman),
+            menuOptions: menuOptions(for: item),
+            quickAccessibilityLabel: item.label,
             detailAccessibilityLabel: l.tr(zh: "查看详情", en: "Details", de: "Details"),
-            detailAction: { onAction(action, false) },
-            action: { onAction(action, true) }
+            detailAction: { onAction(item, false) },
+            optionAction: { optionId in onOptionAction(item, optionId) },
+            action: { onAction(item, true) }
+        )
+    }
+
+    private func makeAddEmbeddedAction(_ item: QuickActionItem) -> VerticalHomeEmbeddedAction {
+        let isAlreadyAdded = existingActionTypes.contains(normalizedActionType(item.actionType))
+        return VerticalHomeEmbeddedAction(
+            id: item.actionType,
+            title: item.label,
+            icon: item.icon,
+            isCompleted: false,
+            isAddDisabled: isAlreadyAdded,
+            quickAccessibilityLabel: l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"),
+            detailAccessibilityLabel: l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"),
+            action: {}
         )
     }
 
     private func toggleEditMode() {
-        loadActionIdsIfNeeded()
-
         if isEditMode {
             exitEditMode()
         } else {
@@ -471,8 +591,10 @@ private struct VerticalSolidHomeExpandedCardActions: View {
         }
     }
 
-    private func exitEditMode() {
-        persistActionIds()
+    private func exitEditMode(persists: Bool = true) {
+        if persists {
+            persistItems(currentItems)
+        }
         draggingItemId = nil
         jiggle = false
         withAnimation(GoMotion.selection) {
@@ -481,92 +603,228 @@ private struct VerticalSolidHomeExpandedCardActions: View {
     }
 
     private func moveAction(fromId: String, toId: String) {
+        var items = currentItems
         guard fromId != toId,
-              let fromIndex = visibleActionIds.firstIndex(of: fromId),
-              let toIndex = visibleActionIds.firstIndex(of: toId) else {
+              let fromIndex = items.firstIndex(where: { $0.id == fromId }),
+              let toIndex = items.firstIndex(where: { $0.id == toId }) else {
             return
         }
 
         withAnimation(GoMotion.selection) {
-            let moved = visibleActionIds.remove(at: fromIndex)
-            visibleActionIds.insert(moved, at: toIndex)
+            let moved = items.remove(at: fromIndex)
+            items.insert(moved, at: toIndex)
+            persistItems(items)
         }
-        schedulePersistActionIds()
     }
 
     private func removeAction(_ id: String) {
-        guard visibleActionIds.count > 1,
-              visibleActionIds.contains(id) else {
+        var items = currentItems
+        guard items.count > 1,
+              items.contains(where: { $0.id == id }) else {
             OhanaFeedback.warning()
             return
         }
 
         withAnimation(GoMotion.feedback) {
-            visibleActionIds.removeAll { $0 == id }
+            items.removeAll { $0.id == id }
+            persistItems(items)
         }
-        schedulePersistActionIds()
     }
 
-    private func addAction(_ id: String) {
-        guard action(for: id) != nil,
-              !visibleActionIds.contains(id) else {
+    private func addAction(_ actionType: String) {
+        var items = currentItems
+        guard items.count < QuickActionLimit.maxItemsPerEntity else {
+            onLimitReached()
             return
         }
 
-        withAnimation(GoMotion.feedback) {
-            visibleActionIds.append(id)
+        let normalizedType = normalizedActionType(actionType)
+        guard !existingActionTypes.contains(normalizedType),
+              let item = candidateItems.first(where: { normalizedActionType($0.actionType) == normalizedType }) else {
+            return
         }
-        schedulePersistActionIds()
+        withAnimation(GoMotion.feedback) {
+            items.append(item)
+            persistItems(items)
+        }
     }
 
-    private func loadActionIdsIfNeeded(force: Bool = false) {
-        guard force || !didLoadActionIds else { return }
+    private var existingActionTypes: Set<String> {
+        Set(currentItems.map { normalizedActionType($0.actionType) })
+    }
 
-        let rawValue = UserDefaults.standard.string(forKey: storageKey)
-        let savedIds = rawValue.map { raw in
-            raw.isEmpty ? [] : raw.split(separator: ",").map(String.init)
-        } ?? allActionIds
-        let sanitizedIds = sanitize(savedIds)
+    private func normalizedActionType(_ actionType: String) -> String {
+        WaterQuickActionPolicy.foldedActionTypes.contains(actionType) ? "water" : actionType
+    }
 
-        var transaction = Transaction()
+    private func stableItems(_ items: [QuickActionItem], entityID: UUID, kind: EntityKind) -> [QuickActionItem] {
+        items.map { item in
+            var stableItem = item
+            stableItem.id = "\(kind.rawValue)-\(entityID.uuidString)-\(item.actionType)"
+            return stableItem
+        }
+    }
+
+    private func quickActionState(for item: QuickActionItem) -> QuickActionRenderState {
+        if let pet = currentPet {
+            let now = Date()
+            return QuickActionRenderState(
+                status: ExpandedQuickActionLogic.countText(
+                    item: item,
+                    pet: pet,
+                    allEvents: allEvents,
+                    allFeedCareLogs: pet.careLogs,
+                    now: now
+                ),
+                isCompleted: ExpandedQuickActionLogic.isCompleted(
+                    item: item,
+                    pet: pet,
+                    allEvents: allEvents,
+                    allFeedCareLogs: pet.careLogs,
+                    now: now
+                ),
+                showsAttention: ExpandedQuickActionLogic.showsAttentionDot(
+                    item: item,
+                    pet: pet,
+                    allEvents: allEvents,
+                    allFeedCareLogs: pet.careLogs,
+                    now: now
+                ),
+                isLocked: false
+            )
+        }
+
+        if let human = currentHuman {
+            let viewedBy = UUID(uuidString: activeHumanIdRaw)
+            let isLocked = ExpandedHumanQuickActionStateProvider.isPrivate(item, human: human, viewedBy: viewedBy)
+            let medicationWarning = item.actionType == "humanMedication"
+                ? CarePlanOverdueStatusCalculator.humanMedicationWarning(
+                    for: human,
+                    medications: humanMedications,
+                    logs: humanMedicationLogs
+                )
+                : nil
+            let status = medicationWarning?.compactText ?? humanStatusText(for: item, human: human, viewedBy: viewedBy)
+            return QuickActionRenderState(
+                status: status,
+                isCompleted: ExpandedHumanQuickActionStateProvider.completed(
+                    item: item,
+                    human: human,
+                    viewedBy: viewedBy,
+                    todayMedicationLogs: humanMedicationLogs
+                ),
+                showsAttention: medicationWarning != nil,
+                isLocked: isLocked
+            )
+        }
+
+        return QuickActionRenderState(status: nil, isCompleted: false, showsAttention: false, isLocked: false)
+    }
+
+    private func humanStatusText(for item: QuickActionItem, human: Human, viewedBy: UUID?) -> String? {
+        return ExpandedHumanQuickActionStateProvider.countText(
+            item: item,
+            human: human,
+            viewedBy: viewedBy,
+            activeMedications: humanMedications,
+            todayMedicationLogs: humanMedicationLogs,
+            recentExpenses: expenseLogs
+        )
+    }
+
+    private func primaryIcon(for item: QuickActionItem) -> String {
+        switch item.actionType {
+        case "walk": return "figure.walk"
+        case "medication", "humanMedication": return "plus"
+        case "weight", "expense", "moment", "humanWeight", "humanWorkout", "humanNote", "humanExpense":
+            return "square.and.pencil"
+        case "water", "waterChange", "filterClean":
+            return "drop.fill"
+        case "health":
+            return "cross.fill"
+        default:
+            return "bolt.fill"
+        }
+    }
+
+    private func isPrimaryDisabled(item: QuickActionItem, state: QuickActionRenderState) -> Bool {
+        ExpandedQuickActionLogic.singleUseLabel(for: item.actionType) != nil && state.isCompleted
+    }
+
+    private func menuOptions(for item: QuickActionItem) -> [VerticalHomeEmbeddedActionOption] {
+        switch item.actionType {
+        case "groom":
+            return [
+                VerticalHomeEmbeddedActionOption(id: "bath", icon: "drop.fill", title: l.tr(zh: "洗澡", en: "Bath", de: "Bad"), tint: Color.goBlue),
+                VerticalHomeEmbeddedActionOption(id: "teeth", icon: "mouth.fill", title: l.tr(zh: "刷牙", en: "Teeth", de: "Zähne"), tint: Color.goTeal),
+                VerticalHomeEmbeddedActionOption(id: "nails", icon: "scissors", title: l.tr(zh: "剪甲", en: "Nails", de: "Krallen"), tint: Color.goPurple),
+                VerticalHomeEmbeddedActionOption(id: "brushing", icon: "comb.fill", title: l.tr(zh: "梳毛", en: "Brush", de: "Bürsten"), tint: Color.goYellow),
+                VerticalHomeEmbeddedActionOption(id: "ears", icon: "ear.fill", title: l.tr(zh: "清耳", en: "Ears", de: "Ohren"), tint: Color.goOrange)
+            ]
+        case "potty":
+            return [
+                VerticalHomeEmbeddedActionOption(id: PottyType.perfectPoop.rawValue, icon: "seal.fill", title: l.tr(zh: "完美", en: "Good", de: "Gut"), tint: Color.goYellow),
+                VerticalHomeEmbeddedActionOption(id: PottyType.softPoop.rawValue, icon: "circle.dashed", title: l.tr(zh: "软便", en: "Soft", de: "Weich"), tint: Color.goYellow),
+                VerticalHomeEmbeddedActionOption(id: PottyType.liquidPoop.rawValue, icon: "exclamationmark.triangle.fill", title: l.tr(zh: "水便", en: "Loose", de: "Flüssig"), tint: Color.goRed),
+                VerticalHomeEmbeddedActionOption(id: PottyType.pee.rawValue, icon: "drop.fill", title: l.tr(zh: "尿尿", en: "Pee", de: "Pipi"), tint: Color.goBlue)
+            ]
+        case "health":
+            return [
+                VerticalHomeEmbeddedActionOption(id: "vaccine", icon: "syringe.fill", title: l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung"), tint: Color.goTeal),
+                VerticalHomeEmbeddedActionOption(id: "deworming", icon: "shield.lefthalf.filled", title: l.tr(zh: "驱虫", en: "Deworm", de: "Entwurmen"), tint: Color.goPurple),
+                VerticalHomeEmbeddedActionOption(id: "visit", icon: "stethoscope", title: l.tr(zh: "体检", en: "Visit", de: "Besuch"), tint: Color.goBlue)
+            ]
+        default:
+            return []
+        }
+    }
+
+    private func normalizeStoredItemsIfNeeded() {
+        guard !currentItems.isEmpty else { return }
+        let stableIds = currentItems.map(\.id).joined(separator: "|")
+        let rawIds = visibleItems.map(\.id).joined(separator: "|")
+        guard stableIds != rawIds else { return }
+        var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            visibleActionIds = sanitizedIds.isEmpty ? [allActionIds[0]] : sanitizedIds
-            didLoadActionIds = true
-            draggingItemId = nil
-            isEditMode = false
-            jiggle = false
+            persistItems(currentItems)
         }
     }
 
-    private func sanitize(_ ids: [String]) -> [String] {
-        var seen = Set<String>()
-        var result: [String] = []
-        for id in ids where allActionIds.contains(id) && !seen.contains(id) {
-            seen.insert(id)
-            result.append(id)
+    private func persistItems(_ items: [QuickActionItem]) {
+        if let pet = currentPet {
+            quickActionItemsRaw = ExpandedQuickActionStore.savingPetItems(
+                stableItems(items, entityID: pet.id, kind: .pet),
+                pet: pet,
+                currentItems: currentItems,
+                raw: quickActionItemsRaw
+            )
+            return
         }
-        return result
-    }
-
-    private func schedulePersistActionIds() {
-        guard didLoadActionIds else { return }
-        persistTask?.cancel()
-        let ids = visibleActionIds
-        let key = storageKey
-        persistTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
-            UserDefaults.standard.set(ids.joined(separator: ","), forKey: key)
+        if let human = currentHuman {
+            quickActionItemsRaw = ExpandedQuickActionStore.savingHumanItems(
+                stableItems(items, entityID: human.id, kind: .human),
+                human: human,
+                currentItems: currentItems,
+                raw: quickActionItemsRaw
+            )
         }
     }
 
-    private func persistActionIds() {
-        guard didLoadActionIds else { return }
-        persistTask?.cancel()
-        UserDefaults.standard.set(visibleActionIds.joined(separator: ","), forKey: storageKey)
+    private func detailIcon(for actionType: String, isHuman: Bool) -> String {
+        if actionType.contains("medication") { return "list.bullet.rectangle.fill" }
+        if actionType.contains("note") || actionType == "moment" { return "sparkles" }
+        if actionType.contains("expense") { return "creditcard.fill" }
+        if actionType.contains("weight") { return "chart.line.uptrend.xyaxis" }
+        if isHuman { return "rectangle.stack.fill" }
+        return "chart.line.uptrend.xyaxis"
     }
 
-    private func action(for id: String) -> VerticalSolidHomeQuickAction? {
-        VerticalSolidHomeQuickAction.allCases.first { $0.id == id }
+    private struct QuickActionRenderState {
+        let status: String?
+        let isCompleted: Bool
+        let showsAttention: Bool
+        let isLocked: Bool
     }
 }
 
@@ -630,12 +888,20 @@ struct VerticalSolidHomePlantsPage: View {
 
 struct VerticalSolidHomeBottomBar: View {
     let selectedTab: VerticalSolidHomeTab
+    @Binding var isFabExpanded: Bool
+    @Binding var itemsVisible: Bool
+    let activeCard: FocusCard?
+    let homeShortcuts: [HomeFabFunctionShortcut]
+    let expandedShortcuts: [ExpandedCardFabShortcut]
     let safeBottom: CGFloat
     let canAnimate: Bool
     let onSelect: (VerticalSolidHomeTab) -> Void
+    let onHomeShortcut: (HomeFabFunctionShortcut) -> Void
+    let onExpandedShortcut: (ExpandedCardFabShortcut, FocusCard) -> Void
     let onCenter: () -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.colorScheme) private var colorScheme
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
@@ -643,6 +909,9 @@ struct VerticalSolidHomeBottomBar: View {
         let centerBottomInset = max(safeBottom + 4, 12)
 
         ZStack(alignment: .bottom) {
+            menuRows
+                .padding(.bottom, safeBottom + 90)
+
             HStack(spacing: 0) {
                 tabButton(.home)
                 tabButton(.calendar)
@@ -652,11 +921,16 @@ struct VerticalSolidHomeBottomBar: View {
             }
             .padding(.horizontal, 14)
             .frame(height: 58)
-            .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+            .background(navBackground)
             .padding(.horizontal, 16)
             .padding(.bottom, barBottomInset)
 
             Button {
+                OhanaFeedback.medium()
+                if usesFabMenu {
+                    toggleFab()
+                    return
+                }
                 onCenter()
             } label: {
                 Image(systemName: centerIcon)
@@ -666,21 +940,116 @@ struct VerticalSolidHomeBottomBar: View {
                     .frame(width: 64, height: 64)
                     .background(Color.goPrimary, in: Circle())
                     .shadow(color: Color.goPrimary.opacity(0.26), radius: 16, x: 0, y: 8) // ui-v4: allow elevated primary nav action
+                    .rotationEffect(.degrees(isFabExpanded ? 90 : 0))
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(ScaleButtonStyle())
             .padding(.bottom, centerBottomInset)
+            .accessibilityLabel(centerButtonAccessibilityLabel)
         }
         .animation(canAnimate ? GoMotion.selection : GoMotion.reduced, value: selectedTab)
+        .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: isFabExpanded)
+        .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: itemsVisible)
     }
 
     private var centerIcon: String {
+        if isFabExpanded {
+            return "xmark"
+        }
+        if usesFabMenu {
+            return "plus"
+        }
         switch selectedTab {
         case .home: return "plus"
         case .calendar: return "calendar.badge.plus"
         case .oasis: return "bolt.fill"
         case .plants: return "leaf.fill"
         }
+    }
+
+    private var centerButtonAccessibilityLabel: String {
+        if isFabExpanded {
+            return l.tr(zh: "收起菜单", en: "Close menu", de: "Menü schließen")
+        }
+        if activeCard != nil {
+            return l.tr(zh: "显示该成员剩余功能", en: "Show remaining member features", de: "Weitere Funktionen anzeigen")
+        }
+        if selectedTab == .home {
+            return l.tr(zh: "展开首页快捷菜单", en: "Show home shortcuts", de: "Home-Schnellzugriffe anzeigen")
+        }
+        switch selectedTab {
+        case .home:
+            return l.tr(zh: "更多功能", en: "More features", de: "Weitere Funktionen")
+        case .calendar:
+            return l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen")
+        case .oasis:
+            return l.tr(zh: "注入能量", en: "Inject energy", de: "Energie einspeisen")
+        case .plants:
+            return l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen")
+        }
+    }
+
+    private var navBackground: some View {
+        Capsule()
+            .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.42 : 0.72))
+            .overlay {
+                Capsule()
+                    .strokeBorder(Color.ohanaGlassStroke.opacity(0.22), lineWidth: 1)
+            }
+            .shadow(color: Color.arkInk.opacity(0.18), radius: 20, x: 0, y: 10) // ui-v4: allow home bottom navigation lift
+    }
+
+    @ViewBuilder
+    private var menuRows: some View {
+        if isFabExpanded, let activeCard {
+            HStack(spacing: 8) {
+                ForEach(Array(expandedShortcuts.enumerated()), id: \.element.id) { index, shortcut in
+                    VerticalSolidHomeFabShortcutButton(shortcut: shortcut) {
+                        guard shortcut.isAvailable else {
+                            OhanaFeedback.light()
+                            return
+                        }
+                        onExpandedShortcut(shortcut, activeCard)
+                    }
+                    .scaleEffect(canAnimate ? (itemsVisible ? 1 : 0.88) : 1, anchor: .bottom)
+                    .opacity(itemsVisible ? 1 : 0)
+                    .offset(y: canAnimate ? (itemsVisible ? 0 : 34) : 0)
+                    .animation(
+                        canAnimate ? HeroAnim.fabSpring.delay(GoMotion.staggerDelay(index, step: 0.035, maxDelay: 0.14)) : GoMotion.reduced,
+                        value: itemsVisible
+                    )
+                    .allowsHitTesting(itemsVisible)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 2)
+        } else if isFabExpanded, selectedTab == .home {
+            HStack(spacing: 8) {
+                ForEach(Array(homeShortcuts.enumerated()), id: \.element.id) { index, shortcut in
+                    VerticalSolidHomeHomeFabShortcutButton(shortcut: shortcut) {
+                        guard shortcut.isAvailable else {
+                            OhanaFeedback.light()
+                            return
+                        }
+                        onHomeShortcut(shortcut)
+                    }
+                    .scaleEffect(canAnimate ? (itemsVisible ? 1 : 0.88) : 1, anchor: .bottom)
+                    .opacity(itemsVisible ? 1 : 0)
+                    .offset(y: canAnimate ? (itemsVisible ? 0 : 34) : 0)
+                    .animation(
+                        canAnimate ? HeroAnim.fabSpring.delay(GoMotion.staggerDelay(index, step: 0.035, maxDelay: 0.14)) : GoMotion.reduced,
+                        value: itemsVisible
+                    )
+                    .allowsHitTesting(itemsVisible)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 2)
+        }
+    }
+
+    private var usesFabMenu: Bool {
+        activeCard != nil || selectedTab == .home
     }
 
     private func tabButton(_ tab: VerticalSolidHomeTab) -> some View {
@@ -702,6 +1071,122 @@ struct VerticalSolidHomeBottomBar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func toggleFab() {
+        if isFabExpanded {
+            withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
+                itemsVisible = false
+            }
+            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
+                guard !itemsVisible else { return }
+                withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
+                    isFabExpanded = false
+                }
+            }
+        } else {
+            itemsVisible = false
+            withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
+                isFabExpanded = true
+            }
+            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 16) {
+                withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
+                    itemsVisible = true
+                }
+            }
+        }
+    }
+}
+
+private struct VerticalSolidHomeFabShortcutButton: View {
+    let shortcut: ExpandedCardFabShortcut
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                ZStack(alignment: .topTrailing) {
+                    Circle()
+                        .fill(Color.goPrimary.opacity(shortcut.isAvailable ? 1 : 0.36))
+                        .frame(width: 42, height: 42)
+                    OhanaQuickActionIcon(
+                        actionType: shortcut.id,
+                        fallbackSystemName: shortcut.icon,
+                        size: 24,
+                        color: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54)
+                    )
+                    .frame(width: 42, height: 42)
+
+                    if let badge = shortcut.badge {
+                        Text(badge)
+                            .font(.system(size: 8, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.arkInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .padding(.horizontal, 5)
+                            .frame(height: 15)
+                            .background(Color.goYellow, in: Capsule())
+                            .offset(x: 5, y: -4)
+                    }
+                }
+
+                Text(shortcut.label)
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+                    .frame(width: 44)
+            }
+            .opacity(shortcut.isAvailable ? 1 : 0.55)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(shortcut.label)
+    }
+}
+
+private struct VerticalSolidHomeHomeFabShortcutButton: View {
+    let shortcut: HomeFabFunctionShortcut
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                ZStack(alignment: .topTrailing) {
+                    Circle()
+                        .fill(Color.goPrimary.opacity(shortcut.isAvailable ? 1 : 0.36))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: shortcut.icon)
+                        .font(.system(size: 20, weight: .black))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54))
+                        .frame(width: 42, height: 42)
+
+                    if let badge = shortcut.badge {
+                        Text(badge)
+                            .font(.system(size: 8, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.arkInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .padding(.horizontal, 5)
+                            .frame(height: 15)
+                            .background(Color.goYellow, in: Capsule())
+                            .offset(x: 5, y: -4)
+                    }
+                }
+
+                Text(shortcut.label)
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+                    .frame(width: 46)
+            }
+            .opacity(shortcut.isAvailable ? 1 : 0.55)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(shortcut.label)
     }
 }
 

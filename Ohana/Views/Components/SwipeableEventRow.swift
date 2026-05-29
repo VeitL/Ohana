@@ -14,6 +14,7 @@ struct SwipeableEventRow: View {
     var petThemeColor: Color? = nil
     let onComplete: () -> Void
     let onDelete: () -> Void
+    var onOpenRelated: (() -> Bool)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
@@ -133,7 +134,10 @@ struct SwipeableEventRow: View {
             eventCard
                 .offset(x: offsetX)
                 .simultaneousGesture(rowSwipeGesture)
-                .onTapGesture { showDetail = true }
+                .onTapGesture {
+                    guard onOpenRelated?() != true else { return }
+                    showDetail = true
+                }
         }
         .sheet(isPresented: $showDetail) {
             EventDetailSheet(event: event, occurrenceDate: occurrenceDate, onDelete: onDelete, onComplete: onComplete)

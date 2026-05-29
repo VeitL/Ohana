@@ -142,6 +142,113 @@ struct MemberCreationDraft: Equatable {
     }
 }
 
+private struct MemberCreationMediaRecoverySnapshot: Codable {
+    var sessionId: String
+    var capturedAt: Date
+    var name: String
+    var themeColorHex: String
+    var species: String
+    var breed: String
+    var customBreed: String
+    var isCustomBreed: Bool
+    var petGender: String
+    var isNeutered: Bool
+    var coatColor: String
+    var eyeColor: String
+    var hasBirthday: Bool
+    var birthday: Date
+    var hasHomeDate: Bool
+    var homeDate: Date
+    var personalityTagIds: [String]
+    var humanGender: String
+    var bloodType: String
+    var mbti: String
+    var role: String
+    var nationality: String
+    var residenceCountry: String
+    var residenceCity: String
+    var notes: String
+    var heightText: String
+    var weightText: String
+    var privateWeight: Bool
+    var privateWorkout: Bool
+    var privateMedication: Bool
+    var privateWishlist: Bool
+    var privateExpense: Bool
+
+    init(draft: MemberCreationDraft, sessionId: String, capturedAt: Date = Date()) {
+        self.sessionId = sessionId
+        self.capturedAt = capturedAt
+        name = draft.name
+        themeColorHex = draft.themeColorHex
+        species = draft.species
+        breed = draft.breed
+        customBreed = draft.customBreed
+        isCustomBreed = draft.isCustomBreed
+        petGender = draft.petGender
+        isNeutered = draft.isNeutered
+        coatColor = draft.coatColor
+        eyeColor = draft.eyeColor
+        hasBirthday = draft.hasBirthday
+        birthday = draft.birthday
+        hasHomeDate = draft.hasHomeDate
+        homeDate = draft.homeDate
+        personalityTagIds = draft.personalityTagIds
+        humanGender = draft.humanGender
+        bloodType = draft.bloodType
+        mbti = draft.mbti
+        role = draft.role
+        nationality = draft.nationality
+        residenceCountry = draft.residenceCountry
+        residenceCity = draft.residenceCity
+        notes = draft.notes
+        heightText = draft.heightText
+        weightText = draft.weightText
+        privateWeight = draft.privateWeight
+        privateWorkout = draft.privateWorkout
+        privateMedication = draft.privateMedication
+        privateWishlist = draft.privateWishlist
+        privateExpense = draft.privateExpense
+    }
+
+    func apply(to draft: inout MemberCreationDraft) {
+        draft.name = name
+        draft.themeColorHex = themeColorHex
+        draft.species = species
+        draft.breed = breed
+        draft.customBreed = customBreed
+        draft.isCustomBreed = isCustomBreed
+        draft.petGender = petGender
+        draft.isNeutered = isNeutered
+        draft.coatColor = coatColor
+        draft.eyeColor = eyeColor
+        draft.hasBirthday = hasBirthday
+        draft.birthday = birthday
+        draft.hasHomeDate = hasHomeDate
+        draft.homeDate = homeDate
+        draft.personalityTagIds = personalityTagIds
+        draft.humanGender = humanGender
+        draft.bloodType = bloodType
+        draft.mbti = mbti
+        draft.role = role
+        draft.nationality = nationality
+        draft.residenceCountry = residenceCountry
+        draft.residenceCity = residenceCity
+        draft.notes = notes
+        draft.heightText = heightText
+        draft.weightText = weightText
+        draft.privateWeight = privateWeight
+        draft.privateWorkout = privateWorkout
+        draft.privateMedication = privateMedication
+        draft.privateWishlist = privateWishlist
+        draft.privateExpense = privateExpense
+    }
+
+    var isFresh: Bool {
+        Date().timeIntervalSince(capturedAt) < 30 * 60
+    }
+}
+
 struct MemberCardRenderSnapshot {
     let kind: MemberCreationKind
     let title: String
@@ -156,11 +263,8 @@ struct MemberCardRenderSnapshot {
 
 enum MemberCreationStep: String, Identifiable, Hashable {
     case basicInfo
-    case avatar
-    case humanRegion
-    case humanWellbeing
     case petProfile
-    case petVibe
+    case avatar
     case theme
 
     var id: String { rawValue }
@@ -168,9 +272,9 @@ enum MemberCreationStep: String, Identifiable, Hashable {
     static func steps(for kind: MemberCreationKind) -> [MemberCreationStep] {
         switch kind {
         case .human:
-            return [.basicInfo, .avatar, .humanRegion, .humanWellbeing, .theme]
+            return [.basicInfo, .avatar, .theme]
         case .pet:
-            return [.basicInfo, .avatar, .petProfile, .petVibe, .theme]
+            return [.basicInfo, .petProfile, .avatar, .theme]
         }
     }
 
@@ -178,16 +282,10 @@ enum MemberCreationStep: String, Identifiable, Hashable {
         switch self {
         case .basicInfo:
             return l.tr(zh: "基础信息", en: "Basic info", de: "Basisdaten")
+        case .petProfile:
+            return l.tr(zh: "品种与性格", en: "Breed & vibe", de: "Rasse & Charakter")
         case .avatar:
             return l.tr(zh: "头像", en: "Avatar", de: "Avatar")
-        case .humanRegion:
-            return l.tr(zh: "地区", en: "Region", de: "Region")
-        case .humanWellbeing:
-            return l.tr(zh: "个性与身体", en: "Personality & body", de: "Persönlichkeit & Körper")
-        case .petProfile:
-            return l.tr(zh: "物种与外观", en: "Species & look", de: "Art & Aussehen")
-        case .petVibe:
-            return l.tr(zh: "性格", en: "Vibe", de: "Charakter")
         case .theme:
             return l.tr(zh: "主题色", en: "Theme color", de: "Themenfarbe")
         }
@@ -898,6 +996,7 @@ struct MemberCardCreationView: View {
     var onCancel: (() -> Void)?
     var onPetSaved: ((Pet) -> Void)?
     var onHumanSaved: ((Human) -> Void)?
+    private let recoverySessionId: UUID
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -905,6 +1004,12 @@ struct MemberCardCreationView: View {
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(Avatar2DAccess.extraPassInventoryKey) private var avatarPassCount = 0
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
+    @SceneStorage("memberCreation.pet.mediaReturnStep") private var petMediaReturnStepRaw = ""
+    @SceneStorage("memberCreation.human.mediaReturnStep") private var humanMediaReturnStepRaw = ""
+    @SceneStorage("memberCreation.pet.mediaReturnSession") private var petMediaReturnSessionRaw = ""
+    @SceneStorage("memberCreation.human.mediaReturnSession") private var humanMediaReturnSessionRaw = ""
+    @SceneStorage("memberCreation.pet.mediaRecovery") private var petMediaRecoveryRaw = ""
+    @SceneStorage("memberCreation.human.mediaRecovery") private var humanMediaRecoveryRaw = ""
     @Query(sort: \Pet.createdAt) private var existingPets: [Pet]
     @Query(sort: \Human.createdAt) private var existingHumans: [Human]
 
@@ -923,6 +1028,11 @@ struct MemberCardCreationView: View {
     @State private var didShowSuccess = false
     @State private var isPreparingCamera = false
     @State private var currentStep: MemberCreationStep = .basicInfo
+    @State private var lastCustomAvatarImageData: Data?
+    @State private var avatarMediaReturnStep: MemberCreationStep?
+    @State private var isAvatarMediaTransitioning = false
+    @State private var cropPresentationTask: Task<Void, Never>?
+    @State private var photoLoadTask: Task<Void, Never>?
     @State private var mbtiEnergy = ""
     @State private var mbtiInformation = ""
     @State private var mbtiDecision = ""
@@ -930,6 +1040,7 @@ struct MemberCardCreationView: View {
     @State private var usesCustomResidenceCity = false
     @State private var isJoinHandoffRunning = false
     @State private var joinHandoffProgress: CGFloat = 0
+    @State private var joinHandoffSnapshot: MemberCardRenderSnapshot?
     @State private var joinSaveTask: Task<Void, Never>?
 
     init(
@@ -937,13 +1048,15 @@ struct MemberCardCreationView: View {
         onComplete: @escaping () -> Void,
         onCancel: (() -> Void)? = nil,
         onPetSaved: ((Pet) -> Void)? = nil,
-        onHumanSaved: ((Human) -> Void)? = nil
+        onHumanSaved: ((Human) -> Void)? = nil,
+        recoverySessionId: UUID = UUID()
     ) {
         self.kind = kind
         self.onComplete = onComplete
         self.onCancel = onCancel
         self.onPetSaved = onPetSaved
         self.onHumanSaved = onHumanSaved
+        self.recoverySessionId = recoverySessionId
         _draft = State(initialValue: MemberCreationDraft(kind: kind))
     }
 
@@ -1048,16 +1161,8 @@ struct MemberCardCreationView: View {
             VStack(spacing: 12) {
                 topChrome
                     .opacity(isJoinHandoffRunning ? 0.28 : 1)
-                MemberPortraitDraftCardSurface(snapshot: snapshot) {
-                    cardControls
-                }
-                .frame(maxWidth: 390)
-                .frame(maxHeight: .infinity)
-                .modifier(MemberCreationJoinHandoffModifier(
-                    progress: joinHandoffProgress,
-                    reduceMotion: reduceMotion
-                ))
-                .allowsHitTesting(!isJoinHandoffRunning)
+                    .allowsHitTesting(!isJoinHandoffRunning)
+                creationCardArea
                 bottomCTA
                     .opacity(isJoinHandoffRunning ? 0 : 1)
                     .allowsHitTesting(!isJoinHandoffRunning)
@@ -1079,6 +1184,8 @@ struct MemberCardCreationView: View {
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear {
             MemberCreationPerformance.event("Member Creation Appeared")
+            restoreMediaRecoverySnapshotIfNeeded()
+            restoreMediaReturnStepFromSceneStorage()
             configureInitialAvatarIfNeeded()
             scheduleAvatarDecode()
             OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
@@ -1089,6 +1196,15 @@ struct MemberCardCreationView: View {
             MemberCreationPerformance.event("Member Creation Disappeared")
             decodeTask?.cancel()
             joinSaveTask?.cancel()
+            if !isAvatarMediaTransitioning {
+                cropPresentationTask?.cancel()
+                cropPresentationTask = nil
+                photoLoadTask?.cancel()
+                photoLoadTask = nil
+                if !isSaving, !isJoinHandoffRunning {
+                    clearMediaReturnStepStorage()
+                }
+            }
         }
         .onChange(of: draft.name) { _, _ in
             MemberCreationPerformance.event("Draft Name Changed")
@@ -1108,6 +1224,7 @@ struct MemberCardCreationView: View {
                 set: { isPresented in
                     if !isPresented, media.isPhotoPickerPresented {
                         media.route = nil
+                        handlePhotoLibraryDismissed()
                     }
                 }
             ),
@@ -1120,24 +1237,26 @@ struct MemberCardCreationView: View {
                 set: { isPresented in
                     if !isPresented, media.isCameraPresented {
                         media.route = nil
+                        handleCameraDismissed()
                     }
                 }
             )
         ) {
             MemberCameraCaptureView(maxPixel: 2000) { image in
                 media.route = nil
-                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        let normalizeID = MemberCreationPerformance.begin("Camera Image Normalize")
-                        let prepared = MemberAvatarImageProcessor.normalized(image)
-                        MemberCreationPerformance.end("Camera Image Normalize", normalizeID)
-                        DispatchQueue.main.async {
-                            media.showCrop(for: prepared)
-                        }
+                Task {
+                    let normalizeID = MemberCreationPerformance.begin("Camera Image Normalize")
+                    let prepared = await Task.detached(priority: .userInitiated) {
+                        MemberAvatarImageProcessor.normalized(image)
+                    }.value
+                    MemberCreationPerformance.end("Camera Image Normalize", normalizeID)
+                    await MainActor.run {
+                        presentAvatarCropAfterMediaDismissal(prepared, delayMilliseconds: 320)
                     }
                 }
             } onCancel: {
                 media.route = nil
+                finishAvatarMediaPresentation()
             }
         }
         .sheet(
@@ -1155,16 +1274,22 @@ struct MemberCardCreationView: View {
                     draft.avatarSource = .customImage
                     draft.selectedAvatarCandidateId = nil
                     draft.usesPurchasedOrInventoryPass = false
+                    lastCustomAvatarImageData = data
                     draft.avatarImageData = data
                 }
                 media.route = nil
+                finishAvatarMediaPresentation()
             } onCancel: {
                 media.route = nil
+                finishAvatarMediaPresentation()
             }
             .presentationDetents([.large]) // ui-v4: allow portrait crop editor needs full-height working area
         }
         .alert(l.tr(zh: "无法打开相机", en: "Camera unavailable", de: "Kamera nicht verfügbar"), isPresented: permissionAlertBinding) {
-            Button(l.done, role: .cancel) { media.route = nil }
+            Button(l.done, role: .cancel) {
+                media.route = nil
+                finishAvatarMediaPresentation()
+            }
         } message: {
             Text(l.tr(zh: "请在系统设置中允许 Ohana 访问相机，或在支持相机的设备上使用。", en: "Allow camera access in Settings, or use a device with a camera.", de: "Erlaube den Kamerazugriff in den Einstellungen oder nutze ein Gerät mit Kamera."))
         }
@@ -1183,6 +1308,27 @@ struct MemberCardCreationView: View {
         }
     }
 
+    private var creationCardArea: some View {
+        ZStack {
+            MemberPortraitDraftCardSurface(snapshot: snapshot) {
+                cardControls
+            }
+            .opacity(isJoinHandoffRunning ? 0 : 1)
+            .allowsHitTesting(!isJoinHandoffRunning)
+
+            if let joinHandoffSnapshot, isJoinHandoffRunning {
+                MemberCreationJoinHandoffCard(snapshot: joinHandoffSnapshot)
+                    .modifier(MemberCreationJoinHandoffModifier(
+                        progress: joinHandoffProgress,
+                        reduceMotion: reduceMotion
+                    ))
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(maxWidth: 390)
+        .frame(maxHeight: .infinity)
+    }
+
     private var permissionAlertBinding: Binding<Bool> {
         Binding(
             get: {
@@ -1192,6 +1338,7 @@ struct MemberCardCreationView: View {
             set: { isShowing in
                 if !isShowing, case .permissionAlert = media.route {
                     media.route = nil
+                    finishAvatarMediaPresentation()
                 }
             }
         )
@@ -1200,6 +1347,7 @@ struct MemberCardCreationView: View {
     private var topChrome: some View {
         HStack(spacing: 10) {
             Button {
+                clearMediaReturnStepStorage()
                 onCancel?()
             } label: {
                 Image(systemName: "xmark")
@@ -1216,7 +1364,7 @@ struct MemberCardCreationView: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
-                Text(l.tr(zh: "在卡片上完成资料", en: "Build the profile on the card", de: "Profil direkt auf der Karte erstellen"))
+                Text(l.tr(zh: "先加入，更多资料稍后编辑", en: "Add now, edit details later", de: "Jetzt hinzufügen, Details später bearbeiten"))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
@@ -1253,16 +1401,10 @@ struct MemberCardCreationView: View {
             } else {
                 humanBasicInfoStep
             }
-        case .avatar:
-            avatarSection
-        case .humanRegion:
-            humanRegionSection
-        case .humanWellbeing:
-            humanWellbeingSection
         case .petProfile:
             petProfileSection
-        case .petVibe:
-            petVibeSection
+        case .avatar:
+            avatarSection
         case .theme:
             themeSection
         }
@@ -1334,7 +1476,7 @@ struct MemberCardCreationView: View {
 
     private var humanBasicInfoStep: some View {
         MemberCreationSection(
-            title: l.tr(zh: "基础与日期", en: "Basics & date", de: "Basis & Datum"),
+            title: l.tr(zh: "必要信息", en: "Essentials", de: "Wichtiges"),
             icon: "person.crop.rectangle.fill",
             foreground: cardForeground
         ) {
@@ -1360,7 +1502,7 @@ struct MemberCardCreationView: View {
 
     private var petBasicInfoStep: some View {
         MemberCreationSection(
-            title: l.tr(zh: "基础与日期", en: "Basics & dates", de: "Basis & Daten"),
+            title: l.tr(zh: "必要信息", en: "Essentials", de: "Wichtiges"),
             icon: "pawprint.fill",
             foreground: cardForeground
         ) {
@@ -1368,6 +1510,20 @@ struct MemberCardCreationView: View {
                 HStack(spacing: 10) {
                     compactNameInput(width: 148)
                     compactOptionRow(options: petGenderOptions, selection: $draft.petGender) { petGenderLabel($0) }
+                }
+                compactMenuPicker(
+                    title: l.tr(zh: "物种", en: "Species", de: "Art"),
+                    value: speciesLabel(draft.species)
+                ) {
+                    ForEach(speciesOptions, id: \.self) { species in
+                        Button(speciesLabel(species)) {
+                            draft.species = species
+                            draft.breed = ""
+                            draft.customBreed = ""
+                            draft.isCustomBreed = false
+                            clampPetAppearance()
+                        }
+                    }
                 }
                 MemberCompactDateRow(
                     title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
@@ -1407,8 +1563,7 @@ struct MemberCardCreationView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     mediaButton(title: l.tr(zh: "相册", en: "Photos", de: "Fotos"), icon: "photo.on.rectangle") {
-                        GoKeyboard.dismiss()
-                        media.openPhotoLibrary()
+                        openPhotoLibraryAfterFirstFrame()
                     }
                     mediaButton(title: isPreparingCamera ? l.tr(zh: "打开中", en: "Opening", de: "Öffnet") : l.tr(zh: "相机", en: "Camera", de: "Kamera"), icon: "camera.fill") {
                         openCameraAfterFirstFrame()
@@ -1469,26 +1624,15 @@ struct MemberCardCreationView: View {
 
     private var petProfileSection: some View {
         MemberCreationSection(
-            title: l.tr(zh: "物种与外观", en: "Species & look", de: "Art & Aussehen"),
+            title: l.tr(zh: "品种与性格", en: "Breed & vibe", de: "Rasse & Charakter"),
             icon: "list.bullet.clipboard.fill",
             foreground: cardForeground
         ) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 compactMenuPicker(
-                    title: l.tr(zh: "物种", en: "Species", de: "Art"),
-                    value: speciesLabel(draft.species)
+                    title: l.tr(zh: "品种", en: "Breed", de: "Rasse"),
+                    value: draft.resolvedBreed.isEmpty ? l.tr(zh: "选择", en: "Choose", de: "Wählen") : draft.resolvedBreed
                 ) {
-                    ForEach(speciesOptions, id: \.self) { species in
-                        Button(speciesLabel(species)) {
-                            draft.species = species
-                            draft.breed = ""
-                            draft.customBreed = ""
-                            draft.isCustomBreed = false
-                            clampPetAppearance()
-                        }
-                    }
-                }
-                menuPicker(title: l.tr(zh: "品种", en: "Breed", de: "Rasse"), value: draft.resolvedBreed.isEmpty ? l.tr(zh: "选择品种", en: "Choose breed", de: "Rasse wählen") : draft.resolvedBreed) {
                     ForEach(petBreedOptions.prefix(40), id: \.name) { breed in
                         Button(breed.name) {
                             draft.isCustomBreed = breed.name == "其他"
@@ -1500,22 +1644,47 @@ struct MemberCardCreationView: View {
                 if draft.isCustomBreed {
                     flatTextField(l.tr(zh: "自定义品种", en: "Custom breed", de: "Eigene Rasse"), text: $draft.customBreed)
                 }
-                HStack(spacing: 10) {
-                    compactMenuPicker(title: l.tr(zh: "毛色", en: "Coat", de: "Fell"), value: draft.coatColor.isEmpty ? l.tr(zh: "自动", en: "Auto", de: "Auto") : draft.coatColor) {
-                        ForEach(petCoatOptions, id: \.self) { option in
-                            Button(option) {
-                                draft.coatColor = option
-                                clampPetAppearance()
-                            }
+                compactMenuPicker(
+                    title: l.tr(zh: "毛色", en: "Coat", de: "Fell"),
+                    value: draft.coatColor.isEmpty ? l.tr(zh: "自动", en: "Auto", de: "Auto") : draft.coatColor
+                ) {
+                    ForEach(petCoatOptions, id: \.self) { option in
+                        Button(option) {
+                            draft.coatColor = option
+                            clampPetAppearance()
                         }
                     }
-                    compactMenuPicker(title: l.tr(zh: "眼睛", en: "Eyes", de: "Augen"), value: draft.eyeColor.isEmpty ? l.tr(zh: "自动", en: "Auto", de: "Auto") : draft.eyeColor) {
-                        ForEach(petEyeOptions, id: \.self) { option in
-                            Button(option) {
-                                draft.eyeColor = option
-                                clampPetAppearance()
+                }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 7)], spacing: 7) {
+                    ForEach(Array(PetPersonalityTag.allTags.prefix(8).map(\.id)), id: \.self) { id in
+                        let isSelected = draft.personalityTagIds.contains(id)
+                        Button {
+                            withAnimation(GoMotion.selection) {
+                                if draft.personalityTagIds.contains(id) {
+                                    draft.personalityTagIds.removeAll { $0 == id }
+                                } else {
+                                    if draft.personalityTagIds.count >= 3 {
+                                        draft.personalityTagIds.removeFirst()
+                                    }
+                                    draft.personalityTagIds.append(id)
+                                }
                             }
+                            UISelectionFeedbackGenerator().selectionChanged()
+                        } label: {
+                            Text(personalityLabel(id))
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.62)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 34)
+                                .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
+                                .overlay {
+                                    Capsule()
+                                        .strokeBorder(cardControlStroke, lineWidth: 1)
+                                }
                         }
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
             }
@@ -1821,6 +1990,7 @@ struct MemberCardCreationView: View {
     }
 
     private func apply(_ candidate: Avatar2DCandidate, usesInventoryPass: Bool? = nil) {
+        rememberCurrentCustomAvatarIfNeeded()
         withAnimation(GoMotion.selection) {
             draft.avatarSource = .avatar2D
             draft.selectedAvatarCandidateId = candidate.id
@@ -1861,17 +2031,142 @@ struct MemberCardCreationView: View {
 
     private func clearAvatarSelection() {
         withAnimation(GoMotion.selection) {
-            draft.avatarSource = .placeholder
+            if let lastCustomAvatarImageData {
+                draft.avatarSource = .customImage
+                draft.avatarImageData = lastCustomAvatarImageData
+            } else {
+                draft.avatarSource = .placeholder
+                draft.avatarImageData = nil
+            }
             draft.selectedAvatarCandidateId = nil
-            draft.avatarImageData = nil
             draft.usesPurchasedOrInventoryPass = false
+        }
+    }
+
+    private func rememberCurrentCustomAvatarIfNeeded() {
+        guard draft.avatarSource == .customImage,
+              let data = draft.avatarImageData
+        else { return }
+        lastCustomAvatarImageData = data
+    }
+
+    private func beginAvatarMediaPresentation() {
+        guard !isAvatarMediaTransitioning else { return }
+        GoKeyboard.dismiss()
+        avatarMediaReturnStep = currentStep
+        storeMediaReturnStep(currentStep)
+        storeMediaRecoverySnapshot()
+        isAvatarMediaTransitioning = true
+    }
+
+    private func finishAvatarMediaPresentation() {
+        restoreAvatarMediaReturnStep()
+        avatarMediaReturnStep = nil
+        isAvatarMediaTransitioning = false
+        cropPresentationTask?.cancel()
+        cropPresentationTask = nil
+        photoLoadTask?.cancel()
+        photoLoadTask = nil
+    }
+
+    private func restoreAvatarMediaReturnStep() {
+        guard let step = avatarMediaReturnStep,
+              creationSteps.contains(step),
+              currentStep != step
+        else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            currentStep = step
+        }
+    }
+
+    private func restoreMediaReturnStepFromSceneStorage() {
+        let rawStep = kind == .pet ? petMediaReturnStepRaw : humanMediaReturnStepRaw
+        let rawSession = kind == .pet ? petMediaReturnSessionRaw : humanMediaReturnSessionRaw
+        guard rawSession == recoverySessionId.uuidString else {
+            if !rawStep.isEmpty || !rawSession.isEmpty {
+                clearMediaReturnStepStorage()
+            }
+            return
+        }
+        guard let step = MemberCreationStep(rawValue: rawStep),
+              creationSteps.contains(step),
+              currentStep != step
+        else { return }
+        avatarMediaReturnStep = step
+        restoreAvatarMediaReturnStep()
+    }
+
+    private func restoreMediaRecoverySnapshotIfNeeded() {
+        let rawSnapshot = kind == .pet ? petMediaRecoveryRaw : humanMediaRecoveryRaw
+        guard draft.trimmedName.isEmpty,
+              !rawSnapshot.isEmpty,
+              let data = rawSnapshot.data(using: .utf8),
+              let snapshot = try? JSONDecoder().decode(MemberCreationMediaRecoverySnapshot.self, from: data),
+              snapshot.sessionId == recoverySessionId.uuidString,
+              snapshot.isFresh
+        else {
+            let rawSession = kind == .pet ? petMediaReturnSessionRaw : humanMediaReturnSessionRaw
+            if !rawSnapshot.isEmpty, rawSession != recoverySessionId.uuidString {
+                clearMediaReturnStepStorage()
+            }
+            return
+        }
+        var restored = draft
+        snapshot.apply(to: &restored)
+        draft = restored
+    }
+
+    private func storeMediaReturnStep(_ step: MemberCreationStep) {
+        switch kind {
+        case .pet:
+            petMediaReturnStepRaw = step.rawValue
+            petMediaReturnSessionRaw = recoverySessionId.uuidString
+        case .human:
+            humanMediaReturnStepRaw = step.rawValue
+            humanMediaReturnSessionRaw = recoverySessionId.uuidString
+        }
+    }
+
+    private func storeMediaRecoverySnapshot() {
+        let snapshot = MemberCreationMediaRecoverySnapshot(draft: draft, sessionId: recoverySessionId.uuidString)
+        guard let data = try? JSONEncoder().encode(snapshot),
+              let raw = String(data: data, encoding: .utf8)
+        else { return }
+        switch kind {
+        case .pet:
+            petMediaRecoveryRaw = raw
+        case .human:
+            humanMediaRecoveryRaw = raw
+        }
+    }
+
+    private func clearMediaReturnStepStorage() {
+        switch kind {
+        case .pet:
+            petMediaReturnStepRaw = ""
+            petMediaReturnSessionRaw = ""
+            petMediaRecoveryRaw = ""
+        case .human:
+            humanMediaReturnStepRaw = ""
+            humanMediaReturnSessionRaw = ""
+            humanMediaRecoveryRaw = ""
+        }
+    }
+
+    private func openPhotoLibraryAfterFirstFrame() {
+        MemberCreationPerformance.event("Photo Library Button Tap")
+        beginAvatarMediaPresentation()
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 16) {
+            media.openPhotoLibrary()
         }
     }
 
     private func openCameraAfterFirstFrame() {
         guard !isPreparingCamera else { return }
         MemberCreationPerformance.event("Camera Button Tap")
-        GoKeyboard.dismiss()
+        beginAvatarMediaPresentation()
         isPreparingCamera = true
         OhanaFrameScheduler.runAfterNextFrame(milliseconds: 16) {
             media.openCamera()
@@ -1881,14 +2176,16 @@ struct MemberCardCreationView: View {
 
     private func handlePhotoPickerItem(_ item: PhotosPickerItem?) {
         guard let item else { return }
-        Task {
+        beginAvatarMediaPresentation()
+        photoLoadTask?.cancel()
+        photoLoadTask = Task {
             let loadID = MemberCreationPerformance.begin("PhotoPicker LoadTransferable")
             guard let data = try? await item.loadTransferable(type: Data.self)
             else {
                 MemberCreationPerformance.end("PhotoPicker LoadTransferable", loadID)
                 await MainActor.run {
                     media.photoItem = nil
-                    media.route = nil
+                    finishPhotoLibraryIfIdle()
                 }
                 return
             }
@@ -1901,16 +2198,58 @@ struct MemberCardCreationView: View {
             guard let image else {
                 await MainActor.run {
                     media.photoItem = nil
-                    media.route = nil
+                    finishPhotoLibraryIfIdle()
                 }
                 return
             }
             await MainActor.run {
                 media.photoItem = nil
-                media.route = nil
-                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 90) {
-                    media.showCrop(for: image)
+                presentAvatarCropAfterMediaDismissal(image, delayMilliseconds: 360)
+            }
+        }
+    }
+
+    private func handlePhotoLibraryDismissed() {
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 140) {
+            finishPhotoLibraryIfIdle()
+        }
+    }
+
+    private func handleCameraDismissed() {
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 140) {
+            guard media.cropItem == nil, cropPresentationTask == nil else { return }
+            finishAvatarMediaPresentation()
+        }
+    }
+
+    private func finishPhotoLibraryIfIdle() {
+        guard !media.isPhotoPickerPresented,
+              media.photoItem == nil,
+              media.cropItem == nil,
+              cropPresentationTask == nil,
+              !media.isCameraPresented
+        else { return }
+        finishAvatarMediaPresentation()
+    }
+
+    private func presentAvatarCropAfterMediaDismissal(
+        _ image: UIImage,
+        delayMilliseconds: UInt64
+    ) {
+        cropPresentationTask?.cancel()
+        cropPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
+            guard !media.isPhotoPickerPresented, !media.isCameraPresented else {
+                presentAvatarCropAfterMediaDismissal(image, delayMilliseconds: 140)
+                return
+            }
+            restoreAvatarMediaReturnStep()
+            cropPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 50) {
+                guard !media.isPhotoPickerPresented, !media.isCameraPresented else {
+                    presentAvatarCropAfterMediaDismissal(image, delayMilliseconds: 140)
+                    return
                 }
+                media.showCrop(for: image)
+                cropPresentationTask = nil
             }
         }
     }
@@ -1980,14 +2319,15 @@ struct MemberCardCreationView: View {
     }
 
     private func startHomeJoinHandoff() {
+        joinHandoffSnapshot = snapshot
         isSaving = true
         isJoinHandoffRunning = true
         joinHandoffProgress = 0
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.zStackHero) {
+        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.sheetEnter) {
             joinHandoffProgress = 1
         }
-        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 90 : 340) {
+        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 140 : 620) {
             performSave(showsHomeJoinHandoff: true)
         }
     }
@@ -2002,15 +2342,28 @@ struct MemberCardCreationView: View {
                 countryCode: appCountry
             )
             if let pet = result.pet {
+                FocusWalletAvatarCache.storeDecodedImage(
+                    cardId: pet.id,
+                    data: pet.avatarImageData,
+                    image: decodedAvatar,
+                    isTransparent: decodedAvatarTransparent
+                )
                 onPetSaved?(pet)
             }
             if let human = result.human {
+                FocusWalletAvatarCache.storeDecodedImage(
+                    cardId: human.id,
+                    data: human.avatarImageData,
+                    image: decodedAvatar,
+                    isTransparent: decodedAvatarTransparent
+                )
                 onHumanSaved?(human)
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             if showsHomeJoinHandoff {
-                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 70 : 160) {
+                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 60 : 80) {
                     isSaving = false
+                    clearMediaReturnStepStorage()
                     onComplete()
                 }
                 return
@@ -2021,6 +2374,7 @@ struct MemberCardCreationView: View {
             joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 780) {
                 didShowSuccess = false
                 isSaving = false
+                clearMediaReturnStepStorage()
                 onComplete()
             }
         } catch MemberCreationService.ServiceError.duplicateName {
@@ -2046,6 +2400,7 @@ struct MemberCardCreationView: View {
         joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 90 : 240) {
             isSaving = false
             isJoinHandoffRunning = false
+            joinHandoffSnapshot = nil
         }
     }
 
@@ -3004,15 +3359,14 @@ private struct MemberCreationJoinHandoffModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let p = easedProgress
-        let scale = reduceMotion ? mix(1, 0.92, p) : mix(1, 0.58, p)
-        let flip = reduceMotion ? 0 : Double(mix(0, -78, p))
-        let turn = reduceMotion ? 0 : Double(mix(0, -4, p))
-        let x = reduceMotion ? CGFloat(0) : mix(0, 18, p)
-        let y = reduceMotion ? mix(0, -8, p) : mix(0, -34, p)
-        let opacity = reduceMotion ? Double(mix(1, 0.78, p)) : Double(mix(1, 0.90, p))
+        let scale = reduceMotion ? mix(1, 0.72, p) : mix(1, 0.36, p)
+        let flip = reduceMotion ? 0 : Double(mix(0, -82, p))
+        let turn = reduceMotion ? 0 : Double(mix(0, -5, p))
+        let x = reduceMotion ? CGFloat(0) : mix(0, 22, p)
+        let y = reduceMotion ? mix(0, -10, p) : mix(0, -72, p)
+        let opacity = reduceMotion ? Double(mix(1, 0.38, p)) : Double(mix(1, 0.12, p))
 
         content
-            .compositingGroup()
             .scaleEffect(scale, anchor: .center)
             .rotation3DEffect(.degrees(flip), axis: (x: 0.06, y: 1, z: 0), perspective: 0.78)
             .rotationEffect(.degrees(turn))
@@ -3023,6 +3377,115 @@ private struct MemberCreationJoinHandoffModifier: ViewModifier {
 
     private func mix(_ start: CGFloat, _ end: CGFloat, _ progress: CGFloat) -> CGFloat {
         start + (end - start) * progress
+    }
+}
+
+private struct MemberCreationJoinHandoffCard: View {
+    let snapshot: MemberCardRenderSnapshot
+
+    private var accent: Color {
+        Color(hex: snapshot.themeColorHex)
+    }
+
+    private var prefersDarkText: Bool {
+        WalletPetCardTheme.prefersDarkForeground(for: snapshot.themeColorHex)
+    }
+
+    private var primaryText: Color {
+        prefersDarkText ? Color.arkInk : Color.goCardWhite
+    }
+
+    private var secondaryText: Color {
+        primaryText.opacity(0.66)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                .fill(cardGradient)
+                .overlay(alignment: .topLeading) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(snapshot.title)
+                            .font(.system(size: min(max(width * 0.115, 32), 46), weight: .black, design: .rounded))
+                            .foregroundStyle(primaryText)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.62)
+                        Text(snapshot.subtitle)
+                            .font(OhanaFont.callout(.bold))
+                            .foregroundStyle(secondaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                    }
+                    .padding(.top, 24)
+                    .padding(.horizontal, 22)
+                }
+                .overlay {
+                    avatar(width: width, height: height)
+                }
+                .overlay(alignment: .bottomLeading) {
+                    HStack(spacing: 7) {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text(snapshot.statusText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(primaryText)
+                    .padding(.horizontal, 12)
+                    .frame(height: 34)
+                    .background(primaryText.opacity(prefersDarkText ? 0.10 : 0.14), in: Capsule())
+                    .padding(18)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 34, style: .continuous)
+                        .strokeBorder(Color.goCardWhite.opacity(0.24), lineWidth: 1)
+                }
+                .shadow(color: Color.arkInk.opacity(0.20), radius: 22, x: 0, y: 14) // ui-v4: allow lightweight handoff card depth
+        }
+    }
+
+    private var cardGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                accent.mix(with: .white, by: 0.14),
+                accent,
+                accent.mix(with: .black, by: 0.34),
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    @ViewBuilder
+    private func avatar(width: CGFloat, height: CGFloat) -> some View {
+        if let image = snapshot.avatarImage, snapshot.avatarSource == .customImage, !snapshot.avatarIsTransparent {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: width, height: height)
+                .clipped()
+                .overlay(
+                    LinearGradient(
+                        colors: [Color.arkInk.opacity(0.10), Color.arkInk.opacity(0.52)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        } else if let image = snapshot.avatarImage {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .frame(width: width * 0.68, height: height * 0.48)
+                .position(x: width * 0.52, y: height * 0.53)
+        } else {
+            Image(systemName: snapshot.fallbackSymbol)
+                .font(.system(size: min(width * 0.32, 110), weight: .black))
+                .foregroundStyle(primaryText.opacity(0.86))
+                .frame(width: width * 0.58, height: height * 0.42)
+                .position(x: width * 0.54, y: height * 0.53)
+        }
     }
 }
 
@@ -3064,6 +3527,7 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
+            let height = proxy.size.height
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     hero(width: width)
@@ -3072,7 +3536,9 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(cardBackground)
+            .background {
+                cardBackground(width: width, height: height)
+            }
             .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 34, style: .continuous)
@@ -3083,26 +3549,33 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
         }
     }
 
-    private var cardBackground: some View {
-        LinearGradient(
-            colors: [
-                accent.mix(with: .white, by: 0.14),
-                accent,
-                accent.mix(with: .black, by: 0.34),
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+    @ViewBuilder
+    private func cardBackground(width: CGFloat, height: CGFloat) -> some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    accent.mix(with: .white, by: 0.14),
+                    accent,
+                    accent.mix(with: .black, by: 0.34),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            if usesWidePhoto, let image = snapshot.avatarImage {
+                WalletCardVerticalPhotoBlendLayer(
+                    image: image,
+                    width: width,
+                    height: height,
+                    themeColorHex: snapshot.themeColorHex,
+                    shadowDepth: 1.02
+                )
+            }
+        }
     }
 
     private func hero(width: CGFloat) -> some View {
-        let heroHeight = min(max(width * 0.92, 260), 330)
         let readableText = usesWidePhoto ? Color.goCardWhite : primaryText
         return ZStack(alignment: .topLeading) {
-            if usesWidePhoto {
-                widePhotoLayer(width: width, height: heroHeight)
-            }
-
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -3156,32 +3629,6 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
         } else {
             Color.clear
                 .frame(width: width * 0.72, height: width * 0.50)
-        }
-    }
-
-    @ViewBuilder
-    private func widePhotoLayer(width: CGFloat, height: CGFloat) -> some View {
-        if let image = snapshot.avatarImage {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: width, height: height)
-                .clipped()
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color.arkInk.opacity(0.36),
-                            Color.arkInk.opacity(0.08),
-                            Color.arkInk.opacity(0.58),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
-                .overlay {
-                    accent.opacity(0.14)
-                }
-                .allowsHitTesting(false)
         }
     }
 }

@@ -146,6 +146,8 @@ struct CalendarView: View {
     var isEmbeddedPrepared: Bool = true
     var isEmbeddedVisible: Bool = true
     var isEmbeddedActive: Bool = true
+    var onRequestAddEvent: (() -> Void)? = nil
+    var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)? = nil
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -161,6 +163,8 @@ struct CalendarView: View {
     @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
     @AppStorage("calendar_filterHumanId") private var calendarFilterHumanId: String = ""
     @State private var showingAddEvent = false
+    @State private var addEventPresentationProgress: CGFloat = 0
+    @State private var isAddEventContentMounted = false
     @State private var showingCoconutLog = false
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage("calendar_viewMode") private var viewModeRaw: String = CalendarViewMode.list.rawValue
@@ -181,6 +185,8 @@ struct CalendarView: View {
     @State private var filterStorageCommitTask: Task<Void, Never>?
     @State private var calendarMaintenanceTask: Task<Void, Never>?
     @State private var listInitialPositionTask: Task<Void, Never>?
+    @State private var addEventPresentationTask: Task<Void, Never>?
+    @State private var addEventContentMountTask: Task<Void, Never>?
     @State private var didScheduleCalendarMaintenance = false
 
     private var isMaterial: Bool { false }
@@ -218,10 +224,16 @@ struct CalendarView: View {
         didSyncCalendarFilter ? appliedFilterSelection : storedFilterSelection
     }
 
+    private var effectiveFilterSelection: CalendarFilterSelection {
+        if let preselectedPetId { return .pet(preselectedPetId) }
+        if let preselectedHumanId { return .human(preselectedHumanId) }
+        return activeFilterSelection
+    }
+
     private var contentHandoffState: CalendarContentHandoffState {
         CalendarContentHandoffState(
             viewModeRaw: displayedViewModeRaw ?? viewModeRaw,
-            filter: activeFilterSelection
+            filter: effectiveFilterSelection
         )
     }
 
@@ -501,15 +513,12 @@ struct CalendarView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showingAddEvent) {
-            AddEventView()
-                .ohanaSheetPagePresentation() // ui-v4: allow calendar editor as long sheet
-        }
+        .overlay { inlineAddEventLayer }
         .sheet(isPresented: $showingCoconutLog) {
             CoconutLogView()
                 .ohanaSheetPagePresentation() // ui-v4: allow coconut history as long sheet
         }
-        .onChange(of: addEventTrigger) { _, _ in showingAddEvent = true }
+        .onChange(of: addEventTrigger) { _, _ in requestAddEventPresentation() }
         .onChange(of: viewModeRaw) { _, newValue in
             syncCalendarViewModeFromStorage(newValue)
         }
@@ -535,6 +544,8 @@ struct CalendarView: View {
             filterStorageCommitTask?.cancel()
             listInitialPositionTask?.cancel()
             listInitialPositionTask = nil
+            addEventPresentationTask?.cancel()
+            addEventContentMountTask?.cancel()
         }
         .onChange(of: isEmbeddedActive) { _, isActive in
             if isActive {
@@ -572,6 +583,76 @@ struct CalendarView: View {
                 listInitialPositionTask?.cancel()
                 listInitialPositionTask = nil
             }
+        }
+    }
+
+    @ViewBuilder
+    private var inlineAddEventLayer: some View {
+        if showingAddEvent || addEventPresentationProgress > 0.001 {
+            OhanaDeferredInlinePageCover(
+                progress: addEventPresentationProgress,
+                isContentMounted: isAddEventContentMounted
+            ) {
+                AddEventView(onClose: closeInlineAddEvent)
+            }
+            .zIndex(90)
+        }
+    }
+
+    private func requestAddEventPresentation() {
+        OhanaFeedback.light()
+        if let onRequestAddEvent {
+            onRequestAddEvent()
+        } else {
+            openInlineAddEvent()
+        }
+    }
+
+    private func openInlineAddEvent() {
+        guard !showingAddEvent else { return }
+        addEventPresentationTask?.cancel()
+        addEventContentMountTask?.cancel()
+        showingAddEvent = true
+        addEventPresentationProgress = 0
+        isAddEventContentMounted = false
+        addEventPresentationTask = OhanaFrameScheduler.runAfterNextFrame {
+            guard showingAddEvent else {
+                addEventPresentationTask = nil
+                return
+            }
+            withAnimation(GoMotion.sheetEnter) {
+                addEventPresentationProgress = 1
+            }
+            addEventPresentationTask = nil
+        }
+        addEventContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
+            guard showingAddEvent else {
+                addEventContentMountTask = nil
+                return
+            }
+            withAnimation(GoMotion.quick) {
+                isAddEventContentMounted = true
+            }
+            addEventContentMountTask = nil
+        }
+    }
+
+    private func closeInlineAddEvent() {
+        guard showingAddEvent || addEventPresentationProgress > 0.001 else { return }
+        addEventContentMountTask?.cancel()
+        isAddEventContentMounted = false
+        withAnimation(GoMotion.sheetEnter) {
+            addEventPresentationProgress = 0
+        }
+        addEventPresentationTask?.cancel()
+        addEventPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 340) {
+            guard addEventPresentationProgress <= 0.02 else {
+                addEventPresentationTask = nil
+                return
+            }
+            showingAddEvent = false
+            isAddEventContentMounted = false
+            addEventPresentationTask = nil
         }
     }
 
@@ -756,7 +837,7 @@ struct CalendarView: View {
             .goGlassBackground(Capsule())
 
             // 添加事件按钮
-            Button { showingAddEvent = true } label: {
+            Button { requestAddEventPresentation() } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 16, weight: .bold))
                     .symbolRenderingMode(.monochrome)
@@ -777,7 +858,7 @@ struct CalendarView: View {
         let accent = Color(hex: "FF5A00")
         return HStack(spacing: 10) {
             // Add event
-            Button { showingAddEvent = true } label: {
+            Button { requestAddEventPresentation() } label: {
                 Image(systemName: "calendar.badge.plus")
                     .font(.system(size: 17, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
@@ -1389,8 +1470,29 @@ struct CalendarView: View {
                     }
                 }
             },
-            onDelete: { /* F2: 删除逻辑已在 SwipeableEventRow 内处理 */ }
+            onDelete: { /* F2: 删除逻辑已在 SwipeableEventRow 内处理 */ },
+            onOpenRelated: {
+                openRelatedDestination(for: event)
+            }
         )
+    }
+
+    private func openRelatedDestination(for event: Event) -> Bool {
+        guard let onOpenEventDestination else { return false }
+        let destination = FocusHomeReminderDeepLinkRouter.destination(
+            for: event,
+            pets: pets,
+            humans: humans,
+            plants: plants,
+            humanMedications: humanMedications
+        )
+        if case let .calendar(entityId, humanId) = destination,
+           entityId == nil,
+           humanId == nil {
+            return false
+        }
+        onOpenEventDestination(destination)
+        return true
     }
     
     // MARK: - Calendar Helpers

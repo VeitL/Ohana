@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct OasisHomeTabHost: View {
-    let lifecycle: VerticalHomePageLifecycle
+    let lifecycle: VerticalSolidHomePageLifecycle
     let injectEnergyTrigger: Int
 
     @State private var showsLiveContent = false

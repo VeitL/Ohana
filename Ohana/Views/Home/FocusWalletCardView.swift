@@ -7,6 +7,11 @@
 
 import SwiftUI
 
+enum FocusWalletCardPresentation {
+    case home
+    case rosterMember
+}
+
 struct FocusWalletCardView: View {
     let card: FocusCard
     let namespace: Namespace.ID
@@ -16,6 +21,8 @@ struct FocusWalletCardView: View {
     let heroProgress: CGFloat
     let avatarCacheRevision: Int
     var usesMatchedGeometry: Bool = true
+    var presentation: FocusWalletCardPresentation = .home
+    var expandedCardHeight: CGFloat = K.expandedCardH
 
     private let accent = Color(hex: "FF5A3D")
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
@@ -29,6 +36,14 @@ struct FocusWalletCardView: View {
 
     private var shouldReduceWork: Bool {
         reduceMotion || workloadPolicy.interactionMotionBudget(isVisible: true) != .full
+    }
+
+    private var showsCardTextBadges: Bool {
+        presentation == .home
+    }
+
+    private var showsHomeVisibilityStatusBadge: Bool {
+        presentation == .home
     }
 
     private var walletAnimation: Animation {
@@ -114,7 +129,7 @@ struct FocusWalletCardView: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                if card.hasPassedAway {
+                if card.hasPassedAway, showsCardTextBadges {
                     PetMemorialBadge(
                         passedAwayDate: card.passedAwayDate,
                         daysTogether: card.daysTogetherAtPassing
@@ -128,7 +143,7 @@ struct FocusWalletCardView: View {
         }
         .frame(height: OhanaHeroGeometry.lerp(
             K.cardH,
-            K.expandedCardH,
+            expandedCardHeight,
             progress: isHeroExpanded ? HomeHeroTransitionProgress(value: heroProgress).clamped : 0
         ))
         .overlay(
@@ -605,30 +620,48 @@ struct FocusWalletCardView: View {
         .allowsHitTesting(false)
     }
 
+    @ViewBuilder
     private func rightInfoColumn(h: CGFloat, usesFullBleed: Bool, progress: CGFloat) -> some View {
         let spacing = OhanaHeroGeometry.lerp(3, 5, progress: progress)
-        return VStack(alignment: .trailing, spacing: spacing) {
-            if card.streak > 1 {
-                Text("🔥 \(card.streak)天连续")
-                    .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 9).padding(.vertical, 4)
-                    .background(Color.goPrimary, in: Capsule())
+        if presentation == .rosterMember {
+            VStack(alignment: .trailing, spacing: spacing) {
+                if card.isHuman {
+                    humanInfoStack(usesFullBleed: usesFullBleed, progress: progress)
+                } else if card.isElectronicPet {
+                    electronicPetInfoStack(usesFullBleed: usesFullBleed, progress: progress)
+                } else {
+                    petInfoStack(usesFullBleed: usesFullBleed, progress: progress)
+                }
             }
-            Spacer(minLength: 4)
-            if card.isHuman {
-                humanInfoStack(usesFullBleed: usesFullBleed, progress: progress)
-            } else if card.isElectronicPet {
-                electronicPetInfoStack(usesFullBleed: usesFullBleed, progress: progress)
-            } else {
-                petInfoStack(usesFullBleed: usesFullBleed, progress: progress)
+            .padding(.trailing, 16)
+            .padding(.top, 74)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        } else {
+            VStack(alignment: .trailing, spacing: spacing) {
+                if showsCardTextBadges, card.streak > 1 {
+                    Text("🔥 \(card.streak)天连续")
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 9).padding(.vertical, 4)
+                        .background(Color.goPrimary, in: Capsule())
+                }
+                Spacer(minLength: 4)
+                if card.isHuman {
+                    humanInfoStack(usesFullBleed: usesFullBleed, progress: progress)
+                } else if card.isElectronicPet {
+                    electronicPetInfoStack(usesFullBleed: usesFullBleed, progress: progress)
+                } else {
+                    petInfoStack(usesFullBleed: usesFullBleed, progress: progress)
+                }
+                if showsHomeVisibilityStatusBadge {
+                    homeVisibilityStatusBadge
+                        .padding(.top, 8)
+                        .opacity(Double(WalletHeroTimeline.smooth(progress, 0.72, 1)))
+                }
             }
-            homeVisibilityStatusBadge
-                .padding(.top, 8)
-                .opacity(Double(WalletHeroTimeline.smooth(progress, 0.72, 1)))
+            .padding(.trailing, 16).padding(.top, 18).padding(.bottom, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
-        .padding(.trailing, 16).padding(.top, 18).padding(.bottom, 16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }
 
     private func humanInfoStack(usesFullBleed: Bool, progress: CGFloat) -> some View {
@@ -638,7 +671,7 @@ struct FocusWalletCardView: View {
         let spacing = OhanaHeroGeometry.lerp(3, 5, progress: progress)
 
         return VStack(alignment: .trailing, spacing: spacing) {
-            if let title = equippedTitleBadge {
+            if showsCardTextBadges, let title = equippedTitleBadge {
                 Text(title)
                     .font(.system(size: OhanaHeroGeometry.lerp(9, 11, progress: progress), weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
@@ -764,7 +797,7 @@ struct FocusWalletCardView: View {
                 .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed).opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
-            if petBondNameplateActive {
+            if showsCardTextBadges, petBondNameplateActive {
                 Text(L10n(AppLanguage.code).tr(zh: "羁绊", en: "Bond", de: "Bindung"))
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
@@ -774,7 +807,7 @@ struct FocusWalletCardView: View {
                     .transition(.scale.combined(with: .opacity))
             }
             Spacer(minLength: 0)
-            if let title = equippedTitleBadge {
+            if showsCardTextBadges, let title = equippedTitleBadge {
                 Text(title)
                     .font(.system(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)

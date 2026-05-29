@@ -62,12 +62,18 @@ enum FeedHomeSnapshotBuilder {
             .filter { $0.foodKind == .wet }
             .reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
 
-        let todayPlanReminders = manualPlanEvents
+        let allPlanReminders = manualPlanEvents
             .flatMap(\.reminders)
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+        let todayPlanReminders = allPlanReminders
             .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
             .sorted { $0.scheduledAt < $1.scheduledAt }
-        let pendingPlanReminders = todayPlanReminders.filter { $0.isPending || $0.isFailed }
-        let missedPlanReminders = todayPlanReminders.filter { $0.isFailed || ($0.isPending && $0.scheduledAt < now) }
+        let pendingTodayPlanReminders = todayPlanReminders.filter { !$0.isCompleted && ($0.isPending || $0.isFailed) }
+        let catchUpPlanReminders = allPlanReminders.filter { FeedPlanCatchUpPolicy.isCatchUpEligible($0, now: now) }
+        let expiredMissedPlanReminders = allPlanReminders.filter { FeedPlanCatchUpPolicy.isExpiredMiss($0, now: now) }
+        let nextActionablePlanReminder = expiredMissedPlanReminders.isEmpty
+            ? (catchUpPlanReminders.first ?? pendingTodayPlanReminders.first)
+            : nil
         let completedPlanReminders = todayPlanReminders.filter { $0.isCompleted }
         let planTotal = max(todayPlanReminders.count, manualPlanEvents.count, 1)
         let planCompleted = min(completedPlanReminders.count, planTotal)
@@ -124,9 +130,10 @@ enum FeedHomeSnapshotBuilder {
             todayTreatGrams: treatTodayLogs.reduce(0) { $0 + max(0, $1.amountGrams) },
             todayTreatCount: treatTodayLogs.count,
             todayAutoFeedCount: mainTodayLogs.filter { FeedLogMetadata.source(for: $0) == .autoMain }.count,
-            hasNextManualReminder: pendingPlanReminders.first != nil,
-            hasMissedManualPlan: !missedPlanReminders.isEmpty,
-            todayManualPlanMissedCount: missedPlanReminders.count,
+            hasNextManualReminder: nextActionablePlanReminder != nil,
+            hasMissedManualPlan: expiredMissedPlanReminders.isEmpty && !catchUpPlanReminders.isEmpty,
+            todayManualPlanMissedCount: expiredMissedPlanReminders.isEmpty ? catchUpPlanReminders.count : 0,
+            lastExpiredManualPlanDate: expiredMissedPlanReminders.map(\.scheduledAt).max(),
             todayManualPlanCompletionText: "\(planCompleted)/\(planTotal)",
             autoDailyTotalGrams: FeedStockCalculator.autoRuleDailyTotalGrams(for: pet, events: allEvents),
             latestAutoFeedDate: latestAutoFeedDate,

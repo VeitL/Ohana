@@ -11,12 +11,14 @@ import SwiftData
 struct QuickPottyDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
+    var onClose: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     @State private var activeSheet: ActiveSheet?
     @State private var nestedInlineSheet: ActiveSheet?
@@ -30,6 +32,8 @@ struct QuickPottyDetailSheet: View {
     @State private var showSaveToast = false
     @State private var saveToastMessage = ""
     @State private var saveToastTask: Task<Void, Never>?
+    @State private var pottyPlanSaveTask: Task<Void, Never>?
+    @State private var isSavingPottyPlan = false
     @State private var showSingleUseNotice = false
     @State private var singleUseNoticeMessage = ""
     @State private var overviewRange: PoopOverviewRange = .days7
@@ -335,6 +339,12 @@ struct QuickPottyDetailSheet: View {
                 inlineSheetVisible = false
             }
         }
+        .onDisappear {
+            saveToastTask?.cancel()
+            feedbackClearTask?.cancel()
+            pottyPlanSaveTask?.cancel()
+            isSavingPottyPlan = false
+        }
         .interactiveDismissDisabled(activeInlineSheet != nil)
     }
 
@@ -512,7 +522,7 @@ struct QuickPottyDetailSheet: View {
 
             Spacer()
 
-            Button { dismiss() } label: {
+            Button { closeDetail() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -521,6 +531,14 @@ struct QuickPottyDetailSheet: View {
             }
             .frame(width: 44, height: 44)
             .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    private func closeDetail() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 
@@ -992,12 +1010,14 @@ struct QuickPottyDetailSheet: View {
                 anchorDate: $scoopAnchorDate,
                 reminderOn: $scoopReminderOn,
                 onSave: {
-                    syncScoopPlan(showToast: true)
-                    dismissInlinePoopSheet()
+                    startPottyPlanSave {
+                        syncScoopPlan(showToast: true)
+                    }
                 },
                 onDelete: {
-                    deleteScoopPlan()
-                    dismissInlinePoopSheet()
+                    startPottyPlanSave {
+                        deleteScoopPlan()
+                    }
                 }
             )
             .ohanaAdaptiveSheetContentHeight(
@@ -1020,12 +1040,14 @@ struct QuickPottyDetailSheet: View {
                 anchorDate: $litterCycleAnchorDate,
                 reminderOn: $litterReminderOn,
                 onSave: {
-                    syncLitterChangePlan(showToast: true)
-                    dismissInlinePoopSheet()
+                    startPottyPlanSave {
+                        syncLitterChangePlan(showToast: true)
+                    }
                 },
                 onDelete: {
-                    deleteLitterChangePlan()
-                    dismissInlinePoopSheet()
+                    startPottyPlanSave {
+                        deleteLitterChangePlan()
+                    }
                 }
             )
             .ohanaAdaptiveSheetContentHeight(
@@ -1503,6 +1525,25 @@ struct QuickPottyDetailSheet: View {
         defaults.set(litterChangeIntervalDays, forKey: "litterChangeInterval_\(key)")
         defaults.set(litterCycleAnchorDate.timeIntervalSince1970, forKey: "litterChangeCycleAnchor_\(key)")
         defaults.set(litterReminderOn, forKey: "litterReminder_\(key)")
+    }
+
+    private func startPottyPlanSave(_ operation: @escaping @MainActor () -> Void) {
+        guard !isSavingPottyPlan else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            return
+        }
+        isSavingPottyPlan = true
+        pottyPlanSaveTask?.cancel()
+        dismissInlinePoopSheet()
+        pottyPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: pottyPlanSaveDelayMilliseconds) {
+            operation()
+            isSavingPottyPlan = false
+            pottyPlanSaveTask = nil
+        }
+    }
+
+    private var pottyPlanSaveDelayMilliseconds: UInt64 {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 120 : 40
     }
 
     private func syncScoopPlan(showToast: Bool) {

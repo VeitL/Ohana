@@ -130,6 +130,10 @@ struct ExampleV4Page: View {
 
 Short record, confirm, restock, and lightweight management popups should be implemented as an in-page overlay inside the current `ZStack` so the glass samples the real screen behind it. Reserve system `.sheet` for overview pages, history, long lists, and complex editors.
 
+Inline overlays are not free-form full-screen views. If an overlay or custom sheet ignores the container safe area, the host must pass explicit top and bottom safe-area insets into the presented content. Header chrome, close buttons, and drag affordances must start below the status bar/Dynamic Island region; bottom actions and floating controls must clear the home indicator. Entry and exit should be driven by a lightweight shell or frozen snapshot first, with heavy content mounted after the visual handoff and route clearing delayed until the exit animation has started.
+
+Before marking an inline overlay or custom sheet complete, verify the actual route for entry motion, exit motion, close-button hit testing, top safe-area clearance, and bottom safe-area clearance. Use a simulator screenshot or manual-device run when the route is reachable; if onboarding or missing seed data blocks the route, report that explicitly.
+
 Use the authoritative `sheet*` tokens from `ui规范.selection.json`. The example below mirrors the current token values; if the JSON changes, update the example from the JSON instead of treating this file as a second source of truth.
 
 ```swift

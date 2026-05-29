@@ -43,7 +43,7 @@ Default to fast-change mode unless the user explicitly asks for exhaustive valid
 - Make focused edits and avoid checkpoint builds after every small step.
 - Prefer cheap validation first: `rg`, path-specific audits, targeted tests, or a focused compiler check.
 - For pure UI changes, default to no compile/build. Pure UI means copy, spacing, padding, color/token usage, view composition, static layout, icon choice, simple animation parameters, and visual-only SwiftUI modifier changes that do not change data flow, route state, public APIs, model/service calls, generated assets, or shared component contracts. Validate with `rg`, visual reasoning, and `scripts/audit-ui-v4.sh --changed` or a path-specific UI audit instead.
-- Escalate a UI change to compile validation only when it introduces or renames Swift types/properties/functions, changes generic/component APIs, touches shared design-system helpers, changes navigation/sheet/route behavior, changes runtime policy/timers/maps/Canvas/TimelineView, changes localization plumbing, or the user explicitly asks for a build.
+- Escalate a UI change to compile validation when it introduces or renames Swift types/properties/functions, changes generic/component APIs, touches shared design-system helpers, changes navigation/sheet/route behavior, changes inline overlay or custom sheet presentation, changes safe-area/hit-testing behavior, changes runtime policy/timers/maps/Canvas/TimelineView, changes localization plumbing, or the user explicitly asks for a build.
 - For documentation-only changes, do not run app builds or audits unless the user asks.
 - For single-file logic changes, run the narrowest relevant test or one quick build only when the compiler surface changed.
 - For new types, changed public APIs, SwiftData, routing, reminders, notifications, rewards, runtime policy, startup, or cross-feature behavior, upgrade validation to targeted tests plus `scripts/build-debug-fast.sh`.
@@ -139,6 +139,8 @@ During implementation in this mode:
 - Make the mature-app first pass before tuning. Remove or disable hidden live surfaces, broad `.task(id:)` signatures, decorative runtime loops, live avatar/image fallback in motion, and any always-mounted heavy deck before adjusting springs, shadows, delays, or token values. Do not spend time optimizing work that should not happen.
 - Do not call a partial improvement "compliant" if any live tree, broad query, image decode, service call, timer start, dashboard refresh, route construction, or uncancellable background task remains in the user-triggered first frame or visible hero/transition path.
 - Motion scenes should be mechanically isolated where practical: they receive frozen value snapshots, precomputed geometry, and prepared assets, and animate only transform, frame, scale, opacity, mask, zIndex, and hit testing. They must not import SwiftData, access `ModelContext`, execute commands, decode images, or rebuild unrelated view trees.
+- Inline overlays, custom sheets, full-screen popups, and any route presented outside the system sheet host must be treated as their own presentation scene. The host must pass explicit `safeTop` and `safeBottom` values from `GeometryProxy`, `FocusHomeSafeAreaController`, or another stable safe-area source; child content must not assume the system sheet will reserve status bar, Dynamic Island, or home-indicator space. Top chrome and close controls must begin below the safe area, bottom controls must clear the home indicator, and hit testing must be disabled during entry/exit handoff.
+- Custom presentation scenes must include both entry and exit mechanics before they are called smooth: first frame shows a lightweight shell or frozen snapshot, heavy content mounts after the visual handoff, close/select actions start an exit animation first, and route clearing happens only after the exit handoff. If a screenshot or simulator/manual interaction cannot verify safe area and close-button hit testing, report that gap instead of claiming the interaction is fully fixed.
 - Keep old micro-motion quality only if it can live inside the compliant layer. Premium details such as numeric motion, restrained scale pulses, quick-action reveal, and Today Focus fades should start in the same interaction frame, but they must be driven by frozen snapshots or lightweight local progress, not by thawing live business state.
 - Prefer making incorrect architecture difficult to express: use typed snapshots, read models, command executors, thaw coordinators, route-scoped tasks, and explicit `isAnimating`/`isFrozen` gates instead of ad-hoc booleans scattered through views.
 
@@ -150,6 +152,7 @@ Before reporting completion in this mode, include a short compliance matrix with
 - Visual/business separation.
 - Runtime budget and visibility gating.
 - Thaw timing.
+- Safe area and hit testing.
 - Validation performed.
 
 If any row is `Partial` or `Not compliant`, do not present the task as complete. Describe the remaining gap, the reason it remains, and the next concrete step needed to reach full compliance.
@@ -215,6 +218,8 @@ Before reporting an interaction-heavy change complete, verify:
 - Route-scoped `.task(id:)` work is cancellable when the route disappears.
 - Repeating work uses `AppWorkloadPolicy` and stops or downgrades when invisible, backgrounded, Low Power Mode, Reduce Motion, or app power-saving mode applies.
 - Animation layers use frozen snapshots and do not scan SwiftData, decode images, or insert/remove complex view trees during transition.
+- Inline overlays, custom sheets, and full-screen popups have verified entry and exit animations, explicit safe-area insets, top controls outside the status bar/Dynamic Island region, bottom controls outside the home-indicator region, and disabled hit testing while the presentation is entering or exiting.
+- If a system sheet is replaced with an inline overlay, validate the actual route with a simulator screenshot, accessibility/semantic tap, or manual-device run when reachable. If the app cannot reach that route because seed data/onboarding blocks it, say so explicitly and do not present visual verification as complete.
 - If business state changes, add or update a SwiftData in-memory test proving the service writes one fact and synchronizes derived task/reminder/reward state.
 
 ## UI Design Source of Truth

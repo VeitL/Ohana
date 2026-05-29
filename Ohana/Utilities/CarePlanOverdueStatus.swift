@@ -127,6 +127,9 @@ enum CarePlanOverdueStatusCalculator {
         now: Date,
         calendar: Calendar
     ) -> [CarePlanOverdueStatus] {
+        let feedRules = FeedRuleState(pet: pet, allEvents: events, now: now, calendar: calendar)
+        let feedMode = feedRules.operatingMode
+        let hasExpiredFeedMiss = !feedRules.expiredMissedManualReminders.isEmpty
         let reminderWarnings = events.flatMap { event -> [CarePlanOverdueStatus] in
             guard event.isActionableTask,
                   eventBelongsToPet(event, pet: pet),
@@ -136,8 +139,17 @@ enum CarePlanOverdueStatusCalculator {
                 return []
             }
 
+            if actionType == "feed" {
+                guard feedMode == .manualReminder, !hasExpiredFeedMiss else {
+                    return []
+                }
+            }
+
             return event.reminders.compactMap { reminder in
                 guard reminder.isFailed || (reminder.isPending && reminder.scheduledAt < now) else {
+                    return nil
+                }
+                if actionType == "feed", !FeedPlanCatchUpPolicy.isCatchUpEligible(reminder, now: now) {
                     return nil
                 }
                 return CarePlanOverdueStatus(

@@ -68,44 +68,6 @@ private extension PetHealthInitialSection {
     }
 }
 
-enum HomePopupRoute: Equatable, Identifiable {
-    case petWeight(routeID: UUID = UUID(), petID: UUID)
-    case petExpense(routeID: UUID = UUID(), petID: UUID)
-    case petMedication(routeID: UUID = UUID(), petID: UUID)
-    case humanWeight(routeID: UUID = UUID(), humanID: UUID, actionType: String)
-    case humanExpense(routeID: UUID = UUID(), humanID: UUID, actionType: String)
-    case humanNote(routeID: UUID = UUID(), humanID: UUID, actionType: String)
-    case humanWorkout(routeID: UUID = UUID(), humanID: UUID, actionType: String)
-    case humanMedication(routeID: UUID = UUID(), humanID: UUID, actionType: String)
-
-    var id: UUID {
-        switch self {
-        case let .petWeight(routeID, _),
-             let .petExpense(routeID, _),
-             let .petMedication(routeID, _),
-             let .humanWeight(routeID, _, _),
-             let .humanExpense(routeID, _, _),
-             let .humanNote(routeID, _, _),
-             let .humanWorkout(routeID, _, _),
-             let .humanMedication(routeID, _, _):
-            return routeID
-        }
-    }
-
-    var humanActionKey: String? {
-        switch self {
-        case let .humanWeight(_, humanID, actionType),
-             let .humanExpense(_, humanID, actionType),
-             let .humanNote(_, humanID, actionType),
-             let .humanWorkout(_, humanID, actionType),
-             let .humanMedication(_, humanID, actionType):
-            return "\(humanID.uuidString):\(actionType)"
-        case .petWeight, .petExpense, .petMedication:
-            return nil
-        }
-    }
-}
-
 enum HomeModalRoute: Identifiable {
     case functionMenu(destination: FMDest?)
     case streakDetail
@@ -194,13 +156,9 @@ final class HomeRouteCoordinator: ObservableObject {
     @Published var overlay: HomeOverlayRoute?
     @Published var alert: HomeAlertRoute?
     @Published var sheet: HomeSheetRoute?
-    @Published var popup: HomePopupRoute?
+    @Published var settingsPresented = false
 
     var pendingRepeatAction: (() -> Void)?
-
-    var hasActiveOverlay: Bool {
-        popup != nil
-    }
 
     func openModal(_ route: HomeModalRoute) {
         modal = route
@@ -243,7 +201,11 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openSettings() {
-        fullScreen = .settings
+        settingsPresented = true
+    }
+
+    func dismissSettings() {
+        settingsPresented = false
     }
 
     func openWalk(_ pet: Pet) {
@@ -304,43 +266,6 @@ final class HomeRouteCoordinator: ObservableObject {
         sheet = nil
     }
 
-    func openPetWeight(_ pet: Pet) {
-        popup = .petWeight(petID: pet.id)
-    }
-
-    func openPetExpense(_ pet: Pet) {
-        popup = .petExpense(petID: pet.id)
-    }
-
-    func openPetMedication(_ pet: Pet) {
-        popup = .petMedication(petID: pet.id)
-    }
-
-    func openHumanWeight(_ human: Human, actionType: String = "humanWeight") {
-        popup = .humanWeight(humanID: human.id, actionType: actionType)
-    }
-
-    func openHumanExpense(_ human: Human, actionType: String = "humanExpense") {
-        popup = .humanExpense(humanID: human.id, actionType: actionType)
-    }
-
-    func openHumanNote(_ human: Human, actionType: String = "humanNote") {
-        popup = .humanNote(humanID: human.id, actionType: actionType)
-    }
-
-    func openHumanWorkout(_ human: Human, actionType: String = "humanWorkout") {
-        popup = .humanWorkout(humanID: human.id, actionType: actionType)
-    }
-
-    func openHumanMedication(_ human: Human, actionType: String = "humanMedication") {
-        popup = .humanMedication(humanID: human.id, actionType: actionType)
-    }
-
-    func dismissPopup(routeID: UUID) {
-        guard popup?.id == routeID else { return }
-        popup = nil
-    }
-
     func resetAllRoutes() {
         modal = nil
         fullScreen = nil
@@ -348,18 +273,12 @@ final class HomeRouteCoordinator: ObservableObject {
         alert = nil
         pendingRepeatAction = nil
         sheet = nil
-        popup = nil
+        settingsPresented = false
     }
 
     func resetHumanRoutes() {
         if let sheet, sheet.isHumanRoute {
             self.sheet = nil
-        }
-        switch popup {
-        case .humanWeight, .humanExpense, .humanNote, .humanWorkout, .humanMedication:
-            popup = nil
-        case .petWeight, .petExpense, .petMedication, .none:
-            break
         }
     }
 }

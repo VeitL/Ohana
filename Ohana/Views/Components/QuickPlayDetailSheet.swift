@@ -11,6 +11,7 @@ import SwiftData
 struct QuickPlayDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
+    var onClose: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -23,6 +24,8 @@ struct QuickPlayDetailSheet: View {
     @State private var playPlanIntervalDays = 3
     @State private var playPlanAnchorDate = Date()
     @State private var saveToastMessage: String?
+    @State private var playPlanSaveTask: Task<Void, Never>?
+    @State private var isSavingPlayPlan = false
     @State private var playFeedbackToken: CheckInFeedbackToken?
     @State private var chartProgress: Double = 0
 
@@ -39,6 +42,14 @@ struct QuickPlayDetailSheet: View {
                 $0.title == playPlanTitle
             }
             .sorted { $0.startDate < $1.startDate }
+            .first
+    }
+
+    private var missedPlayPlanReminder: Reminder? {
+        let now = Date()
+        return playPlanEvent?.reminders
+            .filter { !$0.isCompleted && ($0.isPending || $0.isFailed) && $0.scheduledAt <= now }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
             .first
     }
 
@@ -150,6 +161,10 @@ struct QuickPlayDetailSheet: View {
                 loadPlayPlanDraft()
                 animateChartIn()
             }
+            .onDisappear {
+                playPlanSaveTask?.cancel()
+                isSavingPlayPlan = false
+            }
         }
     }
 
@@ -174,9 +189,15 @@ struct QuickPlayDetailSheet: View {
 
             Spacer()
 
-            OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) {
-                dismiss()
-            }
+            OhanaPopupCloseButton(tint: Color.ohanaPrimaryText, action: closeDetail)
+        }
+    }
+
+    private func closeDetail() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 
@@ -250,7 +271,7 @@ struct QuickPlayDetailSheet: View {
             }
 
             Button { commitPlay() } label: {
-                Label(l.tr(zh: "打卡", en: "Check in", de: "Eintragen"), systemImage: "checkmark")
+                Label(playPrimaryTitle, systemImage: missedPlayPlanReminder == nil ? "checkmark" : "clock.badge.exclamationmark")
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
@@ -331,6 +352,13 @@ struct QuickPlayDetailSheet: View {
     }
 
     private var playPlanSubtitle: String {
+        if let missed = missedPlayPlanReminder {
+            return l.tr(
+                zh: "待补 \(playPlanDueText(for: missed.scheduledAt))",
+                en: "Catch up \(playPlanDueText(for: missed.scheduledAt))",
+                de: "\(playPlanDueText(for: missed.scheduledAt)) nachtragen"
+            )
+        }
         guard let event = playPlanEvent else {
             return l.tr(zh: "自由玩，或设置一个轻提醒。", en: "Free play, or add a light reminder.", de: "Frei spielen oder sanft erinnern.")
         }
@@ -342,6 +370,13 @@ struct QuickPlayDetailSheet: View {
     }
 
     private var planStatusText: String {
+        if let missed = missedPlayPlanReminder {
+            return l.tr(
+                zh: "待补 · \(playPlanDueText(for: missed.scheduledAt))",
+                en: "Catch up · \(playPlanDueText(for: missed.scheduledAt))",
+                de: "Nachtragen · \(playPlanDueText(for: missed.scheduledAt))"
+            )
+        }
         guard let event = playPlanEvent else {
             return l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt")
         }
@@ -350,6 +385,12 @@ struct QuickPlayDetailSheet: View {
             en: "Every \(max(event.recurrenceDays, 1))d · \(nextPlayPlanText(for: event.startDate))",
             de: "Alle \(max(event.recurrenceDays, 1))T · \(nextPlayPlanText(for: event.startDate))"
         )
+    }
+
+    private var playPrimaryTitle: String {
+        missedPlayPlanReminder == nil
+            ? l.tr(zh: "打卡", en: "Check in", de: "Eintragen")
+            : l.tr(zh: "补打卡", en: "Catch up", de: "Nachtragen")
     }
 
     private var recentLogsSection: some View {
@@ -561,12 +602,13 @@ struct QuickPlayDetailSheet: View {
                             .background(Color.ohanaCardSurfaceElevated, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .disabled(isSavingPlayPlan)
                 }
 
                 Button {
                     savePlayPlan()
                 } label: {
-                    Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
+                    Text(isSavingPlayPlan ? l.tr(zh: "保存中", en: "Saving", de: "Speichert") : l.tr(zh: "保存", en: "Save", de: "Speichern"))
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
@@ -574,6 +616,7 @@ struct QuickPlayDetailSheet: View {
                         .background(Color.goPurple, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .disabled(isSavingPlayPlan)
             }
         }
         .padding(.horizontal, 20)
@@ -649,32 +692,56 @@ struct QuickPlayDetailSheet: View {
     }
 
     private func savePlayPlan() {
-        CarePlanCalendarSync.syncPlayPlan(
-            pet: pet,
-            context: modelContext,
-            intervalDays: playPlanIntervalDays,
-            enabled: true,
-            anchor: playPlanAnchorDate
-        )
+        guard !isSavingPlayPlan else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            return
+        }
+        isSavingPlayPlan = true
+        playPlanSaveTask?.cancel()
         closePlayPlanEditor()
-        showToast(l.tr(zh: "计划已保存", en: "Plan saved", de: "Plan gespeichert"))
-        Task { @MainActor in
+        playPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: playPlanSaveDelayMilliseconds) {
+            CarePlanCalendarSync.syncPlayPlan(
+                pet: pet,
+                context: modelContext,
+                intervalDays: playPlanIntervalDays,
+                enabled: true,
+                anchor: playPlanAnchorDate
+            )
+            showToast(l.tr(zh: "计划已保存", en: "Plan saved", de: "Plan gespeichert"))
             if let event = fetchPlayPlanEvent() {
-                await ReminderSchedulingService.scheduleManyIfNeeded(reminders: event.reminders, context: modelContext, source: .detail)
+                Task { @MainActor in
+                    await ReminderSchedulingService.scheduleManyIfNeeded(reminders: event.reminders, context: modelContext, source: .detail)
+                }
             }
+            isSavingPlayPlan = false
+            playPlanSaveTask = nil
         }
     }
 
     private func deletePlayPlan() {
-        CarePlanCalendarSync.syncPlayPlan(
-            pet: pet,
-            context: modelContext,
-            intervalDays: 0,
-            enabled: false,
-            anchor: playPlanAnchorDate
-        )
+        guard !isSavingPlayPlan else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            return
+        }
+        isSavingPlayPlan = true
+        playPlanSaveTask?.cancel()
         closePlayPlanEditor()
-        showToast(l.tr(zh: "计划已关闭", en: "Plan off", de: "Plan aus"))
+        playPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: playPlanSaveDelayMilliseconds) {
+            CarePlanCalendarSync.syncPlayPlan(
+                pet: pet,
+                context: modelContext,
+                intervalDays: 0,
+                enabled: false,
+                anchor: playPlanAnchorDate
+            )
+            showToast(l.tr(zh: "计划已关闭", en: "Plan off", de: "Plan aus"))
+            isSavingPlayPlan = false
+            playPlanSaveTask = nil
+        }
+    }
+
+    private var playPlanSaveDelayMilliseconds: UInt64 {
+        AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true).allowsMotion ? 120 : 40
     }
 
     private func fetchPlayPlanEvent() -> Event? {
@@ -721,5 +788,17 @@ struct QuickPlayDetailSheet: View {
             return l.tr(zh: "明天", en: "tomorrow", de: "morgen")
         }
         return date.formatted(.dateTime.month().day())
+    }
+
+    private func playPlanDueText(for date: Date) -> String {
+        let cal = Calendar.current
+        let time = date.formatted(date: .omitted, time: .shortened)
+        if cal.isDateInToday(date) {
+            return l.tr(zh: "今天 \(time)", en: "today \(time)", de: "heute \(time)")
+        }
+        if cal.isDateInYesterday(date) {
+            return l.tr(zh: "昨天 \(time)", en: "yesterday \(time)", de: "gestern \(time)")
+        }
+        return date.formatted(date: .abbreviated, time: .shortened)
     }
 }

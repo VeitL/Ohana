@@ -17,6 +17,7 @@ struct FeedHomeTaskViewState {
     let todayAutoFeedCount: Int
     let hasNextManualReminder: Bool
     let hasMissedManualPlan: Bool
+    let lastExpiredManualPlanDate: Date?
     let todayManualPlanCompletionText: String
     let autoDailyTotalGrams: Double
     let latestAutoFeedDate: Date?
@@ -65,6 +66,7 @@ struct FeedHomeViewState {
                 todayAutoFeedCount: 0,
                 hasNextManualReminder: false,
                 hasMissedManualPlan: false,
+                lastExpiredManualPlanDate: nil,
                 todayManualPlanCompletionText: "0/1",
                 autoDailyTotalGrams: 0,
                 latestAutoFeedDate: nil,
@@ -100,6 +102,7 @@ struct FeedHomeViewState {
             todayAutoFeedCount: snapshot.todayAutoFeedCount,
             hasNextManualReminder: snapshot.hasNextManualReminder,
             hasMissedManualPlan: snapshot.hasMissedManualPlan,
+            lastExpiredManualPlanDate: snapshot.lastExpiredManualPlanDate,
             todayManualPlanCompletionText: snapshot.todayManualPlanCompletionText,
             autoDailyTotalGrams: snapshot.autoDailyTotalGrams,
             latestAutoFeedDate: snapshot.latestAutoFeedDate,
@@ -150,6 +153,7 @@ struct FeedHomeViewState {
             todayAutoFeedCount: snapshot.todayAutoFeedCount,
             hasNextManualReminder: snapshot.hasNextManualReminder,
             hasMissedManualPlan: snapshot.hasMissedManualPlan,
+            lastExpiredManualPlanDate: snapshot.lastExpiredManualPlanDate,
             todayManualPlanCompletionText: snapshot.todayManualPlanCompletionText,
             autoDailyTotalGrams: snapshot.autoDailyTotalGrams,
             latestAutoFeedDate: snapshot.latestAutoFeedDate,
@@ -226,6 +230,7 @@ struct FeedHomeSnapshotRevision: Equatable {
                 hasher.combine(record.totalGrams)
                 hasher.combine(record.dailyGrams)
                 hasher.combine(record.foodKindRaw)
+                hasher.combine(record.notes)
                 hasher.combine(record.remainingCorrectionGrams ?? -1)
                 hasher.combine(record.remainingCorrectionDate?.timeIntervalSince1970 ?? 0)
             }

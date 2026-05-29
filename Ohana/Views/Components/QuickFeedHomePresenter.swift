@@ -106,18 +106,27 @@ struct QuickFeedHomePresenter {
             case .manualReminder:
                 let hasPending = renderState.task.hasNextManualReminder
                 let hasMissedPlan = renderState.task.hasMissedManualPlan
+                let lastExpiredPlanDate = renderState.task.lastExpiredManualPlanDate
                 let completionText = renderState.task.todayManualPlanCompletionText
                 title = hasMissedPlan
                     ? localization.tr(zh: "有计划餐待补", en: "Meal missed", de: "Mahlzeit verpasst")
-                    : (hasPending ? localization.tr(zh: "有计划餐待打卡", en: "Planned meal ready", de: "Planmahlzeit bereit") : localization.tr(zh: "下一餐已安排", en: "Next meal is set", de: "Nächste Mahlzeit steht"))
+                    : (lastExpiredPlanDate != nil
+                        ? localization.tr(zh: "计划餐已逾期", en: "Plan meal expired", de: "Planmahlzeit abgelaufen")
+                        : (hasPending ? localization.tr(zh: "有计划餐待打卡", en: "Planned meal ready", de: "Planmahlzeit bereit") : localization.tr(zh: "下一餐已安排", en: "Next meal is set", de: "Nächste Mahlzeit steht")))
                 metricTitle = localization.tr(zh: "今日计划", en: "Today plan", de: "Heute Plan")
                 metricValue = completionText
-                detail = nextFeedDetailText(
-                    events: renderState.task.manualPlanEvents,
-                    fallback: localization.tr(zh: "今天 \(completionText)", en: "Today \(completionText)", de: "Heute \(completionText)")
-                )
-                primaryTitle = hasPending ? localization.tr(zh: "完成", en: "Complete", de: "Erledigen") : localization.tr(zh: "查看", en: "View", de: "Ansehen")
-                primaryIcon = hasPending ? "checkmark" : "calendar"
+                if let lastExpiredPlanDate {
+                    detail = lastExpiredPlanText(lastExpiredPlanDate)
+                } else {
+                    detail = nextFeedDetailText(
+                        events: renderState.task.manualPlanEvents,
+                        fallback: localization.tr(zh: "今天 \(completionText)", en: "Today \(completionText)", de: "Heute \(completionText)")
+                    )
+                }
+                primaryTitle = hasMissedPlan
+                    ? localization.tr(zh: "补录", en: "Catch up", de: "Nachtragen")
+                    : (hasPending ? localization.tr(zh: "完成", en: "Complete", de: "Erledigen") : localization.tr(zh: "查看", en: "View", de: "Ansehen"))
+                primaryIcon = hasMissedPlan ? "clock.badge.exclamationmark" : (hasPending ? "checkmark" : "calendar")
                 isPrimaryEnabled = true
             case .autoFeeder:
                 title = localization.tr(zh: "自动记录中", en: "Auto logging", de: "Auto-Aufzeichnung")
@@ -328,6 +337,15 @@ struct QuickFeedHomePresenter {
             zh: "下次 \(time) · \(kind) · \(grams)",
             en: "Next \(time) · \(kind) · \(grams)",
             de: "Nächste \(time) · \(kind) · \(grams)"
+        )
+    }
+
+    private func lastExpiredPlanText(_ date: Date) -> String {
+        let time = date.formatted(date: .abbreviated, time: .shortened)
+        return localization.tr(
+            zh: "最后逾期 \(time)",
+            en: "Last missed \(time)",
+            de: "Zuletzt verpasst \(time)"
         )
     }
 

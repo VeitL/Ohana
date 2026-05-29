@@ -11,12 +11,17 @@ import SwiftUI
 struct FocusHomeRouteSheetModifier: ViewModifier {
     let pets: [Pet]
     let humans: [Human]
+    let electronicPets: [OasisElectronicPet]
     let l: L10n
 
     @ObservedObject var routes: HomeRouteCoordinator
 
     @Binding var activeHumanIdStr: String
     @State private var lastModalRoute: HomeModalRoute?
+    @State private var settingsPresentationProgress: CGFloat = 0
+    @State private var isSettingsContentMounted = false
+    @State private var settingsPresentationTask: Task<Void, Never>?
+    @State private var settingsContentMountTask: Task<Void, Never>?
 
     let onAddEntityDismissed: () -> Void
     let onPetSavedFromAddEntity: (Pet) -> Void
@@ -28,20 +33,32 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: $routes.modal, onDismiss: handleModalDismissed) { route in
+            .sheet(item: modalSheetRouteBinding, onDismiss: handleModalDismissed) { route in
                 homeModalDestination(for: route)
                     .onAppear {
                         lastModalRoute = route
                     }
             }
-            .sheet(item: $routes.sheet) { route in
+            .sheet(item: systemSheetRouteBinding) { route in
                 homeSheetDestination(for: route)
             }
-            .fullScreenCover(item: $routes.fullScreen) { route in
+            .fullScreenCover(item: fullScreenRouteBinding) { route in
                 homeFullScreenDestination(for: route)
             }
             .overlay {
-                homeOverlayDestination()
+                ZStack {
+                    homeOverlayLayer()
+                    inlineSettingsLayer()
+                }
+            }
+            .onAppear {
+                reconcileInlineSettingsPresentation()
+            }
+            .onChange(of: settingsRouteIsActive) { _, _ in
+                reconcileInlineSettingsPresentation()
+            }
+            .onDisappear {
+                cancelDeferredPresentationTasks()
             }
             .alert(antiRepeatTitleText, isPresented: antiRepeatAlertBinding) {
                 Button(l.homeConfirmCheckIn, role: .destructive) {
@@ -76,6 +93,56 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             }
     }
 
+    private var modalSheetRouteBinding: Binding<HomeModalRoute?> {
+        Binding(
+            get: {
+                if case .crewRoster = routes.modal {
+                    return nil
+                }
+                return routes.modal
+            },
+            set: { route in
+                if route == nil,
+                   case .crewRoster = routes.modal {
+                    return
+                }
+                routes.modal = route
+            }
+        )
+    }
+
+    private var fullScreenRouteBinding: Binding<HomeFullScreenRoute?> {
+        Binding(
+            get: {
+                if case .settings = routes.fullScreen {
+                    return nil
+                }
+                if case .coconutLog = routes.fullScreen {
+                    return nil
+                }
+                return routes.fullScreen
+            },
+            set: { route in
+                routes.fullScreen = route
+            }
+        )
+    }
+
+    private var systemSheetRouteBinding: Binding<HomeSheetRoute?> {
+        Binding(
+            get: {
+                return routes.sheet
+            },
+            set: { route in
+                routes.sheet = route
+            }
+        )
+    }
+
+    private var settingsRouteIsActive: Bool {
+        routes.settingsPresented
+    }
+
     @ViewBuilder
     private func homeModalDestination(for route: HomeModalRoute) -> some View {
         switch route {
@@ -106,7 +173,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                     onSelectHuman: { human in
                         routes.dismissModal()
                         onCrewHumanSelected(human)
-                    }
+                    },
+                    onClose: { routes.dismissModal() }
                 )
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -119,22 +187,137 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             }
             .ohanaSheetPagePresentation() // ui-v4: allow family collaboration/member hub
         case .accountSwitcher:
-            HumanAccountSwitcherSheet()
+            HumanAccountSwitcherSheet(
+                homePets: pets,
+                homeHumans: humans,
+                homeElectronicPets: electronicPets
+            )
                 .ohanaCompactSheetPresentation(detents: [.medium, .large])
         case let .calendar(entityID, humanID):
             CalendarView(
                 preselectedPetId: entityID,
-                preselectedHumanId: humanID
+                preselectedHumanId: humanID,
+                onOpenEventDestination: openCalendarEventDestination
             )
             .ohanaSheetPagePresentation() // ui-v4: allow calendar as long sheet
         }
+    }
+
+    private func openCalendarEventDestination(_ destination: FocusHomeReminderDestination) {
+        routes.dismissModal()
+        DispatchQueue.main.async {
+            openCalendarEventDestinationAfterDismiss(destination)
+        }
+    }
+
+    private func openCalendarEventDestinationAfterDismiss(_ destination: FocusHomeReminderDestination) {
+        switch destination {
+        case let .petQuick(key, pet):
+            openPetQuickKey(key, pet: pet)
+        case let .petFeature(feature, pet):
+            openPetFeature(feature, pet: pet)
+        case let .petHealth(pet, section):
+            routes.openSheet(.petHealth(pet.id, initialSection: section))
+        case let .humanQuick(key, human):
+            openHumanQuickKey(key, human: human)
+        case let .humanDetail(human):
+            routes.openSheet(.humanBasicInfo(human.id))
+        case .plant:
+            routes.openFunctionMenu(destination: .plantsDashboard)
+        case let .functionMenu(destination):
+            routes.openFunctionMenu(destination: destination)
+        case let .calendar(entityId, humanId):
+            routes.openCalendar(entityID: entityId, humanID: humanId)
+        }
+    }
+
+    private func openPetQuickKey(_ key: String, pet: Pet) {
+        switch key {
+        case "feed":
+            routes.openSheet(.petFeed(pet.id, opensManualSheet: false))
+        case "water", "waterChange", "filterClean":
+            routes.openSheet(.petWater(pet.id))
+        case "potty":
+            routes.openSheet(.petPotty(pet.id))
+        case "litter":
+            routes.openSheet(.petLitter(pet.id))
+        case "walk":
+            routes.openSheet(.petWalkSummary(pet.id))
+        case "play":
+            routes.openSheet(.petPlay(pet.id))
+        case "health":
+            routes.openSheet(.petHealth(pet.id, initialSection: nil))
+        case "medication":
+            routes.openSheet(.petMedication(pet.id))
+        case "groom", "cageCleaning", "freeFlight", "misting", "substrateChange":
+            routes.openSheet(.petHygiene(pet.id))
+        case "weight":
+            routes.openSheet(.petWeight(pet.id))
+        case "expense":
+            routes.openSheet(.petExpense(pet.id))
+        case "moment":
+            routes.openQuickMoment(pet)
+        default:
+            routes.openSheet(.petAllFeatures(pet.id))
+        }
+    }
+
+    private func openPetFeature(_ feature: PetFeature, pet: Pet) {
+        switch feature {
+        case .health:
+            routes.openSheet(.petHealth(pet.id, initialSection: nil))
+        case .medications:
+            routes.openSheet(.petMedication(pet.id))
+        case .food:
+            routes.openSheet(.petFeed(pet.id, opensManualSheet: false))
+        case .hygiene:
+            routes.openSheet(.petHygiene(pet.id))
+        case .walks:
+            routes.openSheet(.petWalkSummary(pet.id))
+        case .potty:
+            routes.openSheet(.petPotty(pet.id))
+        case .basicInfo:
+            routes.openSheet(.petBasicInfo(pet.id))
+        case .moments:
+            routes.openSheet(.petMomentHistory(pet.id))
+        case .weight:
+            routes.openSheet(.petWeight(pet.id))
+        case .expense:
+            routes.openSheet(.petExpense(pet.id))
+        case .retention, .documents, .achievements:
+            routes.openSheet(.petAllFeatures(pet.id))
+        }
+    }
+
+    private func openHumanQuickKey(_ key: String, human: Human) {
+        switch key {
+        case "humanWeight":
+            routes.openSheet(.humanWeight(human.id))
+        case "humanWorkout":
+            routes.openSheet(.humanWorkout(human.id))
+        case "humanMedication":
+            routes.openSheet(.humanMedication(human.id))
+        case "humanExpense":
+            routes.openSheet(.humanExpense(human.id))
+        case "humanNote":
+            routes.openSheet(.humanNote(human.id))
+        default:
+            routes.openSheet(.humanAllFeatures(human.id))
+        }
+    }
+
+    private func cancelDeferredPresentationTasks() {
+        settingsPresentationTask?.cancel()
+        settingsContentMountTask?.cancel()
+        settingsPresentationTask = nil
+        settingsContentMountTask = nil
     }
 
     @ViewBuilder
     private func homeFullScreenDestination(for route: HomeFullScreenRoute) -> some View {
         switch route {
         case .settings:
-            SettingsView()
+            SettingsView(homePets: pets, homeHumans: humans, homeElectronicPets: electronicPets)
         case let .walk(id):
             if let pet = pet(id) {
                 WalkTrackingFullScreen(pet: pet)
@@ -145,6 +328,147 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             OasisRewardView()
         case let .coconutLog(subject):
             CoconutLogView(subject: subject)
+        }
+    }
+
+    @ViewBuilder
+    private func inlineSettingsLayer() -> some View {
+        if settingsRouteIsActive || settingsPresentationProgress > 0.001 {
+            OhanaDeferredInlinePageCover(
+                progress: settingsPresentationProgress,
+                isContentMounted: isSettingsContentMounted
+            ) {
+                SettingsView(
+                    homePets: pets,
+                    homeHumans: humans,
+                    homeElectronicPets: electronicPets,
+                    onClose: dismissInlineSettings
+                )
+            }
+            .zIndex(120)
+        }
+    }
+
+    private func openInlineSettings() {
+        settingsPresentationTask?.cancel()
+        settingsContentMountTask?.cancel()
+        settingsPresentationTask = nil
+        settingsContentMountTask = nil
+        isSettingsContentMounted = false
+        settingsPresentationProgress = 0
+        settingsPresentationTask = OhanaFrameScheduler.runAfterNextFrame {
+            guard settingsRouteIsActive else {
+                settingsPresentationTask = nil
+                return
+            }
+            withAnimation(GoMotion.sheetEnter) {
+                settingsPresentationProgress = 1
+            }
+            settingsPresentationTask = nil
+        }
+        scheduleSettingsContentMount(milliseconds: 80)
+    }
+
+    private func reconcileInlineSettingsPresentation() {
+        if settingsRouteIsActive {
+            openInlineSettingsIfNeeded()
+        } else {
+            collapseInlineSettings(clearRoute: false)
+        }
+    }
+
+    private func openInlineSettingsIfNeeded() {
+        guard settingsPresentationProgress <= 0.001,
+              !isSettingsContentMounted,
+              settingsPresentationTask == nil else {
+            if !isSettingsContentMounted, settingsContentMountTask == nil {
+                scheduleSettingsContentMount(milliseconds: 40)
+            }
+            return
+        }
+        openInlineSettings()
+    }
+
+    private func scheduleSettingsContentMount(milliseconds: UInt64) {
+        settingsContentMountTask?.cancel()
+        settingsContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
+            guard settingsRouteIsActive else {
+                settingsContentMountTask = nil
+                return
+            }
+            withAnimation(GoMotion.quick) {
+                isSettingsContentMounted = true
+            }
+            settingsContentMountTask = nil
+        }
+    }
+
+    private func dismissInlineSettings() {
+        OhanaFeedback.light()
+        collapseInlineSettings(clearRoute: true)
+    }
+
+    private func collapseInlineSettings(clearRoute: Bool) {
+        guard settingsRouteIsActive || settingsPresentationProgress > 0.001 || isSettingsContentMounted else { return }
+        settingsContentMountTask?.cancel()
+        settingsContentMountTask = nil
+        isSettingsContentMounted = false
+        withAnimation(GoMotion.sheetEnter) {
+            settingsPresentationProgress = 0
+        }
+        settingsPresentationTask?.cancel()
+        settingsPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 340) {
+            guard settingsPresentationProgress <= 0.02 else {
+                settingsPresentationTask = nil
+                return
+            }
+            if clearRoute, routes.settingsPresented {
+                routes.dismissSettings()
+            }
+            isSettingsContentMounted = false
+            settingsPresentationTask = nil
+        }
+    }
+
+    @ViewBuilder
+    private func homeOverlayLayer() -> some View {
+        homeOverlayDestination()
+        inlineCoconutLogDestination()
+        crewRosterOverlayDestination()
+    }
+
+    @ViewBuilder
+    private func inlineCoconutLogDestination() -> some View {
+        if case let .coconutLog(subject) = routes.fullScreen {
+            HomeCoconutLogInlineHost(
+                subject: subject,
+                onClose: {
+                    routes.dismissFullScreen()
+                }
+            )
+            .ignoresSafeArea()
+            .zIndex(130)
+        }
+    }
+
+    @ViewBuilder
+    private func crewRosterOverlayDestination() -> some View {
+        if case .crewRoster = routes.modal {
+            HomeCrewRosterInlineHost(
+                onClose: {
+                    routes.dismissModal()
+                },
+                onSelectPet: { pet in
+                    routes.dismissModal()
+                    onCrewPetSelected(pet)
+                },
+                onSelectHuman: { human in
+                    routes.dismissModal()
+                    onCrewHumanSelected(human)
+                }
+            )
+            .ignoresSafeArea()
+            .zIndex(140)
         }
     }
 
@@ -333,6 +657,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 QuickFeedDetailSheet(
                     pet: pet,
                     onRemove: { routes.dismissSheet() },
+                    onClose: { routes.dismissSheet() },
                     opensManualSheetOnAppear: opensManualSheet
                 )
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
@@ -477,12 +802,371 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 routes.dismissFullScreen()
             }
     }
+
+}
+
+private struct HomeCrewRosterInlineHost: View {
+    let onClose: () -> Void
+    let onSelectPet: (Pet) -> Void
+    let onSelectHuman: (Human) -> Void
+
+    @StateObject private var safeAreaController = FocusHomeSafeAreaController()
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var isShellVisible = false
+    @State private var isContentMounted = false
+    @State private var isContentVisible = false
+    @State private var isInteractionReady = false
+    @State private var isClosing = false
+    @State private var closeTask: Task<Void, Never>?
+
+    var body: some View {
+        GeometryReader { proxy in
+            let safeTop = safeAreaController.resolvedTop(in: proxy)
+            let safeBottom = safeAreaController.resolvedBottom(in: proxy)
+
+            ZStack {
+                ZStack {
+                    OhanaAppBackground()
+                        .ignoresSafeArea()
+
+                    ZStack {
+                        HomeCrewRosterOpeningShell(
+                            safeTopInset: safeTop,
+                            onClose: requestClose
+                        )
+                        .opacity(isContentMounted ? 0 : 1)
+
+                        if isContentMounted {
+                            CrewRosterOverlay(
+                                onSelectPet: selectPet,
+                                onSelectHuman: selectHuman,
+                                onClose: requestClose,
+                                safeTopInset: safeTop,
+                                safeBottomInset: safeBottom
+                            )
+                            .opacity(isContentVisible ? 1 : 0)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .offset(y: presentationOffset(in: proxy, safeBottom: safeBottom))
+                .allowsHitTesting(isInteractionReady && !isClosing)
+            }
+            .accessibilityAddTraits(.isModal)
+            .onAppear {
+                safeAreaController.stabilize(from: proxy)
+            }
+        }
+        .task {
+            await playEntrance()
+        }
+        .onDisappear {
+            closeTask?.cancel()
+        }
+    }
+
+    @MainActor
+    private func playEntrance() async {
+        isShellVisible = false
+        isContentMounted = false
+        isContentVisible = false
+        isInteractionReady = false
+        isClosing = false
+
+        await OhanaFrameScheduler.waitAfterNextFrame()
+        guard !Task.isCancelled else { return }
+        isContentMounted = true
+        isContentVisible = true
+
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: contentPrepareDelayMilliseconds)
+        guard !Task.isCancelled, !isClosing else { return }
+        withAnimation(drawerEnterAnimation) {
+            isShellVisible = true
+        }
+
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: interactionReadyDelayMilliseconds)
+        guard !Task.isCancelled, !isClosing else { return }
+        isInteractionReady = true
+    }
+
+    private func requestClose() {
+        closeThen(onClose)
+    }
+
+    private func selectPet(_ pet: Pet) {
+        closeThen {
+            onSelectPet(pet)
+        }
+    }
+
+    private func selectHuman(_ human: Human) {
+        closeThen {
+            onSelectHuman(human)
+        }
+    }
+
+    private func closeThen(_ action: @escaping () -> Void) {
+        guard !isClosing else { return }
+        isClosing = true
+        isInteractionReady = false
+        OhanaFeedback.light()
+        withAnimation(drawerExitAnimation) {
+            isShellVisible = false
+        }
+        closeTask?.cancel()
+        closeTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: closeDelayMilliseconds) {
+            action()
+        }
+    }
+
+    private func presentationOffset(in proxy: GeometryProxy, safeBottom: CGFloat) -> CGFloat {
+        guard allowsMotion else { return 0 }
+        return isShellVisible ? 0 : proxy.size.height + safeBottom + 24
+    }
+
+    private var allowsMotion: Bool {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion
+    }
+
+    private var drawerEnterAnimation: Animation {
+        allowsMotion ? .smooth(duration: 0.38, extraBounce: 0.0) : GoMotion.reduced
+    }
+
+    private var drawerExitAnimation: Animation {
+        allowsMotion ? .smooth(duration: 0.38, extraBounce: 0.0) : GoMotion.reduced
+    }
+
+    private var contentPrepareDelayMilliseconds: UInt64 {
+        allowsMotion ? 32 : 0
+    }
+
+    private var closeDelayMilliseconds: UInt64 {
+        allowsMotion ? 430 : 90
+    }
+
+    private var interactionReadyDelayMilliseconds: UInt64 {
+        allowsMotion ? 420 : 0
+    }
+}
+
+private struct HomeCrewRosterOpeningShell: View {
+    let safeTopInset: CGFloat
+    let onClose: () -> Void
+
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "person.2.crop.square.stack.fill")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 42, height: 42)
+                    .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l.tr(zh: "Ohana 成员", en: "Ohana Members", de: "Ohana Mitglieder"))
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(zh: "成员和首页显示", en: "Members and home cards", de: "Mitglieder und Startkarten"))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+
+                Spacer()
+
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 40, height: 40)
+                        .background(Color.ohanaControlFill, in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, safeTopInset + 16)
+            .padding(.bottom, 12)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct HomeCoconutLogInlineHost: View {
+    let subject: CoconutLogSubject
+    let onClose: () -> Void
+
+    @StateObject private var safeAreaController = FocusHomeSafeAreaController()
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var isShellVisible = false
+    @State private var isContentMounted = false
+    @State private var isContentVisible = false
+    @State private var isClosing = false
+    @State private var closeTask: Task<Void, Never>?
+
+    var body: some View {
+        GeometryReader { proxy in
+            let safeTop = safeAreaController.resolvedTop(in: proxy)
+            let safeBottom = safeAreaController.resolvedBottom(in: proxy)
+
+            ZStack {
+                OhanaAppBackground()
+                    .ignoresSafeArea()
+
+                ZStack {
+                    HomeCoconutLogOpeningShell(
+                        safeTopInset: safeTop,
+                        onClose: requestClose
+                    )
+                    .opacity(isContentMounted ? 0 : 1)
+
+                    if isContentMounted {
+                        CoconutLogView(subject: subject, onClose: requestClose)
+                            .opacity(isContentVisible ? 1 : 0)
+                            .transition(.opacity)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .offset(y: presentationOffset(in: proxy, safeBottom: safeBottom))
+                .allowsHitTesting(isShellVisible && !isClosing)
+            }
+            .accessibilityAddTraits(.isModal)
+            .onAppear {
+                safeAreaController.stabilize(from: proxy)
+            }
+        }
+        .task(id: subject.id) {
+            await playEntrance()
+        }
+        .onDisappear {
+            closeTask?.cancel()
+        }
+    }
+
+    @MainActor
+    private func playEntrance() async {
+        closeTask?.cancel()
+        isShellVisible = false
+        isContentMounted = false
+        isContentVisible = false
+        isClosing = false
+
+        await OhanaFrameScheduler.waitAfterNextFrame()
+        guard !Task.isCancelled else { return }
+        withAnimation(drawerEnterAnimation) {
+            isShellVisible = true
+        }
+
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: contentMountDelayMilliseconds)
+        guard !Task.isCancelled, !isClosing else { return }
+        isContentMounted = true
+        withAnimation(GoMotion.quick) {
+            isContentVisible = true
+        }
+    }
+
+    private func requestClose() {
+        guard !isClosing else { return }
+        isClosing = true
+        OhanaFeedback.light()
+        withAnimation(GoMotion.quick) {
+            isContentVisible = false
+        }
+        isContentMounted = false
+        withAnimation(drawerExitAnimation) {
+            isShellVisible = false
+        }
+        closeTask?.cancel()
+        closeTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: closeDelayMilliseconds) {
+            onClose()
+        }
+    }
+
+    private func presentationOffset(in proxy: GeometryProxy, safeBottom: CGFloat) -> CGFloat {
+        guard allowsMotion else { return 0 }
+        return isShellVisible ? 0 : proxy.size.height + safeBottom + 24
+    }
+
+    private var allowsMotion: Bool {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion
+    }
+
+    private var drawerEnterAnimation: Animation {
+        allowsMotion ? .smooth(duration: 0.38, extraBounce: 0.0) : GoMotion.reduced
+    }
+
+    private var drawerExitAnimation: Animation {
+        allowsMotion ? .smooth(duration: 0.38, extraBounce: 0.0) : GoMotion.reduced
+    }
+
+    private var contentMountDelayMilliseconds: UInt64 {
+        allowsMotion ? 180 : 0
+    }
+
+    private var closeDelayMilliseconds: UInt64 {
+        allowsMotion ? 430 : 90
+    }
+}
+
+private struct HomeCoconutLogOpeningShell: View {
+    let safeTopInset: CGFloat
+    let onClose: () -> Void
+
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "circle.hexagongrid.fill")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 42, height: 42)
+                    .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l.tr(zh: "椰子历史", en: "Coconut History", de: "Kokosnuss-Historie"))
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(zh: "每一笔收支", en: "Every coconut change", de: "Jede Bewegung"))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+
+                Spacer()
+
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 40, height: 40)
+                        .background(Color.ohanaControlFill, in: Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, safeTopInset + 16)
+            .padding(.bottom, 12)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
 }
 
 extension View {
     func focusHomeRouteSheets(
         pets: [Pet],
         humans: [Human],
+        electronicPets: [OasisElectronicPet],
         l: L10n,
         routes: HomeRouteCoordinator,
         activeHumanIdStr: Binding<String>,
@@ -497,6 +1181,7 @@ extension View {
         modifier(FocusHomeRouteSheetModifier(
             pets: pets,
             humans: humans,
+            electronicPets: electronicPets,
             l: l,
             routes: routes,
             activeHumanIdStr: activeHumanIdStr,

@@ -14,9 +14,12 @@ struct CrewRosterOverlay: View {
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
     var onAddEntity: ((EntityType) -> Void)? = nil
+    var onClose: (() -> Void)? = nil
     var hideToolbar: Bool = false
     var searchTrigger: Bool = false
     var addMemberTrigger: Bool = false
+    var safeTopInset: CGFloat = 0
+    var safeBottomInset: CGFloat = 0
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -38,8 +41,13 @@ struct CrewRosterOverlay: View {
     @State private var expandedRosterCardId: UUID? = nil
     @State private var showHomeStackFullAlert = false
     @State private var homeStackFullMemberName = ""
+    @State private var homeVisibilityOverrides: [UUID: Bool] = [:]
+    @State private var homeVisibilityCommitTasks: [UUID: Task<Void, Never>] = [:]
     @State private var rosterHeroProgress: CGFloat = 0
     @State private var rosterHeroDirection: Int = 1
+    @State private var editingRosterCardId: UUID? = nil
+    @State private var rosterEditorProgress: CGFloat = 0
+    @State private var isRosterEditorContentMounted = false
     @Namespace private var rosterWalletNamespace
     @Namespace private var rosterHeroNamespace
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
@@ -117,7 +125,7 @@ struct CrewRosterOverlay: View {
                 if shouldShowRosterFab {
                     rosterFloatingActionOverlay
                         .padding(.trailing, 22)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, safeBottomInset + 24)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .transition(.scale(scale: 0.86, anchor: .center).combined(with: .opacity))
                 }
@@ -141,12 +149,12 @@ struct CrewRosterOverlay: View {
                 openMemberAddMenu()
             }
             .onAppear {
-                if showsFamilyCollaboration {
-                    selectedRosterMode = .collaboration
-                }
+                selectedRosterMode = .members
             }
             .onChange(of: showsFamilyCollaboration) { _, canCollaborate in
-                selectedRosterMode = canCollaborate ? .collaboration : .members
+                if !canCollaborate {
+                    selectedRosterMode = .members
+                }
                 collaborationEditorPresented = false
                 memberAddMenuItemsVisible = false
                 memberAddMenuExpanded = false
@@ -168,7 +176,7 @@ struct CrewRosterOverlay: View {
             rosterControlRow
         }
         .padding(.horizontal, 18)
-        .padding(.top, 16)
+        .padding(.top, safeTopInset + 16)
         .padding(.bottom, 12)
         .background {
             LinearGradient(
@@ -263,7 +271,7 @@ struct CrewRosterOverlay: View {
             Spacer()
 
             if !hideToolbar {
-                Button { dismiss() } label: {
+                Button { closeRoster() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
@@ -273,6 +281,14 @@ struct CrewRosterOverlay: View {
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
             }
+        }
+    }
+
+    private func closeRoster() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 
@@ -478,31 +494,59 @@ struct CrewRosterOverlay: View {
             namespace: rosterWalletNamespace,
             heroNamespace: rosterHeroNamespace,
             avatarCacheRevision: 0,
+            editingCardId: editingRosterCardId,
+            editorProgress: rosterEditorProgress,
+            isEditorContentMounted: isRosterEditorContentMounted,
             expandedInfo: { card in
                 CrewRosterWalletInfoOverlay(card: card)
             },
             cardOverlay: { card in
                 rosterHomeVisibilityOverlay(for: card)
             },
+            editorContent: { card in
+                rosterProfileEditor(for: card)
+            },
             onSelect: openRosterWalletCard,
-            onCollapse: closeRosterWalletCard
+            onCollapse: closeRosterWalletCard,
+            onOpenEditor: openRosterCardEditor,
+            onCloseEditor: closeRosterCardEditor
         )
         .padding(.top, 2)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
+    private func rosterProfileEditor(for card: FocusCard) -> some View {
+        if let pet = filteredPets.first(where: { $0.id == card.id }) {
+            CrewRosterPetProfileEditor(pet: pet, onCancel: closeRosterCardEditor) {
+                postHomeVisibilityChanged(id: pet.id, kind: "pet")
+                closeRosterCardEditor()
+            }
+        } else if let human = filteredHumans.first(where: { $0.id == card.id }) {
+            CrewRosterHumanProfileEditor(human: human, onCancel: closeRosterCardEditor) {
+                postHomeVisibilityChanged(id: human.id, kind: "human")
+                closeRosterCardEditor()
+            }
+        } else if let plant = filteredPlants.first(where: { $0.id == card.id }) {
+            CrewRosterPlantProfileEditor(plant: plant, onCancel: closeRosterCardEditor) {
+                postHomeVisibilityChanged(id: plant.id, kind: "plant")
+                closeRosterCardEditor()
+            }
+        }
+    }
+
+    @ViewBuilder
     private func rosterHomeVisibilityOverlay(for card: FocusCard) -> some View {
         if let pet = filteredPets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
             RosterHomeVisibilityToggle(
-                isOn: HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw),
+                isOn: effectivePetHomeVisibility(pet),
                 label: l.tr(zh: "首页", en: "Home", de: "Start")
             ) {
                 setPetHomeVisibility(pet, visible: $0)
             }
         } else if let human = filteredHumans.first(where: { $0.id == card.id }) {
             RosterHomeVisibilityToggle(
-                isOn: human.shouldShowOnHome,
+                isOn: effectiveHumanHomeVisibility(human),
                 label: l.tr(zh: "首页", en: "Home", de: "Start")
             ) {
                 setHumanHomeVisibility(human, visible: $0)
@@ -524,36 +568,92 @@ struct CrewRosterOverlay: View {
         )
     }
 
-    private func setPetHomeVisibility(_ pet: Pet, visible: Bool) {
-        let currentlyVisible = HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw)
-        guard currentlyVisible != visible else { return }
+    private func setPetHomeVisibility(_ pet: Pet, visible: Bool) -> Bool {
+        let currentlyVisible = effectivePetHomeVisibility(pet)
+        guard currentlyVisible != visible else { return true }
         OhanaFeedback.light()
         if visible,
-           !HomeCardVisibility.canShowPet(pet, pets: pets, humans: humans, raw: hiddenHomePetIDsRaw) {
+           !canShowHomeCard(id: pet.id) {
             showHomeVisibilityLimit(for: pet.name)
-            return
+            return false
         }
         withAnimation(GoMotion.feedback) {
-            hiddenHomePetIDsRaw = HomeCardVisibility.rawBySettingPet(pet, visible: visible, raw: hiddenHomePetIDsRaw)
+            homeVisibilityOverrides[pet.id] = visible
         }
-        postHomeVisibilityChanged(id: pet.id, kind: "pet")
+        scheduleHomeVisibilityCommit(id: pet.id) {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                hiddenHomePetIDsRaw = HomeCardVisibility.rawBySettingPet(pet, visible: visible, raw: hiddenHomePetIDsRaw)
+                homeVisibilityOverrides[pet.id] = nil
+            }
+            postHomeVisibilityChanged(id: pet.id, kind: "pet")
+        }
+        return true
     }
 
-    private func setHumanHomeVisibility(_ human: Human, visible: Bool) {
-        guard human.shouldShowOnHome != visible else { return }
+    private func setHumanHomeVisibility(_ human: Human, visible: Bool) -> Bool {
+        guard effectiveHumanHomeVisibility(human) != visible else { return true }
         OhanaFeedback.light()
         if visible,
-           !HomeCardVisibility.canShowHuman(human, pets: pets, humans: humans, raw: hiddenHomePetIDsRaw) {
+           !canShowHomeCard(id: human.id) {
             showHomeVisibilityLimit(for: human.name)
-            return
+            return false
         }
         withAnimation(GoMotion.feedback) {
-            human.shouldShowOnHome = visible
+            homeVisibilityOverrides[human.id] = visible
         }
-        OhanaFrameScheduler.runAfterNextFrame {
+        scheduleHomeVisibilityCommit(id: human.id) {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                human.shouldShowOnHome = visible
+                homeVisibilityOverrides[human.id] = nil
+            }
             modelContext.safeSave()
             postHomeVisibilityChanged(id: human.id, kind: "human")
         }
+        return true
+    }
+
+    private func effectivePetHomeVisibility(_ pet: Pet) -> Bool {
+        homeVisibilityOverrides[pet.id] ?? HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw)
+    }
+
+    private func effectiveHumanHomeVisibility(_ human: Human) -> Bool {
+        homeVisibilityOverrides[human.id] ?? human.shouldShowOnHome
+    }
+
+    private func canShowHomeCard(id: UUID) -> Bool {
+        if effectiveHomeVisibilityCount() < HomeCardVisibility.maxVisibleCards {
+            return true
+        }
+        if pets.contains(where: { $0.id == id && effectivePetHomeVisibility($0) }) {
+            return true
+        }
+        if humans.contains(where: { $0.id == id && effectiveHumanHomeVisibility($0) }) {
+            return true
+        }
+        return false
+    }
+
+    private func effectiveHomeVisibilityCount() -> Int {
+        let petCount = pets.filter { !$0.hasPassedAway && effectivePetHomeVisibility($0) }.count
+        let humanCount = humans.filter { effectiveHumanHomeVisibility($0) }.count
+        return petCount + humanCount
+    }
+
+    private func scheduleHomeVisibilityCommit(id: UUID, operation: @escaping @MainActor () -> Void) {
+        homeVisibilityCommitTasks[id]?.cancel()
+        homeVisibilityCommitTasks[id] = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeVisibilityCommitDelayMilliseconds) {
+            guard !Task.isCancelled else { return }
+            operation()
+            homeVisibilityCommitTasks[id] = nil
+        }
+    }
+
+    private var homeVisibilityCommitDelayMilliseconds: UInt64 {
+        AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true).allowsMotion ? 220 : 70
     }
 
     private func showHomeVisibilityLimit(for name: String) {
@@ -605,6 +705,9 @@ struct CrewRosterOverlay: View {
         guard expandedRosterCardId == nil else { return }
         memberAddMenuItemsVisible = false
         memberAddMenuExpanded = false
+        editingRosterCardId = nil
+        rosterEditorProgress = 0
+        isRosterEditorContentMounted = false
         rosterHeroDirection = 1
         rosterHeroProgress = 0
         expandedRosterCardId = card.id
@@ -617,6 +720,10 @@ struct CrewRosterOverlay: View {
     }
 
     private func closeRosterWalletCard() {
+        guard editingRosterCardId == nil else {
+            closeRosterCardEditor()
+            return
+        }
         guard expandedRosterCardId != nil else { return }
         rosterHeroDirection = -1
         OhanaFeedback.light()
@@ -630,61 +737,37 @@ struct CrewRosterOverlay: View {
         }
     }
 
-    private var bentoDex: some View {
-        VStack(spacing: 16) {
-            // ── 宠物区（Wallet 栈）
-            if !filteredPets.isEmpty {
-                dexSectionLabel(l.tr(zh: "宠物", en: "Pets", de: "Tiere"), count: filteredPets.count, symbol: "pawprint.fill")
-                BentoPetGrid(pets: filteredPets, onSelect: { pet in
-                    openRosterPetDetail(pet)
-                })
-                .padding(.horizontal, 16)
+    private func openRosterCardEditor(_ card: FocusCard) {
+        guard expandedRosterCardId == card.id, editingRosterCardId == nil else { return }
+        editingRosterCardId = card.id
+        rosterEditorProgress = 0
+        isRosterEditorContentMounted = false
+        OhanaFeedback.medium()
+        OhanaFrameScheduler.runAfterNextFrame {
+            withAnimation(HeroAnim.walletSpring) {
+                rosterEditorProgress = 1
             }
-
-            // ── 人类区（Wallet 栈）
-            if !filteredHumans.isEmpty {
-                dexSectionLabel(l.tr(zh: "人类", en: "Humans", de: "Menschen"), count: filteredHumans.count, symbol: "person.2.fill")
-                BentoHumanGrid(humans: filteredHumans, onSelect: { human in
-                    openRosterHumanDetail(human)
-                })
-                .padding(.horizontal, 16)
-            }
-
-            // ── 植物区（竖向卡片横排）
-            if !filteredPlants.isEmpty {
-                dexSectionLabel(l.tr(zh: "植物", en: "Plants", de: "Pflanzen"), count: filteredPlants.count, symbol: "leaf.fill")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(Array(filteredPlants.enumerated()), id: \.element.id) { index, plant in
-                            PlantTallCard(plant: plant)
-                                .ohanaSmoothAppear(index: index)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                }
+        }
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 170) {
+            guard editingRosterCardId == card.id else { return }
+            withAnimation(GoMotion.feedback) {
+                isRosterEditorContentMounted = true
             }
         }
     }
 
-    // MARK: - Section 标签
-    private func dexSectionLabel(_ title: String, count: Int, symbol: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: symbol)
-                .font(.system(size: 12, weight: .black))
-                .foregroundStyle(Color.goPrimary)
-            Text(title)
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text("\(count)")
-                .font(OhanaFont.caption2(.black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .monospacedDigit()
-                .padding(.horizontal, 7)
-                .padding(.vertical, 3)
-                .background(Color.goPrimary, in: Capsule())
-            Spacer()
+    private func closeRosterCardEditor() {
+        guard editingRosterCardId != nil else { return }
+        isRosterEditorContentMounted = false
+        OhanaFeedback.light()
+        withAnimation(HeroAnim.walletCollapseSpring) {
+            rosterEditorProgress = 0
         }
-        .padding(.horizontal, 20)
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 360) {
+            guard rosterEditorProgress <= 0.02 else { return }
+            editingRosterCardId = nil
+            isRosterEditorContentMounted = false
+        }
     }
 
     // MARK: - 空状态
@@ -707,1080 +790,577 @@ struct CrewRosterOverlay: View {
         .padding(.horizontal, 32)
     }
 
-    private func openRosterPetDetail(_ pet: Pet) {
-        OhanaFeedback.light()
-        withAnimation(GoMotion.page) {
-            memberAddMenuItemsVisible = false
-            memberAddMenuExpanded = false
-            expandedRosterCardId = pet.id
-        }
-    }
-
-    private func openRosterHumanDetail(_ human: Human) {
-        OhanaFeedback.light()
-        withAnimation(GoMotion.page) {
-            memberAddMenuItemsVisible = false
-            memberAddMenuExpanded = false
-            expandedRosterCardId = human.id
-        }
-    }
-
-    private func closeRosterMemberDetail() {
-        withAnimation(GoMotion.sheet) {
-            expandedRosterCardId = nil
-        }
-    }
 }
-
 private struct RosterHomeVisibilityToggle: View {
     let isOn: Bool
     let label: String
-    let onChange: (Bool) -> Void
+    let onChange: (Bool) -> Bool
+
+    @State private var visualOverride: Bool?
+
+    private var visualIsOn: Bool {
+        visualOverride ?? isOn
+    }
 
     var body: some View {
         Button {
-            onChange(!isOn)
+            let nextValue = !visualIsOn
+            withAnimation(GoMotion.feedback) {
+                visualOverride = nextValue
+            }
+            guard onChange(nextValue) else {
+                withAnimation(GoMotion.feedback) {
+                    visualOverride = isOn
+                }
+                return
+            }
         } label: {
-            HStack(spacing: 6) {
-                Text(label)
-                    .font(OhanaFont.caption2(.black))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+            HStack(spacing: 7) {
+                Image(systemName: visualIsOn ? "house.fill" : "house")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(visualIsOn ? Color.goPrimary : Color.goCardWhite.opacity(0.78))
+                    .symbolEffect(.bounce, value: visualIsOn)
 
-                ZStack(alignment: isOn ? .trailing : .leading) {
+                ZStack(alignment: visualIsOn ? .trailing : .leading) {
                     Capsule()
-                        .fill(isOn ? Color.arkInk.opacity(0.18) : Color.goCardWhite.opacity(0.20))
+                        .fill(visualIsOn ? Color.goPrimary.opacity(0.92) : Color.goCardWhite.opacity(0.18))
                         .frame(width: 28, height: 16)
                     Circle()
-                        .fill(isOn ? Color.arkInk : Color.goCardWhite.opacity(0.90))
+                        .fill(visualIsOn ? Color.arkInk : Color.goCardWhite.opacity(0.92))
                         .frame(width: 12, height: 12)
                         .padding(.horizontal, 2)
                 }
             }
-            .foregroundStyle(isOn ? Color.arkInk : Color.goCardWhite)
-            .padding(.horizontal, 10)
-            .frame(height: 34)
-            .background(isOn ? Color.goPrimary : Color.arkInk.opacity(0.52), in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.goCardWhite.opacity(isOn ? 0.0 : 0.16), lineWidth: 0.75))
-            .shadow(color: Color.arkInk.opacity(0.24), radius: 10, x: 0, y: 5) // ui-v4: allow card-top home visibility control lift
+            .frame(width: 58, height: 32)
+            .background(Color.goCardWhite.opacity(visualIsOn ? 0.18 : 0.12), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.goCardWhite.opacity(visualIsOn ? 0.22 : 0.16), lineWidth: 0.75))
+            .contentShape(Capsule())
+            .animation(GoMotion.feedback, value: visualIsOn)
+            .frame(width: 66, height: 44)
             .contentShape(Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel("首页显示")
-        .accessibilityValue(isOn ? "开启" : "关闭")
-    }
-}
-
-// MARK: - 成员 Wallet 栈
-
-private struct RosterWalletStack<Card: View>: View {
-    let count: Int
-    let cardAspectRatio: CGFloat
-    let card: (Int) -> Card
-
-    private let overlap: CGFloat = 52
-    private let maxDepth = 6
-
-    init(
-        count: Int,
-        cardAspectRatio: CGFloat = 1.586,
-        @ViewBuilder card: @escaping (Int) -> Card
-    ) {
-        self.count = count
-        self.cardAspectRatio = cardAspectRatio
-        self.card = card
-    }
-
-    var body: some View {
-        if count > 0 {
-            GeometryReader { geo in
-                let width = geo.size.width
-                ZStack(alignment: .top) {
-                    ForEach(0..<count, id: \.self) { index in
-                        let depth = CGFloat(min(index, maxDepth))
-                        card(index)
-                            .frame(width: width)
-                            .scaleEffect(1 - depth * 0.028, anchor: .top)
-                            .rotationEffect(.degrees(rotation(for: index)))
-                            .offset(y: CGFloat(index) * overlap)
-                            .zIndex(Double(count - index))
-                    }
-                }
-                .frame(width: width, height: stackHeight(for: width), alignment: .top)
-            }
-            .frame(height: stackHeight(for: estimatedWidth))
-        }
-    }
-
-    private var estimatedWidth: CGFloat {
-        max(280, ScreenCompat.bounds.width - 32)
-    }
-
-    private func stackHeight(for width: CGFloat) -> CGFloat {
-        let cardHeight = width / cardAspectRatio
-        return cardHeight + CGFloat(max(count - 1, 0)) * overlap + 10
-    }
-
-    private func rotation(for index: Int) -> Double {
-        let pattern: [Double] = [0, -1.4, 1.15, -0.75, 0.9, -0.55]
-        return pattern[index % pattern.count]
-    }
-}
-
-// MARK: - 宠物 Wallet 栈
-
-private struct BentoPetGrid: View {
-    let pets: [Pet]
-    let onSelect: (Pet) -> Void
-
-    var body: some View {
-        RosterWalletStack(count: pets.count) { index in
-            let pet = pets[index]
-            PetSquareCard(pet: pet) {
-                onSelect(pet)
-            }
-            .ohanaSmoothAppear(index: index)
+        .accessibilityLabel(label)
+        .accessibilityValue(visualIsOn ? "开启" : "关闭")
+        .onChange(of: isOn) { _, newValue in
+            guard visualOverride == newValue else { return }
+            visualOverride = nil
         }
     }
 }
 
-// MARK: - 宠物小卡片（Wallet 栈用，单击进详情）
-
-private struct PetSquareCard: View {
-    let pet: Pet
-    let onTap: () -> Void
-
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
-    @Query(sort: \Human.createdAt) private var allHumans: [Human]
-    @State private var isDeletePressing = false
-    @State private var deletePressCandidate = false
-    @State private var deletePressToken = UUID()
-    @State private var suppressTapUntil = Date.distantPast
-    @State private var showDeleteAlert = false
-    @State private var showHomeStackFullAlert = false
-    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
-
-    private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
-    private var isShownOnHome: Bool { HomeCardVisibility.isPetVisible(pet, raw: hiddenHomePetIDsRaw) }
-
-    private var posterHeadline: String {
-        let trimmed = pet.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return "OHANA" }
-        return String(trimmed.prefix(6)).uppercased()
-    }
-
-    private var deletePressAnimation: Animation? {
-        if isDeletePressing {
-            return workloadPolicy.shouldAnimate()
-            ? .easeInOut(duration: 0.09).repeatForever(autoreverses: true)
-            : .spring(response: 0.22, dampingFraction: 0.82)
-        }
-        return .spring(response: 0.22, dampingFraction: 0.82)
-    }
+private struct CrewRosterEditorShell<Content: View>: View {
+    let title: String
+    let subtitle: String
+    let tint: Color
+    let onCancel: () -> Void
+    let onSave: () -> Void
+    @ViewBuilder let content: () -> Content
 
     var body: some View {
-        cardFace
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .onTapGesture {
-                guard Date() >= suppressTapUntil else { return }
-                onTap()
-            }
-            .scaleEffect(isDeletePressing ? 0.97 : 1.0)
-            .rotationEffect(.degrees(isDeletePressing ? -1.35 : 0))
-            .animation(deletePressAnimation, value: isDeletePressing)
-            .overlay(alignment: .topTrailing) {
-                homeVisibilityToggle
-                    .padding(7)
-            }
-            .overlay(alignment: .topLeading) {
-                if isDeletePressing {
-                    deletePreviewBadge
-                        .padding(7)
-                        .transition(.scale(scale: 0.82).combined(with: .opacity))
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Button {
+                    onCancel()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(Color.goCardWhite)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
                 }
-            }
-            .onLongPressGesture(
-                minimumDuration: 0.7,
-                maximumDistance: 12,
-                pressing: updateDeletePressFeedback,
-                perform: triggerDeleteAlert
-            )
-            .alert("删除 \(pet.name)？", isPresented: $showDeleteAlert) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) {
-                let petIdStr = pet.id.uuidString
-                if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
-                    for event in allEvents where event.relatedEntityId == petIdStr {
-                        modelContext.delete(event)
-                    }
-                }
-                modelContext.delete(pet)
-                modelContext.safeSave()
-            }
-        } message: {
-            Text("确定要删除 \(pet.name) 吗？此操作不可撤销。")
-        }
-    }
-    private var cardFace: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let (cardTop, cardBottom) = WalletPetCardTheme.gradientPair(for: pet.themeColorHex)
-            let avatarImage: UIImage? = pet.avatarImageData.flatMap { UIImage(data: $0) }
-            let isTransparent: Bool = pet.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
-            let isPopout = isTransparent && avatarImage != nil
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel("取消")
 
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [cardTop, cardBottom],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, .black.opacity(0.22)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-
-                Text(posterHeadline)
-                    .font(.system(size: w * 0.28, weight: .black, design: .rounded))
-                    .foregroundStyle(Color(hex: "FF5A3D").opacity(0.85))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.25)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .offset(y: -h * 0.22)
-                    .allowsHitTesting(false)
-
-                miniSubjectLayer(avatarImage: avatarImage, isPopout: isPopout, w: w, h: h)
-                    .frame(width: w * 0.52, height: h)
-                    .clipped()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .allowsHitTesting(false)
-
-                HStack(alignment: .bottom, spacing: 0) {
-                    Spacer().frame(width: w * 0.50)
-                    miniInfoColumn(w: w, h: h)
-                }
-                .allowsHitTesting(false)
-            }
-        }
-        .aspectRatio(1.586, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: themeColor.opacity(0.32), radius: 12, x: 0, y: 4) // ui-v4: allow member card lifted preview
-    }
-
-    private var readableTextColor: Color {
-        let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF","FFEAA7","FDCB6E"]
-        return bright.contains(pet.themeColorHex.uppercased()) ? Color.arkInk : Color.goCardWhite
-    }
-
-    private func compactBadge(_ text: String, textColor: Color) -> some View {
-        Text(text)
-            .font(OhanaFont.caption2(.black))
-            .foregroundStyle(textColor.opacity(0.9))
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(textColor.opacity(0.16), in: Capsule())
-            .overlay(Capsule().strokeBorder(textColor.opacity(0.12), lineWidth: 0.5))
-    }
-
-    private var homeVisibilityBinding: Binding<Bool> {
-        Binding(
-            get: { isShownOnHome },
-            set: { newValue in
-                OhanaFeedback.light()
-                if newValue,
-                   !HomeCardVisibility.canShowPet(pet, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
-                    showHomeStackFullAlert = true
-                    return
-                }
-                hiddenHomePetIDsRaw = HomeCardVisibility.rawBySettingPet(pet, visible: newValue, raw: hiddenHomePetIDsRaw)
-            }
-        )
-    }
-
-    private var homeVisibilityToggle: some View {
-        Toggle("", isOn: homeVisibilityBinding)
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .tint(Color.goPrimary)
-            .scaleEffect(0.58)
-            .frame(width: 38, height: 24)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 4)
-            .background(Color.arkInk.opacity(0.42), in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 0.5))
-        .accessibilityLabel("首页显示")
-        .accessibilityValue(isShownOnHome ? "开启" : "关闭")
-        .alert("首页卡片堆已满", isPresented: $showHomeStackFullAlert) {
-            Button("知道了", role: .cancel) {}
-        } message: {
-            Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先隐藏一张成员卡片，再显示 \(pet.name)。")
-        }
-    }
-
-    private var deletePreviewBadge: some View {
-        Image(systemName: "trash.fill")
-            .font(.system(size: 12, weight: .black))
-            .foregroundStyle(Color.goCardWhite)
-            .frame(width: 28, height: 28)
-            .background(Color.goRed, in: Circle())
-            .shadow(color: Color.goRed.opacity(0.45), radius: 8, y: 3) // ui-v4: allow delete press warning badge lift
-    }
-
-    private func updateDeletePressFeedback(_ pressing: Bool) {
-        if pressing {
-            let token = UUID()
-            deletePressToken = token
-            deletePressCandidate = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
-                guard deletePressCandidate, deletePressToken == token else { return }
-                suppressTapUntil = Date().addingTimeInterval(1.1)
-                withAnimation(deletePressAnimation) {
-                    isDeletePressing = true
-                }
-                OhanaFeedback.light()
-            }
-        } else {
-            deletePressCandidate = false
-            deletePressToken = UUID()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
-                guard !showDeleteAlert else { return }
-                withAnimation(GoMotion.feedback) {
-                    isDeletePressing = false
-                }
-            }
-        }
-    }
-
-    private func triggerDeleteAlert() {
-        suppressTapUntil = Date().addingTimeInterval(1.1)
-        deletePressCandidate = false
-        deletePressToken = UUID()
-        withAnimation(GoMotion.feedback) {
-            isDeletePressing = false
-        }
-        OhanaFeedback.strong()
-        showDeleteAlert = true
-    }
-
-    @ViewBuilder
-    private func miniSubjectLayer(avatarImage: UIImage?, isPopout: Bool, w: CGFloat, h: CGFloat) -> some View {
-        if let avatarImage {
-            if isPopout {
-                // 透明 2.5D 主体只渲染一层，避免成员页小卡出现重影。
-                Image(uiImage: avatarImage)
-                    .resizable()
-                    .scaledToFit()
-                    .scaleEffect(0.92)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.top, 4)
-                    .padding(.bottom, 2)
-                    .shadow(color: Color.arkInk.opacity(0.22), radius: 10, x: 0, y: 6) // ui-v4: allow avatar grounding
-            } else {
-                // 普通照片：填满左半区域，右侧羽化
-                Image(uiImage: avatarImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: w * 0.52, height: h)
-                    .clipped()
-                    .saturation(1.02)
-                    .contrast(1.03)
-                    .mask(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black, location: 0.0),
-                                .init(color: .black, location: 0.65),
-                                .init(color: .clear, location: 1.0)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .overlay {
-                        LinearGradient(
-                            colors: [
-                                .white.opacity(0.08),
-                                .clear,
-                                themeColor.opacity(0.18)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        .blendMode(.screen)
-                    }
-            }
-        } else {
-            // 无头像：剪影
-            let silhouetteSpecies: String = {
-                let value = pet.species.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                if value == "dog" || pet.species == "狗" { return "狗" }
-                if value == "cat" || pet.species == "猫" { return "猫" }
-                return pet.species
-            }()
-            ZStack {
-                Ellipse()
-                    .fill(Color.arkInk.opacity(0.16))
-                    .frame(width: w * 0.28, height: 12)
-                    .blur(radius: 6)
-                    .offset(y: h * 0.14)
-                PetSilhouetteView(
-                    species: silhouetteSpecies,
-                    coatColor: pet.coatColor.isEmpty ? Color(hex: "E8C49A") : Color(hex: pet.coatColor),
-                    eyeColor: pet.eyeColor.isEmpty ? Color(hex: "6B3A2A") : Color(hex: pet.eyeColor)
-                )
-                .scaleEffect(0.42)
-                .frame(width: w * 0.38, height: h * 0.68)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-
-    // ── 方案1：透明抠图 破框悬浮
-    private func petCutoutCard(geo: GeometryProxy, img: UIImage, w: CGFloat, h: CGFloat) -> some View {
-        UltimateGlassCard {
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [themeColor.opacity(0.85),
-                                 themeColor.mix(with: Color(hex: "000000"), by: 0.45).opacity(0.95)],
-                        startPoint: .topTrailing, endPoint: .bottomLeading))
-                // 右侧名字
-                HStack(alignment: .bottom, spacing: 0) {
-                    Spacer().frame(width: w * 0.48)
-                    miniInfoColumn(w: w, h: h)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            // 破框层
-            .overlay(alignment: .bottomLeading) {
-                ZStack(alignment: .bottom) {
-                    Ellipse()
-                        .fill(RadialGradient(colors: [themeColor.opacity(0.55), .clear],
-                                            center: .center, startRadius: 0, endRadius: 50))
-                        .frame(width: 100, height: 28).blur(radius: 8).offset(y: 6)
-                    ZStack {
-                        Image(uiImage: img).resizable().scaledToFit()
-                            .scaleEffect(1.06).colorMultiply(.white)
-                            .shadow(color: Color.goCardWhite, radius: 0, x: 2, y: 0) // ui-v4: allow cutout rim for 2.5D readability
-                            .shadow(color: Color.goCardWhite, radius: 0, x: -2, y: 0) // ui-v4: allow cutout rim for 2.5D readability
-                            .shadow(color: Color.goCardWhite, radius: 0, x: 0, y: -2) // ui-v4: allow cutout rim for 2.5D readability
-                        Image(uiImage: img).resizable().scaledToFit()
-                    }
-                    .frame(width: w * 0.50, height: h * 1.12)
-                    .offset(y: -12)
-                }
-                .frame(width: w * 0.50, alignment: .bottom)
-                .allowsHitTesting(false)
-            }
-        }
-    }
-
-    // ── 方案2：普通照片 高斯模糊背景
-    private func petBlurCard(geo: GeometryProxy, img: UIImage, w: CGFloat, h: CGFloat) -> some View {
-        UltimateGlassCard {
-            ZStack(alignment: .bottomLeading) {
-                Image(uiImage: img).resizable().scaledToFill()
-                    .frame(width: w, height: h).blur(radius: 30)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [Color.arkInk.opacity(0.25), Color.arkInk.opacity(0.52)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.ohanaCardSurface.opacity(0.30))
-                Image(uiImage: img).resizable().scaledToFill()
-                    .frame(width: w * 0.60, height: h).clipped()
-                    .mask(LinearGradient(
-                        stops: [.init(color: Color.arkInk, location: 0),
-                                .init(color: Color.arkInk, location: 0.45),
-                                .init(color: .clear, location: 1.0)],
-                        startPoint: .leading, endPoint: .trailing))
-                    .allowsHitTesting(false)
-                HStack(alignment: .bottom, spacing: 0) {
-                    Spacer().frame(width: w * 0.44)
-                    miniInfoColumn(w: w, h: h, textColor: .white)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
-
-    // ── 方案3：纯色渐变 + Emoji
-    private func petEmojiCard(geo: GeometryProxy, w: CGFloat, h: CGFloat) -> some View {
-        UltimateGlassCard {
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [themeColor, themeColor.mix(with: .black, by: 0.45)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                Text(pet.avatarEmoji.isEmpty ? String(pet.name.prefix(1)) : pet.avatarEmoji)
-                    .font(.system(size: 56)).minimumScaleFactor(0.5)
-                    .frame(width: w * 0.50, height: h * 0.90, alignment: .center)
-                    .allowsHitTesting(false)
-                HStack(alignment: .bottom, spacing: 0) {
-                    Spacer().frame(width: w * 0.50)
-                    miniInfoColumn(w: w, h: h)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
-
-    // ── 右侧信息列（姓名 + 陪伴天数）
-    private func miniInfoColumn(w: CGFloat, h: CGFloat, textColor: Color? = nil) -> some View {
-        let tc: Color = textColor ?? readableTextColor
-        return VStack(alignment: .trailing, spacing: 0) {
-            Spacer(minLength: 0)
-            if pet.daysTogether > 0 {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text("\(pet.daysTogether)")
-                        .font(OhanaFont.metric(size: 20))
-                        .foregroundStyle(tc)
-                    Text("天")
-                        .font(OhanaFont.caption2(.black))
-                        .foregroundStyle(tc.opacity(0.6))
-                }
-                .padding(.bottom, 3)
-            } else {
-                Text("新成员")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(tc.opacity(0.68))
-                    .padding(.bottom, 3)
-            }
-
-            HStack(spacing: 4) {
-                compactBadge(pet.species.isEmpty ? "宠物" : pet.species, textColor: tc)
-                compactBadge(pet.ageText.isEmpty ? "年龄未知" : pet.ageText, textColor: tc)
-            }
-            .padding(.bottom, 10)
-        }
-        .padding(.trailing, 10)
-        .frame(width: w * 0.50, alignment: .trailing)
-    }
-
-    @ViewBuilder
-    private var petStatusBadge: some View {
-        let statusInfo = petStatus(for: pet)
-        if let (emoji, label, color) = statusInfo {
-            HStack(spacing: 4) {
-                Text(emoji).font(.system(size: 11))
-                Text(label)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(color)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.15), in: Capsule())
-        }
-    }
-
-    private func petStatus(for pet: Pet) -> (String, String, Color)? {
-        // 正在遛狗
-        let mgr = PetWalkingManager.shared
-        if case .running = mgr.phase, mgr.currentPet?.id == pet.id {
-            return ("🐕", "遛狗中", Color.goPrimary)
-        }
-        if case .paused = mgr.phase, mgr.currentPet?.id == pet.id {
-            return ("⏸️", "暂停中", Color.goYellow)
-        }
-        // 余粮告急
-        if pet.dailyPortionGrams > 0 && pet.remainingFoodDays <= 3 && pet.remainingFoodDays >= 0 {
-            return ("🍖", "粮食告急", Color.goOrange)
-        }
-        // 今日已遛狗
-        let todayWalked = pet.walkLogs.contains { Calendar.current.isDateInToday($0.startDate) }
-        if todayWalked { return ("✨", "今日已溜", Color.goTeal) }
-        return nil
-    }
-}
-
-// MARK: - 人类 Wallet 栈
-
-private struct BentoHumanGrid: View {
-    let humans: [Human]
-    let onSelect: (Human) -> Void
-
-    var body: some View {
-        RosterWalletStack(count: humans.count) { index in
-            let human = humans[index]
-            HumanSquareCard(human: human) {
-                onSelect(human)
-            }
-            .ohanaSmoothAppear(index: index)
-        }
-    }
-}
-
-// MARK: - 人类小卡片（Wallet 栈用，单击进详情）
-
-private struct HumanSquareCard: View {
-    let human: Human
-    let onTap: () -> Void
-
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
-    @Query(sort: \Human.createdAt) private var allHumans: [Human]
-    @State private var isDeletePressing = false
-    @State private var deletePressCandidate = false
-    @State private var deletePressToken = UUID()
-    @State private var suppressTapUntil = Date.distantPast
-    @State private var showDeleteAlert = false
-    @State private var showHomeStackFullAlert = false
-    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
-
-    private var themeColor: Color { Color(hex: human.themeColor) }
-    private var companionshipDays: Int {
-        max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
-    }
-
-    private var deletePressAnimation: Animation? {
-        if isDeletePressing {
-            return workloadPolicy.shouldAnimate()
-            ? .easeInOut(duration: 0.09).repeatForever(autoreverses: true)
-            : .spring(response: 0.22, dampingFraction: 0.82)
-        }
-        return .spring(response: 0.22, dampingFraction: 0.82)
-    }
-
-    var body: some View {
-        cardFace
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .onTapGesture {
-                guard Date() >= suppressTapUntil else { return }
-                onTap()
-            }
-            .scaleEffect(isDeletePressing ? 0.97 : 1.0)
-            .rotationEffect(.degrees(isDeletePressing ? -1.35 : 0))
-            .animation(deletePressAnimation, value: isDeletePressing)
-            .overlay(alignment: .topTrailing) {
-                homeVisibilityToggle
-                    .padding(7)
-            }
-            .overlay(alignment: .topLeading) {
-                if isDeletePressing {
-                    deletePreviewBadge
-                        .padding(7)
-                        .transition(.scale(scale: 0.82).combined(with: .opacity))
-                }
-            }
-            .onLongPressGesture(
-                minimumDuration: 0.7,
-                maximumDistance: 12,
-                pressing: updateDeletePressFeedback,
-                perform: triggerDeleteAlert
-            )
-            .alert("删除 \(human.name)？", isPresented: $showDeleteAlert) {
-            Button("取消", role: .cancel) { }
-            Button("删除", role: .destructive) {
-                modelContext.delete(human)
-                modelContext.safeSave()
-            }
-        } message: {
-            Text("确定要删除 \(human.name) 吗？此操作不可撤销。")
-        }
-    }
-
-    private var cardFace: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let avatarImage: UIImage? = human.avatarImageData.flatMap { UIImage(data: $0) }
-            let hasAvatarImage = avatarImage != nil
-            let isTransparent: Bool = human.avatarImageData.map { ImageCutoutService.isTransparentPNG($0) } ?? false
-
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(
-                        MeshGradient(
-                            width: 3, height: 3,
-                            points: [
-                                SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
-                                SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
-                                SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
-                            ],
-                            colors: WalletPetCardTheme.meshColors(for: human.themeColor)
-                        )
-                    )
-                LinearGradient(
-                    colors: [.clear, .black.opacity(hasAvatarImage ? 0.16 : 0.28)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                Text(human.name.uppercased())
-                    .font(.system(size: WalletPetCardTheme.headlinePointSize(cardWidth: w, headlineCount: human.name.count), weight: .black, design: .rounded))
-                    .foregroundStyle(Color(hex: "FF5A3D").opacity(0.85))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.22)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.horizontal, 8)
-                    .padding(.top, 24)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .opacity(0.78)
-                    .allowsHitTesting(false)
-
-                humanSubjectLayer(avatarImage: avatarImage, isTransparent: isTransparent, w: w, h: h)
-                    .frame(width: w * 0.52, height: h)
-                    .clipped()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                    .allowsHitTesting(false)
-
-                HStack(alignment: .bottom, spacing: 0) {
-                    Spacer().frame(width: w * 0.50)
-                    miniInfoColumn(w: w, h: h)
-                }
-                .allowsHitTesting(false)
-            }
-        }
-        .aspectRatio(1.586, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.goCardWhite.opacity(0.15), lineWidth: 0.5)
-        )
-        .shadow(color: themeColor.opacity(0.28), radius: 12, x: 0, y: 4) // ui-v4: allow member card lifted preview
-    }
-
-    private var readableTextColor: Color {
-        let bright = ["C8FF00","E8FFB0","B8FFD0","FFF44F","FFEB3B","FFFFFF","FFEAA7","FDCB6E"]
-        return bright.contains(human.themeColor.uppercased()) ? Color.arkInk : Color.goCardWhite
-    }
-
-    private func compactBadge(_ text: String, textColor: Color) -> some View {
-        Text(text)
-            .font(OhanaFont.caption2(.black))
-            .foregroundStyle(textColor.opacity(0.9))
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(textColor.opacity(0.16), in: Capsule())
-            .overlay(Capsule().strokeBorder(textColor.opacity(0.12), lineWidth: 0.5))
-    }
-
-    private var homeVisibilityBinding: Binding<Bool> {
-        Binding(
-            get: { human.shouldShowOnHome },
-            set: { newValue in
-                OhanaFeedback.light()
-                if newValue,
-                   !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
-                    showHomeStackFullAlert = true
-                    return
-                }
-                human.shouldShowOnHome = newValue
-                modelContext.safeSave()
-            }
-        )
-    }
-
-    private var homeVisibilityToggle: some View {
-        Toggle("", isOn: homeVisibilityBinding)
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .tint(Color.goPrimary)
-            .scaleEffect(0.58)
-            .frame(width: 38, height: 24)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 4)
-            .background(Color.arkInk.opacity(0.42), in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 0.5))
-        .accessibilityLabel("首页显示")
-        .accessibilityValue(human.shouldShowOnHome ? "开启" : "关闭")
-        .alert("首页卡片堆已满", isPresented: $showHomeStackFullAlert) {
-            Button("知道了", role: .cancel) {}
-        } message: {
-            Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先隐藏一张成员卡片，再显示 \(human.name)。")
-        }
-    }
-
-    private var deletePreviewBadge: some View {
-        Image(systemName: "trash.fill")
-            .font(.system(size: 12, weight: .black))
-            .foregroundStyle(Color.goCardWhite)
-            .frame(width: 28, height: 28)
-            .background(Color.goRed, in: Circle())
-            .shadow(color: Color.goRed.opacity(0.45), radius: 8, y: 3) // ui-v4: allow delete press warning badge lift
-    }
-
-    private func updateDeletePressFeedback(_ pressing: Bool) {
-        if pressing {
-            let token = UUID()
-            deletePressToken = token
-            deletePressCandidate = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) {
-                guard deletePressCandidate, deletePressToken == token else { return }
-                suppressTapUntil = Date().addingTimeInterval(1.1)
-                withAnimation(deletePressAnimation) {
-                    isDeletePressing = true
-                }
-                OhanaFeedback.light()
-            }
-        } else {
-            deletePressCandidate = false
-            deletePressToken = UUID()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
-                guard !showDeleteAlert else { return }
-                withAnimation(GoMotion.feedback) {
-                    isDeletePressing = false
-                }
-            }
-        }
-    }
-
-    private func triggerDeleteAlert() {
-        suppressTapUntil = Date().addingTimeInterval(1.1)
-        deletePressCandidate = false
-        deletePressToken = UUID()
-        withAnimation(GoMotion.feedback) {
-            isDeletePressing = false
-        }
-        OhanaFeedback.strong()
-        showDeleteAlert = true
-    }
-
-    @ViewBuilder
-    private var humanAvatarContent: some View {
-        if let data = human.avatarImageData, let img = UIImage(data: data) {
-            Image(uiImage: img)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-        } else if !human.avatarEmoji.isEmpty {
-            Text(human.avatarEmoji)
-                .font(.system(size: 44))
-        } else {
-            Text(String(human.name.prefix(1)))
-                .font(.system(size: 36, weight: .black, design: .rounded))
-                .foregroundStyle(Color.goCardWhite.opacity(0.6))
-        }
-    }
-
-    @ViewBuilder
-    private func humanSubjectLayer(avatarImage: UIImage?, isTransparent: Bool, w: CGFloat, h: CGFloat) -> some View {
-        if let avatarImage {
-            if isTransparent {
-                Image(uiImage: avatarImage)
-                    .resizable()
-                    .scaledToFit()
-                    .scaleEffect(0.92)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.top, 4)
-                    .padding(.bottom, 2)
-                    .shadow(color: Color.arkInk.opacity(0.22), radius: 10, x: 0, y: 6) // ui-v4: allow avatar grounding
-            } else {
-                Image(uiImage: avatarImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: w * 0.52, height: h)
-                    .clipped()
-                    .saturation(1.02)
-                    .contrast(1.03)
-                    .mask(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black, location: 0.0),
-                                .init(color: .black, location: 0.65),
-                                .init(color: .clear, location: 1.0)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-            }
-        } else {
-            humanAvatarContent
-                .frame(width: w * 0.42, height: h * 0.72)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        }
-    }
-
-    // ── 方案1：透明抠图 破框悬浮
-    private func humanCutoutCard(geo: GeometryProxy, img: UIImage, w: CGFloat, h: CGFloat) -> some View {
-        UltimateGlassCard {
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [themeColor.opacity(0.85),
-                                 themeColor.mix(with: Color(hex: "000000"), by: 0.45).opacity(0.95)],
-                        startPoint: .topTrailing, endPoint: .bottomLeading))
-                HStack(alignment: .bottom, spacing: 0) {
-                    Spacer().frame(width: w * 0.48)
-                    miniInfoColumn(w: w, h: h)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(alignment: .bottomLeading) {
-                ZStack(alignment: .bottom) {
-                    Ellipse()
-                        .fill(RadialGradient(colors: [themeColor.opacity(0.55), .clear],
-                                            center: .center, startRadius: 0, endRadius: 50))
-                        .frame(width: 100, height: 28).blur(radius: 8).offset(y: 6)
-                    ZStack {
-                        Image(uiImage: img).resizable().scaledToFit()
-                            .scaleEffect(1.06).colorMultiply(.white)
-                            .shadow(color: Color.goCardWhite, radius: 0, x: 2, y: 0) // ui-v4: allow cutout rim for 2.5D readability
-                            .shadow(color: Color.goCardWhite, radius: 0, x: -2, y: 0) // ui-v4: allow cutout rim for 2.5D readability
-                            .shadow(color: Color.goCardWhite, radius: 0, x: 0, y: -2) // ui-v4: allow cutout rim for 2.5D readability
-                        Image(uiImage: img).resizable().scaledToFit()
-                            .clipShape(Circle()) // Apply circular clipping for humans if preferring normal avatar look
-                    }
-                    .frame(width: w * 0.50, height: h * 1.12)
-                    .offset(y: -12)
-                }
-                .frame(width: w * 0.50, alignment: .bottom)
-                .allowsHitTesting(false)
-            }
-        }
-    }
-
-    // ── 方案2：普通照片 高斯模糊背景
-    private func humanBlurCard(geo: GeometryProxy, img: UIImage, w: CGFloat, h: CGFloat) -> some View {
-        UltimateGlassCard {
-            ZStack(alignment: .bottomLeading) {
-                Image(uiImage: img).resizable().scaledToFill()
-                    .frame(width: w, height: h).blur(radius: 30)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [Color.arkInk.opacity(0.25), Color.arkInk.opacity(0.52)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.ohanaCardSurface.opacity(0.30))
-                Image(uiImage: img).resizable().scaledToFill()
-                    .frame(width: w * 0.60, height: h).clipped()
-                    .mask(LinearGradient(
-                        stops: [.init(color: Color.arkInk, location: 0),
-                                .init(color: Color.arkInk, location: 0.45),
-                                .init(color: .clear, location: 1.0)],
-                        startPoint: .leading, endPoint: .trailing))
-                    .allowsHitTesting(false)
-                HStack(alignment: .bottom, spacing: 0) {
-                    Spacer().frame(width: w * 0.44)
-                    miniInfoColumn(w: w, h: h, textColor: .white)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
-
-    // ── 方案3：纯色渐变 + Emoji
-    private func humanEmojiCard(geo: GeometryProxy, w: CGFloat, h: CGFloat) -> some View {
-        UltimateGlassCard {
-            ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [themeColor, themeColor.mix(with: .black, by: 0.45)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                Text(human.avatarEmoji.isEmpty ? String(human.name.prefix(1)) : human.avatarEmoji)
-                    .font(.system(size: 56)).minimumScaleFactor(0.5)
-                    .frame(width: w * 0.50, height: h * 0.90, alignment: .center)
-                    .allowsHitTesting(false)
-                HStack(alignment: .bottom, spacing: 0) {
-                    Spacer().frame(width: w * 0.50)
-                    miniInfoColumn(w: w, h: h)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        }
-    }
-
-    // ── 右侧信息列（姓名 + 陪伴天数 + 角色）
-    private func miniInfoColumn(w: CGFloat, h: CGFloat, textColor: Color? = nil) -> some View {
-        let tc: Color = textColor ?? readableTextColor
-        return VStack(alignment: .trailing, spacing: 0) {
-            Spacer(minLength: 0)
-
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text("\(companionshipDays)")
-                    .font(OhanaFont.metric(size: 20))
-                    .foregroundStyle(tc)
-                Text("天")
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(tc.opacity(0.6))
-            }
-            .padding(.bottom, 3)
-
-            HStack(spacing: 4) {
-                compactBadge("人类", textColor: tc)
-                compactBadge(human.birthday == nil ? "年龄未知" : human.ageText, textColor: tc)
-            }
-            .padding(.bottom, 10)
-        }
-        .padding(.trailing, 10)
-        .frame(width: w * 0.50, alignment: .trailing)
-    }
-}
-
-// MARK: - 植物竖向长卡片
-
-private struct PlantTallCard: View {
-    let plant: Plant
-
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            // 背景渐变
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(LinearGradient(
-                    colors: [Color(hex: "1A2F1A").opacity(0.6), Color(hex: "00D4AA").opacity(0.15)],
-                    startPoint: .bottom, endPoint: .top
-                ))
-
-            VStack(spacing: 0) {
-                Spacer()
-                // 植物向上生长的 emoji
-                Text(plant.avatarEmoji)
-                    .font(.system(size: 42))
-                    .shadow(color: Color.goTeal.opacity(0.4), radius: 10) // ui-v4: allow plant avatar growth glow
-                Spacer()
-            }
-            .frame(maxWidth: .infinity)
-
-            // 底部信息
-            VStack(alignment: .leading, spacing: 4) {
-                Text(plant.name)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                if plant.needsWatering {
-                    Label("需要浇水", systemImage: "drop.fill")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.goCardCyan)
-                } else {
-                    Text(plant.species.isEmpty ? "植物" : plant.species)
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.goCardWhite)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                    Text(subtitle)
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(Color.goCardWhite.opacity(0.66))
                         .lineLimit(1)
                 }
+
+                Spacer(minLength: 8)
+
+                Button {
+                    onSave()
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .black))
+                        .foregroundStyle(Color.arkInk)
+                        .frame(width: 44, height: 44)
+                        .background(tint, in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel("保存")
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: [.clear, Color.arkInk.opacity(0.55)],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            )
+
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 10) {
+                    content()
+                }
+                .padding(.bottom, 10)
+            }
         }
-        .frame(width: 110, height: 160)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.arkInk.opacity(0.50), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.goCardWhite.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 0.75)
         )
+    }
+}
+
+private struct CrewRosterPetProfileEditor: View {
+    let pet: Pet
+    let onCancel: () -> Void
+    let onSave: () -> Void
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var name = ""
+    @State private var species = ""
+    @State private var breed = ""
+    @State private var gender = "unknown"
+    @State private var isNeutered = false
+    @State private var hasBirthday = false
+    @State private var birthday = Date()
+    @State private var hasHomeDate = false
+    @State private var homeDate = Date()
+    @State private var themeHex = ""
+    @State private var notes = ""
+
+    private let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
+
+    var body: some View {
+        CrewRosterEditorShell(
+            title: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "编辑宠物" : name,
+            subtitle: "宠物基本信息",
+            tint: Color(hex: resolvedThemeHex),
+            onCancel: onCancel,
+            onSave: saveChanges
+        ) {
+            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor")
+            CrewRosterEditorMenuRow(title: "物种", icon: "pawprint.fill", selection: $species, options: speciesOptions)
+            CrewRosterEditorTextField(title: "品种", text: $breed, icon: "tag.fill")
+            CrewRosterEditorSegmentedRow(
+                title: "性别",
+                selection: $gender,
+                options: [("male", "男孩"), ("female", "女孩"), ("unknown", "未知")]
+            )
+            CrewRosterEditorToggleRow(title: "已绝育", icon: "checkmark.seal.fill", isOn: $isNeutered)
+            CrewRosterEditorDateToggleRow(title: "生日", icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
+            CrewRosterEditorDateToggleRow(title: "到家日", icon: "house.fill", isOn: $hasHomeDate, date: $homeDate)
+            CrewRosterThemeSwatchRow(title: "主题色", selectedHex: $themeHex)
+            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical)
+        }
+        .onAppear(perform: loadState)
+    }
+
+    private var resolvedThemeHex: String {
+        themeHex.isEmpty ? pet.safeThemeColorHex : themeHex
+    }
+
+    private func loadState() {
+        name = pet.name
+        species = pet.species.isEmpty ? "其他" : pet.species
+        breed = pet.breed
+        gender = pet.gender.isEmpty ? "unknown" : pet.gender
+        isNeutered = pet.isNeutered
+        hasBirthday = pet.birthday != nil
+        birthday = pet.birthday ?? Date()
+        hasHomeDate = pet.homeDate != nil
+        homeDate = pet.homeDate ?? Date()
+        themeHex = pet.safeThemeColorHex
+        notes = pet.notes
+    }
+
+    private func saveChanges() {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        pet.name = trimmedName.isEmpty ? pet.name : trimmedName
+        pet.species = species
+        pet.breed = breed.trimmingCharacters(in: .whitespacesAndNewlines)
+        pet.gender = gender
+        pet.isNeutered = isNeutered
+        pet.birthday = hasBirthday ? birthday : nil
+        pet.homeDate = hasHomeDate ? homeDate : nil
+        pet.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+            themeHex,
+            fallback: OhanaThemeColorPolicy.petFallbackHex
+        )
+        pet.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        modelContext.safeSave()
+        onSave()
+    }
+}
+
+private struct CrewRosterHumanProfileEditor: View {
+    let human: Human
+    let onCancel: () -> Void
+    let onSave: () -> Void
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var name = ""
+    @State private var role = "member"
+    @State private var gender = ""
+    @State private var hasBirthday = false
+    @State private var birthday = Date()
+    @State private var bloodType = ""
+    @State private var mbti = ""
+    @State private var nationality = ""
+    @State private var city = ""
+    @State private var themeHex = ""
+    @State private var notes = ""
+
+    private let bloodTypeOptions = ["未填写", "A", "B", "AB", "O"]
+    private let mbtiOptions = ["未填写", "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]
+
+    var body: some View {
+        CrewRosterEditorShell(
+            title: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "编辑成员" : name,
+            subtitle: "人类基本信息",
+            tint: Color(hex: resolvedThemeHex),
+            onCancel: onCancel,
+            onSave: saveChanges
+        ) {
+            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor")
+            CrewRosterEditorSegmentedRow(
+                title: "权限",
+                selection: $role,
+                options: [("owner", "管理者"), ("member", "成员")]
+            )
+            CrewRosterEditorMenuRow(
+                title: "性别/身份",
+                icon: "person.fill",
+                selection: $gender,
+                options: HumanProfileOptions.genderOptions.map(\.key)
+            )
+            CrewRosterEditorDateToggleRow(title: "生日", icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
+            CrewRosterEditorMenuRow(title: "血型", icon: "drop.fill", selection: $bloodType, options: bloodTypeOptions)
+            CrewRosterEditorMenuRow(title: "MBTI", icon: "brain.head.profile", selection: $mbti, options: mbtiOptions)
+            CrewRosterEditorTextField(title: "国籍", text: $nationality, icon: "globe.asia.australia.fill")
+            CrewRosterEditorTextField(title: "现居地", text: $city, icon: "location.fill")
+            CrewRosterThemeSwatchRow(title: "主题色", selectedHex: $themeHex)
+            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical)
+        }
+        .onAppear(perform: loadState)
+    }
+
+    private var resolvedThemeHex: String {
+        themeHex.isEmpty ? human.safeThemeColorHex : themeHex
+    }
+
+    private func loadState() {
+        name = human.name
+        role = HumanProfileOptions.normalizedRole(human.role)
+        gender = HumanProfileOptions.normalizedGender(human.genderRaw)
+        hasBirthday = human.birthday != nil
+        birthday = human.birthday ?? Date()
+        bloodType = human.bloodType.isEmpty ? "未填写" : human.bloodType
+        mbti = human.mbti.isEmpty ? "未填写" : human.mbti.uppercased()
+        nationality = human.nationality
+        city = human.city
+        themeHex = human.safeThemeColorHex
+        notes = HumanProfileOptions.visibleNoteParts(from: human.notes).joined(separator: "｜")
+    }
+
+    private func saveChanges() {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        human.name = trimmedName.isEmpty ? human.name : trimmedName
+        human.role = HumanProfileOptions.normalizedRole(role)
+        human.birthday = hasBirthday ? birthday : nil
+        human.bloodType = bloodType == "未填写" ? "" : bloodType
+        human.mbti = mbti == "未填写" ? "" : mbti.uppercased()
+        human.nationality = nationality.trimmingCharacters(in: .whitespacesAndNewlines)
+        human.city = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        human.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
+            themeHex,
+            fallback: OhanaThemeColorPolicy.humanFallbackHex
+        )
+
+        var noteParts: [String] = []
+        let normalizedGender = HumanProfileOptions.normalizedGender(gender)
+        if !normalizedGender.isEmpty {
+            noteParts.append("性别:\(normalizedGender)")
+        }
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedNotes.isEmpty {
+            noteParts.append(trimmedNotes)
+        }
+        human.notes = noteParts.joined(separator: "｜")
+        modelContext.safeSave()
+        onSave()
+    }
+}
+
+private struct CrewRosterPlantProfileEditor: View {
+    let plant: Plant
+    let onCancel: () -> Void
+    let onSave: () -> Void
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var name = ""
+    @State private var species = ""
+    @State private var location = ""
+    @State private var wateringDays = 7
+    @State private var fertilizingDays = 30
+    @State private var themeHex = ""
+    @State private var notes = ""
+
+    var body: some View {
+        CrewRosterEditorShell(
+            title: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "编辑植物" : name,
+            subtitle: "植物基本信息",
+            tint: Color(hex: resolvedThemeHex),
+            onCancel: onCancel,
+            onSave: saveChanges
+        ) {
+            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor")
+            CrewRosterEditorTextField(title: "品种", text: $species, icon: "leaf.fill")
+            CrewRosterEditorTextField(title: "位置", text: $location, icon: "location.fill")
+            CrewRosterEditorStepperRow(title: "浇水间隔", icon: "drop.fill", value: $wateringDays, range: 1...60, unit: "天")
+            CrewRosterEditorStepperRow(title: "施肥间隔", icon: "sparkles", value: $fertilizingDays, range: 1...120, unit: "天")
+            CrewRosterThemeSwatchRow(title: "主题色", selectedHex: $themeHex)
+            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical)
+        }
+        .onAppear(perform: loadState)
+    }
+
+    private var resolvedThemeHex: String {
+        themeHex.isEmpty ? plant.themeColorHex : themeHex
+    }
+
+    private func loadState() {
+        name = plant.name
+        species = plant.species
+        location = plant.location
+        wateringDays = plant.wateringIntervalDays
+        fertilizingDays = plant.fertilizingIntervalDays
+        themeHex = plant.themeColorHex
+        notes = plant.notes
+    }
+
+    private func saveChanges() {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        plant.name = trimmedName.isEmpty ? plant.name : trimmedName
+        plant.species = species.trimmingCharacters(in: .whitespacesAndNewlines)
+        plant.location = location.trimmingCharacters(in: .whitespacesAndNewlines)
+        plant.wateringIntervalDays = wateringDays
+        plant.fertilizingIntervalDays = fertilizingDays
+        plant.themeColorHex = themeHex
+        plant.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        modelContext.safeSave()
+        onSave()
+    }
+}
+
+private struct CrewRosterEditorTextField: View {
+    let title: String
+    @Binding var text: String
+    let icon: String
+    var axis: Axis = .horizontal
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            CrewRosterEditorLabel(title: title, icon: icon)
+            TextField(title, text: $text, axis: axis)
+                .font(OhanaFont.caption(.bold))
+                .foregroundStyle(Color.goCardWhite)
+                .textFieldStyle(.plain)
+                .lineLimit(axis == .vertical ? 2...4 : 1...1)
+                .padding(.horizontal, 12)
+                .padding(.vertical, axis == .vertical ? 11 : 10)
+                .background(Color.goCardWhite.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(12)
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct CrewRosterEditorMenuRow: View {
+    let title: String
+    let icon: String
+    @Binding var selection: String
+    let options: [String]
+
+    var body: some View {
+        HStack(spacing: 10) {
+            CrewRosterEditorLabel(title: title, icon: icon)
+            Spacer(minLength: 8)
+            Picker(title, selection: $selection) {
+                ForEach(options, id: \.self) { option in
+                    Text(option.isEmpty ? "未填写" : option).tag(option)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(Color.goPrimary)
+        }
+        .padding(12)
+        .frame(minHeight: 56)
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct CrewRosterEditorSegmentedRow: View {
+    let title: String
+    @Binding var selection: String
+    let options: [(String, String)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CrewRosterEditorLabel(title: title, icon: "slider.horizontal.3")
+            Picker(title, selection: $selection) {
+                ForEach(options, id: \.0) { key, value in
+                    Text(value).tag(key)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+        .padding(12)
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct CrewRosterEditorToggleRow: View {
+    let title: String
+    let icon: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            CrewRosterEditorLabel(title: title, icon: icon)
+        }
+        .tint(Color.goPrimary)
+        .padding(12)
+        .frame(minHeight: 56)
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct CrewRosterEditorDateToggleRow: View {
+    let title: String
+    let icon: String
+    @Binding var isOn: Bool
+    @Binding var date: Date
+    var upperBound: Date? = nil
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Toggle(isOn: $isOn) {
+                CrewRosterEditorLabel(title: title, icon: icon)
+            }
+            .tint(Color.goPrimary)
+
+            if isOn {
+                if let upperBound {
+                    DatePicker(title, selection: $date, in: ...upperBound, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .tint(Color.goPrimary)
+                        .labelsHidden()
+                } else {
+                    DatePicker(title, selection: $date, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .tint(Color.goPrimary)
+                        .labelsHidden()
+                }
+            }
+        }
+        .padding(12)
+        .frame(minHeight: 56)
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .animation(GoMotion.feedback, value: isOn)
+    }
+}
+
+private struct CrewRosterEditorStepperRow: View {
+    let title: String
+    let icon: String
+    @Binding var value: Int
+    let range: ClosedRange<Int>
+    let unit: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            CrewRosterEditorLabel(title: title, icon: icon)
+            Spacer(minLength: 8)
+            Stepper(value: $value, in: range) {
+                Text("\(value) \(unit)")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.goCardWhite)
+                    .monospacedDigit()
+            }
+            .labelsHidden()
+            Text("\(value) \(unit)")
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.goCardWhite)
+                .monospacedDigit()
+                .frame(width: 56, alignment: .trailing)
+        }
+        .padding(12)
+        .frame(minHeight: 56)
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct CrewRosterThemeSwatchRow: View {
+    let title: String
+    @Binding var selectedHex: String
+
+    private var themeHexes: [String] {
+        PetThemeColor.allCases.map(\.hexValue)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CrewRosterEditorLabel(title: title, icon: "paintpalette.fill")
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 8), spacing: 8) {
+                ForEach(themeHexes, id: \.self) { hex in
+                    Button {
+                        selectedHex = hex
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: hex))
+                                .frame(width: 28, height: 28)
+                            if selectedHex.uppercased() == hex.uppercased() {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .black))
+                                    .foregroundStyle(WalletPetCardTheme.prefersDarkForeground(for: hex) ? Color.arkInk : Color.goCardWhite)
+                            }
+                        }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel("主题色")
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct CrewRosterEditorLabel: View {
+    let title: String
+    let icon: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(Color.goPrimary)
+                .frame(width: 18)
+            Text(title)
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.goCardWhite.opacity(0.82))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
     }
 }

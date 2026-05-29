@@ -263,9 +263,6 @@ extension QuickFeedDetailContent {
             if occurrence.isCompleted {
                 return (l.tr(zh: "自动记录", en: "Auto logged", de: "Automatisch erfasst"), Color.goTeal, FeedRuleKind.autoFeeder.iconName)
             }
-            if occurrence.date < clockTick {
-                return (l.tr(zh: "未自动记录", en: "Not logged", de: "Nicht erfasst"), Color.goRed, "exclamationmark.triangle.fill")
-            }
             if !isToday {
                 return (l.tr(zh: "自动计划", en: "Auto planned", de: "Auto geplant"), Color.ohanaSecondaryText.opacity(0.42), "clock.fill")
             }
@@ -288,15 +285,14 @@ extension QuickFeedDetailContent {
         let calendar = Calendar.current
         guard calendar.isDateInToday(draftStore.feedPlanCalendarSelectedDate), !occurrence.isCompleted else { return nil }
         if occurrence.date < clockTick {
+            guard FeedPlanCatchUpPolicy.isCatchUpEligible(scheduledAt: occurrence.date, now: clockTick) else { return nil }
             return l.tr(zh: "补打卡", en: "Catch up", de: "Nachtragen")
         }
         return l.tr(zh: "提前打卡", en: "Check in early", de: "Früher abhaken")
     }
 
     func canCatchUpPlanReminder(_ reminder: Reminder) -> Bool {
-        guard !reminder.isCompleted, reminder.scheduledAt < clockTick else { return false }
-        let cutoff = Calendar.current.date(byAdding: .hour, value: -24, to: clockTick) ?? clockTick.addingTimeInterval(-24 * 60 * 60)
-        return reminder.scheduledAt >= cutoff && (reminder.isPending || reminder.isFailed)
+        FeedPlanCatchUpPolicy.isCatchUpEligible(reminder, now: clockTick)
     }
 
     func friendlyPlanDateText(_ date: Date) -> String {

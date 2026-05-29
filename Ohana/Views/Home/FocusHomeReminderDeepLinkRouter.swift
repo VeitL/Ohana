@@ -100,7 +100,7 @@ enum FocusHomeReminderDeepLinkRouter {
         return nil
     }
 
-    private static func destination(
+    static func destination(
         for event: Event,
         pets: [Pet],
         humans: [Human],
@@ -164,7 +164,9 @@ enum FocusHomeReminderDeepLinkRouter {
 
     private static func pet(for event: Event, pets: [Pet]) -> Pet? {
         let entityType = event.relatedEntityType.lowercased()
-        if isPetEntity(entityType) || entityType == FeedRuleMetadata.autoFeederEntityType {
+        if isPetEntity(entityType) ||
+            entityType == FeedRuleMetadata.autoFeederEntityType ||
+            entityType == WaterPlanWriter.entityType.lowercased() {
             return pets.first { $0.id.uuidString == event.relatedEntityId && !$0.hasPassedAway }
         }
         if entityType == FeedingPlanWriter.stockReminderEntityType {
@@ -199,12 +201,6 @@ enum FocusHomeReminderDeepLinkRouter {
         if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication || eventType == .petMedicationDose {
             return .petFeature(.medications, pet)
         }
-        if entityType == FeedingPlanWriter.stockReminderEntityType ||
-            entityType == FeedRuleMetadata.autoFeederEntityType ||
-            eventType == .foodChange ||
-            matchesAny(text, ["喂", "吃饭", "粮", "feed", "food", "meal", "futter"]) {
-            return .petQuick("feed", pet)
-        }
         if eventType == .litterBox ||
             matchesAny(text, ["猫砂", "铲", "便便", "potty", "litter", "scoop", "toilet", "klo"]) {
             return .petQuick(sharedLitterKey(for: pet), pet)
@@ -224,8 +220,15 @@ enum FocusHomeReminderDeepLinkRouter {
             matchesAny(text, ["疫苗", "驱虫", "就医", "体检", "健康", "温湿度", "水温", "vaccine", "deworm", "vet", "health", "check"]) {
             return .petHealth(pet, .preventive)
         }
-        if matchesAny(text, ["喝水", "饮水", "补充饮水", "换水", "water", "drink", "wasser"]) {
+        if entityType == WaterPlanWriter.entityType.lowercased() ||
+            matchesAny(text, ["喝水", "饮水", "补充饮水", "喂水", "换水", "water", "drink", "wasser"]) {
             return .petQuick("water", pet)
+        }
+        if entityType == FeedingPlanWriter.stockReminderEntityType ||
+            entityType == FeedRuleMetadata.autoFeederEntityType ||
+            eventType == .foodChange ||
+            matchesAny(text, ["喂", "吃饭", "粮", "feed", "food", "meal", "futter"]) {
+            return .petQuick("feed", pet)
         }
         if matchesAny(text, ["体重", "weight", "gewicht"]) {
             return .petFeature(.weight, pet)
@@ -233,7 +236,7 @@ enum FocusHomeReminderDeepLinkRouter {
         if matchesAny(text, ["玩", "陪伴", "play", "spiel"]) {
             return .petQuick("play", pet)
         }
-        return calendarDestination(for: event)
+        return .petFeature(.basicInfo, pet)
     }
 
     private static func humanDestination(for event: Event, human: Human) -> FocusHomeReminderDestination {

@@ -33,6 +33,7 @@ final class QuickFeedDraftStore: ObservableObject {
     @Published var planCount = 3
     @Published var planTimes: [Date] = []
     @Published var planMeals: [FeedPlanMealDraft] = []
+    @Published var isSavingFeedPlan = false
 
     @Published var stockBrandText = ""
     @Published var stockWeightText = ""
@@ -43,6 +44,7 @@ final class QuickFeedDraftStore: ObservableObject {
     @Published var stockExpenseAmountText = ""
     @Published var stockExpensePayerId: String?
     @Published var stockExpenseAmountKeypadVisible = false
+    @Published var stockCalculationMode: FeedStockCalculationMode = .manualOrPlan
     @Published var stockReminderEnabled = false
     @Published var stockReminderAdvanceDays = 7
     @Published var editingFoodRecord: PetFoodRecord?
@@ -65,7 +67,11 @@ final class QuickFeedDraftStore: ObservableObject {
         stockExpenseAmountKeypadVisible = false
     }
 
-    func resetNewStockDraft(foodKind: FeedFoodKind, currentUserId: String?) {
+    func resetNewStockDraft(
+        foodKind: FeedFoodKind,
+        currentUserId: String?,
+        calculationMode: FeedStockCalculationMode = .manualOrPlan
+    ) {
         inputError = nil
         editingFoodRecord = nil
         selectedStockFoodKind = foodKind
@@ -75,6 +81,7 @@ final class QuickFeedDraftStore: ObservableObject {
         stockPurchaseDate = Date()
         stockHasOpenDate = false
         stockOpenDate = Date()
+        stockCalculationMode = calculationMode
         resetStockExpense(currentUserId: currentUserId, expense: nil)
     }
 }

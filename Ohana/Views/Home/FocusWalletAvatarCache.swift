@@ -19,6 +19,35 @@ enum FocusWalletAvatarCache {
     private static var entries: [UUID: Entry] = [:]
     private static var inFlightKeys: Set<String> = []
 
+    @discardableResult
+    static func seedPreviewEntries(payloads: [Payload]) -> Bool {
+        var didChange = false
+
+        for payload in payloads {
+            guard let data = payload.data else {
+                if entries.removeValue(forKey: payload.id) != nil {
+                    didChange = true
+                }
+                continue
+            }
+
+            let signature = signature(for: data)
+            if let cached = entries[payload.id],
+               cached.signature == signature,
+               cached.image != nil {
+                continue
+            }
+
+            guard let preview = previewEntry(for: payload.id, signature: signature) else {
+                continue
+            }
+            entries[payload.id] = preview
+            didChange = true
+        }
+
+        return didChange
+    }
+
     static func entry(for cardId: UUID, data: Data?) -> Entry {
         guard let data else {
             entries.removeValue(forKey: cardId)
@@ -63,6 +92,17 @@ enum FocusWalletAvatarCache {
               cached.signature == signature,
               cached.image != nil else { return nil }
         return cached
+    }
+
+    static func storeDecodedImage(cardId: UUID, data: Data?, image: UIImage?, isTransparent: Bool) {
+        guard let data, let image else { return }
+        let signature = signature(for: data)
+        entries[cardId] = Entry(
+            image: image,
+            isTransparent: isTransparent,
+            signature: signature,
+            isFinal: true
+        )
     }
 
     @discardableResult

@@ -331,6 +331,23 @@ struct OhanaAppBackground: View {
     }
 }
 
+/// Static app backdrop for presentation handoffs and high-frequency route opens.
+/// It preserves the selected background palette without decoding custom photos or
+/// starting ambient animation loops on the user's tap frame.
+struct OhanaStaticAppBackground: View {
+    @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var style: AppBackgroundStyle {
+        AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland
+    }
+
+    var body: some View {
+        StaticGradientBackground(colors: style.gradientColors(for: colorScheme))
+            .ignoresSafeArea()
+    }
+}
+
 // MARK: - 1. Go 默认（三球 Blob）
 private struct GoDefaultBackground: View {
     @Environment(\.colorScheme) private var colorScheme

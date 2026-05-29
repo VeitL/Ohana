@@ -54,11 +54,17 @@ struct QuickFeedOverviewSnapshot {
                 return FeedLogMetadata.source(for: log) == .autoMain
             }
         }
-        let todayPlanReminders = manualPlanEvents
+        let allPlanReminders = manualPlanEvents
             .flatMap(\.reminders)
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+        let todayPlanReminders = allPlanReminders
             .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
             .sorted { $0.scheduledAt < $1.scheduledAt }
-        let nextPendingManualReminder = todayPlanReminders.first { ($0.isPending || $0.isFailed) && !$0.isCompleted }
+        let catchUpPlanReminders = allPlanReminders.filter { FeedPlanCatchUpPolicy.isCatchUpEligible($0, now: now) }
+        let expiredMissedPlanReminders = allPlanReminders.filter { FeedPlanCatchUpPolicy.isExpiredMiss($0, now: now) }
+        let nextPendingManualReminder = expiredMissedPlanReminders.isEmpty
+            ? (catchUpPlanReminders.first ?? todayPlanReminders.first { ($0.isPending || $0.isFailed) && !$0.isCompleted })
+            : nil
         let feedModePlanRemindersInRange = manualPlanEvents
             .flatMap(\.reminders)
             .filter { $0.scheduledAt >= startDate && $0.scheduledAt <= now }

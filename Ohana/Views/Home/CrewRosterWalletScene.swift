@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
+struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View, EditorContent: View>: View {
     private let sceneCoordinateSpace = "CrewRosterWalletSceneSpace"
 
     let cards: [FocusCard]
@@ -21,10 +21,16 @@ struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
     let namespace: Namespace.ID
     let heroNamespace: Namespace.ID
     let avatarCacheRevision: Int
+    let editingCardId: UUID?
+    let editorProgress: CGFloat
+    let isEditorContentMounted: Bool
     let expandedInfo: (FocusCard) -> ExpandedInfo
     @ViewBuilder let cardOverlay: (FocusCard) -> CardOverlay
+    @ViewBuilder let editorContent: (FocusCard) -> EditorContent
     let onSelect: (FocusCard) -> Void
     let onCollapse: () -> Void
+    let onOpenEditor: (FocusCard) -> Void
+    let onCloseEditor: () -> Void
 
     private var selectedCardIndex: Int? {
         selectedCardId.flatMap { selectedId in
@@ -42,8 +48,19 @@ struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
         selectedCardId != nil && progress > 0.985
     }
 
+    private var isEditorActive: Bool {
+        guard let selectedCardId, let editingCardId else { return false }
+        return selectedCardId == editingCardId
+    }
+
+    private var isEditorInteractionReady: Bool {
+        isEditorActive && editorProgress > 0.985 && isEditorContentMounted
+    }
+
     var body: some View {
         GeometryReader { geo in
+            let expandedCardHeight = min(430, max(K.expandedCardH + 36, geo.size.height - 156))
+            let expandedTopOffset = max(72, min(108, geo.size.height * 0.13))
             let layout = WalletHeroLayout(
                 size: geo.size,
                 safeTop: safeTop,
@@ -52,19 +69,22 @@ struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
                 horizontalInset: 0,
                 collapsedPeek: 44,
                 collapsedBottomGap: 42,
-                expandedTopOffset: 140,
-                expandedHeightRatio: 0.43,
-                expandedMinHeight: K.expandedCardH,
-                expandedMaxHeight: K.expandedCardH,
+                expandedTopOffset: expandedTopOffset,
+                expandedHeightRatio: 0.58,
+                expandedMinHeight: expandedCardHeight,
+                expandedMaxHeight: expandedCardHeight,
                 quickGap: K.expandedQuickModuleGap,
                 quickHeight: 0
             )
+            let editorFrame = editorFrame(in: geo.size, baseFrame: layout.expandedFrame)
 
             ZStack {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                     let isActive = card.id == selectedCardId
-                    let frame = frame(for: card, index: index, layout: layout)
+                    let frame = frame(for: card, index: index, layout: layout, editorFrame: editorFrame)
                     let walkTrackingPet = FocusHomeWalletCardContent.walkTrackingPet(for: card, isHero: isActive, pets: pets)
+                    let cardEditorProgress = isActive && card.id == editingCardId ? editorProgress : 0
+                    let editorReveal = WalletHeroTimeline.smooth(cardEditorProgress, 0.22, 0.52)
 
                     FocusHomeWalletCardContent(
                         card: card,
@@ -75,15 +95,28 @@ struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
                         heroProgress: isActive ? progress : 0,
                         avatarCacheRevision: avatarCacheRevision,
                         walkTrackingPet: walkTrackingPet,
-                        usesMatchedGeometry: false
+                        usesMatchedGeometry: false,
+                        reduceMotion: reduceMotion,
+                        presentation: .rosterMember,
+                        expandedCardHeight: layout.expandedHeight
                     )
                     .overlay {
                         if isActive {
-                            expandedInfo(card)
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 16)
-                                .opacity(Double(WalletHeroTimeline.smooth(progress, 0.26, 0.46)))
-                                .allowsHitTesting(false)
+                            ZStack {
+                                expandedInfo(card)
+                                    .padding(.horizontal, 18)
+                                    .padding(.vertical, 16)
+                                    .opacity(Double(WalletHeroTimeline.smooth(progress, 0.26, 0.46) * (1 - editorReveal)))
+                                    .allowsHitTesting(false)
+
+                                if card.id == editingCardId, isEditorContentMounted {
+                                    editorContent(card)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 14)
+                                        .opacity(Double(editorReveal))
+                                        .allowsHitTesting(isEditorInteractionReady)
+                                }
+                            }
                         }
                     }
                     .frame(width: frame.width, height: frame.height)
@@ -94,11 +127,11 @@ struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
                     .contentShape(RoundedRectangle(cornerRadius: WalletHeroTimeline.cornerRadius(progress: isActive ? progress : 0), style: .continuous))
                     .allowsHitTesting(isActive && isExpandedInteractionReady)
                     .onTapGesture {
-                        guard isActive, isExpandedInteractionReady, walkTrackingPet == nil else { return }
+                        guard !isEditorActive, isActive, isExpandedInteractionReady, walkTrackingPet == nil else { return }
                         OhanaFeedback.light()
                         onCollapse()
                     }
-                    .simultaneousGesture(collapseDragGesture(isEnabled: walkTrackingPet == nil))
+                    .simultaneousGesture(collapseDragGesture(isEnabled: walkTrackingPet == nil && !isEditorActive))
                 }
 
                 if selectedCardId == nil {
@@ -106,7 +139,7 @@ struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
                         .zIndex(70)
                 }
 
-                if isExpandedInteractionReady {
+                if isExpandedInteractionReady && !isEditorActive {
                     expandedCardHitZone(layout: layout)
                         .zIndex(80)
                 }
@@ -115,13 +148,22 @@ struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
                     collapsedCardOverlays(layout: layout)
                         .zIndex(100)
                 } else if isExpandedInteractionReady, let activeCard {
-                    cardOverlayLayer(for: activeCard, frame: layout.expandedFrame)
-                        .zIndex(100)
+                    if !isEditorActive {
+                        cardOverlayLayer(for: activeCard, frame: layout.expandedFrame, placement: .expandedLeading)
+                            .zIndex(100)
+                        expandedSettingsButton(for: activeCard, frame: layout.expandedFrame)
+                            .zIndex(120)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .coordinateSpace(name: sceneCoordinateSpace)
         }
+    }
+
+    private enum OverlayPlacement {
+        case collapsed
+        case expandedLeading
     }
 
     private func collapsedCardOverlays(layout: WalletHeroLayout) -> some View {
@@ -132,20 +174,70 @@ struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
         }
     }
 
-    private func cardOverlayLayer(for card: FocusCard, frame: CGRect) -> some View {
-        cardOverlay(card)
-            .frame(width: 104, height: 54, alignment: .topTrailing)
-            .position(x: frame.maxX - 52, y: frame.minY + 27)
+    private func cardOverlayLayer(
+        for card: FocusCard,
+        frame: CGRect,
+        placement: OverlayPlacement = .collapsed
+    ) -> some View {
+        let overlayWidth: CGFloat = 66
+        let overlayHeight: CGFloat = 44
+        let sideInset: CGFloat = placement == .collapsed ? 13 : 16
+        let topInset: CGFloat = selectedCardId == nil ? 8 : 16
+        let x = placement == .collapsed
+            ? frame.maxX - sideInset - overlayWidth / 2
+            : frame.minX + sideInset + overlayWidth / 2
+
+        return cardOverlay(card)
+            .frame(width: overlayWidth, height: overlayHeight, alignment: .center)
+            .position(
+                x: x,
+                y: frame.minY + topInset + overlayHeight / 2
+            )
     }
 
-    private func frame(for card: FocusCard, index: Int, layout: WalletHeroLayout) -> CGRect {
-        let collapsed = layout.collapsedFrame(index: index, count: cards.count)
-        if reduceMotion {
-            return card.id == selectedCardId ? layout.expandedFrame : collapsed
+    private func expandedSettingsButton(for card: FocusCard, frame: CGRect) -> some View {
+        Button {
+            OhanaFeedback.medium()
+            onOpenEditor(card)
+        } label: {
+            Image(systemName: "gearshape.fill")
+                .font(.system(size: 14, weight: .black))
+                .foregroundStyle(Color.goCardWhite)
+                .frame(width: 44, height: 44)
+                .background(Color.goCardWhite.opacity(0.16), in: Circle())
+                .overlay(Circle().strokeBorder(Color.goCardWhite.opacity(0.18), lineWidth: 0.75))
+                .contentShape(Circle())
         }
+        .buttonStyle(ScaleButtonStyle())
+        .position(x: frame.maxX - 16 - 22, y: frame.minY + 16 + 22)
+        .accessibilityLabel("设置")
+    }
 
-        guard card.id == selectedCardId else {
-            return WalletHeroTimeline.inactiveFrame(
+    private func editorFrame(in size: CGSize, baseFrame: CGRect) -> CGRect {
+        let availableHeight = max(baseFrame.height, size.height - safeBottom - 42)
+        let height = min(max(baseFrame.height + 116, 520), availableHeight)
+        let top = max(14, min(baseFrame.minY - 44, size.height - safeBottom - height - 18))
+        return CGRect(
+            x: baseFrame.minX,
+            y: top,
+            width: baseFrame.width,
+            height: height
+        )
+    }
+
+    private func frame(for card: FocusCard, index: Int, layout: WalletHeroLayout, editorFrame: CGRect) -> CGRect {
+        let collapsed = layout.collapsedFrame(index: index, count: cards.count)
+        let baseFrame: CGRect
+        if reduceMotion {
+            baseFrame = card.id == selectedCardId ? layout.expandedFrame : collapsed
+        } else if card.id == selectedCardId {
+            baseFrame = WalletHeroTimeline.activeFrame(
+                from: collapsed,
+                to: layout.expandedFrame,
+                progress: progress
+            )
+        } else {
+            baseFrame = WalletHeroTimeline.inactiveFrame(
                 from: collapsed,
                 index: index,
                 selectedIndex: selectedCardIndex,
@@ -155,10 +247,14 @@ struct CrewRosterWalletScene<ExpandedInfo: View, CardOverlay: View>: View {
             )
         }
 
-        return WalletHeroTimeline.activeFrame(
-            from: collapsed,
-            to: layout.expandedFrame,
-            progress: progress
+        guard card.id == editingCardId else { return baseFrame }
+        if reduceMotion {
+            return editorProgress > 0.5 ? editorFrame : baseFrame
+        }
+        return WalletHeroTimeline.interpolate(
+            from: baseFrame,
+            to: editorFrame,
+            progress: WalletHeroTimeline.smooth(editorProgress)
         )
     }
 
@@ -253,49 +349,55 @@ struct CrewRosterWalletInfoOverlay: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
 
-            HStack(alignment: .bottom, spacing: 10) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 7) {
-                        if let status = card.statusBadgeText, !status.isEmpty {
-                            infoChip(status, icon: card.statusBadgeIsWarning ? "exclamationmark.triangle.fill" : "checkmark.seal.fill")
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    inlineFact(memberKindText, icon: memberKindIcon)
+                    if let status = card.statusBadgeText, !status.isEmpty {
+                        inlineFact(status, icon: card.statusBadgeIsWarning ? "exclamationmark.triangle.fill" : "checkmark.seal.fill")
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                HStack(alignment: .bottom, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(l.tr(zh: "基本信息", en: "Profile", de: "Profil"))
+                            .font(OhanaFont.caption2(.black))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.64))
+                            .textCase(.uppercase)
+                        Text(card.personalityHint ?? secondaryIdentityText)
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.84))
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.76)
+                    }
+                    .shadow(color: Color.arkInk.opacity(0.34), radius: 6, y: 2) // ui-v4: allow readability shadow on image card
+
+                    Spacer(minLength: 8)
+
+                    HStack(alignment: .bottom, spacing: 12) {
+                        if card.coconutBalance > 0 || !card.isHuman {
+                            plainMetric(
+                                title: l.tr(zh: "椰子", en: "Coconuts", de: "Kokos"),
+                                value: "\(card.coconutBalance)",
+                                icon: "circle.hexagongrid.fill"
+                            )
                         }
-                        infoChip(memberKindText, icon: memberKindIcon)
+                        if card.streak > 0 {
+                            plainMetric(
+                                title: l.tr(zh: "连击", en: "Streak", de: "Serie"),
+                                value: "\(card.streak)",
+                                icon: "flame.fill"
+                            )
+                        }
                     }
-
-                    Text(card.personalityHint ?? secondaryIdentityText)
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.goCardWhite.opacity(0.82))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                        .shadow(color: Color.arkInk.opacity(0.35), radius: 6, y: 2) // ui-v4: allow readability shadow on image card
                 }
 
-                Spacer(minLength: 10)
-
-                VStack(alignment: .trailing, spacing: 8) {
-                    if card.coconutBalance > 0 || !card.isHuman {
-                        metricChip(
-                            title: l.tr(zh: "椰子", en: "Coconuts", de: "Kokos"),
-                            value: "\(card.coconutBalance)",
-                            icon: "circle.hexagongrid.fill"
-                        )
-                    }
-                    if card.streak > 0 {
-                        metricChip(
-                            title: l.tr(zh: "连击", en: "Streak", de: "Serie"),
-                            value: "\(card.streak)",
-                            icon: "flame.fill"
-                        )
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 9) {
+                    ForEach(infoRows) { row in
+                        compactInfoTile(row)
                     }
                 }
             }
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-                ForEach(infoRows) { row in
-                    compactInfoTile(row)
-                }
-            }
-            .padding(.top, 12)
         }
     }
 
@@ -347,7 +449,7 @@ struct CrewRosterWalletInfoOverlay: View {
         return Array(rows.prefix(4))
     }
 
-    private func infoChip(_ text: String, icon: String) -> some View {
+    private func inlineFact(_ text: String, icon: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 10, weight: .black))
@@ -355,31 +457,29 @@ struct CrewRosterWalletInfoOverlay: View {
                 .font(OhanaFont.caption2(.black))
                 .lineLimit(1)
         }
-        .foregroundStyle(Color.goCardWhite)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .background(Color.arkInk.opacity(0.34), in: Capsule())
+        .foregroundStyle(Color.goCardWhite.opacity(0.78))
+        .shadow(color: Color.arkInk.opacity(0.30), radius: 5, y: 2) // ui-v4: allow text readability shadow on image card
     }
 
-    private func metricChip(title: String, value: String, icon: String) -> some View {
-        HStack(spacing: 7) {
+    private func plainMetric(title: String, value: String, icon: String) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .black))
                 .foregroundStyle(Color.goPrimary)
-            VStack(alignment: .trailing, spacing: 0) {
-                Text(value)
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.goCardWhite)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                Text(title)
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.64))
-            }
+            Text(value)
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.goCardWhite)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .contentTransition(.numericText())
+            Text(title)
+                .font(OhanaFont.caption2(.bold))
+                .foregroundStyle(Color.goCardWhite.opacity(0.64))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color.arkInk.opacity(0.36), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: Color.arkInk.opacity(0.32), radius: 6, y: 2) // ui-v4: allow text readability shadow on image card
     }
 
     private func compactInfoTile(_ row: CrewRosterWalletInfoRow) -> some View {
@@ -401,9 +501,7 @@ struct CrewRosterWalletInfoOverlay: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(Color.arkInk.opacity(0.30), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: Color.arkInk.opacity(0.30), radius: 5, y: 2) // ui-v4: allow text readability shadow on image card
     }
 }
 

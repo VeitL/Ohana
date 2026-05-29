@@ -160,6 +160,7 @@ struct QuickFeedStockSnapshotRevision: Equatable {
                 hasher.combine(record.purchaseDate?.timeIntervalSince1970 ?? 0)
                 hasher.combine(record.totalGrams)
                 hasher.combine(record.foodKindRaw)
+                hasher.combine(record.notes)
                 hasher.combine(record.remainingCorrectionGrams ?? -1)
                 hasher.combine(record.remainingCorrectionDate?.timeIntervalSince1970 ?? 0)
             },

@@ -212,9 +212,14 @@ struct FeedTodayState {
     }
 
     var todayPlanReminders: [Reminder] {
+        allPlanReminders
+            .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+    }
+
+    var allPlanReminders: [Reminder] {
         feedScheduleEvents
             .flatMap(\.reminders)
-            .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
             .sorted { $0.scheduledAt < $1.scheduledAt }
     }
 
@@ -226,12 +231,29 @@ struct FeedTodayState {
         todayPlanReminders.filter { !isPlanReminderSatisfied($0) && ($0.isFailed || ($0.isPending && $0.scheduledAt < now)) }
     }
 
+    var missedPlanReminders: [Reminder] {
+        allPlanReminders.filter { !isPlanReminderSatisfied($0) && ($0.isPending || $0.isFailed) && $0.scheduledAt <= now }
+    }
+
+    var catchUpPlanReminders: [Reminder] {
+        allPlanReminders.filter { FeedPlanCatchUpPolicy.isCatchUpEligible($0, now: now) }
+    }
+
+    var expiredMissedPlanReminders: [Reminder] {
+        allPlanReminders.filter { FeedPlanCatchUpPolicy.isExpiredMiss($0, now: now) }
+    }
+
+    var lastExpiredPlanReminderDate: Date? {
+        expiredMissedPlanReminders.map(\.scheduledAt).max()
+    }
+
     var completedTodayPlanReminders: [Reminder] {
         todayPlanReminders.filter { isPlanReminderSatisfied($0) }
     }
 
     var nextPendingReminder: Reminder? {
-        pendingTodayPlanReminders.first
+        guard expiredMissedPlanReminders.isEmpty else { return nil }
+        return catchUpPlanReminders.first ?? pendingTodayPlanReminders.first
     }
 
     var hasTodayPlan: Bool {
@@ -295,7 +317,7 @@ struct FeedTodayState {
     }
 
     var hasOverduePlan: Bool {
-        !missedTodayPlanReminders.isEmpty
+        !missedPlanReminders.isEmpty
     }
 
     var todayFeedGrams: Double {

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct AchievementWallView: View {
     let pet: Pet
@@ -34,6 +35,9 @@ struct AchievementWallView: View {
     @State private var showRewardAnimation = false
     @State private var rewardAnimationAmount = 0
     @State private var rewardAnimationLabel: String?
+    @State private var achievementShareImage: UIImage?
+    @State private var showingAchievementShareSheet = false
+    @State private var isRenderingAchievementShareImage = false
 
     private enum AchievementSubject: Hashable, Identifiable {
         case pet(UUID)
@@ -72,6 +76,57 @@ struct AchievementWallView: View {
 
     private let rewardPerAchievement = 10
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+    private let achievementArtworkAspectRatio: CGFloat = 520.0 / 444.0
+    private let achievementPopupMaxImageWidth: CGFloat = 520
+    private static let achievementBackgroundNames: [String: String] = [
+        "iron_gut": "AchievementBgIronGut",
+        "iron_paw": "AchievementBgIronPaw",
+        "walk_streak": "AchievementBgWalkStreak",
+        "health_hero": "AchievementBgHealthHero",
+        "nutritionist": "AchievementBgNutritionist",
+        "happy_birthday": "AchievementBgHappyBirthday",
+        "hundred_days": "AchievementBgHundredDays",
+        "first_record": "AchievementBgFirstRecord",
+        "day_one_checkin": "AchievementBgDayOneCheckin",
+        "old_friend": "AchievementBgOldFriend",
+        "long_runner": "AchievementBgLongRunner",
+        "medication_complete": "AchievementBgMedicationComplete",
+        "photo_enthusiast": "AchievementBgPhotoEnthusiast",
+        "expense_tracker": "AchievementBgExpenseTracker",
+        "weight_manager": "AchievementBgWeightManager",
+        "hydration_buddy": "AchievementBgHydrationBuddy",
+        "play_champion": "AchievementBgPlayChampion",
+        "clean_keeper": "AchievementBgCleanKeeper",
+        "treat_scout": "AchievementBgTreatScout",
+        "food_kind_explorer": "AchievementBgFoodKindExplorer",
+        "auto_feeder_pilot": "AchievementBgAutoFeederPilot",
+        "stock_keeper": "AchievementBgStockKeeper",
+        "protection_ready": "AchievementBgProtectionReady",
+        "vaccine_keeper": "AchievementBgVaccineKeeper",
+        "symptom_watcher": "AchievementBgSymptomWatcher",
+        "global_island_crew": "AchievementBgGlobalIslandCrew",
+        "global_first_critter": "AchievementBgGlobalFirstCritter",
+        "global_legendary_critter": "AchievementBgGlobalLegendaryCritter",
+        "global_critter_collector": "AchievementBgGlobalCritterCollector",
+        "global_critter_star": "AchievementBgGlobalCritterStar",
+        "global_critter_caretaker": "AchievementBgGlobalCritterCaretaker",
+        "global_first_blind_box": "AchievementBgGlobalFirstBlindBox",
+        "global_blind_box_collector": "AchievementBgGlobalBlindBoxCollector",
+        "global_secret_blind_box": "AchievementBgGlobalSecretBlindBox",
+        "global_gacha_series_complete": "AchievementBgGlobalGachaSeriesComplete",
+        "global_gacha_jackpot": "AchievementBgGlobalGachaJackpot",
+        "human_profile_ready": "AchievementBgHumanProfileReady",
+        "human_first_record": "AchievementBgHumanFirstRecord",
+        "human_weight_starter": "AchievementBgHumanWeightStarter",
+        "human_weight_keeper": "AchievementBgHumanWeightKeeper",
+        "human_expense_tracker": "AchievementBgHumanExpenseTracker",
+        "human_medication_setup": "AchievementBgHumanMedicationSetup",
+        "human_medication_keeper": "AchievementBgHumanMedicationKeeper",
+        "human_workout_starter": "AchievementBgHumanWorkoutStarter",
+        "human_workout_rhythm": "AchievementBgHumanWorkoutRhythm",
+        "human_coconut_saver": "AchievementBgHumanCoconutSaver",
+        "human_old_friend": "AchievementBgHumanOldFriend"
+    ]
     private var l: L10n { L10n(appLanguageRaw) }
 
     private var pets: [Pet] {
@@ -214,6 +269,11 @@ struct AchievementWallView: View {
         )
         .fullScreenCover(isPresented: $showingCoconutLog) {
             CoconutLogView(subject: activeCoconutLogSubject)
+        }
+        .sheet(isPresented: $showingAchievementShareSheet) {
+            if let achievementShareImage {
+                ShareSheet(image: achievementShareImage)
+            }
         }
         .animation(GoMotion.sheet, value: selectedAchievement?.id)
         .animation(GoMotion.sheet, value: pendingClaimAchievement?.id)
@@ -421,70 +481,109 @@ struct AchievementWallView: View {
     private func achievementCard(_ badge: Achievement) -> some View {
         let info = progress(for: badge)
         let state = rewardState(for: badge)
-        let foreground = cardForeground(for: state)
+        let backgroundName = achievementBackgroundName(for: badge)
+        let usesArtwork = backgroundName != nil
+        let foreground = usesArtwork ? artworkCardForeground(for: state) : cardForeground(for: state)
 
         return Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            if state == .claimable {
-                pendingClaimAchievement = badge
-            } else {
+            withAnimation(GoMotion.sheet) {
                 selectedAchievement = badge
             }
         } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    badgeGlyph(badge, state: state)
-                    Spacer()
-                    stateMark(state, tint: badge.color)
+            ZStack(alignment: .topTrailing) {
+                achievementArtworkBackground(backgroundName, state: state, tint: badge.color)
+
+                stateMark(state, tint: badge.color, foreground: foreground.primary)
+                    .padding(14)
+                    .shadow(color: Color.arkInk.opacity(usesArtwork ? 0.24 : 0), radius: 4, x: 0, y: 2) // ui-v4: allow artwork icon readability without image wash
+
+                VStack(alignment: .leading, spacing: 9) {
+                    Spacer(minLength: 0)
+                    Text(badge.title)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(foreground.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+
+                    Text(stateText(for: badge, state: state, info: info))
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(foreground.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    progressBar(info.fraction, tint: foreground.progressTint, track: foreground.progressTrack)
                 }
-
-                Text(badge.title)
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(foreground.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-
-                Text(stateText(for: badge, state: state, info: info))
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(foreground.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                progressBar(info.fraction, tint: foreground.progressTint, track: foreground.progressTrack)
+                .padding(14)
+                .shadow(color: Color.arkInk.opacity(usesArtwork ? 0.34 : 0), radius: 5, x: 0, y: 2) // ui-v4: allow artwork text readability without image wash
             }
-            .padding(14)
             .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
-            .background(cardBackground(for: state, tint: badge.color), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Color.arkInk.opacity(usesArtwork ? 0.08 : 0), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
         }
         .buttonStyle(ScaleButtonStyle())
     }
 
-    private func badgeGlyph(_ badge: Achievement, state: AchievementRewardState) -> some View {
-        Text(badge.emoji)
-            .font(.system(size: 28))
-            .opacity(state == .locked ? 0.32 : 1)
-            .grayscale(state == .locked ? 1 : 0)
-            .frame(width: 42, height: 42)
-            .background(glyphBackground(for: state, tint: badge.color), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
     @ViewBuilder
-    private func stateMark(_ state: AchievementRewardState, tint: Color) -> some View {
+    private func stateMark(_ state: AchievementRewardState, tint: Color, foreground: Color? = nil) -> some View {
+        let resolvedForeground = foreground ?? Color.ohanaPrimaryText
         switch state {
         case .claimable:
             Image(systemName: "gift.fill")
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(foreground ?? Color.arkInk)
         case .claimed:
             Image(systemName: "checkmark.seal.fill")
-                .foregroundStyle(Color.ohanaPrimaryText)
+                .foregroundStyle(resolvedForeground)
         case .unlocked:
             Image(systemName: "seal.fill")
-                .foregroundStyle(Color.ohanaPrimaryText)
+                .foregroundStyle(resolvedForeground)
         case .locked:
             Image(systemName: "lock.fill")
                 .font(.system(size: 11, weight: .black))
-                .foregroundStyle(Color.ohanaSecondaryText)
+                .foregroundStyle(foreground ?? Color.ohanaSecondaryText)
         }
+    }
+
+    private func achievementBackgroundName(for badge: Achievement) -> String? {
+        Self.achievementBackgroundNames[badge.id]
+    }
+
+    @ViewBuilder
+    private func achievementArtworkBackground(_ imageName: String?, state: AchievementRewardState, tint: Color) -> some View {
+        if let imageName {
+            Image(imageName)
+                .resizable()
+                .scaledToFill()
+                .saturation(state == .locked ? 0.24 : 1)
+                .opacity(state == .locked ? 0.58 : 1)
+                .overlay {
+                    if state == .locked {
+                        artworkReadabilityWash(for: state)
+                            .allowsHitTesting(false)
+                    }
+                }
+        } else {
+            cardBackground(for: state, tint: tint)
+        }
+    }
+
+    private func artworkReadabilityWash(for state: AchievementRewardState) -> LinearGradient {
+        let top = state == .locked ? 0.84 : 0.64
+        let middle = state == .claimable ? 0.44 : 0.54
+        let bottom = state == .locked ? 0.30 : 0.16
+        return LinearGradient(
+            colors: [
+                Color.goCardWhite.opacity(top),
+                Color.goCardWhite.opacity(middle),
+                Color.arkInk.opacity(bottom)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
     private func cardBackground(for state: AchievementRewardState, tint: Color) -> Color {
@@ -492,14 +591,6 @@ struct AchievementWallView: View {
         case .claimable: return Color.goPrimary
         case .claimed, .unlocked: return Color.ohanaCardSurfaceElevated
         case .locked: return Color.ohanaCardSurface
-        }
-    }
-
-    private func glyphBackground(for state: AchievementRewardState, tint: Color) -> Color {
-        switch state {
-        case .claimable: return Color.arkInk.opacity(0.18)
-        case .claimed, .unlocked: return tint
-        case .locked: return Color.ohanaControlFill
         }
     }
 
@@ -529,6 +620,25 @@ struct AchievementWallView: View {
         }
     }
 
+    private func artworkCardForeground(for state: AchievementRewardState) -> (primary: Color, secondary: Color, progressTint: Color, progressTrack: Color) {
+        switch state {
+        case .claimable, .claimed, .unlocked:
+            return (
+                Color.goCardWhite,
+                Color.goCardWhite.opacity(0.82),
+                Color.goCardWhite,
+                Color.goCardWhite.opacity(0.28)
+            )
+        case .locked:
+            return (
+                Color.arkInk.opacity(0.62),
+                Color.arkInk.opacity(0.48),
+                Color.arkInk.opacity(0.45),
+                Color.arkInk.opacity(0.10)
+            )
+        }
+    }
+
     private func stateText(for badge: Achievement, state: AchievementRewardState, info: ProgressInfo) -> String {
         switch state {
         case .claimable:
@@ -540,6 +650,272 @@ struct AchievementWallView: View {
         case .locked:
             return info.summary
         }
+    }
+
+    private func achievementMomentLine(for badge: Achievement) -> String {
+        switch badge.id {
+        case "iron_gut": return l.tr(zh: "这是一段稳定又安心的照护节奏。", en: "A steady care rhythm worth keeping.", de: "Ein ruhiger Pflegerhythmus, der bleibt.")
+        case "iron_paw": return l.tr(zh: "一步一步，你们把日常走成了远方。", en: "Step by step, ordinary walks became distance.", de: "Schritt für Schritt wurde Alltag zu Strecke.")
+        case "walk_streak": return l.tr(zh: "连续出门的日子，会慢慢变成习惯。", en: "Daily walks quietly turn into a habit.", de: "Tägliche Wege werden leise zur Gewohnheit.")
+        case "health_hero": return l.tr(zh: "平稳健康，是最值得庆祝的小事。", en: "Steady health is a quiet thing to celebrate.", de: "Stabile Gesundheit ist ein leiser Grund zum Feiern.")
+        case "nutritionist": return l.tr(zh: "每一餐都被认真记住了。", en: "Every meal was remembered with care.", de: "Jede Mahlzeit wurde achtsam festgehalten.")
+        case "happy_birthday": return l.tr(zh: "今天属于这个被爱着的小生命。", en: "Today belongs to this well-loved little life.", de: "Heute gehört diesem geliebten kleinen Leben.")
+        case "hundred_days": return l.tr(zh: "一百天的小事，已经长成一段陪伴。", en: "A hundred small days have become companionship.", de: "Hundert kleine Tage wurden zu Begleitung.")
+        case "first_record": return l.tr(zh: "第一条记录，是你们故事的起点。", en: "The first record is where the story begins.", de: "Der erste Eintrag ist der Anfang eurer Geschichte.")
+        case "day_one_checkin": return l.tr(zh: "今天也被好好照顾到了。", en: "Today got its little act of care.", de: "Auch heute gab es diesen kleinen Moment Fürsorge.")
+        case "old_friend": return l.tr(zh: "熟悉感，是每天都回来一次。", en: "Familiarity is coming back, day after day.", de: "Vertrautheit heißt, jeden Tag wiederzukommen.")
+        case "long_runner": return l.tr(zh: "这一次，你们真的走了很远。", en: "This time, you really went the distance.", de: "Diesmal seid ihr wirklich weit gegangen.")
+        case "medication_complete": return l.tr(zh: "坚持到最后，是温柔也可靠的照护。", en: "Finishing the course is care that follows through.", de: "Bis zum Ende dranzubleiben ist verlässliche Fürsorge.")
+        case "photo_enthusiast": return l.tr(zh: "镜头里留下了好多被爱的瞬间。", en: "So many loved moments made it into the frame.", de: "So viele geliebte Momente blieben im Bild.")
+        case "expense_tracker": return l.tr(zh: "爱也有账本，清楚一点更安心。", en: "Care has a ledger too, and clarity feels good.", de: "Auch Fürsorge hat ein kleines Kassenbuch.")
+        case "weight_manager": return l.tr(zh: "变化被看见，身体就更容易被照顾。", en: "When change is visible, care gets easier.", de: "Wenn Veränderung sichtbar wird, wird Fürsorge leichter.")
+        case "hydration_buddy": return l.tr(zh: "一碗清水，也是一件被放在心上的事。", en: "A fresh bowl of water is care in its simplest form.", de: "Eine frische Schale Wasser ist Fürsorge ganz schlicht.")
+        case "play_champion": return l.tr(zh: "玩耍不是奖励，是关系本身。", en: "Play is not a bonus; it is part of the bond.", de: "Spiel ist kein Extra, sondern Teil der Bindung.")
+        case "clean_keeper": return l.tr(zh: "干净舒适的角落，藏着很多认真。", en: "A clean corner holds a lot of quiet effort.", de: "Eine saubere Ecke trägt viel stille Mühe.")
+        case "treat_scout": return l.tr(zh: "小零食有小快乐，也有认真记录。", en: "Tiny treats carry tiny joy and careful notes.", de: "Kleine Snacks tragen kleine Freude und gute Notizen.")
+        case "food_kind_explorer": return l.tr(zh: "口味被照顾到，日子也更丰富。", en: "Different tastes make daily care richer.", de: "Unterschiedliche Vorlieben machen den Alltag reicher.")
+        case "auto_feeder_pilot": return l.tr(zh: "自动喂养也被纳入了照护节奏。", en: "Automated feeding joined the care rhythm.", de: "Automatisches Füttern gehört nun zum Rhythmus.")
+        case "stock_keeper": return l.tr(zh: "粮仓有余，心里就更稳。", en: "A stocked pantry makes care feel ready.", de: "Ein gefüllter Vorrat macht Fürsorge gelassen.")
+        case "protection_ready": return l.tr(zh: "重要的保障，已经被妥善收好。", en: "The important safeguards are now in place.", de: "Wichtige Absicherung ist gut aufgehoben.")
+        case "vaccine_keeper": return l.tr(zh: "健康本里，多了一份安心。", en: "The health record now carries more peace of mind.", de: "Im Gesundheitsheft steckt nun mehr Sicherheit.")
+        case "symptom_watcher": return l.tr(zh: "异常被看见，本身就是一种保护。", en: "Noticing what is unusual is protection too.", de: "Auffälligkeiten zu bemerken ist auch Schutz.")
+        case "global_island_crew": return l.tr(zh: "这不是一个人的岛，是一家人的小队。", en: "This island belongs to the whole crew.", de: "Diese Insel gehört der ganzen Crew.")
+        case "global_first_critter": return l.tr(zh: "第一个 Oasis 伙伴醒来了。", en: "The first Oasis companion has awakened.", de: "Der erste Oasis-Begleiter ist erwacht.")
+        case "global_legendary_critter": return l.tr(zh: "稀有的相遇，也被故事收下了。", en: "A rare meeting found its place in the story.", de: "Eine seltene Begegnung fand ihren Platz.")
+        case "global_critter_collector": return l.tr(zh: "小伙伴越来越多，岛也更热闹了。", en: "More companions make the island feel alive.", de: "Mehr Begleiter machen die Insel lebendig.")
+        case "global_critter_star": return l.tr(zh: "成长发光的时候，一眼就看得见。", en: "Growth has a way of shining through.", de: "Wachstum beginnt sichtbar zu leuchten.")
+        case "global_critter_caretaker": return l.tr(zh: "轻轻互动，也会养出默契。", en: "Small interactions grow into familiarity.", de: "Kleine Interaktionen wachsen zu Vertrautheit.")
+        case "global_first_blind_box": return l.tr(zh: "第一份惊喜，正式打开。", en: "The first surprise has officially opened.", de: "Die erste Überraschung ist geöffnet.")
+        case "global_blind_box_collector": return l.tr(zh: "收藏架上，开始有了自己的宇宙。", en: "The collection shelf is becoming its own universe.", de: "Das Sammlerregal bekommt sein eigenes Universum.")
+        case "global_secret_blind_box": return l.tr(zh: "隐藏款出现的瞬间，运气也有了形状。", en: "A secret pull gave luck a shape.", de: "Ein geheimer Fund gab dem Glück eine Form.")
+        case "global_gacha_series_complete": return l.tr(zh: "一整个系列，被你完整收进故事里。", en: "A whole series now lives in your story.", de: "Eine ganze Serie lebt nun in deiner Geschichte.")
+        case "global_gacha_jackpot": return l.tr(zh: "这一次，椰子像阳光一样落下来。", en: "This time, coconuts landed like sunlight.", de: "Diesmal fielen Kokosnüsse wie Sonnenlicht.")
+        case "human_profile_ready": return l.tr(zh: "你的身份卡，让 Ohana 更懂边界和照顾。", en: "Your profile helps Ohana care with better context.", de: "Dein Profil hilft Ohana, achtsamer zu begleiten.")
+        case "human_first_record": return l.tr(zh: "自己的第一条记录，也值得被纪念。", en: "Your first record deserves to be remembered too.", de: "Auch dein erster Eintrag verdient Erinnerung.")
+        case "human_weight_starter": return l.tr(zh: "建立基线，是照顾自己的第一步。", en: "A baseline is a gentle first step in self-care.", de: "Eine Basislinie ist ein sanfter erster Schritt.")
+        case "human_weight_keeper": return l.tr(zh: "趋势被看见，身体的声音就更清楚。", en: "Seeing the trend makes the body's signals clearer.", de: "Der Trend macht Körpersignale klarer.")
+        case "human_expense_tracker": return l.tr(zh: "家庭里的花费，也开始有迹可循。", en: "Household spending now has a clearer trail.", de: "Familienausgaben werden nun nachvollziehbarer.")
+        case "human_medication_setup": return l.tr(zh: "计划建好了，照顾就少一点慌张。", en: "With a plan in place, care feels calmer.", de: "Mit Plan fühlt sich Fürsorge ruhiger an.")
+        case "human_medication_keeper": return l.tr(zh: "按时完成的小事，最能托住日常。", en: "Small on-time routines can hold the day together.", de: "Pünktliche kleine Routinen tragen den Alltag.")
+        case "human_workout_starter": return l.tr(zh: "开始活动，就是身体收到的第一封回信。", en: "Starting to move is the body's first reply.", de: "Loszugehen ist die erste Antwort des Körpers.")
+        case "human_workout_rhythm": return l.tr(zh: "运动有了节奏，生活也跟着顺起来。", en: "Once movement has rhythm, life follows more easily.", de: "Wenn Bewegung Rhythmus findet, folgt der Alltag.")
+        case "human_coconut_saver": return l.tr(zh: "一点点攒起来，也会变成看得见的底气。", en: "Saved bit by bit, confidence becomes visible.", de: "Stück für Stück wird Rückhalt sichtbar.")
+        case "human_old_friend": return l.tr(zh: "你也和 Ohana 变熟了。", en: "You and Ohana have become familiar now.", de: "Du und Ohana seid vertrauter geworden.")
+        default: return badge.description
+        }
+    }
+
+    private func achievementCompletionText(for badge: Achievement, state: AchievementRewardState) -> String {
+        guard badge.isUnlocked else {
+            return l.tr(zh: "尚未完成", en: "Not completed yet", de: "Noch nicht abgeschlossen")
+        }
+
+        if let date = achievementCompletionDate(for: badge) {
+            let formatted = date.formatted(.dateTime.year().month().day())
+            return l.tr(zh: "完成于 \(formatted)", en: "Completed \(formatted)", de: "Abgeschlossen \(formatted)")
+        }
+
+        return l.tr(zh: "已完成", en: "Completed", de: "Abgeschlossen")
+    }
+
+    private func achievementCompletionDate(for badge: Achievement) -> Date? {
+        if let unlockedAt = badge.unlockedAt { return unlockedAt }
+        if let human = activeHuman { return humanAchievementCompletionDate(for: badge, human: human) }
+
+        switch badge.id {
+        case "iron_gut", "walk_streak", "health_hero":
+            return badge.isUnlocked ? Date() : nil
+        case "iron_paw":
+            return cumulativeWalkDate(targetMeters: 100_000)
+        case "nutritionist":
+            return latestDate(from: feedingRecordDates())
+        case "happy_birthday", "day_one_checkin":
+            return badge.isUnlocked ? Date() : nil
+        case "hundred_days":
+            return Calendar.current.date(byAdding: .day, value: 100, to: activePet.createdAt)
+        case "first_record":
+            return earliestDate(from: petRecordDates())
+        case "old_friend":
+            return Calendar.current.date(byAdding: .day, value: 7, to: activePet.createdAt)
+        case "long_runner":
+            return activePet.walkLogs
+                .filter { $0.distanceMeters >= 5_000 }
+                .map(\.startDate)
+                .min()
+        case "medication_complete":
+            return activePet.medications.compactMap(\.endDate).filter { $0 <= Date() }.min()
+        case "photo_enthusiast":
+            return thresholdDate(from: activePet.photoLogs.map(\.date), target: 20)
+        case "expense_tracker":
+            return thresholdDate(from: activePet.expenseLogs.map(\.date), target: 10)
+        case "weight_manager":
+            return thresholdDate(from: activePet.weightLogs.map(\.date), target: 7)
+        case "hydration_buddy":
+            return thresholdDate(from: activePet.careLogs.filter { $0.careType == .watering }.map(\.date), target: 14)
+        case "play_champion":
+            return thresholdDate(from: activePet.careLogs.filter { $0.careType == .play }.map(\.date), target: 20)
+        case "clean_keeper":
+            return thresholdDate(from: cleaningRecordDates(), target: 20)
+        case "treat_scout":
+            return thresholdDate(from: activePet.careLogs.filter { FeedLogMetadata.isTreatLog($0) }.map(\.date), target: 10)
+        case "food_kind_explorer":
+            return latestDate(from: mainFeedLogs().map(\.date))
+        case "auto_feeder_pilot":
+            return thresholdDate(from: mainFeedLogs().filter(\.isAutoFeedLogEntry).map(\.date), target: 3)
+        case "stock_keeper":
+            return thresholdDate(from: activePet.foodRecords.map(\.startDate), target: 2)
+        case "protection_ready":
+            return earliestDate(from: activePet.insurances.map(\.createdAt) + activePet.documents.compactMap(\.issueDate))
+        case "vaccine_keeper":
+            return activePet.healthLogs
+                .filter {
+                    $0.type == "vaccine"
+                    || $0.type == "vaccination"
+                    || $0.note.localizedCaseInsensitiveContains("疫苗")
+                    || $0.note.localizedCaseInsensitiveContains("vaccine")
+                    || $0.note.localizedCaseInsensitiveContains("impf")
+                }
+                .map(\.date)
+                .min()
+        case "symptom_watcher":
+            return thresholdDate(from: activePet.symptomLogs.map(\.date), target: 3)
+        case "global_island_crew":
+            return thresholdDate(from: pets.map(\.createdAt), target: 2)
+        case "global_first_critter":
+            return electronicPets.map(\.obtainedAt).min()
+        case "global_legendary_critter":
+            return electronicPets.filter { $0.rarity == .legendary }.map(\.obtainedAt).min()
+        case "global_critter_collector":
+            return uniqueThresholdDate(
+                items: electronicPets,
+                key: { $0.catalogId },
+                date: { $0.obtainedAt },
+                target: 3
+            )
+        case "global_critter_star":
+            return electronicPets.filter { $0.starLevel >= 2 }.map(\.obtainedAt).min()
+        case "global_critter_caretaker":
+            return thresholdDate(from: critterActionLogs.filter { $0.action != .careEcho }.map(\.createdAt), target: 10)
+        case "global_first_blind_box":
+            return gachaDrawLogs.map(\.drawDate).min()
+        case "global_blind_box_collector":
+            return uniqueThresholdDate(
+                items: gachaOwnedItems,
+                key: { "\($0.seriesId)#\($0.itemId)" },
+                date: { $0.latestObtainedAt },
+                target: 8
+            )
+        case "global_secret_blind_box":
+            return gachaOwnedItems.filter(\.isHidden).map(\.latestObtainedAt).min()
+        case "global_gacha_series_complete":
+            return gachaOwnedItems.map(\.latestObtainedAt).max()
+        case "global_gacha_jackpot":
+            return gachaDrawLogs.filter { $0.instantCoconutDelta >= 500 }.map(\.drawDate).min()
+        default:
+            return nil
+        }
+    }
+
+    private func humanAchievementCompletionDate(for badge: Achievement, human: Human) -> Date? {
+        switch badge.id {
+        case "human_profile_ready":
+            return human.createdAt
+        case "human_first_record":
+            return earliestDate(from: humanRecordDates(human))
+        case "human_weight_starter":
+            return human.weightLogs.map(\.date).min()
+        case "human_weight_keeper":
+            return thresholdDate(from: human.weightLogs.map(\.date), target: 7)
+        case "human_expense_tracker":
+            return thresholdDate(from: expenses(for: human).map(\.date), target: 5)
+        case "human_medication_setup":
+            return medications(for: human).map(\.createdAt).min()
+        case "human_medication_keeper":
+            return thresholdDate(
+                from: medicationLogs(for: human)
+                    .filter { $0.status == .taken }
+                    .map { $0.recordedTime ?? $0.createdAt },
+                target: 7
+            )
+        case "human_workout_starter":
+            return human.workoutLogs.map(\.date).min()
+        case "human_workout_rhythm":
+            return thresholdDate(from: human.workoutLogs.map(\.date), target: 10)
+        case "human_old_friend":
+            return Calendar.current.date(byAdding: .day, value: 7, to: human.createdAt)
+        default:
+            return nil
+        }
+    }
+
+    private func thresholdDate(from dates: [Date], target: Int) -> Date? {
+        let sorted = dates.sorted()
+        guard sorted.count >= target, target > 0 else { return nil }
+        return sorted[target - 1]
+    }
+
+    private func earliestDate(from dates: [Date]) -> Date? {
+        dates.min()
+    }
+
+    private func latestDate(from dates: [Date]) -> Date? {
+        dates.max()
+    }
+
+    private func uniqueThresholdDate<Item, Key: Hashable>(
+        items: [Item],
+        key: (Item) -> Key,
+        date: (Item) -> Date,
+        target: Int
+    ) -> Date? {
+        var seen = Set<Key>()
+        for item in items.sorted(by: { date($0) < date($1) }) {
+            seen.insert(key(item))
+            if seen.count >= target { return date(item) }
+        }
+        return nil
+    }
+
+    private func cumulativeWalkDate(targetMeters: Double) -> Date? {
+        var total = 0.0
+        for log in activePet.walkLogs.sorted(by: { $0.startDate < $1.startDate }) {
+            total += log.distanceMeters
+            if total >= targetMeters { return log.startDate }
+        }
+        return nil
+    }
+
+    private func petRecordDates() -> [Date] {
+        activePet.healthLogs.map(\.date)
+        + activePet.pottyLogs.map(\.date)
+        + activePet.walkLogs.map(\.startDate)
+        + activePet.hygieneLogs.map(\.date)
+        + activePet.careLogs.map(\.date)
+        + activePet.foodRecords.map(\.startDate)
+        + activePet.expenseLogs.map(\.date)
+        + activePet.weightLogs.map(\.date)
+        + activePet.photoLogs.map(\.date)
+        + activePet.milestones.map(\.date)
+    }
+
+    private func feedingRecordDates() -> [Date] {
+        activePet.foodRecords.map(\.startDate)
+        + activePet.careLogs.filter { $0.careType == .feeding }.map(\.date)
+    }
+
+    private func cleaningRecordDates() -> [Date] {
+        activePet.hygieneLogs.map(\.date)
+        + activePet.careLogs.filter {
+            [.litter, .waterChange, .filterClean, .cageCleaning, .substrateChange].contains($0.careType)
+        }.map(\.date)
+    }
+
+    private func humanRecordDates(_ human: Human) -> [Date] {
+        human.weightLogs.map(\.date)
+        + human.workoutLogs.map(\.date)
+        + medications(for: human).map(\.createdAt)
+        + medicationLogs(for: human).map { $0.recordedTime ?? $0.createdAt }
+        + expenses(for: human).map(\.date)
     }
 
     private var achievementProgressFill: LinearGradient {
@@ -579,83 +955,170 @@ struct AchievementWallView: View {
     }
 
     private func achievementPopup(_ badge: Achievement) -> some View {
-        let info = progress(for: badge)
         let state = rewardState(for: badge)
+        let completionText = achievementCompletionText(for: badge, state: state)
 
-        return ZStack(alignment: .bottom) {
-            Color.ohanaPrimaryText.opacity(0.18)
+        return ZStack {
+            Color.arkInk.opacity(0.34)
                 .ignoresSafeArea()
                 .onTapGesture { closePopup() }
 
-            VStack(spacing: 0) {
-                OhanaPopupDragHandle(tint: Color.ohanaPrimaryText.opacity(0.24))
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 16)
-                            .onEnded { value in
-                                if value.translation.height > 48 { closePopup() }
-                            }
-                    )
+            VStack(spacing: 14) {
+                ZStack(alignment: .topTrailing) {
+                    achievementPopupArtwork(for: badge, state: state)
 
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 14) {
-                        Text(badge.emoji)
-                            .font(.system(size: 42))
-                            .frame(width: 66, height: 66)
-                            .background(badge.color.opacity(0.18), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(badge.title)
-                                .font(OhanaFont.title3(.black))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                            Text(statusTitle(for: state))
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(state == .claimable ? Color.goPrimary : Color.ohanaSecondaryText)
-                        }
-                        Spacer()
-                        OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) { closePopup() }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Spacer(minLength: 0)
+
+                        Text(badge.title)
+                            .font(OhanaFont.title2(.black))
+                            .foregroundStyle(Color.goCardWhite)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+
+                        Text(statusTitle(for: state))
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.82))
+
+                        Text(achievementMomentLine(for: badge))
+                            .font(OhanaFont.body(.semibold))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.92))
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text(completionText)
+                            .font(OhanaFont.caption(.black))
+                            .foregroundStyle(Color.goCardWhite.opacity(0.78))
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .padding(18)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .shadow(color: Color.arkInk.opacity(0.48), radius: 6, x: 0, y: 2) // ui-v4: allow enlarged artwork text readability without image wash
 
-                    Text(badge.description)
-                        .font(OhanaFont.body(.semibold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    VStack(alignment: .leading, spacing: 9) {
-                        HStack {
-                            Text(info.actionTitle)
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                            Spacer()
-                            Text(info.summary)
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(badge.color)
+                    HStack(spacing: 8) {
+                        achievementPopupIconButton(
+                            systemName: isRenderingAchievementShareImage ? "hourglass" : "square.and.arrow.down",
+                            label: l.tr(zh: "下载", en: "Download", de: "Laden")
+                        ) {
+                            Task { await renderAndShareAchievement(badge) }
                         }
-                        progressBar(info.fraction, tint: badge.color)
-                    }
-                    .padding(14)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .disabled(isRenderingAchievementShareImage)
 
-                    if state == .claimable {
-                        Button {
-                            closePopup()
-                            pendingClaimAchievement = badge
-                        } label: {
-                            Text(l.tr(zh: "领取 +\(rewardPerAchievement)🥥", en: "Claim +\(rewardPerAchievement)🥥", de: "+\(rewardPerAchievement)🥥 abholen"))
-                                .font(OhanaFont.subheadline(.black))
-                                .foregroundStyle(Color.ohanaPrimaryActionText)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 13)
-                                .background(Color.goPrimary, in: Capsule())
-                        }
-                        .buttonStyle(ScaleButtonStyle())
+                        achievementPopupIconButton(
+                            systemName: "xmark",
+                            label: l.tr(zh: "关闭", en: "Close", de: "Schließen"),
+                            action: closePopup
+                        )
                     }
+                    .padding(12)
                 }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 22)
+                .frame(maxWidth: achievementPopupMaxImageWidth)
+                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+
+                if state == .claimable {
+                    Button {
+                        pendingClaimAchievement = badge
+                    } label: {
+                        Text(l.tr(zh: "领取 +\(rewardPerAchievement)🥥", en: "Claim +\(rewardPerAchievement)🥥", de: "+\(rewardPerAchievement)🥥 abholen"))
+                            .font(OhanaFont.subheadline(.black))
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.goPrimary, in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .frame(maxWidth: achievementPopupMaxImageWidth)
+                }
             }
-            .padding(.horizontal, 6)
-            .padding(.bottom, 8)
-            .background { OhanaPopupGlassSurface(cornerRadius: 52) }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 12)
+            .transition(.scale(scale: 0.94).combined(with: .opacity))
         }
+    }
+
+    @ViewBuilder
+    private func achievementPopupArtwork(for badge: Achievement, state: AchievementRewardState) -> some View {
+        let backgroundName = achievementBackgroundName(for: badge)
+
+        ZStack(alignment: .bottomLeading) {
+            if let backgroundName {
+                Image(backgroundName)
+                    .resizable()
+                    .scaledToFill()
+                    .saturation(state == .locked ? 0.34 : 1)
+            } else {
+                badge.color
+            }
+        }
+        .aspectRatio(achievementArtworkAspectRatio, contentMode: .fit)
+        .frame(maxWidth: .infinity)
+        .clipped()
+    }
+
+    private func achievementPopupIconButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 15, weight: .black))
+                .foregroundStyle(Color.arkInk)
+                .frame(width: 44, height: 44)
+                .background(Color.goCardWhite.opacity(0.78), in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(Color.arkInk.opacity(0.08), lineWidth: 1)
+                        .allowsHitTesting(false)
+                }
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(label)
+    }
+
+    @MainActor
+    private func renderAndShareAchievement(_ badge: Achievement) async {
+        guard !isRenderingAchievementShareImage else { return }
+        isRenderingAchievementShareImage = true
+        defer { isRenderingAchievementShareImage = false }
+
+        let renderer = ImageRenderer(
+            content: achievementDownloadCard(for: badge)
+                .frame(width: achievementPopupMaxImageWidth, height: achievementPopupMaxImageWidth / achievementArtworkAspectRatio)
+        )
+        renderer.scale = 2
+        if let image = renderer.uiImage {
+            achievementShareImage = image
+            showingAchievementShareSheet = true
+        }
+    }
+
+    private func achievementDownloadCard(for badge: Achievement) -> some View {
+        let state = rewardState(for: badge)
+        let completionText = achievementCompletionText(for: badge, state: state)
+
+        return ZStack(alignment: .bottomLeading) {
+            achievementPopupArtwork(for: badge, state: state)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(badge.title)
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goCardWhite)
+
+                Text(statusTitle(for: state))
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.82))
+
+                Text(achievementMomentLine(for: badge))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.92))
+                    .lineLimit(2)
+
+                Text(completionText)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.goCardWhite.opacity(0.78))
+            }
+            .padding(22)
+            .shadow(color: Color.arkInk.opacity(0.48), radius: 6, x: 0, y: 2) // ui-v4: allow exported artwork text readability without image wash
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
     }
 
     private func closePopup() {

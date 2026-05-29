@@ -119,7 +119,8 @@ struct OasisRewardCommandExecutor {
             amount,
             emoji: "🥥",
             title: "摘下椰子 +\(amount)🥥",
-            context: context
+            context: context,
+            postsRewardFeedback: false
         )
         context.safeSave()
     }
@@ -133,7 +134,8 @@ struct OasisRewardCommandExecutor {
             amount,
             emoji: "🌳",
             title: "生命之树的馈赠 +\(amount)🥥",
-            context: context
+            context: context,
+            postsRewardFeedback: false
         )
         context.safeSave()
         return true

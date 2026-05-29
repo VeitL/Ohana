@@ -90,12 +90,17 @@ enum CareEventService {
         reminder: Reminder,
         context: ModelContext,
         quality: QuestManager.QualityBonus = .precise,
-        executorId: String? = nil
+        executorId: String? = nil,
+        date: Date = Date()
     ) -> (humanGot: Int, petGot: Int)? {
         guard let event = reminder.event else { return nil }
+        let isCatchUp = reminder.scheduledAt < date
+        guard !isCatchUp || FeedPlanCatchUpPolicy.isCatchUpEligible(reminder, now: date) else {
+            return nil
+        }
 
         let log = PetCareLog(
-            date: Date(),
+            date: date,
             type: .feeding,
             amountGrams: feedAmount(from: event, fallback: pet.dailyPortionGrams),
             note: "\(PetCareLog.plannedFeedNotePrefix)\(event.id.uuidString)",
@@ -106,10 +111,11 @@ enum CareEventService {
         context.insert(log)
 
         reminder.statusEnum = .completed
-        reminder.completedAt = Date()
+        reminder.completedAt = date
         if let executorId {
             reminder.completedBy = executorId
         }
+        event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
         NotificationManager.shared.cancel(notificationId: reminder.notificationId)
         context.safeSave()
         CareLedgerService.recordReminderState(
@@ -120,6 +126,19 @@ enum CareEventService {
             context: context
         )
         FamilyTaskService.syncCompletedReminder(reminder, completedBy: executorId, context: context)
+
+        if isCatchUp {
+            CareLedgerService.recordPetCare(
+                log: log,
+                pet: pet,
+                source: .reminder,
+                sourceEventId: event.id.uuidString,
+                sourceReminderId: reminder.id.uuidString,
+                coconutDelta: 0,
+                context: context
+            )
+            return (0, 0)
+        }
 
         QuestManager.shared.recordFirstMeal()
         let reward = CoconutEconomyService.awardCareAction(type: .feed, pet: pet, context: context, quality: quality)
@@ -162,6 +181,7 @@ enum CareEventService {
         if let executorId {
             reminder.completedBy = executorId
         }
+        event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
         NotificationManager.shared.cancel(notificationId: reminder.notificationId)
         context.safeSave()
         CareLedgerService.recordReminderState(
@@ -835,6 +855,7 @@ enum ReminderCompletionService {
         reminder.statusEnum = .completed
         reminder.completedAt = Date()
         reminder.completedBy = humanId ?? ""
+        reminder.event?.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
         NotificationManager.shared.cancel(notificationId: reminder.notificationId)
         context.safeSave()
         CareLedgerService.recordReminderState(reminder: reminder, actionType: "complete", actorId: humanId, source: .service, context: context)
@@ -856,6 +877,7 @@ enum ReminderCompletionService {
         reminder.statusEnum = .pending
         reminder.completedAt = nil
         reminder.completedBy = humanId ?? ""
+        reminder.event?.setOccurrenceMarkedComplete(false, on: reminder.scheduledAt)
         if reschedule {
             Task { @MainActor in
                 await ReminderSchedulingService.scheduleIfNeeded(reminder: reminder, context: context, source: .service)
@@ -954,11 +976,12 @@ enum QuickActionReminderCompletionSyncService {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: now)
         let end = calendar.date(byAdding: .day, value: 1, to: start) ?? now
+        let catchUpStart = calendar.date(byAdding: .day, value: -30, to: start) ?? start
         let pending = ReminderStatus.pending.rawValue
         let failed = ReminderStatus.failed.rawValue
         var descriptor = FetchDescriptor<Reminder>(
             predicate: #Predicate<Reminder> { reminder in
-                reminder.scheduledAt >= start &&
+                reminder.scheduledAt >= catchUpStart &&
                 reminder.scheduledAt < end &&
                 (reminder.status == pending || reminder.status == failed)
             },
@@ -985,7 +1008,7 @@ enum QuickActionReminderCompletionSyncService {
 
     private static func isPetEvent(_ event: Event, petId: String) -> Bool {
         let type = event.relatedEntityType.lowercased()
-        return (type == EntityKind.pet.rawValue.lowercased() || type == "pet") &&
+        return (type == EntityKind.pet.rawValue.lowercased() || type == "pet" || type == WaterPlanWriter.entityType.lowercased()) &&
             event.relatedEntityId == petId
     }
 

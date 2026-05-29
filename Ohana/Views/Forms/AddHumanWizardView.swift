@@ -30,6 +30,7 @@ struct AddHumanWizardView: View {
     private var l: L10n { L10n(appLanguage) }
 
     // ── Identity
+    @State private var memberCreationSessionId = UUID()
     @State private var name = ""
     @State private var avatarImageData: Data? = nil
     @State private var usesAutomaticAvatarAsset = true
@@ -217,7 +218,8 @@ struct AddHumanWizardView: View {
             kind: .human,
             onComplete: onComplete,
             onCancel: onCancel,
-            onHumanSaved: onHumanSaved
+            onHumanSaved: onHumanSaved,
+            recoverySessionId: memberCreationSessionId
         )
     }
 
@@ -488,11 +490,12 @@ struct AddHumanWizardView: View {
                         } label: {
                             Text(bt)
                                 .font(.system(size: 15, weight: .black, design: .rounded))
-                                .foregroundStyle(bloodType == bt ? Color.arkInk : .primary)
-                                .frame(maxWidth: .infinity).padding(.vertical, 12)
+                                .foregroundStyle(bloodType == bt ? Color.arkInk : Color.ohanaPrimaryText)
+                                .frame(maxWidth: .infinity)
+                                .frame(minHeight: 44)
                                 .background(
-                                    bloodType == bt ? Color.goPrimary : Color.primary.opacity(0.08),
-                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    bloodType == bt ? Color.goPrimary : Color.ohanaCardSurfaceElevated,
+                                    in: Capsule()
                                 )
                                 .scaleEffect(bloodType == bt ? 0.96 : 1.0)
                                 .animation(GoMotion.feedback, value: bloodType)
@@ -526,10 +529,10 @@ struct AddHumanWizardView: View {
                     }
                     .foregroundStyle(mbti.isEmpty ? Color.ohanaSecondaryText : Color.arkInk)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .frame(minHeight: 44)
                     .background(
-                        mbti.isEmpty ? Color.primary.opacity(0.08) : Color.goPrimary,
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        mbti.isEmpty ? Color.ohanaCardSurfaceElevated : Color.goPrimary,
+                        in: Capsule()
                     )
                 }
             }
@@ -623,10 +626,11 @@ struct AddHumanWizardView: View {
                             } label: {
                                 Text(l.humanWizSkipChip)
                                     .font(.system(size: 13, weight: nationalityCountry.isEmpty ? .bold : .medium, design: .rounded))
-                                    .foregroundStyle(nationalityCountry.isEmpty ? Color.arkInk : .primary.opacity(0.75))
+                                    .foregroundStyle(nationalityCountry.isEmpty ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75))
                                     .padding(.horizontal, 12).padding(.vertical, 7)
+                                    .frame(minHeight: 44)
                                     .background(
-                                        nationalityCountry.isEmpty ? Color.goPrimary : Color.primary.opacity(0.08),
+                                        nationalityCountry.isEmpty ? Color.goPrimary : Color.ohanaCardSurfaceElevated,
                                         in: Capsule()
                                     )
                             }
@@ -638,10 +642,11 @@ struct AddHumanWizardView: View {
                                 } label: {
                                     Text(country)
                                         .font(.system(size: 13, weight: nationalityCountry == country ? .bold : .medium, design: .rounded))
-                                        .foregroundStyle(nationalityCountry == country ? Color.arkInk : .primary.opacity(0.75))
+                                        .foregroundStyle(nationalityCountry == country ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75))
                                         .padding(.horizontal, 12).padding(.vertical, 7)
+                                        .frame(minHeight: 44)
                                         .background(
-                                            nationalityCountry == country ? Color.goPrimary : Color.primary.opacity(0.08),
+                                            nationalityCountry == country ? Color.goPrimary : Color.ohanaCardSurfaceElevated,
                                             in: Capsule()
                                         )
                                 }
@@ -664,10 +669,11 @@ struct AddHumanWizardView: View {
                             } label: {
                                 Text(l.humanWizSkipChip)
                                     .font(.system(size: 13, weight: residenceCountry.isEmpty && residenceCity.isEmpty ? .bold : .medium, design: .rounded))
-                                    .foregroundStyle(residenceCountry.isEmpty && residenceCity.isEmpty ? Color.arkInk : .primary.opacity(0.75))
+                                    .foregroundStyle(residenceCountry.isEmpty && residenceCity.isEmpty ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75))
                                     .padding(.horizontal, 12).padding(.vertical, 7)
+                                    .frame(minHeight: 44)
                                     .background(
-                                        residenceCountry.isEmpty && residenceCity.isEmpty ? Color.goPrimary : Color.primary.opacity(0.08),
+                                        residenceCountry.isEmpty && residenceCity.isEmpty ? Color.goPrimary : Color.ohanaCardSurfaceElevated,
                                         in: Capsule()
                                     )
                             }
@@ -687,10 +693,11 @@ struct AddHumanWizardView: View {
                                 } label: {
                                     Text(country)
                                         .font(.system(size: 13, weight: residenceCountry == country ? .bold : .medium, design: .rounded))
-                                        .foregroundStyle(residenceCountry == country ? Color.arkInk : .primary.opacity(0.75))
+                                        .foregroundStyle(residenceCountry == country ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75))
                                         .padding(.horizontal, 12).padding(.vertical, 7)
+                                        .frame(minHeight: 44)
                                         .background(
-                                            residenceCountry == country ? Color.goPrimary : Color.primary.opacity(0.08),
+                                            residenceCountry == country ? Color.goPrimary : Color.ohanaCardSurfaceElevated,
                                             in: Capsule()
                                         )
                                 }
@@ -716,13 +723,14 @@ struct AddHumanWizardView: View {
                                         .font(.system(size: 13, weight: residenceCity == city && !isCustomResidenceCity ? .bold : .medium, design: .rounded))
                                         .foregroundStyle(
                                             (residenceCity == city && !isCustomResidenceCity) || (city == "其他" && isCustomResidenceCity)
-                                                ? Color.arkInk : .primary.opacity(0.75)
+                                                ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75)
                                         )
-                                        .frame(maxWidth: .infinity).padding(.vertical, 8)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(minHeight: 44)
                                         .background(
                                             (residenceCity == city && !isCustomResidenceCity) || (city == "其他" && isCustomResidenceCity)
-                                                ? Color.goPrimary : Color.primary.opacity(0.08),
-                                            in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                ? Color.goPrimary : Color.ohanaCardSurfaceElevated,
+                                            in: Capsule()
                                         )
                                 }
                                 .buttonStyle(ScaleButtonStyle())
@@ -891,7 +899,7 @@ struct AddHumanWizardView: View {
                             .font(.system(size: 15, weight: .bold))
                             .symbolRenderingMode(.monochrome)
                     }
-                    .foregroundStyle(confirmOk ? Color.arkInk : .secondary)
+                    .foregroundStyle(confirmOk ? Color.arkInk : Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity).padding(.vertical, 15)
                     .background(confirmOk ? Color.goPrimary : Color.primary.opacity(0.12), in: Capsule())
                 }
@@ -1208,10 +1216,12 @@ struct AddHumanWizardView: View {
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.65))
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 12)
-        .background(accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 44)
+        .padding(.vertical, 4)
+        .background(Color.ohanaCardSurfaceElevated, in: Capsule())
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            Capsule()
                 .strokeBorder(accent.opacity(0.3), lineWidth: 1)
         )
     }
@@ -1271,26 +1281,26 @@ struct AddHumanWizardView: View {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(iconColor)
+                    .foregroundStyle(isActive ? Color.arkInk : iconColor)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .foregroundStyle(isActive ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
                     Text(text.wrappedValue.isEmpty ? placeholder : text.wrappedValue)
                         .font(.system(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(text.wrappedValue.isEmpty ? Color.ohanaSecondaryText.opacity(0.45) : Color.ohanaPrimaryText)
+                        .foregroundStyle(isActive ? Color.arkInk : text.wrappedValue.isEmpty ? Color.ohanaSecondaryText.opacity(0.45) : Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                 }
                 Text(unit)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .foregroundStyle(isActive ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
             }
             .padding(12)
             .frame(maxWidth: .infinity)
-            .background(isActive ? Color.goPrimary.opacity(0.14) : Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(isActive ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                Capsule()
                     .strokeBorder(isActive ? Color.goPrimary.opacity(0.5) : Color.clear, lineWidth: 1.5)
             )
         }
@@ -1408,12 +1418,13 @@ struct AddHumanWizardView: View {
             }
             .padding(.horizontal, 11)
             .padding(.vertical, 10)
+            .frame(minHeight: 44)
             .background(
                 isSelected ? wizardAccent : Color.ohanaCardSurfaceElevated,
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                in: Capsule()
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                Capsule()
                     .strokeBorder(isSelected ? wizardAccent.opacity(0.4) : Color.ohanaCardStroke, lineWidth: 1)
             )
         }

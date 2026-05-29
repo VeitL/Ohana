@@ -170,6 +170,8 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             .onDisappear {
                 arrivalCleanupTask?.cancel()
                 arrivalCleanupTask = nil
+                animatedArrivalCardId = nil
+                arrivalProgress = 1
             }
         }
     }
@@ -441,7 +443,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                     .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                     .rotationEffect(.degrees(collapsedRotation(index: index) + floating.rotation))
                     .position(x: frame.midX + floating.x, y: frame.midY + floating.y)
-                    .zIndex(100 + collapsedZIndex(index: index))
+                    .zIndex(100 + collapsedZIndex(index: index, count: cards.count))
                     .highPriorityGesture(
                         TapGesture()
                             .onEnded {
@@ -495,15 +497,15 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
 
     private func zIndex(for index: Int, isSelected: Bool) -> Double {
         guard isSelected else {
-            return collapsedZIndex(index: index)
+            return collapsedZIndex(index: index, count: cards.count)
         }
 
         if progress <= 0.001 {
-            return collapsedZIndex(index: index)
+            return collapsedZIndex(index: index, count: cards.count)
         }
 
         if heroDirection < 0, progress < 0.035 {
-            return collapsedZIndex(index: index)
+            return collapsedZIndex(index: index, count: cards.count)
         }
 
         return 24
@@ -603,30 +605,36 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
             ]
         case 5:
             return [
-                CGSize(width: -0.66, height: -0.84),
-                CGSize(width: 0.66, height: -0.82),
-                CGSize(width: -0.66, height: 0.84),
-                CGSize(width: 0.66, height: 0.82),
-                CGSize(width: 0, height: 0),
+                CGSize(width: -0.84, height: -0.98),
+                CGSize(width: 0.78, height: -0.86),
+                CGSize(width: -0.88, height: 0.34),
+                CGSize(width: 0.88, height: 0.42),
+                CGSize(width: -0.06, height: 1.02),
             ]
         default:
             return [
-                CGSize(width: -0.62, height: -1.05),
-                CGSize(width: 0.62, height: -1.05),
-                CGSize(width: -0.62, height: 0),
-                CGSize(width: 0.62, height: 0),
-                CGSize(width: -0.62, height: 1.05),
-                CGSize(width: 0.62, height: 1.05),
+                CGSize(width: -0.92, height: -1.12),
+                CGSize(width: 0.72, height: -0.88),
+                CGSize(width: -1.03, height: -0.02),
+                CGSize(width: 0.92, height: 0.28),
+                CGSize(width: -0.54, height: 1.18),
+                CGSize(width: 0.98, height: 0.92),
             ]
         }
     }
 
     private func collapsedRotation(index: Int) -> Double {
-        let rotations: [Double] = [-7, 6, 4, -5, 1.5, -3]
+        let rotations: [Double] = [-10.5, 6.8, -3.2, 9.6, 4.8, -7.4]
         return rotations[index % rotations.count]
     }
 
-    private func collapsedZIndex(index: Int) -> Double {
+    private func collapsedZIndex(index: Int, count: Int) -> Double {
+        if count >= 5 {
+            let offsets = collapsedOffsets(count: count)
+            let safeIndex = min(max(index, 0), max(offsets.count - 1, 0))
+            return Double(offsets[safeIndex].height * 100) + Double(safeIndex) * 0.01
+        }
+
         let depths: [Double] = [6, 5, 4, 3, 2, 1]
         return depths[index % depths.count]
     }
@@ -762,6 +770,7 @@ private struct FocusHomeVerticalSolidCardSurface: View {
             let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             let avatarSource = frozenAvatarSource
                 ?? (allowsLiveAvatarFallback ? FocusHomeFrozenAvatarSource.live(for: card) : .placeholder)
+            let usesFullWidthPhoto = avatarSource.image != nil && !avatarSource.isTransparent
 
             ZStack(alignment: .topLeading) {
                 shape
@@ -770,6 +779,17 @@ private struct FocusHomeVerticalSolidCardSurface: View {
                         shape
                             .strokeBorder(borderGradient, lineWidth: lerp(1, 1.25, p))
                     }
+
+                if let image = avatarSource.image, usesFullWidthPhoto {
+                    WalletCardVerticalPhotoBlendLayer(
+                        image: image,
+                        width: w,
+                        height: h,
+                        themeColorHex: card.themeColorHex,
+                        shadowDepth: lerp(0.90, 1.08, p)
+                    )
+                    .zIndex(1)
+                }
 
                 bottomQuickActionGradient(height: h, progress: p)
                     .zIndex(2)
@@ -866,7 +886,14 @@ private struct FocusHomeVerticalSolidCardSurface: View {
 
     @ViewBuilder
     private func avatar(image: UIImage?, transparent: Bool, width: CGFloat, height: CGFloat) -> some View {
-        if let image {
+        if let image, !transparent {
+            Color.clear
+                .frame(
+                    width: width * (card.isHuman ? lerp(0.50, 0.60, visualProgress) : lerp(0.62, 0.80, visualProgress)),
+                    height: height * (card.isHuman ? lerp(0.40, 0.42, visualProgress) : lerp(0.42, 0.49, visualProgress)),
+                    alignment: .bottom
+                )
+        } else if let image {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()

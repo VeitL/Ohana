@@ -23,6 +23,7 @@ extension QuickFeedDetailContent {
         draftStore.stockPurchaseDate = Date()
         draftStore.stockHasOpenDate = pet.restockDate != nil
         draftStore.stockOpenDate = pet.restockDate ?? Date()
+        draftStore.stockCalculationMode = defaultStockCalculationMode
         configureStockExpenseFields(for: nil)
         draftStore.stockReminderEnabled = pet.foodReminderEnabled
         draftStore.stockReminderAdvanceDays = pet.foodReminderAdvanceDays
@@ -87,6 +88,7 @@ extension QuickFeedDetailContent {
             draftStore.stockPurchaseDate = record.purchaseDate ?? Date()
             draftStore.stockHasOpenDate = true
             draftStore.stockOpenDate = record.startDate
+            draftStore.stockCalculationMode = FeedStockRecordMetadata.calculationMode(for: record)
             configureStockExpenseFields(for: record)
         } else {
             draftStore.stockBrandText = ""
@@ -95,6 +97,7 @@ extension QuickFeedDetailContent {
             draftStore.stockPurchaseDate = Date()
             draftStore.stockHasOpenDate = false
             draftStore.stockOpenDate = Date()
+            draftStore.stockCalculationMode = defaultStockCalculationMode
             configureStockExpenseFields(for: nil)
         }
         draftStore.stockReminderEnabled = pet.foodReminderEnabled
@@ -107,6 +110,10 @@ extension QuickFeedDetailContent {
         draftStore.stockReminderEnabled = pet.foodReminderEnabled
         draftStore.stockReminderAdvanceDays = pet.foodReminderAdvanceDays
         prepareStockCorrectionText()
+    }
+
+    var defaultStockCalculationMode: FeedStockCalculationMode {
+        activeFeedingMode == .autoFeeder ? .autoFeeder : .manualOrPlan
     }
 
     func prepareStockCorrectionText() {

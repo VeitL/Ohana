@@ -9,12 +9,17 @@ import SwiftUI
 import SwiftData
 
 struct HumanAccountSwitcherSheet: View {
+    var homePets: [Pet]? = nil
+    var homeHumans: [Human]? = nil
+    var homeElectronicPets: [OasisElectronicPet]? = nil
     var onSwitched: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
+    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
+    @AppStorage("goFocusHomeCardOrder.v1") private var homeCardOrderRaw = ""
 
     @State private var pendingHuman: Human? = nil
     @State private var pin = ""
@@ -321,7 +326,9 @@ struct HumanAccountSwitcherSheet: View {
     }
 
     private func activateAndManageSecurity(_ human: Human) {
+        let oldHumanIdRaw = activeHumanId
         activeHumanId = human.id.uuidString
+        syncHomeCardStackAfterAccountSwitch(from: oldHumanIdRaw, to: human)
         pendingHuman = nil
         pin = ""
         statusMessage = ""
@@ -332,12 +339,44 @@ struct HumanAccountSwitcherSheet: View {
     }
 
     private func switchTo(_ human: Human) {
+        let oldHumanIdRaw = activeHumanId
         activeHumanId = human.id.uuidString
+        syncHomeCardStackAfterAccountSwitch(from: oldHumanIdRaw, to: human)
         pendingHuman = nil
         pin = ""
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         onSwitched?()
         dismiss()
+    }
+
+    private func syncHomeCardStackAfterAccountSwitch(from oldHumanIdRaw: String, to human: Human) {
+        guard let homePets else { return }
+        let sourceHumans = homeHumans ?? humans
+        var updatedOrderRaw = homeCardOrderRaw
+        var didChange = false
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            didChange = HomeActiveHumanCardSync.applyAfterAccountSwitch(
+                from: oldHumanIdRaw,
+                to: human,
+                pets: homePets,
+                humans: sourceHumans,
+                electronicPets: homeElectronicPets ?? [],
+                hiddenPetIDsRaw: hiddenHomePetIDsRaw,
+                homeCardOrderRaw: &updatedOrderRaw
+            )
+            if updatedOrderRaw != homeCardOrderRaw {
+                homeCardOrderRaw = updatedOrderRaw
+            }
+        }
+        guard didChange else { return }
+        modelContext.safeSave()
+        NotificationCenter.default.post(
+            name: .ohanaMemberProfileDidChange,
+            object: nil,
+            userInfo: ["id": human.id.uuidString, "kind": "human", "reason": "activeHumanSwitch"]
+        )
     }
 
     @ViewBuilder

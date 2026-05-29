@@ -11,6 +11,7 @@ import SwiftData
 struct QuickWaterDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
+    var onClose: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -51,6 +52,8 @@ struct QuickWaterDetailSheet: View {
     @State private var activeWaterModeTransitionID: UUID?
     @State private var waterModeMaintenanceTask: Task<Void, Never>?
     @State private var waterPlanMaintenanceTask: Task<Void, Never>?
+    @State private var waterPlanSaveTask: Task<Void, Never>?
+    @State private var isSavingWaterPlan = false
     @State private var waterReminderSchedulingTask: Task<Void, Never>?
     @State private var waterReminderSchedulingID: UUID?
     @State private var carePlanReminderSchedulingTask: Task<Void, Never>?
@@ -103,9 +106,10 @@ struct QuickWaterDetailSheet: View {
         }
     }
 
-    init(pet: Pet, onRemove: @escaping () -> Void) {
+    init(pet: Pet, onRemove: @escaping () -> Void, onClose: (() -> Void)? = nil) {
         self.pet = pet
         self.onRemove = onRemove
+        self.onClose = onClose
         _displayedWaterMode = State(initialValue: WaterOperatingMode.stored(pet.id) ?? .manual)
 
         let petID = pet.id
@@ -342,6 +346,7 @@ struct QuickWaterDetailSheet: View {
             waterModeTransitionTask?.cancel()
             waterModeMaintenanceTask?.cancel()
             waterPlanMaintenanceTask?.cancel()
+            waterPlanSaveTask?.cancel()
             waterReminderSchedulingTask?.cancel()
             carePlanReminderSchedulingTask?.cancel()
             waterActionTask?.cancel()
@@ -350,6 +355,7 @@ struct QuickWaterDetailSheet: View {
             activeWaterModeTransitionID = nil
             waterReminderSchedulingID = nil
             carePlanReminderSchedulingID = nil
+            isSavingWaterPlan = false
         }
         .interactiveDismissDisabled(activeInlineSheet != nil)
     }
@@ -518,7 +524,7 @@ struct QuickWaterDetailSheet: View {
 
             Spacer()
 
-            Button { dismiss() } label: {
+            Button { closeDetail() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -527,6 +533,14 @@ struct QuickWaterDetailSheet: View {
             }
             .frame(width: 44, height: 44)
             .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    private func closeDetail() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 
@@ -885,15 +899,13 @@ struct QuickWaterDetailSheet: View {
                 reminderOn: $waterReminderOn,
                 nextDateText: waterNextDateText,
                 onSave: {
-                    dismissInlineWaterSheet()
-                    scheduleDeferredWaterAction(milliseconds: 80) {
+                    startWaterCalendarPlanSave {
                         saveWaterChangePlanToCalendar(toast: "已保存换水周期")
                     }
                 },
                 onDelete: {
                     waterReminderOn = false
-                    dismissInlineWaterSheet()
-                    scheduleDeferredWaterAction(milliseconds: 80) {
+                    startWaterCalendarPlanSave {
                         saveWaterChangePlanToCalendar(toast: "已关闭换水提醒")
                     }
                 }
@@ -954,14 +966,10 @@ struct QuickWaterDetailSheet: View {
                     completionText: waterRuleState.completionText,
                     onCountChange: syncWaterPlanTimesCount,
                     onSave: {
-                        dismissInlineWaterSheet()
-                        scheduleDeferredWaterAction(milliseconds: 80) {
-                            saveWaterPlan()
-                        }
+                        startWaterPlanSave()
                     },
                     onDelete: {
-                        dismissInlineWaterSheet()
-                        scheduleDeferredWaterAction(milliseconds: 80) {
+                        startWaterCalendarPlanSave {
                             deleteWaterPlanAndSwitchToManual()
                         }
                     }
@@ -982,15 +990,13 @@ struct QuickWaterDetailSheet: View {
                 nextCleanText: filterNextCleanText,
                 nextReplaceText: filterNextReplaceText,
                 onSave: {
-                    dismissInlineWaterSheet()
-                    scheduleDeferredWaterAction(milliseconds: 80) {
+                    startWaterCalendarPlanSave {
                         syncFilterPlan(showToast: true)
                     }
                 },
                 onDelete: {
                     filterReminderOn = false
-                    dismissInlineWaterSheet()
-                    scheduleDeferredWaterAction(milliseconds: 80) {
+                    startWaterCalendarPlanSave {
                         syncFilterPlan(showToast: true)
                     }
                 }
@@ -1671,6 +1677,39 @@ struct QuickWaterDetailSheet: View {
         }
     }
 
+    private func startWaterPlanSave() {
+        guard !isSavingWaterPlan else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            return
+        }
+        isSavingWaterPlan = true
+        waterPlanSaveTask?.cancel()
+        dismissInlineWaterSheet()
+        performWaterModeUpdatesWithoutAnimation {
+            displayedWaterMode = .reminder
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+        waterPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: waterPlanSaveDelayMilliseconds) {
+            saveWaterPlan()
+        }
+    }
+
+    private func startWaterCalendarPlanSave(_ operation: @escaping @MainActor () -> Void) {
+        guard !isSavingWaterPlan else {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            return
+        }
+        isSavingWaterPlan = true
+        waterPlanSaveTask?.cancel()
+        dismissInlineWaterSheet()
+        UISelectionFeedbackGenerator().selectionChanged()
+        waterPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: waterPlanSaveDelayMilliseconds) {
+            operation()
+            isSavingWaterPlan = false
+            waterPlanSaveTask = nil
+        }
+    }
+
     private func saveWaterPlan() {
         let result = commandExecutor.saveWaterPlan(
             pet: pet,
@@ -1691,6 +1730,8 @@ struct QuickWaterDetailSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         setActiveWaterMode(.reminder)
         showSaveConfirmation(result.targetCount > 1 ? "共同喂水计划已保存 · \(result.targetCount)只" : "已保存喂水计划")
+        isSavingWaterPlan = false
+        waterPlanSaveTask = nil
     }
 
     private func activateManualWaterMode() {
@@ -1831,6 +1872,10 @@ struct QuickWaterDetailSheet: View {
 
     private var waterPlanPostSaveSnapshotDelayMilliseconds: UInt64 {
         workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 180 : 80
+    }
+
+    private var waterPlanSaveDelayMilliseconds: UInt64 {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 120 : 40
     }
 
     private var waterPlanPostSaveReminderDelayMilliseconds: UInt64 {

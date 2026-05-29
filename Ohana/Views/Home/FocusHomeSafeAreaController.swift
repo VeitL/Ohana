@@ -11,8 +11,16 @@ import UIKit
 
 @MainActor
 final class FocusHomeSafeAreaController: ObservableObject {
+    private static let cachedTopKey = "home.safeArea.top.v1"
+    private static let cachedBottomKey = "home.safeArea.bottom.v1"
+
     @Published private(set) var stableTop: CGFloat?
     @Published private(set) var stableBottom: CGFloat?
+
+    init() {
+        stableTop = Self.initialTop()
+        stableBottom = Self.initialBottom()
+    }
 
     var top: CGFloat {
         resolvedTop()
@@ -47,8 +55,11 @@ final class FocusHomeSafeAreaController: ObservableObject {
     }
 
     func stabilize(from geo: GeometryProxy) {
-        let top = geo.safeAreaInsets.top > 1 ? geo.safeAreaInsets.top : resolvedTop()
-        let bottom = geo.safeAreaInsets.bottom > 1 ? geo.safeAreaInsets.bottom : resolvedBottom()
+        let measuredTop = geo.safeAreaInsets.top > 1 ? geo.safeAreaInsets.top : Self.windowTop()
+        let measuredBottom = geo.safeAreaInsets.bottom > 1 ? geo.safeAreaInsets.bottom : Self.windowBottom()
+        let top = measuredTop > 1 ? measuredTop : resolvedTop()
+        let bottom = measuredBottom > 1 ? measuredBottom : resolvedBottom()
+        Self.cache(top: top, bottom: bottom)
         guard stableTop == nil || stableBottom == nil else { return }
 
         var transaction = Transaction()
@@ -66,5 +77,37 @@ final class FocusHomeSafeAreaController: ObservableObject {
             valueMS: 0,
             note: "top \(Int(top)), bottom \(Int(bottom))"
         )
+    }
+
+    private static func initialTop() -> CGFloat? {
+        let window = windowTop()
+        if window > 1 { return window }
+        let cached = UserDefaults.standard.double(forKey: cachedTopKey)
+        if cached > 1 { return CGFloat(cached) }
+        return 59
+    }
+
+    private static func initialBottom() -> CGFloat? {
+        let window = windowBottom()
+        if window > 1 { return window }
+        let cached = UserDefaults.standard.double(forKey: cachedBottomKey)
+        if cached > 1 { return CGFloat(cached) }
+        return 34
+    }
+
+    private static func windowTop() -> CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .keyWindow?.safeAreaInsets.top ?? 0
+    }
+
+    private static func windowBottom() -> CGFloat {
+        (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
+            .keyWindow?.safeAreaInsets.bottom ?? 0
+    }
+
+    private static func cache(top: CGFloat, bottom: CGFloat) {
+        guard top > 1, bottom > 1 else { return }
+        UserDefaults.standard.set(Double(top), forKey: cachedTopKey)
+        UserDefaults.standard.set(Double(bottom), forKey: cachedBottomKey)
     }
 }

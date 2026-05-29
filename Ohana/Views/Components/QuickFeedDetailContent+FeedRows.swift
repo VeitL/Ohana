@@ -123,7 +123,7 @@ extension QuickFeedDetailContent {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            if allowsCatchUp && overdue && !isSatisfied && (reminder.isPending || reminder.isFailed) {
+            if allowsCatchUp && overdue && canCatchUpPlanReminder(reminder) {
                 Button {
                     completePlannedFeed(reminder)
                 } label: {

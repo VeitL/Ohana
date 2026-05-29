@@ -36,13 +36,15 @@ struct QuickFeedDraftStoreTests {
         store.stockBrandText = "Old"
         store.stockWeightText = "1000"
         store.stockExpenseAmountKeypadVisible = true
+        store.stockCalculationMode = .autoFeeder
 
-        store.resetNewStockDraft(foodKind: .wet, currentUserId: "human-1")
+        store.resetNewStockDraft(foodKind: .wet, currentUserId: "human-1", calculationMode: .manualOrPlan)
 
         #expect(store.editingFoodRecord == nil)
         #expect(store.selectedStockFoodKind == .wet)
         #expect(store.stockBrandText.isEmpty)
         #expect(store.stockWeightText.isEmpty)
+        #expect(store.stockCalculationMode == .manualOrPlan)
         #expect(store.stockExpensePayerId == "human-1")
         #expect(store.stockExpenseAmountKeypadVisible == false)
     }

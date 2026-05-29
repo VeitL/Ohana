@@ -19,6 +19,7 @@ struct QuickFeedHomeSnapshot {
     let hasNextManualReminder: Bool
     let hasMissedManualPlan: Bool
     let todayManualPlanMissedCount: Int
+    let lastExpiredManualPlanDate: Date?
     let todayManualPlanCompletionText: String
     let autoDailyTotalGrams: Double
     let latestAutoFeedDate: Date?

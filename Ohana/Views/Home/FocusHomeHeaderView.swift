@@ -106,7 +106,10 @@ struct FocusHomeHeaderView: View {
                 .accessibilityLabel("家庭协作")
                 .accessibilityHint("点击打开家庭协作，长按切换人类账户")
 
-                Button(action: onSettings) {
+                Button {
+                    OhanaFeedback.light()
+                    onSettings()
+                } label: {
                     settingsPill
                 }
                 .buttonStyle(ScaleButtonStyle())
