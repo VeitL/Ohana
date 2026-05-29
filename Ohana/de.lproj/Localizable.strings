@@ -83,7 +83,7 @@
 "体重" = "Gewicht";
 "余粮" = "Futtervorrat";
 "佛系" = "Buddhist";
-"便便" = "Kot";
+"便便" = "Häufchen";
 "保存" = "Speichern";
 "保险" = "Insurance";
 "保额" = "Insured amount";
@@ -119,10 +119,10 @@
 "别人" = "other people";
 "到家" = "Arrive home";
 "到账" = "Receipt";
-"刷牙" = "brush teeth";
+"刷牙" = "Zähne";
 "刺猬" = "hedgehog";
 "剂量" = "dose";
-"剪甲" = "Cut nails";
+"剪甲" = "Krallen";
 "加成" = "addition";
 "加水" = "add water";
 "北京" = "Beijing";
@@ -157,7 +157,7 @@
 "喂水" = "Wasser";
 "喂食" = "Füttern";
 "喷水" = "squirt";
-"噗噗" = "Puff puff";
+"噗噗" = "Häufchen";
 "回忆" = "remember";
 "国家" = "nation";
 "国籍" = "Country of Citizenship";
@@ -192,7 +192,7 @@
 "孩子" = "child";
 "宁波" = "Ningbo";
 "完成" = "Fertig";
-"完美" = "Perfect";
+"完美" = "Perfekt";
 "定位" = "position";
 "宠物" = "Haustier";
 "家人" = "family";
@@ -201,7 +201,7 @@
 "就医" = "Seek medical advice";
 "就诊" = "See a doctor";
 "尼斯" = "Nice";
-"尿尿" = "Pee";
+"尿尿" = "Pipi";
 "岛民" = "islanders";
 "巡岛" = "Patrol the island";
 "已停" = "Stopped";
@@ -236,7 +236,7 @@
 "悉尼" = "Sydney";
 "戏精" = "drama queen";
 "成员" = "member";
-"成就" = "Achievement";
+"成就" = "Erfolge";
 "成都" = "Chengdu";
 "截止" = "Deadline";
 "手动" = "Manuell";
@@ -310,7 +310,7 @@
 "标签" = "Label";
 "标题" = "title";
 "栗色" = "maroon";
-"梳毛" = "combing";
+"梳毛" = "Bürsten";
 "棕白" = "Brown and white";
 "棕色" = "brown";
 "森谷" = "Moritani";
@@ -330,7 +330,7 @@
 "每天" = "every day";
 "每月" = "per month";
 "毛色" = "Coat color";
-"水便" = "Watery stool";
+"水便" = "Wässriges Häufchen";
 "水样" = "water sample";
 "汉堡" = "Hamburger";
 "沈阳" = "shenyang";
@@ -339,7 +339,7 @@
 "注意" = "Notice";
 "泰国" = "Thailand";
 "泰迪" = "teddy";
-"洗澡" = "bath";
+"洗澡" = "Bad";
 "浅棕" = "light brown";
 "浇水" = "watering";
 "济南" = "Jinan";
@@ -349,7 +349,7 @@
 "深棕" = "dark brown";
 "添加" = "Hinzufügen";
 "清洁" = "clean";
-"清耳" = "Clear ears";
+"清耳" = "Ohren";
 "清除" = "Clear";
 "游泳" = "swim";
 "溶水" = "Dissolved water";
@@ -399,7 +399,7 @@
 "科隆" = "Cologne";
 "称号" = "title";
 "移除" = "Remove";
-"稀便" = "Loose stool";
+"稀便" = "Lockeres Häufchen";
 "稀有" = "rare";
 "米色" = "Beige";
 "类别" = "category";
@@ -467,7 +467,7 @@
 "距离" = "distance";
 "跳过" = "jump over";
 "身高" = "height";
-"软便" = "Soft stool";
+"软便" = "Weiches Häufchen";
 "轻微" = "slight";
 "边牧" = "Border Collie";
 "运动" = "sports";
@@ -492,7 +492,7 @@
 "金黄" = "golden";
 "釜山" = "Busan";
 "铜色" = "copper";
-"铲屎" = "Katzenklo";
+"铲屎" = "Schaufeln";
 "铲砂" = "shovel sand";
 "银灰" = "silver gray";
 "银白" = "silvery white";
@@ -793,7 +793,7 @@
 "金黄色" = "golden yellow";
 "铁脚板" = "Iron base plate";
 "铜绿色" = "copper green";
-"铲猫砂" = "shovel cat litter";
+"铲猫砂" = "Klo reinigen";
 "银渐层" = "silver gradient";
 "银虎斑" = "silver tabby";
 "银豹纹" = "silver leopard print";
@@ -843,7 +843,7 @@
 "今天复查" = "Review today";
 "今天已换" = "Changed today";
 "今天已清" = "Cleared today";
-"今日便便" = "Today's poop";
+"今日便便" = "Heute Häufchen";
 "今日全勤" = "Perfect attendance today";
 "今日到期" = "Expires today";
 "今日回忆" = "Today's memories";
@@ -871,18 +871,18 @@
 "体内驱虫" = "Internal deworming";
 "体外驱虫" = "In vitro deworming";
 "体检记录" = "Physical examination records";
-"体重记录" = "weight record";
+"体重记录" = "Gewichtslog";
 "体重走势" = "Weight trend";
 "体重趋势" = "weight trends";
 "体重追踪" = "weight tracking";
 "佛系估算" = "Buddhist estimate";
 "你的名字" = "your name";
 "侦探气质" = "Detective temperament";
-"便便 💩" = "poop 💩";
+"便便 💩" = "Häufchen 💩";
 "便便打卡" = "Poop clock";
-"便便次数" = "Number of poops";
-"便便记录" = "poop log";
-"便便追踪" = "poop tracking";
+"便便次数" = "Häufchen-Stopps";
+"便便记录" = "Häufchen-Log";
+"便便追踪" = "Häufchen-Tracking";
 "保单详情" = "Policy details";
 "保存中…" = "Saving…";
 "保存修改" = "Save changes";
@@ -904,9 +904,9 @@
 "健康信息" = "health information";
 "健康打卡" = "Health check-in";
 "健康日志" = "health log";
-"健康档案" = "health record";
+"健康档案" = "Gesundheitsakte";
 "健康洞察" = "health insights";
-"健康管理" = "health management";
+"健康管理" = "Gesundheit";
 "健康达人" = "health guru";
 "健康预警" = "health warning";
 "偷食小贼" = "food thief";
@@ -988,11 +988,11 @@
 "喂食记录" = "Feeding records";
 "喝水打卡" = "Drink water and clock in";
 "喷水保湿" = "Moisturizing spray";
-"噗噗打卡" = "Puff puff clock in";
-"噗噗电台" = "Pupu radio station";
+"噗噗打卡" = "Häufchen-Check-in";
+"噗噗电台" = "Häufchen-Radio";
 "坚持到底" = "persevere to the end";
 "垫付较多" = "More advance payment";
-"基本信息" = "Basic information";
+"基本信息" = "Basisdaten";
 "基础信息" = "Basic information";
 "填写保额" = "Fill in the insured amount";
 "处理中…" = "Processing…";
@@ -1013,7 +1013,7 @@
 "完成待办" = "Complete to-do";
 "完成打卡" = "Completed clocking in";
 "完整分析" = "full analysis";
-"完美便便" = "perfect poop";
+"完美便便" = "Top-Häufchen";
 "定时领取" = "Collect on time";
 "宠物信息" = "pet information";
 "宠物管理" = "Haustierverwaltung";
@@ -1129,7 +1129,7 @@
 "无需记录" = "No need to record";
 "日常换水" = "Daily water changes";
 "日常照料" = "daily care";
-"日常生活" = "daily life";
+"日常生活" = "Alltag";
 "星尘落雨" = "Stardust falls in the rain";
 "星际漫游" = "Interstellar Odyssey";
 "晴天徽章" = "Sunny Badge";
@@ -1233,7 +1233,7 @@
 "添加疫苗" = "add vaccine";
 "添加药物" = "Add medication";
 "添加证件" = "Add ID";
-"清洁护理" = "cleaning care";
+"清洁护理" = "Pflege";
 "清洗间隔" = "Cleaning interval";
 "清理滤材" = "Clean filter media";
 "清理滤芯" = "Clean filter element";
@@ -1250,7 +1250,7 @@
 "状态良好" = "in good condition";
 "狂犬疫苗" = "rabies vaccine";
 "猫咪最爱" = "Cat's favorite";
-"猫砂管理" = "Cat litter management";
+"猫砂管理" = "Streu-Pflege";
 "玄凤鹦鹉" = "cockatiel";
 "理想体型" = "ideal body shape";
 "理想偏瘦" = "Ideal to be thin";
@@ -1265,7 +1265,7 @@
 "生活花费" = "living expenses";
 "生物特征" = "Biometrics";
 "用药提醒" = "Medication reminder";
-"用药管理" = "Medication management";
+"用药管理" = "Medikamente";
 "用药记录" = "Medication records";
 "申请状态" = "Application status";
 "疗程天数" = "Number of days of treatment";
@@ -1338,7 +1338,7 @@
 "肉球印章" = "Meat ball seal";
 "背景风格" = "Hintergrundstil";
 "花费椰子" = "spend coconut";
-"花费记录" = "Spending records";
+"花费记录" = "Ausgabenlog";
 "花费记账" = "expense accounting";
 "茁壮小树" = "Strong small tree";
 "茁壮成长" = "thrive";
@@ -1382,7 +1382,7 @@
 "设置头像" = "Set avatar";
 "设置生日" = "set birthday";
 "设计说明" = "design description";
-"证件保障" = "Document protection";
+"证件保障" = "Dokumente & Schutz";
 "证件信息" = "ID information";
 "证件号码" = "ID number";
 "证件名称" = "Document name";
@@ -1428,12 +1428,12 @@
 "通知提醒" = "Notification reminder";
 "通知权限" = "Notification permissions";
 "遛狗奖励" = "dog walking reward";
-"遛狗记录" = "dog walking record";
+"遛狗记录" = "Gassi-Log";
 "重复频率" = "repetition frequency";
 "重置椰子" = "reset coconut";
 "重置记录" = "reset record";
 "重要日期" = "important dates";
-"重要时刻" = "important moment";
+"重要时刻" = "Momente";
 "金刚鹦鹉" = "macaw";
 "金底渐层" = "Gradient gold base";
 "钢铁肠胃" = "Steel stomach";
@@ -1466,7 +1466,7 @@
 "饮水管理" = "Drinking water management";
 "饮食异常" = "Abnormal eating habits";
 "饮食排泄" = "Dietary excretion";
-"饮食管理" = "Diet management";
+"饮食管理" = "Futter";
 "首席厨师" = "chief chef";
 "马尔济斯" = "Maltese";
 "马来西亚" = "Malaysia";
@@ -1602,7 +1602,7 @@
 "本周最勤快" = "Most diligent this week";
 "标记为停用" = "Mark as disabled";
 "标记未完成" = "Mark incomplete";
-"档案与记忆" = "Archives and Memory";
+"档案与记忆" = "Archiv & Erinnerungen";
 "欧气扭蛋机" = "European Gas Gashapon Machine";
 "正在发情期" = "in estrus";
 "正在处理…" = "Processing…";
@@ -1679,7 +1679,7 @@
 "🔥 传奇！" = "🔥 Legend!";
 "🔥 火热！" = "🔥 Hot!";
 " × 毛孩子" = "× furry kid";
-") 便便打卡" = ") poop clock";
+") 便便打卡" = ") Häufchen-Check-in";
 ") 喂水奖励" = ") water feeding reward";
 ") 喂食奖励" = ") Feeding rewards";
 ") 遛狗奖励" = ") dog walking reward";
@@ -1706,7 +1706,7 @@
 "人宠共健报告" = "Report on the health of people and pets";
 "人宠同行奖励" = "Rewards for companions";
 "今日一切安好" = "Everything is fine today";
-"今日便便次数" = "Number of poops today";
+"今日便便次数" = "Häufchen heute";
 "今日喂水次数" = "Number of water feedings today";
 "今日多人协作" = "Multi-person collaboration today";
 "今日手动记录" = "Manual recording today";
@@ -3180,7 +3180,7 @@
 "\\\\(pet.name) 就诊记录 +\\\\(got.petGot + got.humanGot)🥥" = "\\\\(pet.name) Medical treatment record +\\\\(got.petGot + got.humanGot)🥥";
 "\\\\(pet.name) 疫苗记录 +\\\\(got.petGot + got.humanGot)🥥" = "\\\\(pet.name) vaccine record +\\\\(got.petGot + got.humanGot)🥥";
 "\\\\(pet.name) 驱虫记录 +\\\\(got.petGot + got.humanGot)🥥" = "\\\\(pet.name) deworming record +\\\\(got.petGot + got.humanGot)🥥";
-"噗噗 · \\\\(p.pottyType.emoji)\\\\(p.pottyType.rawValue)" = "Puff · \\\\(p.pottyType.emoji)\\\\(p.pottyType.rawValue)";
+"噗噗 · \\\\(p.pottyType.emoji)\\\\(p.pottyType.rawValue)" = "Häufchen · \\\\(p.pottyType.emoji)\\\\(p.pottyType.rawValue)";
 "备份含全部宠物、家庭成员、日志、健康档案及应用状态。恢复时以 UUID 去重，不会清除现有数据。" = "The backup includes all pets, family members, logs, health files and application status. UUID deduplication is used during recovery and existing data will not be cleared.";
 "将清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。此操作不可撤销。" = "All log records of the pet (weight, expenses, health, care, dog walking, puff, etc.) will be cleared, and the basic information will be retained. This action cannot be undone.";
 "最多 3 个 · 已选 \\\\(selectedPersonalityTagIds.count)/3" = "Up to 3 · Selected \\\\(selectedPersonalityTagIds.count)/3";
@@ -3227,7 +3227,7 @@
 "本月你带 \\\\(petName) 走了 \\\\(km)km，\\\\(petName)\\\\(dir) \\\\(String(format: " = "This month you took \\\\(petName) away \\\\(km)km, \\\\(petName)\\\\(dir) \\\\(String(format:";
 "生命之树升级到 \\\\(levelAfter.displayName) · Lv.\\\\(levelAfter.rawValue)" = "Tree of Life upgraded to \\\\(levelAfter.displayName) · Lv.\\\\(levelAfter.rawValue)";
 "下次 \\\\(next.formatted(.dateTime.month(.defaultDigits).day())) 换砂" = "Next time \\\\(next.formatted(.dateTime.month(.defaultDigits).day())) change the sand";
-"下次 \\\\(next.formatted(.dateTime.month(.defaultDigits).day())) 铲屎" = "Next time \\\\(next.formatted(.dateTime.month(.defaultDigits).day())) shovel shit";
+"下次 \\\\(next.formatted(.dateTime.month(.defaultDigits).day())) 铲屎" = "Nächstes Klo reinigen: \\\\(next.formatted(.dateTime.month(.defaultDigits).day()))";
 "能量 \\\\(treeMgr.totalEnergy) · 下一级需 \\\\(treeMgr.nextLevelThreshold)" = "Energy \\\\(treeMgr.totalEnergy) · Next level required \\\\(treeMgr.nextLevelThreshold)";
 ", lifeStageFactors[calcLifeStage])) 系数，干粮以 3500 kcal/kg 换算，仅供参考。" = ", lifeStageFactors[calcLifeStage])) coefficient, converted to 3500 kcal/kg for dry food, for reference only.";
 "完成于 \\\\(completedAt.formatted(date: .abbreviated, time: .omitted))" = "Completed at \\\\(completedAt.formatted(date: .abbreviated, time: .omitted))";
@@ -3275,3 +3275,12 @@
 "货币" = "Währung";
 "购买日期" = "Kaufdatum";
 "身体" = "Körper";
+
+/* Kuratierte kurze Feature-Titel */
+"每日照护" = "Tägliche Pflege";
+"成长档案" = "Wachstumsarchiv";
+"家庭事务" = "Haushalt";
+"绿洲奖励" = "Oasen-Belohnungen";
+"照护分析" = "Pflege-Insights";
+"提醒健康" = "Erinnerungsstatus";
+"家庭周报" = "Familienwoche";

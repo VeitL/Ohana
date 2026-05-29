@@ -72,7 +72,7 @@ enum HomeModalRoute: Identifiable {
     case functionMenu(destination: FMDest?)
     case streakDetail
     case addEntity(EntityType)
-    case crewRoster
+    case crewRoster(CrewRosterMode)
     case accountSwitcher
     case calendar(entityID: String?, humanID: String?)
 
@@ -84,8 +84,8 @@ enum HomeModalRoute: Identifiable {
             return "streak-detail"
         case let .addEntity(type):
             return "add-entity-\(type.id)"
-        case .crewRoster:
-            return "crew-roster"
+        case let .crewRoster(mode):
+            return "crew-roster-\(mode.rawValue)"
         case .accountSwitcher:
             return "account-switcher"
         case let .calendar(entityID, humanID):
@@ -180,8 +180,8 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = .addEntity(type)
     }
 
-    func openCrewRoster() {
-        modal = .crewRoster
+    func openCrewRoster(mode: CrewRosterMode = .members) {
+        modal = .crewRoster(mode)
     }
 
     func openAccountSwitcher() {

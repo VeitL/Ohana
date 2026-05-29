@@ -64,7 +64,7 @@ struct FeatureGroupDashboardView: View {
                 .font(.system(size: 17, weight: .black))
                 .foregroundStyle(group.color)
                 .frame(width: 34, height: 34)
-            Text(group.title)
+            Text(LocalizedStringKey(group.title))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
@@ -88,7 +88,7 @@ struct FeatureGroupDashboardView: View {
                         HStack(spacing: 6) {
                             Image(systemName: item.icon)
                                 .font(.system(size: 11, weight: .bold))
-                            Text(item.title)
+                            Text(LocalizedStringKey(item.title))
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
                                 .lineLimit(1)
                         }

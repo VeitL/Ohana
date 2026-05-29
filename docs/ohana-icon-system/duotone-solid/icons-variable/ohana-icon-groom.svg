@@ -37,12 +37,12 @@
   <title>Grooming / 洗护</title>
   <g>
 
-      <rect class="primary" x="5.6" y="8" width="20.8" height="5.6" rx="2.8"/>
-      <rect class="primary" x="5.6" y="10.8" width="4.7" height="15.1" rx="2.35"/>
-      <rect class="accent" x="12.4" y="13.4" width="1.75" height="10.6" rx=".88"/>
-      <rect class="accent" x="15.5" y="13.4" width="1.75" height="10.6" rx=".88"/>
-      <rect class="accent" x="18.6" y="13.4" width="1.75" height="10.6" rx=".88"/>
-      <rect class="accent" x="21.7" y="13.4" width="1.75" height="10.6" rx=".88"/>
-      <circle class="accent-soft" cx="8" cy="20.9" r="1.25"/>
+      <rect class="primary" x="6.5" y="8.5" width="19" height="6" rx="3"/>
+      <rect class="primary" x="22.6" y="10.2" width="4.2" height="11.2" rx="2.1" opacity=".42"/>
+      <rect class="accent" x="8.5" y="13.2" width="1.55" height="10.7" rx=".78"/>
+      <rect class="accent" x="11.4" y="13.2" width="1.55" height="10.7" rx=".78"/>
+      <rect class="accent" x="14.3" y="13.2" width="1.55" height="10.7" rx=".78"/>
+      <rect class="accent" x="17.2" y="13.2" width="1.55" height="10.7" rx=".78"/>
+      <rect class="accent" x="20.1" y="13.2" width="1.55" height="10.7" rx=".78"/>
   </g>
 </svg>

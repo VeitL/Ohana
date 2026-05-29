@@ -37,16 +37,12 @@
   <title>Dry food / 干粮</title>
   <g>
 
-      <circle class="primary" cx="11.2" cy="12" r="2.65"/>
-      <circle class="primary" cx="16" cy="10.6" r="2.65"/>
-      <circle class="primary" cx="20.8" cy="12" r="2.65"/>
-      <circle class="primary" cx="9.4" cy="17.2" r="2.65"/>
-      <circle class="primary" cx="14.2" cy="17.2" r="2.65"/>
-      <circle class="primary" cx="19" cy="17.2" r="2.65"/>
-      <circle class="primary" cx="23.8" cy="17.2" r="2.65"/>
-      <circle class="primary" cx="12.2" cy="22.3" r="2.65"/>
-      <circle class="primary" cx="17" cy="22.3" r="2.65"/>
-      <circle class="primary" cx="21.8" cy="22.3" r="2.65"/>
-      <circle class="accent" cx="16" cy="16.8" r="1.2"/>
+      <path class="primary" d="M6.2 18.5h19.6l-1.4 4.8a4 4 0 0 1-3.8 2.7h-9.2a4 4 0 0 1-3.8-2.7l-1.4-4.8Z"/>
+      <path class="accent" d="m11 14-1.5.9v1.8l1.5.9 1.5-.9v-1.8L11 14Z"/>
+      <path class="accent" d="m15.1 12.4-1.5.9v1.8l1.5.9 1.5-.9v-1.8l-1.5-.9Z"/>
+      <path class="accent" d="m19.2 13.9-1.5.9v1.8l1.5.9 1.5-.9v-1.8l-1.5-.9Z"/>
+      <path class="accent" d="m13 17-1.5.9v1.8l1.5.9 1.5-.9v-1.8L13 17Z"/>
+      <path class="accent" d="m17.2 17.1-1.5.9v1.8l1.5.9 1.5-.9V18l-1.5-.9Z"/>
+      <path class="accent" d="m21.1 16.3-1.5.9V19l1.5.9 1.5-.9v-1.8l-1.5-.9Z"/>
   </g>
 </svg>

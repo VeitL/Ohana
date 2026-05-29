@@ -88,7 +88,7 @@ enum PetFeature: String, Hashable, CaseIterable {
         case .food:          return "饮食管理"
         case .hygiene:       return "清洁护理"
         case .walks:         return "遛狗记录"
-        case .potty:         return "便便记录"
+        case .potty:         return "噗噗电台"
         case .retention:     return "成长档案"
         case .basicInfo:     return "基本信息"
         case .documents:     return "证件保障"

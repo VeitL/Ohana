@@ -49,13 +49,11 @@ const icons = [
     primary: "#1f8a8a",
     accent: "#ff755f",
     shapes: `
-      <ellipse class="primary-soft" cx="16" cy="13.3" rx="10.2" ry="4.8"/>
-      <path class="primary" d="M5.6 13.7h20.8l-1.5 7.5A5.8 5.8 0 0 1 19.2 26h-6.4a5.8 5.8 0 0 1-5.7-4.8l-1.5-7.5Z"/>
-      <rect class="primary" x="9.3" y="23.6" width="13.4" height="2.7" rx="1.35"/>
-      <path class="accent" d="M16 21.7c-1.8-1-3-2.3-3-3.6 0-1 .7-1.7 1.5-1.7.6 0 1.1.3 1.5.9.4-.6.9-.9 1.5-.9.8 0 1.5.7 1.5 1.7 0 1.3-1.2 2.6-3 3.6Z"/>
-      <circle class="accent" cx="11.3" cy="11.8" r="2.05"/>
-      <circle class="accent" cx="15.8" cy="10.6" r="2.45"/>
-      <circle class="accent" cx="20.2" cy="12" r="2"/>
+      <ellipse class="primary-soft" cx="16" cy="14.2" rx="9.4" ry="4.4"/>
+      <path class="primary" d="M5.5 14.7h21l-1.7 8.1A4.9 4.9 0 0 1 20.1 26h-8.2a4.9 4.9 0 0 1-4.7-3.2l-1.7-8.1Z"/>
+      <circle class="accent" cx="12.2" cy="12.1" r="2.2"/>
+      <circle class="accent" cx="16.4" cy="11.1" r="2.55"/>
+      <circle class="accent" cx="20.4" cy="12.6" r="2.1"/>
     `
   },
   {
@@ -80,17 +78,15 @@ const icons = [
     primary: "#2b8f78",
     accent: "#c8ff3d",
     shapes: `
-      <path class="accent-thin-line" d="M7.2 9.2c3.4.3 6.1 2.2 8.8 5.1"/>
-      <circle class="accent-soft" cx="6.8" cy="9" r="2.1"/>
-      <rect class="primary" x="12.2" y="16.2" width="9.2" height="5.4" rx="2.7"/>
-      <circle class="primary" cx="22.3" cy="15.2" r="3.05"/>
-      <ellipse class="primary" cx="25" cy="16.3" rx="2.1" ry="1.45"/>
-      <path class="primary" d="M24.3 13 27 11.8l-.4 3.4-2.3-2.2Z"/>
-      <path class="primary-thin-line" d="M12.6 17.4 9.5 15.5"/>
-      <rect class="primary" x="13.4" y="20.7" width="2" height="4.4" rx="1"/>
-      <rect class="primary" x="18.1" y="20.7" width="2" height="4.4" rx="1"/>
-      <circle class="accent" cx="23.2" cy="14.8" r=".75"/>
-      <rect class="accent" x="17.7" y="13.2" width="4.1" height="1.8" rx=".9"/>
+      <path class="accent-thin-line" d="M6.6 8.8c2.7-.4 5.1 3.5 8.9 5.9"/>
+      <circle class="accent-soft" cx="6.6" cy="8.8" r="1.9"/>
+      <rect class="primary" x="11.3" y="15" width="11.4" height="6.7" rx="3.2"/>
+      <circle class="primary" cx="23.5" cy="14.9" r="4.1"/>
+      <path class="primary" d="M21.7 11.9 23.2 7.9 25.3 12.6Z" opacity=".64"/>
+      <circle class="accent" cx="25.1" cy="14.7" r=".9"/>
+      <path class="primary-thin-line" d="M13.3 15.3 8.1 14.2"/>
+      <rect class="primary" x="13.1" y="20.2" width="2.2" height="5.2" rx="1.1"/>
+      <rect class="primary" x="19.4" y="20.2" width="2.2" height="5.2" rx="1.1"/>
     `
   },
   {
@@ -101,8 +97,8 @@ const icons = [
     accent: "#7be4d4",
     shapes: `
       <path class="primary" d="M16 4.8c4.8 5.7 7.1 9.5 7.1 13.1a7.1 7.1 0 0 1-14.2 0c0-3.6 2.3-7.4 7.1-13.1Z"/>
-      <path class="accent" d="M7.2 20.2h17.6l-1 3.3A4.3 4.3 0 0 1 19.7 26h-7.4a4.3 4.3 0 0 1-4.1-2.5l-1-3.3Z"/>
-      <ellipse class="accent-soft" cx="16" cy="20.3" rx="8.8" ry="3"/>
+      <path class="accent" d="M7.2 20.2h17.6l-1 3.3A4.3 4.3 0 0 1 19.7 26h-7.4a4.3 4.3 0 0 1-4.1-2.5l-1-3.3Z" opacity=".38"/>
+      <ellipse class="accent-soft" cx="16" cy="20.3" rx="8.8" ry="3" opacity=".18"/>
     `
   },
   {
@@ -112,10 +108,9 @@ const icons = [
     primary: "#7b6ac8",
     accent: "#ffb36b",
     shapes: `
-      <rect class="primary" x="5.8" y="7" width="20.4" height="18.5" rx="5.8"/>
-      <rect class="primary-soft" x="9.2" y="10.8" width="13.6" height="10.7" rx="3.6"/>
-      <text class="accent" x="16" y="18.7" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="8.1" font-weight="900">WC</text>
-      <rect class="accent-soft" x="10.2" y="22.5" width="11.6" height="2.1" rx="1.05"/>
+      <path class="primary" d="M7 17.2h18l-1.4 6a4 4 0 0 1-3.9 2.8h-7.4a4 4 0 0 1-3.9-2.8l-1.4-6Z"/>
+      <rect class="primary-soft" x="7.8" y="7.4" width="16.4" height="10.8" rx="4"/>
+      <text class="accent" x="16" y="15.9" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="7.5" font-weight="900">WC</text>
     `
   },
   {
@@ -139,13 +134,13 @@ const icons = [
     primary: "#2d88c8",
     accent: "#ff9a6a",
     shapes: `
-      <rect class="primary" x="5.6" y="8" width="20.8" height="5.6" rx="2.8"/>
-      <rect class="primary" x="5.6" y="10.8" width="4.7" height="15.1" rx="2.35"/>
-      <rect class="accent" x="12.4" y="13.4" width="1.75" height="10.6" rx=".88"/>
-      <rect class="accent" x="15.5" y="13.4" width="1.75" height="10.6" rx=".88"/>
-      <rect class="accent" x="18.6" y="13.4" width="1.75" height="10.6" rx=".88"/>
-      <rect class="accent" x="21.7" y="13.4" width="1.75" height="10.6" rx=".88"/>
-      <circle class="accent-soft" cx="8" cy="20.9" r="1.25"/>
+      <rect class="primary" x="6.5" y="8.5" width="19" height="6" rx="3"/>
+      <rect class="primary" x="22.6" y="10.2" width="4.2" height="11.2" rx="2.1" opacity=".42"/>
+      <rect class="accent" x="8.5" y="13.2" width="1.55" height="10.7" rx=".78"/>
+      <rect class="accent" x="11.4" y="13.2" width="1.55" height="10.7" rx=".78"/>
+      <rect class="accent" x="14.3" y="13.2" width="1.55" height="10.7" rx=".78"/>
+      <rect class="accent" x="17.2" y="13.2" width="1.55" height="10.7" rx=".78"/>
+      <rect class="accent" x="20.1" y="13.2" width="1.55" height="10.7" rx=".78"/>
     `
   },
   {
@@ -167,13 +162,10 @@ const icons = [
     primary: "#5f6fd8",
     accent: "#ffd36c",
     shapes: `
-      <path class="primary" d="M5.7 25.5 16 8.4l10.3 17.1H5.7Z"/>
-      <path class="primary-soft" d="M16 8.4v17.1H5.7L16 8.4Z"/>
-      <path class="accent" d="M16 16.7 21 25.5H11l5-8.8Z"/>
-      <rect class="primary" x="6.2" y="24.2" width="19.6" height="2.4" rx="1.2"/>
-      <text class="accent" x="23.5" y="8.6" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="5.5" font-weight="900">Z</text>
-      <text class="accent" x="26.6" y="13" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="4.5" font-weight="900">Z</text>
-      <text class="accent-soft" x="20" y="5.9" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="4" font-weight="900">Z</text>
+      <path class="primary" d="M16 6.4 27 26.2H5Z"/>
+      <path class="accent-soft" d="M15.9 14.1 20.6 25.8H11.2Z"/>
+      <text class="accent" x="21.1" y="10.9" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="7.4" font-weight="900">Z</text>
+      <text class="accent-soft" x="25" y="14.6" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="5.9" font-weight="900">z</text>
     `
   },
   {
@@ -272,11 +264,11 @@ const icons = [
     primary: "#2b8f78",
     accent: "#ffb36b",
     shapes: `
-      <path class="primary" d="M9.1 9.5h13.8l1.5 15.3A3.2 3.2 0 0 1 21.2 28H10.8a3.2 3.2 0 0 1-3.2-3.2L9.1 9.5Z"/>
-      <path class="primary-soft" d="M11.2 5.2h9.6l2.1 4.3H9.1l2.1-4.3Z"/>
-      <rect class="accent" x="11" y="13" width="10" height="2.4" rx="1.2"/>
-      <rect class="accent" x="11" y="17" width="8.2" height="2.4" rx="1.2" opacity=".74"/>
-      <rect class="accent" x="11" y="21" width="5.8" height="2.4" rx="1.2" opacity=".48"/>
+      <path class="primary" d="M10 6.2h12l3 20H7l3-20Z"/>
+      <rect class="primary-soft" x="11" y="8.8" width="10" height="2.7" rx="1.35"/>
+      <rect class="accent" x="10" y="15.1" width="12" height="2.3" rx="1.15"/>
+      <rect class="accent" x="10" y="19" width="9.2" height="2.3" rx="1.15" opacity=".68"/>
+      <rect class="accent" x="10" y="22.9" width="6.4" height="2.3" rx="1.15" opacity=".46"/>
     `
   },
   {
@@ -286,17 +278,13 @@ const icons = [
     primary: "#d7863f",
     accent: "#7be4d4",
     shapes: `
-      <circle class="primary" cx="11.2" cy="12" r="2.65"/>
-      <circle class="primary" cx="16" cy="10.6" r="2.65"/>
-      <circle class="primary" cx="20.8" cy="12" r="2.65"/>
-      <circle class="primary" cx="9.4" cy="17.2" r="2.65"/>
-      <circle class="primary" cx="14.2" cy="17.2" r="2.65"/>
-      <circle class="primary" cx="19" cy="17.2" r="2.65"/>
-      <circle class="primary" cx="23.8" cy="17.2" r="2.65"/>
-      <circle class="primary" cx="12.2" cy="22.3" r="2.65"/>
-      <circle class="primary" cx="17" cy="22.3" r="2.65"/>
-      <circle class="primary" cx="21.8" cy="22.3" r="2.65"/>
-      <circle class="accent" cx="16" cy="16.8" r="1.2"/>
+      <path class="primary" d="M6.2 18.5h19.6l-1.4 4.8a4 4 0 0 1-3.8 2.7h-9.2a4 4 0 0 1-3.8-2.7l-1.4-4.8Z"/>
+      <path class="accent" d="m11 14-1.5.9v1.8l1.5.9 1.5-.9v-1.8L11 14Z"/>
+      <path class="accent" d="m15.1 12.4-1.5.9v1.8l1.5.9 1.5-.9v-1.8l-1.5-.9Z"/>
+      <path class="accent" d="m19.2 13.9-1.5.9v1.8l1.5.9 1.5-.9v-1.8l-1.5-.9Z"/>
+      <path class="accent" d="m13 17-1.5.9v1.8l1.5.9 1.5-.9v-1.8L13 17Z"/>
+      <path class="accent" d="m17.2 17.1-1.5.9v1.8l1.5.9 1.5-.9V18l-1.5-.9Z"/>
+      <path class="accent" d="m21.1 16.3-1.5.9V19l1.5.9 1.5-.9v-1.8l-1.5-.9Z"/>
     `
   },
   {
@@ -306,11 +294,11 @@ const icons = [
     primary: "#d86a76",
     accent: "#ffd36c",
     shapes: `
-      <ellipse class="primary-soft" cx="16" cy="8.8" rx="8.3" ry="3.2"/>
-      <path class="primary" d="M7.7 8.8h16.6v14.3c0 2-3.7 3.6-8.3 3.6s-8.3-1.6-8.3-3.6V8.8Z"/>
-      <ellipse class="primary" cx="16" cy="8.8" rx="8.3" ry="3.2"/>
-      <rect class="accent" x="10.1" y="14.4" width="11.8" height="5.4" rx="2.7"/>
-      <ellipse class="primary-soft" cx="16" cy="23.2" rx="7.8" ry="2.6"/>
+      <ellipse class="primary" cx="16" cy="9.9" rx="7.6" ry="2.8"/>
+      <rect class="primary" x="8.4" y="9.8" width="15.2" height="15.4" rx="4"/>
+      <ellipse class="accent-soft" cx="16" cy="24.3" rx="7.6" ry="2.5"/>
+      <rect class="accent-soft" x="11.3" y="13.2" width="9.4" height="5.4" rx="2.7"/>
+      <circle class="accent" cx="16" cy="16" r="2.35"/>
     `
   },
   {
@@ -333,11 +321,11 @@ const icons = [
     primary: "#2b8f78",
     accent: "#ffb36b",
     shapes: `
-      <path class="primary" d="M9.1 9.5h13.8l1.5 15.3A3.2 3.2 0 0 1 21.2 28H10.8a3.2 3.2 0 0 1-3.2-3.2L9.1 9.5Z"/>
-      <path class="primary-soft" d="M11.2 5.2h9.6l2.1 4.3H9.1l2.1-4.3Z"/>
-      <rect class="accent" x="11" y="13" width="10" height="2.4" rx="1.2"/>
-      <rect class="accent" x="11" y="17" width="8.2" height="2.4" rx="1.2" opacity=".74"/>
-      <rect class="accent" x="11" y="21" width="5.8" height="2.4" rx="1.2" opacity=".48"/>
+      <path class="primary" d="M10 6.2h12l3 20H7l3-20Z"/>
+      <rect class="primary-soft" x="11" y="8.8" width="10" height="2.7" rx="1.35"/>
+      <rect class="accent" x="10" y="15.1" width="12" height="2.3" rx="1.15"/>
+      <rect class="accent" x="10" y="19" width="9.2" height="2.3" rx="1.15" opacity=".68"/>
+      <rect class="accent" x="10" y="22.9" width="6.4" height="2.3" rx="1.15" opacity=".46"/>
     `
   },
   {
@@ -360,11 +348,11 @@ const icons = [
     primary: "#1c9ec2",
     accent: "#c8ff3d",
     shapes: `
-      <path class="primary" d="M14.1 5.2c4.4 5.1 6.5 8.4 6.5 11.7a6.5 6.5 0 0 1-13 0c0-3.3 2.1-6.6 6.5-11.7Z"/>
-      <path class="accent-line" d="M23.6 11a5.6 5.6 0 0 1 .8 7.7"/>
-      <path class="accent-line" d="m24.4 18.8 3.2-.6-.8-3.1"/>
-      <path class="accent-line" d="M21.6 24a5.6 5.6 0 0 1-.8-7.7"/>
-      <path class="accent-line" d="m20.8 16.2-3.2.6.8 3.1"/>
+      <path class="primary" d="M12.8 6.2c4.1 4.9 6.1 8 6.1 11.1a6.1 6.1 0 0 1-12.2 0c0-3.1 2-6.2 6.1-11.1Z"/>
+      <path class="accent-line" d="M23.2 8.2a6 6 0 0 1-1 10"/>
+      <path class="accent-line" d="m22.3 18.2 4.1-.5-2.6-3.5"/>
+      <path class="accent-line" d="M8.8 23.8a6 6 0 0 1 1-10"/>
+      <path class="accent-line" d="m9.7 13.8-4.1.5 2.6 3.5"/>
     `
   },
   {
@@ -374,19 +362,13 @@ const icons = [
     primary: "#7b6ac8",
     accent: "#ffb36b",
     shapes: `
-      <path class="primary" d="M6.7 17h18.6l-1.5 6.1A4.1 4.1 0 0 1 19.8 26h-7.6a4.1 4.1 0 0 1-4-2.9L6.7 17Z"/>
-      <ellipse class="primary-soft" cx="16" cy="16.9" rx="9.3" ry="3.7"/>
-      <circle class="accent" cx="9.7" cy="16.5" r=".78"/>
-      <circle class="accent" cx="12.1" cy="15.2" r=".68"/>
-      <circle class="accent" cx="14.5" cy="16.8" r=".76"/>
-      <circle class="accent" cx="17.1" cy="15.5" r=".7"/>
-      <circle class="accent" cx="19.5" cy="17.1" r=".8"/>
-      <circle class="accent" cx="22" cy="15.8" r=".66"/>
-      <circle class="accent-soft" cx="10.9" cy="19.1" r=".66"/>
-      <circle class="accent-soft" cx="13.8" cy="18.5" r=".74"/>
-      <circle class="accent-soft" cx="16.5" cy="19.5" r=".68"/>
-      <circle class="accent-soft" cx="19.2" cy="18.8" r=".72"/>
-      <circle class="accent-soft" cx="21.8" cy="19.5" r=".62"/>
+      <path class="primary" d="M6.5 17.2h19l-1.4 6a4 4 0 0 1-3.9 2.8h-8.4a4 4 0 0 1-3.9-2.8l-1.4-6Z"/>
+      <ellipse class="primary-soft" cx="16" cy="16.6" rx="9.5" ry="3.9"/>
+      <circle class="accent" cx="10.2" cy="15.3" r="1.05"/>
+      <circle class="accent" cx="13.3" cy="14.1" r=".86"/>
+      <circle class="accent" cx="16.4" cy="15.5" r="1.18"/>
+      <circle class="accent" cx="19.6" cy="14.2" r=".94"/>
+      <circle class="accent" cx="22.1" cy="16.1" r=".78"/>
     `
   },
   {
@@ -511,7 +493,7 @@ const icons = [
     shapes: `
       <rect class="primary" x="6" y="9" width="20" height="15.8" rx="5"/>
       <rect class="accent-soft" x="8.6" y="12" width="14.8" height="3" rx="1.5"/>
-      <text class="accent" x="16" y="21.4" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="10.6" font-weight="900">$</text>
+      <text class="accent" x="16" y="21.4" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="10.6" font-weight="900">¥</text>
     `
   },
   {
@@ -622,17 +604,8 @@ const icons = [
     primary: "#27313a",
     accent: "#7be4d4",
     shapes: `
-      <rect class="primary" x="14.3" y="3.6" width="3.4" height="6.2" rx="1.7"/>
-      <rect class="primary" x="14.3" y="22.2" width="3.4" height="6.2" rx="1.7"/>
-      <rect class="primary" x="22.2" y="14.3" width="6.2" height="3.4" rx="1.7"/>
-      <rect class="primary" x="3.6" y="14.3" width="6.2" height="3.4" rx="1.7"/>
-      <rect class="primary" x="14.3" y="3.6" width="3.4" height="6.2" rx="1.7" transform="rotate(45 16 16)"/>
-      <rect class="primary" x="14.3" y="22.2" width="3.4" height="6.2" rx="1.7" transform="rotate(45 16 16)"/>
-      <rect class="primary" x="22.2" y="14.3" width="6.2" height="3.4" rx="1.7" transform="rotate(45 16 16)"/>
-      <rect class="primary" x="3.6" y="14.3" width="6.2" height="3.4" rx="1.7" transform="rotate(45 16 16)"/>
-      <circle class="primary" cx="16" cy="16" r="7.6"/>
-      <circle class="accent-soft" cx="16" cy="16" r="4"/>
-      <circle class="accent" cx="16" cy="16" r="2"/>
+      <path class="primary" d="M27.2 16 24 17.3l1.8 2.9-3.5 3.5-2.9-1.8-1.3 3.2h-4.2l-1.3-3.2-2.9 1.8-3.5-3.5L8 17.3 4.8 16 8 14.7 6.2 11.8l3.5-3.5 2.9 1.8 1.3-3.2h4.2l1.3 3.2 2.9-1.8 3.5 3.5-1.8 2.9L27.2 16Z"/>
+      <circle class="accent-soft" cx="16" cy="16" r="4.1"/>
     `
   }
 ];
@@ -902,13 +875,11 @@ function motionDemoMarkup() {
           <svg class="motion-feed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="motionFeedTitle motionFeedDesc">
             <title id="motionFeedTitle">喂食图标动画</title>
             <desc id="motionFeedDesc">点击后，饭碗里的粮食圆点从透明变为实色，再次点击会淡出回到空碗。</desc>
-            <ellipse class="motion-food-shadow primary-soft" cx="16" cy="13.3" rx="10.2" ry="4.8"/>
-            <path class="motion-bowl primary" d="M5.6 13.7h20.8l-1.5 7.5A5.8 5.8 0 0 1 19.2 26h-6.4a5.8 5.8 0 0 1-5.7-4.8l-1.5-7.5Z"/>
-            <rect class="motion-bowl primary" x="9.3" y="23.6" width="13.4" height="2.7" rx="1.35"/>
-            <path class="accent" d="M16 21.7c-1.8-1-3-2.3-3-3.6 0-1 .7-1.7 1.5-1.7.6 0 1.1.3 1.5.9.4-.6.9-.9 1.5-.9.8 0 1.5.7 1.5 1.7 0 1.3-1.2 2.6-3 3.6Z"/>
-            <circle class="motion-grain motion-grain-a accent" cx="11.3" cy="11.8" r="2.05"/>
-            <circle class="motion-grain motion-grain-b accent" cx="15.8" cy="10.6" r="2.45"/>
-            <circle class="motion-grain motion-grain-c accent" cx="20.2" cy="12" r="2"/>
+            <ellipse class="motion-food-shadow primary-soft" cx="16" cy="14.2" rx="9.4" ry="4.4"/>
+            <path class="motion-bowl primary" d="M5.5 14.7h21l-1.7 8.1A4.9 4.9 0 0 1 20.1 26h-8.2a4.9 4.9 0 0 1-4.7-3.2l-1.7-8.1Z"/>
+            <circle class="motion-grain motion-grain-a accent" cx="12.2" cy="12.1" r="2.2"/>
+            <circle class="motion-grain motion-grain-b accent" cx="16.4" cy="11.1" r="2.55"/>
+            <circle class="motion-grain motion-grain-c accent" cx="20.4" cy="12.6" r="2.1"/>
             <g class="motion-badge" aria-hidden="true">
               <circle fill="#fff" cx="23.9" cy="23.7" r="4.15"/>
               <circle class="accent" cx="23.9" cy="23.7" r="3.25"/>

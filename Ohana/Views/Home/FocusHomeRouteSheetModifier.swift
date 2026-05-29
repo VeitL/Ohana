@@ -96,14 +96,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private var modalSheetRouteBinding: Binding<HomeModalRoute?> {
         Binding(
             get: {
-                if case .crewRoster = routes.modal {
+                if activeCrewRosterMode != nil {
                     return nil
                 }
                 return routes.modal
             },
             set: { route in
                 if route == nil,
-                   case .crewRoster = routes.modal {
+                   activeCrewRosterMode != nil {
                     return
                 }
                 routes.modal = route
@@ -143,6 +143,13 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         routes.settingsPresented
     }
 
+    private var activeCrewRosterMode: CrewRosterMode? {
+        if case let .some(.crewRoster(mode)) = routes.modal {
+            return mode
+        }
+        return nil
+    }
+
     @ViewBuilder
     private func homeModalDestination(for route: HomeModalRoute) -> some View {
         switch route {
@@ -163,9 +170,10 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 }
             )
             .ohanaSheetPagePresentation() // ui-v4: allow role creation flow as long sheet
-        case .crewRoster:
+        case let .crewRoster(mode):
             NavigationStack {
                 CrewRosterOverlay(
+                    initialMode: mode,
                     onSelectPet: { pet in
                         routes.dismissModal()
                         onCrewPetSelected(pet)
@@ -453,8 +461,9 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
 
     @ViewBuilder
     private func crewRosterOverlayDestination() -> some View {
-        if case .crewRoster = routes.modal {
+        if case let .some(.crewRoster(mode)) = routes.modal {
             HomeCrewRosterInlineHost(
+                initialMode: mode,
                 onClose: {
                     routes.dismissModal()
                 },
@@ -806,6 +815,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
 }
 
 private struct HomeCrewRosterInlineHost: View {
+    let initialMode: CrewRosterMode
     let onClose: () -> Void
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
@@ -831,6 +841,7 @@ private struct HomeCrewRosterInlineHost: View {
 
                     ZStack {
                         HomeCrewRosterOpeningShell(
+                            initialMode: initialMode,
                             safeTopInset: safeTop,
                             onClose: requestClose
                         )
@@ -838,6 +849,7 @@ private struct HomeCrewRosterInlineHost: View {
 
                         if isContentMounted {
                             CrewRosterOverlay(
+                                initialMode: initialMode,
                                 onSelectPet: selectPet,
                                 onSelectHuman: selectHuman,
                                 onClose: requestClose,
@@ -951,6 +963,7 @@ private struct HomeCrewRosterInlineHost: View {
 }
 
 private struct HomeCrewRosterOpeningShell: View {
+    let initialMode: CrewRosterMode
     let safeTopInset: CGFloat
     let onClose: () -> Void
 
@@ -959,19 +972,24 @@ private struct HomeCrewRosterOpeningShell: View {
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
+        let isCollaboration = initialMode == .collaboration
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "person.2.crop.square.stack.fill")
+                Image(systemName: isCollaboration ? "hands.sparkles.fill" : "person.2.crop.square.stack.fill")
                     .font(.system(size: 18, weight: .black))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 42, height: 42)
                     .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(l.tr(zh: "Ohana 成员", en: "Ohana Members", de: "Ohana Mitglieder"))
+                    Text(isCollaboration
+                         ? l.tr(zh: "家庭协作", en: "Family Care", de: "Familienpflege")
+                         : l.tr(zh: "Ohana 成员", en: "Ohana Members", de: "Ohana Mitglieder"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "成员和首页显示", en: "Members and home cards", de: "Mitglieder und Startkarten"))
+                    Text(isCollaboration
+                         ? l.tr(zh: "任务、悬赏和今日分工", en: "Tasks, bounties, and today's handoff", de: "Aufgaben, Prämien und heutige Übergabe")
+                         : l.tr(zh: "成员和首页显示", en: "Members and home cards", de: "Mitglieder und Startkarten"))
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -1007,6 +1025,7 @@ private struct HomeCoconutLogInlineHost: View {
     @State private var isShellVisible = false
     @State private var isContentMounted = false
     @State private var isContentVisible = false
+    @State private var isInteractionReady = false
     @State private var isClosing = false
     @State private var closeTask: Task<Void, Never>?
 
@@ -1027,14 +1046,20 @@ private struct HomeCoconutLogInlineHost: View {
                     .opacity(isContentMounted ? 0 : 1)
 
                     if isContentMounted {
-                        CoconutLogView(subject: subject, onClose: requestClose)
+                        CoconutLogView(
+                            subject: subject,
+                            onClose: requestClose,
+                            safeTopInset: safeTop,
+                            safeBottomInset: safeBottom,
+                            historyContentDelayMilliseconds: historyContentDelayMilliseconds
+                        )
                             .opacity(isContentVisible ? 1 : 0)
                             .transition(.opacity)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .offset(y: presentationOffset(in: proxy, safeBottom: safeBottom))
-                .allowsHitTesting(isShellVisible && !isClosing)
+                .allowsHitTesting(isInteractionReady && !isClosing)
             }
             .accessibilityAddTraits(.isModal)
             .onAppear {
@@ -1055,30 +1080,30 @@ private struct HomeCoconutLogInlineHost: View {
         isShellVisible = false
         isContentMounted = false
         isContentVisible = false
+        isInteractionReady = false
         isClosing = false
 
         await OhanaFrameScheduler.waitAfterNextFrame()
         guard !Task.isCancelled else { return }
+        isContentMounted = true
+        isContentVisible = true
+
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: contentPrepareDelayMilliseconds)
+        guard !Task.isCancelled, !isClosing else { return }
         withAnimation(drawerEnterAnimation) {
             isShellVisible = true
         }
 
-        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: contentMountDelayMilliseconds)
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: interactionReadyDelayMilliseconds)
         guard !Task.isCancelled, !isClosing else { return }
-        isContentMounted = true
-        withAnimation(GoMotion.quick) {
-            isContentVisible = true
-        }
+        isInteractionReady = true
     }
 
     private func requestClose() {
         guard !isClosing else { return }
         isClosing = true
+        isInteractionReady = false
         OhanaFeedback.light()
-        withAnimation(GoMotion.quick) {
-            isContentVisible = false
-        }
-        isContentMounted = false
         withAnimation(drawerExitAnimation) {
             isShellVisible = false
         }
@@ -1105,12 +1130,20 @@ private struct HomeCoconutLogInlineHost: View {
         allowsMotion ? .smooth(duration: 0.38, extraBounce: 0.0) : GoMotion.reduced
     }
 
-    private var contentMountDelayMilliseconds: UInt64 {
-        allowsMotion ? 180 : 0
+    private var contentPrepareDelayMilliseconds: UInt64 {
+        allowsMotion ? 32 : 0
     }
 
     private var closeDelayMilliseconds: UInt64 {
         allowsMotion ? 430 : 90
+    }
+
+    private var interactionReadyDelayMilliseconds: UInt64 {
+        allowsMotion ? 420 : 0
+    }
+
+    private var historyContentDelayMilliseconds: UInt64 {
+        allowsMotion ? 470 : 0
     }
 }
 

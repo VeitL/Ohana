@@ -22,6 +22,14 @@ enum PoopOverviewRange: String, CaseIterable, Identifiable {
         }
     }
 
+    func title(_ l: L10n) -> String {
+        switch self {
+        case .days7: return l.tr(zh: "7天", en: "7d", de: "7 T.")
+        case .days30: return l.tr(zh: "30天", en: "30d", de: "30 T.")
+        case .days90: return l.tr(zh: "90天", en: "90d", de: "90 T.")
+        }
+    }
+
     var days: Int {
         switch self {
         case .days7: return 7
@@ -80,6 +88,13 @@ enum PoopLogItem: Identifiable {
         }
     }
 
+    func title(_ l: L10n) -> String {
+        switch self {
+        case .potty(let log): return log.pottyType.localizedLabel(l)
+        case .litter: return l.tr(zh: "铲砂", en: "Litter scooped", de: "Klo gereinigt")
+        }
+    }
+
     var icon: String {
         switch self {
         case .potty(let log): return log.pottyType.systemIconName
@@ -91,6 +106,15 @@ enum PoopLogItem: Identifiable {
         switch self {
         case .potty(let log): return log.executorId == nil ? nil : "已记录"
         case .litter: return nil
+        }
+    }
+
+    func detail(_ l: L10n) -> String? {
+        switch self {
+        case .potty(let log):
+            return log.executorId == nil ? nil : l.tr(zh: "已记录", en: "Logged", de: "Erfasst")
+        case .litter:
+            return nil
         }
     }
 }
@@ -240,11 +264,14 @@ struct PoopHeroCard: View {
     @State private var bounce = false
     @State private var isVisible = false
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
     @Environment(\.colorScheme) private var colorScheme
 
     private var shouldAnimateHero: Bool {
         workloadPolicy.shouldAnimate(isVisible: isVisible)
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -284,17 +311,17 @@ struct PoopHeroCard: View {
                 .frame(width: 118, height: 102)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("今日便便")
+                    Text(l.tr(zh: "今日噗噗", en: "Today's poop", de: "Heute Häufchen"))
                         .font(.system(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                    Text("\(pottyCount) 次")
+                    Text(l.tr(zh: "\(pottyCount) 次", en: "\(pottyCount)x", de: "\(pottyCount)x"))
                         .font(.system(size: 32, weight: .black, design: .rounded))
                         .foregroundStyle(tint)
                     HStack(spacing: 12) {
-                        MiniPoopGauge(title: "铲屎", progress: scoopProgress, tint: scoopTint)
-                        MiniPoopGauge(title: "换砂", progress: litterProgress, tint: litterTint)
+                        MiniPoopGauge(title: l.tr(zh: "铲砂", en: "Scoop", de: "Klo"), progress: scoopProgress, tint: scoopTint)
+                        MiniPoopGauge(title: l.tr(zh: "换砂", en: "Litter", de: "Streu"), progress: litterProgress, tint: litterTint)
                         if abnormalRatio > 0.3 {
-                            MiniPoopGauge(title: "异常", progress: abnormalRatio, tint: Color.goRed)
+                            MiniPoopGauge(title: l.tr(zh: "留意", en: "Watch", de: "Achten"), progress: abnormalRatio, tint: Color.goRed)
                         }
                     }
                 }
@@ -348,6 +375,10 @@ struct PoopLogRow: View {
     var showDelete = true
     let onDelete: () -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: item.icon)
@@ -356,10 +387,10 @@ struct PoopLogRow: View {
                 .frame(width: 26, height: 26)
                 .background(tint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
+                Text(item.title(l))
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                if let detail = item.detail {
+                if let detail = item.detail(l) {
                     Text(detail)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
@@ -467,6 +498,10 @@ struct PoopCheckInSheet: View {
     let primaryAction: () -> Void
     let secondaryAction: () -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -479,7 +514,7 @@ struct PoopCheckInSheet: View {
                         .frame(width: 54, height: 54)
                         .background(tint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("当前状态")
+                        Text(l.tr(zh: "当前状态", en: "Status now", de: "Status"))
                             .font(.system(size: 12, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                         Text(value)
@@ -494,7 +529,15 @@ struct PoopCheckInSheet: View {
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                 if isPrimaryDisabled {
-                    PoopInlineNotice(icon: "checkmark.circle.fill", text: "今天已经完成，可以在最近记录里删除后重新打卡。", tint: tint)
+                    PoopInlineNotice(
+                        icon: "checkmark.circle.fill",
+                        text: l.tr(
+                            zh: "今天已完成；要重来，请先在最近记录里删除。",
+                            en: "Done today. Delete the latest log to redo.",
+                            de: "Heute erledigt. Lösche den letzten Eintrag zum Wiederholen."
+                        ),
+                        tint: tint
+                    )
                 }
 
                 PoopPrimaryButton(
@@ -526,15 +569,24 @@ struct PottyTypeSheet: View {
     var onUnknownGroup: (() -> Void)? = nil
     let onSelect: (PottyType) -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
     private let columns = [
         GridItem(.flexible(), spacing: 12),
         GridItem(.flexible(), spacing: 12)
     ]
 
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                PoopSheetHero(icon: "seal.fill", title: "记录便便", subtitle: "选择今天看到的状态", tint: tint)
+                PoopSheetHero(
+                    icon: "seal.fill",
+                    title: l.tr(zh: "记录噗噗", en: "Log poop", de: "Häufchen loggen"),
+                    subtitle: l.tr(zh: "选择今天看到的状态", en: "Pick what you saw today", de: "Wähle, was du heute gesehen hast"),
+                    tint: tint
+                )
 
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(PottyType.allCases, id: \.rawValue) { type in
@@ -545,7 +597,7 @@ struct PottyTypeSheet: View {
                                 Image(systemName: type.systemIconName)
                                     .font(.system(size: 22, weight: .bold))
                                     .foregroundStyle(color(for: type))
-                                Text(type.rawValue)
+                                Text(type.localizedLabel(l))
                                     .font(.system(size: 14, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1)
@@ -571,7 +623,15 @@ struct PottyTypeSheet: View {
                     .buttonStyle(ScaleButtonStyle())
                 }
 
-                PoopInlineNotice(icon: "chart.bar.fill", text: "记录次数和状态后，首页会自动更新趋势。", tint: tint)
+                PoopInlineNotice(
+                    icon: "chart.bar.fill",
+                    text: l.tr(
+                        zh: "记录次数和状态后，首页会自动更新趋势。",
+                        en: "Logs update the home trend automatically.",
+                        de: "Einträge aktualisieren den Starttrend automatisch."
+                    ),
+                    tint: tint
+                )
             }
             .padding(20)
         }
@@ -601,6 +661,10 @@ struct PoopCycleSettingsSheet: View {
     @Binding var reminderOn: Bool
     let onSave: () -> Void
     let onDelete: () -> Void
+
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ScrollView {
@@ -632,30 +696,35 @@ struct PoopCycleSettingsSheet: View {
 
                 VStack(spacing: 12) {
                     Stepper(value: $intervalDays, in: intervalRange) {
-                        settingsRow("周期", value: "每\(intervalDays)天")
+                        settingsRow(l.tr(zh: "周期", en: "Cycle", de: "Rhythmus"), value: everyDaysText(intervalDays))
                     }
                     .tint(tint)
 
-                    DatePicker("起算日", selection: $anchorDate, displayedComponents: .date)
+                    DatePicker(selection: $anchorDate, displayedComponents: .date) {
+                        Text(l.tr(zh: "起算日", en: "Start date", de: "Startdatum"))
+                    }
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .tint(tint)
 
                     Toggle(isOn: $reminderOn) {
-                        settingsRow("提醒", value: reminderOn ? "开" : "关")
+                        settingsRow(
+                            l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"),
+                            value: reminderOn ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus")
+                        )
                     }
                     .tint(tint)
                 }
                 .padding(14)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
-                PoopPrimaryButton(title: "保存计划", icon: "checkmark", tint: tint) {
+                PoopPrimaryButton(title: l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern"), icon: "checkmark", tint: tint) {
                     onSave()
                 }
 
                 Button(role: .destructive) {
                     onDelete()
                 } label: {
-                    Label("删除当前计划", systemImage: "trash")
+                    Label(l.tr(zh: "删除当前计划", en: "Delete this plan", de: "Plan löschen"), systemImage: "trash")
                         .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
@@ -679,6 +748,10 @@ struct PoopCycleSettingsSheet: View {
                 .foregroundStyle(tint)
         }
     }
+
+    private func everyDaysText(_ days: Int) -> String {
+        l.tr(zh: "每\(days)天", en: "Every \(days)d", de: "Alle \(days) Tage")
+    }
 }
 
 struct PoopHistorySheet: View {
@@ -687,11 +760,15 @@ struct PoopHistorySheet: View {
     let tintForItem: (PoopLogItem) -> Color
     let onDelete: (PoopLogItem) -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         NavigationStack {
             List {
                 if items.isEmpty {
-                    Text("暂无记录")
+                    Text(l.tr(zh: "暂无记录", en: "No logs yet", de: "Noch keine Einträge"))
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 } else {

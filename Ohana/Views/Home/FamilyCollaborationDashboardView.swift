@@ -1614,7 +1614,7 @@ struct FamilyCollaborationDashboardView: View {
         switch type {
         case .feeding: return l.tr(zh: "喂食", en: "Feed", de: "Füttern")
         case .watering: return l.tr(zh: "饮水", en: "Water", de: "Wasser")
-        case .litter: return l.tr(zh: "铲屎", en: "Scoop", de: "Klo reinigen")
+        case .litter: return l.tr(zh: "铲砂", en: "Scoop", de: "Klo reinigen")
         case .waterChange: return l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
         case .filterClean: return l.tr(zh: "滤芯", en: "Filter", de: "Filter")
         case .cageCleaning: return l.tr(zh: "清笼", en: "Clean cage", de: "Käfig reinigen")
@@ -1626,12 +1626,7 @@ struct FamilyCollaborationDashboardView: View {
     }
 
     private func pottyTitle(_ type: PottyType) -> String {
-        switch type {
-        case .perfectPoop: return l.tr(zh: "完美便便", en: "Good poop", de: "Guter Kot")
-        case .softPoop: return l.tr(zh: "软便", en: "Soft stool", de: "Weicher Kot")
-        case .liquidPoop: return l.tr(zh: "水便", en: "Diarrhea", de: "Durchfall")
-        case .pee: return l.tr(zh: "尿尿", en: "Pee", de: "Urin")
-        }
+        type.localizedLabel(l)
     }
 
     private enum ReminderRole {

@@ -23,6 +23,7 @@ struct FocusWalletCardView: View {
     var usesMatchedGeometry: Bool = true
     var presentation: FocusWalletCardPresentation = .home
     var expandedCardHeight: CGFloat = K.expandedCardH
+    var cardCornerRadius: CGFloat = HeroAnim.stackCardCorner
 
     private let accent = Color(hex: "FF5A3D")
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
@@ -119,7 +120,7 @@ struct FocusWalletCardView: View {
                 topIdentityBar(usesFullBleed: usesFullBleed)
                     .opacity(1 - Double(WalletHeroTimeline.smooth(visualProgress, 0, 0.12)))
             }
-            .clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
             .petMemorialTone(isActive: card.hasPassedAway)
             .overlay(alignment: .topLeading) {
                 if usesPopoutOverlay, let popoutImage {
@@ -147,7 +148,7 @@ struct FocusWalletCardView: View {
             progress: isHeroExpanded ? HomeHeroTransitionProgress(value: heroProgress).clamped : 0
         ))
         .overlay(
-            RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous)
+            RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
                 .strokeBorder(cardBorderColor, lineWidth: cardBorderWidth)
         )
         .shadow(color: cardBorderShadow, radius: cardBorderShadowRadius, y: 0) // ui-v4: allow equipped/pet-bond card border glow

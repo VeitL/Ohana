@@ -13,10 +13,16 @@ struct OasisHomeTabHost: View {
     let injectEnergyTrigger: Int
 
     @State private var showsLiveContent = false
+    @State private var forwardedInjectEnergyTrigger = 0
     @State private var liveContentTask: Task<Void, Never>?
+    @State private var injectHandoffTask: Task<Void, Never>?
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var l: L10n { L10n(appLanguage) }
+    private var liveContentMountDelayMilliseconds: UInt64 {
+        reduceMotion ? 80 : 360
+    }
 
     var body: some View {
         ZStack {
@@ -30,7 +36,7 @@ struct OasisHomeTabHost: View {
             if showsLiveContent {
                 OasisRewardView(
                     hideToolbar: true,
-                    injectEnergyTrigger: injectEnergyTrigger,
+                    injectEnergyTrigger: forwardedInjectEnergyTrigger,
                     isEmbeddedPrepared: true,
                     isEmbeddedVisible: true,
                     isEmbeddedActive: true
@@ -38,16 +44,21 @@ struct OasisHomeTabHost: View {
                 .transition(.opacity.animation(GoMotion.quick))
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 10)
         .padding(.top, 4)
         .onAppear(perform: updateLiveContentGate)
         .onDisappear {
             liveContentTask?.cancel()
+            injectHandoffTask?.cancel()
             liveContentTask = nil
+            injectHandoffTask = nil
         }
         .onChange(of: lifecycle) { _, _ in
             updateLiveContentGate()
+        }
+        .onChange(of: injectEnergyTrigger) { _, newValue in
+            handleInjectEnergyTriggerChanged(newValue)
         }
     }
 
@@ -55,7 +66,7 @@ struct OasisHomeTabHost: View {
         liveContentTask?.cancel()
         if lifecycle.isLive {
             guard !showsLiveContent else { return }
-            liveContentTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 90) {
+            liveContentTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: liveContentMountDelayMilliseconds) {
                 guard lifecycle.isLive else {
                     liveContentTask = nil
                     return
@@ -63,15 +74,40 @@ struct OasisHomeTabHost: View {
                 withAnimation(GoMotion.quick) {
                     showsLiveContent = true
                 }
+                schedulePendingInjectHandoff()
                 liveContentTask = nil
             }
         } else {
+            injectHandoffTask?.cancel()
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
             withTransaction(transaction) {
                 showsLiveContent = false
             }
             liveContentTask = nil
+            injectHandoffTask = nil
+        }
+    }
+
+    private func handleInjectEnergyTriggerChanged(_ newValue: Int) {
+        guard lifecycle.isLive else { return }
+        if showsLiveContent {
+            forwardedInjectEnergyTrigger = newValue
+        } else {
+            schedulePendingInjectHandoff()
+        }
+    }
+
+    private func schedulePendingInjectHandoff() {
+        guard lifecycle.isLive, showsLiveContent, forwardedInjectEnergyTrigger != injectEnergyTrigger else { return }
+        injectHandoffTask?.cancel()
+        injectHandoffTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
+            guard lifecycle.isLive, showsLiveContent else {
+                injectHandoffTask = nil
+                return
+            }
+            forwardedInjectEnergyTrigger = injectEnergyTrigger
+            injectHandoffTask = nil
         }
     }
 }

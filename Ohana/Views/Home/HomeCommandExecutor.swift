@@ -135,6 +135,48 @@ struct HomeCommandExecutor {
         modelContext.safeSave()
     }
 
+    func recordPlantCare(_ type: PlantCareType, plant: Plant, executorId: String?) {
+        let now = Date()
+        switch type {
+        case .watering:
+            plant.lastWateredDate = now
+        case .fertilizing:
+            plant.lastFertilizedDate = now
+        }
+
+        let log = PlantCareLog(date: now, careType: type, executorId: executorId)
+        log.plant = plant
+        modelContext.insert(log)
+
+        let event = Event(
+            title: "\(type.emoji) 给 \(plant.name)\(type.displayName)",
+            startDate: now,
+            isAllDay: false,
+            eventType: type == .watering ? EventType.watering.rawValue : EventType.fertilizing.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString
+        )
+        event.assigneeId = executorId
+        modelContext.insert(event)
+        modelContext.safeSave()
+
+        CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: executorId == nil ? .unknown : .human,
+            actorId: executorId,
+            subjectKind: .plant,
+            subjectId: plant.id.uuidString,
+            eventKind: .plantCare,
+            actionType: type.rawValue,
+            note: log.note,
+            source: .detail,
+            sourceEventId: event.id.uuidString,
+            legacyModelName: "PlantCareLog",
+            legacyModelId: log.id.uuidString,
+            context: modelContext
+        )
+    }
+
     func confirmCoconutExchange(_ request: CoconutExchangeRequest, receiver: Human) throws {
         try CoconutExchangeService.confirm(request, by: receiver, context: modelContext)
     }

@@ -28,11 +28,14 @@ struct IslandPottyDashboard: View {
     var onOpenPet: ((Pet) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
     @Query(sort: \Pet.name) private var pets: [Pet]
 
     @State private var selectedPetId: UUID? = nil
     @State private var sheetPet: Pet? = nil
     @State private var pulseProgress: CGFloat = 0
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
 
@@ -71,6 +74,18 @@ struct IslandPottyDashboard: View {
 
     private var dominantType: PottyType? {
         typeCounts.max { $0.count < $1.count }?.type
+    }
+
+    private var rhythmSummaryText: String {
+        guard !weekLogs.isEmpty else {
+            return l.tr(zh: "还没有形成规律", en: "No rhythm yet", de: "Noch kein Rhythmus")
+        }
+        let type = dominantType?.localizedLabel(l) ?? l.tr(zh: "混合记录", en: "mixed logs", de: "gemischt")
+        return l.tr(
+            zh: "7 天共 \(weekLogs.count) 次 · \(type) 最多",
+            en: "7d · \(weekLogs.count)x · mostly \(type)",
+            de: "7 T. · \(weekLogs.count)x · meist \(type)"
+        )
     }
 
     private var petSummaries: [PottyPetSummary] {
@@ -144,7 +159,7 @@ struct IslandPottyDashboard: View {
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
-            Text("便便电台")
+            Text(l.tr(zh: "噗噗电台", en: "Poop Radio", de: "Häufchen-Radio"))
                 .font(.system(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
             Spacer()
@@ -156,7 +171,7 @@ struct IslandPottyDashboard: View {
     private var memberSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                selectorChip(title: "全部", icon: "dot.radiowaves.left.and.right", isSelected: selectedPetId == nil) {
+                selectorChip(title: l.tr(zh: "全部", en: "All", de: "Alle"), icon: "dot.radiowaves.left.and.right", isSelected: selectedPetId == nil) {
                     selectedPetId = nil
                 }
                 ForEach(activePets) { pet in
@@ -186,18 +201,18 @@ struct IslandPottyDashboard: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("今日节奏")
+                Text(l.tr(zh: "今日节奏", en: "Today's rhythm", de: "Heute Rhythmus"))
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goCardWhite.opacity(0.56))
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text("\(todayLogs.count)")
                         .font(.system(size: 44, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goCardWhite)
-                    Text("次")
+                    Text(l.tr(zh: "次", en: "x", de: "x"))
                         .font(.system(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(pottyBrown)
                 }
-                Text(weekLogs.isEmpty ? "还没有形成规律" : "7 天共 \(weekLogs.count) 次 · \(dominantType?.rawValue ?? "混合记录")最多")
+                Text(rhythmSummaryText)
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.goCardWhite.opacity(0.52))
                     .lineLimit(2)
@@ -224,7 +239,7 @@ struct IslandPottyDashboard: View {
                     Text("\(item.count)")
                         .font(.system(size: 18, weight: .black, design: .rounded))
                         .monospacedDigit()
-                    Text(item.type.rawValue)
+                    Text(item.type.localizedLabel(l))
                         .font(.system(size: 9, weight: .black, design: .rounded))
                         .lineLimit(1)
                 }
@@ -263,7 +278,7 @@ struct IslandPottyDashboard: View {
 
     private var pottyRows: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("成员便便状态")
+            Text(l.tr(zh: "成员噗况", en: "Crew poop status", de: "Team-Häufchenstatus"))
                 .font(.system(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
             ForEach(petSummaries) { summary in
@@ -275,11 +290,11 @@ struct IslandPottyDashboard: View {
                                 Text(summary.pet.name)
                                     .font(.system(size: 15, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.goCardWhite)
-                                Text(summary.latestType?.rawValue ?? "暂无")
+                                Text(summary.latestType?.localizedLabel(l) ?? l.tr(zh: "暂无", en: "None", de: "Keine"))
                                     .font(.system(size: 11, weight: .bold, design: .rounded))
                                     .foregroundStyle((summary.latestType.map(pottyColor) ?? .white).opacity(0.72))
                             }
-                            Text("今日 \(summary.todayCount) 次 · 7 天 \(summary.weekCount) 次")
+                            Text(memberSummaryText(today: summary.todayCount, week: summary.weekCount))
                                 .font(.system(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.goCardWhite.opacity(0.48))
                         }
@@ -348,8 +363,17 @@ struct IslandPottyDashboard: View {
     }
 
     private func relativeDayText(_ date: Date) -> String {
-        if Calendar.current.isDateInToday(date) { return "今天" }
+        if Calendar.current.isDateInToday(date) { return l.tr(zh: "今天", en: "Today", de: "Heute") }
         let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: date), to: Calendar.current.startOfDay(for: Date())).day ?? 0
-        return "\(max(days, 0))天前"
+        let safeDays = max(days, 0)
+        return l.tr(zh: "\(safeDays)天前", en: "\(safeDays)d ago", de: "vor \(safeDays) T.")
+    }
+
+    private func memberSummaryText(today: Int, week: Int) -> String {
+        l.tr(
+            zh: "今日 \(today) 次 · 7 天 \(week) 次",
+            en: "Today \(today)x · 7d \(week)x",
+            de: "Heute \(today)x · 7 T. \(week)x"
+        )
     }
 }

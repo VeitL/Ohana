@@ -31,6 +31,19 @@ enum PottyType: String, Codable, CaseIterable {
         case .pee:         return "drop.fill"
         }
     }
+
+    func localizedLabel(_ l: L10n) -> String {
+        switch self {
+        case .perfectPoop:
+            return l.tr(zh: "完美噗噗", en: "Great poop", de: "Top-Häufchen")
+        case .softPoop:
+            return l.tr(zh: "软软噗噗", en: "Soft poop", de: "Weiches Häufchen")
+        case .liquidPoop:
+            return l.tr(zh: "水水噗噗", en: "Watery poop", de: "Wässriges Häufchen")
+        case .pee:
+            return l.tr(zh: "尿尿", en: "Pee", de: "Pipi")
+        }
+    }
 }
 
 @Model

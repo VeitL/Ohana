@@ -42,10 +42,22 @@ struct CoconutLogView: View {
     @State private var historyContentMountTask: Task<Void, Never>?
     private let subject: CoconutLogSubject?
     private let onClose: (() -> Void)?
+    private let safeTopInset: CGFloat
+    private let safeBottomInset: CGFloat
+    private let historyContentDelayMilliseconds: UInt64
 
-    init(subject: CoconutLogSubject? = nil, onClose: (() -> Void)? = nil) {
+    init(
+        subject: CoconutLogSubject? = nil,
+        onClose: (() -> Void)? = nil,
+        safeTopInset: CGFloat = 0,
+        safeBottomInset: CGFloat = 0,
+        historyContentDelayMilliseconds: UInt64 = 70
+    ) {
         self.subject = subject
         self.onClose = onClose
+        self.safeTopInset = safeTopInset
+        self.safeBottomInset = safeBottomInset
+        self.historyContentDelayMilliseconds = historyContentDelayMilliseconds
         _selectedActorId = State(initialValue: subject?.actorId)
     }
 
@@ -138,7 +150,7 @@ struct CoconutLogView: View {
             VStack(spacing: 0) {
                 header
                     .padding(.horizontal, 20)
-                    .padding(.top, 16)
+                    .padding(.top, safeTopInset + 16)
                     .padding(.bottom, 16)
 
                 if isHistoryContentReady {
@@ -259,14 +271,14 @@ struct CoconutLogView: View {
                     }
                 }
             }
-            .padding(.bottom, 40)
+            .padding(.bottom, 40 + safeBottomInset)
         }
     }
 
     private func scheduleHistoryContentMount() {
         guard !isHistoryContentReady else { return }
         historyContentMountTask?.cancel()
-        historyContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 70) {
+        historyContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: historyContentDelayMilliseconds) {
             withAnimation(GoMotion.quick) {
                 isHistoryContentReady = true
             }

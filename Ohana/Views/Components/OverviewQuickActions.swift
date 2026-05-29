@@ -110,6 +110,9 @@ struct QuickActionItem: Identifiable, Codable, Hashable {
 
 enum OhanaQuickActionGlyphKind {
     case feed
+    case dryFood
+    case wetFood
+    case foodInventory
     case calendar
     case walk
     case water
@@ -122,11 +125,13 @@ enum OhanaQuickActionGlyphKind {
     case weight
     case expense
     case play
+    case rest
     case photo
     case cleanup
     case training
     case plantFertilize
     case document
+    case settings
 
     static func resolve(actionType: String, fallbackSystemName: String) -> OhanaQuickActionGlyphKind? {
         let action = actionType.lowercased()
@@ -139,6 +144,12 @@ enum OhanaQuickActionGlyphKind {
         switch action {
         case "feed":
             return .feed
+        case "dryfood", "fooddry", "dry":
+            return .dryFood
+        case "wetfood", "foodwet", "wet", "canned", "can":
+            return .wetFood
+        case "foodinventory", "foodstock", "inventory", "stock", "restock":
+            return .foodInventory
         case "calendar":
             return .calendar
         case "walk":
@@ -163,6 +174,8 @@ enum OhanaQuickActionGlyphKind {
             return .expense
         case "play":
             return .play
+        case "rest", "sleep":
+            return .rest
         case "moment":
             return .photo
         case "cagecleaning":
@@ -175,28 +188,35 @@ enum OhanaQuickActionGlyphKind {
             return .plantFertilize
         case "humannote", "note":
             return .document
+        case "settings", "setting":
+            return .settings
         default:
             break
         }
 
-        if symbol.contains("fork") { return .feed }
+        if action.contains("dryfood") || action.contains("fooddry") || symbol.contains("hexagongrid") { return .dryFood }
+        if action.contains("wetfood") || action.contains("foodwet") || action.contains("canned") || symbol.contains("takeoutbag") { return .wetFood }
+        if action.contains("inventory") || action.contains("stock") || action.contains("restock") || symbol.contains("shippingbox") { return .foodInventory }
+        if action.contains("feed") || action.contains("food") || symbol.contains("fork") { return .feed }
         if symbol.contains("calendar") { return .calendar }
-        if symbol.contains("figure.walk") { return .walk }
-        if symbol.contains("drop") { return .water }
-        if symbol.contains("water.waves") { return .waterChange }
-        if symbol.contains("allergens") { return .potty }
-        if symbol.contains("trash") { return .litter }
-        if symbol.contains("scissors") || symbol.contains("comb") { return .groom }
-        if symbol.contains("heart") || symbol.contains("stethoscope") { return .health }
-        if symbol.contains("pill") { return .medicine }
-        if symbol.contains("scale") { return .weight }
-        if symbol.contains("credit") || symbol.contains("banknote") || symbol.contains("yensign") { return .expense }
-        if symbol.contains("tennisball") { return .play }
-        if symbol.contains("camera") { return .photo }
-        if symbol.contains("basket") { return .cleanup }
-        if symbol.contains("cloud.drizzle") { return .water }
-        if symbol.contains("leaf") { return .plantFertilize }
-        if symbol.contains("note") { return .document }
+        if action.contains("walk") || symbol.contains("figure.walk") { return .walk }
+        if action.contains("waterchange") || action.contains("filterclean") || symbol.contains("water.waves") || symbol.contains("arrow.2.circlepath") { return .waterChange }
+        if action.contains("water") || action.contains("misting") || symbol.contains("drop") || symbol.contains("cloud.drizzle") { return .water }
+        if action.contains("potty") || action.contains("poop") || action == "pee" || symbol.contains("allergens") { return .potty }
+        if action.contains("litter") || symbol.contains("trash") { return .litter }
+        if action.contains("groom") || action.contains("hygiene") || action.contains("bath") || action.contains("teeth") || action.contains("nails") || action.contains("brushing") || action.contains("ears") || symbol.contains("scissors") || symbol.contains("comb") || symbol.contains("bubbles") { return .groom }
+        if action.contains("health") || action.contains("visit") || symbol.contains("heart") || symbol.contains("stethoscope") || symbol.contains("cross") { return .health }
+        if action.contains("medication") || action.contains("medicine") || action.contains("vaccine") || action.contains("deworming") || symbol.contains("pill") || symbol.contains("syringe") || symbol.contains("shield") { return .medicine }
+        if action.contains("weight") || symbol.contains("scale") { return .weight }
+        if action.contains("expense") || symbol.contains("credit") || symbol.contains("banknote") || symbol.contains("yensign") || symbol.contains("dollarsign") || symbol.contains("eurosign") || symbol.contains("sterlingsign") { return .expense }
+        if action.contains("play") || symbol.contains("gamecontroller") || symbol.contains("tennisball") { return .play }
+        if action.contains("rest") || action.contains("sleep") || symbol.contains("zzz") || symbol.contains("tent") { return .rest }
+        if action.contains("moment") || symbol.contains("camera") { return .photo }
+        if action.contains("cagecleaning") || symbol.contains("basket") { return .cleanup }
+        if action.contains("freeflight") || action.contains("workout") { return .training }
+        if action.contains("substratechange") || action.contains("fertilizeplant") || symbol.contains("leaf") { return .plantFertilize }
+        if action.contains("note") || action.contains("document") || symbol.contains("note") || symbol.contains("doc") { return .document }
+        if action.contains("settings") || action.contains("setting") || symbol.contains("gear") { return .settings }
         return nil
     }
 }
@@ -208,23 +228,25 @@ struct OhanaQuickActionIcon: View {
     var color: Color = Color.ohanaFunctionalIcon
     var isCompleted: Bool = false
     var showsCompletionBadge: Bool = false
+    var animationTrigger: Int = 0
+    var animatesStateChanges: Bool = true
 
     private var glyphKind: OhanaQuickActionGlyphKind? {
         OhanaQuickActionGlyphKind.resolve(actionType: actionType, fallbackSystemName: fallbackSystemName)
     }
 
     var body: some View {
+        iconBody
+            .ohanaPhasePop(trigger: animationKey, enabled: animatesStateChanges)
+            .animation(GoMotion.stateChange, value: isCompleted)
+            .animation(GoMotion.stateChange, value: showsCompletionBadge)
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+
+    private var iconBody: some View {
         ZStack(alignment: .bottomTrailing) {
-            if let glyphKind {
-                OhanaQuickActionGlyph(kind: glyphKind, color: color)
-                    .frame(width: size, height: size)
-            } else {
-                Image(systemName: fallbackSystemName)
-                    .font(.system(size: size * 0.62, weight: .semibold))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(color)
-                    .frame(width: size, height: size)
-            }
+            glyphLayer
 
             if showsCompletionBadge && isCompleted {
                 completionBadge
@@ -233,7 +255,31 @@ struct OhanaQuickActionIcon: View {
             }
         }
         .frame(width: size, height: size)
-        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var glyphLayer: some View {
+        if let glyphKind {
+            ZStack {
+                OhanaQuickActionGlyph(kind: glyphKind, color: color)
+                OhanaQuickActionGlyphStateOverlay(
+                    kind: glyphKind,
+                    color: color,
+                    isCompleted: isCompleted
+                )
+            }
+            .frame(width: size, height: size)
+        } else {
+            Image(systemName: fallbackSystemName)
+                .font(.system(size: size * 0.62, weight: .semibold))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(color)
+                .frame(width: size, height: size)
+        }
+    }
+
+    private var animationKey: String {
+        "\(isCompleted)-\(showsCompletionBadge)-\(animationTrigger)"
     }
 
     private var completionBadge: some View {
@@ -275,9 +321,33 @@ private struct OhanaQuickActionGlyph: View {
         case .feed:
             fill(ellipse(x: 6.6, y: 9.8, width: 18.8, height: 8.8), in: &context, opacity: 0.2)
             fill(bowlPath(x: 5.5, y: 14.7, width: 21, height: 11.3), in: &context)
-            fill(circle(cx: 12.2, cy: 12.1, r: 2.2), in: &context, opacity: 0.82)
-            fill(circle(cx: 16.4, cy: 11.1, r: 2.6), in: &context, opacity: 0.82)
-            fill(circle(cx: 20.4, cy: 12.6, r: 2.1), in: &context, opacity: 0.82)
+
+        case .dryFood:
+            fill(bowlPath(x: 6.2, y: 18.5, width: 19.6, height: 7.4), in: &context)
+            for point in [
+                CGPoint(x: 11, y: 16),
+                CGPoint(x: 15.1, y: 14.4),
+                CGPoint(x: 19.2, y: 15.9),
+                CGPoint(x: 13, y: 19),
+                CGPoint(x: 17.2, y: 19.1),
+                CGPoint(x: 21.1, y: 18.3)
+            ] {
+                fill(hexFoodPiece(center: point, radius: 1.75), in: &context, opacity: 0.82)
+            }
+
+        case .wetFood:
+            fill(ellipse(x: 8.4, y: 7.1, width: 15.2, height: 5.6), in: &context)
+            fill(roundedRect(x: 8.4, y: 9.8, width: 15.2, height: 15.4, radius: 4), in: &context)
+            fill(ellipse(x: 8.4, y: 21.8, width: 15.2, height: 5), in: &context, opacity: 0.36)
+            fill(capsule(x: 11.3, y: 13.2, width: 9.4, height: 5.4), in: &context, opacity: 0.22)
+            fill(circle(cx: 16, cy: 16, r: 2.35), in: &context, opacity: 0.42)
+
+        case .foodInventory:
+            fill(foodBagPath(), in: &context)
+            fill(capsule(x: 11, y: 8.8, width: 10, height: 2.7), in: &context, opacity: 0.2)
+            fill(capsule(x: 10, y: 15.1, width: 12, height: 2.3), in: &context, opacity: 0.56)
+            fill(capsule(x: 10, y: 19, width: 9.2, height: 2.3), in: &context, opacity: 0.38)
+            fill(capsule(x: 10, y: 22.9, width: 6.4, height: 2.3), in: &context, opacity: 0.24)
 
         case .calendar:
             fill(roundedRect(x: 5.5, y: 6.5, width: 21, height: 20, radius: 5.5), in: &context)
@@ -288,15 +358,22 @@ private struct OhanaQuickActionGlyph: View {
             fill(capsule(x: 14.1, y: 20.2, width: 7.9, height: 3.2), in: &context, opacity: 0.42)
 
         case .walk:
-            var path = Path()
-            path.move(to: CGPoint(x: 9, y: 22.1))
-            path.addCurve(to: CGPoint(x: 16.8, y: 10.3), control1: CGPoint(x: 6.8, y: 15.5), control2: CGPoint(x: 11, y: 9.5))
-            path.addCurve(to: CGPoint(x: 23.1, y: 18.4), control1: CGPoint(x: 21.2, y: 10.9), control2: CGPoint(x: 24, y: 14.2))
-            path.addCurve(to: CGPoint(x: 13.6, y: 21), control1: CGPoint(x: 22.2, y: 22.6), control2: CGPoint(x: 17.1, y: 24.4))
-            path.addCurve(to: CGPoint(x: 15.7, y: 14.3), control1: CGPoint(x: 10.8, y: 18.3), control2: CGPoint(x: 12.1, y: 14.5))
-            stroke(path, in: &context, width: 4.2)
-            fill(circle(cx: 8.8, cy: 22.2, r: 3.15), in: &context)
-            fill(rotated(roundedRect(x: 20.1, y: 7.5, width: 5.6, height: 3.4, radius: 1.7), degrees: 32, center: CGPoint(x: 22.9, y: 9.2)), in: &context, opacity: 0.48)
+            var leash = Path()
+            leash.move(to: CGPoint(x: 6.6, y: 8.8))
+            leash.addCurve(to: CGPoint(x: 15.5, y: 14.7), control1: CGPoint(x: 9.3, y: 8.4), control2: CGPoint(x: 11.6, y: 12.4))
+            stroke(leash, in: &context, width: 2.1, opacity: 0.52)
+            fill(circle(cx: 6.6, cy: 8.8, r: 1.9), in: &context, opacity: 0.34)
+            fill(roundedRect(x: 11.3, y: 15, width: 11.4, height: 6.7, radius: 3.2), in: &context)
+            fill(circle(cx: 23.5, cy: 14.9, r: 4.1), in: &context)
+            fill(triangle(points: [
+                CGPoint(x: 21.7, y: 11.9),
+                CGPoint(x: 23.2, y: 7.9),
+                CGPoint(x: 25.3, y: 12.6)
+            ]), in: &context, opacity: 0.64)
+            fill(circle(cx: 25.1, cy: 14.7, r: 0.9), in: &context, opacity: 0.36)
+            stroke(capsule(x: 8.1, y: 14.2, width: 5.2, height: 2.3), in: &context, width: 2.1, opacity: 0.76)
+            fill(capsule(x: 13.1, y: 20.2, width: 2.2, height: 5.2), in: &context)
+            fill(capsule(x: 19.4, y: 20.2, width: 2.2, height: 5.2), in: &context)
 
         case .water:
             fill(dropPath(), in: &context)
@@ -304,33 +381,24 @@ private struct OhanaQuickActionGlyph: View {
             fill(ellipse(x: 7.2, y: 17.3, width: 17.6, height: 6), in: &context, opacity: 0.18)
 
         case .waterChange:
-            fill(bowlPath(x: 7.2, y: 20.8, width: 17.6, height: 6.2), in: &context)
-            var wave = Path()
-            wave.move(to: CGPoint(x: 8.8, y: 18.4))
-            wave.addCurve(to: CGPoint(x: 15, y: 18.4), control1: CGPoint(x: 10.8, y: 16), control2: CGPoint(x: 13, y: 16))
-            wave.addCurve(to: CGPoint(x: 21.2, y: 18.4), control1: CGPoint(x: 17, y: 20.8), control2: CGPoint(x: 19.2, y: 20.8))
-            stroke(wave, in: &context, width: 2.2, opacity: 0.48)
-            stroke(arcArrowPath(clockwise: true), in: &context, width: 2.5, opacity: 0.84)
-            stroke(arcArrowPath(clockwise: false), in: &context, width: 2.5, opacity: 0.84)
+            fill(dropPath().applying(CGAffineTransform(translationX: -3.2, y: 1.4).scaledBy(x: 0.86, y: 0.86)), in: &context)
+            stroke(arcArrowPath(clockwise: true), in: &context, width: 2.55, opacity: 0.84)
+            stroke(arcArrowPath(clockwise: false), in: &context, width: 2.55, opacity: 0.84)
 
         case .potty:
-            fill(bowlPath(x: 7.2, y: 16.2, width: 17.6, height: 9.8), in: &context)
-            fill(capsule(x: 10, y: 11.2, width: 12, height: 5.2), in: &context, opacity: 0.2)
-            fill(capsule(x: 11.6, y: 12.8, width: 8.8, height: 2.4), in: &context, opacity: 0.5)
-            fill(circle(cx: 23.1, cy: 9.7, r: 2.15), in: &context, opacity: 0.66)
-            fill(circle(cx: 26.2, cy: 13, r: 1.35), in: &context, opacity: 0.24)
+            fill(bowlPath(x: 7, y: 17.2, width: 18, height: 8.8), in: &context)
+            fill(roundedRect(x: 7.8, y: 7.4, width: 16.4, height: 10.8, radius: 4), in: &context, opacity: 0.24)
+            drawLabel("WC", at: CGPoint(x: 16, y: 13.2), size: 7.5, opacity: 0.62, in: &context)
 
         case .litter:
-            fill(bowlPath(x: 6.7, y: 17, width: 18.6, height: 9), in: &context)
-            fill(ellipse(x: 6.7, y: 13.2, width: 18.6, height: 7.4), in: &context, opacity: 0.18)
-            fill(rotated(capsule(x: 17.2, y: 7.1, width: 3.6, height: 11.2), degrees: 28, center: CGPoint(x: 19, y: 12.7)), in: &context, opacity: 0.74)
-            fill(rotated(capsule(x: 19.6, y: 6.5, width: 5.6, height: 3.4), degrees: 28, center: CGPoint(x: 22.4, y: 8.2)), in: &context, opacity: 0.28)
+            fill(bowlPath(x: 6.5, y: 17.2, width: 19, height: 8.8), in: &context)
+            fill(ellipse(x: 6.5, y: 12.7, width: 19, height: 7.8), in: &context, opacity: 0.18)
 
         case .groom:
-            fill(roundedRect(x: 8, y: 7, width: 16, height: 9.5, radius: 4.4), in: &context)
-            fill(roundedRect(x: 12.4, y: 15.3, width: 7.2, height: 10.7, radius: 3.6), in: &context)
-            for x in [10, 14.7, 19.4] {
-                fill(capsule(x: x, y: 18.2, width: 2.6, height: 5.8), in: &context, opacity: 0.42)
+            fill(roundedRect(x: 6.5, y: 8.5, width: 19, height: 6, radius: 3), in: &context)
+            fill(capsule(x: 22.6, y: 10.2, width: 4.2, height: 11.2), in: &context, opacity: 0.42)
+            for x in [8.5, 11.4, 14.3, 17.2, 20.1] {
+                fill(capsule(x: x, y: 13.2, width: 1.55, height: 10.7), in: &context, opacity: 0.68)
             }
 
         case .health:
@@ -357,20 +425,26 @@ private struct OhanaQuickActionGlyph: View {
         case .expense:
             fill(roundedRect(x: 6, y: 9, width: 20, height: 15.8, radius: 5), in: &context)
             fill(capsule(x: 8.6, y: 12, width: 14.8, height: 3), in: &context, opacity: 0.4)
-            fill(circle(cx: 19.8, cy: 20.1, r: 2.5), in: &context, opacity: 0.22)
-            fill(circle(cx: 13.1, cy: 20.1, r: 2.1), in: &context, opacity: 0.42)
+            drawLabel(AppCurrency.symbol, at: CGPoint(x: 16, y: 20.2), size: AppCurrency.symbol.count > 1 ? 6.8 : 8.8, opacity: 0.58, in: &context)
 
         case .play:
-            var triangle = Path()
-            triangle.move(to: CGPoint(x: 11, y: 9.1))
-            triangle.addCurve(to: CGPoint(x: 14.9, y: 7), control1: CGPoint(x: 11, y: 7.1), control2: CGPoint(x: 13.2, y: 5.9))
-            triangle.addLine(to: CGPoint(x: 24.9, y: 13.8))
-            triangle.addCurve(to: CGPoint(x: 24.9, y: 18.2), control1: CGPoint(x: 26.4, y: 14.8), control2: CGPoint(x: 26.4, y: 17.2))
-            triangle.addLine(to: CGPoint(x: 14.9, y: 25))
-            triangle.addCurve(to: CGPoint(x: 11, y: 22.9), control1: CGPoint(x: 13.2, y: 26.1), control2: CGPoint(x: 11, y: 24.9))
-            triangle.closeSubpath()
-            fill(triangle, in: &context)
-            fill(circle(cx: 8.6, cy: 23.3, r: 3.1), in: &context, opacity: 0.42)
+            fill(roundedRect(x: 5.8, y: 12.4, width: 20.4, height: 11.8, radius: 5.8), in: &context)
+            fill(circle(cx: 10.8, cy: 22.1, r: 3.1), in: &context)
+            fill(circle(cx: 21.2, cy: 22.1, r: 3.1), in: &context)
+            fill(capsule(x: 9.2, y: 16.6, width: 6.1, height: 1.8), in: &context, opacity: 0.46)
+            fill(capsule(x: 11.3, y: 14.45, width: 1.8, height: 6.1), in: &context, opacity: 0.46)
+            fill(circle(cx: 20.3, cy: 15.8, r: 1.45), in: &context, opacity: 0.52)
+            fill(circle(cx: 23.2, cy: 17.9, r: 1.2), in: &context, opacity: 0.34)
+
+        case .rest:
+            fill(tentPath(), in: &context)
+            fill(triangle(points: [
+                CGPoint(x: 15.9, y: 14.1),
+                CGPoint(x: 20.6, y: 25.8),
+                CGPoint(x: 11.2, y: 25.8)
+            ]), in: &context, opacity: 0.2)
+            drawLabel("Z", at: CGPoint(x: 21.1, y: 8.4), size: 7.4, opacity: 0.62, in: &context)
+            drawLabel("z", at: CGPoint(x: 25, y: 12.4), size: 5.9, opacity: 0.38, in: &context)
 
         case .photo:
             fill(roundedRect(x: 6, y: 8, width: 20, height: 16, radius: 5), in: &context)
@@ -409,6 +483,10 @@ private struct OhanaQuickActionGlyph: View {
             fill(foldPath(), in: &context, opacity: 0.24)
             fill(capsule(x: 12, y: 15.1, width: 8, height: 2.4), in: &context, opacity: 0.42)
             fill(capsule(x: 12, y: 19.6, width: 6.2, height: 2.4), in: &context, opacity: 0.24)
+
+        case .settings:
+            fill(gearPath(), in: &context)
+            fill(circle(cx: 16, cy: 16, r: 4.1), in: &context, opacity: 0.18)
         }
     }
 
@@ -455,6 +533,56 @@ private struct OhanaQuickActionGlyph: View {
         return path.applying(transform)
     }
 
+    private func triangle(points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        for point in points.dropFirst() {
+            path.addLine(to: point)
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    private func hexFoodPiece(center: CGPoint, radius: CGFloat) -> Path {
+        var points: [CGPoint] = []
+        for index in 0..<6 {
+            let angle = CGFloat(index) * .pi / 3 + .pi / 6
+            points.append(CGPoint(
+                x: center.x + cos(angle) * radius,
+                y: center.y + sin(angle) * radius
+            ))
+        }
+        return triangleFan(points: points)
+    }
+
+    private func triangleFan(points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        for point in points.dropFirst() {
+            path.addLine(to: point)
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    private func drawLabel(
+        _ text: String,
+        at point: CGPoint,
+        size: CGFloat,
+        opacity: Double,
+        in context: inout GraphicsContext
+    ) {
+        context.draw(
+            Text(text)
+                .font(.system(size: size, weight: .black, design: .rounded))
+                .foregroundStyle(color.opacity(opacity)),
+            at: point,
+            anchor: .center
+        )
+    }
+
     private func bowlPath(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) -> Path {
         let bottom = y + height
         var path = Path()
@@ -470,6 +598,45 @@ private struct OhanaQuickActionGlyph: View {
             to: CGPoint(x: x + width * 0.08, y: bottom - height * 0.28),
             control: CGPoint(x: x + width * 0.08, y: bottom)
         )
+        path.closeSubpath()
+        return path
+    }
+
+    private func foodBagPath() -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 10, y: 6.2))
+        path.addLine(to: CGPoint(x: 22, y: 6.2))
+        path.addLine(to: CGPoint(x: 25, y: 26.2))
+        path.addLine(to: CGPoint(x: 7, y: 26.2))
+        path.closeSubpath()
+        return path
+    }
+
+    private func tentPath() -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 16, y: 6.4))
+        path.addLine(to: CGPoint(x: 27, y: 26.2))
+        path.addLine(to: CGPoint(x: 5, y: 26.2))
+        path.closeSubpath()
+        return path
+    }
+
+    private func gearPath() -> Path {
+        var path = Path()
+        let center = CGPoint(x: 16, y: 16)
+        for index in 0..<16 {
+            let angle = CGFloat(index) * .pi / 8
+            let radius: CGFloat = index.isMultiple(of: 2) ? 11.2 : 8.7
+            let point = CGPoint(
+                x: center.x + cos(angle) * radius,
+                y: center.y + sin(angle) * radius
+            )
+            if index == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
         path.closeSubpath()
         return path
     }
@@ -548,6 +715,98 @@ private struct OhanaQuickActionGlyph: View {
         path.addLine(to: CGPoint(x: 19.1, y: 10.6))
         path.closeSubpath()
         return path
+    }
+}
+
+private struct OhanaQuickActionGlyphStateOverlay: View {
+    let kind: OhanaQuickActionGlyphKind
+    let color: Color
+    let isCompleted: Bool
+
+    private struct Dot: Identifiable {
+        let id: Int
+        let x: CGFloat
+        let y: CGFloat
+        let radius: CGFloat
+        let delay: Double
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                content(in: proxy.size)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    @ViewBuilder
+    private func content(in size: CGSize) -> some View {
+        switch kind {
+        case .feed:
+            ForEach(feedDots) { dot in
+                dotView(dot, in: size, activeOpacity: 0.94, inactiveOpacity: 0.18)
+            }
+        case .litter:
+            ForEach(litterDots) { dot in
+                dotView(dot, in: size, activeOpacity: 0.72, inactiveOpacity: 0.32)
+            }
+        case .water, .waterChange:
+            dotView(
+                Dot(id: 0, x: 21.6, y: 8.3, radius: 1.55, delay: 0),
+                in: size,
+                activeOpacity: 0.72,
+                inactiveOpacity: 0.18
+            )
+        case .play:
+            dotView(
+                Dot(id: 0, x: 20.3, y: 15.8, radius: 1.45, delay: 0),
+                in: size,
+                activeOpacity: 0.7,
+                inactiveOpacity: 0.34
+            )
+            dotView(
+                Dot(id: 1, x: 23.2, y: 17.9, radius: 1.2, delay: 0.035),
+                in: size,
+                activeOpacity: 0.58,
+                inactiveOpacity: 0.24
+            )
+        default:
+            EmptyView()
+        }
+    }
+
+    private func dotView(
+        _ dot: Dot,
+        in size: CGSize,
+        activeOpacity: Double,
+        inactiveOpacity: Double
+    ) -> some View {
+        let side = min(size.width, size.height)
+        return Circle()
+            .fill(color.opacity(isCompleted ? activeOpacity : inactiveOpacity))
+            .frame(width: dot.radius * 2 * side / 32, height: dot.radius * 2 * side / 32)
+            .position(x: dot.x * side / 32, y: dot.y * side / 32)
+            .scaleEffect(isCompleted ? 1 : 0.72)
+            .animation(GoMotion.feedback.delay(dot.delay), value: isCompleted)
+    }
+
+    private var feedDots: [Dot] {
+        [
+            Dot(id: 0, x: 12.2, y: 12.1, radius: 2.2, delay: 0),
+            Dot(id: 1, x: 16.4, y: 11.1, radius: 2.55, delay: 0.035),
+            Dot(id: 2, x: 20.4, y: 12.6, radius: 2.1, delay: 0.07)
+        ]
+    }
+
+    private var litterDots: [Dot] {
+        [
+            Dot(id: 0, x: 10.2, y: 15.3, radius: 1.05, delay: 0),
+            Dot(id: 1, x: 13.3, y: 14.1, radius: 0.86, delay: 0.02),
+            Dot(id: 2, x: 16.4, y: 15.5, radius: 1.18, delay: 0.04),
+            Dot(id: 3, x: 19.6, y: 14.2, radius: 0.94, delay: 0.06),
+            Dot(id: 4, x: 22.1, y: 16.1, radius: 0.78, delay: 0.08)
+        ]
     }
 }
 
@@ -970,7 +1229,7 @@ private struct GroomPopoverContent: View {
                             .font(.system(size: 24, weight: .semibold))
                             .foregroundStyle(themeColor)
                             .frame(width: 48, height: 48)
-                        Text(opt.label)
+                        Text(LocalizedStringKey(opt.label))
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
@@ -1015,7 +1274,7 @@ private struct PottyPopoverContent: View {
                             .font(.system(size: 24, weight: .semibold))
                             .foregroundStyle(Color.ohanaFunctionalIcon)
                             .frame(width: 48, height: 48)
-                        Text(opt.label)
+                        Text(LocalizedStringKey(opt.label))
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }

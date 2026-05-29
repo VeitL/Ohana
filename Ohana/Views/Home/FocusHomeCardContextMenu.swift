@@ -48,7 +48,7 @@ struct FocusHomeCardContextMenu: View {
                 modelContext.insert(log)
                 modelContext.safeSave()
             } label: {
-                Label("便便记录", systemImage: "drop.circle")
+                Label("噗噗打卡", systemImage: "drop.circle")
             }
 
             Divider()

@@ -945,7 +945,7 @@ private struct VerticalGlassHomeLabAction: Identifiable {
     static let pet: [VerticalGlassHomeLabAction] = [
         VerticalGlassHomeLabAction(id: "feed", zh: "喂食", en: "Feed", de: "Futter", icon: "fork.knife", isPrimary: true),
         VerticalGlassHomeLabAction(id: "water", zh: "喂水", en: "Water", de: "Wasser", icon: "drop.fill", isPrimary: false),
-        VerticalGlassHomeLabAction(id: "poop", zh: "噗噗", en: "Poop", de: "Pupu", icon: "circle.grid.2x2.fill", isPrimary: false),
+        VerticalGlassHomeLabAction(id: "poop", zh: "噗噗", en: "Poop", de: "Häufchen", icon: "circle.grid.2x2.fill", isPrimary: false),
         VerticalGlassHomeLabAction(id: "play", zh: "陪玩", en: "Play", de: "Spiel", icon: "sparkles", isPrimary: false),
         VerticalGlassHomeLabAction(id: "weight", zh: "体重", en: "Weight", de: "Gewicht", icon: "scalemass.fill", isPrimary: false),
         VerticalGlassHomeLabAction(id: "more", zh: "更多", en: "More", de: "Mehr", icon: "ellipsis", isPrimary: false)

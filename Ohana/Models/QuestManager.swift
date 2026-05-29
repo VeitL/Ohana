@@ -309,7 +309,10 @@ final class QuestManager {
             let n = pet?.name ?? ""
             switch self {
             case .walk:    return "\(n) 遛狗奖励"
-            case .potty(let l): return "\(n) \(l ? "铲猫砂奖励" : "便便打卡")"
+            case .potty(let isLitter):
+                return isLitter
+                    ? L10n().tr(zh: "\(n) 铲砂奖励", en: "\(n) scoop reward", de: "\(n) Klo-Bonus")
+                    : L10n().tr(zh: "\(n) 噗噗打卡", en: "\(n) poop check-in", de: "\(n) Häufchen-Check-in")
             case .feed:    return "\(n) 喂食奖励"
             case .water:   return "\(n) 喂水奖励"
             case .care(let t):

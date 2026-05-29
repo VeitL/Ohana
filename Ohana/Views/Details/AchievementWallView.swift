@@ -963,13 +963,9 @@ struct AchievementWallView: View {
                 .ignoresSafeArea()
                 .onTapGesture { closePopup() }
 
-            VStack(spacing: 14) {
-                ZStack(alignment: .topTrailing) {
-                    achievementPopupArtwork(for: badge, state: state)
-
+            achievementPopupArtwork(for: badge, state: state)
+                .overlay(alignment: .bottomLeading) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Spacer(minLength: 0)
-
                         Text(badge.title)
                             .font(OhanaFont.title2(.black))
                             .foregroundStyle(Color.goCardWhite)
@@ -983,7 +979,7 @@ struct AchievementWallView: View {
                         Text(achievementMomentLine(for: badge))
                             .font(OhanaFont.body(.semibold))
                             .foregroundStyle(Color.goCardWhite.opacity(0.92))
-                            .lineLimit(3)
+                            .lineLimit(state == .claimable ? 2 : 3)
                             .fixedSize(horizontal: false, vertical: true)
 
                         Text(completionText)
@@ -991,11 +987,27 @@ struct AchievementWallView: View {
                             .foregroundStyle(Color.goCardWhite.opacity(0.78))
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
+
+                        if state == .claimable {
+                            Button {
+                                pendingClaimAchievement = badge
+                            } label: {
+                                Text(l.tr(zh: "领取 +\(rewardPerAchievement)🥥", en: "Claim +\(rewardPerAchievement)🥥", de: "+\(rewardPerAchievement)🥥 abholen"))
+                                    .font(OhanaFont.subheadline(.black))
+                                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color.goPrimary, in: Capsule())
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+                            .padding(.top, 4)
+                        }
                     }
                     .padding(18)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .shadow(color: Color.arkInk.opacity(0.48), radius: 6, x: 0, y: 2) // ui-v4: allow enlarged artwork text readability without image wash
-
+                }
+                .overlay(alignment: .topTrailing) {
                     HStack(spacing: 8) {
                         achievementPopupIconButton(
                             systemName: isRenderingAchievementShareImage ? "hourglass" : "square.and.arrow.down",
@@ -1013,25 +1025,8 @@ struct AchievementWallView: View {
                     }
                     .padding(12)
                 }
-                .frame(maxWidth: achievementPopupMaxImageWidth)
-                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-
-                if state == .claimable {
-                    Button {
-                        pendingClaimAchievement = badge
-                    } label: {
-                        Text(l.tr(zh: "领取 +\(rewardPerAchievement)🥥", en: "Claim +\(rewardPerAchievement)🥥", de: "+\(rewardPerAchievement)🥥 abholen"))
-                            .font(OhanaFont.subheadline(.black))
-                            .foregroundStyle(Color.ohanaPrimaryActionText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.goPrimary, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .frame(maxWidth: achievementPopupMaxImageWidth)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: achievementPopupMaxImageWidth)
+            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
             .padding(.horizontal, 12)
             .transition(.scale(scale: 0.94).combined(with: .opacity))
         }

@@ -2,10 +2,10 @@
   <title>Food bag / 粮袋</title>
   <g>
 
-      <path style="fill:#2b8f78" d="M9.1 9.5h13.8l1.5 15.3A3.2 3.2 0 0 1 21.2 28H10.8a3.2 3.2 0 0 1-3.2-3.2L9.1 9.5Z"/>
-      <path style="fill:#2b8f78;opacity:.22" d="M11.2 5.2h9.6l2.1 4.3H9.1l2.1-4.3Z"/>
-      <rect style="fill:#ffb36b" x="11" y="13" width="10" height="2.4" rx="1.2"/>
-      <rect style="fill:#ffb36b" x="11" y="17" width="8.2" height="2.4" rx="1.2" opacity=".74"/>
-      <rect style="fill:#ffb36b" x="11" y="21" width="5.8" height="2.4" rx="1.2" opacity=".48"/>
+      <path style="fill:#2b8f78" d="M10 6.2h12l3 20H7l3-20Z"/>
+      <rect style="fill:#2b8f78;opacity:.22" x="11" y="8.8" width="10" height="2.7" rx="1.35"/>
+      <rect style="fill:#ffb36b" x="10" y="15.1" width="12" height="2.3" rx="1.15"/>
+      <rect style="fill:#ffb36b" x="10" y="19" width="9.2" height="2.3" rx="1.15" opacity=".68"/>
+      <rect style="fill:#ffb36b" x="10" y="22.9" width="6.4" height="2.3" rx="1.15" opacity=".46"/>
   </g>
 </svg>

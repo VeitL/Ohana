@@ -20,6 +20,7 @@ struct FocusHomeWalletCardContent: View {
     var reduceMotion: Bool = false
     var presentation: FocusWalletCardPresentation = .home
     var expandedCardHeight: CGFloat = K.expandedCardH
+    var cardCornerRadius: CGFloat = HeroAnim.stackCardCorner
 
     var body: some View {
         FocusHomeWalkCardFlip(
@@ -37,7 +38,8 @@ struct FocusHomeWalletCardContent: View {
                 avatarCacheRevision: avatarCacheRevision,
                 usesMatchedGeometry: usesMatchedGeometry,
                 presentation: presentation,
-                expandedCardHeight: expandedCardHeight
+                expandedCardHeight: expandedCardHeight,
+                cardCornerRadius: cardCornerRadius
             )
         }
     }

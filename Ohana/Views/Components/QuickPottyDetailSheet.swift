@@ -16,6 +16,7 @@ struct QuickPottyDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @Query(sort: \Pet.createdAt) private var allPets: [Pet]
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
@@ -54,11 +55,11 @@ struct QuickPottyDetailSheet: View {
         case litter
 
         var id: String { rawValue }
-        var title: String {
+        func title(_ l: L10n) -> String {
             switch self {
-            case .potty: return "便便"
-            case .scoop: return "铲屎"
-            case .litter: return "猫砂"
+            case .potty: return l.tr(zh: "噗噗", en: "Poop", de: "Häufchen")
+            case .scoop: return l.tr(zh: "铲砂", en: "Scoop", de: "Schaufeln")
+            case .litter: return l.tr(zh: "猫砂", en: "Litter", de: "Streu")
             }
         }
         var icon: String {
@@ -116,6 +117,7 @@ struct QuickPottyDetailSheet: View {
     private var scoopTint: Color { isDark ? Color.goPrimary : Color(hex: CareType.litter.accentColorHex) }
     private var litterTint: Color { Color(hex: "D4A574") }
     private var chromeTint: Color { isDark ? Color.goPrimary : themeColor }
+    private var l: L10n { L10n(appLanguage) }
     private var isCatPet: Bool {
         let text = "\(pet.species) \(pet.breed)".lowercased()
         return text.contains("猫") || text.contains("cat")
@@ -293,8 +295,8 @@ struct QuickPottyDetailSheet: View {
                 }
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
             }
-            .alert("今天已经完成了", isPresented: $showSingleUseNotice) {
-                Button("知道了", role: .cancel) {}
+            .alert(l.tr(zh: "今天已经完成了", en: "Already done today", de: "Heute schon erledigt"), isPresented: $showSingleUseNotice) {
+                Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {}
             } message: {
                 Text(singleUseNoticeMessage)
             }
@@ -515,7 +517,7 @@ struct QuickPottyDetailSheet: View {
                 Text(pet.name)
                     .font(.system(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("噗噗电台")
+                Text(l.tr(zh: "噗噗电台", en: "Poop Radio", de: "Häufchen-Radio"))
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -568,7 +570,7 @@ struct QuickPottyDetailSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("噗噗电台")
+                    Text(l.tr(zh: "噗噗电台", en: "Poop Radio", de: "Häufchen-Radio"))
                         .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(pottyDashboardSubtitle)
@@ -581,13 +583,13 @@ struct QuickPottyDetailSheet: View {
             }
 
             HStack(spacing: 8) {
-                pottySummaryPill(title: isCatPet ? "便便" : "今日", value: "\(todayPottyLogs.count)次", tint: pottyTint)
+                pottySummaryPill(title: isCatPet ? l.tr(zh: "噗噗", en: "Poop", de: "Häufchen") : l.tr(zh: "今日", en: "Today", de: "Heute"), value: timesText(todayPottyLogs.count), tint: pottyTint)
                 if isCatPet {
-                    pottySummaryPill(title: "铲屎", value: dueText(daysUntil: daysUntilScoop), tint: scoopTint)
-                    pottySummaryPill(title: "猫砂", value: dueText(daysUntil: daysUntilLitterChange), tint: litterTint)
+                    pottySummaryPill(title: l.tr(zh: "铲砂", en: "Scoop", de: "Klo"), value: dueText(daysUntil: daysUntilScoop), tint: scoopTint)
+                    pottySummaryPill(title: l.tr(zh: "猫砂", en: "Litter", de: "Streu"), value: dueText(daysUntil: daysUntilLitterChange), tint: litterTint)
                 } else {
-                    pottySummaryPill(title: "最近", value: lastPottyLog.map { relativeDayText(for: $0.date) } ?? "暂无", tint: pottyTint)
-                    pottySummaryPill(title: "异常", value: "\(Int(last7AbnormalRatio * 100))%", tint: last7AbnormalRatio > 0.3 ? Color.goRed : pottyTint)
+                    pottySummaryPill(title: l.tr(zh: "最近", en: "Latest", de: "Zuletzt"), value: lastPottyLog.map { relativeDayText(for: $0.date) } ?? l.tr(zh: "暂无", en: "None", de: "Keine"), tint: pottyTint)
+                    pottySummaryPill(title: l.tr(zh: "留意", en: "Watch", de: "Achten"), value: "\(Int(last7AbnormalRatio * 100))%", tint: last7AbnormalRatio > 0.3 ? Color.goRed : pottyTint)
                 }
             }
 
@@ -630,7 +632,7 @@ struct QuickPottyDetailSheet: View {
             HStack(spacing: 6) {
                 Image(systemName: focus.icon)
                     .font(.system(size: 10, weight: .black))
-                Text(focus.title)
+                Text(focus.title(l))
                     .font(.system(size: 12, weight: .black, design: .rounded))
             }
             .foregroundStyle(selected ? Color.arkInk : tint)
@@ -695,13 +697,13 @@ struct QuickPottyDetailSheet: View {
 
     private var pottyCard: some View {
         PoopCoreCard(
-            title: "便便",
+            title: l.tr(zh: "噗噗", en: "Poop", de: "Häufchen"),
             icon: lastPottyLog?.pottyType.systemIconName ?? "seal.fill",
             tint: pottyTint,
-            value: "\(todayPottyLogs.count) 次",
+            value: timesText(todayPottyLogs.count),
             subtitle: pottySubtitle,
             progress: min(Double(todayPottyLogs.count) / 3, 1),
-            primaryTitle: "记录",
+            primaryTitle: l.tr(zh: "记录", en: "Log", de: "Loggen"),
             primaryIcon: "plus",
             primaryAction: {
                 guard !pet.hasPassedAway else {
@@ -712,7 +714,7 @@ struct QuickPottyDetailSheet: View {
                 selectedFocus = .potty
                 openPottySheet(.pottyType)
             },
-            secondaryTitle: "历史",
+            secondaryTitle: l.tr(zh: "历史", en: "History", de: "Verlauf"),
             secondaryAction: {
                 selectedFocus = .potty
                 openPottySheet(.pottyHistory)
@@ -727,7 +729,7 @@ struct QuickPottyDetailSheet: View {
 
     private var scoopCard: some View {
         PoopCoreCard(
-            title: "铲屎",
+            title: l.tr(zh: "铲砂", en: "Scoop", de: "Schaufeln"),
             icon: "trash.fill",
             tint: scoopTint,
             value: dueText(daysUntil: daysUntilScoop),
@@ -744,7 +746,7 @@ struct QuickPottyDetailSheet: View {
                 selectedFocus = .scoop
                 openPottySheet(.scoopCheckIn)
             },
-            secondaryTitle: "管理",
+            secondaryTitle: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
             secondaryAction: {
                 selectedFocus = .scoop
                 if pet.hasPassedAway {
@@ -763,7 +765,7 @@ struct QuickPottyDetailSheet: View {
 
     private var litterChangeCard: some View {
         PoopCoreCard(
-            title: "猫砂",
+            title: l.tr(zh: "猫砂", en: "Litter", de: "Streu"),
             icon: "tray.full.fill",
             tint: litterTint,
             value: dueText(daysUntil: daysUntilLitterChange),
@@ -780,7 +782,7 @@ struct QuickPottyDetailSheet: View {
                 selectedFocus = .litter
                 openPottySheet(.litterChangeCheckIn)
             },
-            secondaryTitle: "管理",
+            secondaryTitle: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
             secondaryAction: {
                 selectedFocus = .litter
                 if pet.hasPassedAway {
@@ -800,14 +802,14 @@ struct QuickPottyDetailSheet: View {
     private var recentStrip: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("最近")
+                Text(l.tr(zh: "最近", en: "Latest", de: "Zuletzt"))
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Button {
                     openPottySheet(.history)
                 } label: {
-                    Text("管理")
+                    Text(l.tr(zh: "管理", en: "Manage", de: "Verwalten"))
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(chromeTint)
                 }
@@ -815,7 +817,7 @@ struct QuickPottyDetailSheet: View {
             }
 
             if recentItems.isEmpty {
-                Text("暂无记录")
+                Text(l.tr(zh: "暂无记录", en: "No logs yet", de: "Noch keine Einträge"))
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.62))
                     .frame(maxWidth: .infinity)
@@ -852,52 +854,68 @@ struct QuickPottyDetailSheet: View {
         if let lastPottyLog {
             let abnormalPercent = Int(last7AbnormalRatio * 100)
             if abnormalPercent >= 30 {
-                return "异常 \(abnormalPercent)% · \(relativeDayText(for: lastPottyLog.date))"
+                return l.tr(
+                    zh: "留意 \(abnormalPercent)% · \(relativeDayText(for: lastPottyLog.date))",
+                    en: "Watch \(abnormalPercent)% · \(relativeDayText(for: lastPottyLog.date))",
+                    de: "Auffällig \(abnormalPercent)% · \(relativeDayText(for: lastPottyLog.date))"
+                )
             }
-            return "\(lastPottyLog.pottyType.rawValue) · \(relativeDayText(for: lastPottyLog.date))"
+            return "\(lastPottyLog.pottyType.localizedLabel(l)) · \(relativeDayText(for: lastPottyLog.date))"
         }
-        return "记录形态和次数"
+        return l.tr(zh: "记录形态和次数", en: "Track shape and rhythm", de: "Form und Rhythmus erfassen")
     }
 
     private var scoopSubtitle: String {
         if let lastScoopLog {
-            return "\(relativeDayText(for: lastScoopLog.date)) · \(scoopIntervalDays)天周期"
+            return "\(relativeDayText(for: lastScoopLog.date)) · \(cycleText(scoopIntervalDays))"
         }
-        return "\(scoopIntervalDays)天周期"
+        return cycleText(scoopIntervalDays)
     }
 
     private var litterChangeSubtitle: String {
         if let lastFullChange {
-            return "\(relativeDayText(for: lastFullChange)) · \(litterChangeIntervalDays)天周期"
+            return "\(relativeDayText(for: lastFullChange)) · \(cycleText(litterChangeIntervalDays))"
         }
-        return "\(litterChangeIntervalDays)天周期"
+        return cycleText(litterChangeIntervalDays)
+    }
+
+    private var scoopNeedsCatchUp: Bool {
+        daysUntilScoop < 0
+    }
+
+    private var scoopDoneToday: Bool {
+        !todayLitterLogs.isEmpty && daysUntilScoop >= 0
     }
 
     private var scoopPrimaryTitle: String {
-        if daysUntilScoop < 0 { return "补打卡" }
-        if todayLitterLogs.isEmpty { return "打卡" }
-        return "已完成"
+        if scoopNeedsCatchUp { return l.tr(zh: "补打卡", en: "Catch up", de: "Nachtragen") }
+        if todayLitterLogs.isEmpty { return l.tr(zh: "打卡", en: "Check in", de: "Eintragen") }
+        return l.tr(zh: "已完成", en: "Done", de: "Erledigt")
     }
 
     private var litterPrimaryTitle: String {
-        if daysUntilLitterChange < 0 { return "补打卡" }
-        return "换砂"
+        if daysUntilLitterChange < 0 { return l.tr(zh: "补打卡", en: "Catch up", de: "Nachtragen") }
+        return l.tr(zh: "换砂", en: "Change litter", de: "Streu wechseln")
     }
 
     private var scoopPlanDetail: String {
-        "每\(scoopIntervalDays)天"
+        everyDaysText(scoopIntervalDays)
     }
 
     private var litterPlanDetail: String {
-        "每\(litterChangeIntervalDays)天"
+        everyDaysText(litterChangeIntervalDays)
     }
 
     private var scoopLastActionText: String {
-        lastScoopLog.map { "上次 \(relativeDayText(for: $0.date))" } ?? "还没有打卡"
+        lastScoopLog.map {
+            l.tr(zh: "上次 \(relativeDayText(for: $0.date))", en: "Last \(relativeDayText(for: $0.date))", de: "Zuletzt \(relativeDayText(for: $0.date))")
+        } ?? l.tr(zh: "还没有打卡", en: "No scoop yet", de: "Noch nicht gereinigt")
     }
 
     private var litterLastActionText: String {
-        lastFullChange.map { "上次 \(relativeDayText(for: $0))" } ?? "还没有换砂"
+        lastFullChange.map {
+            l.tr(zh: "上次 \(relativeDayText(for: $0))", en: "Last \(relativeDayText(for: $0))", de: "Zuletzt \(relativeDayText(for: $0))")
+        } ?? l.tr(zh: "还没有换砂", en: "No litter change yet", de: "Noch kein Streuwechsel")
     }
 
     // MARK: - Sheets
@@ -907,7 +925,7 @@ struct QuickPottyDetailSheet: View {
         case .pottyType:
             PottyTypeSheet(
                 tint: pottyTint,
-                unknownGroupTitle: sameSpeciesPottyPets.count > 1 ? "猫砂盆未知便便" : nil,
+                unknownGroupTitle: sameSpeciesPottyPets.count > 1 ? l.tr(zh: "猫砂盆未知噗噗", en: "Mystery litter-box poop", de: "Unbekanntes Klo-Häufchen") : nil,
                 onUnknownGroup: sameSpeciesPottyPets.count > 1 ? {
                     logUnknownGroupPotty()
                     dismissInlinePoopSheet()
@@ -926,8 +944,8 @@ struct QuickPottyDetailSheet: View {
             VStack(spacing: 12) {
                 if sameSpeciesPottyPets.count > 1 {
                     SharedCareTargetPicker(
-                        title: "共同铲砂",
-                        subtitle: "\(selectedPottyTargets.count)只\(pet.species)",
+                        title: l.tr(zh: "共同铲砂", en: "Scoop together", de: "Gemeinsam reinigen"),
+                        subtitle: petCountText(selectedPottyTargets.count, species: pet.species),
                         pets: sameSpeciesPottyPets,
                         selectedPetIds: $selectedSharedPottyPetIds,
                         tint: scoopTint
@@ -938,11 +956,11 @@ struct QuickPottyDetailSheet: View {
                 PoopCheckInSheet(
                     tint: scoopTint,
                     icon: "trash.fill",
-                    title: "铲屎打卡",
+                    title: l.tr(zh: "铲砂打卡", en: "Scoop check-in", de: "Klo-Check-in"),
                     value: dueText(daysUntil: daysUntilScoop),
                     subtitle: scoopSubtitle,
-                    primaryTitle: scoopPrimaryTitle == "补打卡" ? "补打卡" : (todayLitterLogs.isEmpty ? "完成铲屎" : "今天已完成"),
-                    secondaryTitle: "编辑计划",
+                    primaryTitle: scoopNeedsCatchUp ? l.tr(zh: "补打卡", en: "Catch up", de: "Nachtragen") : (todayLitterLogs.isEmpty ? l.tr(zh: "完成铲砂", en: "Scoop done", de: "Klo sauber") : l.tr(zh: "今天已完成", en: "Done today", de: "Heute erledigt")),
+                    secondaryTitle: l.tr(zh: "编辑计划", en: "Edit plan", de: "Plan ändern"),
                     isPrimaryDisabled: !todayLitterLogs.isEmpty && daysUntilScoop >= 0,
                     primaryAction: {
                         recordScoop()
@@ -963,8 +981,8 @@ struct QuickPottyDetailSheet: View {
             VStack(spacing: 12) {
                 if sameSpeciesPottyPets.count > 1 {
                     SharedCareTargetPicker(
-                        title: "共同换砂",
-                        subtitle: "\(selectedPottyTargets.count)只\(pet.species)",
+                        title: l.tr(zh: "共同换砂", en: "Change together", de: "Gemeinsam wechseln"),
+                        subtitle: petCountText(selectedPottyTargets.count, species: pet.species),
                         pets: sameSpeciesPottyPets,
                         selectedPetIds: $selectedSharedPottyPetIds,
                         tint: litterTint
@@ -975,11 +993,11 @@ struct QuickPottyDetailSheet: View {
                 PoopCheckInSheet(
                     tint: litterTint,
                     icon: "tray.full.fill",
-                    title: "换猫砂",
+                    title: l.tr(zh: "换猫砂", en: "Change litter", de: "Streu wechseln"),
                     value: dueText(daysUntil: daysUntilLitterChange),
                     subtitle: litterChangeSubtitle,
-                    primaryTitle: "记录换砂",
-                    secondaryTitle: "编辑计划",
+                    primaryTitle: l.tr(zh: "记录换砂", en: "Log change", de: "Wechsel loggen"),
+                    secondaryTitle: l.tr(zh: "编辑计划", en: "Edit plan", de: "Plan ändern"),
                     isPrimaryDisabled: false,
                     primaryAction: {
                         doFullChange()
@@ -1000,9 +1018,9 @@ struct QuickPottyDetailSheet: View {
             PoopCycleSettingsSheet(
                 tint: scoopTint,
                 icon: "trash.fill",
-                title: "铲屎计划",
-                subtitle: "编辑 \(pet.name) 的铲屎周期",
-                statusTitle: scoopReminderOn ? "提醒已开启" : "仅本地记录",
+                title: l.tr(zh: "铲砂计划", en: "Scoop plan", de: "Klo-Plan"),
+                subtitle: l.tr(zh: "编辑 \(pet.name) 的铲砂周期", en: "Edit \(pet.name)'s scoop rhythm", de: "\(pet.name)s Klo-Rhythmus ändern"),
+                statusTitle: scoopReminderOn ? l.tr(zh: "提醒已开启", en: "Reminder on", de: "Erinnerung an") : l.tr(zh: "仅本地记录", en: "Local only", de: "Nur lokal"),
                 statusValue: dueText(daysUntil: daysUntilScoop),
                 statusDetail: "\(scoopPlanDetail) · \(scoopLastActionText)",
                 intervalRange: 1...14,
@@ -1030,9 +1048,9 @@ struct QuickPottyDetailSheet: View {
             PoopCycleSettingsSheet(
                 tint: litterTint,
                 icon: "tray.full.fill",
-                title: "换猫砂计划",
-                subtitle: "编辑 \(pet.name) 的整盆换砂周期",
-                statusTitle: litterReminderOn ? "提醒已开启" : "仅本地记录",
+                title: l.tr(zh: "换猫砂计划", en: "Litter-change plan", de: "Streuwechsel-Plan"),
+                subtitle: l.tr(zh: "编辑 \(pet.name) 的整盆换砂周期", en: "Edit \(pet.name)'s full litter-change rhythm", de: "\(pet.name)s Streuwechsel-Rhythmus ändern"),
+                statusTitle: litterReminderOn ? l.tr(zh: "提醒已开启", en: "Reminder on", de: "Erinnerung an") : l.tr(zh: "仅本地记录", en: "Local only", de: "Nur lokal"),
                 statusValue: dueText(daysUntil: daysUntilLitterChange),
                 statusDetail: "\(litterPlanDetail) · \(litterLastActionText)",
                 intervalRange: 3...60,
@@ -1064,14 +1082,14 @@ struct QuickPottyDetailSheet: View {
             litterOverviewSheet
         case .pottyHistory:
             PoopHistorySheet(
-                title: "便便历史",
+                title: l.tr(zh: "噗噗历史", en: "Poop history", de: "Häufchen-Verlauf"),
                 items: pottyLogs.map(PoopLogItem.potty),
                 tintForItem: tint(for:),
                 onDelete: deleteItem
             )
         case .scoopHistory:
             PoopHistorySheet(
-                title: "铲屎历史",
+                title: l.tr(zh: "铲砂历史", en: "Scoop history", de: "Klo-Verlauf"),
                 items: litterLogs.map(PoopLogItem.litter),
                 tintForItem: tint(for:),
                 onDelete: deleteItem
@@ -1080,7 +1098,7 @@ struct QuickPottyDetailSheet: View {
             litterHistorySheet
         case .history:
             PoopHistorySheet(
-                title: "便便管理记录",
+                title: l.tr(zh: "噗噗节目单", en: "Poop Radio log", de: "Häufchen-Radio-Log"),
                 items: recentItems,
                 tintForItem: tint(for:),
                 onDelete: deleteItem
@@ -1093,23 +1111,23 @@ struct QuickPottyDetailSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 poopOverviewRangePicker(tint: pottyTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    poopOverviewMetric(title: "今日次数", value: "\(todayPottyLogs.count)", icon: "number.circle.fill", tint: pottyTint)
-                    poopOverviewMetric(title: "异常比例", value: "\(Int(last7AbnormalRatio * 100))%", icon: "exclamationmark.triangle.fill", tint: last7AbnormalRatio > 0.3 ? Color.goRed : pottyTint)
+                    poopOverviewMetric(title: l.tr(zh: "今日次数", en: "Today", de: "Heute"), value: "\(todayPottyLogs.count)", icon: "number.circle.fill", tint: pottyTint)
+                    poopOverviewMetric(title: l.tr(zh: "留意比例", en: "Watch rate", de: "Auffällig"), value: "\(Int(last7AbnormalRatio * 100))%", icon: "exclamationmark.triangle.fill", tint: last7AbnormalRatio > 0.3 ? Color.goRed : pottyTint)
                 }
                 poopOverviewLineChart(
-                    title: "便便趋势",
-                    subtitle: "按天统计次数。",
+                    title: l.tr(zh: "噗噗趋势", en: "Poop trend", de: "Häufchen-Trend"),
+                    subtitle: l.tr(zh: "按天统计次数。", en: "Daily count.", de: "Tageszahlen."),
                     points: pottyChartPoints,
                     tint: pottyTint,
-                    emptyText: "记录便便后会出现趋势"
+                    emptyText: l.tr(zh: "记录噗噗后会出现趋势", en: "Log poop to see the trend", de: "Logge Häufchen für den Trend")
                 )
-                overviewSectionHeader("类型")
+                overviewSectionHeader(l.tr(zh: "类型", en: "Types", de: "Typen"))
                 ForEach(pottyTypeSummaries) { summary in
-                    poopSummaryRow(icon: summary.icon, title: summary.title, value: "\(summary.count)次", tint: summary.tint)
+                    poopSummaryRow(icon: summary.icon, title: summary.title, value: timesText(summary.count), tint: summary.tint)
                 }
-                overviewSectionHeader("最近便便")
+                overviewSectionHeader(l.tr(zh: "最近噗噗", en: "Latest poop", de: "Neueste Häufchen"))
                 if pottyLogs.isEmpty {
-                    emptyInlineState(icon: "seal", text: "还没有便便记录")
+                    emptyInlineState(icon: "seal", text: l.tr(zh: "还没有噗噗记录", en: "No poop logs yet", de: "Noch keine Häufchen"))
                 } else {
                     ForEach(Array(pottyLogs.prefix(8)).map(PoopLogItem.potty)) { item in
                         PoopLogRow(item: item, tint: tint(for: item), showDelete: true) {
@@ -1128,25 +1146,25 @@ struct QuickPottyDetailSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 poopOverviewRangePicker(tint: scoopTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    poopOverviewMetric(title: "今日", value: todayLitterLogs.isEmpty ? "未完成" : "已完成", icon: "checkmark.seal.fill", tint: scoopTint)
-                    poopOverviewMetric(title: "下次", value: dueText(daysUntil: daysUntilScoop), icon: "calendar", tint: daysUntilScoop < 0 ? Color.goRed : scoopTint)
+                    poopOverviewMetric(title: l.tr(zh: "今日", en: "Today", de: "Heute"), value: todayLitterLogs.isEmpty ? l.tr(zh: "未完成", en: "Open", de: "Offen") : l.tr(zh: "已完成", en: "Done", de: "Erledigt"), icon: "checkmark.seal.fill", tint: scoopTint)
+                    poopOverviewMetric(title: l.tr(zh: "下次", en: "Next", de: "Nächstes"), value: dueText(daysUntil: daysUntilScoop), icon: "calendar", tint: daysUntilScoop < 0 ? Color.goRed : scoopTint)
                 }
-                poopProgressBlock(title: "铲屎周期", elapsed: scoopElapsedDays, interval: scoopIntervalDays, tint: scoopTint)
+                poopProgressBlock(title: l.tr(zh: "铲砂周期", en: "Scoop rhythm", de: "Klo-Rhythmus"), elapsed: scoopElapsedDays, interval: scoopIntervalDays, tint: scoopTint)
                 poopOverviewLineChart(
-                    title: "铲屎记录",
-                    subtitle: "按天统计铲屎次数。",
+                    title: l.tr(zh: "铲砂记录", en: "Scoop logs", de: "Klo-Einträge"),
+                    subtitle: l.tr(zh: "按天统计铲砂次数。", en: "Daily scoop count.", de: "Reinigungen pro Tag."),
                     points: scoopChartPoints,
                     tint: scoopTint,
-                    emptyText: "铲屎后会出现趋势"
+                    emptyText: l.tr(zh: "铲砂后会出现趋势", en: "Scoop to see the trend", de: "Reinigen zeigt den Trend")
                 )
                 HStack(spacing: 10) {
-                    PoopPrimaryButton(title: scoopPrimaryTitle == "已完成" ? "今天已完成" : scoopPrimaryTitle, icon: "checkmark", tint: scoopTint, isDisabled: scoopPrimaryTitle == "已完成") {
+                    PoopPrimaryButton(title: scoopDoneToday ? l.tr(zh: "今天已完成", en: "Done today", de: "Heute erledigt") : scoopPrimaryTitle, icon: "checkmark", tint: scoopTint, isDisabled: scoopDoneToday) {
                         openPottySheet(.scoopCheckIn)
                     }
                     Button {
                         openPottySheet(.scoopSettings)
                     } label: {
-                        Label("管理", systemImage: "slider.horizontal.3")
+                        Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
                             .font(.system(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(scoopTint)
                             .frame(maxWidth: .infinity)
@@ -1155,9 +1173,9 @@ struct QuickPottyDetailSheet: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
-                overviewSectionHeader("最近铲屎")
+                overviewSectionHeader(l.tr(zh: "最近铲砂", en: "Latest scoops", de: "Letzte Reinigungen"))
                 if litterLogs.isEmpty {
-                    emptyInlineState(icon: "trash", text: "还没有铲屎记录")
+                    emptyInlineState(icon: "trash", text: l.tr(zh: "还没有铲砂记录", en: "No scoop logs yet", de: "Noch keine Klo-Einträge"))
                 } else {
                     ForEach(Array(litterLogs.prefix(8)).map(PoopLogItem.litter)) { item in
                         PoopLogRow(item: item, tint: scoopTint, showDelete: true) {
@@ -1175,10 +1193,10 @@ struct QuickPottyDetailSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    poopOverviewMetric(title: "周期", value: "\(litterChangeIntervalDays)天", icon: "repeat", tint: litterTint)
-                    poopOverviewMetric(title: "下次", value: dueText(daysUntil: daysUntilLitterChange), icon: "calendar", tint: daysUntilLitterChange < 0 ? Color.goRed : litterTint)
+                    poopOverviewMetric(title: l.tr(zh: "周期", en: "Cycle", de: "Rhythmus"), value: dayCountText(litterChangeIntervalDays), icon: "repeat", tint: litterTint)
+                    poopOverviewMetric(title: l.tr(zh: "下次", en: "Next", de: "Nächstes"), value: dueText(daysUntil: daysUntilLitterChange), icon: "calendar", tint: daysUntilLitterChange < 0 ? Color.goRed : litterTint)
                 }
-                poopProgressBlock(title: "换砂周期", elapsed: litterElapsedDays, interval: litterChangeIntervalDays, tint: litterTint)
+                poopProgressBlock(title: l.tr(zh: "换砂周期", en: "Litter rhythm", de: "Streu-Rhythmus"), elapsed: litterElapsedDays, interval: litterChangeIntervalDays, tint: litterTint)
                 HStack(spacing: 10) {
                     PoopPrimaryButton(title: litterPrimaryTitle, icon: "arrow.2.circlepath", tint: litterTint) {
                         openPottySheet(.litterChangeCheckIn)
@@ -1186,7 +1204,7 @@ struct QuickPottyDetailSheet: View {
                     Button {
                         openPottySheet(.litterSettings)
                     } label: {
-                        Label("管理", systemImage: "slider.horizontal.3")
+                        Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
                             .font(.system(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(litterTint)
                             .frame(maxWidth: .infinity)
@@ -1195,7 +1213,7 @@ struct QuickPottyDetailSheet: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
-                overviewSectionHeader("最近换砂")
+                overviewSectionHeader(l.tr(zh: "最近换砂", en: "Latest changes", de: "Letzte Wechsel"))
                 litterHistorySheetContent
             }
             .padding(20)
@@ -1223,7 +1241,7 @@ struct QuickPottyDetailSheet: View {
                     .frame(width: 28, height: 28)
                     .background(litterTint.opacity(0.14), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("整盆换砂")
+                    Text(l.tr(zh: "整盆换砂", en: "Full litter change", de: "Kompletter Streuwechsel"))
                         .font(.system(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(relativeDayText(for: lastFullChange))
@@ -1237,7 +1255,7 @@ struct QuickPottyDetailSheet: View {
             }
             .padding(.vertical, 3)
         } else {
-            emptyInlineState(icon: "tray", text: "还没有换砂记录")
+            emptyInlineState(icon: "tray", text: l.tr(zh: "还没有换砂记录", en: "No litter changes yet", de: "Noch kein Streuwechsel"))
         }
     }
 
@@ -1275,7 +1293,7 @@ struct QuickPottyDetailSheet: View {
                         }
                     }
                 } label: {
-                    Text(range.title)
+                    Text(range.title(l))
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(overviewRange == range ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
@@ -1303,13 +1321,13 @@ struct QuickPottyDetailSheet: View {
     private func pottySheetChromeTitle(_ sheet: ActiveSheet) -> some View {
         switch sheet {
         case .pottyOverview:
-            pottySheetChromeTitleContent(icon: "seal.fill", title: "便便总览", tint: pottyTint)
+            pottySheetChromeTitleContent(icon: "seal.fill", title: l.tr(zh: "噗噗总览", en: "Poop overview", de: "Häufchen-Überblick"), tint: pottyTint)
         case .scoopOverview:
-            pottySheetChromeTitleContent(icon: "trash.fill", title: "铲屎总览", tint: scoopTint)
+            pottySheetChromeTitleContent(icon: "trash.fill", title: l.tr(zh: "铲砂总览", en: "Scoop overview", de: "Klo-Überblick"), tint: scoopTint)
         case .litterOverview:
-            pottySheetChromeTitleContent(icon: "tray.full.fill", title: "猫砂总览", tint: litterTint)
+            pottySheetChromeTitleContent(icon: "tray.full.fill", title: l.tr(zh: "猫砂总览", en: "Litter overview", de: "Streu-Überblick"), tint: litterTint)
         case .litterHistory:
-            pottySheetChromeTitleContent(icon: "tray.full.fill", title: "换砂历史", tint: litterTint)
+            pottySheetChromeTitleContent(icon: "tray.full.fill", title: l.tr(zh: "换砂历史", en: "Litter history", de: "Streu-Verlauf"), tint: litterTint)
         default:
             EmptyView()
         }
@@ -1387,7 +1405,7 @@ struct QuickPottyDetailSheet: View {
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Text("\(elapsed)/\(max(interval, 1))天")
+                Text(progressDaysText(elapsed: elapsed, interval: max(interval, 1)))
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
             }
@@ -1472,7 +1490,7 @@ struct QuickPottyDetailSheet: View {
         PottyType.allCases.compactMap { type in
             let count = pottyLogs.filter { $0.pottyType == type }.count
             guard count > 0 else { return nil }
-            return PoopTypeSummary(title: type.rawValue, icon: type.systemIconName, count: count, tint: pottyTypeColor(type))
+            return PoopTypeSummary(title: type.localizedLabel(l), icon: type.systemIconName, count: count, tint: pottyTypeColor(type))
         }
     }
 
@@ -1562,7 +1580,7 @@ struct QuickPottyDetailSheet: View {
         }
         if showToast {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            showSaveConfirmation(scoopReminderOn ? "已保存铲屎提醒" : "已保存")
+            showSaveConfirmation(scoopReminderOn ? l.tr(zh: "铲砂提醒已保存", en: "Scoop reminder saved", de: "Klo-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
         }
     }
 
@@ -1582,7 +1600,7 @@ struct QuickPottyDetailSheet: View {
         }
         if showToast {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            showSaveConfirmation(litterReminderOn ? "已保存换砂提醒" : "已保存")
+            showSaveConfirmation(litterReminderOn ? l.tr(zh: "换砂提醒已保存", en: "Litter reminder saved", de: "Streu-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
         }
     }
 
@@ -1590,14 +1608,14 @@ struct QuickPottyDetailSheet: View {
         scoopReminderOn = false
         syncScoopPlan(showToast: false)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        showSaveConfirmation("铲屎计划已删除")
+        showSaveConfirmation(l.tr(zh: "铲砂计划已删除", en: "Scoop plan deleted", de: "Klo-Plan gelöscht"))
     }
 
     private func deleteLitterChangePlan() {
         litterReminderOn = false
         syncLitterChangePlan(showToast: false)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        showSaveConfirmation("换砂计划已删除")
+        showSaveConfirmation(l.tr(zh: "换砂计划已删除", en: "Litter plan deleted", de: "Streu-Plan gelöscht"))
     }
 
     private func showSaveConfirmation(_ message: String) {
@@ -1628,7 +1646,7 @@ struct QuickPottyDetailSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: pottyTint)
         scheduleFeedbackClear()
-        showSaveConfirmation(delta > 0 ? "\(type.emoji) +\(delta)🥥" : "已记录便便")
+        showSaveConfirmation(delta > 0 ? "\(type.emoji) +\(delta)🥥" : l.tr(zh: "噗噗已记录", en: "Poop logged", de: "Häufchen erfasst"))
     }
 
     private func logUnknownGroupPotty() {
@@ -1642,7 +1660,7 @@ struct QuickPottyDetailSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: pottyTint)
         scheduleFeedbackClear()
-        showSaveConfirmation("已记录猫砂盆事件")
+        showSaveConfirmation(l.tr(zh: "猫砂盆事件已记录", en: "Litter-box event logged", de: "Klo-Ereignis erfasst"))
     }
 
     private func doScoop() {
@@ -1650,7 +1668,11 @@ struct QuickPottyDetailSheet: View {
             recordScoop()
             return
         }
-        singleUseNoticeMessage = "\(pet.name) 今天已经铲屎过了，这类操作一天记录一次就够了。需要修改记录的话，可以在下方最近记录中删除。"
+        singleUseNoticeMessage = l.tr(
+            zh: "\(pet.name) 今天已经铲砂过了。要修改的话，先在最近记录里删除。",
+            en: "\(pet.name)'s litter was already scooped today. Delete the latest log to change it.",
+            de: "\(pet.name)s Klo wurde heute schon gereinigt. Lösche den letzten Eintrag zum Ändern."
+        )
         showSingleUseNotice = true
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
@@ -1676,7 +1698,9 @@ struct QuickPottyDetailSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         scoopFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: scoopTint)
         scheduleFeedbackClear()
-        let actionText = targets.count > 1 ? "\(targets.count)只猫 已铲" : "已记录铲屎"
+        let actionText = targets.count > 1
+            ? l.tr(zh: "\(targets.count)只猫 已铲", en: "\(targets.count) cats scooped", de: "\(targets.count) Katzenklos sauber")
+            : l.tr(zh: "铲砂已记录", en: "Scoop logged", de: "Klo erfasst")
         showSaveConfirmation(delta > 0 ? "\(actionText) +\(delta)🥥" : actionText)
     }
 
@@ -1710,7 +1734,11 @@ struct QuickPottyDetailSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         litterFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: litterTint)
         scheduleFeedbackClear()
-        showSaveConfirmation(targets.count > 1 ? "\(targets.count)只猫 已换砂" : "已记录换砂")
+        showSaveConfirmation(
+            targets.count > 1
+            ? l.tr(zh: "\(targets.count)只猫 已换砂", en: "\(targets.count) litter boxes changed", de: "\(targets.count) Katzenstreus gewechselt")
+            : l.tr(zh: "换砂已记录", en: "Litter change logged", de: "Streuwechsel erfasst")
+        )
     }
 
     private func scheduleFeedbackClear() {
@@ -1782,14 +1810,39 @@ struct QuickPottyDetailSheet: View {
 
     private func relativeDayText(for date: Date) -> String {
         let days = daysSinceDate(date)
-        if days == 0 { return "今天" }
-        return "\(days)天前"
+        if days == 0 { return l.tr(zh: "今天", en: "Today", de: "Heute") }
+        return l.tr(zh: "\(days)天前", en: "\(days)d ago", de: "vor \(days) T.")
     }
 
     private func dueText(daysUntil: Int) -> String {
-        if daysUntil > 0 { return "\(daysUntil)天" }
-        if daysUntil == 0 { return "今天" }
-        return "逾期\(abs(daysUntil))天"
+        if daysUntil > 0 { return dayCountText(daysUntil) }
+        if daysUntil == 0 { return l.tr(zh: "今天", en: "Today", de: "Heute") }
+        let overdue = abs(daysUntil)
+        return l.tr(zh: "逾期\(overdue)天", en: "\(overdue)d overdue", de: "\(overdue) T. fällig")
+    }
+
+    private func timesText(_ count: Int) -> String {
+        l.tr(zh: "\(count) 次", en: "\(count)x", de: "\(count)x")
+    }
+
+    private func dayCountText(_ days: Int) -> String {
+        l.tr(zh: "\(days)天", en: "\(days)d", de: "\(days) T.")
+    }
+
+    private func cycleText(_ days: Int) -> String {
+        l.tr(zh: "\(days)天周期", en: "\(days)d rhythm", de: "\(days)-Tage-Rhythmus")
+    }
+
+    private func everyDaysText(_ days: Int) -> String {
+        l.tr(zh: "每\(days)天", en: "Every \(days)d", de: "Alle \(days) Tage")
+    }
+
+    private func progressDaysText(elapsed: Int, interval: Int) -> String {
+        l.tr(zh: "\(elapsed)/\(interval)天", en: "\(elapsed)/\(interval)d", de: "\(elapsed)/\(interval) T.")
+    }
+
+    private func petCountText(_ count: Int, species: String) -> String {
+        l.tr(zh: "\(count)只\(species)", en: "\(count) \(species)", de: "\(count) \(species)")
     }
 
     private func cycleProgress(elapsed: Int, interval: Int) -> Double {

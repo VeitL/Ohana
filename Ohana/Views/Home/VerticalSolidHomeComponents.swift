@@ -369,18 +369,23 @@ struct VerticalSolidHomeTodayFocusChrome: View {
     let snapshot: TodayFocusSnapshot
     let isLive: Bool
     let onOpenOasis: () -> Void
+    let onOpenQuest: (IslandQuest) -> Void
+    let onCompleteQuest: (IslandQuest) -> Void
+    let onTapNegativeSignal: (IslandNegativeSignal) -> Void
+    let onTapFamilyTask: (FamilyCollaborationTask) -> Void
+    let onConfirmExchange: (CoconutExchangeRequest) -> Void
 
     var body: some View {
         TodayFocusCard(
             snapshot: snapshot,
             presentation: .compactStack,
-            onOpenQuest: { _ in onOpenOasis() },
-            onCompleteQuest: { _ in },
-            onTapNegativeSignal: { _ in onOpenOasis() },
+            onOpenQuest: onOpenQuest,
+            onCompleteQuest: onCompleteQuest,
+            onTapNegativeSignal: onTapNegativeSignal,
             onTapMemory: onOpenOasis,
             onTapOasis: onOpenOasis,
-            onTapFamilyTask: { _ in },
-            onConfirmExchange: { _ in },
+            onTapFamilyTask: onTapFamilyTask,
+            onConfirmExchange: onConfirmExchange,
             freezesToFrontCard: !isLive,
             allowsAmbientMotion: false
         )
@@ -1110,7 +1115,7 @@ private struct VerticalSolidHomeFabShortcutButton: View {
                         .fill(Color.goPrimary.opacity(shortcut.isAvailable ? 1 : 0.36))
                         .frame(width: 42, height: 42)
                     OhanaQuickActionIcon(
-                        actionType: shortcut.id,
+                        actionType: iconActionType,
                         fallbackSystemName: shortcut.icon,
                         size: 24,
                         color: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54)
@@ -1143,6 +1148,17 @@ private struct VerticalSolidHomeFabShortcutButton: View {
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(shortcut.label)
     }
+
+    private var iconActionType: String {
+        switch shortcut.action {
+        case .quick(let actionType), .humanQuick(let actionType):
+            return actionType
+        case .detail(let feature):
+            return feature.rawValue
+        case .allFeatures, .humanAllFeatures:
+            return shortcut.id
+        }
+    }
 }
 
 private struct VerticalSolidHomeHomeFabShortcutButton: View {
@@ -1156,10 +1172,13 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
                     Circle()
                         .fill(Color.goPrimary.opacity(shortcut.isAvailable ? 1 : 0.36))
                         .frame(width: 42, height: 42)
-                    Image(systemName: shortcut.icon)
-                        .font(.system(size: 20, weight: .black))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54))
+                    OhanaQuickActionIcon(
+                        actionType: iconActionType,
+                        fallbackSystemName: shortcut.icon,
+                        size: 24,
+                        color: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54),
+                        animatesStateChanges: false
+                    )
                         .frame(width: 42, height: 42)
 
                     if let badge = shortcut.badge {
@@ -1187,6 +1206,16 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(shortcut.label)
+    }
+
+    private var iconActionType: String {
+        if case let .featureAggregate(feature)? = shortcut.destination {
+            return feature.rawValue
+        }
+        if case .calendar? = shortcut.destination {
+            return "calendar"
+        }
+        return shortcut.id
     }
 }
 

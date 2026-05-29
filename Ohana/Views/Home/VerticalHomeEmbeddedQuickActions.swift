@@ -12,6 +12,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
     let id: String
     let title: String
     let icon: String
+    let actionType: String
     let statusText: String?
     let isCompleted: Bool
     let showsAttention: Bool
@@ -31,6 +32,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         id: String,
         title: String,
         icon: String,
+        actionType: String? = nil,
         statusText: String? = nil,
         isCompleted: Bool,
         showsAttention: Bool = false,
@@ -49,6 +51,7 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         self.id = id
         self.title = title
         self.icon = icon
+        self.actionType = actionType ?? Self.inferredActionType(id: id, icon: icon)
         self.statusText = statusText
         self.isCompleted = isCompleted
         self.showsAttention = showsAttention
@@ -63,6 +66,13 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         self.detailAction = detailAction
         self.optionAction = optionAction
         self.action = action
+    }
+
+    private static func inferredActionType(id: String, icon: String) -> String {
+        let fallback = id.split(separator: "-").last.map(String.init) ?? id
+        return OhanaQuickActionGlyphKind.resolve(actionType: fallback, fallbackSystemName: icon) == nil
+            ? id
+            : fallback
     }
 }
 
@@ -91,6 +101,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
     @State private var openActionId: String?
     @State private var showingAddPanel = false
     @State private var lastDropTargetId: String?
+    @State private var iconAnimationTokens: [String: Int] = [:]
 
     private var l: L10n { L10n(appLanguage) }
     private let maxItems = QuickActionLimit.maxItemsPerEntity
@@ -219,6 +230,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         ZStack {
             Button {
                 guard !isEditMode else { return }
+                triggerIconAnimation(for: item.id)
                 OhanaFeedback.light()
                 if item.detailAction == nil && item.menuOptions.isEmpty {
                     item.action()
@@ -229,15 +241,18 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 }
             } label: {
                 let state = visualState(for: item)
+                let statusLine = statusText(for: item)
                 VStack(spacing: 2) {
                     ZStack(alignment: .topTrailing) {
                         OhanaQuickActionIcon(
-                            actionType: item.id,
+                            actionType: item.actionType,
                             fallbackSystemName: item.icon,
                             size: iconSize,
                             color: state.foreground,
                             isCompleted: state.showsCompleted,
-                            showsCompletionBadge: state.showsCompleted
+                            showsCompletionBadge: state.showsCompleted,
+                            animationTrigger: iconAnimationTokens[item.id, default: 0],
+                            animatesStateChanges: !shouldReduceWork
                         )
                         if item.showsAttention && !isEditMode {
                             Circle()
@@ -257,7 +272,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         .foregroundStyle(state.foreground)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
-                    Text(item.statusText?.isEmpty == false ? item.statusText ?? "" : " ")
+                    Text(statusLine)
                         .font(.system(size: 8.4, weight: .bold, design: .rounded))
                         .foregroundStyle(state.statusForeground)
                         .lineLimit(1)
@@ -269,6 +284,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .allowsHitTesting(!isEditMode)
+            .accessibilityLabel(accessibilityLabel(for: item, statusText: statusText(for: item)))
 
             if openActionId == item.id {
                 inlineMenu(item: item, detailAction: item.detailAction, index: index)
@@ -316,6 +332,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         HStack(spacing: 8) {
             if item.menuOptions.isEmpty {
                 inlineMenuButton(
+                    actionType: item.actionType,
                     icon: item.isPrimaryDisabled ? "checkmark" : item.primaryIcon,
                     tint: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.16) : Color.goPrimary,
                     foreground: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.42) : Color.arkInk,
@@ -326,6 +343,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
             } else {
                 ForEach(item.menuOptions) { option in
                     inlineMenuButton(
+                        actionType: option.id,
                         icon: option.icon,
                         tint: option.tint.opacity(0.92),
                         foreground: Color.arkInk,
@@ -338,6 +356,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
             if let detailAction {
                 inlineMenuButton(
+                    actionType: detailActionType(for: item),
                     icon: item.detailIcon,
                     tint: Color.goCardWhite.opacity(0.16),
                     foreground: Color.goCardWhite,
@@ -355,6 +374,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
     }
 
     private func inlineMenuButton(
+        actionType: String,
         icon: String,
         tint: Color,
         foreground: Color,
@@ -372,10 +392,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 action()
             }
         } label: {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .black))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(foreground)
+            OhanaQuickActionIcon(
+                actionType: actionType,
+                fallbackSystemName: icon,
+                size: 20,
+                color: foreground,
+                animatesStateChanges: false
+            )
                 .frame(width: 44, height: 38)
                 .background(tint, in: Circle())
                 .contentShape(Rectangle())
@@ -383,6 +406,15 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .buttonStyle(ScaleButtonStyle())
         .disabled(isDisabled)
         .accessibilityLabel(accessibility)
+    }
+
+    private func detailActionType(for item: VerticalHomeEmbeddedAction) -> String {
+        let action = item.actionType.lowercased()
+        if item.detailIcon.contains("credit") { return "expense" }
+        if item.detailIcon.contains("chart") { return action.contains("weight") ? "weight" : "document" }
+        if item.detailIcon.contains("sparkles") { return "moment" }
+        if item.detailIcon.contains("list") { return "document" }
+        return item.actionType
     }
 
     private var addLauncherCell: some View {
@@ -476,7 +508,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 5) {
                 OhanaQuickActionIcon(
-                    actionType: item.id,
+                    actionType: item.actionType,
                     fallbackSystemName: item.icon,
                     size: 23,
                     color: item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaFunctionalIcon
@@ -519,7 +551,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
             } preview: {
                 VStack(spacing: 6) {
                     OhanaQuickActionIcon(
-                        actionType: item.id,
+                        actionType: item.actionType,
                         fallbackSystemName: item.icon,
                         size: 34,
                         color: Color.goPrimary
@@ -557,6 +589,11 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
     private func isDragging(_ item: VerticalHomeEmbeddedAction) -> Bool {
         activeDraggingItemId == item.id
+    }
+
+    private func triggerIconAnimation(for id: String) {
+        guard !shouldReduceWork else { return }
+        iconAnimationTokens[id, default: 0] += 1
     }
 
     private func editJiggleAngle(for item: VerticalHomeEmbeddedAction) -> Double {
@@ -603,6 +640,52 @@ struct VerticalHomeEmbeddedQuickActions: View {
             return (false, Color.goCardWhite, Color.goRed.mix(with: Color.goCardWhite, by: 0.18))
         }
         return (false, Color.goCardWhite, Color.goCardWhite.opacity(0.58))
+    }
+
+    private func statusText(for item: VerticalHomeEmbeddedAction) -> String {
+        guard !isEditMode else { return " " }
+        if item.isLocked {
+            return l.tr(zh: "私密", en: "Private", de: "Privat")
+        }
+        if let raw = item.statusText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !raw.isEmpty {
+            return raw
+        }
+        if item.isCompleted {
+            return l.tr(zh: "已打卡", en: "Done", de: "Erledigt")
+        }
+        if item.showsAttention {
+            return l.tr(zh: "待处理", en: "Needs care", de: "Offen")
+        }
+        if showsCheckInStatus(for: item) {
+            return l.tr(zh: "未打卡", en: "Open", de: "Offen")
+        }
+        return " "
+    }
+
+    private func showsCheckInStatus(for item: VerticalHomeEmbeddedAction) -> Bool {
+        let action = item.actionType.lowercased()
+        return [
+            "feed",
+            "water",
+            "walk",
+            "potty",
+            "litter",
+            "groom",
+            "health",
+            "medication",
+            "play",
+            "cagecleaning",
+            "freeflight",
+            "misting",
+            "substratechange",
+            "humanworkout"
+        ].contains { action.contains($0) }
+    }
+
+    private func accessibilityLabel(for item: VerticalHomeEmbeddedAction, statusText: String) -> String {
+        let trimmed = statusText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? item.quickAccessibilityLabel : "\(item.quickAccessibilityLabel), \(trimmed)"
     }
 }
 

@@ -12,9 +12,12 @@ struct QuickPottySheet: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
 
     @State private var selectedType: PottyType = .perfectPoop
     @State private var date = Date()
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -22,7 +25,7 @@ struct QuickPottySheet: View {
             VStack(spacing: 24) {
                 // 标题
                 HStack {
-                    Text("噗噗打卡")
+                    Text(l.tr(zh: "噗噗打卡", en: "Poop check-in", de: "Häufchen-Check-in"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
@@ -48,7 +51,7 @@ struct QuickPottySheet: View {
                         Button { selectedType = type } label: {
                             VStack(spacing: 8) {
                                 Text(type.emoji).font(.system(size: 32))
-                                Text(type.rawValue)
+                                Text(type.localizedLabel(l))
                                     .font(OhanaFont.caption(.bold))
                                     .foregroundStyle(selectedType == type ? Color.arkInk : .primary.opacity(0.4))
                             }
@@ -66,7 +69,7 @@ struct QuickPottySheet: View {
                 // 时间选择
                 UltimateGlassCard {
                     HStack {
-                        Text("记录时间")
+                        Text(l.tr(zh: "记录时间", en: "Log time", de: "Zeit"))
                             .font(OhanaFont.footnote(.bold))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         Spacer()
@@ -82,7 +85,7 @@ struct QuickPottySheet: View {
                 Button { savePotty() } label: {
                     HStack(spacing: 8) {
                         Text(selectedType.emoji).font(.system(size: 16))
-                        Text("记录 \(selectedType.rawValue)")
+                        Text(l.tr(zh: "记录 \(selectedType.localizedLabel(l))", en: "Log \(selectedType.localizedLabel(l))", de: "\(selectedType.localizedLabel(l)) loggen"))
                             .font(OhanaFont.headline(.black))
                     }
                     .foregroundStyle(Color.arkInk)

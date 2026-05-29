@@ -154,7 +154,8 @@ struct OasisRewardView: View {
     private var matAccent:  Color { Color(hex: "FF5A00") }
     @State private var lastLevel: TreeLevel = .lv1
     @State private var isInjecting: Bool = false
-    @State private var treeInjectionScale: CGFloat = 1.0
+    @State private var treeInjectionProgress: CGFloat = 0
+    @State private var treeInjectionBoost: CGFloat = 0.026
     @State private var injectionPulseToken = 0
     @State private var levelUpPulse         = false
     @State private var levelUpBadgeVisible  = false
@@ -281,6 +282,10 @@ struct OasisRewardView: View {
 
     private var shouldTreatEmbeddedAsVisible: Bool {
         isEmbeddedVisible || isEmbeddedActive
+    }
+
+    private var treeInjectionVisualScale: CGFloat {
+        1 + treeInjectionProgress * treeInjectionBoost
     }
 
     private var makeupConfirmationTitle: String {
@@ -562,7 +567,8 @@ struct OasisRewardView: View {
         treeVisualEnergyOverride = nil
         coconutBalanceVisualOverride = nil
         isInjecting = false
-        treeInjectionScale = 1.0
+        treeInjectionProgress = 0
+        treeInjectionBoost = 0.026
         preparedWorkTask?.cancel()
         preparedWorkTask = nil
         visibleWorkTask?.cancel()
@@ -830,10 +836,9 @@ struct OasisRewardView: View {
                         onHarvest: { harvestTreeCoconut($0) }
                     )
                     .shadow(color: Color.goPrimary.opacity(glowBreathing ? 0.42 : 0.16), radius: glowBreathing ? 22 : 10, x: 0, y: 0) // ui-v4: allow Oasis tree focus glow
-                    .scaleEffect((levelUpPulse ? 1.10 : treeScale) * treeInjectionScale)
-                    .animation(GoMotion.rewardPop, value: levelUpPulse)
+                    .scaleEffect(treeScale * treeInjectionVisualScale)
                     .animation(GoMotion.hero, value: treeScale)
-                    .animation(GoMotion.stateChange, value: treeInjectionScale)
+                    .animation(interactionMotionBudget.allowsMotion ? GoMotion.feedback : GoMotion.reduced, value: treeInjectionProgress)
                     .frame(height: 300)
                     .padding(.bottom, 16)
 
@@ -989,7 +994,8 @@ struct OasisRewardView: View {
     }
 
     private var treeEnergyBeam: some View {
-        VStack(spacing: 0) {
+        let progress = max(0, min(1, treeInjectionProgress))
+        return VStack(spacing: 0) {
             Spacer()
             Capsule()
                 .fill(
@@ -999,13 +1005,13 @@ struct OasisRewardView: View {
                         endPoint: .top
                     )
                 )
-                .frame(width: isInjecting ? 9 : 2, height: isInjecting ? 220 : 52)
-                .blur(radius: isInjecting ? 5 : 10)
-                .opacity(isInjecting ? 0.9 : 0)
-                .offset(y: isInjecting ? -138 : -18)
+                .frame(width: 2 + 7 * progress, height: 52 + 168 * progress)
+                .blur(radius: 10 - 5 * progress)
+                .opacity(0.9 * Double(progress))
+                .offset(y: -18 - 120 * progress)
                 .animation(
-                    interactionMotionBudget.allowsMotion ? GoMotion.stateChange : GoMotion.reduced,
-                    value: isInjecting
+                    interactionMotionBudget.allowsMotion ? GoMotion.feedback : GoMotion.reduced,
+                    value: treeInjectionProgress
                 )
         }
         .allowsHitTesting(false)
@@ -1400,15 +1406,16 @@ struct OasisRewardView: View {
 
         let motionBudget = interactionMotionBudget
         let visualAnimation = motionBudget.allowsMotion ? GoMotion.feedback : GoMotion.reduced
-        let commandDelay: UInt64 = motionBudget.usesFullMotion ? 96 : 48
-        let resetDelay: UInt64 = motionBudget.usesFullMotion ? 190 : 120
+        let commandDelay: UInt64 = motionBudget.usesFullMotion ? 280 : 120
+        let resetDelay: UInt64 = motionBudget.usesFullMotion ? 230 : 120
+        let thawDelay: UInt64 = motionBudget.usesFullMotion ? 120 : 48
         let beforeLevel = treeVisualLevel
         let beforeBalance = activeHumanCoconutBalance
         let targetBalance = max(0, beforeBalance - 10)
         let targetEnergy = treeMgr.totalEnergy + 10
         let targetLevel = OasisTreeManager.treeLevel(forTotalEnergy: targetEnergy)
         let isLevelUp = targetLevel.rawValue > beforeLevel.rawValue
-        let pulseScale: CGFloat = motionBudget.usesFullMotion ? (isLevelUp ? 1.045 : 1.026) : 1.01
+        let pulseBoost: CGFloat = motionBudget.usesFullMotion ? (isLevelUp ? 0.045 : 0.026) : 0.01
         injectionPulseToken += 1
         let pulseToken = injectionPulseToken
         OhanaFeedback.light()
@@ -1419,7 +1426,8 @@ struct OasisRewardView: View {
             bentoSnapshot.shopMetric = "\(targetBalance)"
             treeVisualEnergyOverride = targetEnergy
             isInjecting = true
-            treeInjectionScale = pulseScale
+            treeInjectionBoost = pulseBoost
+            treeInjectionProgress = 1
         }
         if isLevelUp {
             triggerLevelUpFeedback()
@@ -1429,26 +1437,31 @@ struct OasisRewardView: View {
         treeCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: commandDelay) {
             let didInject = commandExecutor.injectTreeEnergy(treeManager: treeMgr)
             if didInject {
-                var transaction = Transaction(animation: nil)
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    rebuildOasisRenderSnapshots()
-                    treeVisualEnergyOverride = nil
-                    coconutBalanceVisualOverride = nil
+                treeCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: thawDelay) {
+                    var transaction = Transaction(animation: nil)
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        rebuildOasisRenderSnapshots()
+                        isInjecting = false
+                        treeVisualEnergyOverride = nil
+                        coconutBalanceVisualOverride = nil
+                    }
+                    treeCommandTask = nil
                 }
             } else {
                 injectionResetTask?.cancel()
                 injectionResetTask = nil
                 withAnimation(visualAnimation) {
                     isInjecting = false
-                    treeInjectionScale = 1.0
+                    treeInjectionProgress = 0
+                    treeInjectionBoost = 0.026
                     treeVisualEnergyOverride = nil
                     coconutBalanceVisualOverride = nil
                 }
                 rebuildOasisRenderSnapshots()
                 OhanaFeedback.error()
+                treeCommandTask = nil
             }
-            treeCommandTask = nil
         }
 
         injectionResetTask?.cancel()
@@ -1458,10 +1471,16 @@ struct OasisRewardView: View {
                 return
             }
             withAnimation(visualAnimation) {
-                isInjecting = false
-                treeInjectionScale = 1.0
+                treeInjectionProgress = 0
             }
-            injectionResetTask = nil
+            injectionResetTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
+                guard injectionPulseToken == pulseToken else {
+                    injectionResetTask = nil
+                    return
+                }
+                treeInjectionBoost = 0.026
+                injectionResetTask = nil
+            }
         }
     }
 

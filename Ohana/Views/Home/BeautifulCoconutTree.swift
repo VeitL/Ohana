@@ -155,12 +155,9 @@ struct BeautifulCoconutTree: View {
                 .allowsHitTesting(false)
             }
 
-            if isInjecting {
-                EnergyRootPulseView(token: injectionPulseToken, color: glowColor)
-                    .offset(x: bend * 0.18, y: 2)
-                    .transition(.scale(scale: 0.82).combined(with: .opacity))
-                    .allowsHitTesting(false)
-            }
+            EnergyRootPulseView(token: injectionPulseToken, color: glowColor, isActive: isInjecting)
+                .offset(x: bend * 0.18, y: 2)
+                .allowsHitTesting(false)
 
             if level <= 4 {
                 ForEach(0..<sproutCount, id: \.self) { i in
@@ -318,9 +315,6 @@ struct BeautifulCoconutTree: View {
                     : nil,
                 value: isSwaying
             )
-            // 注入能量只给轻微局部反馈；主脉冲由外层稳定场景统一驱动。
-            .scaleEffect(isInjecting ? 1.018 : 1.0)
-            .animation(GoMotion.feedback, value: isInjecting)
         }
         // 整体 scale 随等级变化（React 源码 animate.scale）
         .scaleEffect(CGFloat(cfg.scale))
@@ -414,6 +408,7 @@ private struct LevelUpBurstView: View {
 private struct EnergyRootPulseView: View {
     let token: Int
     let color: Color
+    let isActive: Bool
 
     @State private var scale: CGFloat = 0.72
     @State private var opacity: Double = 0.9
@@ -424,16 +419,20 @@ private struct EnergyRootPulseView: View {
                 .stroke(color.opacity(0.9), lineWidth: 3)
                 .frame(width: 44, height: 44)
                 .scaleEffect(scale)
-                .opacity(opacity)
+                .opacity(isActive ? opacity : 0)
             Circle()
                 .fill(color.opacity(0.18))
                 .frame(width: 36, height: 36)
                 .scaleEffect(scale * 0.84)
-                .opacity(opacity)
+                .opacity(isActive ? opacity : 0)
         }
         .blendMode(.screen)
-        .onAppear { run() }
-        .onChange(of: token) { _, _ in run() }
+        .onAppear {
+            if isActive { run() }
+        }
+        .onChange(of: token) { _, _ in
+            if isActive { run() }
+        }
     }
 
     private func run() {

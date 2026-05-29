@@ -71,7 +71,7 @@ struct WalletPetCardBack: View {
         var dailyEntries: [FeatureEntry] = [
             FeatureEntry(id: "food",     symbol: "fork.knife",                  title: "饮食管理", action: onShowFood),
             FeatureEntry(id: "hygiene",  symbol: "bubbles.and.sparkles.fill",   title: "清洁护理", action: onShowHygiene),
-            FeatureEntry(id: "potty",    symbol: "drop.fill",                   title: "便便记录", action: onShowPotty),
+            FeatureEntry(id: "potty",    symbol: "drop.fill",                   title: "噗噗电台", action: onShowPotty),
             FeatureEntry(id: "expenses", symbol: "creditcard.fill",             title: "花费记录", action: onShowExpenses),
         ]
         if isDog {
@@ -149,7 +149,7 @@ struct WalletPetCardBack: View {
             HStack(spacing: 4) {
                 Image(systemName: section.symbol)
                     .font(.system(size: 7, weight: .bold))
-                Text(section.title)
+                Text(LocalizedStringKey(section.title))
                     .font(.system(size: 8, weight: .bold, design: .rounded))
                     .kerning(0.3)
                 Rectangle()
@@ -174,7 +174,7 @@ struct WalletPetCardBack: View {
                     .font(.system(size: 11, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(.white.opacity(0.95))
-                Text(entry.title)
+                Text(LocalizedStringKey(entry.title))
                     .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.9))
                     .lineLimit(1)

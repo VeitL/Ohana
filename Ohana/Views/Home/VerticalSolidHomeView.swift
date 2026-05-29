@@ -315,16 +315,10 @@ struct VerticalSolidHomeView: View {
                     .padding(.horizontal, 10)
                     .padding(.top, 4)
                 } oasis: { lifecycle in
-                    OasisRewardView(
-                        hideToolbar: true,
-                        injectEnergyTrigger: oasisInjectEnergyTrigger,
-                        isEmbeddedPrepared: lifecycle.isPrepared,
-                        isEmbeddedVisible: lifecycle.isVisible,
-                        isEmbeddedActive: lifecycle.isLive
+                    OasisHomeTabHost(
+                        lifecycle: lifecycle,
+                        injectEnergyTrigger: oasisInjectEnergyTrigger
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .padding(.horizontal, 10)
-                    .padding(.top, 4)
                 } plants: { _ in
                     VerticalSolidHomePlantsPage(
                         plants: controller.snapshot.plants,
@@ -339,7 +333,12 @@ struct VerticalSolidHomeView: View {
                     VerticalSolidHomeTodayFocusChrome(
                         snapshot: controller.snapshot.todayFocus,
                         isLive: true,
-                        onOpenOasis: { controller.select(.oasis) }
+                        onOpenOasis: { selectTab(.oasis) },
+                        onOpenQuest: openTodayFocusQuest,
+                        onCompleteQuest: completeTodayFocusQuest,
+                        onTapNegativeSignal: openTodayFocusNegativeSignal,
+                        onTapFamilyTask: openTodayFocusFamilyTask,
+                        onConfirmExchange: confirmTodayFocusExchange
                     )
                     .padding(.horizontal, 8)
                     .frame(width: proxy.size.width, height: focusHeight, alignment: .top)
@@ -598,6 +597,261 @@ struct VerticalSolidHomeView: View {
 
     private func openPlant(_ plant: VerticalSolidHomePlantSnapshot) {
         selectedPlant = plants.first { $0.id == plant.id }
+    }
+
+    private func openTodayFocusQuest(_ quest: IslandQuest) {
+        if openTodayFocusOasisQuest(quest) { return }
+
+        if let destination = eventDestination(for: quest) {
+            openCalendarEventDestinationAfterDismiss(destination)
+            return
+        }
+
+        if let medicationId = IslandQuestEngine.medicationId(fromQuestId: quest.id),
+           let target = petMedicationTarget(medicationId) {
+            routeCoordinator.openSheet(.petMedication(target.pet.id))
+            return
+        }
+
+        if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: quest.id),
+           let human = humans.first(where: { $0.id == humanId }) {
+            routeCoordinator.openSheet(.humanWeight(human.id))
+            return
+        }
+
+        if let pet = targetPet(for: quest) {
+            openPetQuickKey(todayFocusPetQuickKey(for: quest, pet: pet), pet: pet)
+            return
+        }
+
+        if let plant = targetPlant(for: quest) {
+            openTodayFocusPlant(plant)
+            return
+        }
+
+        if quest.id == "q_reminder" {
+            selectTab(.calendar)
+            return
+        }
+
+        selectTab(.oasis)
+    }
+
+    private func completeTodayFocusQuest(_ quest: IslandQuest) {
+        if let medicationId = IslandQuestEngine.medicationId(fromQuestId: quest.id),
+           let target = petMedicationTarget(medicationId) {
+            commandExecutor.recordMedicationDose(medication: target.medication, pet: target.pet)
+            applyTodayFocusMutationFeedback(entityId: target.pet.id)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return
+        }
+
+        if let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id),
+           let event = allEvents.first(where: { $0.id == eventId }) {
+            commandExecutor.completeTodayFocusEvent(event)
+            applyTodayFocusMutationFeedback(entityId: event.id)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return
+        }
+
+        if quest.id == "q_water_plant",
+           let plant = targetPlant(for: quest) {
+            commandExecutor.recordPlantCare(.watering, plant: plant, executorId: currentExecutorId())
+            applyTodayFocusMutationFeedback(entityId: plant.id)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return
+        }
+
+        if quest.id == "q_fertilize_plant",
+           let plant = targetPlant(for: quest) {
+            commandExecutor.recordPlantCare(.fertilizing, plant: plant, executorId: currentExecutorId())
+            applyTodayFocusMutationFeedback(entityId: plant.id)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            return
+        }
+
+        if let humanId = IslandQuestEngine.humanWeightId(fromQuestId: quest.id),
+           let human = humans.first(where: { $0.id == humanId }) {
+            routeCoordinator.openSheet(.humanWeight(human.id))
+            return
+        }
+
+        guard let pet = targetPet(for: quest) else {
+            openTodayFocusQuest(quest)
+            return
+        }
+
+        switch todayFocusPetQuickKey(for: quest, pet: pet) {
+        case "feed", "water", "walk", "play":
+            performPetQuickAction(todayFocusPetQuickKey(for: quest, pet: pet), pet: pet)
+        case "potty":
+            commandExecutor.applyPottyCheckIn(
+                raw: PottyType.perfectPoop.rawValue,
+                pet: pet,
+                executorId: currentExecutorId(),
+                feedback: applyQuickActionExecutorFeedback
+            )
+        case "litter":
+            performPetQuickAction("litter", pet: pet)
+        case "weight", "moment":
+            openPetQuickKey(todayFocusPetQuickKey(for: quest, pet: pet), pet: pet)
+        default:
+            openTodayFocusQuest(quest)
+        }
+    }
+
+    private func openTodayFocusNegativeSignal(_ signal: IslandNegativeSignal) {
+        if let petId = signal.petId,
+           let pet = pets.first(where: { $0.id == petId && !$0.hasPassedAway }) {
+            switch signal.healthAlertType {
+            case .some(.weightGainAlert), .some(.weightLossAlert):
+                routeCoordinator.openSheet(.petWeight(pet.id))
+            case .some(.drinkingWeightAlert):
+                routeCoordinator.openSheet(.petWater(pet.id))
+            case .some(.noPotty):
+                routeCoordinator.openSheet(.petPotty(pet.id))
+            case .some(.noWalk):
+                routeCoordinator.openSheet(.petWalkSummary(pet.id))
+            case .some(.documentExpiringSoon):
+                routeCoordinator.openSheet(.petAllFeatures(pet.id))
+            default:
+                routeCoordinator.openSheet(.petHealth(pet.id, initialSection: .preventive))
+            }
+            return
+        }
+
+        if signal.iconName.contains("fork.knife"),
+           let pet = pets.first(where: { signal.title.contains($0.name) && !$0.hasPassedAway }) {
+            routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
+            return
+        }
+
+        if signal.iconName.contains("drop"),
+           let pet = pets.first(where: { signal.title.contains($0.name) && !$0.hasPassedAway }) {
+            routeCoordinator.openSheet(.petWater(pet.id))
+            return
+        }
+
+        if signal.iconName.contains("triangle"),
+           let pet = pets.first(where: { signal.title.contains($0.name) && !$0.hasPassedAway }) {
+            routeCoordinator.openSheet(.petPotty(pet.id))
+            return
+        }
+
+        routeCoordinator.openFunctionMenu(destination: .featureGroup(.healthBody))
+    }
+
+    private func openTodayFocusFamilyTask(_ task: FamilyCollaborationTask) {
+        routeCoordinator.openCrewRoster(mode: .collaboration)
+    }
+
+    private func confirmTodayFocusExchange(_ request: CoconutExchangeRequest) {
+        guard let receiver = activeHuman else {
+            routeCoordinator.openAccountSwitcher()
+            return
+        }
+        do {
+            try commandExecutor.confirmCoconutExchange(request, receiver: receiver)
+            applyTodayFocusMutationFeedback(entityId: request.id)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            routeCoordinator.openCoconutLog(.human(receiver.id))
+        }
+    }
+
+    private func openTodayFocusOasisQuest(_ quest: IslandQuest) -> Bool {
+        guard IslandQuestEngine.isOasisBuildQuest(quest.id) else { return false }
+        switch quest.id {
+        case IslandQuestEngine.oasisPetWizardQuestId:
+            routeCoordinator.openAddEntity(humans.isEmpty ? .human : .pet)
+        case IslandQuestEngine.oasisFirstMealQuestId:
+            if let pet = pets.first(where: { !$0.hasPassedAway }) {
+                routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
+            } else {
+                routeCoordinator.openAddEntity(.pet)
+            }
+        case IslandQuestEngine.oasisThemeQuestId:
+            routeCoordinator.openCrewRoster()
+        default:
+            selectTab(.oasis)
+        }
+        return true
+    }
+
+    private func eventDestination(for quest: IslandQuest) -> FocusHomeReminderDestination? {
+        guard let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id),
+              let event = allEvents.first(where: { $0.id == eventId }) else {
+            return nil
+        }
+        return FocusHomeReminderDeepLinkRouter.destination(
+            for: event,
+            pets: pets,
+            humans: humans,
+            plants: plants,
+            humanMedications: humanMedications
+        )
+    }
+
+    private func petMedicationTarget(_ medicationId: UUID) -> (pet: Pet, medication: PetMedication)? {
+        for pet in pets where !pet.hasPassedAway {
+            if let medication = pet.medications.first(where: { $0.id == medicationId }) {
+                return (pet, medication)
+            }
+        }
+        return nil
+    }
+
+    private func targetPet(for quest: IslandQuest) -> Pet? {
+        if let targetPetId = quest.targetPetId,
+           let pet = pets.first(where: { $0.id == targetPetId && !$0.hasPassedAway }) {
+            return pet
+        }
+        if quest.id == "q_walk" || quest.id == "q_potty" {
+            return pets.first(where: { !$0.hasPassedAway })
+        }
+        return nil
+    }
+
+    private func targetPlant(for quest: IslandQuest) -> Plant? {
+        if let targetPlantId = quest.targetPlantId {
+            return plants.first(where: { $0.id == targetPlantId })
+        }
+        switch quest.id {
+        case "q_water_plant":
+            return plants.first(where: { $0.needsWatering })
+        case "q_fertilize_plant":
+            return plants.first(where: { $0.needsFertilizing })
+        default:
+            return nil
+        }
+    }
+
+    private func openTodayFocusPlant(_ plant: Plant) {
+        selectedPlant = plant
+    }
+
+    private func todayFocusPetQuickKey(for quest: IslandQuest, pet: Pet) -> String {
+        if quest.id.hasPrefix("q_feed_") { return "feed" }
+        if quest.id.hasPrefix("q_water_") { return "water" }
+        if quest.id == "q_walk" { return "walk" }
+        if quest.id == "q_potty" {
+            return pet.species.contains("猫") || pet.species.contains("兔") ? "litter" : "potty"
+        }
+        if quest.id.hasPrefix("q_play_") { return "play" }
+        if quest.id.hasPrefix("q_weight_") { return "weight" }
+        if quest.id.hasPrefix("q_moment_") { return "moment" }
+        return "basic"
+    }
+
+    private func applyTodayFocusMutationFeedback(entityId: UUID) {
+        applyQuickActionExecutorFeedback(
+            ExpandedQuickActionExecutor.Feedback(
+                cardId: entityId,
+                coconutDelta: 0,
+                label: nil
+            )
+        )
     }
 
     private func openHeaderCoconutDestination() {

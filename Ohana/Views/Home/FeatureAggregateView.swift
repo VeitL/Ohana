@@ -83,7 +83,7 @@ struct FeatureAggregateView: View {
                 .font(.system(size: 17, weight: .black))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 34, height: 34)
-            Text(feature.title)
+            Text(LocalizedStringKey(feature.title))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)

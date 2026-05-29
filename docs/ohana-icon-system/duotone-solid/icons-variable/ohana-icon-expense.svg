@@ -39,6 +39,6 @@
 
       <rect class="primary" x="6" y="9" width="20" height="15.8" rx="5"/>
       <rect class="accent-soft" x="8.6" y="12" width="14.8" height="3" rx="1.5"/>
-      <text class="accent" x="16" y="21.4" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="10.6" font-weight="900">$</text>
+      <text class="accent" x="16" y="21.4" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="10.6" font-weight="900">¥</text>
   </g>
 </svg>

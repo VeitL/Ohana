@@ -179,6 +179,7 @@ struct CalendarView: View {
     @StateObject private var visibleDateCoordinator = CalendarVisibleDateCoordinator()
     @State private var listVisibleTopDate = Calendar.current.startOfDay(for: Date())
     @State private var visibleTimelineDateID: String? = CalendarView.todayTimelineDateID
+    @State private var timelineTodayScrollRequest = 0
     @State private var didScrollListToToday = false
     @State private var viewModeCommitTask: Task<Void, Never>?
     @State private var filterApplyTask: Task<Void, Never>?
@@ -799,11 +800,7 @@ struct CalendarView: View {
     // MARK: - Classic Calendar Header
     private var embeddedCalendarHeader: some View {
         HStack(spacing: 10) {
-            Text(calendarHeaderDate, format: .dateTime.year().month(.wide))
-                .font(.system(size: 19, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+            calendarHeaderTitle(fontSize: 19)
 
             Spacer(minLength: 8)
 
@@ -821,10 +818,7 @@ struct CalendarView: View {
 
     private var classicCalendarHeader: some View {
         HStack(spacing: 12) {
-            // 月历标题
-            Text(calendarHeaderDate, format: .dateTime.year().month(.wide))
-                .font(.system(size: 20, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
+            calendarHeaderTitle(fontSize: 20)
 
             Spacer()
 
@@ -850,6 +844,24 @@ struct CalendarView: View {
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, 10)
+    }
+
+    private func calendarHeaderTitle(fontSize: CGFloat) -> some View {
+        let l = L10n(AppLanguage.code)
+        return Button {
+            returnCalendarToToday()
+        } label: {
+            Text(calendarHeaderDate, format: .dateTime.year().month(.wide))
+                .font(.system(size: fontSize, weight: .black, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .frame(minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(zh: "返回今天", en: "Return to today", de: "Zu heute springen"))
+        .accessibilityValue(calendarHeaderDate.formatted(.dateTime.year().month(.wide)))
     }
 
     // MARK: - Sticky Calendar Header (Material)
@@ -1159,6 +1171,7 @@ struct CalendarView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
                 }
+                .scrollPosition(id: $visibleTimelineDateID, anchor: .top)
                 .onAppear {
                     scheduleInitialTimelineScrollIfNeeded(proxy: proxy)
                 }
@@ -1177,9 +1190,10 @@ struct CalendarView: View {
                 }
                 .onChange(of: visibleTimelineDateID) { _, dateID in
                     guard isCalendarPrepared else { return }
-                    guard let dateID else { return }
-                    scrollTimeline(proxy, to: dateID, animated: false)
                     scheduleVisibleCalendarMonthUpdate(from: dateID)
+                }
+                .onChange(of: timelineTodayScrollRequest) { _, _ in
+                    scrollListToToday(proxy: proxy)
                 }
             }
             // F2: 删除 alert 已移至 SwipeableEventRow’s confirmationDialog
@@ -1383,6 +1397,34 @@ struct CalendarView: View {
         } else {
             proxy.scrollTo(dateID, anchor: .top)
         }
+    }
+
+    private func returnCalendarToToday() {
+        OhanaFeedback.light()
+        listInitialPositionTask?.cancel()
+        listInitialPositionTask = nil
+        let today = Calendar.current.startOfDay(for: Date())
+        let todayID = timelineDateID(today)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            selectedDate = today
+            listVisibleTopDate = today
+            if timelineDateIDs.contains(todayID) {
+                visibleTimelineDateID = todayID
+                timelineTodayScrollRequest += 1
+            }
+            didScrollListToToday = true
+        }
+    }
+
+    private func scrollListToToday(proxy: ScrollViewProxy) {
+        guard isCalendarPrepared else { return }
+        let today = Calendar.current.startOfDay(for: Date())
+        let todayID = timelineDateID(today)
+        guard timelineDateIDs.contains(todayID) else { return }
+        scrollTimeline(proxy, to: todayID, animated: false)
+        scheduleVisibleCalendarMonthUpdate(from: todayID)
     }
 
     private func scheduleVisibleCalendarMonthUpdate(from dateID: String?) {

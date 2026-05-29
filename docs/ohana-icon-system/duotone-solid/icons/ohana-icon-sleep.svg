@@ -2,12 +2,9 @@
   <title>Sleep / 休息</title>
   <g>
 
-      <path style="fill:#5f6fd8" d="M5.7 25.5 16 8.4l10.3 17.1H5.7Z"/>
-      <path style="fill:#5f6fd8;opacity:.22" d="M16 8.4v17.1H5.7L16 8.4Z"/>
-      <path style="fill:#ffd36c" d="M16 16.7 21 25.5H11l5-8.8Z"/>
-      <rect style="fill:#5f6fd8" x="6.2" y="24.2" width="19.6" height="2.4" rx="1.2"/>
-      <text style="fill:#ffd36c" x="23.5" y="8.6" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="5.5" font-weight="900">Z</text>
-      <text style="fill:#ffd36c" x="26.6" y="13" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="4.5" font-weight="900">Z</text>
-      <text style="fill:#ffd36c;opacity:.28" x="20" y="5.9" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="4" font-weight="900">Z</text>
+      <path style="fill:#5f6fd8" d="M16 6.4 27 26.2H5Z"/>
+      <path style="fill:#ffd36c;opacity:.28" d="M15.9 14.1 20.6 25.8H11.2Z"/>
+      <text style="fill:#ffd36c" x="21.1" y="10.9" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="7.4" font-weight="900">Z</text>
+      <text style="fill:#ffd36c;opacity:.28" x="25" y="14.6" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="5.9" font-weight="900">z</text>
   </g>
 </svg>

@@ -37,16 +37,7 @@
   <title>Settings / 设置</title>
   <g>
 
-      <rect class="primary" x="14.3" y="3.6" width="3.4" height="6.2" rx="1.7"/>
-      <rect class="primary" x="14.3" y="22.2" width="3.4" height="6.2" rx="1.7"/>
-      <rect class="primary" x="22.2" y="14.3" width="6.2" height="3.4" rx="1.7"/>
-      <rect class="primary" x="3.6" y="14.3" width="6.2" height="3.4" rx="1.7"/>
-      <rect class="primary" x="14.3" y="3.6" width="3.4" height="6.2" rx="1.7" transform="rotate(45 16 16)"/>
-      <rect class="primary" x="14.3" y="22.2" width="3.4" height="6.2" rx="1.7" transform="rotate(45 16 16)"/>
-      <rect class="primary" x="22.2" y="14.3" width="6.2" height="3.4" rx="1.7" transform="rotate(45 16 16)"/>
-      <rect class="primary" x="3.6" y="14.3" width="6.2" height="3.4" rx="1.7" transform="rotate(45 16 16)"/>
-      <circle class="primary" cx="16" cy="16" r="7.6"/>
-      <circle class="accent-soft" cx="16" cy="16" r="4"/>
-      <circle class="accent" cx="16" cy="16" r="2"/>
+      <path class="primary" d="M27.2 16 24 17.3l1.8 2.9-3.5 3.5-2.9-1.8-1.3 3.2h-4.2l-1.3-3.2-2.9 1.8-3.5-3.5L8 17.3 4.8 16 8 14.7 6.2 11.8l3.5-3.5 2.9 1.8 1.3-3.2h4.2l1.3 3.2 2.9-1.8 3.5 3.5-1.8 2.9L27.2 16Z"/>
+      <circle class="accent-soft" cx="16" cy="16" r="4.1"/>
   </g>
 </svg>

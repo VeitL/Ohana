@@ -192,7 +192,7 @@ struct L10n {
     }
     var thisMonth: String { isEn ? "This month" : "本月" }
     var patrol: String { isEn ? "Patrol" : "巡岛" }
-    var potty: String { isEn ? "Potty" : "噗噗" }
+    var potty: String { tr(zh: "噗噗", en: "Poop", de: "Häufchen") }
     var today: String { isEn ? "Today" : "今日" }
     var foodStock: String { isEn ? "Food Stock" : "粮仓" }
     func daysLeft(_ n: Int) -> String { isEn ? "\(n) days left" : "仅剩 \(n) 天" }
@@ -709,10 +709,10 @@ struct L10n {
         isEn ? "Walking \(petName)!" : "开始遛 \(petName)！"
     }
     func homeToastPotty(_ petName: String, points: Int) -> String {
-        isEn ? "\(petName) potty log +\(points) 🥥" : "\(petName) 便便打卡 +\(points)🥥"
+        tr(zh: "\(petName) 噗噗打卡 +\(points)🥥", en: "\(petName) poop logged +\(points) 🥥", de: "\(petName) Häufchen +\(points) 🥥")
     }
     func homeToastLitter(_ petName: String, points: Int) -> String {
-        isEn ? "\(petName) litter box +\(points) 🥥" : "\(petName) 铲猫砂 +\(points)🥥"
+        tr(zh: "\(petName) 铲砂完成 +\(points)🥥", en: "\(petName) litter scooped +\(points) 🥥", de: "\(petName) Klo sauber +\(points) 🥥")
     }
     func homeToastManualFeed(_ petName: String, points: Int) -> String {
         isEn ? "\(petName) manual feed +\(points) 🥥" : "\(petName) 手动喂食 +\(points)🥥"
@@ -777,8 +777,8 @@ struct L10n {
     var homeQAWaterChange: String { isEn ? "Change water" : "换水" }
     var homeQAFilterClean: String { isEn ? "Filter clean" : "清滤材" }
     var homeQAWalk: String { isEn ? "Walk" : "遛狗" }
-    var homeQAPotty: String { isEn ? "Potty" : "便便" }
-    var homeQALitter: String { isEn ? "Litter" : "铲屎" }
+    var homeQAPotty: String { tr(zh: "噗噗", en: "Poop", de: "Häufchen") }
+    var homeQALitter: String { tr(zh: "铲砂", en: "Scoop", de: "Schaufeln") }
     var homeQAGroom: String { isEn ? "Groom" : "护理" }
     var homeQAWeight: String { isEn ? "Weight" : "体重" }
     var homeQASport: String { isEn ? "Workout" : "运动" }
@@ -829,18 +829,17 @@ struct L10n {
 
     // MARK: - Care / hygiene / potty (UI labels; persisted logs keep zh `rawValue`)
     func careTypeUILabel(_ type: CareType) -> String {
-        if !isEn { return type.label }
         switch type {
-        case .feeding: return "Feeding"
-        case .watering: return "Water"
-        case .litter: return "Litter box"
-        case .waterChange: return "Water change"
-        case .filterClean: return "Filter cleaning"
-        case .cageCleaning: return "Cage cleaning"
-        case .freeFlight: return "Free flight"
-        case .misting: return "Misting"
-        case .substrateChange: return "Substrate change"
-        case .play: return "Playtime"
+        case .feeding: return tr(zh: "喂食", en: "Feeding", de: "Füttern")
+        case .watering: return tr(zh: "喂水", en: "Water", de: "Wasser")
+        case .litter: return tr(zh: "铲砂", en: "Scoop litter", de: "Klo reinigen")
+        case .waterChange: return tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
+        case .filterClean: return tr(zh: "清滤材", en: "Filter cleaning", de: "Filter reinigen")
+        case .cageCleaning: return tr(zh: "清鸟笼", en: "Cage cleaning", de: "Käfig reinigen")
+        case .freeFlight: return tr(zh: "放飞", en: "Free flight", de: "Freiflug")
+        case .misting: return tr(zh: "喷水", en: "Misting", de: "Besprühen")
+        case .substrateChange: return tr(zh: "换垫材", en: "Substrate change", de: "Substratwechsel")
+        case .play: return tr(zh: "陪玩", en: "Playtime", de: "Spielen")
         }
     }
 
@@ -856,20 +855,16 @@ struct L10n {
     }
 
     func pottyTypeUILabel(_ type: PottyType) -> String {
-        if !isEn { return type.rawValue }
-        switch type {
-        case .perfectPoop: return "Great poop"
-        case .softPoop: return "Soft stool"
-        case .liquidPoop: return "Loose stool"
-        case .pee: return "Pee"
-        }
+        type.localizedLabel(self)
     }
 
     func homeToastPottyLine(petName: String, type: PottyType, points: Int) -> String {
         let label = pottyTypeUILabel(type)
-        return isEn
-            ? "\(petName) \(type.emoji) \(label) +\(points) 🥥"
-            : "\(petName) \(type.emoji)\(label) +\(points)🥥"
+        return tr(
+            zh: "\(petName) \(type.emoji)\(label) +\(points)🥥",
+            en: "\(petName) \(type.emoji) \(label) +\(points) 🥥",
+            de: "\(petName) \(type.emoji) \(label) +\(points) 🥥"
+        )
     }
 
     func homeToastGroomLine(petName: String, type: HygieneType, points: Int) -> String {
@@ -899,7 +894,7 @@ struct L10n {
 
     var petCardWalkPatrolling: String { isEn ? "On patrol" : "巡岛中" }
     var petCardWalkDistanceLabel: String { isEn ? "Patrol distance" : "巡岛距离" }
-    var petCardWalkPoopLabel: String { isEn ? "Poops" : "便便次数" }
+    var petCardWalkPoopLabel: String { tr(zh: "噗噗站点", en: "Poop stops", de: "Häufchen-Stopps") }
     var petCardPause: String { isEn ? "Pause" : "暂停" }
     var petCardResume: String { isEn ? "Resume" : "继续" }
     var petCardEndWalk: String { isEn ? "End" : "结束" }
