@@ -247,6 +247,15 @@ final class Human {
         return "不满1岁"
     }
 
+    func walletAgeChip(l: L10n) -> String? {
+        guard let b = birthday else { return nil }
+        let years = Calendar.current.dateComponents([.year], from: b, to: Date()).year ?? 0
+        if years >= 1 {
+            return l.tr(zh: "\(years)岁", en: "\(years) yrs young", de: "\(years) J. jung")
+        }
+        return l.tr(zh: "不满1岁", en: "Under 1 ✨", de: "Unter 1 ✨")
+    }
+
     /// 阳历十二星座（与 `AddHumanWizardView` 向导一致）
     static func westernZodiacChinese(for date: Date) -> String {
         let c = Calendar.current
@@ -287,8 +296,38 @@ final class Human {
         return "Capricorn"
     }
 
+    static func westernZodiacGerman(for date: Date) -> String {
+        let c = Calendar.current
+        let m = c.component(.month, from: date)
+        let d = c.component(.day, from: date)
+        if (m == 12 && d >= 22) || (m == 1 && d <= 19) { return "Steinbock" }
+        if (m == 1 && d >= 20) || (m == 2 && d <= 18) { return "Wassermann" }
+        if (m == 2 && d >= 19) || (m == 3 && d <= 20) { return "Fische" }
+        if (m == 3 && d >= 21) || (m == 4 && d <= 19) { return "Widder" }
+        if (m == 4 && d >= 20) || (m == 5 && d <= 20) { return "Stier" }
+        if (m == 5 && d >= 21) || (m == 6 && d <= 21) { return "Zwillinge" }
+        if (m == 6 && d >= 22) || (m == 7 && d <= 22) { return "Krebs" }
+        if (m == 7 && d >= 23) || (m == 8 && d <= 22) { return "Löwe" }
+        if (m == 8 && d >= 23) || (m == 9 && d <= 22) { return "Jungfrau" }
+        if (m == 9 && d >= 23) || (m == 10 && d <= 23) { return "Waage" }
+        if (m == 10 && d >= 24) || (m == 11 && d <= 21) { return "Skorpion" }
+        if (m == 11 && d >= 22) || (m == 12 && d <= 21) { return "Schütze" }
+        return "Steinbock"
+    }
+
     static func westernZodiacDisplay(for date: Date, isEnglish: Bool) -> String {
         isEnglish ? westernZodiacEnglish(for: date) : westernZodiacChinese(for: date)
+    }
+
+    static func westernZodiacDisplay(for date: Date, l: L10n) -> String {
+        switch l.languageCode {
+        case "de":
+            return westernZodiacGerman(for: date)
+        case "en":
+            return westernZodiacEnglish(for: date)
+        default:
+            return westernZodiacChinese(for: date)
+        }
     }
     
     var roleText: String {

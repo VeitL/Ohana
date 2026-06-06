@@ -30,7 +30,7 @@ struct EmptyStateWelcomeCard: View {
                         Text("添加宠物")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                     }
-                    .foregroundStyle(.black)
+                    .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
                     .background(Color.goLime, in: Capsule())
@@ -48,7 +48,7 @@ struct EmptyStateWelcomeCard: View {
                     .foregroundStyle(Color(hex: "23181A").opacity(0.88))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
-                    .background(Color.white.opacity(0.6), in: Capsule())
+                    .background(Color.ohanaCardSurfaceElevated.opacity(0.72), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel("添加家人")
@@ -68,8 +68,7 @@ struct EmptyStateWelcomeCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                .stroke(Color.ohanaGlassStroke.opacity(0.55), lineWidth: 1)
         )
-        .shadow(color: Color(hex: "23181A").opacity(0.08), radius: 14, y: 6)
     }
 }

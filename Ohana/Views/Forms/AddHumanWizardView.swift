@@ -144,26 +144,24 @@ struct AddHumanWizardView: View {
         if !gender.isEmpty { parts.append(l.humanGenderDisplay(gender)) }
         if !bloodType.isEmpty { parts.append(l.humanWizBloodTag(bloodType)) }
         if !nationalityCountry.isEmpty {
-            parts.append(l.isEn ? "From \(nationalityCountry)" : "国籍 \(nationalityCountry)")
+            parts.append(l.humanWizNationalityTag(nationalityCountry))
         }
         if !residenceCountry.isEmpty || !residenceCity.isEmpty {
             if residenceCountry.isEmpty {
-                parts.append(l.isEn ? "Nest: \(residenceCity)" : "现居 \(residenceCity)")
+                parts.append(l.tr(zh: "现居 \(residenceCity)", en: "Nest: \(residenceCity)", de: "Nest: \(residenceCity)"))
             } else if residenceCity.isEmpty {
-                parts.append(l.isEn ? "Nest: \(residenceCountry)" : "现居 \(residenceCountry)")
+                parts.append(l.tr(zh: "现居 \(residenceCountry)", en: "Nest: \(residenceCountry)", de: "Nest: \(residenceCountry)"))
             } else {
-                parts.append(l.isEn ? "Nest: \(residenceCountry) · \(residenceCity)" : "现居 \(residenceCountry)·\(residenceCity)")
+                parts.append(l.tr(zh: "现居 \(residenceCountry)·\(residenceCity)", en: "Nest: \(residenceCountry) · \(residenceCity)", de: "Nest: \(residenceCountry) · \(residenceCity)"))
             }
         }
         if hasBirthday {
             let cal = Calendar.current
             let y = cal.dateComponents([.year], from: birthday, to: Date()).year ?? 0
-            if l.isEn {
-                if y >= 1 { parts.append("\(y) yrs young") } else { parts.append("Under 1 ✨") }
-            } else if y >= 1 {
-                parts.append("\(y)岁")
+            if y >= 1 {
+                parts.append(l.tr(zh: "\(y)岁", en: "\(y) yrs young", de: "\(y) J. jung"))
             } else {
-                parts.append("不满1岁")
+                parts.append(l.tr(zh: "不满1岁", en: "Under 1 ✨", de: "Unter 1 ✨"))
             }
         }
         let cleanHeight = heightText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -182,14 +180,13 @@ struct AddHumanWizardView: View {
 
     private var residenceTagText: String? {
         if residenceCountry.isEmpty, residenceCity.isEmpty { return nil }
-        if l.isEn {
-            if residenceCity.isEmpty { return "Nest: \(residenceCountry)" }
-            if residenceCountry.isEmpty { return "Nest: \(residenceCity)" }
-            return "Nest: \(residenceCountry) · \(residenceCity)"
+        if residenceCity.isEmpty {
+            return l.tr(zh: "现居 \(residenceCountry)", en: "Nest: \(residenceCountry)", de: "Nest: \(residenceCountry)")
         }
-        if residenceCity.isEmpty { return "现居 \(residenceCountry)" }
-        if residenceCountry.isEmpty { return "现居 \(residenceCity)" }
-        return "现居 \(residenceCountry)·\(residenceCity)"
+        if residenceCountry.isEmpty {
+            return l.tr(zh: "现居 \(residenceCity)", en: "Nest: \(residenceCity)", de: "Nest: \(residenceCity)")
+        }
+        return l.tr(zh: "现居 \(residenceCountry)·\(residenceCity)", en: "Nest: \(residenceCountry) · \(residenceCity)", de: "Nest: \(residenceCountry) · \(residenceCity)")
     }
 
     private var isNameDuplicate: Bool {
@@ -246,7 +243,7 @@ struct AddHumanWizardView: View {
             decodedAvatar: decodedAvatar,
             decodedAvatarTransparent: decodedAvatarTransparent,
             themeColorHex: themeColorHex,
-            zodiacText: hasBirthday ? Human.westernZodiacDisplay(for: birthday, isEnglish: l.isEn) : nil,
+            zodiacText: hasBirthday ? Human.westernZodiacDisplay(for: birthday, l: l) : nil,
             mbtiText: mbti.trimmingCharacters(in: .whitespaces).isEmpty ? nil : mbti.uppercased(),
             subtitle: draftWalletSubtitle,
             cornerRadius: walletCardCorner
@@ -455,7 +452,7 @@ struct AddHumanWizardView: View {
                         Text(birthday.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted)))
                             .font(.system(size: 20, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(Human.westernZodiacDisplay(for: birthday, isEnglish: l.isEn))
+                        Text(Human.westernZodiacDisplay(for: birthday, l: l))
                             .font(.system(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goPrimary)
                     }
@@ -869,7 +866,7 @@ struct AddHumanWizardView: View {
                             bloodType.isEmpty ? nil : l.humanWizBloodTag(bloodType),
                             nationalityCountry.isEmpty ? nil : l.humanWizNationalityTag(nationalityCountry),
                             residenceTagText,
-                            hasBirthday ? Human.westernZodiacDisplay(for: birthday, isEnglish: l.isEn) : nil,
+                            hasBirthday ? Human.westernZodiacDisplay(for: birthday, l: l) : nil,
                             hasBirthday ? birthday.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted)) : nil,
                             mbti.isEmpty ? nil : mbti.uppercased(),
                             heightText.isEmpty ? nil : "\(heightText) cm",

@@ -15,6 +15,7 @@ struct CustomPersonalityTagRecord: Codable, Identifiable, Equatable {
     var titleEn: String
 
     func title(isEnglish: Bool) -> String { isEnglish ? titleEn : titleZh }
+    func title(l: L10n) -> String { l.tr(zh: titleZh, en: titleEn, de: titleEn) }
 }
 
 enum CustomPersonalityTagStore {
@@ -31,6 +32,10 @@ enum CustomPersonalityTagStore {
     static func title(forId id: String, isEnglish: Bool) -> String? {
         load().first { $0.id == id }.map { $0.title(isEnglish: isEnglish) }
     }
+
+    static func title(forId id: String, l: L10n) -> String? {
+        load().first { $0.id == id }.map { $0.title(l: l) }
+    }
 }
 
 // MARK: - Tag 目录（稳定 id 存入 Pet.personalityTagsRaw）
@@ -41,49 +46,59 @@ struct PetPersonalityTag: Identifiable, Hashable {
     let sfSymbol: String
     let titleZh: String
     let titleEn: String
+    let titleDe: String
 
     func title(isEnglish: Bool) -> String { isEnglish ? titleEn : titleZh }
+    func title(l: L10n) -> String { l.tr(zh: titleZh, en: titleEn, de: titleDe) }
+
+    init(id: String, sfSymbol: String, titleZh: String, titleEn: String, titleDe: String? = nil) {
+        self.id = id
+        self.sfSymbol = sfSymbol
+        self.titleZh = titleZh
+        self.titleEn = titleEn
+        self.titleDe = titleDe ?? titleEn
+    }
 
     static let allTags: [PetPersonalityTag] = [
-        .init(id: "curious", sfSymbol: "magnifyingglass", titleZh: "好奇宝宝", titleEn: "Curious soul"),
-        .init(id: "lazy", sfSymbol: "bed.double.fill", titleZh: "小懒猪", titleEn: "Couch potato"),
-        .init(id: "energetic", sfSymbol: "bolt.fill", titleZh: "精力充沛", titleEn: "Lightning mode"),
-        .init(id: "clingy", sfSymbol: "figure.2.and.child.holdinghands", titleZh: "黏人精", titleEn: "Velcro baby"),
-        .init(id: "smart", sfSymbol: "lightbulb.fill", titleZh: "聪明蛋", titleEn: "Little genius"),
-        .init(id: "toy", sfSymbol: "gamecontroller.fill", titleZh: "玩具控", titleEn: "Toy boss"),
-        .init(id: "foodie", sfSymbol: "fork.knife", titleZh: "干饭王", titleEn: "Food critic"),
-        .init(id: "drama", sfSymbol: "theatermasks.fill", titleZh: "戏精", titleEn: "Drama star"),
-        .init(id: "clean", sfSymbol: "sparkles", titleZh: "洁癖星人", titleEn: "Clean freak"),
-        .init(id: "shy", sfSymbol: "eye.slash.fill", titleZh: "胆小鬼", titleEn: "Shy bean"),
-        .init(id: "brave", sfSymbol: "shield.fill", titleZh: "勇敢崽", titleEn: "Brave heart"),
-        .init(id: "sleepy", sfSymbol: "moon.zzz.fill", titleZh: "睡神", titleEn: "Sleep CEO"),
-        .init(id: "social", sfSymbol: "person.3.fill", titleZh: "社交达人", titleEn: "Party animal"),
-        .init(id: "gentle", sfSymbol: "heart.fill", titleZh: "温柔派", titleEn: "Gentle soul"),
-        .init(id: "playful", sfSymbol: "figure.play", titleZh: "贪玩鬼", titleEn: "Play machine"),
-        .init(id: "quiet", sfSymbol: "speaker.slash.fill", titleZh: "安静派", titleEn: "Quiet type"),
-        .init(id: "stubborn", sfSymbol: "arrow.triangle.2.circlepath", titleZh: "倔脾气", titleEn: "Stubborn star"),
-        .init(id: "vocal", sfSymbol: "waveform", titleZh: "话痨", titleEn: "Chatterbox"),
-        .init(id: "greedy", sfSymbol: "takeoutbag.and.cup.and.straw.fill", titleZh: "小吃货", titleEn: "Snack gremlin"),
-        .init(id: "guardian", sfSymbol: "lock.shield.fill", titleZh: "护主", titleEn: "Guard mode"),
-        .init(id: "independent", sfSymbol: "figure.stand", titleZh: "独立派", titleEn: "Solo artist"),
-        .init(id: "trainable", sfSymbol: "graduationcap.fill", titleZh: "好训练", titleEn: "Quick learner"),
-        .init(id: "anxious", sfSymbol: "exclamationmark.triangle.fill", titleZh: "小紧张", titleEn: "Nervous bean"),
-        .init(id: "mischief", sfSymbol: "flame.fill", titleZh: "捣蛋王", titleEn: "Chaos agent"),
-        .init(id: "loyal", sfSymbol: "star.fill", titleZh: "忠诚", titleEn: "Loyal buddy"),
-        .init(id: "chill", sfSymbol: "leaf.fill", titleZh: "佛系", titleEn: "Chill vibes"),
-        .init(id: "snuggler", sfSymbol: "figure.hugging", titleZh: "抱抱怪", titleEn: "Cuddle bug"),
-        .init(id: "moody", sfSymbol: "cloud.bolt.fill", titleZh: "情绪派", titleEn: "Mood swing"),
-        .init(id: "spoiled", sfSymbol: "crown.fill", titleZh: "被宠坏了", titleEn: "Spoiled rotten"),
-        .init(id: "detective", sfSymbol: "eye.fill", titleZh: "侦探气质", titleEn: "Little detective"),
-        .init(id: "photogenic", sfSymbol: "camera.fill", titleZh: "天生模特", titleEn: "Born model"),
-        .init(id: "nightowl", sfSymbol: "moon.stars.fill", titleZh: "夜猫子", titleEn: "Night owl"),
-        .init(id: "sunny", sfSymbol: "sun.max.fill", titleZh: "阳光系", titleEn: "Sunshine mode"),
-        .init(id: "collector", sfSymbol: "archivebox.fill", titleZh: "收藏家", titleEn: "Hoarder"),
-        .init(id: "escape_artist", sfSymbol: "figure.run", titleZh: "逃跑艺术家", titleEn: "Escape artist"),
-        .init(id: "zen", sfSymbol: "figure.mind.and.body", titleZh: "禅宗派", titleEn: "Zen master"),
-        .init(id: "jealous", sfSymbol: "eyes", titleZh: "超吃醋", titleEn: "Jelly bean"),
-        .init(id: "foodthief", sfSymbol: "hand.raised.fill", titleZh: "偷食小贼", titleEn: "Food bandit"),
-        .init(id: "chatty", sfSymbol: "bubble.left.fill", titleZh: "碎碎念", titleEn: "Chatty"),
+        .init(id: "curious", sfSymbol: "magnifyingglass", titleZh: "好奇宝宝", titleEn: "Curious soul", titleDe: "Neugierig"),
+        .init(id: "lazy", sfSymbol: "bed.double.fill", titleZh: "小懒猪", titleEn: "Couch potato", titleDe: "Sofamodus"),
+        .init(id: "energetic", sfSymbol: "bolt.fill", titleZh: "精力充沛", titleEn: "Lightning mode", titleDe: "Blitzmodus"),
+        .init(id: "clingy", sfSymbol: "figure.2.and.child.holdinghands", titleZh: "黏人精", titleEn: "Velcro baby", titleDe: "Klebeherz"),
+        .init(id: "smart", sfSymbol: "lightbulb.fill", titleZh: "聪明蛋", titleEn: "Little genius", titleDe: "Köpfchen"),
+        .init(id: "toy", sfSymbol: "gamecontroller.fill", titleZh: "玩具控", titleEn: "Toy boss", titleDe: "Spielzeugboss"),
+        .init(id: "foodie", sfSymbol: "fork.knife", titleZh: "干饭王", titleEn: "Food critic", titleDe: "Feinschmecker"),
+        .init(id: "drama", sfSymbol: "theatermasks.fill", titleZh: "戏精", titleEn: "Drama star", titleDe: "Drama-Star"),
+        .init(id: "clean", sfSymbol: "sparkles", titleZh: "洁癖星人", titleEn: "Clean freak", titleDe: "Putzprofi"),
+        .init(id: "shy", sfSymbol: "eye.slash.fill", titleZh: "胆小鬼", titleEn: "Shy bean", titleDe: "Schüchtern"),
+        .init(id: "brave", sfSymbol: "shield.fill", titleZh: "勇敢崽", titleEn: "Brave heart", titleDe: "Mutig"),
+        .init(id: "sleepy", sfSymbol: "moon.zzz.fill", titleZh: "睡神", titleEn: "Sleep CEO", titleDe: "Schlafprofi"),
+        .init(id: "social", sfSymbol: "person.3.fill", titleZh: "社交达人", titleEn: "Party animal", titleDe: "Partymodus"),
+        .init(id: "gentle", sfSymbol: "heart.fill", titleZh: "温柔派", titleEn: "Gentle soul", titleDe: "Sanft"),
+        .init(id: "playful", sfSymbol: "figure.play", titleZh: "贪玩鬼", titleEn: "Play machine", titleDe: "Spielkind"),
+        .init(id: "quiet", sfSymbol: "speaker.slash.fill", titleZh: "安静派", titleEn: "Quiet type", titleDe: "Leise"),
+        .init(id: "stubborn", sfSymbol: "arrow.triangle.2.circlepath", titleZh: "倔脾气", titleEn: "Stubborn star", titleDe: "Sturkopf"),
+        .init(id: "vocal", sfSymbol: "waveform", titleZh: "话痨", titleEn: "Chatterbox", titleDe: "Plaudertasche"),
+        .init(id: "greedy", sfSymbol: "takeoutbag.and.cup.and.straw.fill", titleZh: "小吃货", titleEn: "Snack fan", titleDe: "Snackfan"),
+        .init(id: "guardian", sfSymbol: "lock.shield.fill", titleZh: "护主", titleEn: "Guard mode", titleDe: "Beschützer"),
+        .init(id: "independent", sfSymbol: "figure.stand", titleZh: "独立派", titleEn: "Solo artist", titleDe: "Solo-Typ"),
+        .init(id: "trainable", sfSymbol: "graduationcap.fill", titleZh: "好训练", titleEn: "Quick learner", titleDe: "Lernt schnell"),
+        .init(id: "anxious", sfSymbol: "exclamationmark.triangle.fill", titleZh: "小紧张", titleEn: "Nervous bean", titleDe: "Etwas nervös"),
+        .init(id: "mischief", sfSymbol: "flame.fill", titleZh: "捣蛋王", titleEn: "Chaos agent", titleDe: "Unsinnsprofi"),
+        .init(id: "loyal", sfSymbol: "star.fill", titleZh: "忠诚", titleEn: "Loyal buddy", titleDe: "Treu"),
+        .init(id: "chill", sfSymbol: "leaf.fill", titleZh: "佛系", titleEn: "Chill vibes", titleDe: "Ganz entspannt"),
+        .init(id: "snuggler", sfSymbol: "figure.hugging", titleZh: "抱抱怪", titleEn: "Cuddle bug", titleDe: "Kuschelprofi"),
+        .init(id: "moody", sfSymbol: "cloud.bolt.fill", titleZh: "情绪派", titleEn: "Mood swing", titleDe: "Launenwelle"),
+        .init(id: "spoiled", sfSymbol: "crown.fill", titleZh: "被宠坏了", titleEn: "Spoiled rotten", titleDe: "Sehr verwöhnt"),
+        .init(id: "detective", sfSymbol: "eye.fill", titleZh: "侦探气质", titleEn: "Little detective", titleDe: "Detektivblick"),
+        .init(id: "photogenic", sfSymbol: "camera.fill", titleZh: "天生模特", titleEn: "Born model", titleDe: "Fotostar"),
+        .init(id: "nightowl", sfSymbol: "moon.stars.fill", titleZh: "夜猫子", titleEn: "Night owl", titleDe: "Nachtmodus"),
+        .init(id: "sunny", sfSymbol: "sun.max.fill", titleZh: "阳光系", titleEn: "Sunshine mode", titleDe: "Sonnig"),
+        .init(id: "collector", sfSymbol: "archivebox.fill", titleZh: "收藏家", titleEn: "Collector", titleDe: "Sammler"),
+        .init(id: "escape_artist", sfSymbol: "figure.run", titleZh: "逃跑艺术家", titleEn: "Escape artist", titleDe: "Ausbruchskünstler"),
+        .init(id: "zen", sfSymbol: "figure.mind.and.body", titleZh: "禅宗派", titleEn: "Zen master", titleDe: "Zen-Modus"),
+        .init(id: "jealous", sfSymbol: "eyes", titleZh: "超吃醋", titleEn: "Jelly bean", titleDe: "Eifersüchtig"),
+        .init(id: "foodthief", sfSymbol: "hand.raised.fill", titleZh: "偷食小贼", titleEn: "Food bandit", titleDe: "Futterdieb"),
+        .init(id: "chatty", sfSymbol: "bubble.left.fill", titleZh: "碎碎念", titleEn: "Chatty", titleDe: "Plaudrig"),
     ]
 
     static func lookup(_ id: String) -> PetPersonalityTag? {
@@ -94,6 +109,12 @@ struct PetPersonalityTag: Identifiable, Hashable {
         if let t = lookup(id) { return t.title(isEnglish: isEnglish) }
         if id.hasPrefix("u."), let c = CustomPersonalityTagStore.title(forId: id, isEnglish: isEnglish) { return c }
         return isEnglish ? "Tag" : "标签"
+    }
+
+    static func displayTitle(for id: String, l: L10n) -> String {
+        if let t = lookup(id) { return t.title(l: l) }
+        if id.hasPrefix("u."), let c = CustomPersonalityTagStore.title(forId: id, l: l) { return c }
+        return l.tr(zh: "标签", en: "Tag", de: "Tag")
     }
 
     static func symbolName(for id: String) -> String {
@@ -141,8 +162,14 @@ enum PetTagGreeting {
 
     private static func customLines(tagId: String, name: String, l: L10n) -> [String] {
         guard tagId.hasPrefix("u."),
-              let label = CustomPersonalityTagStore.title(forId: tagId, isEnglish: l.isEn) else { return [] }
-        if l.isEn {
+              let label = CustomPersonalityTagStore.title(forId: tagId, l: l) else { return [] }
+        if l.isDe {
+            return [
+                "\(name) zeigt heute \(label)-Energie.",
+                "Heute im Programm: \(name) im \(label)-Modus."
+            ]
+        }
+        if l.isEnglish {
             return [
                 "\(name)’s “\(label)” energy is showing.",
                 "Today’s headline: \(name) in full \(label) mode."
@@ -158,7 +185,15 @@ enum PetTagGreeting {
         let custom = customLines(tagId: tagId, name: name, l: l)
         if !custom.isEmpty { return custom }
 
-        if l.isEn {
+        if l.isDe {
+            let label = PetPersonalityTag.displayTitle(for: tagId, l: l)
+            return [
+                "\(name) ist heute ganz \(label).",
+                "\(name)s \(label)-Modus ist an."
+            ]
+        }
+
+        if l.isEnglish {
             switch tagId {
             case "curious":
                 return ["Is \(name) already doing recon at the door?", "\(name)’s curiosity budget is unlimited today."]

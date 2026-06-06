@@ -1,6 +1,6 @@
 # Ohana 项目 AI 导航文件
 > 每次新对话开始时，将本文件内容贴入对话框，或在 Windsurf 中 @CONTEXT.md
-> 最后更新：2026-04-19 | Schema: ArkSchemaV19 | Phase 1-76 完成
+> 最后更新：2026-06-02 | Schema: ArkSchemaV56 | 发布稳定化基线
 
 ---
 
@@ -46,9 +46,10 @@
 ## ⚠️ 改代码前必读的强制规则
 
 ### 1. Schema 变更
-- 当前版本：**ArkSchemaV19**（V19 新增 `Pet.cardStyleRaw`）
-- **任何 Model 字段变更** → 必须新建 `ArkSchemaV20`，在 `SharedModelContainer.swift` 的 `stages` 追加迁移
-- 新增字段必须有默认值，尽量用 `lightweight` 迁移
+- 当前版本：**ArkSchemaV56**（V56 新增 `HumanHealthMetricLog`）
+- **任何 Model 字段变更** → 必须新建 `ArkSchemaV57`，并把它追加到 `ArkMigrationPlan.schemas`
+- 当前 `ArkMigrationPlan.stages` 故意保持为空；只新增字段/模型时依赖 SwiftData lightweight migration，避免 iOS 26 相邻 schema Core Data hash 相同导致 `model reference cannot be equal`
+- 新增字段必须有默认值，尽量保持 lightweight migration
 - 绝对不能跳版本号
 
 ### 2. 椰子奖励

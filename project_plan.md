@@ -1,6 +1,18 @@
 # Ohana App 开发进度
 
-> 最后更新: 2026-03-19 | Schema: ArkSchemaV22 | Phase 1-79 + 第二十章～第四十五章完成
+> 最后更新: 2026-06-02 | Schema: ArkSchemaV56 | 当前阶段：发布稳定化
+
+## 当前优先级（2026-06-02）
+
+| ID | 内容 | 状态 | 说明 |
+|----|------|------|------|
+| REL-BASELINE | 固定模拟器构建基线 | ⚠️ Blocked | `scripts/build-debug-fast.sh` 已新增 CoreSimulator/iPhone 17 preflight；当前 Codex 沙盒中 CoreSimulatorService 不可用，无法到达编译阶段 |
+| REL-GATE | 发布稳定化门禁脚本 | ✅ Added | `scripts/release-hardening-check.sh --skip-build` 已跑通；本地有固定模拟器时跑不带 `--skip-build` 的完整 gate |
+| REL-RUNTIME | Runtime/能耗 guardrail | ✅ Passed | `scripts/audit-runtime-guardrails.sh --all --soft` 全量通过 412 个 Swift 文件 |
+| REL-DATA | 备份/隐私数据安全 | ✅ Improved | `DataBackupManager` 备份版本升至 22，补齐 Human 纪念状态与 `HumanHealthMetricLog`；`OhanaTests` 已扩展备份恢复覆盖，执行仍等待固定模拟器恢复；新增 `scripts/audit-release-data-safety.sh` 防止 PIN hash/salt 泄露到备份 |
+| REL-GITSIZE | Git 体积基线 | ✅ Audited | 仓库约 2.1G，`.git/objects` 约 565M；当前无 tracked tmp 文件，存在 2 个小 git garbage object，非发布阻塞 |
+| REL-UI-DEBT | UI V4 历史债务分流 | ⏳ Pending | `scripts/audit-ui-v4.sh --all --soft` 仍有大量历史 hardcoded color/material/motion 警告，按核心路径分批处理 |
+| REL-SCOPE | 首发功能冻结 | ⏳ Pending | 首发优先稳定建成员、首页快捷照护、Today Focus、日历提醒、家庭任务、椰子奖励、备份恢复；iCloud/Watch/AI/实时多人协作暂缓 |
 
 ## 第四十七章 首页全面重设计（2026-03-28）
 

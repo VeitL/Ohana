@@ -348,7 +348,7 @@ struct AddPetWizardView: View {
 
     private var humanAgeText: String {
         guard hasBirthday else { return "" }
-        return PetAgeConverter.humanAge(birthday: birthday, species: effectiveSpeciesForData, isEnglish: wizardL10n.isEn)
+        return PetAgeConverter.humanAge(birthday: birthday, species: effectiveSpeciesForData, l: wizardL10n)
     }
 
     private var daysTogetherText: String {
@@ -1445,13 +1445,13 @@ struct AddPetWizardView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 6)], spacing: 6) {
                     ForEach(topTags) { tag in
                         let isOn = selectedPersonalityTagIds.contains(tag.id)
-                        meshTagChip(symbol: tag.sfSymbol, title: tag.title(isEnglish: l.isEn), isOn: isOn) {
+                        meshTagChip(symbol: tag.sfSymbol, title: tag.title(l: l), isOn: isOn) {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred(); togglePersonalityTag(tag.id)
                         }
                     }
                     ForEach(decodedCustomPersonalityTags) { rec in
                         let isOn = selectedPersonalityTagIds.contains(rec.id)
-                        meshTagChip(symbol: "tag.fill", title: rec.title(isEnglish: l.isEn), isOn: isOn) {
+                        meshTagChip(symbol: "tag.fill", title: rec.title(l: l), isOn: isOn) {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred(); togglePersonalityTag(rec.id)
                         }
                     }
@@ -1478,7 +1478,7 @@ struct AddPetWizardView: View {
 
             if isComposingCustomPersonalityTag {
                 HStack(spacing: 8) {
-                    TextField(l.isEn ? "Tag name" : "标签名称", text: $newCustomPersonalityTagText)
+                    TextField(l.tr(zh: "标签名称", en: "Tag name", de: "Tag-Name"), text: $newCustomPersonalityTagText)
                         .focused($customPersonalityTagFieldFocused)
                         .font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
                         .textFieldStyle(.plain).padding(.horizontal, 12).padding(.vertical, 10)
@@ -1604,7 +1604,7 @@ struct AddPetWizardView: View {
                 if !selectedPersonalityTagIds.isEmpty {
                     HStack(spacing: 6) {
                         ForEach(selectedPersonalityTagIds, id: \.self) { tid in
-                            Text(PetPersonalityTag.displayTitle(for: tid, isEnglish: wizardL10n.isEn))
+                            Text(PetPersonalityTag.displayTitle(for: tid, l: wizardL10n))
                                 .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
                                 .padding(.horizontal, 8).padding(.vertical, 4)
                                 .background(Color.primary.opacity(0.08), in: Capsule())
@@ -2080,6 +2080,10 @@ extension PetCoatPattern {
 
 enum PetAgeConverter {
     static func humanAge(birthday: Date, species: String, isEnglish: Bool) -> String {
+        humanAge(birthday: birthday, species: species, l: L10n(isEnglish ? "en" : "zh"))
+    }
+
+    static func humanAge(birthday: Date, species: String, l: L10n) -> String {
         let cal = Calendar.current
         let comps = cal.dateComponents([.year, .month], from: birthday, to: Date())
         let years = comps.year ?? 0
@@ -2117,10 +2121,11 @@ enum PetAgeConverter {
         default:
             humanYears = years
         }
-        if isEnglish {
-            return "~ human age \(humanYears) ✨"
-        }
-        return "相当于人类约 \(humanYears) 岁"
+        return l.tr(
+            zh: "相当于人类约 \(humanYears) 岁",
+            en: "~ human age \(humanYears) ✨",
+            de: "~ Menschenalter \(humanYears) ✨"
+        )
     }
 }
 

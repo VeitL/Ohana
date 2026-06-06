@@ -120,6 +120,7 @@ final class AchievementManager {
         let mainFeedLogs = pet.careLogs.filter { FeedLogMetadata.isMainFoodLog($0) }
         let treatLogs = pet.careLogs.filter { FeedLogMetadata.isTreatLog($0) }
         let waterLogs = pet.careLogs.filter { $0.careType == .watering }
+        let waterCareLogs = pet.careLogs.filter { [.watering, .waterChange].contains($0.careType) }
         let playLogs = pet.careLogs.filter { $0.careType == .play }
         let cleaningCareLogs = pet.careLogs.filter {
             [.litter, .waterChange, .filterClean, .cageCleaning, .substrateChange].contains($0.careType)
@@ -132,6 +133,20 @@ final class AchievementManager {
         let hasTodayCare    = pet.careLogs.contains     { calendar.isDateInToday($0.date) }
         let hasTodayWalk    = recentWalkLogs.contains   { calendar.isDateInToday($0.startDate) }
         let hasTodayWeight  = pet.weightLogs.contains   { calendar.isDateInToday($0.date) }
+        let allRecordDates = pet.healthLogs.map(\.date)
+            + pet.pottyLogs.map(\.date)
+            + pet.walkLogs.map(\.startDate)
+            + pet.hygieneLogs.map(\.date)
+            + pet.careLogs.map(\.date)
+            + pet.foodRecords.map(\.startDate)
+            + pet.expenseLogs.map(\.date)
+            + pet.weightLogs.map(\.date)
+            + pet.photoLogs.map(\.date)
+            + pet.milestones.map(\.date)
+
+        func hasAnyRecord(on day: Date) -> Bool {
+            allRecordDates.contains { calendar.isDate($0, inSameDayAs: day) }
+        }
 
         // 1. 🔥 钢铁肠胃：连续 7 天每天有 perfectPoop
         let ironGut: Achievement = {
@@ -386,7 +401,74 @@ final class AchievementManager {
             isUnlocked: pet.symptomLogs.count >= 3
         )
 
-        // 26. 🏝️ Ohana 小队：家里有 2 位以上成员/宠物进入卡片宇宙
+        // 26. 🧭 照护连线：连续 14 天任意记录
+        let careStreakKeeper: Achievement = {
+            var streak = true
+            for i in 0..<14 {
+                guard let day = calendar.date(byAdding: .day, value: -i, to: today) else { streak = false; break }
+                if !hasAnyRecord(on: day) { streak = false; break }
+            }
+            return Achievement(
+                id: "care_streak_keeper",
+                emoji: "🧭",
+                title: "照护连线",
+                description: "连续 14 天都有任意照护记录",
+                color: Color.goMint,
+                isUnlocked: streak
+            )
+        }()
+
+        // 27. 🍽️ 餐桌档案：累计 50 次主食记录
+        let mealArchivist = Achievement(
+            id: "meal_archivist",
+            emoji: "🍽️",
+            title: "餐桌档案",
+            description: "累计完成 50 次主食喂养记录",
+            color: Color.goOrange,
+            isUnlocked: mainFeedLogs.count >= 50
+        )
+
+        // 28. 🚰 清泉守卫：累计 50 次喂水记录
+        let waterGuardian = Achievement(
+            id: "water_guardian",
+            emoji: "🚰",
+            title: "清泉守卫",
+            description: "累计完成 50 次喂水或换水记录",
+            color: Color.goTeal,
+            isUnlocked: waterCareLogs.count >= 50
+        )
+
+        // 29. 🖼️ 记忆相册：累计 50 张照片
+        let memoryCollector = Achievement(
+            id: "memory_collector",
+            emoji: "🖼️",
+            title: "记忆相册",
+            description: "为宠物留下 50 张照片记录",
+            color: Color.goCardBlue,
+            isUnlocked: pet.photoLogs.count >= 50
+        )
+
+        // 30. 📊 体重节奏：累计 14 条体重记录
+        let weightRhythm = Achievement(
+            id: "weight_rhythm",
+            emoji: "📊",
+            title: "体重节奏",
+            description: "累计记录 14 次体重变化",
+            color: Color.goCardCyan,
+            isUnlocked: pet.weightLogs.count >= 14
+        )
+
+        // 31. 🌿 一年同行：陪伴满 365 天
+        let yearCompanion = Achievement(
+            id: "year_companion",
+            emoji: "🌿",
+            title: "一年同行",
+            description: "与宠物共同生活超过 365 天",
+            color: Color.goPrimary,
+            isUnlocked: pet.daysTogether >= 365
+        )
+
+        // 32. 🏝️ Ohana 小队：家里有 2 位以上成员/宠物进入卡片宇宙
         let islandCrew = Achievement(
             id: "global_island_crew",
             emoji: "🏝️",
@@ -500,7 +582,8 @@ final class AchievementManager {
                                firstRecord, dayOneCheckin, oldFriend,
                                longRunner, medicationComplete, photoEnthusiast, expenseTracker, weightManager,
                                hydrationBuddy, playChampion, cleanKeeper, treatScout, foodKindExplorer, autoFeederPilot,
-                               stockKeeper, protectionReady, vaccineKeeper, symptomWatcher]
+                               stockKeeper, protectionReady, vaccineKeeper, symptomWatcher,
+                               careStreakKeeper, mealArchivist, waterGuardian, memoryCollector, weightRhythm, yearCompanion]
 
         guard context.includesGlobalAchievements else {
             return petAchievements

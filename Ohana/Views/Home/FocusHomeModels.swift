@@ -200,7 +200,6 @@ extension FocusCard {
         let hex = pet.safeThemeColorHex
         let language = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh"
         let l = L10n(language)
-        let usesEnglishFallback = AppLanguage.normalize(language) != "zh"
         let hour = Calendar.current.component(.hour, from: Date())
         let togetherDays = pet.hasPassedAway ? pet.daysTogetherAtPassing : pet.daysTogether
         let walkDistanceMeters = includeWalkDistance ? weeklyWalkDistanceMeters(for: pet) : 0
@@ -219,7 +218,7 @@ extension FocusCard {
                 de: "\(togetherDays) Tage"
             ),
             ageText: pet.hasPassedAway ? pet.ageAtPassingText : pet.birthday.map { pet.localizedAgeTextForWallet(birthday: $0, l: l) },
-            zodiacText: pet.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: usesEnglishFallback) },
+            zodiacText: pet.birthday.map { Human.westernZodiacDisplay(for: $0, l: l) },
             humanEquivalentAgeText: pet.birthday.map { pet.humanEquivalentAgeTextForWallet(birthday: $0, l: l) },
             genderText: pet.genderSymbol + (pet.isNeutered ? l.tr(zh: " 已绝育", en: " neutered", de: " kastriert") : ""),
             personalityHint: PetTagGreeting.homeSubtitleHint(pet: pet, hour: hour, l: L10n(language)),
@@ -250,7 +249,6 @@ extension FocusCard {
             : max(0, Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0)
         let language = AppLanguage.code
         let l = L10n(language)
-        let usesEnglishFallback = language != "zh"
         return FocusCard(
             id: human.id,
             name: human.name.isEmpty ? l.tr(zh: "成员", en: "Human", de: "Mitglied") : human.name,
@@ -266,7 +264,7 @@ extension FocusCard {
                 de: "\(days) Tage"
             ),
             ageText: human.hasPassedAway ? human.ageAtPassingText : human.birthday.map { human.localizedAgeTextForWallet(birthday: $0, l: l) },
-            zodiacText: human.birthday.map { Human.westernZodiacDisplay(for: $0, isEnglish: usesEnglishFallback) },
+            zodiacText: human.birthday.map { Human.westernZodiacDisplay(for: $0, l: l) },
             mbtiText: human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : human.mbti.uppercased(),
             genderText: HumanGenderIdentity.title(for: human.genderRaw),
             avatarImageData: includeAvatarData ? human.avatarImageData : nil,

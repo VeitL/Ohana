@@ -139,7 +139,7 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
                     .zIndex(100)
 
                 if isExpandedInteractionReady, let activeCard, !isEditorActive {
-                    expandedSettingsButton(for: activeCard, frame: layout.expandedFrame)
+                    expandedDetailPullIndicator(for: activeCard, frame: layout.expandedFrame)
                         .zIndex(120)
                 }
             }
@@ -202,22 +202,42 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
             )
     }
 
-    private func expandedSettingsButton(for card: FocusCard, frame: CGRect) -> some View {
-        Button {
-            OhanaFeedback.medium()
-            onOpenEditor(card)
-        } label: {
-            Image(systemName: "gearshape.fill")
-                .font(.system(size: 14, weight: .black))
-                .foregroundStyle(Color.goCardWhite)
-                .frame(width: 44, height: 44)
-                .background(Color.goCardWhite.opacity(0.16), in: Circle())
-                .overlay(Circle().strokeBorder(Color.goCardWhite.opacity(0.18), lineWidth: 0.75))
-                .contentShape(Circle())
+    private func expandedDetailPullIndicator(for card: FocusCard, frame: CGRect) -> some View {
+        VStack(spacing: 7) {
+            Capsule()
+                .fill(Color.goCardWhite.opacity(0.68))
+                .frame(width: 48, height: 5)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.goCardWhite.opacity(0.20), lineWidth: 0.75)
+                )
+                .shadow(color: Color.arkInk.opacity(0.28), radius: 6, y: 2) // ui-v4: allow readability shadow on image card
+
+            Image(systemName: "chevron.down")
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(Color.goCardWhite.opacity(0.72))
+                .shadow(color: Color.arkInk.opacity(0.30), radius: 5, y: 2) // ui-v4: allow readability shadow on image card
         }
-        .buttonStyle(ScaleButtonStyle())
-        .position(x: frame.minX + 16 + 22, y: frame.minY + 16 + 22)
-        .accessibilityLabel("设置")
+        .frame(width: 112, height: 54)
+        .contentShape(Rectangle())
+        .position(x: frame.midX, y: frame.maxY - 28)
+        .highPriorityGesture(
+            TapGesture()
+                .onEnded { openExpandedDetail(card) }
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 8)
+                .onEnded { value in
+                    guard value.translation.height > 24 else { return }
+                    openExpandedDetail(card)
+                }
+        )
+        .accessibilityLabel("展开全部信息")
+        .accessibilityHint("向下拉动或点击以展开")
+    }
+
+    private func openExpandedDetail(_ card: FocusCard) {
+        onOpenEditor(card)
     }
 
     private func editorFrame(in size: CGSize, baseFrame: CGRect) -> CGRect {
@@ -348,7 +368,7 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
     private func collapseDragGesture(isEnabled: Bool = true) -> some Gesture {
         DragGesture(minimumDistance: 8)
             .onEnded { value in
-                guard isEnabled, selectedCardId != nil, value.translation.height > 80 else { return }
+                guard isEnabled, selectedCardId != nil, value.translation.height < -80 else { return }
                 OhanaFeedback.light()
                 onCollapse()
             }
@@ -357,7 +377,7 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
 
 enum CrewRosterProfileContinuityMetrics {
     static let horizontalInset: CGFloat = 18
-    static let summaryTopInset: CGFloat = 226
+    static let summaryTopInset: CGFloat = 178
     static let summaryDetailGap: CGFloat = 12
 }
 

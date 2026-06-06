@@ -11,7 +11,7 @@ import SwiftData
 
 // MARK: - 顶层备份结构
 struct OhanaBackup: Codable {
-    var schemaVersion: Int = 21
+    var schemaVersion: Int = 22
     var exportedAt: String
     // 核心实体
     var pets: [PetBackup]
@@ -42,6 +42,7 @@ struct OhanaBackup: Codable {
     var humanWorkoutLogs: [HumanWorkoutLogBackup]
     var humanMedications: [HumanMedicationBackup]?
     var humanMedicationLogs: [HumanMedicationLogBackup]?
+    var humanHealthMetricLogs: [HumanHealthMetricLogBackup]?
     var waterLogs: [WaterLogBackup]
     var wishlistItems: [WishlistItemBackup]
     var careLedgerEvents: [CareLedgerEventBackup]?
@@ -103,6 +104,8 @@ struct HumanBackup: Codable {
     var themeColorHex: String?
     var heightCm: Double?
     var avatarImageBase64: String?
+    var passedAwayDate: String?
+    // Intentionally excluded from backups: pinHash, pinSalt, pinFailedAttempts, pinLockedUntil.
 }
 
 struct EventBackup: Codable {
@@ -315,6 +318,17 @@ struct HumanMedicationLogBackup: Codable {
     var statusRaw: String; var createdAt: String
 }
 
+struct HumanHealthMetricLogBackup: Codable {
+    var id: String
+    var metricKey: String
+    var unitCode: String
+    var value: Double
+    var date: String
+    var notes: String
+    var humanId: String?
+    var createdAt: String
+}
+
 struct SymptomLogBackup: Codable {
     var id: String; var date: String; var categoryRaw: String
     var symptomName: String; var severityRaw: Int; var note: String
@@ -522,7 +536,7 @@ final class DataBackupManager {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 21 else {
+        guard backup.schemaVersion <= 22 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -558,6 +572,7 @@ final class DataBackupManager {
         let hWorkouts   = try context.fetch(FetchDescriptor<HumanWorkoutLog>())
         let humanMeds   = try context.fetch(FetchDescriptor<HumanMedication>())
         let humanMedLogs = try context.fetch(FetchDescriptor<HumanMedicationLog>())
+        let humanHealthMetricLogs = try context.fetch(FetchDescriptor<HumanHealthMetricLog>())
         let waterLogs   = try context.fetch(FetchDescriptor<WaterLog>())
         let wishlist    = try context.fetch(FetchDescriptor<WishlistItem>())
         let ledger      = try context.fetch(FetchDescriptor<CareLedgerEvent>())
@@ -619,6 +634,7 @@ final class DataBackupManager {
             humanWorkoutLogs: hWorkouts.map(encodeHumanWorkout),
             humanMedications:  humanMeds.map(encodeHumanMedication),
             humanMedicationLogs: humanMedLogs.map(encodeHumanMedicationLog),
+            humanHealthMetricLogs: humanHealthMetricLogs.map(encodeHumanHealthMetricLog),
             waterLogs:        waterLogs.map(encodeWaterLog),
             wishlistItems:    wishlist.map(encodeWishlist),
             careLedgerEvents: ledger.map(encodeCareLedgerEvent),
@@ -664,6 +680,7 @@ final class DataBackupManager {
         let existingPetMedicationIds = Set((try? context.fetch(FetchDescriptor<PetMedication>()))?.map { $0.id.uuidString } ?? [])
         let existingHumanMedicationIds = Set((try? context.fetch(FetchDescriptor<HumanMedication>()))?.map { $0.id.uuidString } ?? [])
         let existingHumanMedicationLogIds = Set((try? context.fetch(FetchDescriptor<HumanMedicationLog>()))?.map { $0.id.uuidString } ?? [])
+        let existingHumanHealthMetricLogIds = Set((try? context.fetch(FetchDescriptor<HumanHealthMetricLog>()))?.map { $0.id.uuidString } ?? [])
         let existingSymptomIds = Set((try? context.fetch(FetchDescriptor<SymptomLog>()))?.map { $0.id.uuidString } ?? [])
         let existingHeatCycleIds = Set((try? context.fetch(FetchDescriptor<HeatCycleLog>()))?.map { $0.id.uuidString } ?? [])
 
@@ -746,6 +763,9 @@ final class DataBackupManager {
         }
         for dto in backup.humanMedicationLogs ?? [] where !existingHumanMedicationLogIds.contains(dto.id) {
             context.insert(decodeHumanMedicationLog(dto))
+        }
+        for dto in backup.humanHealthMetricLogs ?? [] where !existingHumanHealthMetricLogIds.contains(dto.id) {
+            context.insert(decodeHumanHealthMetricLog(dto, humans: humanById))
         }
         for dto in backup.petMilestones { context.insert(decodeMilestone(dto, pets: petById)) }
         for dto in backup.humanWeightLogs { context.insert(decodeHumanWeight(dto, humans: humanById)) }
@@ -853,7 +873,8 @@ final class DataBackupManager {
             privateFieldsRaw: h.privateFieldsRaw.isEmpty ? nil : h.privateFieldsRaw,
             themeColorHex: h.themeColorHex,
             heightCm: h.heightCm,
-            avatarImageBase64: h.avatarImageData?.base64EncodedString()
+            avatarImageBase64: h.avatarImageData?.base64EncodedString(),
+            passedAwayDate: d(h.passedAwayDate)
         )
     }
 
@@ -1132,6 +1153,19 @@ final class DataBackupManager {
             scheduledTime: d(l.scheduledTime),
             recordedTime: d(l.recordedTime),
             statusRaw: l.statusRaw,
+            createdAt: d(l.createdAt)
+        )
+    }
+
+    private func encodeHumanHealthMetricLog(_ l: HumanHealthMetricLog) -> HumanHealthMetricLogBackup {
+        HumanHealthMetricLogBackup(
+            id: l.id.uuidString,
+            metricKey: l.metricKey,
+            unitCode: l.unitCode,
+            value: l.value,
+            date: d(l.date),
+            notes: l.notes,
+            humanId: l.human?.id.uuidString,
             createdAt: d(l.createdAt)
         )
     }
@@ -1445,6 +1479,7 @@ final class DataBackupManager {
         )
         h.heightCm = dto.heightCm ?? 0
         h.avatarImageData = dto.avatarImageBase64.flatMap { Data(base64Encoded: $0) }
+        h.passedAwayDate = parseDate(dto.passedAwayDate)
         return h
     }
 
@@ -1765,6 +1800,20 @@ final class DataBackupManager {
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         l.createdAt = parseDate(dto.createdAt) ?? Date()
         return l
+    }
+
+    private func decodeHumanHealthMetricLog(_ dto: HumanHealthMetricLogBackup, humans: [String: Human]) -> HumanHealthMetricLog {
+        let log = HumanHealthMetricLog(
+            metricKey: dto.metricKey,
+            unitCode: dto.unitCode,
+            value: dto.value,
+            date: parseDate(dto.date) ?? Date(),
+            notes: dto.notes,
+            human: dto.humanId.flatMap { humans[$0] }
+        )
+        if let uuid = UUID(uuidString: dto.id) { log.id = uuid }
+        log.createdAt = parseDate(dto.createdAt) ?? Date()
+        return log
     }
 
     private func decodeSymptomLog(_ dto: SymptomLogBackup, pets: [String: Pet]) -> SymptomLog {

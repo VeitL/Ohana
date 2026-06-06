@@ -28,10 +28,10 @@ struct HomeFirstSuccessCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("3 分钟成功体验")
                         .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.white) // ui-v4: allow dark success card text contrast
                     Text("选一个 10 秒动作，马上看到反馈和椰子奖励。")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.62))
+                        .foregroundStyle(Color.white.opacity(0.62)) // ui-v4: allow dark success card secondary text contrast
                         .lineLimit(2)
                 }
 

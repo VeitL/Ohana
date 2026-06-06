@@ -498,14 +498,26 @@ struct OhanaTests {
         let source = try makeInMemoryContainer()
         let sourceContext = source.mainContext
         let human = Human(name: "Ava", avatarEmoji: "A")
+        let passedAwayDate = dateForTest(year: 2026, month: 5, day: 20, hour: 9)
+        let metricDate = dateForTest(year: 2026, month: 5, day: 10, hour: 8)
         human.mbti = "INTJ"
         human.themeColorHex = "C8FF00"
         human.heightCm = 168
         human.setPrivate(.weight, true)
         human.avatarImageData = Data([1, 2, 3])
+        human.passedAwayDate = passedAwayDate
+        let metricLog = HumanHealthMetricLog(
+            metricKey: "hba1c",
+            unitCode: "percent",
+            value: 5.4,
+            date: metricDate,
+            notes: "annual check",
+            human: human
+        )
         sourceContext.insert(human)
         sourceContext.insert(HumanWeightLog(weight: 55, human: human))
         sourceContext.insert(HumanWorkoutLog(type: .running, durationMinutes: 30, human: human))
+        sourceContext.insert(metricLog)
         CareLedgerService.record(
             actorKind: .human,
             actorId: human.id.uuidString,
@@ -535,11 +547,19 @@ struct OhanaTests {
         #expect(restored.heightCm == 168)
         #expect(restored.isPrivate(.weight, viewedBy: UUID()))
         #expect(restored.avatarImageData == Data([1, 2, 3]))
+        #expect(restored.passedAwayDate == passedAwayDate)
 
         let weights = try targetContext.fetch(FetchDescriptor<HumanWeightLog>())
         let workouts = try targetContext.fetch(FetchDescriptor<HumanWorkoutLog>())
+        let healthMetrics = try targetContext.fetch(FetchDescriptor<HumanHealthMetricLog>())
         #expect(weights.first?.human?.id == restored.id)
         #expect(workouts.first?.human?.id == restored.id)
+        #expect(healthMetrics.first?.human?.id == restored.id)
+        #expect(healthMetrics.first?.metricKey == "hba1c")
+        #expect(healthMetrics.first?.unitCode == "percent")
+        #expect(healthMetrics.first?.value == 5.4)
+        #expect(healthMetrics.first?.date == metricDate)
+        #expect(healthMetrics.first?.notes == "annual check")
 
         let ledger = try targetContext.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledger.first?.eventKindEnum == .weight)
@@ -2815,7 +2835,7 @@ struct OhanaTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV47.models)
+        let schema = Schema(ArkSchemaV56.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

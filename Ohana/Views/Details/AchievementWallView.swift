@@ -104,6 +104,12 @@ struct AchievementWallView: View {
         "protection_ready": "AchievementBgProtectionReady",
         "vaccine_keeper": "AchievementBgVaccineKeeper",
         "symptom_watcher": "AchievementBgSymptomWatcher",
+        "care_streak_keeper": "AchievementBgCareStreakKeeper",
+        "meal_archivist": "AchievementBgMealArchivist",
+        "water_guardian": "AchievementBgWaterGuardian",
+        "memory_collector": "AchievementBgMemoryCollector",
+        "weight_rhythm": "AchievementBgWeightRhythm",
+        "year_companion": "AchievementBgYearCompanion",
         "global_island_crew": "AchievementBgGlobalIslandCrew",
         "global_first_critter": "AchievementBgGlobalFirstCritter",
         "global_legendary_critter": "AchievementBgGlobalLegendaryCritter",
@@ -124,8 +130,11 @@ struct AchievementWallView: View {
         "human_medication_keeper": "AchievementBgHumanMedicationKeeper",
         "human_workout_starter": "AchievementBgHumanWorkoutStarter",
         "human_workout_rhythm": "AchievementBgHumanWorkoutRhythm",
+        "human_workout_hero": "AchievementBgHumanWorkoutHero",
         "human_coconut_saver": "AchievementBgHumanCoconutSaver",
-        "human_old_friend": "AchievementBgHumanOldFriend"
+        "human_coconut_elite": "AchievementBgHumanCoconutElite",
+        "human_old_friend": "AchievementBgHumanOldFriend",
+        "human_year_friend": "AchievementBgHumanYearFriend"
     ]
     private var l: L10n { L10n(appLanguageRaw) }
 
@@ -679,6 +688,12 @@ struct AchievementWallView: View {
         case "protection_ready": return l.tr(zh: "重要的保障，已经被妥善收好。", en: "The important safeguards are now in place.", de: "Wichtige Absicherung ist gut aufgehoben.")
         case "vaccine_keeper": return l.tr(zh: "健康本里，多了一份安心。", en: "The health record now carries more peace of mind.", de: "Im Gesundheitsheft steckt nun mehr Sicherheit.")
         case "symptom_watcher": return l.tr(zh: "异常被看见，本身就是一种保护。", en: "Noticing what is unusual is protection too.", de: "Auffälligkeiten zu bemerken ist auch Schutz.")
+        case "care_streak_keeper": return l.tr(zh: "连续照护，把零散日常串成可靠节奏。", en: "Steady care turns scattered days into rhythm.", de: "Stete Fürsorge macht aus Tagen einen Rhythmus.")
+        case "meal_archivist": return l.tr(zh: "餐桌上的习惯，正在被清楚记住。", en: "Mealtime habits are becoming clear records.", de: "Fütterungsgewohnheiten werden klar sichtbar.")
+        case "water_guardian": return l.tr(zh: "清水被反复放好，照护也更稳定。", en: "Fresh water, repeated with care, keeps the routine steady.", de: "Frisches Wasser hält die Routine stabil.")
+        case "memory_collector": return l.tr(zh: "相册越来越厚，陪伴也有了形状。", en: "The album grows, and companionship gains shape.", de: "Das Album wächst, Begleitung bekommt Form.")
+        case "weight_rhythm": return l.tr(zh: "体重变化有了节奏，判断也更有底。", en: "Weight changes now have a visible rhythm.", de: "Gewichtsverläufe bekommen einen sichtbaren Rhythmus.")
+        case "year_companion": return l.tr(zh: "一年同行，已经不是短暂相遇。", en: "A year together is no brief encounter.", de: "Ein Jahr zusammen ist keine kurze Begegnung.")
         case "global_island_crew": return l.tr(zh: "这不是一个人的岛，是一家人的小队。", en: "This island belongs to the whole crew.", de: "Diese Insel gehört der ganzen Crew.")
         case "global_first_critter": return l.tr(zh: "第一个 Oasis 伙伴醒来了。", en: "The first Oasis companion has awakened.", de: "Der erste Oasis-Begleiter ist erwacht.")
         case "global_legendary_critter": return l.tr(zh: "稀有的相遇，也被故事收下了。", en: "A rare meeting found its place in the story.", de: "Eine seltene Begegnung fand ihren Platz.")
@@ -699,8 +714,11 @@ struct AchievementWallView: View {
         case "human_medication_keeper": return l.tr(zh: "按时完成的小事，最能托住日常。", en: "Small on-time routines can hold the day together.", de: "Pünktliche kleine Routinen tragen den Alltag.")
         case "human_workout_starter": return l.tr(zh: "开始活动，就是身体收到的第一封回信。", en: "Starting to move is the body's first reply.", de: "Loszugehen ist die erste Antwort des Körpers.")
         case "human_workout_rhythm": return l.tr(zh: "运动有了节奏，生活也跟着顺起来。", en: "Once movement has rhythm, life follows more easily.", de: "Wenn Bewegung Rhythmus findet, folgt der Alltag.")
+        case "human_workout_hero": return l.tr(zh: "运动记录堆起来，身体会给出答案。", en: "Movement records add up, and the body answers.", de: "Bewegung summiert sich, der Körper antwortet.")
         case "human_coconut_saver": return l.tr(zh: "一点点攒起来，也会变成看得见的底气。", en: "Saved bit by bit, confidence becomes visible.", de: "Stück für Stück wird Rückhalt sichtbar.")
+        case "human_coconut_elite": return l.tr(zh: "稳定积累，本身也是一种掌控感。", en: "Steady saving is its own kind of control.", de: "Stetiges Sammeln gibt ein Gefühl von Kontrolle.")
         case "human_old_friend": return l.tr(zh: "你也和 Ohana 变熟了。", en: "You and Ohana have become familiar now.", de: "Du und Ohana seid vertrauter geworden.")
+        case "human_year_friend": return l.tr(zh: "一年之后，Ohana 已经住进你的日常。", en: "After a year, Ohana has become part of your days.", de: "Nach einem Jahr gehört Ohana zu deinem Alltag.")
         default: return badge.description
         }
     }
@@ -779,6 +797,18 @@ struct AchievementWallView: View {
                 .min()
         case "symptom_watcher":
             return thresholdDate(from: activePet.symptomLogs.map(\.date), target: 3)
+        case "care_streak_keeper":
+            return badge.isUnlocked ? Date() : nil
+        case "meal_archivist":
+            return thresholdDate(from: mainFeedLogs().map(\.date), target: 50)
+        case "water_guardian":
+            return thresholdDate(from: waterCareRecordDates(), target: 50)
+        case "memory_collector":
+            return thresholdDate(from: activePet.photoLogs.map(\.date), target: 50)
+        case "weight_rhythm":
+            return thresholdDate(from: activePet.weightLogs.map(\.date), target: 14)
+        case "year_companion":
+            return Calendar.current.date(byAdding: .day, value: 365, to: activePet.createdAt)
         case "global_island_crew":
             return thresholdDate(from: pets.map(\.createdAt), target: 2)
         case "global_first_critter":
@@ -841,8 +871,14 @@ struct AchievementWallView: View {
             return human.workoutLogs.map(\.date).min()
         case "human_workout_rhythm":
             return thresholdDate(from: human.workoutLogs.map(\.date), target: 10)
+        case "human_workout_hero":
+            return thresholdDate(from: human.workoutLogs.map(\.date), target: 30)
+        case "human_coconut_elite":
+            return nil
         case "human_old_friend":
             return Calendar.current.date(byAdding: .day, value: 7, to: human.createdAt)
+        case "human_year_friend":
+            return Calendar.current.date(byAdding: .day, value: 365, to: human.createdAt)
         default:
             return nil
         }
@@ -908,6 +944,10 @@ struct AchievementWallView: View {
         + activePet.careLogs.filter {
             [.litter, .waterChange, .filterClean, .cageCleaning, .substrateChange].contains($0.careType)
         }.map(\.date)
+    }
+
+    private func waterCareRecordDates() -> [Date] {
+        activePet.careLogs.filter { [.watering, .waterChange].contains($0.careType) }.map(\.date)
     }
 
     private func humanRecordDates(_ human: Human) -> [Date] {
@@ -1355,6 +1395,14 @@ struct AchievementWallView: View {
                 isUnlocked: human.workoutLogs.count >= 10
             ),
             Achievement(
+                id: "human_workout_hero",
+                emoji: "🏅",
+                title: "运动成形",
+                description: "累计记录 30 次运动",
+                color: Color.goOrange,
+                isUnlocked: human.workoutLogs.count >= 30
+            ),
+            Achievement(
                 id: "human_coconut_saver",
                 emoji: "🥥",
                 title: "椰子小金库",
@@ -1363,12 +1411,28 @@ struct AchievementWallView: View {
                 isUnlocked: human.coconutBalance >= 500
             ),
             Achievement(
+                id: "human_coconut_elite",
+                emoji: "🏦",
+                title: "椰子金库",
+                description: "个人椰子余额达到 2000",
+                color: Color.goLime,
+                isUnlocked: human.coconutBalance >= 2000
+            ),
+            Achievement(
                 id: "human_old_friend",
                 emoji: "🤝",
                 title: "Ohana 老朋友",
                 description: "本人档案建立满 7 天",
                 color: Color.goPrimary,
                 isUnlocked: accountDays >= 7
+            ),
+            Achievement(
+                id: "human_year_friend",
+                emoji: "🌿",
+                title: "自我同行",
+                description: "本人档案建立满 365 天",
+                color: Color.goMint,
+                isUnlocked: accountDays >= 365
             )
         ]
     }
@@ -1434,6 +1498,18 @@ struct AchievementWallView: View {
             return .init(current: hasVaccineRecord() ? 1 : 0, target: 1, unit: "针", actionTitle: "记录疫苗")
         case "symptom_watcher":
             return .init(current: Double(activePet.symptomLogs.count), target: 3, unit: "次", actionTitle: "记录症状")
+        case "care_streak_keeper":
+            return .init(current: Double(consecutiveAnyRecordDays()), target: 14, unit: "天", actionTitle: "连续照护记录")
+        case "meal_archivist":
+            return .init(current: Double(mainFeedLogs().count), target: 50, unit: "次", actionTitle: "累计主食记录")
+        case "water_guardian":
+            return .init(current: Double(waterCareRecordDates().count), target: 50, unit: "次", actionTitle: "累计喂水/换水")
+        case "memory_collector":
+            return .init(current: Double(activePet.photoLogs.count), target: 50, unit: "张", actionTitle: "添加宠物照片")
+        case "weight_rhythm":
+            return .init(current: Double(activePet.weightLogs.count), target: 14, unit: "条", actionTitle: "记录体重")
+        case "year_companion":
+            return .init(current: Double(max(0, activePet.daysTogether)), target: 365, unit: "天", actionTitle: "共同生活天数")
         case "global_island_crew":
             return .init(current: Double(pets.count), target: 2, unit: "位", actionTitle: "建立成员档案")
         case "global_first_critter":
@@ -1481,11 +1557,18 @@ struct AchievementWallView: View {
             return .init(current: Double(human.workoutLogs.count), target: 1, unit: "条", actionTitle: "记录运动")
         case "human_workout_rhythm":
             return .init(current: Double(human.workoutLogs.count), target: 10, unit: "次", actionTitle: "累计运动记录")
+        case "human_workout_hero":
+            return .init(current: Double(human.workoutLogs.count), target: 30, unit: "次", actionTitle: "累计运动记录")
         case "human_coconut_saver":
             return .init(current: Double(human.coconutBalance), target: 500, unit: "🥥", actionTitle: "积累个人椰子")
+        case "human_coconut_elite":
+            return .init(current: Double(human.coconutBalance), target: 2000, unit: "🥥", actionTitle: "积累个人椰子")
         case "human_old_friend":
             let days = Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0
             return .init(current: Double(max(0, days)), target: 7, unit: "天", actionTitle: "使用 Ohana 的天数")
+        case "human_year_friend":
+            let days = Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0
+            return .init(current: Double(max(0, days)), target: 365, unit: "天", actionTitle: "使用 Ohana 的天数")
         default:
             return .init(current: badge.isUnlocked ? 1 : 0, target: 1, unit: "项", actionTitle: "完成条件")
         }
@@ -1502,6 +1585,13 @@ struct AchievementWallView: View {
     private func consecutiveWalkDays() -> Int {
         consecutiveDays { day in
             activePet.walkLogs.contains { Calendar.current.isDate($0.startDate, inSameDayAs: day) }
+        }
+    }
+
+    private func consecutiveAnyRecordDays() -> Int {
+        let dates = petRecordDates()
+        return consecutiveDays { day in
+            dates.contains { Calendar.current.isDate($0, inSameDayAs: day) }
         }
     }
 

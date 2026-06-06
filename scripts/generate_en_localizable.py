@@ -30,9 +30,11 @@ TARGET_DEFAULTS = {
     "en": "en",
     "ja": "ja",
     "ko": "ko",
+    "it": "it",
     "fr": "fr",
     "de": "de",
     "es": "es",
+    "pt": "pt",
 }
 
 

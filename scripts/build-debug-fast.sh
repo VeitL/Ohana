@@ -20,7 +20,7 @@ fi
 SAFE_BRANCH="$(printf '%s' "${BRANCH_NAME}" | tr -c '[:alnum:]_.-' '-' | sed 's/-\{1,\}/-/g; s/^-//; s/-$//')"
 WORKTREE_HASH="$(printf '%s' "${REPO_ROOT}" | shasum -a 256 | awk '{ print substr($1, 1, 12) }')"
 BUILD_ID="${SAFE_BRANCH:-detached}-${WORKTREE_HASH}"
-DEFAULT_DERIVED_DATA_ROOT="${OHANA_DERIVED_DATA_ROOT:-/tmp/OhanaCodexDerived}"
+DEFAULT_DERIVED_DATA_ROOT="${OHANA_DERIVED_DATA_ROOT:-${REPO_ROOT}/.build/DerivedData}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-${DEFAULT_DERIVED_DATA_ROOT}/${BUILD_ID}}"
 LOCK_ROOT="${LOCK_ROOT:-${REPO_ROOT}/.build/locks}"
 LOCK_DIR="${LOCK_DIR:-${LOCK_ROOT}/build-${BUILD_ID}.lock}"
@@ -65,6 +65,30 @@ echo "Building ${SCHEME} (${CONFIGURATION})"
 echo "SDK: ${SDK}"
 echo "Destination: ${DESTINATION}"
 echo "DerivedData: ${DERIVED_DATA_PATH}"
+
+if [[ "${OHANA_SKIP_SIMULATOR_PREFLIGHT:-0}" != "1" ]]; then
+  SIMCTL_OUTPUT="$(
+    xcrun simctl list devices available 2>&1
+  )" || {
+    echo "Simulator preflight failed: CoreSimulator is not available." >&2
+    echo "The fixed build destination is still required: ${REQUIRED_DESTINATION}" >&2
+    echo "simctl output:" >&2
+    printf '%s\n' "${SIMCTL_OUTPUT}" >&2
+    echo "Try opening Xcode > Settings > Platforms, installing the iOS simulator runtime, and creating an iPhone 17 simulator." >&2
+    echo "If you are intentionally bypassing this preflight, set OHANA_SKIP_SIMULATOR_PREFLIGHT=1." >&2
+    exit 70
+  }
+
+  if ! printf '%s\n' "${SIMCTL_OUTPUT}" | grep -Eq '^[[:space:]]+iPhone 17 \('; then
+    echo "Simulator preflight failed: no available iPhone 17 simulator was found." >&2
+    echo "The fixed build destination is required: ${REQUIRED_DESTINATION}" >&2
+    echo "Available iPhone simulators:" >&2
+    printf '%s\n' "${SIMCTL_OUTPUT}" | grep -E '^[[:space:]]+iPhone' >&2 || true
+    echo "Create an iPhone 17 simulator in Xcode > Devices and Simulators, then rerun this script." >&2
+    echo "If you are intentionally bypassing this preflight, set OHANA_SKIP_SIMULATOR_PREFLIGHT=1." >&2
+    exit 70
+  fi
+fi
 
 xcodebuild \
   -project Ohana.xcodeproj \

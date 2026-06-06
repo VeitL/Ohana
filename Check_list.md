@@ -1,6 +1,6 @@
 # Ohana 功能完成清单
 
-> 最后更新: 2026-05-18（毛绒 Icon 照护快捷三件套样张规范）| Build: ✅ | Schema: ArkSchemaV51
+> 最后更新: 2026-06-02（发布稳定化基线）| Validation: Release hardening non-simulator baseline ✅ / Fixed simulator build ⚠️ CoreSimulatorService blocker | Schema: ArkSchemaV56
 >
 > **规则**：仅在完成新的功能模块或重大 UI 重构时更新本文档，小 bug 修复不记录。
 
@@ -152,6 +152,8 @@
 
 ## 待办 / 未来规划
 
+- [ ] 发布稳定化：见 `docs/release-hardening-plan.md`
+- [ ] 本机恢复固定 `iPhone 17` 模拟器后运行完整 `scripts/release-hardening-check.sh`
 - [ ] 多设备 iCloud 同步
 - [ ] Apple Watch 伴侣 App
 - [ ] 宠物 AI 健康助手
