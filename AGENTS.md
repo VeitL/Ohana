@@ -2,6 +2,35 @@
 
 In Ohana, a light interaction must stay light: visual feedback, route mutation, data aggregation, persistence writes, background work, timers, and animation loops are separate systems with explicit handoff points.
 
+## Single Rule File
+
+`AGENTS.md` is the only root agent/navigation rule file for this repository. Do not maintain a parallel `CONTEXT.md`, `UIRules.md`, or other root Markdown as a second source of instructions. Legacy planning/reference documents may exist for history, but when they conflict with this file, `ui规范.selection.json`, the governance docs listed below, or the current code, treat the legacy document as stale.
+
+Rule precedence:
+
+1. Current user request.
+2. `AGENTS.md`.
+3. `ui规范.selection.json` for UI tokens and component choices.
+4. Governance docs in `docs/` for detailed quality gates.
+5. Current source code.
+6. Historical planning/reference documents.
+
+## Current App Facts
+
+- Ohana is an iOS SwiftUI app using SwiftData and Swift Charts.
+- The current app group in code is `group.com.guanchen.li.Ohana`; do not reintroduce older `Ark` app-group identifiers.
+- The latest SwiftData schema is defined in `Ohana/Models/SharedModelContainer.swift`; as of this consolidation it is `ArkSchemaV56`.
+- Before changing any SwiftData model field or adding a model, inspect the latest `ArkSchemaV*`, add the next schema version, append it to `ArkMigrationPlan.schemas`, and keep added fields lightweight-migration friendly with defaults when possible.
+- Keep `ArkMigrationPlan.stages` empty for add-only/lightweight changes. Add an explicit migration stage only when there is real custom migration logic.
+- User-facing copy must support Chinese, English, and German through the localization rules below.
+
+## Business Fact Rules
+
+- Views should not directly mutate `pet.coconutBalance`, `human.coconutBalance`, reminders, family tasks, rewards, or ledger side effects.
+- Quick care actions should enter a domain service such as `CareEventService`, `FamilyTaskService`, or a feature command executor, write one business fact, then let services synchronize rewards, reminders, tasks, ledger entries, widgets, and read-model revisions.
+- Coconut rewards are awarded through the existing reward pipeline (`CoconutEconomyService` / `QuestManager`) from domain services, not by ad-hoc balance edits in views.
+- SwiftData relationship arrays such as `pet.walkLogs` may be useful for local model navigation, but high-frequency live UI must read through narrow screen-container queries, snapshot builders, or read models. Do not put broad `@Query` reads in reusable rows, cards, popups, or motion scenes.
+
 ## Project Structure & Module Organization
 
 This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohana/`, with `Models/`, `ViewModels/`, `Views/`, `Utilities/`, localized resources in `en.lproj/`, and app assets in `Assets.xcassets/`. Unit tests are in `OhanaTests/`; UI tests are in `OhanaUITests/`. Project-level documentation and design references live at the repository root, while helper automation belongs in `scripts/`. `Ai_Studio_New_UI/` and `ohana-design-system/` are separate design/reference projects; avoid changing them unless the task explicitly targets those folders.
