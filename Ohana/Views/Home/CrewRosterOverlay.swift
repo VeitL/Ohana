@@ -1153,31 +1153,6 @@ private struct CrewRosterProfilePanel: View {
         }
     }
 
-    private var profileHero: some View {
-        HStack(spacing: 14) {
-            profileAvatar(size: 76)
-            VStack(alignment: .leading, spacing: 7) {
-                Text(displayName)
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.goCardWhite)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-                Text(profileSubtitle)
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.70))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.72)
-                HStack(spacing: 8) {
-                    miniPill(card.kind, icon: memberIcon)
-                    miniPill("\(card.coconutBalance)", icon: "circle.hexagongrid.fill")
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(14)
-        .background(Color.goCardWhite.opacity(0.10), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private func petReadContent(_ pet: Pet) -> some View {
         VStack(spacing: 12) {
             profileSection("身份", icon: "pawprint.fill") {
@@ -1402,20 +1377,6 @@ private struct CrewRosterProfilePanel: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func miniPill(_ text: String, icon: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(.system(size: 10, weight: .black))
-            Text(text)
-                .font(OhanaFont.caption2(.black))
-                .lineLimit(1)
-        }
-        .foregroundStyle(Color.arkInk)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(tint, in: Capsule())
-    }
-
     private func secondaryButton(_ title: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon)
@@ -1475,26 +1436,6 @@ private struct CrewRosterProfilePanel: View {
     private var displayName: String {
         if isEditing, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return name }
         return pet?.name ?? human?.name ?? plant?.name ?? card.name
-    }
-
-    private var profileSubtitle: String {
-        if let pet {
-            let breedText = pet.breed.isEmpty ? "未填写品种" : pet.breed
-            return "\(pet.species.isEmpty ? "宠物" : pet.species) · \(breedText)"
-        }
-        if let human {
-            return "\(HumanPermissionRole.title(for: human.role)) · \(human.hasPassedAway ? "纪念模式" : "家庭成员")"
-        }
-        if let plant {
-            return "\(plant.species.isEmpty ? "植物" : plant.species) · \(plant.location.isEmpty ? "未设置位置" : plant.location)"
-        }
-        return card.kind
-    }
-
-    private var memberIcon: String {
-        if pet != nil { return "pawprint.fill" }
-        if human != nil { return "person.fill" }
-        return "leaf.fill"
     }
 
     private var fallbackEmoji: String {
