@@ -18,6 +18,7 @@ struct FocusCard: Identifiable {
     let coconutBalance: Int
     var createdAt: Date = .distantPast
     var daysTogetherText: String?
+    var togetherHeadlineText: String?
     var ageText: String?
     var zodiacText: String?
     var mbtiText: String?
@@ -25,9 +26,14 @@ struct FocusCard: Identifiable {
     var genderText: String?
     var personalityHint: String?
     var avatarImageData: Data?
+    var avatarImageSignature: String = ""
     var cardStyleRaw: String = "classic"
     var cardPopoutImageData: Data? = nil
+    var cardPopoutImageSignature: String = ""
     var cardPopoutSourceRaw: String = ""
+    var petBondCardBorderActive: Bool = false
+    var petBondNameplateActive: Bool = false
+    var petBondNameplateText: String? = nil
     var humanGender: String? = nil
     var petSpecies: String?
     var coatColor: Color = .init(hex: "E8C49A")
@@ -40,6 +46,7 @@ struct FocusCard: Identifiable {
     var passedAwayDate: Date? = nil
     var daysTogetherAtPassing: Int = 0
     var isShownOnHome: Bool = true
+    var equippedTitleBadgeText: String? = nil
     var statusBadgeText: String? = nil
     var statusBadgeIsWarning: Bool = false
     var isHuman: Bool = false
@@ -202,7 +209,19 @@ extension FocusCard {
         let l = L10n(language)
         let hour = Calendar.current.component(.hour, from: Date())
         let togetherDays = pet.hasPassedAway ? pet.daysTogetherAtPassing : pet.daysTogether
+        let togetherHeadline: String
+        if pet.homeDate == nil {
+            togetherHeadline = l.tr(zh: "新成员", en: "New Family", de: "Neue Familie")
+        } else if togetherDays < 0 {
+            let days = abs(togetherDays)
+            togetherHeadline = l.tr(zh: "\(days) 天后到家", en: "\(days) Days Until Home", de: "\(days) Tage bis Zuhause")
+        } else {
+            togetherHeadline = l.tr(zh: "相伴 \(togetherDays) 天", en: "\(togetherDays) Days Together", de: "\(togetherDays) Tage zusammen")
+        }
         let walkDistanceMeters = includeWalkDistance ? weeklyWalkDistanceMeters(for: pet) : 0
+        let popoutImageData = includeAvatarData && pet.cardStyleRaw == "popout"
+            ? (pet.cardPopoutImageData ?? pet.avatarImageData)
+            : nil
         return FocusCard(
             id: pet.id,
             name: pet.name.isEmpty ? l.tr(zh: "未命名", en: "Unnamed", de: "Unbenannt") : pet.name,
@@ -217,14 +236,17 @@ extension FocusCard {
                 en: "\(togetherDays) days",
                 de: "\(togetherDays) Tage"
             ),
+            togetherHeadlineText: togetherHeadline,
             ageText: pet.hasPassedAway ? pet.ageAtPassingText : pet.birthday.map { pet.localizedAgeTextForWallet(birthday: $0, l: l) },
             zodiacText: pet.birthday.map { Human.westernZodiacDisplay(for: $0, l: l) },
             humanEquivalentAgeText: pet.birthday.map { pet.humanEquivalentAgeTextForWallet(birthday: $0, l: l) },
             genderText: pet.genderSymbol + (pet.isNeutered ? l.tr(zh: " 已绝育", en: " neutered", de: " kastriert") : ""),
             personalityHint: PetTagGreeting.homeSubtitleHint(pet: pet, hour: hour, l: L10n(language)),
             avatarImageData: includeAvatarData ? pet.avatarImageData : nil,
+            avatarImageSignature: includeAvatarData ? pet.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? "" : "",
             cardStyleRaw: pet.cardStyleRaw,
-            cardPopoutImageData: pet.cardStyleRaw == "popout" ? pet.cardPopoutImageData : nil,
+            cardPopoutImageData: popoutImageData,
+            cardPopoutImageSignature: popoutImageData.map(FocusWalletAvatarCache.signature(for:)) ?? "",
             cardPopoutSourceRaw: pet.cardPopoutSourceRaw ?? "",
             petSpecies: pet.species,
             coatColor: WalletPetCardTheme.silhouetteCoatColor(for: pet),
@@ -268,6 +290,7 @@ extension FocusCard {
             mbtiText: human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : human.mbti.uppercased(),
             genderText: HumanGenderIdentity.title(for: human.genderRaw),
             avatarImageData: includeAvatarData ? human.avatarImageData : nil,
+            avatarImageSignature: includeAvatarData ? human.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? "" : "",
             humanGender: human.genderRaw,
             themeColorHex: hex,
             daysTogether: days,

@@ -27,10 +27,12 @@ struct SettingsView: View {
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
     @AppStorage("appBackgroundStyle") private var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
+    @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @AppStorage("goFocusHomeCardOrder.v1") private var homeCardOrderRaw = ""
-    @State private var showingClearDataAlert = false
+    @State private var showingAppResetAlert = false
+    @State private var appResetErrorMessage: String? = nil
     // TASK 1：JSON 备份
     @State private var exportedJSONURL: URL? = nil
     @State private var isExporting = false
@@ -497,22 +499,45 @@ struct SettingsView: View {
                         }
 
                         // 数据
-                        settingsSection(title: "数据") {
+                        settingsSection(title: l.tr(zh: "数据", en: "Data", de: "Daten")) {
                             VStack(spacing: 0) {
-                                settingsRow(icon: "square.and.arrow.up", title: "导出数据", subtitle: "即将推出") {}
+                                settingsRow(
+                                    icon: "square.and.arrow.up",
+                                    title: l.tr(zh: "导出数据", en: "Export Data", de: "Daten exportieren"),
+                                    subtitle: l.tr(zh: "即将推出", en: "Coming soon", de: "Demnachst")
+                                ) {}
                                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-                                settingsRow(icon: "exclamationmark.triangle", title: "清除所有数据", subtitle: "", iconColor: Color.goRed) {
-                                    showingClearDataAlert = true
+                                settingsRow(
+                                    icon: "arrow.counterclockwise.circle.fill",
+                                    title: l.tr(zh: "重置 App", en: "Reset App", de: "App zurucksetzen"),
+                                    subtitle: l.tr(zh: "删除数据并回到引导页", en: "Delete data and restart onboarding", de: "Daten loschen und Onboarding starten"),
+                                    iconColor: Color.goRed
+                                ) {
+                                    showingAppResetAlert = true
                                 }
                             }
                         }
-                        .alert("清除所有数据", isPresented: $showingClearDataAlert) {
-                            Button("取消", role: .cancel) {}
-                            Button("清除", role: .destructive) {
-                                clearAllData()
+                        .alert(l.tr(zh: "重置 App", en: "Reset App", de: "App zurucksetzen"), isPresented: $showingAppResetAlert) {
+                            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
+                            Button(l.tr(zh: "重置", en: "Reset", de: "Zurucksetzen"), role: .destructive) {
+                                resetApp()
                             }
                         } message: {
-                            Text("此操作将删除 App 内所有宠物、记录、日历数据，无法恢复。确定继续？")
+                            Text(l.tr(
+                                zh: "此操作将删除 App 内的成员、记录、提醒、任务、奖励和本地自定义内容，无法恢复。重置后会从引导页面重新开始。",
+                                en: "This deletes members, logs, reminders, tasks, rewards, and local custom content. It cannot be undone. After reset, Ohana starts from onboarding.",
+                                de: "Dies loscht Mitglieder, Eintrage, Erinnerungen, Aufgaben, Belohnungen und lokale Anpassungen. Das kann nicht ruckgangig gemacht werden. Danach startet Ohana im Onboarding."
+                            ))
+                        }
+                        .alert(l.tr(zh: "重置失败", en: "Reset Failed", de: "Zurucksetzen fehlgeschlagen"), isPresented: Binding(
+                            get: { appResetErrorMessage != nil },
+                            set: { if !$0 { appResetErrorMessage = nil } }
+                        )) {
+                            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {
+                                appResetErrorMessage = nil
+                            }
+                        } message: {
+                            Text(appResetErrorMessage ?? l.tr(zh: "未知错误", en: "Unknown error", de: "Unbekannter Fehler"))
                         }
                         
                         Spacer(minLength: 40)
@@ -755,17 +780,16 @@ struct SettingsView: View {
     private struct SettingsHumanIdentityAvatar: View {
         let human: Human
         let isSelected: Bool
+        @State private var avatarImage: UIImage?
 
         var body: some View {
-            let avatarEntry = FocusWalletAvatarCache.entry(for: human.id, data: human.avatarImageData)
-
             ZStack {
                 Circle()
                     .fill(isSelected ? Color.goPrimary.opacity(0.20) : Color.ohanaControlFill)
                     .frame(width: 44, height: 44)
                     .overlay(Circle().strokeBorder(isSelected ? Color.goPrimary : Color.clear, lineWidth: 2))
 
-                if let image = avatarEntry.image {
+                if let image = avatarImage {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -776,6 +800,30 @@ struct SettingsView: View {
                         .font(.system(size: 20))
                 }
             }
+            .task(id: avatarSignature) {
+                await loadAvatarImage()
+            }
+        }
+
+        private var avatarSignature: String {
+            human.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
+        }
+
+        @MainActor
+        private func loadAvatarImage() async {
+            guard !avatarSignature.isEmpty else {
+                avatarImage = nil
+                return
+            }
+            if let image = FocusWalletAvatarCache.cachedEntry(for: human.id, signature: avatarSignature)?.image {
+                avatarImage = image
+                return
+            }
+            await FocusWalletAvatarCache.preload(payloads: [
+                FocusWalletAvatarCache.Payload(id: human.id, data: human.avatarImageData)
+            ])
+            guard !Task.isCancelled else { return }
+            avatarImage = FocusWalletAvatarCache.cachedEntry(for: human.id, signature: avatarSignature)?.image
         }
     }
 
@@ -1079,19 +1127,17 @@ struct SettingsView: View {
         .frame(minHeight: 44)
     }
 
-    private func clearAllData() {
+    private func resetApp() {
         do {
-            try modelContext.delete(model: Pet.self)
-            try modelContext.delete(model: Event.self)
-            try modelContext.delete(model: Reminder.self)
-            try modelContext.delete(model: Human.self)
-            try modelContext.save()
-            // Reset onboarding and binding to force fresh setup
-            UserDefaults.standard.set(false, forKey: "ohana_has_onboarded")
-            UserDefaults.standard.set("", forKey: "currentActiveHumanId")
+            try AppResetService.reset(context: modelContext)
+            currentActiveHumanId = ""
+            withAnimation(GoMotion.page) {
+                hasOnboarded = false
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch {
-            print("Clear data error: \(error)")
+            appResetErrorMessage = error.localizedDescription
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
     

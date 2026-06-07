@@ -166,12 +166,47 @@ final class ImageCutoutService {
             context.clear(CGRect(x: 0, y: 0, width: sampleW, height: sampleH))
             context.draw(cgImage, in: CGRect(x: 0, y: 0, width: sampleW, height: sampleH))
 
-            for index in stride(from: 3, to: pixelBufferCount, by: 4) {
-                if rawBuffer[index] < alphaThreshold {
-                    return true
+            let buffer = rawBuffer.bindMemory(to: UInt8.self)
+            var transparentCount = 0
+            var opaqueMinX = sampleW
+            var opaqueMinY = sampleH
+            var opaqueMaxX = -1
+            var opaqueMaxY = -1
+
+            for y in 0..<sampleH {
+                let rowStart = y * bytesPerRow
+                for x in 0..<sampleW {
+                    let alpha = buffer[rowStart + x * 4 + 3]
+                    if alpha < alphaThreshold {
+                        transparentCount += 1
+                    } else {
+                        opaqueMinX = min(opaqueMinX, x)
+                        opaqueMinY = min(opaqueMinY, y)
+                        opaqueMaxX = max(opaqueMaxX, x)
+                        opaqueMaxY = max(opaqueMaxY, y)
+                    }
                 }
             }
-            return false
+
+            guard transparentCount > 0 else { return false }
+            guard opaqueMaxX >= 0, opaqueMaxY >= 0 else { return true }
+
+            let totalPixels = max(1, sampleW * sampleH)
+            let transparentRatio = Double(transparentCount) / Double(totalPixels)
+            guard transparentRatio >= 0.015 else { return false }
+
+            let opaqueWidth = opaqueMaxX - opaqueMinX + 1
+            let opaqueHeight = opaqueMaxY - opaqueMinY + 1
+            let fillsCanvas = Double(opaqueWidth) / Double(sampleW) >= 0.94
+                && Double(opaqueHeight) / Double(sampleH) >= 0.94
+
+            // A rounded/circular real photo can have transparent corners while
+            // still filling the card visually. Keep those as photo cards; reserve
+            // popout rendering for meaningful transparent backdrops.
+            if fillsCanvas && transparentRatio < 0.28 {
+                return false
+            }
+            return true
         }
     }
 

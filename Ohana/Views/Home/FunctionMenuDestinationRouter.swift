@@ -8,9 +8,19 @@ struct FunctionMenuDestinationRouter: View {
 
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.name) private var humans: [Human]
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @State private var treeManager = OasisTreeManager.shared
 
     var body: some View {
-        destinationView(destination)
+        let unlock = GrowthUnlockPolicy.status(
+            for: destination,
+            currentLevel: treeManager.treeLevel.rawValue
+        )
+        if unlock.isUnlocked {
+            destinationView(destination)
+        } else {
+            GrowthLockedFeatureView(status: unlock, appLanguage: appLanguage)
+        }
     }
 
     @ViewBuilder

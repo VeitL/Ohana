@@ -403,11 +403,6 @@ struct WalletCardVerticalPhotoBlendLayer: View {
     let themeColorHex: String
     var shadowDepth: Double = 1
 
-    private var imageAspectRatio: CGFloat {
-        guard image.size.width > 0, image.size.height > 0 else { return 1 }
-        return image.size.width / image.size.height
-    }
-
     private var themeTop: Color {
         WalletPetCardTheme.gradientPair(for: themeColorHex).0
     }
@@ -420,7 +415,9 @@ struct WalletCardVerticalPhotoBlendLayer: View {
         ZStack(alignment: .top) {
             Image(uiImage: image)
                 .resizable()
-                .aspectRatio(imageAspectRatio, contentMode: .fill)
+                .interpolation(.high)
+                .antialiased(true)
+                .scaledToFill()
                 .frame(width: width, height: height, alignment: .top)
                 .clipped()
                 .saturation(1.03)

@@ -10,12 +10,51 @@ import SwiftUI
 
 struct VerticalSolidHomePageLifecycle: Equatable {
     let isPrepared: Bool
+    let isPreparingForDisplay: Bool
     let isVisible: Bool
     let isLive: Bool
 }
 
+enum VerticalHomeTabMountPolicy {
+    static func mountedTabs(
+        active: VerticalSolidHomeTab,
+        outgoing: VerticalSolidHomeTab?,
+        prepared: Set<VerticalSolidHomeTab> = []
+    ) -> Set<VerticalSolidHomeTab> {
+        var mounted: Set<VerticalSolidHomeTab> = [active]
+        if let outgoing {
+            mounted.insert(outgoing)
+        }
+        mounted.formUnion(prepared)
+        return mounted
+    }
+
+    static func lifecycle(
+        for tab: VerticalSolidHomeTab,
+        active: VerticalSolidHomeTab,
+        outgoing: VerticalSolidHomeTab?,
+        selected: VerticalSolidHomeTab,
+        prepared: Set<VerticalSolidHomeTab> = [],
+        preparing: VerticalSolidHomeTab? = nil
+    ) -> VerticalSolidHomePageLifecycle {
+        let isOutgoing = outgoing == tab
+        let isPreparing = preparing == tab
+        let isPrepared = tab == active || prepared.contains(tab) || isPreparing
+        let isVisible = tab == active || isOutgoing
+        let isLive = tab == active && outgoing == nil && !isPreparing
+        return VerticalSolidHomePageLifecycle(
+            isPrepared: isPrepared,
+            isPreparingForDisplay: isPreparing,
+            isVisible: isVisible,
+            isLive: isLive
+        )
+    }
+}
+
 struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: View, PlantsPage: View>: View {
     let selectedTab: VerticalSolidHomeTab
+    let outgoingTab: VerticalSolidHomeTab?
+    let preparingTab: VerticalSolidHomeTab?
     let preparedTabs: Set<VerticalSolidHomeTab>
     let canAnimate: Bool
     @ViewBuilder var home: (VerticalSolidHomePageLifecycle) -> HomePage
@@ -43,13 +82,11 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
 
     @ViewBuilder
     private func page(for tab: VerticalSolidHomeTab) -> some View {
-        let lifecycle = VerticalSolidHomePageLifecycle(
-            isPrepared: isMounted(tab),
-            isVisible: tab == selectedTab,
-            isLive: tab == selectedTab && isMounted(tab)
-        )
+        let lifecycle = lifecycle(for: tab)
 
-        if isMounted(tab) {
+        if lifecycle.isPreparingForDisplay && tab != .oasis {
+            VerticalSolidHomePreparedPlaceholder()
+        } else if lifecycle.isVisible {
             switch tab {
             case .home:
                 home(lifecycle)
@@ -66,7 +103,20 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     }
 
     private func isMounted(_ tab: VerticalSolidHomeTab) -> Bool {
-        preparedTabs.contains(tab)
+        VerticalHomeTabMountPolicy
+            .mountedTabs(active: selectedTab, outgoing: outgoingTab, prepared: preparedTabs)
+            .contains(tab)
+    }
+
+    private func lifecycle(for tab: VerticalSolidHomeTab) -> VerticalSolidHomePageLifecycle {
+        VerticalHomeTabMountPolicy.lifecycle(
+            for: tab,
+            active: selectedTab,
+            outgoing: outgoingTab,
+            selected: selectedTab,
+            prepared: preparedTabs,
+            preparing: preparingTab
+        )
     }
 }
 
@@ -81,6 +131,9 @@ struct VerticalSolidHomeDashboardPage: View {
     let avatarCacheRevision: Int
     let isLive: Bool
     let collapsedTopInset: CGFloat
+    let localization: L10n
+    let activeHumanID: UUID?
+    let allowsAmbientFloat: Bool
     @Binding var quickActionItemsRaw: String
     @Binding var headerContextCardId: UUID?
     @Binding var isCardExpandedOrTransitioning: Bool
@@ -124,6 +177,8 @@ struct VerticalSolidHomeDashboardPage: View {
                         heroDirection: heroDirection,
                         arrivingCardId: arrivingCardId,
                         reduceMotion: reduceMotion,
+                        localization: localization,
+                        allowsAmbientFloat: allowsAmbientFloat,
                         isVisible: isLive,
                         embedsQuickActionsInCard: true,
                         collapsedTopInset: collapsedTopInset,
@@ -136,6 +191,8 @@ struct VerticalSolidHomeDashboardPage: View {
                                 humanMedications: humanMedications,
                                 humanMedicationLogs: humanMedicationLogs,
                                 expenseLogs: expenseLogs,
+                                localization: localization,
+                                activeHumanID: activeHumanID,
                                 quickActionItemsRaw: $quickActionItemsRaw,
                                 onAction: { item, usesPrimaryAction in
                                     onQuickActionForCard(item, card, usesPrimaryAction)
@@ -315,20 +372,7 @@ struct VerticalSolidHomeDashboardPage: View {
     }
 
     private var heroSnapshotPreparationKey: String {
-        let cardKey = snapshot.cards.map { card in
-            [
-                card.id.uuidString,
-                card.name,
-                card.kind,
-                "\(card.coconutBalance)",
-                card.homePrimaryMetricValue,
-                card.homePrimaryMetricUnit,
-                card.statusBadgeText ?? "",
-                card.themeColorHex
-            ].joined(separator: ":")
-        }
-        .joined(separator: "|")
-        return "\(avatarCacheRevision)|\(cardKey)"
+        "\(avatarCacheRevision)|\(snapshot.heroPreparationRevision)"
     }
 
     private func makeHeroSnapshot(for cardId: UUID) -> FocusHomeVerticalSolidHeroSnapshot? {
@@ -408,26 +452,32 @@ private struct VerticalSolidHomeExpandedCardActions: View {
     let humanMedications: [HumanMedication]
     let humanMedicationLogs: [HumanMedicationLog]
     let expenseLogs: [PetExpenseLog]
+    let localization: L10n
+    let activeHumanID: UUID?
     @Binding var quickActionItemsRaw: String
     let onAction: (QuickActionItem, Bool) -> Void
     let onOptionAction: (QuickActionItem, String) -> Void
     let onLimitReached: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var isEditMode = false
     @State private var jiggle = false
     @State private var draggingItemId: String?
+    @State private var renderModel = VerticalSolidHomeExpandedActionRenderModel.empty
+    @State private var renderModelTask: Task<Void, Never>?
+    @State private var jiggleTask: Task<Void, Never>?
 
-    private var l: L10n { L10n(appLanguage) }
+    private var l: L10n { localization }
 
     var body: some View {
         VerticalHomeEmbeddedQuickActions(
             title: l.tr(zh: "快捷", en: "Quick", de: "Schnell"),
-            items: visibleItems.map(makeEmbeddedAction),
-            addItems: candidateItems.map(makeAddEmbeddedAction),
+            items: renderModel.actions,
+            addItems: renderModel.addActions,
+            localization: l,
+            itemsRevision: renderModel.actionsRevision,
+            addItemsRevision: renderModel.addActionsRevision,
             isEditMode: isEditMode,
             jiggle: jiggle,
             shouldReduceWork: reduceMotion || workloadPolicy.interactionMotionBudget(isVisible: true) != .full,
@@ -439,19 +489,78 @@ private struct VerticalSolidHomeExpandedCardActions: View {
             onAdd: addAction
         )
         .onAppear {
-            normalizeStoredItemsIfNeeded()
+            scheduleRenderModelRefresh(normalizesStoredItems: true)
         }
         .onChange(of: card.id) { _, _ in
             exitEditMode(persists: false)
-            normalizeStoredItemsIfNeeded()
+            scheduleRenderModelRefresh(normalizesStoredItems: true)
+        }
+        .onChange(of: renderRefreshKey) { _, _ in
+            scheduleRenderModelRefresh(normalizesStoredItems: true)
+        }
+        .onChange(of: isEditMode) { _, _ in
+            scheduleRenderModelRefresh(normalizesStoredItems: false)
+        }
+        .onDisappear {
+            renderModelTask?.cancel()
+            renderModelTask = nil
+            jiggleTask?.cancel()
+            jiggleTask = nil
+            jiggle = false
+            renderModel = .empty
         }
     }
 
-    private var visibleItems: [QuickActionItem] {
-        Array(currentItems.prefix(QuickActionLimit.maxItemsPerEntity))
+    private var renderRefreshKey: String {
+        [
+            card.id.uuidString,
+            card.isHuman ? "human" : "pet",
+            quickActionItemsRaw,
+            localization.languageCode,
+            activeHumanID?.uuidString ?? "",
+            "\(allEvents.count)",
+            "\(humanMedications.count)",
+            "\(humanMedicationLogs.count)",
+            "\(expenseLogs.count)",
+            card.homePrimaryMetricValue,
+            card.statusBadgeText ?? ""
+        ].joined(separator: "|")
     }
 
-    private var currentItems: [QuickActionItem] {
+    private func scheduleRenderModelRefresh(normalizesStoredItems: Bool) {
+        renderModelTask?.cancel()
+        renderModelTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
+            let nextModel = buildRenderModel()
+            guard !Task.isCancelled else { return }
+            withTransaction(Transaction(animation: nil)) {
+                renderModel = nextModel
+            }
+            if normalizesStoredItems {
+                normalizeStoredItemsIfNeeded(using: nextModel)
+            }
+            renderModelTask = nil
+        }
+    }
+
+    private func buildRenderModel() -> VerticalSolidHomeExpandedActionRenderModel {
+        let currentItems = buildCurrentItems()
+        let visibleItems = Array(currentItems.prefix(QuickActionLimit.maxItemsPerEntity))
+        let candidateItems = buildCandidateItems()
+        let existingActionTypes = Set(currentItems.map { normalizedActionType($0.actionType) })
+        return VerticalSolidHomeExpandedActionRenderModel(
+            currentItems: currentItems,
+            visibleItems: visibleItems,
+            candidateItems: candidateItems,
+            actions: visibleItems.map(makeEmbeddedAction),
+            actionsRevision: actionRevisionKey(for: visibleItems),
+            addActions: candidateItems.map {
+                makeAddEmbeddedAction($0, existingActionTypes: existingActionTypes)
+            },
+            addActionsRevision: actionRevisionKey(for: candidateItems)
+        )
+    }
+
+    private func buildCurrentItems() -> [QuickActionItem] {
         if let pet = currentPet {
             return stableItems(
                 ExpandedQuickActionStore.petItems(
@@ -479,7 +588,7 @@ private struct VerticalSolidHomeExpandedCardActions: View {
         return fallbackItems
     }
 
-    private var candidateItems: [QuickActionItem] {
+    private func buildCandidateItems() -> [QuickActionItem] {
         guard isEditMode else { return [] }
         if let pet = currentPet {
             return stableItems(
@@ -561,7 +670,10 @@ private struct VerticalSolidHomeExpandedCardActions: View {
         )
     }
 
-    private func makeAddEmbeddedAction(_ item: QuickActionItem) -> VerticalHomeEmbeddedAction {
+    private func makeAddEmbeddedAction(
+        _ item: QuickActionItem,
+        existingActionTypes: Set<String>
+    ) -> VerticalHomeEmbeddedAction {
         let isAlreadyAdded = existingActionTypes.contains(normalizedActionType(item.actionType))
         return VerticalHomeEmbeddedAction(
             id: item.actionType,
@@ -587,19 +699,23 @@ private struct VerticalSolidHomeExpandedCardActions: View {
         withAnimation(GoMotion.selection) {
             isEditMode = true
         }
+        jiggleTask?.cancel()
         jiggle = false
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 50) {
-            guard isEditMode else { return }
+        jiggleTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 50) {
+            guard !Task.isCancelled, isEditMode else { return }
             withAnimation(nil) {
                 jiggle = true
             }
+            jiggleTask = nil
         }
     }
 
     private func exitEditMode(persists: Bool = true) {
         if persists {
-            persistItems(currentItems)
+            persistItems(currentItemsForMutation())
         }
+        jiggleTask?.cancel()
+        jiggleTask = nil
         draggingItemId = nil
         jiggle = false
         withAnimation(GoMotion.selection) {
@@ -608,7 +724,7 @@ private struct VerticalSolidHomeExpandedCardActions: View {
     }
 
     private func moveAction(fromId: String, toId: String) {
-        var items = currentItems
+        var items = currentItemsForMutation()
         guard fromId != toId,
               let fromIndex = items.firstIndex(where: { $0.id == fromId }),
               let toIndex = items.firstIndex(where: { $0.id == toId }) else {
@@ -623,7 +739,7 @@ private struct VerticalSolidHomeExpandedCardActions: View {
     }
 
     private func removeAction(_ id: String) {
-        var items = currentItems
+        var items = currentItemsForMutation()
         guard items.count > 1,
               items.contains(where: { $0.id == id }) else {
             OhanaFeedback.warning()
@@ -637,15 +753,16 @@ private struct VerticalSolidHomeExpandedCardActions: View {
     }
 
     private func addAction(_ actionType: String) {
-        var items = currentItems
+        var items = currentItemsForMutation()
         guard items.count < QuickActionLimit.maxItemsPerEntity else {
             onLimitReached()
             return
         }
 
         let normalizedType = normalizedActionType(actionType)
+        let existingActionTypes = Set(items.map { normalizedActionType($0.actionType) })
         guard !existingActionTypes.contains(normalizedType),
-              let item = candidateItems.first(where: { normalizedActionType($0.actionType) == normalizedType }) else {
+              let item = renderModel.candidateItems.first(where: { normalizedActionType($0.actionType) == normalizedType }) else {
             return
         }
         withAnimation(GoMotion.feedback) {
@@ -654,12 +771,12 @@ private struct VerticalSolidHomeExpandedCardActions: View {
         }
     }
 
-    private var existingActionTypes: Set<String> {
-        Set(currentItems.map { normalizedActionType($0.actionType) })
-    }
-
     private func normalizedActionType(_ actionType: String) -> String {
         WaterQuickActionPolicy.foldedActionTypes.contains(actionType) ? "water" : actionType
+    }
+
+    private func currentItemsForMutation() -> [QuickActionItem] {
+        renderModel.currentItems.isEmpty ? buildCurrentItems() : renderModel.currentItems
     }
 
     private func stableItems(_ items: [QuickActionItem], entityID: UUID, kind: EntityKind) -> [QuickActionItem] {
@@ -668,6 +785,10 @@ private struct VerticalSolidHomeExpandedCardActions: View {
             stableItem.id = "\(kind.rawValue)-\(entityID.uuidString)-\(item.actionType)"
             return stableItem
         }
+    }
+
+    private func actionRevisionKey(for items: [QuickActionItem]) -> String {
+        items.map(\.id).joined(separator: "|")
     }
 
     private func quickActionState(for item: QuickActionItem) -> QuickActionRenderState {
@@ -700,7 +821,7 @@ private struct VerticalSolidHomeExpandedCardActions: View {
         }
 
         if let human = currentHuman {
-            let viewedBy = UUID(uuidString: activeHumanIdRaw)
+            let viewedBy = activeHumanID
             let isLocked = ExpandedHumanQuickActionStateProvider.isPrivate(item, human: human, viewedBy: viewedBy)
             let medicationWarning = item.actionType == "humanMedication"
                 ? CarePlanOverdueStatusCalculator.humanMedicationWarning(
@@ -784,15 +905,15 @@ private struct VerticalSolidHomeExpandedCardActions: View {
         }
     }
 
-    private func normalizeStoredItemsIfNeeded() {
-        guard !currentItems.isEmpty else { return }
-        let stableIds = currentItems.map(\.id).joined(separator: "|")
-        let rawIds = visibleItems.map(\.id).joined(separator: "|")
+    private func normalizeStoredItemsIfNeeded(using model: VerticalSolidHomeExpandedActionRenderModel) {
+        guard !model.currentItems.isEmpty else { return }
+        let stableIds = model.currentItems.map(\.id).joined(separator: "|")
+        let rawIds = model.visibleItems.map(\.id).joined(separator: "|")
         guard stableIds != rawIds else { return }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            persistItems(currentItems)
+            persistItems(model.currentItems)
         }
     }
 
@@ -801,7 +922,7 @@ private struct VerticalSolidHomeExpandedCardActions: View {
             quickActionItemsRaw = ExpandedQuickActionStore.savingPetItems(
                 stableItems(items, entityID: pet.id, kind: .pet),
                 pet: pet,
-                currentItems: currentItems,
+                currentItems: currentItemsForMutation(),
                 raw: quickActionItemsRaw
             )
             return
@@ -810,7 +931,7 @@ private struct VerticalSolidHomeExpandedCardActions: View {
             quickActionItemsRaw = ExpandedQuickActionStore.savingHumanItems(
                 stableItems(items, entityID: human.id, kind: .human),
                 human: human,
-                currentItems: currentItems,
+                currentItems: currentItemsForMutation(),
                 raw: quickActionItemsRaw
             )
         }
@@ -833,13 +954,33 @@ private struct VerticalSolidHomeExpandedCardActions: View {
     }
 }
 
+private struct VerticalSolidHomeExpandedActionRenderModel {
+    var currentItems: [QuickActionItem]
+    var visibleItems: [QuickActionItem]
+    var candidateItems: [QuickActionItem]
+    var actions: [VerticalHomeEmbeddedAction]
+    var actionsRevision: String
+    var addActions: [VerticalHomeEmbeddedAction]
+    var addActionsRevision: String
+
+    static let empty = VerticalSolidHomeExpandedActionRenderModel(
+        currentItems: [],
+        visibleItems: [],
+        candidateItems: [],
+        actions: [],
+        actionsRevision: "",
+        addActions: [],
+        addActionsRevision: ""
+    )
+}
+
 struct VerticalSolidHomePlantsPage: View {
     let plants: [VerticalSolidHomePlantSnapshot]
+    let localization: L10n
     let onOpenPlant: (VerticalSolidHomePlantSnapshot) -> Void
     let onAddPlant: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-    private var l: L10n { L10n(appLanguage) }
+    private var l: L10n { localization }
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -900,14 +1041,14 @@ struct VerticalSolidHomeBottomBar: View {
     let expandedShortcuts: [ExpandedCardFabShortcut]
     let safeBottom: CGFloat
     let canAnimate: Bool
+    let localization: L10n
     let onSelect: (VerticalSolidHomeTab) -> Void
     let onHomeShortcut: (HomeFabFunctionShortcut) -> Void
     let onExpandedShortcut: (ExpandedCardFabShortcut, FocusCard) -> Void
     let onCenter: () -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @Environment(\.colorScheme) private var colorScheme
-    private var l: L10n { L10n(appLanguage) }
+    private var l: L10n { localization }
 
     var body: some View {
         let barBottomInset = max(safeBottom - 2, 4)

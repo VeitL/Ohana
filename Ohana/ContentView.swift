@@ -11,15 +11,10 @@ import UIKit
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @State private var selectedPet: Pet?
-    @State private var selectedHuman: Human?
-    @State private var selectedPlant: Plant?
-    @State private var selectedPetTab: PetDetailTab = .overview
+    @Environment(\.modelContext) private var modelContext
+    @StateObject private var appRoutes = AppRouteCoordinator()
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-    @State private var showingRequiredHumanProfile = false
-    @State private var showingRequiredAccountSwitch = false
     @State private var homeResetToken = UUID()
     @Namespace private var heroNS
     
@@ -30,16 +25,11 @@ struct ContentView: View {
                     .transition(.opacity)
                     .zIndex(100)
             }
-            NavigationStack {
+            NavigationStack(path: $appRoutes.path) {
                 selectedHomeView
-                .navigationDestination(item: $selectedPet) { pet in
-                    petDestination(for: pet)
-                }
-                .navigationDestination(item: $selectedHuman) { human in
-                    HumanDetailView(human: human)
-                }
-                .navigationDestination(item: $selectedPlant) { plant in
-                    PlantDetailView(plant: plant)
+                .navigationDestination(for: AppRoute.self) { route in
+                    AppRouteDestination(route: route)
+                        .navigationTransition(.zoom(sourceID: route.sourceID, in: heroNS))
                 }
                 .toolbar {
                     ToolbarItemGroup(placement: .keyboard) {
@@ -56,7 +46,7 @@ struct ContentView: View {
             .id(homeResetToken)
             .ignoresSafeArea(.keyboard, edges: .bottom)
 
-            if hasOnboarded && !showingRequiredHumanProfile {
+            if hasOnboarded && appRoutes.fullScreen != .requiredHumanProfile {
                 GlobalWalkBanner()
                     .zIndex(80)
             }
@@ -65,61 +55,59 @@ struct ContentView: View {
                 .zIndex(120)
         }
         .onAppear {
-            allowSystemAutoLock()
-            AppWorkloadPolicy.shared.updateScenePhase(scenePhase)
-            AppWorkloadPolicy.shared.refresh(reason: "contentAppear")
+            AppLifecycleCoordinator.shared.handle(.rootAppeared(scenePhase: scenePhase))
             reconcileHumanProfileRequirement()
-            handleAppForegroundTransition()
         }
         .onChange(of: hasOnboarded) { _, _ in
             reconcileHumanProfileRequirement()
         }
-        .onChange(of: humans.map { $0.id }) { _, _ in
-            reconcileHumanProfileRequirement()
-        }
         .onReceive(NotificationCenter.default.publisher(for: .ohanaReturnHomeAfterHumanDeletion)) { notification in
-            selectedPet = nil
-            selectedHuman = nil
-            selectedPlant = nil
-            selectedPetTab = .overview
+            appRoutes.resetToHome()
             homeResetToken = UUID()
             let requiresReplacementHuman = (notification.userInfo?["requiresReplacementHuman"] as? Bool) == true
             if requiresReplacementHuman {
                 currentActiveHumanId = ""
-                showingRequiredHumanProfile = true
+                appRoutes.presentRequiredHumanProfile()
             } else if (notification.userInfo?["requiresAccountSwitch"] as? Bool) == true {
                 currentActiveHumanId = ""
-                showingRequiredAccountSwitch = true
+                appRoutes.presentRequiredAccountSwitch()
             } else {
                 reconcileHumanProfileRequirement()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .ohanaReminderRouteRequested)) { _ in
-            selectedPet = nil
-            selectedHuman = nil
-            selectedPlant = nil
-            selectedPetTab = .overview
+            appRoutes.resetToHome()
         }
-        .fullScreenCover(isPresented: $showingRequiredHumanProfile) {
-            RequiredHumanProfileView { human in
-                currentActiveHumanId = human.id.uuidString
-                showingRequiredHumanProfile = false
+        .fullScreenCover(item: $appRoutes.fullScreen) { route in
+            switch route {
+            case .requiredHumanProfile:
+                RequiredHumanProfileView { human in
+                    currentActiveHumanId = human.id.uuidString
+                    appRoutes.dismissFullScreen(.requiredHumanProfile)
+                }
+                .interactiveDismissDisabled(true)
             }
-            .interactiveDismissDisabled(true)
         }
-        .sheet(isPresented: $showingRequiredAccountSwitch) {
-            HumanAccountSwitcherSheet {
-                showingRequiredAccountSwitch = false
+        .sheet(item: $appRoutes.sheet) { route in
+            switch route {
+            case .requiredAccountSwitch:
+                HumanAccountSwitcherSheet {
+                    appRoutes.dismissSheet(.requiredAccountSwitch)
+                }
+                .interactiveDismissDisabled(true)
             }
-            .interactiveDismissDisabled(true)
         }
         .onChange(of: currentActiveHumanId) { _, newValue in
             if !newValue.isEmpty {
-                showingRequiredAccountSwitch = false
+                appRoutes.dismissSheet(.requiredAccountSwitch)
+                reconcileHumanProfileRequirement()
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            handleScenePhaseChange(newPhase)
+            AppLifecycleCoordinator.shared.handle(.scenePhaseChanged(newPhase))
+            if newPhase == .active {
+                reconcileHumanProfileRequirement()
+            }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
@@ -127,46 +115,39 @@ struct ContentView: View {
     @ViewBuilder
     private var selectedHomeView: some View {
         VerticalSolidHomeDataContainer(
-            selectedPet: $selectedPet,
-            selectedHuman: $selectedHuman,
-            selectedPlant: $selectedPlant,
-            selectedPetTab: $selectedPetTab
+            onOpenPet: { id, tab in
+                appRoutes.openPet(id, initialTab: tab)
+            },
+            onOpenHuman: { id in
+                appRoutes.openHuman(id)
+            },
+            onOpenPlant: { id in
+                appRoutes.openPlant(id)
+            }
         )
     }
 
-    @ViewBuilder
-    private func petDestination(for pet: Pet) -> some View {
-        Group {
-            if selectedPetTab == .health {
-                PetHealthDetailView(pet: pet)
-            } else {
-                PetBasicInfoDetailView(pet: pet)
-            }
-        }
-        .navigationTransition(.zoom(sourceID: pet.id, in: heroNS))
-    }
-
     private func reconcileHumanProfileRequirement() {
-        guard hasOnboarded else {
-            showingRequiredHumanProfile = false
-            return
-        }
+        let resolution = HumanRequirementCoordinator.resolve(
+            hasOnboarded: hasOnboarded,
+            currentActiveHumanId: currentActiveHumanId,
+            isAccountSwitchPresented: appRoutes.sheet == .requiredAccountSwitch,
+            context: modelContext
+        )
 
-        guard let firstHuman = humans.first else {
-            showingRequiredHumanProfile = true
-            return
+        switch resolution {
+        case .notOnboarded:
+            appRoutes.dismissFullScreen(.requiredHumanProfile)
+        case .needsRequiredProfile:
+            appRoutes.presentRequiredHumanProfile()
+        case .preserveAccountSwitch:
+            appRoutes.dismissFullScreen(.requiredHumanProfile)
+        case let .activateHuman(id):
+            currentActiveHumanId = id
+            appRoutes.dismissFullScreen(.requiredHumanProfile)
+        case .ready:
+            appRoutes.dismissFullScreen(.requiredHumanProfile)
         }
-
-        if showingRequiredAccountSwitch {
-            showingRequiredHumanProfile = false
-            return
-        }
-
-        if currentActiveHumanId.isEmpty ||
-            !humans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
-            currentActiveHumanId = firstHuman.id.uuidString
-        }
-        showingRequiredHumanProfile = false
     }
 
     private func dismissKeyboard() {
@@ -178,28 +159,6 @@ struct ContentView: View {
         )
     }
 
-    private func handleScenePhaseChange(_ phase: ScenePhase) {
-        AppWorkloadPolicy.shared.updateScenePhase(phase)
-        switch phase {
-        case .background:
-            PetWalkingManager.shared.handleAppBackgroundTransition()
-        case .inactive:
-            PetWalkingManager.shared.handleAppInactiveTransition()
-        case .active:
-            allowSystemAutoLock()
-            handleAppForegroundTransition()
-        @unknown default:
-            PetWalkingManager.shared.handleAppInactiveTransition()
-        }
-    }
-
-    private func allowSystemAutoLock() {
-        UIApplication.shared.isIdleTimerDisabled = false
-    }
-
-    private func handleAppForegroundTransition() {
-        PetWalkingManager.shared.handleAppForegroundTransition()
-    }
 }
 
 extension Notification.Name {

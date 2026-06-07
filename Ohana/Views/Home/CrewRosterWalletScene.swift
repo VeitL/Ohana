@@ -30,6 +30,8 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
     let onCollapse: () -> Void
     let onOpenEditor: (FocusCard) -> Void
     let onCloseEditor: () -> Void
+    @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow = false
+    @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard = true
 
     private var selectedCardIndex: Int? {
         selectedCardId.flatMap { selectedId in
@@ -99,7 +101,9 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
                         reduceMotion: reduceMotion,
                         presentation: .rosterMember,
                         expandedCardHeight: card.id == editingCardId ? frame.height : layout.expandedHeight,
-                        cardCornerRadius: cardCornerRadius
+                        cardCornerRadius: cardCornerRadius,
+                        equipFxLimeGlow: equipFxLimeGlow,
+                        equipFxPopoutCard: equipFxPopoutCard
                     )
                     .overlay {
                         if isActive {

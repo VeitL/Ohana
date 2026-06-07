@@ -10,10 +10,15 @@ struct FunctionMenuRootView: View {
     @Query(sort: \Human.name) private var humans: [Human]
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
 
+    @State private var treeManager = OasisTreeManager.shared
+    @State private var lockedStatus: GrowthUnlockStatus?
+    @State private var ruleStatus: GrowthUnlockStatus?
+
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome } }
     private var showsFamilyCollaboration: Bool { visibleHumans.count > 1 }
     private var l: L10n { L10n(appLanguage) }
+    private var currentTreeLevel: Int { treeManager.treeLevel.rawValue }
 
     var body: some View {
         ZStack {
@@ -25,6 +30,18 @@ struct FunctionMenuRootView: View {
                     rootHeader
                         .padding(.top, 10)
 
+                    GrowthUnlockProgressCard(
+                        currentLevel: currentTreeLevel,
+                        progressToNextLevel: treeManager.progressToNextLevel,
+                        appLanguage: appLanguage,
+                        isCompact: true
+                    )
+
+                    if let lockedStatus {
+                        lockedCallout(lockedStatus)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
                     VStack(alignment: .leading, spacing: 10) {
                         sectionHeader(
                             icon: "square.grid.2x2.fill",
@@ -34,13 +51,18 @@ struct FunctionMenuRootView: View {
 
                         LazyVGrid(columns: columns, spacing: 10) {
                             ForEach(functionMenuGroups, id: \.self) { group in
+                                let unlock = GrowthUnlockPolicy.status(for: group, currentLevel: currentTreeLevel)
                                 menuTile(
                                     icon: group.icon,
                                     iconColor: group.color,
                                     title: group.title,
-                                    status: compactSubtitle(for: subtitle(for: group))
+                                    status: compactSubtitle(for: subtitle(for: group)),
+                                    unlockStatus: unlock,
+                                    onInfo: {
+                                        presentUnlockRules(unlock)
+                                    }
                                 ) {
-                                    onSelect(.featureGroup(group))
+                                    select(.featureGroup(group), unlock: unlock)
                                 }
                             }
                         }
@@ -55,13 +77,18 @@ struct FunctionMenuRootView: View {
 
                         LazyVGrid(columns: columns, spacing: 10) {
                             ForEach(toolEntries) { entry in
+                                let unlock = GrowthUnlockPolicy.status(for: entry.destination, currentLevel: currentTreeLevel)
                                 menuTile(
                                     icon: entry.icon,
                                     iconColor: entry.color,
                                     title: entry.title,
-                                    status: compactSubtitle(for: entry.subtitle)
+                                    status: compactSubtitle(for: entry.subtitle),
+                                    unlockStatus: unlock,
+                                    onInfo: {
+                                        presentUnlockRules(unlock)
+                                    }
                                 ) {
-                                    onSelect(entry.destination)
+                                    select(entry.destination, unlock: unlock)
                                 }
                             }
                         }
@@ -70,6 +97,15 @@ struct FunctionMenuRootView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 30)
             }
+        }
+        .sheet(item: $ruleStatus) { status in
+            GrowthUnlockRulesSheet(
+                status: status,
+                appLanguage: appLanguage,
+                onClose: { ruleStatus = nil }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -83,6 +119,13 @@ struct FunctionMenuRootView: View {
             Text(l.tr(zh: "更多功能", en: "More", de: "Mehr"))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
+
+            Text("Lv.\(currentTreeLevel)")
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.arkInk)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(Color.goPrimary, in: Capsule())
 
             Spacer()
 
@@ -172,37 +215,124 @@ struct FunctionMenuRootView: View {
         return subtitle.components(separatedBy: " · ").first ?? subtitle
     }
 
-    private func menuTile(icon: String, iconColor: Color, title: String, status: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .black))
-                        .foregroundStyle(Color.ohanaFunctionalIcon)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .black))
-                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    Text(status)
-                        .font(OhanaFont.caption2(.black))
-                        .foregroundStyle(iconColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
+    private func select(_ destination: FMDest, unlock: GrowthUnlockStatus) {
+        guard unlock.isUnlocked else {
+            OhanaFeedback.light()
+            withAnimation(GoMotion.feedback) {
+                lockedStatus = unlock
             }
-            .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
-            .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            return
         }
-        .buttonStyle(ScaleButtonStyle())
+        lockedStatus = nil
+        onSelect(destination)
+    }
+
+    private func presentUnlockRules(_ status: GrowthUnlockStatus) {
+        ruleStatus = status
+    }
+
+    private func menuTile(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        status: String,
+        unlockStatus: GrowthUnlockStatus,
+        onInfo: @escaping () -> Void,
+        action: @escaping () -> Void
+    ) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Button(action: action) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: icon)
+                            .font(.system(size: 18, weight: .black))
+                            .foregroundStyle(unlockStatus.isUnlocked ? Color.ohanaFunctionalIcon : Color.ohanaTertiaryText)
+                        Spacer()
+                        Image(systemName: unlockStatus.isUnlocked ? "chevron.right" : "lock.fill")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundStyle(unlockStatus.isUnlocked ? Color.ohanaSecondaryText.opacity(0.6) : iconColor)
+                            .padding(.trailing, unlockStatus.isUnlocked ? 0 : 30)
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(unlockStatus.isUnlocked ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        Text(unlockStatus.isUnlocked ? status : lockedSubtitle(unlockStatus))
+                            .font(OhanaFont.caption2(.black))
+                            .foregroundStyle(iconColor)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+                .padding(14)
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+            .buttonStyle(ScaleButtonStyle())
+
+            if !unlockStatus.isUnlocked {
+                GrowthUnlockRuleInfoButton(
+                    status: unlockStatus,
+                    appLanguage: appLanguage,
+                    onTap: onInfo
+                )
+                .padding(.top, 2)
+                .padding(.trailing, 2)
+                .zIndex(2)
+            }
+        }
+    }
+
+    private func lockedCallout(_ status: GrowthUnlockStatus) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(Color(hex: status.step.tintHex))
+                .frame(width: 30, height: 30)
+                .background(Color.ohanaControlFill, in: Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(status.step.title(language: appLanguage))
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+                Text(status.step.detail(language: appLanguage))
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: 6)
+
+            GrowthUnlockRuleInfoButton(
+                status: status,
+                appLanguage: appLanguage,
+                onTap: { presentUnlockRules(status) }
+            )
+
+            Text("Lv.\(status.step.requiredLevel)")
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.arkInk)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color.goPrimary, in: Capsule())
+        }
+        .frame(minHeight: 52)
+        .padding(12)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func lockedSubtitle(_ status: GrowthUnlockStatus) -> String {
+        l.tr(
+            zh: "Lv.\(status.step.requiredLevel) 解锁",
+            en: "Unlocks at Lv.\(status.step.requiredLevel)",
+            de: "Ab Lv.\(status.step.requiredLevel)"
+        )
     }
 
     private func sectionHeader(icon: String, title: String, label: String) -> some View {

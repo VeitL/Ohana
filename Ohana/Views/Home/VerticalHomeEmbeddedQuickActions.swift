@@ -87,6 +87,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
     let title: String
     let items: [VerticalHomeEmbeddedAction]
     var addItems: [VerticalHomeEmbeddedAction] = []
+    let localization: L10n
+    var itemsRevision: String = ""
+    var addItemsRevision: String = ""
     var isEditMode = false
     var jiggle = false
     var shouldReduceWork = false
@@ -97,13 +100,12 @@ struct VerticalHomeEmbeddedQuickActions: View {
     var onRemove: (_ id: String) -> Void = { _ in }
     var onAdd: (_ id: String) -> Void = { _ in }
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var openActionId: String?
     @State private var showingAddPanel = false
     @State private var lastDropTargetId: String?
     @State private var iconAnimationTokens: [String: Int] = [:]
 
-    private var l: L10n { L10n(appLanguage) }
+    private var l: L10n { localization }
     private let maxItems = QuickActionLimit.maxItemsPerEntity
     private let cellHeight: CGFloat = 72
     private let iconSize: CGFloat = 29
@@ -112,9 +114,17 @@ struct VerticalHomeEmbeddedQuickActions: View {
         Array(items.prefix(maxItems))
     }
 
+    private var visibleItemsRevision: String {
+        itemsRevision.isEmpty ? Self.revisionKey(for: visibleItems) : itemsRevision
+    }
+
     private var availableAddItems: [VerticalHomeEmbeddedAction] {
         guard isEditMode, visibleItems.count < maxItems else { return [] }
         return addItems
+    }
+
+    private var availableAddItemsRevision: String {
+        addItemsRevision.isEmpty ? Self.revisionKey(for: availableAddItems) : addItemsRevision
     }
 
     private var showsAddLauncher: Bool {
@@ -148,8 +158,8 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         .zIndex(35)
                 }
             }
-            .animation(GoMotion.selection, value: visibleItems.map(\.id).joined(separator: "|"))
-            .animation(GoMotion.selection, value: availableAddItems.map(\.id).joined(separator: "|"))
+            .animation(GoMotion.selection, value: visibleItemsRevision)
+            .animation(GoMotion.selection, value: availableAddItemsRevision)
             .onDrop(
                 of: [.plainText, .utf8PlainText],
                 delegate: VerticalHomeEmbeddedActionDropResetDelegate(
@@ -179,7 +189,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .zIndex(120)
             }
         }
-        .onChange(of: items.map(\.id).joined(separator: "|")) { _, _ in
+        .onChange(of: visibleItemsRevision) { _, _ in
             openActionId = nil
             if visibleItems.count >= maxItems || availableAddItems.isEmpty {
                 showingAddPanel = false
@@ -622,6 +632,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
         case 3: return isWide ? -82 : -18
         default: return 0
         }
+    }
+
+    private static func revisionKey(for items: [VerticalHomeEmbeddedAction]) -> String {
+        items.map(\.id).joined(separator: "|")
     }
 
     private func visualState(for item: VerticalHomeEmbeddedAction) -> (

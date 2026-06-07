@@ -282,7 +282,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ -n \"${TARGET_BUILD_DIR:-}\" ] && [ -n \"${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}\" ]; then\n  /usr/bin/xattr -cr \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\" 2>/dev/null || true\nfi\n";
+			shellScript = "if [ -n \"${TARGET_BUILD_DIR:-}\" ] && [ -n \"${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}\" ]; then\n  APP_BUNDLE=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\n  /usr/bin/xattr -cr \"${APP_BUNDLE}\" 2>/dev/null || true\n  /usr/bin/xattr -d com.apple.FinderInfo \"${APP_BUNDLE}\" 2>/dev/null || true\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

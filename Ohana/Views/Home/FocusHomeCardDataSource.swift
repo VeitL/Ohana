@@ -10,98 +10,6 @@ import Foundation
 enum FocusHomeCardDataSource {
     static let maxCardsPerPage = 6
 
-    static func sourceSignature(
-        pets: [Pet],
-        humans: [Human],
-        electronicPets: [OasisElectronicPet],
-        hiddenPetIDsRaw: String,
-        homeCardOrderRaw: String,
-        showDummyCards: Bool,
-        appLanguage: String
-    ) -> String {
-        let petSignature = pets.map { pet in
-            [
-                pet.id.uuidString,
-                pet.name,
-                pet.species,
-                pet.breed,
-                pet.avatarEmoji,
-                pet.gender,
-                "\(pet.isNeutered)",
-                pet.birthday.map { String(Int($0.timeIntervalSince1970)) } ?? "",
-                pet.homeDate.map { String(Int($0.timeIntervalSince1970)) } ?? "",
-                pet.coatColor,
-                pet.eyeColor,
-                pet.safeThemeColorHex,
-                pet.cardStyleRaw,
-                pet.cardPopoutSourceRaw ?? "",
-                imageDataSignature(pet.avatarImageData),
-                imageDataSignature(pet.cardPopoutImageData),
-                "\(pet.hasPassedAway)",
-                pet.passedAwayDate.map { String(Int($0.timeIntervalSince1970)) } ?? "",
-                "\(pet.daysTogetherAtPassing)",
-                "\(pet.currentStreak)",
-                "\(pet.coconutBalance)",
-                "\(pet.daysTogether)",
-                "\(Int(FocusCard.weeklyWalkDistanceMeters(for: pet).rounded()))",
-                homeWaterWarningSignature(for: pet)
-            ].joined(separator: "|")
-        }.joined(separator: ";")
-
-        let humanSignature = humans.map { human in
-            [
-                human.id.uuidString,
-                human.name,
-                human.avatarEmoji,
-                human.roleText,
-                human.genderRaw,
-                human.birthday.map { String(Int($0.timeIntervalSince1970)) } ?? "",
-                human.mbti,
-                human.safeThemeColorHex,
-                imageDataSignature(human.avatarImageData),
-                "\(human.shouldShowOnHome)",
-                "\(human.hasPassedAway)",
-                human.passedAwayDate.map { String(Int($0.timeIntervalSince1970)) } ?? "",
-                "\(human.daysTogetherAtPassing)",
-                "\(human.coconutBalance)"
-            ].joined(separator: "|")
-        }.joined(separator: ";")
-
-        let electronicPetSignature = electronicPets.map { critter in
-            [
-                critter.id.uuidString,
-                critter.catalogId,
-                critter.displayName(L10n(appLanguage)),
-                "\(critter.isFeaturedOnOasis)",
-                "\(critter.level)",
-                "\(critter.appearanceStage)",
-                "\(critter.hunger)",
-                "\(critter.mood)",
-                "\(critter.health)",
-                "\(critter.bond)",
-                critter.lifeStateRaw,
-                "\(critter.isArchived)"
-            ].joined(separator: "|")
-        }.joined(separator: ";")
-
-        return [
-            petSignature,
-            humanSignature,
-            electronicPetSignature,
-            hiddenPetIDsRaw,
-            homeCardOrderRaw,
-            "\(showDummyCards)",
-            appLanguage
-        ].joined(separator: "||")
-    }
-
-    private static func imageDataSignature(_ data: Data?) -> String {
-        guard let data, !data.isEmpty else { return "nil" }
-        let head = data.prefix(12).map { String(format: "%02x", $0) }.joined()
-        let tail = data.suffix(12).map { String(format: "%02x", $0) }.joined()
-        return "\(data.count)-\(head)-\(tail)"
-    }
-
     static func buildSnapshot(
         pets: [Pet],
         humans: [Human],
@@ -136,13 +44,6 @@ enum FocusHomeCardDataSource {
         let usedNames = Set(real.map { $0.name })
         let extras = FocusCard.dummies.filter { !usedNames.contains($0.name) }
         return orderedByPreference(real + extras, homeCardOrderRaw: homeCardOrderRaw)
-    }
-
-    private static func homeWaterWarningSignature(for pet: Pet) -> String {
-        guard let warning = WaterCareCycleStatusCalculator.mostUrgentWaterWarning(for: pet) else {
-            return "water:ok"
-        }
-        return "water:\(warning.title):\(warning.status.overdueDays)"
     }
 
     static func orderedByPreference(_ base: [FocusCard], homeCardOrderRaw: String) -> [FocusCard] {
@@ -264,7 +165,9 @@ enum FocusHomeCardDataSource {
         cards.map { card in
             var copy = card
             copy.avatarImageData = avatarData[card.id] ?? card.avatarImageData
+            copy.avatarImageSignature = copy.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
             copy.cardPopoutImageData = popoutData[card.id] ?? copy.cardPopoutImageData
+            copy.cardPopoutImageSignature = copy.cardPopoutImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
             return copy
         }
     }

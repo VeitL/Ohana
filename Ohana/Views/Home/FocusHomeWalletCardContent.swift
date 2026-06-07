@@ -21,6 +21,8 @@ struct FocusHomeWalletCardContent: View {
     var presentation: FocusWalletCardPresentation = .home
     var expandedCardHeight: CGFloat = K.expandedCardH
     var cardCornerRadius: CGFloat = HeroAnim.stackCardCorner
+    var equipFxLimeGlow: Bool = false
+    var equipFxPopoutCard: Bool = true
 
     var body: some View {
         FocusHomeWalkCardFlip(
@@ -39,7 +41,9 @@ struct FocusHomeWalletCardContent: View {
                 usesMatchedGeometry: usesMatchedGeometry,
                 presentation: presentation,
                 expandedCardHeight: expandedCardHeight,
-                cardCornerRadius: cardCornerRadius
+                cardCornerRadius: cardCornerRadius,
+                equipFxLimeGlow: equipFxLimeGlow,
+                equipFxPopoutCard: equipFxPopoutCard
             )
         }
     }

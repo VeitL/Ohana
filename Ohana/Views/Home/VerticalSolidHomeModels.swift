@@ -61,6 +61,7 @@ struct VerticalSolidHomeSnapshot {
     var todayFocus = TodayFocusSnapshot.empty
     var cards: [FocusCard] = []
     var plants: [VerticalSolidHomePlantSnapshot] = []
+    var heroPreparationRevision = ""
 
     static let empty = VerticalSolidHomeSnapshot()
 }

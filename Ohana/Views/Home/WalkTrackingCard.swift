@@ -147,7 +147,14 @@ struct WalkTrackingCard: View {
         return false
     }
     private var walkClockInterval: TimeInterval {
-        workloadPolicy.refreshInterval(default: 1, throttled: 15, paused: 60, isVisible: isWalking)
+        guard walkSurfaceGate.allowsRefresh else { return 60 }
+        return workloadPolicy.refreshInterval(
+            default: 1,
+            throttled: 15,
+            paused: 60,
+            isVisible: isWalking,
+            allowDuringActiveWalk: true
+        )
     }
     private var liveRouteCoordinates: [CLLocationCoordinate2D] {
         routeCoordinates(from: locationMgr.collectedLocations, maxCount: 320)
@@ -156,7 +163,16 @@ struct WalkTrackingCard: View {
         isActivePet ? mgr.activePoopMarkers : []
     }
     private var shouldAnimateRainbowWalkEffects: Bool {
-        (equipFxRainbowRoute || equipFxRainbowPoop) && workloadPolicy.ambientMotionBudget(isVisible: true).allowsMotion
+        walkSurfaceGate.allowsAmbientMotion
+    }
+
+    private var walkSurfaceGate: SurfaceActivityGate {
+        workloadPolicy.surfaceGate(
+            isVisible: isWalking,
+            isLive: isActivePet,
+            allowsAmbientOptIn: equipFxRainbowRoute || equipFxRainbowPoop,
+            allowDuringActiveWalk: true
+        )
     }
 
     var body: some View {
@@ -468,19 +484,31 @@ struct WalkTrackingCard: View {
         }
     }
 
+    @ViewBuilder
     private var timerText: some View {
-        let elapsed = isActivePet ? Int(mgr.elapsedTime) : 0
+        if walkSurfaceGate.allowsRefresh {
+            TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
+                walkTimerLabel(elapsed: currentWalkElapsedSeconds)
+            }
+        } else {
+            walkTimerLabel(elapsed: currentWalkElapsedSeconds)
+        }
+    }
+
+    private var currentWalkElapsedSeconds: Int {
+        isActivePet ? Int(mgr.elapsedTime) : 0
+    }
+
+    private func walkTimerLabel(elapsed: Int) -> some View {
         let h = elapsed / 3600
         let m = (elapsed % 3600) / 60
         let s = elapsed % 60
-        return TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
-            Text(h > 0
-                 ? String(format: "%d:%02d:%02d", h, m, s)
-                 : String(format: "%02d:%02d", m, s))
-                .font(OhanaFont.metric(size: 22))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .contentTransition(.numericText())
-        }
+        return Text(h > 0
+             ? String(format: "%d:%02d:%02d", h, m, s)
+             : String(format: "%02d:%02d", m, s))
+            .font(OhanaFont.metric(size: 22))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .contentTransition(.numericText())
     }
 
     // MARK: - Finished Back Face

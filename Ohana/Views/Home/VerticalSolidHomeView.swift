@@ -9,41 +9,32 @@ import SwiftData
 import SwiftUI
 
 struct VerticalSolidHomeView: View {
-    @Binding var selectedPet: Pet?
-    @Binding var selectedHuman: Human?
-    @Binding var selectedPlant: Plant?
-    @Binding var selectedPetTab: PetDetailTab
+    let onOpenPet: (UUID, PetDetailTab) -> Void
+    let onOpenHuman: (UUID) -> Void
+    let onOpenPlant: (UUID) -> Void
 
-    let pets: [Pet]
-    let humans: [Human]
-    let plants: [Plant]
-    let electronicPets: [OasisElectronicPet]
-    let allEvents: [Event]
-    let pendingReminders: [Reminder]
-    let humanMedications: [HumanMedication]
-    let humanMedicationLogs: [HumanMedicationLog]
-    let careLogs: [PetCareLog]
-    let walkLogs: [PetWalkLog]
-    let pottyLogs: [PetPottyLog]
-    let humanWeightLogs: [HumanWeightLog]
-    let expenseLogs: [PetExpenseLog]
-    let familyTasks: [FamilyCollaborationTask]
-    let exchangeRequests: [CoconutExchangeRequest]
+    let payload: HomeReadModelPayload
 
     @StateObject private var controller: VerticalSolidHomeController
     @StateObject private var safeAreaController = FocusHomeSafeAreaController()
     @StateObject private var routeCoordinator = HomeRouteCoordinator()
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @StateObject private var expensePreviewStore = HomeExpensePreviewStore()
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenPetIDsRaw = ""
     @AppStorage("goFocusHomeCardOrder.v1") private var homeCardOrderRaw = ""
     @AppStorage("debugShowDummyCards") private var showDummyCards = false
+    @AppStorage("ohanaGrowthOnboardingCompletedV1") private var growthOnboardingCompleted = false
+    @AppStorage("ohanaGrowthLastSeenTreeLevelV1") private var growthLastSeenTreeLevel = 0
     @AppStorage("quickActionItems_v2") private var quickActionItemsRaw = ""
+    @AppStorage("home_cards_enable_ambient_float") private var enablesHomeCardAmbientFloat = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
     @Bindable private var questMgr = QuestManager.shared
 
     @State private var headerContextCardId: UUID?
@@ -65,87 +56,31 @@ struct VerticalSolidHomeView: View {
     @State private var homeCardHeroProgress: CGFloat = 0
     @State private var arrivingHomeCardId: UUID?
     @State private var arrivalClearTask: Task<Void, Never>?
+    @State private var treeManager = OasisTreeManager.shared
+    @State private var showGrowthOnboarding = false
+    @State private var growthOnboardingTask: Task<Void, Never>?
+    @State private var growthUnlockToastStatus: GrowthUnlockStatus?
+    @State private var growthUnlockToastPresentationTask: Task<Void, Never>?
+    @State private var growthUnlockToastDismissTask: Task<Void, Never>?
+    @State private var snapshotRefreshGate = HomeSnapshotRefreshGate()
 
     init(
-        selectedPet: Binding<Pet?>,
-        selectedHuman: Binding<Human?>,
-        selectedPlant: Binding<Plant?>,
-        selectedPetTab: Binding<PetDetailTab>,
-        pets: [Pet],
-        humans: [Human],
-        plants: [Plant],
-        electronicPets: [OasisElectronicPet],
-        allEvents: [Event],
-        pendingReminders: [Reminder],
-        humanMedications: [HumanMedication],
-        humanMedicationLogs: [HumanMedicationLog],
-        careLogs: [PetCareLog],
-        walkLogs: [PetWalkLog],
-        pottyLogs: [PetPottyLog],
-        humanWeightLogs: [HumanWeightLog],
-        expenseLogs: [PetExpenseLog],
-        familyTasks: [FamilyCollaborationTask],
-        exchangeRequests: [CoconutExchangeRequest]
+        onOpenPet: @escaping (UUID, PetDetailTab) -> Void,
+        onOpenHuman: @escaping (UUID) -> Void,
+        onOpenPlant: @escaping (UUID) -> Void,
+        payload: HomeReadModelPayload
     ) {
-        _selectedPet = selectedPet
-        _selectedHuman = selectedHuman
-        _selectedPlant = selectedPlant
-        _selectedPetTab = selectedPetTab
-        self.pets = pets
-        self.humans = humans
-        self.plants = plants
-        self.electronicPets = electronicPets
-        self.allEvents = allEvents
-        self.pendingReminders = pendingReminders
-        self.humanMedications = humanMedications
-        self.humanMedicationLogs = humanMedicationLogs
-        self.careLogs = careLogs
-        self.walkLogs = walkLogs
-        self.pottyLogs = pottyLogs
-        self.humanWeightLogs = humanWeightLogs
-        self.expenseLogs = expenseLogs
-        self.familyTasks = familyTasks
-        self.exchangeRequests = exchangeRequests
-
-        let defaults = UserDefaults.standard
-        let language = defaults.string(forKey: "appLanguage") ?? AppLanguage.code
-        let activeHumanIdRaw = defaults.string(forKey: "currentActiveHumanId") ?? ""
-        let hiddenPetIDsRaw = defaults.string(forKey: HomeCardVisibility.hiddenPetIDsKey) ?? ""
-        let homeCardOrderRaw = defaults.string(forKey: "goFocusHomeCardOrder.v1") ?? ""
-        let showDummyCards = defaults.bool(forKey: "debugShowDummyCards")
-        let initialSource = VerticalSolidHomeSourceState(
-            pets: pets,
-            humans: humans,
-            plants: plants,
-            electronicPets: electronicPets,
-            events: allEvents,
-            pendingReminders: pendingReminders,
-            humanMedications: humanMedications,
-            humanMedicationLogs: humanMedicationLogs,
-            careLogs: careLogs,
-            walkLogs: walkLogs,
-            pottyLogs: pottyLogs,
-            humanWeightLogs: humanWeightLogs,
-            familyTasks: familyTasks,
-            exchangeRequests: exchangeRequests,
-            activeHumanIdRaw: activeHumanIdRaw,
-            hiddenPetIDsRaw: hiddenPetIDsRaw,
-            homeCardOrderRaw: homeCardOrderRaw,
-            showDummyCards: showDummyCards,
-            language: language
-        )
-        let signature = VerticalSolidHomeSnapshotBuilder.signature(for: initialSource)
-        let initialSnapshot = VerticalSolidHomeSnapshotBuilder.build(from: initialSource)
-        FocusWalletAvatarCache.seedPreviewEntries(
-            payloads: VerticalSolidHomePreloadPlanner.avatarPayloads(
-                source: initialSource,
-                snapshot: initialSnapshot
-            )
+        self.onOpenPet = onOpenPet
+        self.onOpenHuman = onOpenHuman
+        self.onOpenPlant = onOpenPlant
+        self.payload = payload
+        AvatarPipeline.shared.seedPreviewEntries(
+            payload.avatarPreloadPayloads
         )
         _controller = StateObject(
             wrappedValue: VerticalSolidHomeController(
-                initialSnapshot: initialSnapshot,
-                initialSignature: signature
+                initialSnapshot: payload.snapshot,
+                initialSignature: payload.signature
             )
         )
     }
@@ -162,36 +97,55 @@ struct VerticalSolidHomeView: View {
         L10n(appLanguage)
     }
 
+    private var activeHumanID: UUID? {
+        UUID(uuidString: activeHumanIdRaw)
+    }
+
     private var dataSignature: String {
-        VerticalSolidHomeSnapshotBuilder.signature(for: sourceState)
+        payload.signature
     }
 
     private var sourceState: VerticalSolidHomeSourceState {
-        VerticalSolidHomeSourceState(
-            pets: pets,
-            humans: humans,
-            plants: plants,
-            electronicPets: electronicPets,
-            events: allEvents,
-            pendingReminders: pendingReminders,
-            humanMedications: humanMedications,
-            humanMedicationLogs: humanMedicationLogs,
-            careLogs: careLogs,
-            walkLogs: walkLogs,
-            pottyLogs: pottyLogs,
-            humanWeightLogs: humanWeightLogs,
-            familyTasks: familyTasks,
-            exchangeRequests: exchangeRequests,
-            activeHumanIdRaw: activeHumanIdRaw,
-            hiddenPetIDsRaw: hiddenPetIDsRaw,
-            homeCardOrderRaw: homeCardOrderRaw,
-            showDummyCards: showDummyCards,
-            language: appLanguage
-        )
+        payload.source
+    }
+
+    private var pets: [Pet] {
+        sourceState.pets
+    }
+
+    private var humans: [Human] {
+        sourceState.humans
+    }
+
+    private var plants: [Plant] {
+        sourceState.plants
+    }
+
+    private var electronicPets: [OasisElectronicPet] {
+        sourceState.electronicPets
+    }
+
+    private var allEvents: [Event] {
+        sourceState.events
+    }
+
+    private var humanMedications: [HumanMedication] {
+        sourceState.humanMedications
+    }
+
+    private var humanMedicationLogs: [HumanMedicationLog] {
+        sourceState.humanMedicationLogs
+    }
+
+    private var expenseLogs: [PetExpenseLog] {
+        expensePreviewStore.expenseLogs
     }
 
     private var avatarPreloadSignature: String {
-        VerticalSolidHomePreloadPlanner.avatarSignature(for: sourceState)
+        [
+            payload.avatarPreloadSignature,
+            payload.popoutPreloadSignature
+        ].joined(separator: "||popout:")
     }
 
     private var activeHuman: Human? {
@@ -237,8 +191,8 @@ struct VerticalSolidHomeView: View {
     }
 
     private var activeHumanAvatarImage: UIImage? {
-        guard let human = activeHuman else { return nil }
-        return FocusWalletAvatarCache.entry(for: human.id, data: human.avatarImageData).image
+        guard let id = payload.activeHumanAvatar.id else { return nil }
+        return avatarPipeline.cachedImage(for: id, signature: payload.activeHumanAvatar.signature)
     }
 
     var body: some View {
@@ -272,6 +226,8 @@ struct VerticalSolidHomeView: View {
 
                 VerticalSolidHomePageDeck(
                     selectedTab: controller.selectedTab,
+                    outgoingTab: controller.outgoingTab,
+                    preparingTab: controller.preparingTab,
                     preparedTabs: controller.preparedTabs,
                     canAnimate: canAnimate
                 ) { lifecycle in
@@ -283,9 +239,12 @@ struct VerticalSolidHomeView: View {
                         humanMedications: humanMedications,
                         humanMedicationLogs: humanMedicationLogs,
                         expenseLogs: expenseLogs,
-                        avatarCacheRevision: avatarCacheRevision,
+                        avatarCacheRevision: avatarCacheRevision + avatarPipeline.revision,
                         isLive: lifecycle.isLive,
                         collapsedTopInset: homeCollapsedTopInset,
+                        localization: l,
+                        activeHumanID: activeHumanID,
+                        allowsAmbientFloat: enablesHomeCardAmbientFloat,
                         quickActionItemsRaw: $quickActionItemsRaw,
                         headerContextCardId: $headerContextCardId,
                         isCardExpandedOrTransitioning: $isHomeCardExpandedOrTransitioning,
@@ -322,6 +281,7 @@ struct VerticalSolidHomeView: View {
                 } plants: { _ in
                     VerticalSolidHomePlantsPage(
                         plants: controller.snapshot.plants,
+                        localization: l,
                         onOpenPlant: openPlant,
                         onAddPlant: { routeCoordinator.openAddEntity(.plant) }
                     )
@@ -329,10 +289,10 @@ struct VerticalSolidHomeView: View {
                 .frame(width: proxy.size.width, height: contentHeight)
                 .position(x: proxy.size.width / 2, y: topChromeHeight + contentHeight / 2)
 
-                if controller.preparedTabs.contains(.home) {
+                if controller.selectedTab == .home && controller.preparedTabs.contains(.home) {
                     VerticalSolidHomeTodayFocusChrome(
                         snapshot: controller.snapshot.todayFocus,
-                        isLive: true,
+                        isLive: isTodayFocusInteractive,
                         onOpenOasis: { selectTab(.oasis) },
                         onOpenQuest: openTodayFocusQuest,
                         onCompleteQuest: completeTodayFocusQuest,
@@ -382,6 +342,7 @@ struct VerticalSolidHomeView: View {
                     expandedShortcuts: expandedBottomBarShortcuts,
                     safeBottom: safeBottom,
                     canAnimate: canAnimate,
+                    localization: l,
                     onSelect: selectTab,
                     onHomeShortcut: openHomeFabShortcut,
                     onExpandedShortcut: openExpandedFabShortcut,
@@ -399,6 +360,29 @@ struct VerticalSolidHomeView: View {
                     }
                     .zIndex(40)
                 }
+
+                if let growthUnlockToastStatus {
+                    GrowthUnlockToastView(
+                        status: growthUnlockToastStatus,
+                        appLanguage: appLanguage,
+                        onDismiss: dismissGrowthUnlockToast
+                    )
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, max(92, safeBottom + 84))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(62)
+                }
+
+                if showGrowthOnboarding {
+                    OhanaGrowthOnboardingOverlay(
+                        appLanguage: appLanguage,
+                        treeLevel: treeManager.treeLevel.rawValue,
+                        onFinish: completeGrowthOnboarding,
+                        onSkip: completeGrowthOnboarding
+                    )
+                    .zIndex(70)
+                }
             }
             .onAppear {
                 safeAreaController.stabilize(from: proxy)
@@ -408,25 +392,32 @@ struct VerticalSolidHomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             controller.applySnapshot(makeSnapshot(), signature: dataSignature, force: !controller.snapshot.isReady)
+            AppPerformanceMonitor.shared.record("home_first_render", valueMS: 0)
             refreshHeaderStreak()
             controller.startWarmup()
+            scheduleGrowthOnboardingIfNeeded()
+            scheduleGrowthUnlockFeedbackIfNeeded()
         }
-        .task(id: "\(dataSignature)|hero:\(isHomeCardHeroAnimating)") {
-            let signature = dataSignature
-            controller.scheduleSnapshotRefresh(
-                signature: signature,
-                delayMilliseconds: isHomeCardHeroAnimating ? 760 : 96
-            ) {
-                makeSnapshot()
-            }
+        .onChange(of: dataSignature) { _, _ in
+            requestHomeSnapshotRefresh()
+        }
+        .onChange(of: isHomeCardHeroAnimating) { _, isAnimating in
+            flushDeferredHomeSnapshotRefreshIfNeeded(isAnimating: isAnimating)
         }
         .task(id: avatarPreloadSignature) {
             await preloadFirstScreenAvatars()
         }
         .onDisappear {
             clearArrivalState()
+            expensePreviewStore.cancel()
             calendarAddEventPresentationTask?.cancel()
             calendarAddEventContentMountTask?.cancel()
+            growthOnboardingTask?.cancel()
+            growthUnlockToastPresentationTask?.cancel()
+            growthUnlockToastDismissTask?.cancel()
+            avatarPipeline.cancel(key: avatarPreloadSignature)
+            commandQueue.cancelAll()
+            snapshotRefreshGate.cancel()
             controller.cancel()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -449,11 +440,10 @@ struct VerticalSolidHomeView: View {
                 handleNewHomeMemberSaved(id: human.id)
             },
             onCrewPetSelected: { pet in
-                selectedPetTab = .overview
-                selectedPet = pet
+                onOpenPet(pet.id, .overview)
             },
             onCrewHumanSelected: { human in
-                selectedHuman = human
+                onOpenHuman(human.id)
             },
             onFirstSuccessMomentCompleted: { _ in },
             onHumanDoseTaken: { _ in }
@@ -466,11 +456,49 @@ struct VerticalSolidHomeView: View {
         }
         .onChange(of: expandedBottomBarCard?.id) { _, _ in
             closeVerticalFabMenu(immediate: true)
+            requestExpandedExpensePreview()
+        }
+        .onChange(of: treeManager.treeLevel.rawValue) { _, _ in
+            scheduleGrowthUnlockFeedbackIfNeeded()
         }
     }
 
     private func makeSnapshot() -> VerticalSolidHomeSnapshot {
-        VerticalSolidHomeSnapshotBuilder.build(from: sourceState)
+        payload.snapshot
+    }
+
+    private func requestHomeSnapshotRefresh() {
+        guard let request = snapshotRefreshGate.dataDidChange(
+            signature: dataSignature,
+            isHeroAnimating: isHomeCardHeroAnimating
+        ) else {
+            return
+        }
+        scheduleHomeSnapshotRefresh(request)
+    }
+
+    private func flushDeferredHomeSnapshotRefreshIfNeeded(isAnimating: Bool) {
+        guard let request = snapshotRefreshGate.heroAnimationDidChange(isAnimating: isAnimating) else {
+            return
+        }
+        scheduleHomeSnapshotRefresh(request)
+    }
+
+    private func scheduleHomeSnapshotRefresh(_ request: HomeSnapshotRefreshRequest) {
+        controller.scheduleSnapshotRefresh(
+            signature: request.signature,
+            delayMilliseconds: request.delayMilliseconds
+        ) {
+            makeSnapshot()
+        }
+    }
+
+    private func requestExpandedExpensePreview() {
+        guard let card = expandedBottomBarCard, card.isHuman else {
+            expensePreviewStore.clear()
+            return
+        }
+        expensePreviewStore.request(context: modelContext, humanID: card.id)
     }
 
     private func selectTab(_ tab: VerticalSolidHomeTab) {
@@ -562,6 +590,87 @@ struct VerticalSolidHomeView: View {
         }
     }
 
+    private func scheduleGrowthOnboardingIfNeeded() {
+        guard !growthOnboardingCompleted,
+              !showGrowthOnboarding,
+              pets.isEmpty,
+              humans.isEmpty else {
+            return
+        }
+        growthOnboardingTask?.cancel()
+        growthOnboardingTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 680) {
+            guard !growthOnboardingCompleted,
+                  pets.isEmpty,
+                  humans.isEmpty else {
+                growthOnboardingTask = nil
+                return
+            }
+            withAnimation(GoMotion.feedback) {
+                showGrowthOnboarding = true
+            }
+            growthOnboardingTask = nil
+        }
+    }
+
+    private func completeGrowthOnboarding() {
+        growthOnboardingCompleted = true
+        growthOnboardingTask?.cancel()
+        growthOnboardingTask = nil
+        withAnimation(GoMotion.feedback) {
+            showGrowthOnboarding = false
+        }
+    }
+
+    private func scheduleGrowthUnlockFeedbackIfNeeded() {
+        let currentLevel = treeManager.treeLevel.rawValue
+        guard currentLevel > 0 else { return }
+
+        guard growthLastSeenTreeLevel > 0 else {
+            growthLastSeenTreeLevel = currentLevel
+            return
+        }
+
+        guard currentLevel > growthLastSeenTreeLevel else {
+            if currentLevel < growthLastSeenTreeLevel {
+                growthLastSeenTreeLevel = currentLevel
+            }
+            return
+        }
+
+        let unlockedSteps = GrowthUnlockPolicy.newlyUnlockedStages(
+            from: growthLastSeenTreeLevel,
+            to: currentLevel
+        )
+        growthLastSeenTreeLevel = currentLevel
+        guard let step = unlockedSteps.last else { return }
+
+        growthUnlockToastPresentationTask?.cancel()
+        growthUnlockToastDismissTask?.cancel()
+        growthUnlockToastPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: showGrowthOnboarding ? 1_800 : 520) {
+            guard !showGrowthOnboarding else {
+                growthUnlockToastPresentationTask = nil
+                return
+            }
+            withAnimation(GoMotion.sheetEnter) {
+                growthUnlockToastStatus = GrowthUnlockStatus(step: step, currentLevel: currentLevel)
+            }
+            growthUnlockToastPresentationTask = nil
+            growthUnlockToastDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3_800) {
+                dismissGrowthUnlockToast()
+            }
+        }
+    }
+
+    private func dismissGrowthUnlockToast() {
+        growthUnlockToastPresentationTask?.cancel()
+        growthUnlockToastDismissTask?.cancel()
+        growthUnlockToastPresentationTask = nil
+        growthUnlockToastDismissTask = nil
+        withAnimation(GoMotion.sheetEnter) {
+            growthUnlockToastStatus = nil
+        }
+    }
+
     private func openHomeFabShortcut(_ shortcut: HomeFabFunctionShortcut) {
         closeVerticalFabMenu(immediate: true)
         routeCoordinator.openFunctionMenu(destination: shortcut.destination)
@@ -586,17 +695,16 @@ struct VerticalSolidHomeView: View {
 
     private func openCard(_ card: FocusCard) {
         if card.isHuman {
-            selectedHuman = humans.first { $0.id == card.id }
+            onOpenHuman(card.id)
         } else if card.isElectronicPet {
             controller.select(.oasis)
         } else {
-            selectedPetTab = .overview
-            selectedPet = pets.first { $0.id == card.id }
+            onOpenPet(card.id, .overview)
         }
     }
 
     private func openPlant(_ plant: VerticalSolidHomePlantSnapshot) {
-        selectedPlant = plants.first { $0.id == plant.id }
+        onOpenPlant(plant.id)
     }
 
     private func openTodayFocusQuest(_ quest: IslandQuest) {
@@ -638,35 +746,50 @@ struct VerticalSolidHomeView: View {
     }
 
     private func completeTodayFocusQuest(_ quest: IslandQuest) {
+        OhanaFeedback.light()
+
         if let medicationId = IslandQuestEngine.medicationId(fromQuestId: quest.id),
            let target = petMedicationTarget(medicationId) {
-            commandExecutor.recordMedicationDose(medication: target.medication, pet: target.pet)
-            applyTodayFocusMutationFeedback(entityId: target.pet.id)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let petID = target.pet.id
+            let medicationID = target.medication.id
+            enqueueHomeCommand(.medicationDose(petID: petID, medicationID: medicationID)) {
+                commandExecutor.recordMedicationDose(petID: petID, medicationID: medicationID)
+                applyTodayFocusMutationFeedback(entityId: petID)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
             return
         }
 
         if let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id),
            let event = allEvents.first(where: { $0.id == eventId }) {
-            commandExecutor.completeTodayFocusEvent(event)
-            applyTodayFocusMutationFeedback(entityId: event.id)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let eventID = event.id
+            enqueueHomeCommand(.todayFocus(entityID: eventID, action: "eventComplete")) {
+                commandExecutor.completeTodayFocusEvent(eventID: eventID)
+                applyTodayFocusMutationFeedback(entityId: eventID)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
             return
         }
 
         if quest.id == "q_water_plant",
            let plant = targetPlant(for: quest) {
-            commandExecutor.recordPlantCare(.watering, plant: plant, executorId: currentExecutorId())
-            applyTodayFocusMutationFeedback(entityId: plant.id)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let plantID = plant.id
+            enqueueHomeCommand(.plantCare(plantID: plantID, action: PlantCareType.watering.rawValue)) {
+                commandExecutor.recordPlantCare(.watering, plantID: plantID, executorId: currentExecutorId())
+                applyTodayFocusMutationFeedback(entityId: plantID)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
             return
         }
 
         if quest.id == "q_fertilize_plant",
            let plant = targetPlant(for: quest) {
-            commandExecutor.recordPlantCare(.fertilizing, plant: plant, executorId: currentExecutorId())
-            applyTodayFocusMutationFeedback(entityId: plant.id)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let plantID = plant.id
+            enqueueHomeCommand(.plantCare(plantID: plantID, action: PlantCareType.fertilizing.rawValue)) {
+                commandExecutor.recordPlantCare(.fertilizing, plantID: plantID, executorId: currentExecutorId())
+                applyTodayFocusMutationFeedback(entityId: plantID)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
             return
         }
 
@@ -683,16 +806,19 @@ struct VerticalSolidHomeView: View {
 
         switch todayFocusPetQuickKey(for: quest, pet: pet) {
         case "feed", "water", "walk", "play":
-            performPetQuickAction(todayFocusPetQuickKey(for: quest, pet: pet), pet: pet)
+            performPetQuickAction(todayFocusPetQuickKey(for: quest, pet: pet), petID: pet.id)
         case "potty":
-            commandExecutor.applyPottyCheckIn(
-                raw: PottyType.perfectPoop.rawValue,
-                pet: pet,
-                executorId: currentExecutorId(),
-                feedback: applyQuickActionExecutorFeedback
-            )
+            let petID = pet.id
+            enqueueHomeCommand(.quickCare(entityID: petID, action: "potty")) {
+                commandExecutor.applyPottyCheckIn(
+                    raw: PottyType.perfectPoop.rawValue,
+                    petID: petID,
+                    executorId: currentExecutorId(),
+                    feedback: applyQuickActionExecutorFeedback
+                )
+            }
         case "litter":
-            performPetQuickAction("litter", pet: pet)
+            performPetQuickAction("litter", petID: pet.id)
         case "weight", "moment":
             openPetQuickKey(todayFocusPetQuickKey(for: quest, pet: pet), pet: pet)
         default:
@@ -750,13 +876,18 @@ struct VerticalSolidHomeView: View {
             routeCoordinator.openAccountSwitcher()
             return
         }
-        do {
-            try commandExecutor.confirmCoconutExchange(request, receiver: receiver)
-            applyTodayFocusMutationFeedback(entityId: request.id)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        } catch {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            routeCoordinator.openCoconutLog(.human(receiver.id))
+        let requestID = request.id
+        let receiverID = receiver.id
+        OhanaFeedback.light()
+        enqueueHomeCommand(.coconutExchange(requestID: requestID)) {
+            do {
+                try commandExecutor.confirmCoconutExchange(requestID: requestID, receiverID: receiverID)
+                applyTodayFocusMutationFeedback(entityId: requestID)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            } catch {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                routeCoordinator.openCoconutLog(.human(receiverID))
+            }
         }
     }
 
@@ -828,7 +959,7 @@ struct VerticalSolidHomeView: View {
     }
 
     private func openTodayFocusPlant(_ plant: Plant) {
-        selectedPlant = plant
+        onOpenPlant(plant.id)
     }
 
     private func todayFocusPetQuickKey(for quest: IslandQuest, pet: Pet) -> String {
@@ -892,30 +1023,42 @@ struct VerticalSolidHomeView: View {
 
         switch item.actionType {
         case "groom":
-            commandExecutor.applyGroomCheckIn(
-                raw: optionId,
-                pet: pet,
-                executorId: currentExecutorId(),
-                showSingleUseNotice: { title, message in
-                    routeCoordinator.showSingleUseNotice(title: title, message: message)
-                },
-                feedback: applyQuickActionExecutorFeedback
-            )
+            OhanaFeedback.light()
+            let petID = pet.id
+            enqueueHomeCommand(.quickCare(entityID: petID, action: "groom:\(optionId)")) {
+                commandExecutor.applyGroomCheckIn(
+                    raw: optionId,
+                    petID: petID,
+                    executorId: currentExecutorId(),
+                    showSingleUseNotice: { title, message in
+                        routeCoordinator.showSingleUseNotice(title: title, message: message)
+                    },
+                    feedback: applyQuickActionExecutorFeedback
+                )
+            }
         case "potty":
-            commandExecutor.applyPottyCheckIn(
-                raw: optionId,
-                pet: pet,
-                executorId: currentExecutorId(),
-                feedback: applyQuickActionExecutorFeedback
-            )
+            OhanaFeedback.light()
+            let petID = pet.id
+            enqueueHomeCommand(.quickCare(entityID: petID, action: "potty:\(optionId)")) {
+                commandExecutor.applyPottyCheckIn(
+                    raw: optionId,
+                    petID: petID,
+                    executorId: currentExecutorId(),
+                    feedback: applyQuickActionExecutorFeedback
+                )
+            }
         case "health":
-            commandExecutor.applyHealthCheckIn(
-                raw: optionId,
-                pet: pet,
-                executorId: currentExecutorId(),
-                openHealth: { routeCoordinator.openSheet(.petHealth($0.id, initialSection: nil)) },
-                feedback: applyQuickActionExecutorFeedback
-            )
+            OhanaFeedback.light()
+            let petID = pet.id
+            enqueueHomeCommand(.quickCare(entityID: petID, action: "health:\(optionId)")) {
+                commandExecutor.applyHealthCheckIn(
+                    raw: optionId,
+                    petID: petID,
+                    executorId: currentExecutorId(),
+                    openHealth: { routeCoordinator.openSheet(.petHealth($0, initialSection: nil)) },
+                    feedback: applyQuickActionExecutorFeedback
+                )
+            }
         default:
             openPetQuickActionItem(item, pet: pet, usesPrimaryAction: true)
         }
@@ -925,7 +1068,7 @@ struct VerticalSolidHomeView: View {
         if usesPrimaryAction {
             switch ExpandedQuickActionLogic.petTapRoute(for: item, pet: pet) {
             case let .perform(actionType):
-                performPetQuickAction(actionType, pet: pet)
+                performPetQuickAction(actionType, petID: pet.id)
             case .waterManagement:
                 routeCoordinator.openSheet(.petWater(pet.id))
             case .weight:
@@ -970,74 +1113,39 @@ struct VerticalSolidHomeView: View {
         }
     }
 
-    private func performPetQuickAction(_ actionType: String, pet: Pet) {
-        commandExecutor.performActionType(
-            actionType,
-            pet: pet,
-            executorId: currentExecutorId(),
-            allEvents: allEvents,
-            allFeedCareLogs: pet.careLogs,
-            humans: humans,
-            now: Date(),
-            antiRepeatTitle: l.tr(zh: "刚刚已经记录过", en: "Already logged", de: "Bereits erfasst"),
-            antiRepeatMessage: { warning in
-                l.tr(
-                    zh: "\(warning.executorName) \(warning.minutesAgo)分钟前刚记录过，确定再记一次吗？",
-                    en: "\(warning.executorName) logged this \(warning.minutesAgo)m ago. Log again?",
-                    de: "\(warning.executorName) hat das vor \(warning.minutesAgo) Min. erfasst. Erneut erfassen?"
-                )
-            },
-            openFeedDetail: { opensManualSheet in
-                routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: opensManualSheet))
-            },
-            completePlannedFeed: completePlannedFeed,
-            showAntiRepeat: { title, message, pendingAction in
-                routeCoordinator.showAntiRepeat(
-                    title: title,
-                    message: message,
-                    pendingAction: pendingAction
-                )
-            },
-            startWalk: { routeCoordinator.openWalk($0) },
-            openWaterManagement: { routeCoordinator.openSheet(.petWater($0.id)) },
-            openMedication: { routeCoordinator.openSheet(.petMedication($0.id)) },
-            feedback: applyQuickActionExecutorFeedback
-        )
-    }
-
-    private func completePlannedFeed(_ pet: Pet) -> Bool {
-        guard let reminder = ExpandedQuickActionLogic.pendingFeedReminder(
-            for: pet,
-            allEvents: allEvents,
-            allFeedCareLogs: pet.careLogs,
-            now: Date()
-        ) else {
-            return false
-        }
-
-        let reward = commandExecutor.completePlannedFeed(
-            pet: pet,
-            reminder: reminder,
-            executorId: currentExecutorId()
-        )
-        guard let reward else { return false }
-        let delta = reward.humanGot + reward.petGot
-        applyQuickActionExecutorFeedback(
-            ExpandedQuickActionExecutor.Feedback(
-                cardId: pet.id,
-                coconutDelta: delta,
-                label: delta > 0 ? "喂食 +\(delta)🥥" : nil
+    private func performPetQuickAction(_ actionType: String, petID: UUID) {
+        enqueueHomeCommand(.quickCare(entityID: petID, action: actionType)) {
+            commandExecutor.performActionType(
+                actionType,
+                petID: petID,
+                executorId: currentExecutorId(),
+                now: Date(),
+                antiRepeatTitle: l.tr(zh: "刚刚已经记录过", en: "Already logged", de: "Bereits erfasst"),
+                antiRepeatMessage: { warning in
+                    l.tr(
+                        zh: "\(warning.executorName) \(warning.minutesAgo)分钟前刚记录过，确定再记一次吗？",
+                        en: "\(warning.executorName) logged this \(warning.minutesAgo)m ago. Log again?",
+                        de: "\(warning.executorName) hat das vor \(warning.minutesAgo) Min. erfasst. Erneut erfassen?"
+                    )
+                },
+                openFeedDetail: { routeCoordinator.openSheet(.petFeed($0, opensManualSheet: $1)) },
+                showAntiRepeat: { title, message, pendingAction in
+                    routeCoordinator.showAntiRepeat(
+                        title: title,
+                        message: message,
+                        pendingAction: pendingAction
+                    )
+                },
+                startWalk: { routeCoordinator.openFullScreen(.walk($0)) },
+                openWaterManagement: { routeCoordinator.openSheet(.petWater($0)) },
+                openMedication: { routeCoordinator.openSheet(.petMedication($0)) },
+                feedback: applyQuickActionExecutorFeedback
             )
-        )
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        return true
+        }
     }
 
     private func applyQuickActionExecutorFeedback(_ feedback: ExpandedQuickActionExecutor.Feedback) {
         refreshHeaderStreak()
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 72) {
-            controller.applySnapshot(makeSnapshot(), signature: dataSignature, force: true)
-        }
         if feedback.coconutDelta > 0 {
             OhanaFeedback.success()
         }
@@ -1307,15 +1415,16 @@ struct VerticalSolidHomeView: View {
 
     private func preloadFirstScreenAvatars() async {
         let payloads = avatarPreloadPayloads()
-        guard !payloads.isEmpty else { return }
-        if FocusWalletAvatarCache.seedPreviewEntries(payloads: payloads) {
+        let popoutPayloads = popoutPreloadPayloads()
+        guard !payloads.isEmpty || !popoutPayloads.isEmpty else { return }
+        if avatarPipeline.seedPreviewEntries(payloads) {
             bumpAvatarCacheRevision()
         }
-        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 72)
-        guard !Task.isCancelled else { return }
-        let didChange = await FocusWalletAvatarCache.preload(payloads: payloads)
-        guard didChange, !Task.isCancelled else { return }
-        bumpAvatarCacheRevision()
+        avatarPipeline.preload(
+            payloads: payloads,
+            popoutPayloads: popoutPayloads,
+            key: avatarPreloadSignature
+        )
     }
 
     private func bumpAvatarCacheRevision() {
@@ -1327,6 +1436,19 @@ struct VerticalSolidHomeView: View {
     }
 
     private func avatarPreloadPayloads() -> [FocusWalletAvatarCache.Payload] {
-        VerticalSolidHomePreloadPlanner.avatarPayloads(source: sourceState, snapshot: controller.snapshot)
+        payload.avatarPreloadPayloads
+    }
+
+    private func popoutPreloadPayloads() -> [FocusWalletAvatarCache.Payload] {
+        payload.popoutPreloadPayloads
+    }
+
+    private func enqueueHomeCommand(
+        _ command: DomainCommand,
+        operation: @escaping @MainActor () -> Void
+    ) {
+        commandQueue.enqueue(command) {
+            operation()
+        }
     }
 }

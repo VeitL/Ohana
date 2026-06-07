@@ -4,46 +4,39 @@ import Testing
 
 @MainActor
 struct HomeRouteCoordinatorTests {
-    @Test func quickPetActionMapsToSinglePopupRouteAndDismissesById() throws {
+    @Test func quickPetActionMapsToSheetRouteAndDismisses() throws {
         let pet = Pet(name: "Momo", species: "猫")
         let coordinator = HomeRouteCoordinator()
 
-        coordinator.openPetWeight(pet)
+        coordinator.openSheet(.petWeight(pet.id))
 
-        guard case let .petWeight(_, petID) = coordinator.popup else {
-            Issue.record("Expected pet weight popup route")
+        guard case let .petWeight(petID) = coordinator.sheet else {
+            Issue.record("Expected pet weight sheet route")
             return
         }
         #expect(petID == pet.id)
-        #expect(coordinator.hasActiveOverlay)
+        #expect(coordinator.alert == nil)
+        #expect(coordinator.overlay == nil)
 
-        coordinator.dismissPopup(routeID: UUID())
-        #expect(coordinator.popup != nil)
-
-        let routeID = try #require(coordinator.popup?.id)
-        coordinator.dismissPopup(routeID: routeID)
-
-        #expect(coordinator.popup == nil)
-        #expect(!coordinator.hasActiveOverlay)
+        coordinator.dismissSheet()
+        #expect(coordinator.sheet == nil)
     }
 
     @Test func humanRoutesCarryOnlyIdAndActionKeyThenReset() throws {
         let human = Human(name: "Guan")
         let coordinator = HomeRouteCoordinator()
 
-        coordinator.openHumanMedication(human)
+        coordinator.openSheet(.humanMedication(human.id))
 
-        guard case let .humanMedication(_, humanID, actionType) = coordinator.popup else {
-            Issue.record("Expected human medication popup route")
+        guard case let .humanMedication(humanID) = coordinator.sheet else {
+            Issue.record("Expected human medication sheet route")
             return
         }
         #expect(humanID == human.id)
-        #expect(actionType == "humanMedication")
-        #expect(coordinator.popup?.humanActionKey == "\(human.id.uuidString):humanMedication")
 
         coordinator.resetHumanRoutes()
 
-        #expect(coordinator.popup == nil)
+        #expect(coordinator.sheet == nil)
     }
 
     @Test func longDetailSheetRoutesCarryOnlyIdAndDismiss() {
@@ -58,7 +51,8 @@ struct HomeRouteCoordinatorTests {
         }
         #expect(petID == pet.id)
         #expect(opensManualSheet)
-        #expect(!coordinator.hasActiveOverlay)
+        #expect(coordinator.alert == nil)
+        #expect(coordinator.overlay == nil)
 
         coordinator.dismissSheet()
 
@@ -90,7 +84,7 @@ struct HomeRouteCoordinatorTests {
         let coordinator = HomeRouteCoordinator()
 
         coordinator.openSheet(.petWater(pet.id))
-        coordinator.openPetExpense(pet)
+        coordinator.openSheet(.petExpense(pet.id))
         coordinator.openCalendar(entityID: pet.id.uuidString)
         coordinator.openOasisReward()
         coordinator.openQuickMoment(pet)
@@ -98,7 +92,6 @@ struct HomeRouteCoordinatorTests {
         coordinator.resetAllRoutes()
 
         #expect(coordinator.sheet == nil)
-        #expect(coordinator.popup == nil)
         #expect(coordinator.modal == nil)
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.overlay == nil)

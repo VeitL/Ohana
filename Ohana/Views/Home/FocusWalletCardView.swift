@@ -24,14 +24,10 @@ struct FocusWalletCardView: View {
     var presentation: FocusWalletCardPresentation = .home
     var expandedCardHeight: CGFloat = K.expandedCardH
     var cardCornerRadius: CGFloat = HeroAnim.stackCardCorner
+    var equipFxLimeGlow: Bool = false
+    var equipFxPopoutCard: Bool = true
 
     private let accent = Color(hex: "FF5A3D")
-    @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
-    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
-    @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
-    @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
-    @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard: Bool = true
-    @AppStorage(PetBondVaultStore.revisionKey) private var petBondVaultRevision: Int = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
 
@@ -58,13 +54,18 @@ struct FocusWalletCardView: View {
             let visualProgress = isHeroExpanded ? HomeHeroTransitionProgress(value: heroProgress).clamped : 0
             let avatarVisualProgress = shouldReduceWork ? visualProgress : HomeWalletHeroTimeline.avatarProgress(progress: visualProgress)
             let renderH = OhanaHeroGeometry.lerp(K.cardH, h, progress: visualProgress)
-            let avatarEntry = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData)
+            let avatarEntry = FocusWalletAvatarCache.cachedEntry(for: card.id, signature: card.avatarImageSignature)
+                ?? FocusWalletAvatarCache.Entry(
+                    image: nil,
+                    isTransparent: false,
+                    signature: card.avatarImageSignature,
+                    isFinal: false
+                )
             let avatarImage = avatarEntry.image
             let hasPopout = avatarEntry.isTransparent && avatarImage != nil
-            let popoutImage = FocusPopoutImageCache.image(
-                for: card.id,
-                data: equipFxPopoutCard ? (card.cardPopoutImageData ?? (card.cardStyleRaw == "popout" ? card.avatarImageData : nil)) : nil
-            )
+            let popoutImage = equipFxPopoutCard
+                ? FocusPopoutImageCache.cachedImage(for: card.id, signature: card.cardPopoutImageSignature)
+                : nil
             let usesPopoutOverlay = equipFxPopoutCard && avatarVisualProgress > 0.12 && !card.isHuman && card.cardStyleRaw == "popout" && popoutImage != nil
             let usesFullBleed = avatarImage != nil && !avatarEntry.isTransparent && !usesPopoutOverlay
 
@@ -168,17 +169,11 @@ struct FocusWalletCardView: View {
     }
 
     private var petBondBorderActive: Bool {
-        !card.isHuman &&
-        !card.isElectronicPet &&
-        petBondVaultRevision >= 0 &&
-        PetBondVaultStore.isUnlocked(.cardBorder, for: card.id)
+        card.petBondCardBorderActive
     }
 
     private var petBondNameplateActive: Bool {
-        !card.isHuman &&
-        !card.isElectronicPet &&
-        petBondVaultRevision >= 0 &&
-        PetBondVaultStore.isUnlocked(.nameplate, for: card.id)
+        card.petBondNameplateActive
     }
 
     private var cardBorderColor: Color {
@@ -732,9 +727,8 @@ struct FocusWalletCardView: View {
     }
 
     private func electronicPetInfoStack(usesFullBleed: Bool, progress: CGFloat) -> some View {
-        let l = L10n(AppLanguage.code)
         return VStack(alignment: .trailing, spacing: OhanaHeroGeometry.lerp(3, 5, progress: progress)) {
-            Text(l.tr(zh: "电子宠物", en: "Critter", de: "Critter"))
+            Text(card.kind.isEmpty ? "Critter" : card.kind)
                 .font(.system(size: OhanaHeroGeometry.lerp(15, 20, progress: progress), weight: .black, design: .rounded))
                 .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed))
                 .lineLimit(1)
@@ -758,21 +752,11 @@ struct FocusWalletCardView: View {
     }
 
     private var petTogetherHeadline: String {
-        let l = L10n(AppLanguage.code)
-        guard card.daysTogetherText != nil else {
-            return l.tr(zh: "新成员", en: "New Family", de: "Neue Familie")
-        }
-        if card.daysTogether < 0 {
-            let days = abs(card.daysTogether)
-            return l.tr(zh: "\(days) 天后到家", en: "\(days) Days Until Home", de: "\(days) Tage bis Zuhause")
-        }
-        return l.tr(zh: "相伴 \(card.daysTogether) 天", en: "\(card.daysTogether) Days Together", de: "\(card.daysTogether) Tage zusammen")
+        card.togetherHeadlineText ?? card.daysTogetherText ?? ""
     }
 
     private var homeVisibilityStatusBadge: some View {
-        let isShown = card.isElectronicPet
-            ? card.isShownOnHome
-            : (card.isHuman ? card.isShownOnHome : HomeCardVisibility.isPetIDVisible(card.id, raw: hiddenHomePetIDsRaw))
+        let isShown = card.isShownOnHome
         return HStack(spacing: 6) {
             Image(systemName: isShown ? "house.fill" : "house.slash.fill")
                 .font(.system(size: 10, weight: .black))
@@ -798,8 +782,8 @@ struct FocusWalletCardView: View {
                 .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed).opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
-            if showsCardTextBadges, petBondNameplateActive {
-                Text(L10n(AppLanguage.code).tr(zh: "羁绊", en: "Bond", de: "Bindung"))
+            if showsCardTextBadges, petBondNameplateActive, let nameplate = card.petBondNameplateText {
+                Text(nameplate)
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 7)
@@ -833,15 +817,7 @@ struct FocusWalletCardView: View {
     }
 
     private var equippedTitleBadge: String? {
-        guard card.isHuman,
-              card.id.uuidString == activeHumanId,
-              !equippedTitle.isEmpty else { return nil }
-        switch equippedTitle {
-        case "title_guardian": return "🛡️ 守护者"
-        case "title_pioneer": return "🚀 先行者"
-        case "title_chef": return "👨‍🍳 首席厨师"
-        default: return nil
-        }
+        card.isHuman ? card.equippedTitleBadgeText : nil
     }
 
     private func useDarkCardText(usesFullBleed: Bool) -> Bool {
@@ -882,19 +858,48 @@ enum FocusPopoutImageCache {
 
     private static var entries: [UUID: Entry] = [:]
 
-    static func image(for id: UUID, data: Data?) -> UIImage? {
-        guard let data, !data.isEmpty else {
-            entries.removeValue(forKey: id)
+    static func cachedImage(for id: UUID, signature: String) -> UIImage? {
+        guard !signature.isEmpty,
+              let cached = entries[id],
+              cached.signature == signature else {
             return nil
         }
-        let signature = FocusWalletAvatarCache.signature(for: data)
-        if let cached = entries[id], cached.signature == signature {
-            return cached.image
+        return cached.image
+    }
+
+    @discardableResult
+    static func preload(payloads: [FocusWalletAvatarCache.Payload]) async -> Bool {
+        var didChange = false
+        let decodePayloads: [(UUID, Data, String)] = payloads.compactMap { payload in
+            guard let data = payload.data, !data.isEmpty else {
+                if entries.removeValue(forKey: payload.id) != nil {
+                    didChange = true
+                }
+                return nil
+            }
+            let signature = FocusWalletAvatarCache.signature(for: data)
+            if let cached = entries[payload.id], cached.signature == signature {
+                return nil
+            }
+            return (payload.id, data, signature)
         }
+        guard !decodePayloads.isEmpty else { return didChange }
+
+        let decoded = await Task.detached(priority: .userInitiated) {
+            decodePayloads.map { id, data, signature in
+                (id, signature, decodedImage(from: data))
+            }
+        }.value
+
+        for (id, signature, image) in decoded {
+            entries[id] = Entry(signature: signature, image: image)
+        }
+        return true
+    }
+
+    nonisolated private static func decodedImage(from data: Data) -> UIImage? {
         let raw = UIImage(data: data)
-        let image = raw.flatMap { ImageCutoutService.trimmedTransparentSubjectImage(from: $0) } ?? raw
-        entries[id] = Entry(signature: signature, image: image)
-        return image
+        return raw.flatMap { ImageCutoutService.trimmedTransparentSubjectImage(from: $0) } ?? raw
     }
 }
 

@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import BackgroundTasks
 import Foundation
 import Combine
 import UIKit
@@ -16,7 +15,6 @@ let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
 
 @main
 struct OhanaApp: App {
-    private static let bgTaskID = "com.guanchen.li.Ark.reminderRefill"
     private let modelContainer: ModelContainer
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
     @AppStorage("appLanguage") private var appLanguage: String = "zh"
@@ -27,7 +25,7 @@ struct OhanaApp: App {
     init() {
         let initStartedAt = CFAbsoluteTimeGetCurrent()
         AppCountry.ensureInitialized()
-        OhanaApp.registerBGTasks()
+        BackgroundTaskCoordinator.registerTasks()
         _ = NotificationManager.shared
         let containerStartedAt = CFAbsoluteTimeGetCurrent()
         modelContainer = SharedModelContainer.make()
@@ -60,52 +58,17 @@ struct OhanaApp: App {
             .onChange(of: appCurrency) { _, _ in }
             .onChange(of: appMeasurementSystem) { _, _ in }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-                AppWorkloadPolicy.shared.updateScenePhase(.background)
-                PetWalkingManager.shared.handleAppBackgroundTransition()
-                OhanaApp.scheduleReminderRefill()
+                AppLifecycleCoordinator.shared.handle(.didEnterBackground)
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-                PetWalkingManager.shared.handleAppInactiveTransition()
+                AppLifecycleCoordinator.shared.handle(.willResignActive)
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                AppWorkloadPolicy.shared.updateScenePhase(.active)
-                UIApplication.shared.isIdleTimerDisabled = false
-                PetWalkingManager.shared.handleAppForegroundTransition()
+                AppLifecycleCoordinator.shared.handle(.didBecomeActive)
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
-                PetWalkingManager.shared.pauseForAppBackground()
+                AppLifecycleCoordinator.shared.handle(.willTerminate)
             }
-        }
-    }
-
-    // MARK: - BGTask Registration
-    private static func registerBGTasks() {
-        BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: bgTaskID,
-            using: nil
-        ) { task in
-            guard let refreshTask = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }
-            handleReminderRefill(task: refreshTask)
-        }
-    }
-
-    static func scheduleReminderRefill() {
-        let request = BGAppRefreshTaskRequest(identifier: bgTaskID)
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60 * 6) // 6 小时后
-        try? BGTaskScheduler.shared.submit(request)
-    }
-
-    private static func handleReminderRefill(task: BGAppRefreshTask) {
-        scheduleReminderRefill() // 立即再排队下次
-
-        // 与 `OhanaApp` 主容器共用单例，避免再 new 一个 ModelContainer 争用 SQLite
-        Task { @MainActor in
-            let modelContext = ModelContext(SharedModelContainer.make())
-            let reminders = (try? modelContext.fetch(FetchDescriptor<Reminder>())) ?? []
-            await ReminderSchedulingService.refillMissingPendingNotifications(reminders: reminders, context: modelContext)
-            ReminderSchedulingService.compensate(reminders: reminders, context: modelContext)
-            try? modelContext.save()
-            task.setTaskCompleted(success: true)
         }
     }
 }

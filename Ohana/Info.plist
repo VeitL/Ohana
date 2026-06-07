@@ -56,7 +56,7 @@
 	<string>仅当你开始遛狗并需要锁屏或后台继续记录路线时使用。</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.guanchen.li.Ark.reminderRefill</string>
+		<string>com.guanchen.li.Ohana.reminderRefill</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

@@ -70,6 +70,37 @@ struct UIGuidelinesView: View {
 
                 DesignSpecStepRailV4(step: $step, selection: selection, mode: previewMode)
 
+                NavigationLink {
+                    GrowthUnlockFlowTestView()
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "tree.fill")
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundStyle(palette.accent)
+                            .frame(width: 32, height: 32)
+                            .background(palette.controlFill, in: Circle())
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("成长解锁流程 / Growth Unlock")
+                                .font(DesignSpecUIV4.typeFont(13, weight: .black, selection: selection))
+                                .foregroundStyle(palette.primaryText)
+                            Text("新手引导、树等级、功能锁测试")
+                                .font(DesignSpecUIV4.typeFont(10, weight: .bold, selection: selection))
+                                .foregroundStyle(palette.secondaryText)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundStyle(palette.secondaryText)
+                    }
+                    .frame(minHeight: 44)
+                    .padding(13)
+                    .background(glass(cornerRadius: 20))
+                }
+                .buttonStyle(ScaleButtonStyle()) // ui-v4: developer flow test entry
+
                 DesignSpecControlsPanelV4(selection: $selection, step: $step, mode: previewMode)
 
                 advancedToggle(

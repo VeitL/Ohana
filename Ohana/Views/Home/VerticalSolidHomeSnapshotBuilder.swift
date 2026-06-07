@@ -27,6 +27,8 @@ struct VerticalSolidHomeSourceState {
     let hiddenPetIDsRaw: String
     let homeCardOrderRaw: String
     let showDummyCards: Bool
+    let petBondVaultRevision: Int
+    let equippedTitleRaw: String
     let language: String
 
     var activeHumanId: UUID? {
@@ -55,7 +57,11 @@ enum VerticalSolidHomeSnapshotBuilder {
                 now: now
             ),
             pets: source.pets,
-            humans: source.humans
+            humans: source.humans,
+            hiddenPetIDsRaw: source.hiddenPetIDsRaw,
+            activeHumanIdRaw: source.activeHumanIdRaw,
+            equippedTitleRaw: source.equippedTitleRaw,
+            language: source.language
         )
         let todayFocus = TodayFocusSnapshot.make(
             pets: source.pets.filter { !$0.hasPassedAway },
@@ -88,7 +94,8 @@ enum VerticalSolidHomeSnapshotBuilder {
                     themeHex: plant.themeColorHex,
                     needsCare: plant.needsWatering || plant.needsFertilizing
                 )
-            }
+            },
+            heroPreparationRevision: heroPreparationRevision(for: cards)
         )
     }
 
@@ -112,6 +119,8 @@ enum VerticalSolidHomeSnapshotBuilder {
             source.hiddenPetIDsRaw,
             source.homeCardOrderRaw,
             "\(source.showDummyCards)",
+            "\(source.petBondVaultRevision)",
+            source.equippedTitleRaw,
             source.language
         ].joined(separator: "#")
     }
@@ -128,19 +137,64 @@ enum VerticalSolidHomeSnapshotBuilder {
     private static func enrichCardsWithAvatarData(
         _ cards: [FocusCard],
         pets: [Pet],
-        humans: [Human]
+        humans: [Human],
+        hiddenPetIDsRaw: String,
+        activeHumanIdRaw: String,
+        equippedTitleRaw: String,
+        language: String
     ) -> [FocusCard] {
         cards.map { card in
             var copy = card
             if let pet = pets.first(where: { $0.id == card.id }) {
                 copy.avatarImageData = pet.avatarImageData
-                copy.cardPopoutImageData = pet.cardPopoutImageData
+                copy.avatarImageSignature = pet.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
+                let popoutImageData = pet.cardStyleRaw == "popout"
+                    ? (pet.cardPopoutImageData ?? pet.avatarImageData)
+                    : nil
+                copy.cardPopoutImageData = popoutImageData
+                copy.cardPopoutImageSignature = popoutImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
                 copy.cardPopoutSourceRaw = pet.cardPopoutSourceRaw ?? ""
+                copy.petBondCardBorderActive = PetBondVaultStore.isUnlocked(.cardBorder, for: pet.id)
+                copy.petBondNameplateActive = PetBondVaultStore.isUnlocked(.nameplate, for: pet.id)
+                copy.petBondNameplateText = copy.petBondNameplateActive
+                    ? L10n(language).tr(zh: "羁绊", en: "Bond", de: "Bindung")
+                    : nil
+                copy.isShownOnHome = HomeCardVisibility.isPetVisible(pet, raw: hiddenPetIDsRaw)
             } else if let human = humans.first(where: { $0.id == card.id }) {
                 copy.avatarImageData = human.avatarImageData
+                copy.avatarImageSignature = human.avatarImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
+                copy.isShownOnHome = human.shouldShowOnHome
+                if human.id.uuidString == activeHumanIdRaw {
+                    copy.equippedTitleBadgeText = equippedTitleBadgeText(for: equippedTitleRaw)
+                }
             }
             return copy
         }
+    }
+
+    private static func equippedTitleBadgeText(for raw: String) -> String? {
+        switch raw {
+        case "title_guardian": return "🛡️ 守护者"
+        case "title_pioneer": return "🚀 先行者"
+        case "title_chef": return "👨‍🍳 首席厨师"
+        default: return nil
+        }
+    }
+
+    static func heroPreparationRevision(for cards: [FocusCard]) -> String {
+        cards.map { card in
+            [
+                card.id.uuidString,
+                card.name,
+                card.kind,
+                "\(card.coconutBalance)",
+                card.homePrimaryMetricValue,
+                card.homePrimaryMetricUnit,
+                card.statusBadgeText ?? "",
+                card.themeColorHex
+            ].joined(separator: ":")
+        }
+        .joined(separator: "|")
     }
 
     private static func petSignature(_ pets: [Pet]) -> String {
@@ -281,39 +335,37 @@ enum VerticalSolidHomeSnapshotBuilder {
 }
 
 enum VerticalSolidHomePreloadPlanner {
-    static func avatarSignature(for source: VerticalSolidHomeSourceState) -> String {
-        (
-            source.pets.map { pet in
-                [
-                    pet.id.uuidString,
-                    FocusWalletAvatarCache.signature(for: pet.avatarImageData ?? Data()),
-                    pet.cardPopoutImageData.map(FocusWalletAvatarCache.signature(for:)) ?? ""
-                ].joined(separator: ":")
-            } +
-            source.humans.map { human in
-                [
-                    human.id.uuidString,
-                    FocusWalletAvatarCache.signature(for: human.avatarImageData ?? Data())
-                ].joined(separator: ":")
-            }
-        ).joined(separator: "|")
+    static func avatarSignature(for payloads: [FocusWalletAvatarCache.Payload]) -> String {
+        payloads.map { payload in
+            [
+                payload.id.uuidString,
+                payload.data.map(FocusWalletAvatarCache.signature(for:)) ?? ""
+            ].joined(separator: ":")
+        }
+        .joined(separator: "|")
     }
 
-    static func avatarPayloads(
-        source: VerticalSolidHomeSourceState,
-        snapshot: VerticalSolidHomeSnapshot
-    ) -> [FocusWalletAvatarCache.Payload] {
-        var payloads: [FocusWalletAvatarCache.Payload] = []
-        for card in snapshot.cards.prefix(FocusHomeCardDataSource.maxCardsPerPage) {
-            if let pet = source.pets.first(where: { $0.id == card.id }) {
-                payloads.append(.init(id: pet.id, data: pet.avatarImageData))
-                if let popout = pet.cardPopoutImageData {
-                    payloads.append(.init(id: pet.id, data: popout))
-                }
-            } else if let human = source.humans.first(where: { $0.id == card.id }) {
-                payloads.append(.init(id: human.id, data: human.avatarImageData))
+    static func avatarSignature(for snapshot: VerticalSolidHomeSnapshot) -> String {
+        avatarSignature(for: avatarPayloads(snapshot: snapshot))
+    }
+
+    static func avatarPayloads(snapshot: VerticalSolidHomeSnapshot) -> [FocusWalletAvatarCache.Payload] {
+        snapshot.cards
+            .prefix(FocusHomeCardDataSource.maxCardsPerPage)
+            .map { card in
+                FocusWalletAvatarCache.Payload(id: card.id, data: card.avatarImageData)
             }
-        }
-        return payloads
+    }
+
+    static func popoutSignature(for payloads: [FocusWalletAvatarCache.Payload]) -> String {
+        avatarSignature(for: payloads)
+    }
+
+    static func popoutPayloads(snapshot: VerticalSolidHomeSnapshot) -> [FocusWalletAvatarCache.Payload] {
+        snapshot.cards
+            .prefix(FocusHomeCardDataSource.maxCardsPerPage)
+            .map { card in
+                FocusWalletAvatarCache.Payload(id: card.id, data: card.cardPopoutImageData)
+            }
     }
 }

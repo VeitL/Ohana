@@ -60,6 +60,57 @@ struct FocusHomeVerticalSolidHeroSnapshot {
     }
 }
 
+enum FocusHomeEmbeddedQuickActionThawPolicy {
+    static let openingMountProgress: CGFloat = 0.985
+    static let reducedMotionMountProgress: CGFloat = 0.5
+    static let closingKeepAliveProgress: CGFloat = 0.82
+
+    static func isMounted(progress: CGFloat, heroDirection: Int, reduceMotion: Bool) -> Bool {
+        let p = min(max(progress, 0), 1)
+        if heroDirection < 0 {
+            return p > closingKeepAliveProgress
+        }
+        return p >= (reduceMotion ? reducedMotionMountProgress : openingMountProgress)
+    }
+
+    static func reveal(progress: CGFloat, heroDirection: Int, reduceMotion: Bool) -> CGFloat {
+        guard isMounted(progress: progress, heroDirection: heroDirection, reduceMotion: reduceMotion) else {
+            return 0
+        }
+        if reduceMotion { return 1 }
+        if heroDirection < 0 {
+            return WalletHeroTimeline.smooth(progress, closingKeepAliveProgress, 0.92)
+        }
+        return WalletHeroTimeline.smooth(progress, openingMountProgress, 1)
+    }
+}
+
+enum FocusHomeAmbientFloatPolicy {
+    static let timelineMinimumInterval: TimeInterval = 1.0 / 15.0
+
+    static func isSurfaceVisibleForAmbient(
+        isVisible: Bool,
+        selectedCardId: UUID?,
+        progress: CGFloat
+    ) -> Bool {
+        isVisible && selectedCardId == nil && progress <= 0.001
+    }
+
+    static func isSurfaceCovered(
+        selectedCardId: UUID?,
+        progress: CGFloat
+    ) -> Bool {
+        selectedCardId != nil || progress > 0.001
+    }
+
+    static func allowsAmbientOptIn(
+        isEnabled: Bool,
+        reduceMotion: Bool
+    ) -> Bool {
+        isEnabled && !reduceMotion
+    }
+}
+
 struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>: View {
     let cards: [FocusCard]
     let pets: [Pet]
@@ -72,6 +123,8 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     var heroDirection: Int = 0
     var arrivingCardId: UUID? = nil
     let reduceMotion: Bool
+    let localization: L10n
+    let allowsAmbientFloat: Bool
     var isVisible: Bool = true
     var embedsQuickActionsInCard: Bool = false
     var collapsedTopInset: CGFloat = 0
@@ -81,8 +134,6 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let onCollapse: () -> Void
     let onLongPress: (FocusCard) -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-    @AppStorage("home_cards_enable_ambient_float") private var enablesAmbientFloat = false
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var floatingResumeStartTime: TimeInterval?
     @State private var animatedArrivalCardId: UUID?
@@ -90,7 +141,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     @State private var arrivalCleanupTask: Task<Void, Never>?
     @GestureState private var expandedDragY: CGFloat = 0
 
-    private var l: L10n { L10n(appLanguage) }
+    private var l: L10n { localization }
 
     private var selectedCard: FocusCard? {
         if let activeHeroSnapshot {
@@ -143,7 +194,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         GeometryReader { geo in
             Group {
                 if canFloatCards {
-                    TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                    TimelineView(.animation(minimumInterval: FocusHomeAmbientFloatPolicy.timelineMinimumInterval)) { timeline in
                         sceneContent(in: geo, time: timeline.date.timeIntervalSinceReferenceDate)
                     }
                 } else {
@@ -281,10 +332,20 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         let frozenAvatarSource = motionSnapshot?.avatarSource ?? preparedHeroSnapshots[card.id]?.avatarSource
             ?? (selectedCardId == nil ? nil : FocusHomeFrozenAvatarSource.cached(for: renderCard))
         let walkTrackingPet = isExpandedInteractionReady ? walkTrackingPet(for: renderCard, isSelected: isExpandedSurface) : nil
-        let embeddedQuickActionReveal = reduceMotion ? (visualProgress > 0.5 ? CGFloat(1) : CGFloat(0)) : smooth(visualProgress, 0.42, 0.72)
+        let embeddedQuickActionsMounted = FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
+            progress: visualProgress,
+            heroDirection: heroDirection,
+            reduceMotion: reduceMotion
+        )
+        let embeddedQuickActionReveal = FocusHomeEmbeddedQuickActionThawPolicy.reveal(
+            progress: visualProgress,
+            heroDirection: heroDirection,
+            reduceMotion: reduceMotion
+        )
         let showsEmbeddedQuickActions = embedsQuickActionsInCard
             && isExpandedSurface
             && walkTrackingPet == nil
+            && embeddedQuickActionsMounted
             && embeddedQuickActionReveal > 0.001
 
         return FocusHomeWalkCardFlip(
@@ -298,6 +359,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                     card: renderCard,
                     progress: visualProgress,
                     reduceMotion: reduceMotion,
+                    localization: localization,
                     frozenAvatarSource: frozenAvatarSource,
                     allowsLiveAvatarFallback: selectedCardId == nil && motionSnapshot == nil
                 )
@@ -348,15 +410,30 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     }
 
     private var canFloatCards: Bool {
-        enablesAmbientFloat
-            && !reduceMotion
-            && selectedCardId == nil
-            && isVisible
-            && workloadPolicy.ambientMotionBudget(isVisible: isVisible) == .full
+        surfaceGate.allowsAmbientMotion
+    }
+
+    private var surfaceGate: SurfaceActivityGate {
+        workloadPolicy.surfaceGate(
+            isVisible: FocusHomeAmbientFloatPolicy.isSurfaceVisibleForAmbient(
+                isVisible: isVisible,
+                selectedCardId: selectedCardId,
+                progress: progress
+            ),
+            isCovered: FocusHomeAmbientFloatPolicy.isSurfaceCovered(
+                selectedCardId: selectedCardId,
+                progress: progress
+            ),
+            isLive: isVisible,
+            allowsAmbientOptIn: FocusHomeAmbientFloatPolicy.allowsAmbientOptIn(
+                isEnabled: allowsAmbientFloat,
+                reduceMotion: reduceMotion
+            )
+        )
     }
 
     private func primeFloatingMotionIfVisible() {
-        guard isVisible, selectedCardId == nil, progress <= 0.001 else { return }
+        guard canFloatCards else { return }
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
@@ -724,22 +801,16 @@ struct FocusHomeFrozenAvatarSource {
 
     @MainActor
     static func cached(for card: FocusCard) -> FocusHomeFrozenAvatarSource? {
-        guard let entry = FocusWalletAvatarCache.cachedFrozenEntry(for: card.id, data: card.avatarImageData) else {
+        guard let entry = FocusWalletAvatarCache.cachedEntry(for: card.id, signature: card.avatarImageSignature),
+              entry.image != nil else {
             return nil
         }
         return FocusHomeFrozenAvatarSource(image: entry.image, isTransparent: entry.isTransparent)
     }
 
     @MainActor
-    static func make(for card: FocusCard) -> FocusHomeFrozenAvatarSource {
-        let entry = FocusWalletAvatarCache.frozenEntry(for: card.id, data: card.avatarImageData)
-        return FocusHomeFrozenAvatarSource(image: entry.image, isTransparent: entry.isTransparent)
-    }
-
-    @MainActor
     static func live(for card: FocusCard) -> FocusHomeFrozenAvatarSource {
-        let entry = FocusWalletAvatarCache.entry(for: card.id, data: card.avatarImageData)
-        return FocusHomeFrozenAvatarSource(image: entry.image, isTransparent: entry.isTransparent)
+        cached(for: card) ?? .placeholder
     }
 }
 
@@ -747,6 +818,7 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     let card: FocusCard
     let progress: CGFloat
     let reduceMotion: Bool
+    let localization: L10n
     let frozenAvatarSource: FocusHomeFrozenAvatarSource?
     var allowsLiveAvatarFallback: Bool = true
 
@@ -756,6 +828,10 @@ private struct FocusHomeVerticalSolidCardSurface: View {
 
     private var visualProgress: CGFloat {
         min(max(progress, 0), 1)
+    }
+
+    private var l: L10n {
+        localization
     }
 
     private var cornerRadius: CGFloat {
@@ -886,24 +962,29 @@ private struct FocusHomeVerticalSolidCardSurface: View {
 
     @ViewBuilder
     private func avatar(image: UIImage?, transparent: Bool, width: CGFloat, height: CGFloat) -> some View {
-        if let image, !transparent {
+        let avatarWidth = width * (card.isHuman ? lerp(0.56, 0.66, visualProgress) : lerp(0.68, 0.88, visualProgress))
+        let avatarHeight = height * (card.isHuman ? lerp(0.42, 0.46, visualProgress) : lerp(0.48, 0.58, visualProgress))
+        if image != nil, !transparent {
             Color.clear
                 .frame(
-                    width: width * (card.isHuman ? lerp(0.50, 0.60, visualProgress) : lerp(0.62, 0.80, visualProgress)),
-                    height: height * (card.isHuman ? lerp(0.40, 0.42, visualProgress) : lerp(0.42, 0.49, visualProgress)),
+                    width: avatarWidth,
+                    height: avatarHeight,
                     alignment: .bottom
                 )
         } else if let image {
             Image(uiImage: image)
                 .resizable()
+                .interpolation(.high)
+                .antialiased(true)
                 .scaledToFit()
                 .frame(
-                    width: width * (card.isHuman ? lerp(0.50, 0.60, visualProgress) : lerp(0.62, 0.80, visualProgress)),
-                    height: height * (card.isHuman ? lerp(0.40, 0.42, visualProgress) : lerp(0.42, 0.49, visualProgress)),
+                    width: avatarWidth,
+                    height: avatarHeight,
                     alignment: .bottom
                 )
-                .offset(y: card.isHuman ? lerp(0, -18, visualProgress) : lerp(0, -28, visualProgress))
-                .shadow(color: Color.arkInk.opacity(transparent ? 0.26 : 0.16), radius: 16, y: 10) // ui-v4: allow intentional avatar depth
+                .offset(y: card.isHuman ? lerp(0, -20, visualProgress) : lerp(0, -34, visualProgress))
+                .shadow(color: Color.goCardWhite.opacity(transparent ? 0.20 : 0.08), radius: 3, y: 0) // ui-v4: allow intentional avatar cutout crispness
+                .shadow(color: Color.arkInk.opacity(transparent ? 0.28 : 0.16), radius: 18, y: 12) // ui-v4: allow intentional avatar depth
         } else {
             Image(systemName: avatarSymbol)
                 .font(.system(size: width * lerp(0.43, 0.47, visualProgress), weight: .regular))
@@ -1040,7 +1121,6 @@ private struct FocusHomeVerticalSolidCardSurface: View {
         let unit = rawAge
             .dropFirst(numberPrefix.count)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let l = L10n(AppLanguage.code)
         return (
             number: String(numberPrefix),
             unit: unit.isEmpty ? l.tr(zh: "岁", en: "year", de: "Jahr") : unit
@@ -1048,8 +1128,7 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private func electronicPetInfoStack(progress p: CGFloat) -> some View {
-        let l = L10n(AppLanguage.code)
-        return VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
+        VStack(alignment: .trailing, spacing: lerp(3, 5, p)) {
             Text(l.tr(zh: "电子宠物", en: "Critter", de: "Critter"))
                 .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
                 .foregroundStyle(cardPrimaryText)
@@ -1124,7 +1203,10 @@ private struct FocusHomeVerticalSolidCardSurface: View {
     }
 
     private var petTogetherHeadline: String {
-        let l = L10n(AppLanguage.code)
+        if let snapshotText = card.togetherHeadlineText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !snapshotText.isEmpty {
+            return snapshotText
+        }
         guard card.daysTogetherText != nil else {
             return l.tr(zh: "新成员", en: "New Family", de: "Neue Familie")
         }

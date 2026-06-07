@@ -19,6 +19,8 @@ struct CrewRosterExpandedMemberOverlay: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow = false
+    @AppStorage("shop_equip_fx_popout_card") private var equipFxPopoutCard = true
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -103,7 +105,10 @@ struct CrewRosterExpandedMemberOverlay: View {
             isHeroExpanded: true,
             heroProgress: 1,
             avatarCacheRevision: 0,
-            usesMatchedGeometry: false
+            usesMatchedGeometry: false,
+            presentation: .rosterMember,
+            equipFxLimeGlow: equipFxLimeGlow,
+            equipFxPopoutCard: equipFxPopoutCard
         )
         .frame(maxWidth: .infinity)
         .padding(.top, 2)
@@ -119,7 +124,10 @@ struct CrewRosterExpandedMemberOverlay: View {
             isHeroExpanded: true,
             heroProgress: 1,
             avatarCacheRevision: 0,
-            usesMatchedGeometry: false
+            usesMatchedGeometry: false,
+            presentation: .rosterMember,
+            equipFxLimeGlow: equipFxLimeGlow,
+            equipFxPopoutCard: equipFxPopoutCard
         )
         .frame(maxWidth: .infinity)
         .padding(.top, 2)

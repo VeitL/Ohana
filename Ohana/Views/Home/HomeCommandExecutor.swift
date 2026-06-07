@@ -7,10 +7,65 @@
 
 import Foundation
 import SwiftData
+import UIKit
 
 @MainActor
 struct HomeCommandExecutor {
     let modelContext: ModelContext
+
+    func performActionType(
+        _ actionType: String,
+        petID: UUID,
+        executorId: String?,
+        now: Date,
+        antiRepeatTitle: String,
+        antiRepeatMessage: @escaping ((executorName: String, minutesAgo: Int)) -> String,
+        openFeedDetail: @escaping (_ petID: UUID, _ opensManualSheet: Bool) -> Void,
+        showAntiRepeat: @escaping (_ title: String, _ message: String, _ pendingAction: @escaping () -> Void) -> Void,
+        startWalk: (UUID) -> Void,
+        openWaterManagement: (UUID) -> Void,
+        openMedication: (UUID) -> Void,
+        feedback: @escaping (ExpandedQuickActionExecutor.Feedback) -> Void
+    ) {
+        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
+            publishNoop(.quickCare(entityID: petID, action: actionType), note: "home.quickCare.missingPet")
+            return
+        }
+
+        let events = fetchQuickCareEvents(petID: petID, now: now)
+        let feedLogs = fetchRecentCareLogs(petID: petID, now: now)
+        let humans = fetchHumans()
+
+        performActionType(
+            actionType,
+            pet: pet,
+            executorId: executorId,
+            allEvents: events,
+            allFeedCareLogs: feedLogs,
+            humans: humans,
+            now: now,
+            antiRepeatTitle: antiRepeatTitle,
+            antiRepeatMessage: antiRepeatMessage,
+            openFeedDetail: { opensManualSheet in
+                openFeedDetail(petID, opensManualSheet)
+            },
+            completePlannedFeed: { plannedPet in
+                completePlannedFeedFromFetchedState(
+                    pet: plannedPet,
+                    events: events,
+                    feedLogs: feedLogs,
+                    executorId: executorId,
+                    now: now,
+                    feedback: feedback
+                )
+            },
+            showAntiRepeat: showAntiRepeat,
+            startWalk: { startWalk($0.id) },
+            openWaterManagement: { openWaterManagement($0.id) },
+            openMedication: { openMedication($0.id) },
+            feedback: feedback
+        )
+    }
 
     func scheduleMedicationReminders(for pet: Pet) {
         MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
@@ -53,6 +108,11 @@ struct HomeCommandExecutor {
             openMedication: openMedication,
             feedback: feedback
         )
+        publishMutation(
+            .quickCare(entityID: pet.id, action: actionType),
+            affected: [pet.id],
+            note: "home.quickCare"
+        )
     }
 
     func completePlannedFeed(
@@ -60,12 +120,20 @@ struct HomeCommandExecutor {
         reminder: Reminder,
         executorId: String?
     ) -> (humanGot: Int, petGot: Int)? {
-        CareEventService.completePlannedFeed(
+        let reward = CareEventService.completePlannedFeed(
             pet: pet,
             reminder: reminder,
             context: modelContext,
             executorId: executorId
         )
+        if reward != nil {
+            publishMutation(
+                .quickCare(entityID: pet.id, action: "plannedFeed"),
+                affected: [pet.id, reminder.id],
+                note: "home.plannedFeed"
+            )
+        }
+        return reward
     }
 
     func applyPottyCheckIn(
@@ -81,6 +149,24 @@ struct HomeCommandExecutor {
             modelContext: modelContext,
             feedback: feedback
         )
+        publishMutation(
+            .quickCare(entityID: pet.id, action: "potty:\(raw)"),
+            affected: [pet.id],
+            note: "home.potty"
+        )
+    }
+
+    func applyPottyCheckIn(
+        raw: String,
+        petID: UUID,
+        executorId: String?,
+        feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
+    ) {
+        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
+            publishNoop(.quickCare(entityID: petID, action: "potty:\(raw)"), note: "home.potty.missingPet")
+            return
+        }
+        applyPottyCheckIn(raw: raw, pet: pet, executorId: executorId, feedback: feedback)
     }
 
     func applyGroomCheckIn(
@@ -95,6 +181,31 @@ struct HomeCommandExecutor {
             pet: pet,
             executorId: executorId,
             modelContext: modelContext,
+            showSingleUseNotice: showSingleUseNotice,
+            feedback: feedback
+        )
+        publishMutation(
+            .quickCare(entityID: pet.id, action: "groom:\(raw)"),
+            affected: [pet.id],
+            note: "home.groom"
+        )
+    }
+
+    func applyGroomCheckIn(
+        raw: String,
+        petID: UUID,
+        executorId: String?,
+        showSingleUseNotice: (String, String) -> Void,
+        feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
+    ) {
+        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
+            publishNoop(.quickCare(entityID: petID, action: "groom:\(raw)"), note: "home.groom.missingPet")
+            return
+        }
+        applyGroomCheckIn(
+            raw: raw,
+            pet: pet,
+            executorId: executorId,
             showSingleUseNotice: showSingleUseNotice,
             feedback: feedback
         )
@@ -115,6 +226,31 @@ struct HomeCommandExecutor {
             openHealth: openHealth,
             feedback: feedback
         )
+        publishMutation(
+            .quickCare(entityID: pet.id, action: "health:\(raw)"),
+            affected: [pet.id],
+            note: "home.health"
+        )
+    }
+
+    func applyHealthCheckIn(
+        raw: String,
+        petID: UUID,
+        executorId: String?,
+        openHealth: (UUID) -> Void,
+        feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
+    ) {
+        guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
+            publishNoop(.quickCare(entityID: petID, action: "health:\(raw)"), note: "home.health.missingPet")
+            return
+        }
+        applyHealthCheckIn(
+            raw: raw,
+            pet: pet,
+            executorId: executorId,
+            openHealth: { openHealth($0.id) },
+            feedback: feedback
+        )
     }
 
     func recordMedicationDose(medication: PetMedication, pet: Pet) {
@@ -125,6 +261,23 @@ struct HomeCommandExecutor {
             awardCoconut: true
         )
         scheduleMedicationReminders(for: pet)
+        publishMutation(
+            .medicationDose(petID: pet.id, medicationID: medication.id),
+            affected: [pet.id, medication.id],
+            note: "home.medicationDose"
+        )
+    }
+
+    func recordMedicationDose(petID: UUID, medicationID: UUID) {
+        guard let pet = fetchPet(id: petID),
+              let medication = pet.medications.first(where: { $0.id == medicationID }) else {
+            publishNoop(
+                .medicationDose(petID: petID, medicationID: medicationID),
+                note: "home.medicationDose.missingTarget"
+            )
+            return
+        }
+        recordMedicationDose(medication: medication, pet: pet)
     }
 
     func completeTodayFocusEvent(_ event: Event, on date: Date = Date()) {
@@ -133,6 +286,22 @@ struct HomeCommandExecutor {
             event.isCompleted = true
         }
         modelContext.safeSave()
+        publishMutation(
+            .todayFocus(entityID: event.id, action: "eventComplete"),
+            affected: [event.id],
+            note: "home.todayFocusEvent"
+        )
+    }
+
+    func completeTodayFocusEvent(eventID: UUID, on date: Date = Date()) {
+        guard let event = fetchEvent(id: eventID) else {
+            publishNoop(
+                .todayFocus(entityID: eventID, action: "eventComplete"),
+                note: "home.todayFocusEvent.missingEvent"
+            )
+            return
+        }
+        completeTodayFocusEvent(event, on: date)
     }
 
     func recordPlantCare(_ type: PlantCareType, plant: Plant, executorId: String?) {
@@ -175,9 +344,198 @@ struct HomeCommandExecutor {
             legacyModelId: log.id.uuidString,
             context: modelContext
         )
+        publishMutation(
+            .plantCare(plantID: plant.id, action: type.rawValue),
+            affected: [plant.id, log.id, event.id],
+            note: "home.plantCare"
+        )
+    }
+
+    func recordPlantCare(_ type: PlantCareType, plantID: UUID, executorId: String?) {
+        guard let plant = fetchPlant(id: plantID) else {
+            publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
+            return
+        }
+        recordPlantCare(type, plant: plant, executorId: executorId)
     }
 
     func confirmCoconutExchange(_ request: CoconutExchangeRequest, receiver: Human) throws {
-        try CoconutExchangeService.confirm(request, by: receiver, context: modelContext)
+        do {
+            try CoconutExchangeService.confirm(request, by: receiver, context: modelContext)
+            publishMutation(
+                .coconutExchange(requestID: request.id),
+                affected: [request.id, receiver.id],
+                note: "home.coconutExchange"
+            )
+        } catch {
+            ReadModelRevisionCenter.shared.publishFailure(
+                command: .coconutExchange(requestID: request.id),
+                error: error
+            )
+            throw error
+        }
+    }
+
+    func confirmCoconutExchange(requestID: UUID, receiverID: UUID) throws {
+        guard let request = fetchCoconutExchangeRequest(id: requestID),
+              let receiver = fetchHuman(id: receiverID) else {
+            let command = DomainCommand.coconutExchange(requestID: requestID)
+            ReadModelRevisionCenter.shared.publishFailure(
+                command: command,
+                error: HomeCommandExecutorError.missingTarget
+            )
+            throw HomeCommandExecutorError.missingTarget
+        }
+        try confirmCoconutExchange(request, receiver: receiver)
+    }
+
+    private func completePlannedFeedFromFetchedState(
+        pet: Pet,
+        events: [Event],
+        feedLogs: [PetCareLog],
+        executorId: String?,
+        now: Date,
+        feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
+    ) -> Bool {
+        guard let reminder = ExpandedQuickActionLogic.pendingFeedReminder(
+            for: pet,
+            allEvents: events,
+            allFeedCareLogs: feedLogs,
+            now: now
+        ) else {
+            return false
+        }
+
+        let reward = completePlannedFeed(
+            pet: pet,
+            reminder: reminder,
+            executorId: executorId
+        )
+        guard let reward else { return false }
+        let delta = reward.humanGot + reward.petGot
+        feedback(
+            ExpandedQuickActionExecutor.Feedback(
+                cardId: pet.id,
+                coconutDelta: delta,
+                label: delta > 0 ? "喂食 +\(delta)🥥" : nil
+            )
+        )
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        return true
+    }
+
+    private func fetchPet(id: UUID) -> Pet? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { pet in
+                pet.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchPlant(id: UUID) -> Plant? {
+        var descriptor = FetchDescriptor<Plant>(
+            predicate: #Predicate<Plant> { plant in
+                plant.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchEvent(id: UUID) -> Event? {
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchHuman(id: UUID) -> Human? {
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchHumans() -> [Human] {
+        (try? modelContext.fetch(FetchDescriptor<Human>())) ?? []
+    }
+
+    private func fetchCoconutExchangeRequest(id: UUID) -> CoconutExchangeRequest? {
+        var descriptor = FetchDescriptor<CoconutExchangeRequest>(
+            predicate: #Predicate<CoconutExchangeRequest> { request in
+                request.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        return try? modelContext.fetch(descriptor).first
+    }
+
+    private func fetchQuickCareEvents(petID: UUID, now: Date) -> [Event] {
+        let petKey = petID.uuidString
+        let todayStart = Calendar.current.startOfDay(for: now)
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.relatedEntityId == petKey || event.startDate >= todayStart
+            },
+            sortBy: [SortDescriptor(\.startDate, order: .forward)]
+        )
+        descriptor.fetchLimit = 400
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func fetchRecentCareLogs(petID: UUID, now: Date) -> [PetCareLog] {
+        let calendar = Calendar.current
+        let todayStart = calendar.startOfDay(for: now)
+        let since = calendar.date(byAdding: .hour, value: -3, to: todayStart) ?? todayStart
+        var descriptor = FetchDescriptor<PetCareLog>(
+            predicate: #Predicate<PetCareLog> { log in
+                log.date >= since
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        descriptor.fetchLimit = 300
+        return ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.pet?.id == petID }
+    }
+
+    private func publishMutation(
+        _ command: DomainCommand,
+        affected: Set<UUID>,
+        note: String
+    ) {
+        ReadModelRevisionCenter.shared.publish(
+            DomainMutationResult(
+                command: command,
+                affectedEntityIDs: affected,
+                wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+
+    private func publishNoop(_ command: DomainCommand, note: String) {
+        ReadModelRevisionCenter.shared.publish(
+            DomainMutationResult(
+                command: command,
+                affectedEntityIDs: [],
+                wroteBusinessFact: false,
+                note: note
+            )
+        )
+    }
+}
+
+private enum HomeCommandExecutorError: LocalizedError {
+    case missingTarget
+
+    var errorDescription: String? {
+        "Missing command target"
     }
 }

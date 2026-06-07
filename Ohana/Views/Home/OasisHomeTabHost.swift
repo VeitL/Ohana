@@ -2,8 +2,8 @@
 //  OasisHomeTabHost.swift
 //  Ohana
 //
-//  Keeps the vertical home tab transition light by showing a static Oasis
-//  preview during page motion, then mounting the full Oasis feature after.
+//  Keeps the vertical home tab transition light by mounting the real Oasis
+//  shell for visible motion while deferring active work until the page is live.
 //
 
 import SwiftUI
@@ -14,34 +14,36 @@ struct OasisHomeTabHost: View {
 
     @State private var showsLiveContent = false
     @State private var forwardedInjectEnergyTrigger = 0
-    @State private var liveContentTask: Task<Void, Never>?
     @State private var injectHandoffTask: Task<Void, Never>?
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var l: L10n { L10n(appLanguage) }
-    private var liveContentMountDelayMilliseconds: UInt64 {
-        reduceMotion ? 80 : 360
+
+    private var shouldRenderLiveContent: Bool {
+        guard !lifecycle.isPreparingForDisplay else { return false }
+        return showsLiveContent || lifecycle.isPrepared || lifecycle.isVisible || lifecycle.isLive
     }
 
     var body: some View {
+        let rendersLiveContent = shouldRenderLiveContent
+
         ZStack {
             OasisHomeTabPreview(
                 title: l.tr(zh: "Oasis", en: "Oasis", de: "Oasis"),
                 subtitle: l.tr(zh: "生命之树", en: "Life Tree", de: "Lebensbaum")
             )
-            .opacity(showsLiveContent ? 0 : 1)
+            .opacity(rendersLiveContent ? 0 : 1)
             .allowsHitTesting(false)
 
-            if showsLiveContent {
+            if rendersLiveContent {
                 OasisRewardView(
                     hideToolbar: true,
                     injectEnergyTrigger: forwardedInjectEnergyTrigger,
-                    isEmbeddedPrepared: true,
-                    isEmbeddedVisible: true,
-                    isEmbeddedActive: true
+                    isEmbeddedPrepared: lifecycle.isPrepared,
+                    isEmbeddedVisible: lifecycle.isVisible,
+                    isEmbeddedActive: lifecycle.isLive
                 )
-                .transition(.opacity.animation(GoMotion.quick))
+                .allowsHitTesting(lifecycle.isLive)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -49,9 +51,7 @@ struct OasisHomeTabHost: View {
         .padding(.top, 4)
         .onAppear(perform: updateLiveContentGate)
         .onDisappear {
-            liveContentTask?.cancel()
             injectHandoffTask?.cancel()
-            liveContentTask = nil
             injectHandoffTask = nil
         }
         .onChange(of: lifecycle) { _, _ in
@@ -63,19 +63,27 @@ struct OasisHomeTabHost: View {
     }
 
     private func updateLiveContentGate() {
-        liveContentTask?.cancel()
-        if lifecycle.isLive {
-            guard !showsLiveContent else { return }
-            liveContentTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: liveContentMountDelayMilliseconds) {
-                guard lifecycle.isLive else {
-                    liveContentTask = nil
-                    return
-                }
-                withAnimation(GoMotion.quick) {
+        if lifecycle.isPreparingForDisplay {
+            injectHandoffTask?.cancel()
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                showsLiveContent = false
+            }
+            injectHandoffTask = nil
+            return
+        }
+
+        if lifecycle.isPrepared || lifecycle.isVisible || lifecycle.isLive {
+            if !showsLiveContent {
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
                     showsLiveContent = true
                 }
+            }
+            if lifecycle.isLive {
                 schedulePendingInjectHandoff()
-                liveContentTask = nil
             }
         } else {
             injectHandoffTask?.cancel()
@@ -84,14 +92,13 @@ struct OasisHomeTabHost: View {
             withTransaction(transaction) {
                 showsLiveContent = false
             }
-            liveContentTask = nil
             injectHandoffTask = nil
         }
     }
 
     private func handleInjectEnergyTriggerChanged(_ newValue: Int) {
         guard lifecycle.isLive else { return }
-        if showsLiveContent {
+        if shouldRenderLiveContent {
             forwardedInjectEnergyTrigger = newValue
         } else {
             schedulePendingInjectHandoff()
@@ -99,10 +106,12 @@ struct OasisHomeTabHost: View {
     }
 
     private func schedulePendingInjectHandoff() {
-        guard lifecycle.isLive, showsLiveContent, forwardedInjectEnergyTrigger != injectEnergyTrigger else { return }
+        guard lifecycle.isLive,
+              shouldRenderLiveContent,
+              forwardedInjectEnergyTrigger != injectEnergyTrigger else { return }
         injectHandoffTask?.cancel()
         injectHandoffTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
-            guard lifecycle.isLive, showsLiveContent else {
+            guard lifecycle.isLive, shouldRenderLiveContent else {
                 injectHandoffTask = nil
                 return
             }
@@ -182,10 +191,16 @@ private struct OasisHomeTabPreview: View {
                     Circle()
                         .fill(treeLevel.glowColor.opacity(0.18))
                         .frame(width: 210, height: 210)
-                    Image(systemName: "tree.fill")
-                        .font(.system(size: 118, weight: .black))
-                        .symbolRenderingMode(.monochrome)
-                        .foregroundStyle(Color.goPrimary)
+                    BeautifulCoconutTree(
+                        level: treeLevel.rawValue,
+                        isInjecting: false,
+                        growthProgress: progress,
+                        allowsAmbientMotion: false,
+                        harvestedCoconuts: []
+                    )
+                    .scaleEffect(0.72)
+                    .frame(width: 230, height: 246)
+                    .allowsHitTesting(false)
                 }
                 .frame(maxWidth: .infinity)
 

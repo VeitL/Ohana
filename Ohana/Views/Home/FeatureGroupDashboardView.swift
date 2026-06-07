@@ -16,10 +16,13 @@ struct FeatureGroupDashboardView: View {
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.name)    private var humans: [Human]
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var selectedItemID: String?
+    @State private var treeManager = OasisTreeManager.shared
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome } }
+    private var currentTreeLevel: Int { treeManager.treeLevel.rawValue }
 
     private var hasDogs: Bool {
         activePets.contains {
@@ -79,6 +82,7 @@ struct FeatureGroupDashboardView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(items) { item in
+                    let unlock = GrowthUnlockPolicy.status(for: item.destination, currentLevel: currentTreeLevel)
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(GoMotion.feedback) {
@@ -86,7 +90,7 @@ struct FeatureGroupDashboardView: View {
                         }
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: item.icon)
+                            Image(systemName: unlock.isUnlocked ? item.icon : "lock.fill")
                                 .font(.system(size: 11, weight: .bold))
                             Text(LocalizedStringKey(item.title))
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
@@ -96,6 +100,17 @@ struct FeatureGroupDashboardView: View {
                         .padding(.horizontal, 13)
                         .padding(.vertical, 8)
                         .background(selectedItem.id == item.id ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                        .overlay(alignment: .topTrailing) {
+                            if !unlock.isUnlocked {
+                                Text("Lv.\(unlock.step.requiredLevel)")
+                                    .font(.system(size: 7, weight: .black, design: .rounded))
+                                    .foregroundStyle(Color.arkInk)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color(hex: unlock.step.tintHex), in: Capsule())
+                                    .offset(x: 4, y: -6)
+                            }
+                        }
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -121,24 +136,33 @@ struct FeatureGroupDashboardView: View {
 
     @ViewBuilder
     private func content(for item: FeatureGroupItem) -> some View {
-        switch item.destination {
-        case .featureAggregate(let feature):
-            FeatureAggregateView(
-                feature: feature,
-                parentPath: $parentPath,
-                showsNavigationChrome: false,
-                showsEntityChips: false
+        let unlock = GrowthUnlockPolicy.status(for: item.destination, currentLevel: currentTreeLevel)
+        if !unlock.isUnlocked {
+            GrowthLockedFeatureView(
+                status: unlock,
+                appLanguage: appLanguage,
+                showsFullRoadmap: false
             )
-        case .careLedgerAnalysis:
-            CareLedgerAnalysisView()
-        case .reminderObservability:
-            ReminderObservabilityView()
-        case .bountyBoard:
-            BountyBoardView()
-        case .familyWeeklyReport:
-            FamilyWeeklyReportDashboardView()
-        default:
-            EmptyView()
+        } else {
+            switch item.destination {
+            case .featureAggregate(let feature):
+                FeatureAggregateView(
+                    feature: feature,
+                    parentPath: $parentPath,
+                    showsNavigationChrome: false,
+                    showsEntityChips: false
+                )
+            case .careLedgerAnalysis:
+                CareLedgerAnalysisView()
+            case .reminderObservability:
+                ReminderObservabilityView()
+            case .bountyBoard:
+                BountyBoardView()
+            case .familyWeeklyReport:
+                FamilyWeeklyReportDashboardView()
+            default:
+                EmptyView()
+            }
         }
     }
 

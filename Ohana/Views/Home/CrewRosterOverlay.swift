@@ -474,8 +474,16 @@ struct CrewRosterOverlay: View {
 
     // MARK: - Bento Dex 主体
     private var rosterFocusCards: [FocusCard] {
-        let petCards = filteredPets.map { FocusCard.from($0, includeAvatarData: true) }
-        let humanCards = filteredHumans.map { FocusCard.from($0, includeAvatarData: true) }
+        let petCards = filteredPets.map { pet in
+            var card = FocusCard.from(pet, includeAvatarData: true)
+            card.isShownOnHome = effectivePetHomeVisibility(pet)
+            return card
+        }
+        let humanCards = filteredHumans.map { human in
+            var card = FocusCard.from(human, includeAvatarData: true)
+            card.isShownOnHome = effectiveHumanHomeVisibility(human)
+            return card
+        }
         let plantCards = filteredPlants.map { plantFocusCard($0) }
         return (petCards + humanCards + plantCards).sorted { lhs, rhs in
             if lhs.createdAt != rhs.createdAt {

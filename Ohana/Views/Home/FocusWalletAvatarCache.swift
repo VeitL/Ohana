@@ -48,49 +48,12 @@ enum FocusWalletAvatarCache {
         return didChange
     }
 
-    static func entry(for cardId: UUID, data: Data?) -> Entry {
-        guard let data else {
-            entries.removeValue(forKey: cardId)
-            return Entry(image: nil, isTransparent: false, signature: "", isFinal: true)
+    static func cachedEntry(for cardId: UUID, signature: String) -> Entry? {
+        guard !signature.isEmpty,
+              let cached = entries[cardId],
+              cached.signature == signature else {
+            return nil
         }
-
-        let signature = signature(for: data)
-        if let cached = entries[cardId], cached.signature == signature {
-            return cached
-        }
-
-        // Keep SwiftUI body evaluation strictly memory-only. Loading preview files
-        // from disk here can land on the first card-expansion frame and make taps
-        // feel sticky; background `preload` fills the cache instead.
-        let entry = Entry(image: nil, isTransparent: false, signature: signature, isFinal: false)
-        entries[cardId] = entry
-        return entry
-    }
-
-    static func frozenEntry(for cardId: UUID, data: Data?) -> Entry {
-        guard let data else {
-            return Entry(image: nil, isTransparent: false, signature: "", isFinal: true)
-        }
-
-        let signature = signature(for: data)
-        if let cached = entries[cardId], cached.signature == signature, cached.image != nil {
-            return cached
-        }
-
-        let entry = decodedEntry(from: data, signature: signature)
-        entries[cardId] = entry
-        return entry
-    }
-
-    static func cachedFrozenEntry(for cardId: UUID, data: Data?) -> Entry? {
-        guard let data else {
-            return Entry(image: nil, isTransparent: false, signature: "", isFinal: true)
-        }
-
-        let signature = signature(for: data)
-        guard let cached = entries[cardId],
-              cached.signature == signature,
-              cached.image != nil else { return nil }
         return cached
     }
 
@@ -184,7 +147,7 @@ enum FocusWalletAvatarCache {
     nonisolated private static func previewDirectory() -> URL {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-        return base.appendingPathComponent("Ohana/HomeAvatarPreviews", isDirectory: true)
+        return base.appendingPathComponent("Ohana/HomeAvatarPreviewsV2", isDirectory: true)
     }
 
     nonisolated private static func decodedEntry(from data: Data, signature: String) -> Entry {
@@ -194,7 +157,7 @@ enum FocusWalletAvatarCache {
         return Entry(image: displayImage, isTransparent: isTransparent, signature: signature, isFinal: true)
     }
 
-    nonisolated private static func previewPNGData(from image: UIImage, maxPixel: CGFloat = 220) -> Data? {
+    nonisolated private static func previewPNGData(from image: UIImage, maxPixel: CGFloat = 1_600) -> Data? {
         let longest = max(image.size.width, image.size.height)
         guard longest > 0 else { return image.pngData() }
         let scale = min(1, maxPixel / longest)
@@ -209,7 +172,7 @@ enum FocusWalletAvatarCache {
         return preview.pngData()
     }
 
-    nonisolated private static func decodedImage(from data: Data, maxPixel: CGFloat = 700) -> UIImage? {
+    nonisolated private static func decodedImage(from data: Data, maxPixel: CGFloat = 2_200) -> UIImage? {
         let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
         guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
             return UIImage(data: data)

@@ -798,9 +798,14 @@ enum MemberAvatarMediaRoute: Identifiable {
     }
 }
 
+enum MemberPortraitCropSource {
+    case image(UIImage)
+    case photoItem(PhotosPickerItem)
+}
+
 struct MemberPortraitCropItem: Identifiable {
     let id = UUID()
-    let image: UIImage
+    let source: MemberPortraitCropSource
 }
 
 @MainActor
@@ -872,9 +877,9 @@ final class MemberAvatarMediaCoordinator: ObservableObject {
         }
     }
 
-    func showCrop(for image: UIImage) {
+    func showCrop(for item: MemberPortraitCropItem) {
         MemberCreationPerformance.event("Avatar Crop Route Presented")
-        route = .portraitCrop(MemberPortraitCropItem(image: image))
+        route = .portraitCrop(item)
     }
 
     func clearIfRoute(_ routeId: String) {
@@ -1032,7 +1037,6 @@ struct MemberCardCreationView: View {
     @State private var avatarMediaReturnStep: MemberCreationStep?
     @State private var isAvatarMediaTransitioning = false
     @State private var cropPresentationTask: Task<Void, Never>?
-    @State private var photoLoadTask: Task<Void, Never>?
     @State private var mbtiEnergy = ""
     @State private var mbtiInformation = ""
     @State private var mbtiDecision = ""
@@ -1199,8 +1203,6 @@ struct MemberCardCreationView: View {
             if !isAvatarMediaTransitioning {
                 cropPresentationTask?.cancel()
                 cropPresentationTask = nil
-                photoLoadTask?.cancel()
-                photoLoadTask = nil
                 if !isSaving, !isJoinHandoffRunning {
                     clearMediaReturnStepStorage()
                 }
@@ -1251,7 +1253,10 @@ struct MemberCardCreationView: View {
                     }.value
                     MemberCreationPerformance.end("Camera Image Normalize", normalizeID)
                     await MainActor.run {
-                        presentAvatarCropAfterMediaDismissal(prepared, delayMilliseconds: 320)
+                        presentAvatarCropAfterMediaDismissal(
+                            MemberPortraitCropItem(source: .image(prepared)),
+                            delayMilliseconds: 320
+                        )
                     }
                 }
             } onCancel: {
@@ -1269,7 +1274,7 @@ struct MemberCardCreationView: View {
                 }
             )
         ) { item in
-            MemberPortraitCropView(image: item.image) { data in
+            MemberPortraitCropView(item: item) { data in
                 withAnimation(GoMotion.selection) {
                     draft.avatarSource = .customImage
                     draft.selectedAvatarCandidateId = nil
@@ -1376,7 +1381,7 @@ struct MemberCardCreationView: View {
 
     @ViewBuilder
     private var cardControls: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             MemberCreationStepIndicator(
                 steps: creationSteps,
                 currentStep: currentStep,
@@ -1389,7 +1394,7 @@ struct MemberCardCreationView: View {
             currentStepContent
         }
         .padding(.horizontal, 18)
-        .padding(.bottom, 22)
+        .padding(.bottom, 16)
     }
 
     @ViewBuilder
@@ -1506,47 +1511,124 @@ struct MemberCardCreationView: View {
             icon: "pawprint.fill",
             foreground: cardForeground
         ) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     compactNameInput(width: 148)
                     compactOptionRow(options: petGenderOptions, selection: $draft.petGender) { petGenderLabel($0) }
                 }
+                HStack(spacing: 10) {
+                    compactMenuPicker(
+                        title: l.tr(zh: "物种", en: "Species", de: "Art"),
+                        value: speciesLabel(draft.species)
+                    ) {
+                        ForEach(speciesOptions, id: \.self) { species in
+                            Button(speciesLabel(species)) {
+                                draft.species = species
+                                draft.breed = ""
+                                draft.customBreed = ""
+                                draft.isCustomBreed = false
+                                clampPetAppearance()
+                            }
+                        }
+                    }
+                    compactBreedPicker
+                }
+                if draft.isCustomBreed {
+                    flatTextField(l.tr(zh: "自定义品种", en: "Custom breed", de: "Eigene Rasse"), text: $draft.customBreed)
+                }
+                VStack(alignment: .leading, spacing: 7) {
+                    MemberCompactDateRow(
+                        title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
+                        icon: "birthday.cake.fill",
+                        isEnabled: $draft.hasBirthday,
+                        date: $draft.birthday,
+                        range: birthdayRange,
+                        foreground: cardForeground,
+                        secondaryForeground: cardSecondaryForeground,
+                        fill: cardControlFill,
+                        stroke: cardControlStroke
+                    )
+                    MemberCompactDateRow(
+                        title: l.tr(zh: "到家日", en: "Home date", de: "Einzugstag"),
+                        icon: "house.fill",
+                        isEnabled: $draft.hasHomeDate,
+                        date: $draft.homeDate,
+                        range: birthdayRange,
+                        foreground: cardForeground,
+                        secondaryForeground: cardSecondaryForeground,
+                        fill: cardControlFill,
+                        stroke: cardControlStroke
+                    )
+                }
+            }
+        }
+    }
+
+    private var compactBreedPicker: some View {
+        compactMenuPicker(
+            title: l.tr(zh: "品种", en: "Breed", de: "Rasse"),
+            value: draft.resolvedBreed.isEmpty ? l.tr(zh: "选择", en: "Choose", de: "Wählen") : draft.resolvedBreed
+        ) {
+            ForEach(petBreedOptions.prefix(40), id: \.name) { breed in
+                Button(breed.name) {
+                    draft.isCustomBreed = breed.name == "其他"
+                    draft.breed = breed.name == "其他" ? "" : breed.name
+                    clampPetAppearance()
+                }
+            }
+        }
+    }
+
+    private var petProfileSection: some View {
+        MemberCreationSection(
+            title: l.tr(zh: "毛色与性格", en: "Coat & vibe", de: "Fell & Charakter"),
+            icon: "list.bullet.clipboard.fill",
+            foreground: cardForeground
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
                 compactMenuPicker(
-                    title: l.tr(zh: "物种", en: "Species", de: "Art"),
-                    value: speciesLabel(draft.species)
+                    title: l.tr(zh: "毛色", en: "Coat", de: "Fell"),
+                    value: draft.coatColor.isEmpty ? l.tr(zh: "自动", en: "Auto", de: "Auto") : draft.coatColor
                 ) {
-                    ForEach(speciesOptions, id: \.self) { species in
-                        Button(speciesLabel(species)) {
-                            draft.species = species
-                            draft.breed = ""
-                            draft.customBreed = ""
-                            draft.isCustomBreed = false
+                    ForEach(petCoatOptions, id: \.self) { option in
+                        Button(option) {
+                            draft.coatColor = option
                             clampPetAppearance()
                         }
                     }
                 }
-                MemberCompactDateRow(
-                    title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
-                    icon: "birthday.cake.fill",
-                    isEnabled: $draft.hasBirthday,
-                    date: $draft.birthday,
-                    range: birthdayRange,
-                    foreground: cardForeground,
-                    secondaryForeground: cardSecondaryForeground,
-                    fill: cardControlFill,
-                    stroke: cardControlStroke
-                )
-                MemberCompactDateRow(
-                    title: l.tr(zh: "到家日", en: "Home date", de: "Einzugstag"),
-                    icon: "house.fill",
-                    isEnabled: $draft.hasHomeDate,
-                    date: $draft.homeDate,
-                    range: birthdayRange,
-                    foreground: cardForeground,
-                    secondaryForeground: cardSecondaryForeground,
-                    fill: cardControlFill,
-                    stroke: cardControlStroke
-                )
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 7)], spacing: 7) {
+                    ForEach(Array(PetPersonalityTag.allTags.prefix(8).map(\.id)), id: \.self) { id in
+                        let isSelected = draft.personalityTagIds.contains(id)
+                        Button {
+                            withAnimation(GoMotion.selection) {
+                                if draft.personalityTagIds.contains(id) {
+                                    draft.personalityTagIds.removeAll { $0 == id }
+                                } else {
+                                    if draft.personalityTagIds.count >= 3 {
+                                        draft.personalityTagIds.removeFirst()
+                                    }
+                                    draft.personalityTagIds.append(id)
+                                }
+                            }
+                            UISelectionFeedbackGenerator().selectionChanged()
+                        } label: {
+                            Text(personalityLabel(id))
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.62)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 34)
+                                .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
+                                .overlay {
+                                    Capsule()
+                                        .strokeBorder(cardControlStroke, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                }
             }
         }
     }
@@ -1620,75 +1702,6 @@ struct MemberCardCreationView: View {
             return l.tr(zh: "2.5D 头像券 \(avatarPassCost) 椰子。", en: "A 2.5D avatar pass costs \(avatarPassCost) coconuts.", de: "Ein 2,5D-Avatarpass kostet \(avatarPassCost) Kokosnüsse.")
         }
         return nil
-    }
-
-    private var petProfileSection: some View {
-        MemberCreationSection(
-            title: l.tr(zh: "品种与性格", en: "Breed & vibe", de: "Rasse & Charakter"),
-            icon: "list.bullet.clipboard.fill",
-            foreground: cardForeground
-        ) {
-            VStack(alignment: .leading, spacing: 12) {
-                compactMenuPicker(
-                    title: l.tr(zh: "品种", en: "Breed", de: "Rasse"),
-                    value: draft.resolvedBreed.isEmpty ? l.tr(zh: "选择", en: "Choose", de: "Wählen") : draft.resolvedBreed
-                ) {
-                    ForEach(petBreedOptions.prefix(40), id: \.name) { breed in
-                        Button(breed.name) {
-                            draft.isCustomBreed = breed.name == "其他"
-                            draft.breed = breed.name == "其他" ? "" : breed.name
-                            clampPetAppearance()
-                        }
-                    }
-                }
-                if draft.isCustomBreed {
-                    flatTextField(l.tr(zh: "自定义品种", en: "Custom breed", de: "Eigene Rasse"), text: $draft.customBreed)
-                }
-                compactMenuPicker(
-                    title: l.tr(zh: "毛色", en: "Coat", de: "Fell"),
-                    value: draft.coatColor.isEmpty ? l.tr(zh: "自动", en: "Auto", de: "Auto") : draft.coatColor
-                ) {
-                    ForEach(petCoatOptions, id: \.self) { option in
-                        Button(option) {
-                            draft.coatColor = option
-                            clampPetAppearance()
-                        }
-                    }
-                }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 7)], spacing: 7) {
-                    ForEach(Array(PetPersonalityTag.allTags.prefix(8).map(\.id)), id: \.self) { id in
-                        let isSelected = draft.personalityTagIds.contains(id)
-                        Button {
-                            withAnimation(GoMotion.selection) {
-                                if draft.personalityTagIds.contains(id) {
-                                    draft.personalityTagIds.removeAll { $0 == id }
-                                } else {
-                                    if draft.personalityTagIds.count >= 3 {
-                                        draft.personalityTagIds.removeFirst()
-                                    }
-                                    draft.personalityTagIds.append(id)
-                                }
-                            }
-                            UISelectionFeedbackGenerator().selectionChanged()
-                        } label: {
-                            Text(personalityLabel(id))
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.62)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 34)
-                                .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
-                                .overlay {
-                                    Capsule()
-                                        .strokeBorder(cardControlStroke, lineWidth: 1)
-                                }
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                    }
-                }
-            }
-        }
     }
 
     private var petVibeSection: some View {
@@ -2065,8 +2078,6 @@ struct MemberCardCreationView: View {
         isAvatarMediaTransitioning = false
         cropPresentationTask?.cancel()
         cropPresentationTask = nil
-        photoLoadTask?.cancel()
-        photoLoadTask = nil
     }
 
     private func restoreAvatarMediaReturnStep() {
@@ -2177,36 +2188,10 @@ struct MemberCardCreationView: View {
     private func handlePhotoPickerItem(_ item: PhotosPickerItem?) {
         guard let item else { return }
         beginAvatarMediaPresentation()
-        photoLoadTask?.cancel()
-        photoLoadTask = Task {
-            let loadID = MemberCreationPerformance.begin("PhotoPicker LoadTransferable")
-            guard let data = try? await item.loadTransferable(type: Data.self)
-            else {
-                MemberCreationPerformance.end("PhotoPicker LoadTransferable", loadID)
-                await MainActor.run {
-                    media.photoItem = nil
-                    finishPhotoLibraryIfIdle()
-                }
-                return
-            }
-            MemberCreationPerformance.end("PhotoPicker LoadTransferable", loadID)
-            let decodeID = MemberCreationPerformance.begin("Avatar Photo Decode")
-            let image = await Task.detached(priority: .userInitiated) {
-                MemberAvatarImageProcessor.image(from: data)
-            }.value
-            MemberCreationPerformance.end("Avatar Photo Decode", decodeID)
-            guard let image else {
-                await MainActor.run {
-                    media.photoItem = nil
-                    finishPhotoLibraryIfIdle()
-                }
-                return
-            }
-            await MainActor.run {
-                media.photoItem = nil
-                presentAvatarCropAfterMediaDismissal(image, delayMilliseconds: 360)
-            }
-        }
+        let cropItem = MemberPortraitCropItem(source: .photoItem(item))
+        media.photoItem = nil
+        media.route = nil
+        presentAvatarCropAfterMediaDismissal(cropItem, delayMilliseconds: 140)
     }
 
     private func handlePhotoLibraryDismissed() {
@@ -2233,22 +2218,22 @@ struct MemberCardCreationView: View {
     }
 
     private func presentAvatarCropAfterMediaDismissal(
-        _ image: UIImage,
+        _ item: MemberPortraitCropItem,
         delayMilliseconds: UInt64
     ) {
         cropPresentationTask?.cancel()
         cropPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
             guard !media.isPhotoPickerPresented, !media.isCameraPresented else {
-                presentAvatarCropAfterMediaDismissal(image, delayMilliseconds: 140)
+                presentAvatarCropAfterMediaDismissal(item, delayMilliseconds: 140)
                 return
             }
             restoreAvatarMediaReturnStep()
             cropPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 50) {
                 guard !media.isPhotoPickerPresented, !media.isCameraPresented else {
-                    presentAvatarCropAfterMediaDismissal(image, delayMilliseconds: 140)
+                    presentAvatarCropAfterMediaDismissal(item, delayMilliseconds: 140)
                     return
                 }
-                media.showCrop(for: image)
+                media.showCrop(for: item)
                 cropPresentationTask = nil
             }
         }
@@ -2826,7 +2811,7 @@ struct MemberCreationStepIndicator: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(currentStep.title(kind: kind, l: l))
                     .font(OhanaFont.callout(.black))
@@ -2890,12 +2875,7 @@ struct MemberCompactDateRow: View {
             Spacer(minLength: 8)
 
             if isEnabled {
-                DatePicker("", selection: $date, in: range, displayedComponents: .date)
-                    .datePickerStyle(.compact)
-                    .labelsHidden()
-                    .environment(\.locale, AppLanguage.effectiveLocale)
-                    .tint(foreground)
-                    .frame(maxWidth: 142, alignment: .trailing)
+                iconDatePicker
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
 
@@ -2913,6 +2893,27 @@ struct MemberCompactDateRow: View {
         .animation(GoMotion.selection, value: isEnabled)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(isEnabled ? "\(title), \(formattedDate)" : title)
+    }
+
+    private var iconDatePicker: some View {
+        ZStack {
+            DatePicker("", selection: $date, in: range, displayedComponents: .date)
+                .datePickerStyle(.compact)
+                .labelsHidden()
+                .environment(\.locale, AppLanguage.effectiveLocale)
+                .tint(foreground)
+                .frame(width: 44, height: 38, alignment: .trailing)
+                .clipped()
+                .opacity(0.015)
+                .accessibilityLabel(formattedDate)
+
+            Image(systemName: "calendar")
+                .font(.system(size: 14, weight: .black))
+                .foregroundStyle(foreground)
+                .frame(width: 44, height: 38)
+                .allowsHitTesting(false)
+        }
+        .frame(width: 44, height: 38)
     }
 }
 
@@ -3528,14 +3529,18 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
+            let heroHeight = min(max(width * 0.70, 206), min(height * 0.43, 282))
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     hero(width: width)
-                        .frame(height: min(max(width * 0.92, 260), 330))
+                        .frame(height: heroHeight)
+                    Spacer(minLength: 0)
                     controls()
                 }
+                .frame(minHeight: height, alignment: .bottom)
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollBounceBehavior(.basedOnSize)
             .background {
                 cardBackground(width: width, height: height)
             }
@@ -3640,7 +3645,7 @@ struct MemberCreationSection<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: icon)
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(foreground)
@@ -3700,11 +3705,13 @@ struct MemberAvatarCandidateCell: View {
 }
 
 struct MemberPortraitCropView: View {
-    let image: UIImage
+    let item: MemberPortraitCropItem
     let onComplete: (Data) -> Void
     let onCancel: () -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @State private var loadedImage: UIImage?
+    @State private var loadErrorText = ""
     @State private var scale: CGFloat = 1
     @State private var lastScale: CGFloat = 1
     @State private var offset: CGSize = .zero
@@ -3718,7 +3725,11 @@ struct MemberPortraitCropView: View {
             ZStack {
                 Color.arkInk.ignoresSafeArea()
                 VStack(spacing: 18) {
-                    cropStage
+                    if let loadedImage {
+                        cropStage(image: loadedImage)
+                    } else {
+                        cropLoadingStage
+                    }
                     HStack(spacing: 12) {
                         Button {
                             onCancel()
@@ -3741,16 +3752,16 @@ struct MemberPortraitCropView: View {
                                     ProgressView()
                                         .tint(Color.arkInk)
                                 }
-                                Text(isProcessing ? l.tr(zh: "处理中", en: "Processing", de: "Verarbeitet") : l.done)
+                                Text(primaryButtonTitle)
                             }
                             .font(OhanaFont.callout(.black))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(loadedImage == nil ? Color.ohanaSecondaryText : Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .background(Color.goPrimary, in: Capsule())
+                            .background(loadedImage == nil ? Color.ohanaControlFill : Color.goPrimary, in: Capsule())
                         }
                         .buttonStyle(ScaleButtonStyle())
-                        .disabled(isProcessing)
+                        .disabled(isProcessing || loadedImage == nil)
                     }
                     .padding(.horizontal, 18)
                 }
@@ -3759,10 +3770,65 @@ struct MemberPortraitCropView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .interactiveDismissDisabled(isProcessing)
+            .task(id: item.id) {
+                await loadImageIfNeeded()
+            }
         }
     }
 
-    private var cropStage: some View {
+    private var primaryButtonTitle: String {
+        if isProcessing {
+            return l.tr(zh: "处理中", en: "Processing", de: "Verarbeitet")
+        }
+        if loadedImage == nil {
+            return l.tr(zh: "准备中", en: "Preparing", de: "Vorbereiten")
+        }
+        return l.done
+    }
+
+    private var cropLoadingStage: some View {
+        GeometryReader { proxy in
+            let availableWidth = proxy.size.width - 36
+            let availableHeight = proxy.size.height - 12
+            let cropWidth = min(availableWidth, availableHeight / MemberAvatarImageProcessor.portraitAspect)
+            let cropHeight = cropWidth * MemberAvatarImageProcessor.portraitAspect
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    .fill(Color.arkCardDark)
+                    .frame(width: cropWidth, height: cropHeight)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 34, style: .continuous)
+                            .strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 1)
+                    }
+
+                VStack(spacing: 12) {
+                    if loadErrorText.isEmpty {
+                        ProgressView()
+                            .tint(Color.goPrimary)
+                        Text(l.tr(zh: "正在准备照片", en: "Preparing photo", de: "Foto wird vorbereitet"))
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.goCardWhite)
+                    } else {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 24, weight: .black))
+                            .foregroundStyle(Color.goYellow)
+                        Text(loadErrorText)
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.goCardWhite)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.72)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .frame(width: cropWidth, height: cropHeight)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func cropStage(image: UIImage) -> some View {
         GeometryReader { proxy in
             let availableWidth = proxy.size.width - 36
             let availableHeight = proxy.size.height - 12
@@ -3858,9 +3924,8 @@ struct MemberPortraitCropView: View {
     }
 
     private func finishCrop() {
-        guard !isProcessing else { return }
+        guard !isProcessing, let sourceImage = loadedImage else { return }
         isProcessing = true
-        let sourceImage = image
         let scaleSnapshot = scale
         let offsetSnapshot = offset
         DispatchQueue.global(qos: .userInitiated).async {
@@ -3877,6 +3942,45 @@ struct MemberPortraitCropView: View {
                     onComplete(data)
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func loadImageIfNeeded() async {
+        guard loadedImage == nil else { return }
+        loadErrorText = ""
+        scale = 1
+        lastScale = 1
+        offset = .zero
+        lastOffset = .zero
+        await Task.yield()
+
+        switch item.source {
+        case let .image(image):
+            loadedImage = image
+        case let .photoItem(photoItem):
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            guard !Task.isCancelled else { return }
+            let loadID = MemberCreationPerformance.begin("PhotoPicker LoadTransferable")
+            guard let data = try? await photoItem.loadTransferable(type: Data.self) else {
+                MemberCreationPerformance.end("PhotoPicker LoadTransferable", loadID)
+                loadErrorText = l.tr(zh: "无法读取这张照片", en: "Could not read this photo", de: "Dieses Foto konnte nicht gelesen werden")
+                return
+            }
+            MemberCreationPerformance.end("PhotoPicker LoadTransferable", loadID)
+            guard !Task.isCancelled else { return }
+
+            let decodeID = MemberCreationPerformance.begin("Avatar Photo Decode")
+            let image = await Task.detached(priority: .userInitiated) {
+                MemberAvatarImageProcessor.image(from: data)
+            }.value
+            MemberCreationPerformance.end("Avatar Photo Decode", decodeID)
+            guard !Task.isCancelled else { return }
+            guard let image else {
+                loadErrorText = l.tr(zh: "无法解析这张照片", en: "Could not decode this photo", de: "Dieses Foto konnte nicht dekodiert werden")
+                return
+            }
+            loadedImage = image
         }
     }
 }

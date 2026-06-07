@@ -91,6 +91,7 @@ final class FocusHomeSnapshotController: ObservableObject {
             guard !Task.isCancelled else { return }
 
             var payloads: [FocusWalletAvatarCache.Payload] = []
+            var popoutPayloads: [FocusWalletAvatarCache.Payload] = []
             for id in targetIds {
                 guard !Task.isCancelled else { return }
                 let data = FocusHomeCardDataSource.avatarDataForHomeCard(id: id, pets: pets, humans: humans)
@@ -111,8 +112,10 @@ final class FocusHomeSnapshotController: ObservableObject {
                 )
                 if let popout, !popout.isEmpty {
                     popoutDataById[id] = popout
+                    popoutPayloads.append(FocusWalletAvatarCache.Payload(id: id, data: popout))
                 } else {
                     popoutDataById.removeValue(forKey: id)
+                    popoutPayloads.append(FocusWalletAvatarCache.Payload(id: id, data: nil))
                 }
                 await Task.yield()
             }
@@ -128,11 +131,17 @@ final class FocusHomeSnapshotController: ObservableObject {
                 }
             }
 
-            let didRefresh = await FocusWalletAvatarCache.preload(payloads: payloads)
+            let avatarDidRefresh = await FocusWalletAvatarCache.preload(payloads: payloads)
             guard !Task.isCancelled else { return }
-            if didRefresh {
+            let popoutDidRefresh = await FocusPopoutImageCache.preload(payloads: popoutPayloads)
+            guard !Task.isCancelled else { return }
+            if avatarDidRefresh || popoutDidRefresh {
                 avatarCacheRevision &+= 1
-                AppPerformanceMonitor.shared.record("home.avatarFinalReady", valueMS: 0, note: "\(payloads.count) visible")
+                AppPerformanceMonitor.shared.record(
+                    "home.avatarFinalReady",
+                    valueMS: 0,
+                    note: "\(payloads.count) avatars, \(popoutPayloads.count) popouts"
+                )
             }
         }
     }
@@ -198,6 +207,14 @@ final class FocusHomeSnapshotController: ObservableObject {
             popoutDataById[cardId] = data
         } else {
             popoutDataById.removeValue(forKey: cardId)
+        }
+        Task { @MainActor in
+            let didRefresh = await FocusPopoutImageCache.preload(payloads: [
+                FocusWalletAvatarCache.Payload(id: cardId, data: data)
+            ])
+            if didRefresh {
+                avatarCacheRevision &+= 1
+            }
         }
     }
 

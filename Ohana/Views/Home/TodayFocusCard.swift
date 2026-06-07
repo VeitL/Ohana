@@ -87,11 +87,16 @@ struct TodayFocusCard: View {
     }
 
     private var shouldReduceWork: Bool {
-        !allowsAmbientMotion ||
-        !enablesAmbientMotion ||
-        freezesToFrontCard ||
-        reduceMotion ||
-        workloadPolicy.ambientMotionBudget(isVisible: allowsAmbientMotion && !freezesToFrontCard) == .static
+        !surfaceGate.allowsAmbientMotion
+    }
+
+    private var surfaceGate: SurfaceActivityGate {
+        workloadPolicy.surfaceGate(
+            isVisible: allowsAmbientMotion && !freezesToFrontCard,
+            isCovered: freezesToFrontCard,
+            isLive: allowsAmbientMotion,
+            allowsAmbientOptIn: enablesAmbientMotion && !reduceMotion
+        )
     }
 
     private var refreshedQuests: [IslandQuest] {
