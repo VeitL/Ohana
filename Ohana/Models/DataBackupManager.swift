@@ -506,8 +506,14 @@ struct OasisCritterActionLogBackup: Codable {
 }
 
 // MARK: - DataBackupManager
-@MainActor
-final class DataBackupManager {
+//
+// Isolation-agnostic: the build/encode/apply logic only does ModelContext
+// reads/writes plus pure value-type mapping, so the type is not @MainActor.
+// Export runs on a background @ModelActor (see DataBackupActor) so the
+// full-table fetch + JSON encode never blocks the main thread. Import keeps the
+// main context (see @MainActor on importJSON) so SwiftData @Query-backed UI
+// refreshes immediately after a restore.
+final class DataBackupManager: @unchecked Sendable {
     static let shared = DataBackupManager()
     private init() {}
 
@@ -515,22 +521,59 @@ final class DataBackupManager {
 
     // MARK: - Export
 
-    func exportJSON(context: ModelContext) async throws -> URL {
-        let backup = try buildBackup(context: context)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(backup)
+    /// Filename prefix for exported backups in the temporary directory.
+    private static let backupFilePrefix = "ohana_backup_"
+
+    /// Builds and writes a full backup. The unbounded full-table fetch + JSON
+    /// encode run on a dedicated background SwiftData context (`DataBackupActor`)
+    /// so the main thread is never blocked; only the final file write happens
+    /// here.
+    func exportJSON(container: ModelContainer) async throws -> URL {
+        let data = try await DataBackupActor(modelContainer: container).exportData()
+
+        // The export contains full plaintext health / medication / insurance /
+        // document / location data, so it must be written atomically and with
+        // complete file protection (encrypted at rest while the device is
+        // locked). Stale exports from previous runs are purged first so the
+        // sensitive temp file does not linger.
+        Self.purgeStaleExports()
 
         let f = DateFormatter(); f.dateFormat = "yyyyMMdd_HHmmss"
         let stamp = f.string(from: Date())
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ohana_backup_\(stamp).json")
-        try data.write(to: url)
+            .appendingPathComponent("\(Self.backupFilePrefix)\(stamp).json")
+        try data.write(to: url, options: [.atomic, .completeFileProtection])
         return url
+    }
+
+    /// Encodes a prepared backup snapshot. Used by `DataBackupActor` on its
+    /// background context.
+    func encode(_ backup: OhanaBackup) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(backup)
+    }
+
+    /// Removes previously exported backup files from the temporary directory so
+    /// sensitive plaintext does not accumulate after a share/import completes.
+    static func purgeStaleExports() {
+        let fm = FileManager.default
+        let tmp = fm.temporaryDirectory
+        guard let entries = try? fm.contentsOfDirectory(
+            at: tmp,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        for url in entries where url.lastPathComponent.hasPrefix(backupFilePrefix) {
+            try? fm.removeItem(at: url)
+        }
     }
 
     // MARK: - Import
 
+    /// Import stays on the main context so SwiftData @Query-backed UI refreshes
+    /// immediately after a restore.
+    @MainActor
     func importJSON(from url: URL, context: ModelContext) async throws {
         let data = try Data(contentsOf: url)
         let decoder = JSONDecoder()
@@ -545,7 +588,7 @@ final class DataBackupManager {
 
     // MARK: - Build Backup
 
-    private func buildBackup(context: ModelContext) throws -> OhanaBackup {
+    func buildBackup(context: ModelContext) throws -> OhanaBackup {
         let pets        = try context.fetch(FetchDescriptor<Pet>())
         let humans      = try context.fetch(FetchDescriptor<Human>())
         let events      = try context.fetch(FetchDescriptor<Event>())
@@ -2084,5 +2127,18 @@ enum BackupError: LocalizedError {
         case .unsupportedVersion(let v):
             return "备份文件版本 v\(v) 不受支持，请更新 App 后重试。"
         }
+    }
+}
+
+// MARK: - Background Export Actor
+//
+// Owns a dedicated background SwiftData context. Running the full-table fetch +
+// JSON encode here keeps the unbounded export work off the main thread; only the
+// resulting Sendable `Data` crosses back to the caller.
+@ModelActor
+actor DataBackupActor {
+    func exportData() throws -> Data {
+        let backup = try DataBackupManager.shared.buildBackup(context: modelContext)
+        return try DataBackupManager.shared.encode(backup)
     }
 }

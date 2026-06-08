@@ -860,7 +860,7 @@ struct SettingsView: View {
                             Task {
                                 do {
                                     exportedJSONURL = try await DataBackupManager.shared
-                                        .exportJSON(context: modelContext)
+                                        .exportJSON(container: modelContext.container)
                                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                                 } catch {
                                     importError = error.localizedDescription

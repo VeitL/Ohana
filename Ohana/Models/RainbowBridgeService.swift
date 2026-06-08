@@ -23,7 +23,7 @@ struct RainbowBridgeService {
         if let reminders = try? context.fetch(reminderDesc) {
             for r in reminders where r.isPending && r.scheduledAt >= now {
                 if r.event?.relatedEntityId == petIdStr {
-                    NotificationManager.shared.cancel(notificationId: r.notificationId)
+                    OhanaNotifications.current.cancel(notificationId: r.notificationId)
                     context.delete(r)
                 }
             }

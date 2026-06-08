@@ -1073,7 +1073,7 @@ enum FeedingPlanWriter {
         for event in planEvents(pet: pet, kind: .manualReminder, allEvents: allEvents) {
             let pendingReminders = event.reminders.filter(\.isPending)
             for reminder in pendingReminders {
-                NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 if reminder.scheduledAt > now {
                     context.delete(reminder)
                     didChange = true
@@ -1298,7 +1298,7 @@ enum FeedingPlanWriter {
     @MainActor
     private static func deleteEvent(_ event: Event, context: ModelContext) {
         for reminder in event.reminders {
-            NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             context.delete(reminder)
         }
         context.delete(event)
@@ -1538,7 +1538,7 @@ enum WaterPlanWriter {
         for event in planEvents(pet: pet, allEvents: allEvents) {
             let pendingReminders = event.reminders.filter(\.isPending)
             for reminder in pendingReminders {
-                NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 if reminder.scheduledAt > now {
                     context.delete(reminder)
                     didChange = true
@@ -1584,7 +1584,7 @@ enum WaterPlanWriter {
     @MainActor
     private static func deleteEvent(_ event: Event, context: ModelContext) {
         for reminder in event.reminders {
-            NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             context.delete(reminder)
         }
         context.delete(event)

@@ -47,6 +47,27 @@ This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohan
 
 All command-line builds and tests must target the fixed simulator `platform=iOS Simulator,name=iPhone 17` with `-sdk iphonesimulator`. Do not build against a connected physical iPhone, `generic/platform=iOS`, `Any iOS Device`, or an auto-selected device. Do not switch simulator model or pin an older `OS=` unless the user explicitly asks for that validation. If Xcode prints passcode-protected physical-device discovery warnings while the command is still using `-sdk iphonesimulator` and the fixed iPhone 17 simulator destination, treat those warnings as environment noise; do not change the destination to a physical device to "fix" them.
 
+## Continuous Integration & Automated Gates
+
+Rules in this file and `docs/` are enforced mechanically, not only by memory.
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+- `audits`: repo audits (UI V4 + accessibility on changed files, runtime
+  guardrails, localization coverage, release data-safety, git size).
+- `lint`: SwiftLint (`.swiftlint.yml`) and SwiftFormat (`.swiftformat`).
+- `build-test`: `xcodebuild test` on the fixed iPhone 17 simulator.
+
+Treat a red CI as a blocking failure. Do not merge around it. When you add a new
+rule, prefer encoding it as a lint rule, audit script check, or test so it is
+enforced automatically rather than as prose. The `build-test` job requires a
+runner whose Xcode ships the iOS 26 SDK and an iPhone 17 simulator; see
+`docs/os-support-matrix.md`.
+
+Lint/format and the accessibility audit are introduced as an adoptable ratchet:
+they gate new/changed code strictly and start lenient on the legacy baseline.
+Tighten them (enable `--strict`, enforce SwiftFormat, expand audit scope) as the
+baseline is cleaned.
+
 ## Parallel Agent & Build Isolation
 
 Do not run multiple active Codex conversations against the same worktree for large refactors. Each parallel task should get its own git worktree and branch, for example `git worktree add ../Ohana-feeding -b codex/feeding`, `git worktree add ../Ohana-water -b codex/water`, or `git worktree add ../Ohana-potty -b codex/potty`.
@@ -213,7 +234,7 @@ Keep ownership strict:
 
 ## Architecture, Compliance & Energy Guardrails
 
-Use `docs/app-architecture-governance.md` as the engineering source of truth for app architecture boundaries, App Store-sensitive background behavior, privacy, energy, runtime observability, and long-term maintainability. Use `docs/feature-module-contract.md`, `docs/startup-and-lazy-loading-policy.md`, `docs/performance-and-observability.md`, `docs/data-cache-sync-policy.md`, `docs/release-quality-gates.md`, and `docs/design-system-governance.md` for mature-app quality gates. UI-specific rules still come from `ui规范.selection.json`.
+Use `docs/app-architecture-governance.md` as the engineering source of truth for app architecture boundaries, App Store-sensitive background behavior, privacy, energy, runtime observability, and long-term maintainability. Use `docs/feature-module-contract.md`, `docs/startup-and-lazy-loading-policy.md`, `docs/performance-and-observability.md`, `docs/data-cache-sync-policy.md`, `docs/release-quality-gates.md`, `docs/design-system-governance.md`, `docs/accessibility-governance.md`, `docs/reliability-slo.md`, `docs/privacy-compliance.md`, `docs/concurrency-and-error-policy.md`, `docs/dependency-governance.md`, and `docs/os-support-matrix.md` for mature-app quality gates. UI-specific rules still come from `ui规范.selection.json`.
 
 Cross-page runtime policy belongs in `Ohana/Utilities/AppRuntimePolicy.swift`. Do not create parallel low-power, Reduce Motion, scene phase, performance monitor, or background-work policies inside individual views. Views should consume `AppWorkloadPolicy` and keep foreground visible interactions visually unchanged. Interaction motion and ambient work are separate budgets. Visible taps, selections, card expansion, FAB reveal, and popup presentation use `interactionMotionBudget`; decorative loops, particles, breathing glows, Canvas, and repeating effects use `ambientMotionBudget`; timers, maps, countdowns, polling, and refresh use `refreshBudget`. Do not substitute one budget for another.
 
@@ -272,6 +293,8 @@ High-risk reminders for agents:
 For new pages or major view refactors, start from `docs/ui-v4-new-page-template.md`. New SwiftUI views should use `OhanaAppBackground()`, semantic Ohana text colors, shared card/button/sheet helpers, `ScaleButtonStyle()`, and `GoMotion` tokens by default.
 
 Before reporting UI work complete, run `scripts/audit-ui-v4.sh --changed` or a path-specific scan such as `scripts/audit-ui-v4.sh Ohana/Views/Components/NewView.swift`. Fix warnings, or add an inline `// ui-v4: allow <reason>` only for intentional exceptions like modal scrims or asset-specific ink colors.
+
+Also run `scripts/audit-accessibility.sh --changed` and follow `docs/accessibility-governance.md`: icon-only controls need localized `accessibilityLabel`s, interactive targets need a 44x44pt hit area, text uses Dynamic Type (`OhanaFont.*`, not fixed `.system(size:)`), state is never conveyed by color alone, and high-traffic flows get a VoiceOver + largest-Dynamic-Type pass. Use `// a11y: allow <reason>` only for genuinely decorative or non-interactive exceptions.
 
 ## UI UX Pro Max Advisory Skill
 

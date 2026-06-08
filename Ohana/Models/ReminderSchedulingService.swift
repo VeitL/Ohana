@@ -35,10 +35,10 @@ enum ReminderSchedulingService {
         if let existingNotificationIds {
             existingIds = existingNotificationIds
         } else {
-            existingIds = await NotificationManager.shared.pendingNotificationIds()
+            existingIds = await OhanaNotifications.current.pendingNotificationIds()
         }
         let result = await withCheckedContinuation { continuation in
-            NotificationManager.shared.schedule(
+            OhanaNotifications.current.schedule(
                 reminder: reminder,
                 existingNotificationIds: existingIds
             ) { result in
@@ -60,7 +60,7 @@ enum ReminderSchedulingService {
 
     @MainActor
     static func cancelAndReschedule(reminder: Reminder, context: ModelContext, source: CareLedgerSource = .service) async {
-        NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
         await scheduleIfNeeded(reminder: reminder, context: context, source: source)
     }
 
@@ -91,7 +91,7 @@ enum ReminderSchedulingService {
                 actionType = "compensateSkipped"
             }
             reminder.completedAt = nil
-            NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             CareLedgerService.recordReminderState(
                 reminder: reminder,
                 actionType: actionType,
@@ -111,7 +111,7 @@ enum ReminderSchedulingService {
         for reminder in reminders.sorted(by: { $0.createdAt < $1.createdAt }) {
             let key = dedupeKey(for: reminder)
             if seen.contains(key) {
-                NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+                OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 CareLedgerService.recordReminderState(
                     reminder: reminder,
                     actionType: "dedupeRemoved",
@@ -171,7 +171,7 @@ enum ReminderSchedulingService {
         let remindersToKeep = deduplicate(reminders: reminders, context: context)
         guard !remindersToKeep.isEmpty else { return }
 
-        var knownNotificationIds = await NotificationManager.shared.pendingNotificationIds()
+        var knownNotificationIds = await OhanaNotifications.current.pendingNotificationIds()
         for (index, reminder) in remindersToKeep.enumerated() {
             guard !Task.isCancelled else {
                 context.safeSave()

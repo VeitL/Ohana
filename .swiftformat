@@ -1,0 +1,30 @@
+# SwiftFormat configuration for Ohana.
+# Matches AGENTS.md coding-style conventions. Apply a one-time baseline with
+# `swiftformat .` before flipping the CI SwiftFormat step to enforcing.
+
+--swiftversion 6.0
+
+# Indentation: 4 spaces (AGENTS.md Coding Style).
+--indent 4
+--tabwidth 4
+--maxwidth none
+
+# Keep diffs small and predictable.
+--trimwhitespace always
+--commas inline
+--semicolons never
+--wraparguments preserve
+--wrapparameters preserve
+--wrapcollections preserve
+--self remove
+--importgrouping testable-bottom
+
+# Preserve MARK comments and existing structure.
+--header ignore
+
+# Exclude generated/asset/reference trees.
+--exclude .build,Ohana/Assets.xcassets,Ohana/PetAvatarAssets,Ai_Studio_New_UI,ohana-design-system
+
+# Disable opinionated rules that would create large, behavior-noisy diffs on the
+# legacy base. Re-enable incrementally.
+--disable wrapMultilineStatementBraces,blankLinesAtStartOfScope,redundantSelf,organizeDeclarations,blankLinesAroundMark

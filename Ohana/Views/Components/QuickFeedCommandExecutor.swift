@@ -16,23 +16,32 @@ struct QuickFeedCommandExecutor {
         self.context = context
     }
 
+    /// Newest-first feeding history for the lazily-loaded history/overview
+    /// sheets. The fetch is capped so a multi-year account never materializes an
+    /// unbounded number of rows; the cap is generous enough to cover normal
+    /// history (≈1 year at 3 feeds/day) while bounding worst-case memory/CPU.
+    static let fullCareLogsFetchCap = 1000
+    static let fullFoodRecordsFetchCap = 500
+
     func fullCareLogs(petID: UUID, feedingType: String, fallback: [PetCareLog]) -> [PetCareLog] {
-        let descriptor = FetchDescriptor<PetCareLog>(
+        var descriptor = FetchDescriptor<PetCareLog>(
             predicate: #Predicate<PetCareLog> { log in
                 log.type == feedingType && log.pet?.id == petID
             },
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
+        descriptor.fetchLimit = Self.fullCareLogsFetchCap
         return (try? context.fetch(descriptor)) ?? fallback
     }
 
     func fullFoodRecords(petID: UUID, fallback: [PetFoodRecord]) -> [PetFoodRecord] {
-        let descriptor = FetchDescriptor<PetFoodRecord>(
+        var descriptor = FetchDescriptor<PetFoodRecord>(
             predicate: #Predicate<PetFoodRecord> { record in
                 record.pet?.id == petID
             },
             sortBy: [SortDescriptor(\.startDate, order: .reverse)]
         )
+        descriptor.fetchLimit = Self.fullFoodRecordsFetchCap
         return (try? context.fetch(descriptor)) ?? fallback
     }
 

@@ -420,7 +420,7 @@ final class Pet {
         if let events = try? context.fetch(FetchDescriptor<Event>()) {
             for event in events where event.relatedEntityId == petIdStr {
                 for reminder in event.reminders {
-                    NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+                    OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
                 }
                 context.delete(event)
             }

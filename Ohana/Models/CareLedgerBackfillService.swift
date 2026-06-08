@@ -9,7 +9,8 @@ import Foundation
 import SwiftData
 
 enum CareLedgerBackfillService {
-    @MainActor
+    /// Isolation-agnostic: operates only on the supplied ModelContext, so it can
+    /// run on the main context or inside a background @ModelActor.
     static func backfill(context: ModelContext) throws {
         let existing = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         var keys = Set(existing.compactMap { event -> String? in
@@ -195,5 +196,16 @@ enum CareLedgerBackfillService {
 
     private static func key(_ model: String, _ id: String) -> String {
         "\(model):\(id)"
+    }
+}
+
+/// Runs the (potentially large, unbounded) care-ledger backfill on a dedicated
+/// background SwiftData context so the full-table fetch + insert never blocks
+/// the main thread. The backfill is idempotent and writes only persistent data,
+/// so it has no dependency on main-context live models or UI state.
+@ModelActor
+actor CareLedgerBackfillActor {
+    func run() throws {
+        try CareLedgerBackfillService.backfill(context: modelContext)
     }
 }

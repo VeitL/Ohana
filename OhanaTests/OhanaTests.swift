@@ -114,7 +114,7 @@ struct OhanaTests {
         sourceContext.insert(human)
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(context: sourceContext)
+        let url = try await DataBackupManager.shared.exportJSON(container: source)
         let exported = try String(contentsOf: url, encoding: .utf8)
         #expect(!exported.contains("pinHash"))
         #expect(!exported.contains("pinSalt"))
@@ -501,7 +501,7 @@ struct OhanaTests {
         let passedAwayDate = dateForTest(year: 2026, month: 5, day: 20, hour: 9)
         let metricDate = dateForTest(year: 2026, month: 5, day: 10, hour: 8)
         human.mbti = "INTJ"
-        human.themeColorHex = "C8FF00"
+        human.themeColorHex = "FF8800"
         human.heightCm = 168
         human.setPrivate(.weight, true)
         human.avatarImageData = Data([1, 2, 3])
@@ -535,7 +535,7 @@ struct OhanaTests {
         )
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(context: sourceContext)
+        let url = try await DataBackupManager.shared.exportJSON(container: source)
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
         try await DataBackupManager.shared.importJSON(from: url, context: targetContext)
@@ -543,7 +543,7 @@ struct OhanaTests {
         let restoredHumans = try targetContext.fetch(FetchDescriptor<Human>())
         let restored = try #require(restoredHumans.first)
         #expect(restored.mbti == "INTJ")
-        #expect(restored.themeColorHex == "C8FF00")
+        #expect(restored.themeColorHex == "FF8800")
         #expect(restored.heightCm == 168)
         #expect(restored.isPrivate(.weight, viewedBy: UUID()))
         #expect(restored.avatarImageData == Data([1, 2, 3]))
@@ -584,7 +584,7 @@ struct OhanaTests {
         )
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(context: sourceContext)
+        let url = try await DataBackupManager.shared.exportJSON(container: source)
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
         try await DataBackupManager.shared.importJSON(from: url, context: targetContext)
@@ -622,7 +622,7 @@ struct OhanaTests {
         sourceContext.insert(record)
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(context: sourceContext)
+        let url = try await DataBackupManager.shared.exportJSON(container: source)
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
         try await DataBackupManager.shared.importJSON(from: url, context: targetContext)
@@ -671,7 +671,7 @@ struct OhanaTests {
         sourceContext.insert(HeatCycleLog(status: .estrus, note: "normal", isMated: true, pet: pet))
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(context: sourceContext)
+        let url = try await DataBackupManager.shared.exportJSON(container: source)
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
         try await DataBackupManager.shared.importJSON(from: url, context: targetContext)

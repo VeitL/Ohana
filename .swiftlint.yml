@@ -1,0 +1,86 @@
+# SwiftLint configuration for Ohana.
+#
+# Philosophy (mature-app ratchet): start lenient so the existing ~180k-line
+# codebase is not flooded with errors, gate on a small set of high-value rules,
+# then tighten over time. Most default rules stay at WARNING severity; only a
+# few correctness/safety rules are ERROR. CI runs `swiftlint lint` (no --strict),
+# so it fails only on error-severity violations until the warning baseline is
+# cleaned and `--strict` is enabled.
+
+included:
+  - Ohana
+  - OhanaTests
+  - OhanaUITests
+
+excluded:
+  - .build
+  - Ohana/Assets.xcassets
+  - Ohana/PetAvatarAssets
+  - "**/*.generated.swift"
+  - Ai_Studio_New_UI
+  - ohana-design-system
+
+# Rules that are too noisy for this codebase's current style; revisit later.
+disabled_rules:
+  - todo                       # progress notes/TODOs are used intentionally
+  - line_length                # long localized strings + SwiftUI chains
+  - function_body_length       # large SwiftUI view bodies (tracked via file-split rule)
+  - type_body_length
+  - file_length                # AGENTS.md "avoid oversized files" handles this qualitatively
+  - cyclomatic_complexity
+  - nesting
+  - identifier_name            # short SwiftUI idioms (e.g. l, p, h, d) are common here
+  - large_tuple
+  - for_where
+
+# High-value rules turned ON beyond defaults.
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - first_where
+  - last_where
+  - contains_over_first_not_nil
+  - toggle_bool
+  - explicit_init
+  - redundant_nil_coalescing
+  - unused_import
+  - unused_declaration
+  - weak_delegate
+  - prefer_self_type_over_type_of_self
+  - closure_spacing
+  - operator_usage_whitespace
+
+analyzer_rules:
+  - unused_import
+  - unused_declaration
+
+# Match the project's 4-space indentation convention (AGENTS.md Coding Style).
+indentation_width:
+  indentation_width: 4
+
+# Generous thresholds so legacy code is not error-flooded.
+force_cast: warning
+force_try: warning
+force_unwrapping: warning
+
+trailing_whitespace:
+  ignores_empty_lines: true
+
+# A few error-severity gates (these are correctness/safety, kept small):
+custom_rules:
+  no_ark_app_group:
+    name: "Legacy Ark app group"
+    regex: "group\\.com\\.[A-Za-z.]*Ark"
+    message: "Use group.com.guanchen.li.Ohana, not legacy Ark app-group identifiers (AGENTS.md)."
+    severity: error
+  no_print_in_app:
+    name: "print() in app code"
+    regex: "(^|\\s)print\\("
+    match_kinds: [identifier]
+    message: "Use OSLog / Logger instead of print() in shipping code (docs/concurrency-and-error-policy.md)."
+    severity: warning
+  no_language_ternary:
+    name: "Direct language ternary"
+    regex: "appLanguage\\s*==\\s*\"zh\""
+    message: "Use L10n(appLanguage).tr(zh:en:de:) instead of language ternaries (AGENTS.md Localization)."
+    severity: warning

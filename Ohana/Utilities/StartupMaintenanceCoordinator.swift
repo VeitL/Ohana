@@ -62,7 +62,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
             }
 
             await runStep("care_ledger_backfill", delayMilliseconds: 45_000) {
-                self.runCareLedgerBackfillIfNeeded(context: context)
+                await self.runCareLedgerBackfillIfNeeded(context: context)
             }
 
             await runStep("avatar_asset_compaction", delayMilliseconds: 90_000) {
@@ -114,10 +114,13 @@ final class StartupMaintenanceCoordinator: ObservableObject {
         return Date().timeIntervalSince1970 - lastRun >= twelveHours
     }
 
-    private func runCareLedgerBackfillIfNeeded(context: ModelContext) {
+    private func runCareLedgerBackfillIfNeeded(context: ModelContext) async {
         guard !defaults.bool(forKey: Keys.careLedgerBackfillCompleted) else { return }
         do {
-            try CareLedgerBackfillService.backfill(context: context)
+            // Run the unbounded full-table backfill on a background SwiftData
+            // context so it never blocks the main thread.
+            let actor = CareLedgerBackfillActor(modelContainer: context.container)
+            try await actor.run()
             defaults.set(true, forKey: Keys.careLedgerBackfillCompleted)
         } catch {
             #if DEBUG

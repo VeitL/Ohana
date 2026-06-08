@@ -116,7 +116,7 @@ enum CareEventService {
             reminder.completedBy = executorId
         }
         event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
-        NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
         context.safeSave()
         CareLedgerService.recordReminderState(
             reminder: reminder,
@@ -182,7 +182,7 @@ enum CareEventService {
             reminder.completedBy = executorId
         }
         event.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
-        NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
         context.safeSave()
         CareLedgerService.recordReminderState(
             reminder: reminder,
@@ -856,7 +856,7 @@ enum ReminderCompletionService {
         reminder.completedAt = Date()
         reminder.completedBy = humanId ?? ""
         reminder.event?.setOccurrenceMarkedComplete(true, on: reminder.scheduledAt)
-        NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
         context.safeSave()
         CareLedgerService.recordReminderState(reminder: reminder, actionType: "complete", actorId: humanId, source: .service, context: context)
         FamilyTaskService.syncCompletedReminder(reminder, completedBy: humanId, context: context)
@@ -867,7 +867,7 @@ enum ReminderCompletionService {
         reminder.statusEnum = .skipped
         reminder.completedAt = nil
         reminder.completedBy = humanId ?? ""
-        NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+        OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
         context.safeSave()
         CareLedgerService.recordReminderState(reminder: reminder, actionType: "skip", actorId: humanId, source: .service, context: context)
     }

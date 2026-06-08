@@ -9,7 +9,8 @@ import Foundation
 import SwiftData
 
 enum CareLedgerService {
-    @MainActor
+    /// Isolation-agnostic: only performs ModelContext writes, so it is safe to
+    /// call from the main actor or from a background @ModelActor (e.g. backfill).
     @discardableResult
     static func record(
         occurredAt: Date = Date(),

@@ -1,6 +1,6 @@
 # Ohana iOS App 项目文档
 
-> 最后更新: 2026-05-25（竖版实色默认首页 / 全局计划逾期警告 / V4 UI / 任务协作 / Oasis 电子宠物 / 能耗治理 / 合规安全性能功耗 audit 待实施计划）| Build: ✅ `scripts/build-debug-fast.sh`（默认 iPhone 17 / Xcode installed default iOS 26.5 simulator runtime）| Schema: ArkSchemaV56
+> 最后更新: 2026-06-07（成熟度工程强化：MetricKit 可观测性 / 后台 @ModelActor / 通知调度依赖注入接缝 / 持久化模型拆分 / 历史 fetch 安全上限）| Build: ✅ `scripts/build-debug-fast.sh`（默认 iPhone 17 / Xcode installed default iOS 26.5 simulator runtime；在 iCloud 同步目录构建时用 `DERIVED_DATA_PATH=/tmp/OhanaDD` 绕过 CodeSign detritus 失败）| Schema: ArkSchemaV56
 >
 > **当前事实优先级**：本文件顶部“当前快照”代表 2026-05-25 的实现状态；下方早期长章节保留为历史实现记录，若与当前快照、`AGENTS.md`、`ui规范.selection.json` 或 `docs/app-architecture-governance.md` 冲突，以后四者为准。
 >
@@ -37,15 +37,81 @@
 > 本节是未来实施计划，不表示下列风险已经修复。实施时仍以 `docs/app-architecture-governance.md`、`AGENTS.md`、`ui规范.selection.json` 和实际代码为准。
 
 - **本轮验证状态**：已基于当前工作树完成静态审计，并运行 `scripts/audit-runtime-guardrails.sh`、`scripts/audit-ui-v4.sh --changed`、`scripts/build-debug-fast.sh`；最终 Debug build 在默认 iPhone 17 / iOS 26.5 simulator runtime 通过。首次增量构建曾在 `QuickFeedDetailSheet.swift` 出现瞬时 type-check / 作用域异常，复跑通过，但仍作为大 SwiftUI 文件性能债务跟踪。
-- **P0 隐私清单**：新增 app 级 `PrivacyInfo.xcprivacy`。至少声明大量 `UserDefaults` 使用对应的 required-reason API（`NSPrivacyAccessedAPICategoryUserDefaults` / `CA92.1`），并复核是否还有文件时间戳、磁盘空间等 required-reason API。
-- **P0 权限声明一致性**：当前构建产物声明 HealthKit / Photo Library 文案，但代码仍是 HealthKit mock 且没有 HealthKit entitlement；英文/德文 `InfoPlist.strings` 也未覆盖 Health / Photo。先决定移除未使用权限声明，或正式接入 HealthKit capability、授权流和三语权限文案。
-- **P1 备份安全**：`DataBackupManager.exportJSON` 导出明文全量敏感 JSON，包含健康、用药、保险、证件、照片、位置等数据。先加文件保护 / atomic write / 导出敏感提示，再评估用户密码加密；导出临时文件应有清理策略。
+- **P0 隐私清单**：✅ 已完成（见 2C）。新增 `Ohana/PrivacyInfo.xcprivacy`，声明 `UserDefaults` required-reason API（`CA92.1`）；已复核未使用文件时间戳 / 磁盘卷容量 / 系统启动时间类受限 API。
+- **P0 权限声明一致性**：✅ 已完成（见 2C）。移除纯 mock 的 HealthKit 权限键与重复的 Camera/Photo/Location `INFOPLIST_KEY_*`，以 `Info.plist` + 三语 `InfoPlist.strings` 为唯一来源。
+- **P1 备份安全**：✅ 已完成文件保护 / atomic write / 临时文件清理（见 2C）。仍待办：用户密码加密、导出敏感提示。
+- **P1 备份性能**：✅ 导出全表 fetch + encode 已迁到后台 `@ModelActor DataBackupActor`（见 2C）。
 - **P1 导入去重**：备份恢复 UI 写“自动去重”，但部分日志类当前直接插入，可能污染统计、提醒和账本。后续按 UUID 对全模型 upsert/skip，并给导入前加 schema、大小和来源预检。
 - **P1 后台任务与定位透明度**：`BGAppRefreshTask` 需要 expiration/cancel/failure 路径，避免后台任务超时仍占资源。后台定位总体集中在 `LocationManager` / `PetWalkingManager` 是正确方向，但 running walk 进入后台时应加强用户透明度，优先显示系统后台定位指示，并做真机锁屏路线验证。
 - **P2 包体与资源策略**：Debug app 包体约 432 MB，`PetAvatarAssets` 约 197 MB 作为 folder resource 整包复制。发布前压缩/重采样头像，评估 asset catalog、按需资源或下载型资源，并做 Release archive size audit。
-- **P2 SwiftUI 热点拆分**：`QuickFeedDetailSheet.swift` 超 5k 行，是编译、type-check 和 SwiftUI diff 热点。继续拆分 presenter、data loader、sheet section、chart/row 子视图，保留当前 snapshot / lazy-load 思路。
+- **P2 SwiftUI 热点拆分**：进行中。`MemberCardCreationView.swift` 已 4002 → 1734 行（见 2C）。剩余最大文件为 `AddPetWizardView.swift`（3122）、`PetHealthDetailView.swift`（2949）等，可同法继续拆分 presenter / data loader / 子视图。
 - **P3 发布完整性**：设置里的隐私政策、联系开发者等入口需要真实 action；通知 action/title 需要三语本地化；App Group entitlement 若没有真实共享容器使用，应移除或补齐用途说明。
 - **实施顺序**：先修 `PrivacyInfo.xcprivacy` 和权限声明一致性；再修备份安全与导入去重；随后修后台任务和定位透明度；最后处理包体优化与大 SwiftUI 文件拆分。
+
+### 2B. 生产可观测性与依赖注入接缝（2026-06-07）
+
+- **MetricKit 可观测性**：`Ohana/Utilities/MetricKitObserver.swift` 是生产遥测的统一入口，`OhanaApp.init` 在 MainActor 任务里 `MetricKitObserver.shared.start()` 注册为 `MXMetricManagerSubscriber`。
+  - 聚合每日 `MXMetricPayload`：首帧/恢复耗时、应用 Hang 平均时长、内存峰值、后台异常退出计数（直方图按桶中点加权平均换算成毫秒，见 `averageDurationMS(_:)`）。
+  - 聚合 `MXDiagnosticPayload`：崩溃（termination reason / signal / exception）、Hang 时长、CPU 异常、磁盘写异常。
+  - 崩溃诊断由系统在**下次启动**才送达，因此诊断摘要持久化到 `MetricDiagnosticsStore`（`UserDefaults` 键 `ohana_metrickit_pending_diagnostics`，JSON 环形缓冲，上限 20 条，`NSLock` 保护），启动时 `drainUnreported()` 回放进 `AppPerformanceMonitor`，直接显示在设置「性能诊断面板」（`PerformanceDiagnosticsView`）。
+  - 全部对 `AppPerformanceMonitor`（MainActor）的写入都通过 `Task { @MainActor in ... }` 派发；MetricKit 回调在后台队列触发。`#if canImport(MetricKit)` 下编译实现，否则提供 no-op stub。
+- **后台 `@ModelActor` SwiftData 读写**：`CareLedgerBackfillActor`（定义在 `Ohana/Models/CareLedgerBackfillService.swift`）是 `@ModelActor`，拥有专属后台 `modelContext`，其 `run()` 调用 `CareLedgerBackfillService.backfill(context:)`。
+  - 用途：一次性、全表无界的 CareLedger 回填（fetch 全部 `PetCareLog/PetPottyLog/PetWalkLog/PetExpenseLog/HumanWeightLog/HumanWorkoutLog/PlantCareLog/Reminder`）从主线程移到后台 context，幂等、只写持久数据、无 UI 活动模型依赖。
+  - `StartupMaintenanceCoordinator.runCareLedgerBackfillIfNeeded` 改为 `async`，用 `CareLedgerBackfillActor(modelContainer: context.container)` + `await actor.run()`，启动维护步骤 `care_ledger_backfill` 已 `await`。
+  - `CareLedgerService.record` 与 `CareLedgerBackfillService.backfill` 去掉非必要的 `@MainActor`（函数体仅做 `ModelContext` 写入，隔离无关），所有现有 MainActor 调用方与 `OhanaTests` 直接调用均兼容。
+  - **重要约束**：首页高频读模型（`HomeReadModelStore` / `HomeReadModelFetches`）**仍在 MainActor 主上下文**读取，因为 `VerticalSolidHomeView` 与 `TodayFocusSnapshot` 直接消费活动 `Pet/Human/Plant/FamilyCollaborationTask` 模型对象（非纯值类型）；把它整体迁到后台 `@ModelActor` 需要先把整条 home 渲染管线重写为纯值类型，属高风险大改，暂不做。后台 `@ModelActor` 能力优先用于一次性维护 / 导出 / 统计等值类型/隔离路径。
+- **通知调度依赖注入接缝**：`Ohana/Utilities/ReminderNotificationScheduling.swift`。
+  - `ReminderNotificationScheduling`（`Sendable` 协议）声明域服务依赖的通知操作子集；`NotificationManager` 直接 conform。
+  - `OhanaNotifications.current`（`nonisolated(unsafe) static var`）是可注入提供者，默认 = `NotificationManager.shared`（live），`useLive()` 用于测试 teardown 恢复；**生产行为不变**。
+  - 域/模型层（`CareEventService`、`ReminderCompletionService`、`ReminderSchedulingService`、`FamilyTaskService`、`FeedManagementSupport`、`Pet`、`RainbowBridgeService`）的 `schedule` / `cancel` / `pendingNotificationIds` 调用统一改走 `OhanaNotifications.current`，单测可替换为内存假实现以测试 reminder/care 写路径。视图层的 `requestPermission()`（不在协议内）保持直接调用 `NotificationManager.shared`。
+
+### 2C. 合规、备份安全与大文件拆分（2026-06-08）
+
+- **隐私清单**：`Ohana/PrivacyInfo.xcprivacy`（随 `PBXFileSystemSynchronizedRootGroup` 自动打包，构建时 `CpResource` 进 `.app`）。声明唯一实际使用的 required-reason API：`NSPrivacyAccessedAPICategoryUserDefaults` / `CA92.1`。`NSPrivacyTracking=false`，`NSPrivacyTrackingDomains` 与 `NSPrivacyCollectedDataTypes` 为空（数据全本地，不联网收集/不做跟踪）。
+  - 复核结论：代码仅用 `URLResourceValues.fileSizeKey` / `.contentTypeKey` / `FileManager.attributesOfItem[.size]`，均**不属于**文件时间戳（C617.x）、磁盘卷容量（E174.x）或系统启动时间（35F9.x）受限类别，故不需额外声明。
+- **权限声明唯一来源**：权限文案以 `Ohana/Info.plist` + `en.lproj` / `de.lproj` 的 `InfoPlist.strings` 三语为准。已从 `project.pbxproj`（Debug+Release 两处）移除：
+  - `INFOPLIST_KEY_NSHealthShareUsageDescription` / `INFOPLIST_KEY_NSHealthUpdateUsageDescription`——HealthKit 全是 mock（`HumanHealthKitManager`，无 `import HealthKit`、无 entitlement），声明属未使用权限。
+  - 重复的 `INFOPLIST_KEY_NSCamera/PhotoLibrary/Location*`——这些键与 `Info.plist` 文件重复且文案不同，`GENERATE_INFOPLIST_FILE` 注入会覆盖本地化 `InfoPlist.strings`，导致英/德用户看到中文文案。移除后三语本地化生效。
+  - 实际用到的权限：相机（`UIImagePickerController` 拍摄，`QuickHumanNoteSheet`）、相册（`PhotosUI.PhotosPicker`，out-of-process）、定位（遛狗路线 `LocationManager`/`PetWalkingManager`），均由 `Info.plist` 保留。
+- **备份导出安全（`DataBackupManager`）**：
+  - `exportJSON(container:)` 用 `try data.write(to:options:[.atomic, .completeFileProtection])`——原子写入 + 锁屏静止加密。导出含健康/用药/保险/证件/照片/定位明文 JSON，必须加密落盘。
+  - `purgeStaleExports()` 在每次导出前清理临时目录里 `ohana_backup_*.json` 历史文件，避免敏感明文残留。
+- **备份导出后台化**：
+  - 新增 `@ModelActor DataBackupActor`（文件末尾）：拥有专属后台 `modelContext`，`exportData() throws -> Data` 调用 `DataBackupManager.shared.buildBackup` + `.encode`，全表 fetch + JSON encode 在后台执行，仅把 Sendable `Data` 跨回主线程。
+  - `DataBackupManager` 去类级 `@MainActor`，改为 `final class ... : @unchecked Sendable`（其逻辑只做 `ModelContext` 读写 + 纯值映射，隔离无关）。`buildBackup` 去 `private`、新增 `encode(_:)`，供 actor 调用。
+  - **import 仍走主上下文**：`importJSON(from:context:)` 单独标 `@MainActor`，保留主 context 写入，使恢复后 `@Query` 驱动的 UI 立即刷新（不引入跨 context 合并的刷新延迟）。
+  - `SettingsView` 导出按钮改传 `modelContext.container`；`ModelContainer` 是 `Sendable`，跨隔离安全。
+- **超大视图文件拆分**：`MemberCardCreationView.swift` 4002 → 1734 行（同 target，`PBXFileSystemSynchronizedRootGroup` 自动纳入，无需改 pbxproj，行为不变）：
+  - `MemberCardCreationSupport.swift`（997 行）：`MemberCreationKind` / `MemberCreationDraft` / `MemberCreationMediaRecoverySnapshot` / `MemberCardRenderSnapshot` / `MemberCreationStep` / `Avatar2DCandidateProvider` / `MemberCreationService` / `MemberAvatarMediaCoordinator` / `MemberAvatarImageProcessor` 等数据、服务、头像媒体层。
+  - `MemberCardCreationComponents.swift`（1303 行）：输入控件、日期/MBTI/城市选择器、`MemberPortraitDraftCardSurface`、`MemberCameraCaptureView`、`MemberPortraitCropView` 等可复用 UI 子视图。
+  - 跨文件可见性：原 `private` 的 `MemberCreationMediaRecoverySnapshot` 与 `MemberCreationJoinHandoff*` 改为 internal（仍被主 View 引用）。
+- **新增单测**（`OhanaTests`，Swift Testing，in-memory `ModelContainer(for: Schema(ArkSchemaV56.models))`）：
+  - `CareLedgerBackfillActorTests`：后台 `CareLedgerBackfillActor` 把 `PetCareLog` 回填为 `CareLedgerEvent` 且重复运行幂等（跨 context：主 context 写入 → actor 后台读写 → 新 context 校验）。
+  - `OhanaNotificationsSchedulingTests`：注入 `FakeScheduler` 验证 `ReminderCompletionService.skip` 经 `OhanaNotifications.current` 取消通知；并验证默认 `current` 是 live `NotificationManager`。
+  - 修正 `OhanaTests.backupRestoresHumanFieldsAndLogRelationships` 预存在缺陷：原断言把保留品牌主色 `C8FF00`（`OhanaThemeColorPolicy.reservedMemberThemeHexes`，导入 `normalizedMemberThemeHex` 必拒）当作可备份往返，改用非保留色 `FF8800`，使其正确验证 `themeColorHex` 往返。
+
+### 2D. 工程治理基建：CI 门禁、Lint、无障碍与治理文档（2026-06-08）
+
+> 目标：把规则从"散文 + 自觉"升级为机械门禁，并补齐成熟团队常备的治理面。规则越能自动执行，越不依赖执行者记忆。
+
+- **CI 门禁**：`.github/workflows/ci.yml`（push/PR 触发）三 job：
+  - `audits`：UI V4 + 无障碍审计按 **PR 改动文件**严格执行（新代码门禁，不淹没 18 万行遗留基线）；runtime guardrails / 本地化覆盖 / 发布数据安全 / git 体积全量。
+  - `lint`：SwiftLint（真门禁，非 `--strict`）+ SwiftFormat（先 report-only / `continue-on-error`）。
+  - `build-test`：固定 iPhone 17 模拟器 `xcodebuild test`，产出 `.xcresult`。**前提**：runner 的 Xcode 需带 iOS 26 SDK + iPhone 17 模拟器（GitHub 托管镜像可能滞后，必要时自建 runner / `macos-26` 镜像）。
+  - 分支保护在仓库设置里配置（要求 `audits`/`lint`/`build-test` 通过）。
+- **Lint/Format 配置（棘轮策略）**：
+  - `.swiftlint.yml`：宽松基线（禁用过噪规则、放大阈值、排除资源/生成目录）+ 高价值 opt-in 规则 + 三条自定义规则（`no_ark_app_group` error；`no_print_in_app` / `no_language_ternary` warning）。CI 不带 `--strict`，仅 error 级阻断；基线清理后再收紧。
+  - `.swiftformat`：4 空格缩进等对齐 `AGENTS.md` 风格；禁用会产生大 diff 的规则；先 report-only，跑一次 `swiftformat .` 建基线后再强制。
+- **无障碍治理**：
+  - `docs/accessibility-governance.md`：VoiceOver 标签/hint、Dynamic Type（禁 `.system(size:)` 固定值）、44×44pt 点击区、WCAG AA 对比度、颜色非唯一信号、traits、组合朗读、三语 a11y 文案。
+  - `scripts/audit-accessibility.sh`：镜像 `audit-ui-v4.sh` 风格的启发式 grep 审计，`// a11y: allow <reason>` 白名单，已接入 CI 与 `AGENTS.md` UI 完成门禁。
+- **新增治理文档**（已接入 `AGENTS.md` 治理清单，共 12 份 doc）：
+  - `docs/os-support-matrix.md`：标注 `IPHONEOS_DEPLOYMENT_TARGET = 26.2` 安装基数过窄风险；定义 N-1~N-2 支持策略；降级是需可用性守卫审计的独立迁移，不在无关改动里擅自降。
+  - `docs/reliability-slo.md`：crash-free ≥ 99.5% / hang ≤ 0.5% / 冷启 ≤ 1500ms p90 等数值目标 + MetricKit/App Store Connect 度量来源 + 违反处理流程。
+  - `docs/privacy-compliance.md`：App Store 隐私清单/营养标签/加密出口合规；GDPR 数据导出（复用 `DataBackupManager.exportJSON`）与"删除我的数据"完整路径、数据最小化、无静默收集。
+  - `docs/dependency-governance.md`：第三方依赖默认拒绝；新增需理由 + license（MIT/Apache/BSD）+ 供应链 + 版本锁定（提交 `Package.resolved`）；禁分析/广告/外泄 PII 的 SDK。
+  - `docs/concurrency-and-error-policy.md`：MainActor vs 后台 `@ModelActor` 边界、`ModelContext` 非 Sendable 不得跨隔离、`@unchecked Sendable` / `nonisolated(unsafe)` 使用约束、错误建模与用户可见失败、`OSLog` 取代 `print` 的隐私安全日志。
+- **`AGENTS.md` 接入**：治理文档清单补全；新增「Continuous Integration & Automated Gates」章节；UI 完成门禁追加无障碍审计要求。
 
 ### 3. 当前 SwiftData Schema
 

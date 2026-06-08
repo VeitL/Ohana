@@ -459,13 +459,6 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ohana/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Ohana 需要访问相机来拍摄成员或宠物头像";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Ohana 需要读取您的步数、消耗和运动记录，以便在您的岛民档案中展示并参与全岛探索里程统计。";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Ohana 需要此权限来帮您将手动记录的运动数据同步至苹果健康。";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。";
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ohana 在遛狗时需要获取您的位置，以记录步行路线和距离。";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Ohana 需要访问相册来选择成员或宠物头像";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = "(fetch, location)";
@@ -502,13 +495,6 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ohana/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Ohana 需要访问相机来拍摄成员或宠物头像";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Ohana 需要读取您的步数、消耗和运动记录，以便在您的岛民档案中展示并参与全岛探索里程统计。";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Ohana 需要此权限来帮您将手动记录的运动数据同步至苹果健康。";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。";
-				INFOPLIST_KEY_NSLocationAlwaysUsageDescription = "开启始终允许定位，Ohana 可在后台持续追踪遛狗路线，确保数据完整。";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ohana 在遛狗时需要获取您的位置，以记录步行路线和距离。";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Ohana 需要访问相册来选择成员或宠物头像";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = "(fetch, location)";

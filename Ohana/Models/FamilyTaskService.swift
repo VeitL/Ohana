@@ -286,7 +286,7 @@ enum FamilyTaskService {
             reminder.statusEnum = .completed
             reminder.completedAt = task.completedAt
             reminder.completedBy = human?.id.uuidString ?? ""
-            NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             CareLedgerService.recordReminderState(reminder: reminder, actionType: "submitReview", actorId: human?.id.uuidString, source: .service, context: context)
         }
 
@@ -319,7 +319,7 @@ enum FamilyTaskService {
             reminder.statusEnum = .completed
             reminder.completedAt = task.completedAt
             reminder.completedBy = task.completedById ?? ""
-            NotificationManager.shared.cancel(notificationId: reminder.notificationId)
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
         }
 
         transferRewardIfNeeded(task, reviewer: reviewer, context: context)
