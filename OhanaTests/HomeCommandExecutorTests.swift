@@ -5124,6 +5124,7 @@ struct HomeCommandExecutorTests {
         #expect(result.didPurchase == true)
         #expect(result.cost == item.cost)
         #expect(result.ledgerEventID == ledger.id)
+        #expect(result.transactionKey == "shop:\(item.id):\(human.id.uuidString)")
         #expect(human.coconutBalance == 500 - item.cost)
         #expect(questManager.coconutCount == 500 - item.cost)
         #expect(ledgerEvents.count == 1)
@@ -5132,6 +5133,52 @@ struct HomeCommandExecutorTests {
         #expect(ledger.subjectKind == CareLedgerSubjectKind.system.rawValue)
         #expect(ledger.coconutDelta == -item.cost)
         #expect(ledger.metadataJSON.contains(item.id))
+    }
+
+    @MainActor
+    @Test func repeatedConsumableShopPurchasesUseDistinctWalletKeys() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        human.coconutBalance = 500
+        let item = try #require(ShopCatalog.item(id: "boost_backdate_single"))
+        let questManager = QuestManager.shared
+        let oldCoconutCount = questManager.coconutCount
+        let oldCoconutLogs = questManager.coconutLogs
+        defer {
+            questManager.coconutCount = oldCoconutCount
+            questManager.coconutLogs = oldCoconutLogs
+            questManager.flushToDefaults()
+        }
+        questManager.coconutCount = 500
+        questManager.coconutLogs = []
+        context.insert(human)
+        try context.save()
+
+        let first = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Backdate Pass",
+            context: context,
+            questManager: questManager
+        )
+        let second = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Backdate Pass",
+            context: context,
+            questManager: questManager
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(first.didPurchase)
+        #expect(second.didPurchase)
+        #expect(first.transactionKey != nil)
+        #expect(second.transactionKey != nil)
+        #expect(first.transactionKey != second.transactionKey)
+        #expect(human.coconutBalance == 500 - item.cost * 2)
+        #expect(questManager.coconutCount == 500 - item.cost * 2)
+        #expect(walletEntries.filter { $0.source == .shop && $0.entryKind == .spend }.count == 2)
     }
 
     @MainActor
@@ -5769,7 +5816,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV56.models)
+        let schema = Schema(ArkSchemaV58.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

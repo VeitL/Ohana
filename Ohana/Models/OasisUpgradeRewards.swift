@@ -308,11 +308,11 @@ enum OasisUpgradeRewardCatalog {
             id: legendaryCritterId,
             emoji: "✨",
             rarity: .legendary,
-            sourceLevel: 20,
+            sourceLevel: 10,
             assetName: "CritterAuroraLuma",
-            unlockHintZh: "生命树 Lv.20 保底",
-            unlockHintEn: "Guaranteed at Tree Lv.20",
-            unlockHintDe: "Garantiert bei Baum Lv.20",
+            unlockHintZh: "生命树 Lv.10 后碎片唤醒",
+            unlockHintEn: "Awaken with fragments after Tree Lv.10",
+            unlockHintDe: "Ab Baum Lv.10 mit Fragmenten erwecken",
             personalityRaw: "mystic",
             preferredItemId: "aurora_crystal",
             nameZh: "极光灵",
@@ -326,11 +326,11 @@ enum OasisUpgradeRewardCatalog {
             id: "moss_bun",
             emoji: "🍃",
             rarity: .common,
-            sourceLevel: 30,
+            sourceLevel: 10,
             assetName: "CritterMossBun",
-            unlockHintZh: "生命树 Lv.30 保底",
-            unlockHintEn: "Guaranteed at Tree Lv.30",
-            unlockHintDe: "Garantiert bei Baum Lv.30",
+            unlockHintZh: "生命树 Lv.10 后碎片唤醒",
+            unlockHintEn: "Awaken with fragments after Tree Lv.10",
+            unlockHintDe: "Ab Baum Lv.10 mit Fragmenten erwecken",
             personalityRaw: "sleepy",
             preferredItemId: "moss_cookie",
             nameZh: "苔团",
@@ -344,11 +344,11 @@ enum OasisUpgradeRewardCatalog {
             id: "pebble_pop",
             emoji: "🫧",
             rarity: .common,
-            sourceLevel: 40,
+            sourceLevel: 10,
             assetName: "CritterPebblePop",
-            unlockHintZh: "生命树 Lv.40 保底",
-            unlockHintEn: "Guaranteed at Tree Lv.40",
-            unlockHintDe: "Garantiert bei Baum Lv.40",
+            unlockHintZh: "生命树 Lv.10 后碎片唤醒",
+            unlockHintEn: "Awaken with fragments after Tree Lv.10",
+            unlockHintDe: "Ab Baum Lv.10 mit Fragmenten erwecken",
             personalityRaw: "playful",
             preferredItemId: "bubble_pebble",
             nameZh: "泡泡石",
@@ -362,11 +362,11 @@ enum OasisUpgradeRewardCatalog {
             id: "ember_pip",
             emoji: "🔥",
             rarity: .epic,
-            sourceLevel: 50,
+            sourceLevel: 10,
             assetName: "CritterEmberPip",
-            unlockHintZh: "生命树 Lv.50 保底",
-            unlockHintEn: "Guaranteed at Tree Lv.50",
-            unlockHintDe: "Garantiert bei Baum Lv.50",
+            unlockHintZh: "生命树 Lv.10 后碎片唤醒",
+            unlockHintEn: "Awaken with fragments after Tree Lv.10",
+            unlockHintDe: "Ab Baum Lv.10 mit Fragmenten erwecken",
             personalityRaw: "brave",
             preferredItemId: "warm_coal",
             nameZh: "烬豆",
@@ -380,11 +380,11 @@ enum OasisUpgradeRewardCatalog {
             id: "moon_jelly",
             emoji: "🌙",
             rarity: .epic,
-            sourceLevel: 60,
+            sourceLevel: 10,
             assetName: "CritterMoonJelly",
-            unlockHintZh: "生命树 Lv.60 保底",
-            unlockHintEn: "Guaranteed at Tree Lv.60",
-            unlockHintDe: "Garantiert bei Baum Lv.60",
+            unlockHintZh: "生命树 Lv.10 后碎片唤醒",
+            unlockHintEn: "Awaken with fragments after Tree Lv.10",
+            unlockHintDe: "Ab Baum Lv.10 mit Fragmenten erwecken",
             personalityRaw: "calm",
             preferredItemId: "moon_drop",
             nameZh: "月冻",
@@ -563,19 +563,57 @@ enum OasisCritterEconomyService {
         guard amount > 0 else { return true }
         if let human = currentHuman(context: context) {
             guard human.coconutBalance >= amount else { return false }
-            human.coconutBalance -= amount
-            QuestManager.shared.recordCoconutDelta(
-                -amount,
-                emoji: emoji,
-                title: title,
-                actorId: human.id.uuidString,
-                actorName: human.name
-            )
-            return true
+            do {
+                try CoconutWalletService.apply(
+                    deltas: [
+                        .human(
+                            human,
+                            delta: -amount,
+                            entryKind: .spend,
+                            source: .oasis,
+                            title: title,
+                            emoji: emoji,
+                            actorId: human.id.uuidString,
+                            actorName: human.name,
+                            subjectKind: .system,
+                            subjectId: nil
+                        )
+                    ],
+                    context: context,
+                    save: false
+                )
+                return true
+            } catch {
+                #if DEBUG
+                print("❌ [OasisCritterEconomyService] spend failed: \(error.localizedDescription)")
+                #endif
+                return false
+            }
         }
         guard QuestManager.shared.coconutCount >= amount else { return false }
-        QuestManager.shared.recordCoconutDelta(-amount, emoji: emoji, title: title, actorId: "system", actorName: "Oasis")
-        return true
+        do {
+            try CoconutWalletService.apply(
+                deltas: [
+                    .system(
+                        delta: -amount,
+                        entryKind: .spend,
+                        source: .oasis,
+                        title: title,
+                        emoji: emoji,
+                        actorId: "system",
+                        actorName: "Oasis"
+                    )
+                ],
+                context: context,
+                save: false
+            )
+            return true
+        } catch {
+            #if DEBUG
+            print("❌ [OasisCritterEconomyService] system spend failed: \(error.localizedDescription)")
+            #endif
+            return false
+        }
     }
 
     static func awardCurrentHumanCoconuts(
@@ -587,22 +625,40 @@ enum OasisCritterEconomyService {
     ) {
         guard amount > 0 else { return }
         if let human = currentHuman(context: context) {
-            human.coconutBalance += amount
-            QuestManager.shared.recordCoconutDelta(
-                amount,
-                emoji: emoji,
-                title: title,
-                actorId: human.id.uuidString,
-                actorName: human.name,
+            _ = try? CoconutWalletService.apply(
+                deltas: [
+                    .human(
+                        human,
+                        delta: amount,
+                        entryKind: .reward,
+                        source: .oasis,
+                        title: title,
+                        emoji: emoji,
+                        actorId: human.id.uuidString,
+                        actorName: human.name,
+                        subjectKind: .system,
+                        subjectId: nil
+                    )
+                ],
+                context: context,
+                save: false,
                 postsRewardFeedback: postsRewardFeedback
             )
         } else {
-            QuestManager.shared.recordCoconutDelta(
-                amount,
-                emoji: emoji,
-                title: title,
-                actorId: "system",
-                actorName: "Oasis",
+            _ = try? CoconutWalletService.apply(
+                deltas: [
+                    .system(
+                        delta: amount,
+                        entryKind: .reward,
+                        source: .oasis,
+                        title: title,
+                        emoji: emoji,
+                        actorId: "system",
+                        actorName: "Oasis"
+                    )
+                ],
+                context: context,
+                save: false,
                 postsRewardFeedback: postsRewardFeedback
             )
         }
@@ -626,19 +682,27 @@ enum OasisUpgradeRewardService {
     private static let criticalToDeathHours = 72
 
     @discardableResult
-    static func ensureUpgradeCoconuts(from firstLevel: Int, through lastLevel: Int, context: ModelContext) -> Int {
+    static func ensureUpgradeCoconuts(from firstLevel: Int, through lastLevel: Int, context: ModelContext) throws -> Int {
         guard lastLevel >= max(2, firstLevel) else { return 0 }
         let existing = (try? context.fetch(FetchDescriptor<OasisUpgradeCoconut>())) ?? []
         let existingLevels = Set(existing.map(\.level))
         var inserted = 0
+        var insertedCoconuts: [OasisUpgradeCoconut] = []
 
         for level in max(2, firstLevel)...lastLevel where !existingLevels.contains(level) {
-            context.insert(OasisUpgradeRewardCatalog.rule(for: level).makeCoconut())
+            let coconut = OasisUpgradeRewardCatalog.rule(for: level).makeCoconut()
+            context.insert(coconut)
+            insertedCoconuts.append(coconut)
             inserted += 1
         }
 
         if inserted > 0 {
-            try? context.save()
+            do {
+                try context.save()
+            } catch {
+                insertedCoconuts.forEach { context.delete($0) }
+                throw error
+            }
         }
         return inserted
     }

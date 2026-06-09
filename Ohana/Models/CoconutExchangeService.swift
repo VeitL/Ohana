@@ -40,15 +40,6 @@ enum CoconutExchangeService {
         guard sender.id != receiver.id else { throw CoconutExchangeError.sameReceiver }
         guard sender.coconutBalance >= option.coconutCost else { throw CoconutExchangeError.insufficientBalance }
 
-        sender.coconutBalance -= option.coconutCost
-        QuestManager.shared.recordCoconutDelta(
-            -option.coconutCost,
-            emoji: "💱",
-            title: "货币兑换申请",
-            actorId: sender.id.uuidString,
-            actorName: sender.name
-        )
-
         let request = CoconutExchangeRequest(
             senderId: sender.id.uuidString,
             senderName: sender.name,
@@ -61,11 +52,34 @@ enum CoconutExchangeService {
         )
         context.insert(request)
 
-        recordLedger(
+        let ledger = recordLedger(
             request,
             action: "coconutExchangeCreated",
             actor: sender,
             delta: -option.coconutCost,
+            context: context,
+            save: false
+        )
+        try CoconutWalletService.apply(
+            deltas: [
+                .human(
+                    sender,
+                    delta: -option.coconutCost,
+                    entryKind: .spend,
+                    source: .exchange,
+                    title: "货币兑换申请",
+                    emoji: "💱",
+                    actorId: sender.id.uuidString,
+                    actorName: sender.name,
+                    subjectKind: .household,
+                    subjectId: nil,
+                    sourceModelName: "CoconutExchangeRequest",
+                    sourceModelId: request.id.uuidString,
+                    careLedgerEventId: ledger.id.uuidString,
+                    metadataJSON: "{\"exchangeId\":\"\(request.id.uuidString)\",\"status\":\"\(request.status.rawValue)\"}",
+                    transactionKey: "exchange:\(request.id.uuidString):created"
+                )
+            ],
             context: context,
             save: false
         )
@@ -105,19 +119,10 @@ enum CoconutExchangeService {
         guard request.status == .pending else { throw CoconutExchangeError.notPending }
         guard request.senderId == sender.id.uuidString else { throw CoconutExchangeError.notSender }
 
-        sender.coconutBalance += request.coconutCost
-        QuestManager.shared.recordCoconutDelta(
-            request.coconutCost,
-            emoji: "↩️",
-            title: "货币兑换取消退款",
-            actorId: sender.id.uuidString,
-            actorName: sender.name
-        )
-
         request.status = .cancelled
         request.cancelledAt = Date()
         request.updatedAt = Date()
-        recordLedger(
+        let ledger = recordLedger(
             request,
             action: "coconutExchangeCancelled",
             actor: sender,
@@ -125,10 +130,34 @@ enum CoconutExchangeService {
             context: context,
             save: false
         )
+        try CoconutWalletService.apply(
+            deltas: [
+                .human(
+                    sender,
+                    delta: request.coconutCost,
+                    entryKind: .refund,
+                    source: .exchange,
+                    title: "货币兑换取消退款",
+                    emoji: "↩️",
+                    actorId: sender.id.uuidString,
+                    actorName: sender.name,
+                    subjectKind: .household,
+                    subjectId: nil,
+                    sourceModelName: "CoconutExchangeRequest",
+                    sourceModelId: request.id.uuidString,
+                    careLedgerEventId: ledger.id.uuidString,
+                    metadataJSON: "{\"exchangeId\":\"\(request.id.uuidString)\",\"status\":\"\(request.status.rawValue)\"}",
+                    transactionKey: "exchange:\(request.id.uuidString):cancelled"
+                )
+            ],
+            context: context,
+            save: false
+        )
         context.safeSave()
     }
 
     @MainActor
+    @discardableResult
     private static func recordLedger(
         _ request: CoconutExchangeRequest,
         action: String,
@@ -136,9 +165,9 @@ enum CoconutExchangeService {
         delta: Int,
         context: ModelContext,
         save: Bool
-    ) {
+    ) -> CareLedgerEvent {
         let amountText = CoconutExchangeOption.format(request.localAmount, currencyCode: request.currencyCode)
-        CareLedgerService.record(
+        return CareLedgerService.record(
             occurredAt: Date(),
             actorKind: .human,
             actorId: actor.id.uuidString,
@@ -159,4 +188,3 @@ enum CoconutExchangeService {
         )
     }
 }
-

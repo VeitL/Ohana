@@ -96,6 +96,15 @@ struct AppRouteCoordinatorTests {
 
     @Test func coconutShopUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
+        let treeManager = OasisTreeManager.shared
+        let oldIslandEnergy = treeManager.islandEnergy
+        let oldInjectedEnergy = treeManager.injectedEnergy
+        defer {
+            treeManager.islandEnergy = oldIslandEnergy
+            treeManager.injectedEnergy = oldInjectedEnergy
+        }
+        treeManager.islandEnergy = 0
+        treeManager.injectedEnergy = 800
 
         coordinator.presentSettings()
         coordinator.presentCoconutShop(category: .boost)
@@ -104,6 +113,26 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.sheet == .coconutShop(.boost))
         #expect(coordinator.sheet?.id == "coconut-shop-boost")
+    }
+
+    @Test func lockedCoconutShopRedirectsToGrowthRoadmap() {
+        let coordinator = AppRouteCoordinator()
+        let treeManager = OasisTreeManager.shared
+        let oldIslandEnergy = treeManager.islandEnergy
+        let oldInjectedEnergy = treeManager.injectedEnergy
+        defer {
+            treeManager.islandEnergy = oldIslandEnergy
+            treeManager.injectedEnergy = oldInjectedEnergy
+        }
+        treeManager.islandEnergy = 0
+        treeManager.injectedEnergy = 0
+
+        coordinator.presentSettings()
+        coordinator.presentCoconutShop(category: .boost)
+
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .functionMenu(destination: .growthRoadmap))
     }
 
     @Test func addEntityUsesGlobalSheetRoute() {

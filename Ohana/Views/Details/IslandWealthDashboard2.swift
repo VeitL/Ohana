@@ -11,11 +11,13 @@ import SwiftData
 // MARK: - Main View
 struct IslandWealthDashboardView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var vm = IslandWealthViewModel()
+    @State private var vm = IslandWealthScreenModel()
     @State private var selectedCoconutActorId: String? = nil
     @State private var chartProgress: Double = 0
     @Query(sort: \Pet.name) private var pets: [Pet]
     @Query(sort: \Human.name) private var humans: [Human]
+    @Query(sort: \CoconutAccount.updatedAt, order: .reverse) private var walletAccounts: [CoconutAccount]
+    @Query(sort: \CoconutLedgerEntry.occurredAt, order: .reverse) private var walletLedgerEntries: [CoconutLedgerEntry]
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     private var activeHumanId: UUID? {
@@ -94,6 +96,8 @@ struct IslandWealthDashboardView: View {
         }
         .onChange(of: pets.count)   { syncVM() }
         .onChange(of: humans.count) { syncVM() }
+        .onChange(of: walletAccounts.count) { syncVM() }
+        .onChange(of: walletLedgerEntries.count) { syncVM() }
         .onChange(of: activeHumanIdStr) { syncVM() }
         .onChange(of: selectedCoconutActorId) {
             syncVM()
@@ -108,11 +112,15 @@ struct IslandWealthDashboardView: View {
         if let selectedCoconutActorId, hiddenWealthHumanIds.contains(selectedCoconutActorId) {
             self.selectedCoconutActorId = nil
         }
-        vm.pets = pets
-        vm.humans = visibleWealthHumans
-        vm.hiddenHumanIds = hiddenWealthHumanIds
-        vm.petColorMap = petColorMap
-        vm.selectedActorId = selectedCoconutActorId
+        vm.applyQuerySnapshot(
+            pets: pets,
+            visibleHumans: visibleWealthHumans,
+            hiddenHumanIds: hiddenWealthHumanIds,
+            walletAccounts: walletAccounts,
+            walletLedgerEntries: walletLedgerEntries,
+            petColorMap: petColorMap,
+            selectedActorId: selectedCoconutActorId
+        )
     }
 
     private func replayChartAnimation() {

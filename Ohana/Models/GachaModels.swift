@@ -659,8 +659,6 @@ enum GachaDrawService {
 
         let previousBalance = human.coconutBalance
         let instantCoconutDelta = rollResult.instantResult?.coconutDelta ?? 0
-        human.coconutBalance -= costPerDraw
-        human.coconutBalance += instantCoconutDelta
         let log = GachaDrawLog(
             ownerHumanId: human.id.uuidString,
             ownerName: human.name,
@@ -679,7 +677,7 @@ enum GachaDrawService {
 
         let baseMetadata = "\"seriesId\":\"\(series.id)\",\"outcomeKind\":\"\(rollResult.kind.rawValue)\",\"itemId\":\"\(item?.id ?? "")\",\"instantResultId\":\"\(rollResult.instantResult?.id ?? "")\",\"instantCoconutDelta\":\(instantCoconutDelta),\"rarity\":\"\(item?.rarity.rawValue ?? "")\",\"hidden\":\(item?.isHidden ?? false)"
 
-        CareLedgerService.record(
+        let costLedger = CareLedgerService.record(
             actorKind: .human,
             actorId: human.id.uuidString,
             subjectKind: .system,
@@ -693,8 +691,27 @@ enum GachaDrawService {
             context: context,
             save: false
         )
+        var walletDeltas: [CoconutWalletDelta] = [
+            .human(
+                human,
+                delta: -costPerDraw,
+                entryKind: .spend,
+                source: .gacha,
+                title: "盲盒抽取",
+                emoji: "🥥",
+                actorId: human.id.uuidString,
+                actorName: human.name,
+                subjectKind: .system,
+                subjectId: nil,
+                sourceModelName: "GachaDrawLog",
+                sourceModelId: log.id.uuidString,
+                careLedgerEventId: costLedger.id.uuidString,
+                metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"cost\"}",
+                transactionKey: "gacha:\(log.id.uuidString):cost"
+            )
+        ]
         if instantCoconutDelta > 0 {
-            CareLedgerService.record(
+            let instantLedger = CareLedgerService.record(
                 actorKind: .human,
                 actorId: human.id.uuidString,
                 subjectKind: .system,
@@ -708,35 +725,35 @@ enum GachaDrawService {
                 context: context,
                 save: false
             )
+            walletDeltas.append(.human(
+                human,
+                delta: instantCoconutDelta,
+                entryKind: .reward,
+                source: .gacha,
+                title: rollResult.instantResult?.title.translations["zh"] ?? "盲盒即时返还",
+                emoji: rollResult.instantResult?.symbol ?? "🥥",
+                actorId: human.id.uuidString,
+                actorName: human.name,
+                subjectKind: .system,
+                subjectId: nil,
+                sourceModelName: "GachaDrawLog",
+                sourceModelId: log.id.uuidString,
+                careLedgerEventId: instantLedger.id.uuidString,
+                metadataJSON: "{\(baseMetadata),\"ledgerPart\":\"instantReward\"}",
+                transactionKey: "gacha:\(log.id.uuidString):instantReward"
+            ))
         }
 
         do {
-            try context.save()
-            QuestManager.shared.recordCoconutDelta(
-                -costPerDraw,
-                emoji: "🥥",
-                title: "盲盒抽取",
-                actorId: human.id.uuidString,
-                actorName: human.name
+            try CoconutWalletService.apply(
+                deltas: walletDeltas,
+                context: context,
+                save: false
             )
-            if instantCoconutDelta > 0 {
-                QuestManager.shared.recordCoconutDelta(
-                    instantCoconutDelta,
-                    emoji: rollResult.instantResult?.symbol ?? "🥥",
-                    title: rollResult.instantResult?.title.translations["zh"] ?? "盲盒即时返还",
-                    actorId: human.id.uuidString,
-                    actorName: human.name
-                )
-            }
+            try context.save()
         } catch {
+            context.rollback()
             human.coconutBalance = previousBalance
-            context.delete(log)
-            if isNew, let owned {
-                context.delete(owned)
-            } else if let owned {
-                owned.ownedCount = max(0, owned.ownedCount - 1)
-                owned.latestObtainedAt = owned.firstObtainedAt
-            }
             throw error
         }
 

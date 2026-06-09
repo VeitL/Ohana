@@ -121,7 +121,57 @@ enum AppFeatureRouteGuard {
         return visibleFunctionDestination(destination, currentLevel: currentLevel) ?? .growthRoadmap
     }
 
+    static func requiredLevel(for sheetRoute: AppSheetRoute) -> Int? {
+        switch sheetRoute {
+        case .coconutShop:
+            return GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
+        default:
+            return nil
+        }
+    }
+
+    static func requiredLevel(for oasisRoute: OasisSheetRoute) -> Int? {
+        switch oasisRoute {
+        case .coconutShop:
+            return GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
+        case .gacha:
+            return GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
+        case .critterCodex:
+            return critterCodexUnlockLevel
+        case .coconutRules, .achievements, .inventory, .checkInDetail:
+            return nil
+        }
+    }
+
+    static func allowsSheetRoute(_ route: AppSheetRoute, currentLevel: Int) -> Bool {
+        guard let requiredLevel = requiredLevel(for: route) else { return true }
+        return currentLevel >= requiredLevel
+    }
+
+    static func allowsOasisSheetRoute(_ route: OasisSheetRoute, currentLevel: Int) -> Bool {
+        guard let requiredLevel = requiredLevel(for: route) else { return true }
+        return currentLevel >= requiredLevel
+    }
+
+    static func lockedRouteNote(for route: AppSheetRoute, currentLevel: Int) -> String {
+        if let requiredLevel = requiredLevel(for: route) {
+            return "lockedSheet:\(route.id):lv\(currentLevel):requires\(requiredLevel)"
+        }
+        return "lockedSheet:\(route.id):lv\(currentLevel)"
+    }
+
+    static func lockedRouteNote(for route: OasisSheetRoute, currentLevel: Int) -> String {
+        if let requiredLevel = requiredLevel(for: route) {
+            return "lockedOasisSheet:\(route.id):lv\(currentLevel):requires\(requiredLevel)"
+        }
+        return "lockedOasisSheet:\(route.id):lv\(currentLevel)"
+    }
+
     static func recordIntercept(_ note: String) {
         AppPerformanceMonitor.shared.record("hidden_route_intercepted", valueMS: 0, note: note)
+    }
+
+    private static var critterCodexUnlockLevel: Int {
+        OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId)?.sourceLevel ?? 10
     }
 }

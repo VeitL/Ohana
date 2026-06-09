@@ -51,6 +51,8 @@ enum AppResetService {
         try delete(Reminder.self, in: context)
         try delete(Event.self, in: context)
         try delete(CareLedgerEvent.self, in: context)
+        try delete(CoconutLedgerEntry.self, in: context)
+        try delete(CoconutAccount.self, in: context)
         try delete(FamilyCollaborationTask.self, in: context)
         try delete(CoconutExchangeRequest.self, in: context)
         try delete(SharedCareSession.self, in: context)

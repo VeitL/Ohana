@@ -2,101 +2,28 @@
   "brand": "Ohana",
   "sourceReference": "/Users/guanchenli/Documents/Space/Ohana/Icon.png",
   "generatedAt": "2026-06-09",
-  "geometry": {
-    "canvas": 1024,
-    "mark": "two circular eyes plus single closed cubic smile body",
-    "smallSizeRule": "Symbol remains one silhouette and is tested down to 40 px."
+  "colorRule": "Only #000000 and #FFFFFF are used in opaque app icon PNGs.",
+  "extraction": {
+    "method": "Icon.png alpha channel to binary mask",
+    "alphaThreshold": 16,
+    "canvas": [
+      1024,
+      1024
+    ],
+    "maskBoundingBox": [
+      171,
+      229,
+      854,
+      789
+    ]
   },
-  "variants": [
-    {
-      "id": "primary",
-      "name": "Clean Day",
-      "role": "Default light app icon",
-      "master": "masters/ohana-smile-primary-1024.png",
-      "background": [
-        "#F7FBFF",
-        "#C9D8E8"
-      ],
-      "mark": [
-        "#151A20",
-        "#030508"
-      ]
-    },
-    {
-      "id": "dark",
-      "name": "Lime Night",
-      "role": "Default dark app icon",
-      "master": "masters/ohana-smile-dark-1024.png",
-      "background": [
-        "#18222B",
-        "#05080C"
-      ],
-      "mark": [
-        "#F3FFD1",
-        "#B8F540"
-      ]
-    },
-    {
-      "id": "tinted",
-      "name": "System Tint",
-      "role": "iOS tinted appearance",
-      "master": "masters/ohana-smile-tinted-1024.png",
-      "background": [
-        "#F4F4F2",
-        "#BFC5C8"
-      ],
-      "mark": [
-        "#0F1113",
-        "#000000"
-      ]
-    },
-    {
-      "id": "graphite",
-      "name": "Soft Graphite",
-      "role": "Closest to the provided reference",
-      "master": "masters/ohana-smile-graphite-1024.png",
-      "background": [
-        "#8C8E8C",
-        "#545758"
-      ],
-      "mark": [
-        "#111315",
-        "#020303"
-      ]
-    },
-    {
-      "id": "lagoon",
-      "name": "Lagoon Blue",
-      "role": "Clean premium alternate",
-      "master": "masters/ohana-smile-lagoon-1024.png",
-      "background": [
-        "#E9F7FF",
-        "#77B8E8"
-      ],
-      "mark": [
-        "#071C31",
-        "#020914"
-      ]
-    },
-    {
-      "id": "milk",
-      "name": "Coconut Milk",
-      "role": "Warm calm alternate",
-      "master": "masters/ohana-smile-milk-1024.png",
-      "background": [
-        "#FFFDF7",
-        "#DDE7E0"
-      ],
-      "mark": [
-        "#202015",
-        "#060704"
-      ]
-    }
-  ],
+  "masters": {
+    "blackOnWhite": "masters/ohana-smile-black-on-white-1024.png",
+    "whiteOnBlack": "masters/ohana-smile-white-on-black-1024.png"
+  },
   "xcode": {
     "universalAppIconSet": "ios-universal/AppIconOhanaSmile.appiconset",
-    "legacyLight": "ios-legacy/AppIconOhanaSmileLight.appiconset",
-    "legacyDark": "ios-legacy/AppIconOhanaSmileDark.appiconset",
-    "legacyTinted": "ios-legacy/AppIconOhanaSmileTinted.appiconset"
+    "legacyBlackOnWhite": "ios-legacy/AppIconOhanaSmileBlackOnWhite.appiconset",
+    "legacyWhiteOnBlack": "ios-legacy/AppIconOhanaSmileWhiteOnBlack.appiconset"
   }
 }

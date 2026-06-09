@@ -413,6 +413,7 @@ enum CareEventService {
         context.safeSave()
 
         let reward = CoconutEconomyService.awardCareAction(type: .care(type: type), pet: pet, context: context)
+        let metadataJSON = CareLedgerService.rewardMetadata(reward)
         CareLedgerService.record(
             occurredAt: log.date,
             actorKind: executorId == nil ? .unknown : .human,
@@ -425,9 +426,10 @@ enum CareEventService {
             legacyModelName: "PetHygieneLog",
             legacyModelId: log.id.uuidString,
             coconutDelta: CareLedgerService.rewardDelta(reward),
-            metadataJSON: CareLedgerService.rewardMetadata(reward),
+            metadataJSON: metadataJSON,
             context: context
         )
+        CareLedgerService.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
         QuickActionReminderCompletionSyncService.completeNearestPetHygieneReminder(
             pet: pet,
             type: type,
@@ -459,6 +461,7 @@ enum CareEventService {
         context.safeSave()
 
         let reward = CoconutEconomyService.awardCareAction(type: .health, pet: pet, context: context)
+        let metadataJSON = CareLedgerService.rewardMetadata(reward)
         CareLedgerService.record(
             occurredAt: log.date,
             actorKind: executorId == nil ? .unknown : .human,
@@ -472,9 +475,10 @@ enum CareEventService {
             legacyModelName: "PetHealthLog",
             legacyModelId: log.id.uuidString,
             coconutDelta: CareLedgerService.rewardDelta(reward),
-            metadataJSON: CareLedgerService.rewardMetadata(reward),
+            metadataJSON: metadataJSON,
             context: context
         )
+        CareLedgerService.syncOasisTreeEnergyIfNeeded(metadataJSON: metadataJSON, context: context)
         return reward
     }
 

@@ -10,7 +10,7 @@ import Foundation
 nonisolated struct L10n {
     let lang: String
 
-    init(_ lang: String = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh") {
+    init(_ lang: String = UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.detectedCode) {
         self.lang = AppLanguage.normalize(lang)
     }
 
@@ -571,7 +571,7 @@ nonisolated struct L10n {
     var batchCheckIn: String { tr(zh: "一键全家", en: "Crew check-in", de: "Team-Check-in") }
 
     /// 无 `@AppStorage` 的视图可用（与 `SettingsView` / `AppLanguage` 一致）
-    static var current: L10n { L10n(UserDefaults.standard.string(forKey: "appLanguage") ?? "zh") }
+    static var current: L10n { L10n(UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.detectedCode) }
 
     // MARK: - Add Entity sheet
     var addEntityNavRoot: String { tr(zh: "添加家人", en: "Add to the island", de: "Zur Insel hinzufügen") }
@@ -1456,7 +1456,7 @@ nonisolated enum AppLanguage {
 
     /// 与 `SettingsView` 中 Picker 的 tag 一致。
     static var code: String {
-        normalize(UserDefaults.standard.string(forKey: "appLanguage") ?? fallbackCode)
+        normalize(UserDefaults.standard.string(forKey: "appLanguage") ?? detectedCode)
     }
 
     static var isEnglish: Bool { code == "en" }
@@ -1472,7 +1472,32 @@ nonisolated enum AppLanguage {
     static var supportedLprojNames: Set<String> { Set(supported.map(\.lprojName)) }
 
     static func normalize(_ raw: String) -> String {
-        supported.contains { $0.code == raw } ? raw : fallbackCode
+        let normalized = raw.replacingOccurrences(of: "_", with: "-").lowercased()
+        if supported.contains(where: { $0.code == normalized }) {
+            return normalized
+        }
+        if let languagePrefix = normalized.split(separator: "-").first {
+            let code = String(languagePrefix)
+            if supported.contains(where: { $0.code == code }) {
+                return code
+            }
+        }
+        return fallbackCode
+    }
+
+    static var detectedCode: String {
+        for identifier in Locale.preferredLanguages {
+            let languageCode = Locale(identifier: identifier).language.languageCode?.identifier ?? identifier
+            let normalized = normalize(languageCode)
+            if normalized != fallbackCode || languageCode.lowercased().hasPrefix(fallbackCode) {
+                return normalized
+            }
+        }
+
+        if let currentLanguage = Locale.current.language.languageCode?.identifier {
+            return normalize(currentLanguage)
+        }
+        return fallbackCode
     }
 
     static func fallbackChain(for raw: String) -> [String] {
@@ -1915,7 +1940,7 @@ nonisolated enum AppCountry {
         defaults.set(selected.code, forKey: storageKey)
 
         if defaults.object(forKey: "appLanguage") == nil {
-            defaults.set(AppLanguage.normalize(selected.defaultLanguageCode), forKey: "appLanguage")
+            defaults.set(AppLanguage.detectedCode, forKey: "appLanguage")
         }
         if defaults.object(forKey: AppCurrency.storageKey) == nil {
             defaults.set(AppCurrency.normalize(selected.defaultCurrencyCode), forKey: AppCurrency.storageKey)

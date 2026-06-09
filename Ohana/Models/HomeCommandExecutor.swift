@@ -12,6 +12,16 @@ import UIKit
 @MainActor
 struct HomeCommandExecutor {
     let modelContext: ModelContext
+    let careEvents: CareEventRecording
+
+    init(modelContext: ModelContext) {
+        self.init(modelContext: modelContext, careEvents: StaticCareEventRecorder())
+    }
+
+    init(modelContext: ModelContext, careEvents: CareEventRecording) {
+        self.modelContext = modelContext
+        self.careEvents = careEvents
+    }
 
     func performActionType(
         _ actionType: String,
@@ -38,7 +48,7 @@ struct HomeCommandExecutor {
                 startedAt: flowStartedAt,
                 note: ["action": actionType, "reason": "missing_pet"]
             )
-            publishNoop(.quickCare(entityID: petID, action: actionType), note: "home.quickCare.missingPet")
+            publishNoop(QuickCareCommand.action(petID: petID, action: actionType), note: "home.quickCare.missingPet")
             return
         }
 
@@ -141,13 +151,10 @@ struct HomeCommandExecutor {
             startWalk: startWalk,
             openWaterManagement: openWaterManagement,
             openMedication: openMedication,
-            feedback: feedback
+            feedback: feedback,
+            careEvents: careEvents
         )
-        publishMutation(
-            .quickCare(entityID: pet.id, action: actionType),
-            affected: [pet.id],
-            note: "home.quickCare"
-        )
+        publishMutation(QuickCareCommand.action(petID: pet.id, action: actionType))
         if let flowStartedAt {
             AppFlowPerformance.mark(
                 AppPerformanceFlows.quickCareCommand,
@@ -163,18 +170,16 @@ struct HomeCommandExecutor {
         reminder: Reminder,
         executorId: String?
     ) -> (humanGot: Int, petGot: Int)? {
-        let reward = CareEventService.completePlannedFeed(
+        let reward = careEvents.completePlannedFeed(
             pet: pet,
             reminder: reminder,
             context: modelContext,
-            executorId: executorId
+            quality: .precise,
+            executorId: executorId,
+            date: Date()
         )
         if reward != nil {
-            publishMutation(
-                .quickCare(entityID: pet.id, action: "plannedFeed"),
-                affected: [pet.id, reminder.id],
-                note: "home.plannedFeed"
-            )
+            publishMutation(QuickCareCommand.plannedFeed(petID: pet.id, reminderID: reminder.id))
         }
         return reward
     }
@@ -190,13 +195,10 @@ struct HomeCommandExecutor {
             pet: pet,
             executorId: executorId,
             modelContext: modelContext,
-            feedback: feedback
+            feedback: feedback,
+            careEvents: careEvents
         )
-        publishMutation(
-            .quickCare(entityID: pet.id, action: "potty:\(raw)"),
-            affected: [pet.id],
-            note: "home.potty"
-        )
+        publishMutation(QuickCareCommand.potty(petID: pet.id, type: raw))
     }
 
     func applyPottyCheckIn(
@@ -206,7 +208,7 @@ struct HomeCommandExecutor {
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
     ) {
         guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
-            publishNoop(.quickCare(entityID: petID, action: "potty:\(raw)"), note: "home.potty.missingPet")
+            publishNoop(QuickCareCommand.potty(petID: petID, type: raw), note: "home.potty.missingPet")
             return
         }
         applyPottyCheckIn(raw: raw, pet: pet, executorId: executorId, feedback: feedback)
@@ -225,13 +227,10 @@ struct HomeCommandExecutor {
             executorId: executorId,
             modelContext: modelContext,
             showSingleUseNotice: showSingleUseNotice,
-            feedback: feedback
+            feedback: feedback,
+            careEvents: careEvents
         )
-        publishMutation(
-            .quickCare(entityID: pet.id, action: "groom:\(raw)"),
-            affected: [pet.id],
-            note: "home.groom"
-        )
+        publishMutation(QuickCareCommand.grooming(petID: pet.id, type: raw))
     }
 
     func applyGroomCheckIn(
@@ -242,7 +241,7 @@ struct HomeCommandExecutor {
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
     ) {
         guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
-            publishNoop(.quickCare(entityID: petID, action: "groom:\(raw)"), note: "home.groom.missingPet")
+            publishNoop(QuickCareCommand.grooming(petID: petID, type: raw), note: "home.groom.missingPet")
             return
         }
         applyGroomCheckIn(
@@ -267,13 +266,10 @@ struct HomeCommandExecutor {
             executorId: executorId,
             modelContext: modelContext,
             openHealth: openHealth,
-            feedback: feedback
+            feedback: feedback,
+            careEvents: careEvents
         )
-        publishMutation(
-            .quickCare(entityID: pet.id, action: "health:\(raw)"),
-            affected: [pet.id],
-            note: "home.health"
-        )
+        publishMutation(QuickCareCommand.health(petID: pet.id, type: raw))
     }
 
     func applyHealthCheckIn(
@@ -284,7 +280,7 @@ struct HomeCommandExecutor {
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
     ) {
         guard let pet = fetchPet(id: petID), !pet.hasPassedAway else {
-            publishNoop(.quickCare(entityID: petID, action: "health:\(raw)"), note: "home.health.missingPet")
+            publishNoop(QuickCareCommand.health(petID: petID, type: raw), note: "home.health.missingPet")
             return
         }
         applyHealthCheckIn(
@@ -304,20 +300,13 @@ struct HomeCommandExecutor {
             awardCoconut: true
         )
         scheduleMedicationReminders(for: pet)
-        publishMutation(
-            .medicationDose(petID: pet.id, medicationID: medication.id),
-            affected: [pet.id, medication.id],
-            note: "home.medicationDose"
-        )
+        publishMutation(QuickCareCommand.medicationDose(petID: pet.id, medicationID: medication.id))
     }
 
     func recordMedicationDose(petID: UUID, medicationID: UUID) {
         guard let pet = fetchPet(id: petID),
               let medication = pet.medications.first(where: { $0.id == medicationID }) else {
-            publishNoop(
-                .medicationDose(petID: petID, medicationID: medicationID),
-                note: "home.medicationDose.missingTarget"
-            )
+            publishNoop(QuickCareCommand.medicationDose(petID: petID, medicationID: medicationID), note: "home.medicationDose.missingTarget")
             return
         }
         recordMedicationDose(medication: medication, pet: pet)
@@ -364,13 +353,13 @@ struct HomeCommandExecutor {
         do {
             try CoconutExchangeService.confirm(request, by: receiver, context: modelContext)
             publishMutation(
-                .coconutExchange(requestID: request.id),
+                EconomyCommand.coconutExchange(requestID: request.id),
                 affected: [request.id, receiver.id],
                 note: "home.coconutExchange"
             )
         } catch {
             ReadModelRevisionCenter.shared.publishFailure(
-                command: .coconutExchange(requestID: request.id),
+                command: EconomyCommand.coconutExchange(requestID: request.id).domainCommand,
                 error: error
             )
             throw error
@@ -380,7 +369,7 @@ struct HomeCommandExecutor {
     func confirmCoconutExchange(requestID: UUID, receiverID: UUID) throws {
         guard let request = fetchCoconutExchangeRequest(id: requestID),
               let receiver = fetchHuman(id: receiverID) else {
-            let command = DomainCommand.coconutExchange(requestID: requestID)
+            let command = EconomyCommand.coconutExchange(requestID: requestID).domainCommand
             ReadModelRevisionCenter.shared.publishFailure(
                 command: command,
                 error: HomeCommandExecutorError.missingTarget
@@ -519,6 +508,22 @@ struct HomeCommandExecutor {
         )
     }
 
+    private func publishMutation<C: FeatureDomainCommand>(
+        _ command: C,
+        affected: Set<UUID>,
+        note: String
+    ) {
+        publishMutation(command.domainCommand, affected: affected, note: note)
+    }
+
+    private func publishMutation(_ command: QuickCareCommand) {
+        publishMutation(
+            command.domainCommand,
+            affected: command.affectedEntityIDs,
+            note: command.revisionNote
+        )
+    }
+
     private func publishNoop(_ command: DomainCommand, note: String) {
         ReadModelRevisionCenter.shared.publishDomainMutation(
             command: command,
@@ -526,6 +531,10 @@ struct HomeCommandExecutor {
             wroteBusinessFact: false,
             note: note
         )
+    }
+
+    private func publishNoop<C: FeatureDomainCommand>(_ command: C, note: String) {
+        publishNoop(command.domainCommand, note: note)
     }
 }
 

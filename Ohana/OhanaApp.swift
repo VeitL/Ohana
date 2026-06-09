@@ -16,8 +16,9 @@ let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
 @main
 struct OhanaApp: App {
     private let modelContainer: ModelContainer
+    private let appServices: AppServices
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
-    @AppStorage("appLanguage") private var appLanguage: String = "zh"
+    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
@@ -29,6 +30,7 @@ struct OhanaApp: App {
         _ = NotificationManager.shared
         let containerStartedAt = CFAbsoluteTimeGetCurrent()
         modelContainer = SharedModelContainer.make()
+        appServices = AppServices()
         let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1_000
         let containerDurationMS = (CFAbsoluteTimeGetCurrent() - containerStartedAt) * 1_000
         Task { @MainActor in
@@ -51,6 +53,7 @@ struct OhanaApp: App {
         WindowGroup {
             RootView()
                 .modelContainer(modelContainer)
+                .environment(appServices)
             .tint(Color.goPrimary)
             .preferredColorScheme(preferredScheme)
             .environment(\.locale, AppLanguage.swiftUIPreferredLocale)

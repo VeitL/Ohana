@@ -71,6 +71,10 @@ struct GrowthUnlockPolicyTests {
         }
         #expect(AppFeatureRouteGuard.isVisibleFunctionDestination(.featureGroup(.dailyCare), currentLevel: 1))
         #expect(!AppFeatureRouteGuard.allowsAddEntity(.plant))
+        #expect(!AppFeatureRouteGuard.allowsSheetRoute(.coconutShop(.boost), currentLevel: 5))
+        #expect(AppFeatureRouteGuard.allowsSheetRoute(.coconutShop(.boost), currentLevel: 6))
+        #expect(!AppFeatureRouteGuard.allowsOasisSheetRoute(.gacha, currentLevel: 6))
+        #expect(AppFeatureRouteGuard.allowsOasisSheetRoute(.gacha, currentLevel: 7))
     }
 
     @Test func featureRouteGuardOwnsGlobalVisibilityDecisions() {

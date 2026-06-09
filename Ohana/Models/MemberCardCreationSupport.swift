@@ -495,15 +495,8 @@ enum MemberCreationService {
         guard human.coconutBalance >= cost else {
             throw ServiceError.insufficientCoconuts(missing: max(0, cost - human.coconutBalance))
         }
-        human.coconutBalance -= cost
-        QuestManager.shared.recordCoconutDelta(
-            -cost,
-            emoji: "2.5D",
-            title: l.tr(zh: "兑换「2.5D 头像券」", en: "Redeemed 2.5D Avatar Pass", de: "2,5D-Avatarpass eingelöst"),
-            actorId: human.id.uuidString,
-            actorName: human.name
-        )
-        CareLedgerService.record(
+        let title = l.tr(zh: "兑换「2.5D 头像券」", en: "Redeemed 2.5D Avatar Pass", de: "2,5D-Avatarpass eingelöst")
+        let ledger = CareLedgerService.record(
             actorKind: .human,
             actorId: human.id.uuidString,
             subjectKind: .system,
@@ -514,6 +507,29 @@ enum MemberCreationService {
             source: .economy,
             coconutDelta: -cost,
             metadataJSON: "{\"shopItemId\":\"\(Avatar2DAccess.shopItemId)\",\"surface\":\"memberCreation\"}",
+            context: context,
+            save: false
+        )
+        try CoconutWalletService.apply(
+            deltas: [
+                .human(
+                    human,
+                    delta: -cost,
+                    entryKind: .spend,
+                    source: .shop,
+                    title: title,
+                    emoji: "2.5D",
+                    actorId: human.id.uuidString,
+                    actorName: human.name,
+                    subjectKind: .system,
+                    subjectId: nil,
+                    sourceModelName: "Avatar2DAccess",
+                    sourceModelId: Avatar2DAccess.shopItemId,
+                    careLedgerEventId: ledger.id.uuidString,
+                    metadataJSON: "{\"shopItemId\":\"\(Avatar2DAccess.shopItemId)\",\"surface\":\"memberCreation\"}",
+                    transactionKey: "shop:memberCreation:\(Avatar2DAccess.shopItemId):\(human.id.uuidString)"
+                )
+            ],
             context: context,
             save: false
         )

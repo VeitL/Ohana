@@ -90,26 +90,8 @@ enum StarterGiftService {
         context: ModelContext,
         defaults: UserDefaults
     ) -> Result {
-        human.coconutBalance += giftAmount
-        QuestManager.shared.coconutCount += giftAmount
         let title = localizedGiftTitle()
-        QuestManager.shared.coconutLogs.insert(
-            CoconutLogEntry(
-                emoji: "🎁",
-                title: title,
-                amount: giftAmount,
-                actorId: human.id.uuidString,
-                actorName: human.name,
-                economyReason: "starterGift"
-            ),
-            at: 0
-        )
-        if QuestManager.shared.coconutLogs.count > 200 {
-            QuestManager.shared.coconutLogs.removeLast(QuestManager.shared.coconutLogs.count - 200)
-        }
-        QuestManager.shared.flushToDefaults()
-
-        CareLedgerService.record(
+        let ledger = CareLedgerService.record(
             actorKind: .system,
             actorId: nil,
             subjectKind: .human,
@@ -120,8 +102,40 @@ enum StarterGiftService {
             source: .economy,
             coconutDelta: giftAmount,
             metadataJSON: "{\"economyVersion\":2,\"starterGift\":true,\"growthXP\":0,\"coconutBase\":\(giftAmount),\"coconutBonus\":0}",
-            context: context
+            context: context,
+            save: false
         )
+        do {
+            try CoconutWalletService.apply(
+                deltas: [
+                    .human(
+                        human,
+                        delta: giftAmount,
+                        entryKind: .reward,
+                        source: .starterGift,
+                        title: title,
+                        emoji: "🎁",
+                        actorId: human.id.uuidString,
+                        actorName: human.name,
+                        subjectKind: .human,
+                        subjectId: human.id.uuidString,
+                        sourceModelName: "CareLedgerEvent",
+                        sourceModelId: ledger.id.uuidString,
+                        careLedgerEventId: ledger.id.uuidString,
+                        metadataJSON: "{\"starterGift\":true}"
+                    )
+                ],
+                context: context,
+                save: false
+            )
+            try context.save()
+        } catch {
+            context.rollback()
+            #if DEBUG
+            print("❌ [StarterGiftService] wallet write failed: \(error.localizedDescription)")
+            #endif
+            return .missingHuman
+        }
 
         defaults.set(true, forKey: Key.claimed)
         defaults.set(false, forKey: Key.pending)

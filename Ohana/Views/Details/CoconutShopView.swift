@@ -1077,7 +1077,7 @@ struct CoconutShopView: View {
         AppIconService.setIcon(descriptor) { result in
             switch result {
             case .success:
-                enqueueShopPurchase(item, note: "coconutShop.appIcon") {
+                enqueueShopPurchase(item, note: "coconutShop.appIcon") { _ in
                     markPurchased(item)
                     selectedAppIcon = descriptor.itemId
                     pendingPurchaseItem = nil
@@ -1106,10 +1106,10 @@ struct CoconutShopView: View {
     }
 
     private func purchase(_ item: ShopItem) {
-        enqueueShopPurchase(item, note: "coconutShop.purchase") {
+        enqueueShopPurchase(item, note: "coconutShop.purchase") { result in
             if item.isConsumable {
                 guard activateBoost(item) else {
-                    refundPurchasedConsumable(item)
+                    refundPurchasedConsumable(item, purchase: result)
                     pendingPurchaseItem = nil
                     UINotificationFeedbackGenerator().notificationOccurred(.warning)
                     showToast(
@@ -1143,7 +1143,7 @@ struct CoconutShopView: View {
         }
     }
 
-    private func enqueueShopPurchase(_ item: ShopItem, note: String, onSuccess: @escaping @MainActor () -> Void) {
+    private func enqueueShopPurchase(_ item: ShopItem, note: String, onSuccess: @escaping @MainActor (ShopPurchaseCommandResult) -> Void) {
         commandQueue.enqueue(.shopPurchase(humanID: currentHuman?.id, itemID: item.id)) {
             let result = RewardEconomyCommandExecutor(context: modelContext).purchase(
                 item: item,
@@ -1157,7 +1157,7 @@ struct CoconutShopView: View {
                 note: note
             )
             guard handleShopPurchaseResult(result) else { return }
-            onSuccess()
+            onSuccess(result)
         }
     }
 
@@ -1265,19 +1265,39 @@ struct CoconutShopView: View {
         }
     }
 
-    private func refundPurchasedConsumable(_ item: ShopItem) {
+    private func refundPurchasedConsumable(_ item: ShopItem, purchase: ShopPurchaseCommandResult) {
         guard let currentHuman else { return }
-        currentHuman.coconutBalance += item.cost
-        questManager.recordCoconutDelta(
-            item.cost,
-            emoji: item.emoji,
-            title: l.tr(
-                zh: "退回「\(item.name(l))」",
-                en: "Refunded \(item.name(l))",
-                de: "\(item.name(l)) erstattet"
-            ),
-            actorId: currentHuman.id.uuidString,
-            actorName: currentHuman.name
+        let title = l.tr(
+            zh: "退回「\(item.name(l))」",
+            en: "Refunded \(item.name(l))",
+            de: "\(item.name(l)) erstattet"
+        )
+        let refundSource = purchase.transactionKey
+            ?? purchase.ledgerEventID?.uuidString
+            ?? UUID().uuidString
+        _ = try? CoconutWalletService.apply(
+            deltas: [
+                .human(
+                    currentHuman,
+                    delta: item.cost,
+                    entryKind: .refund,
+                    source: .shop,
+                    title: title,
+                    emoji: item.emoji,
+                    actorId: currentHuman.id.uuidString,
+                    actorName: currentHuman.name,
+                    subjectKind: .system,
+                    subjectId: nil,
+                    sourceModelName: "ShopCatalog",
+                    sourceModelId: item.id,
+                    careLedgerEventId: purchase.ledgerEventID?.uuidString,
+                    metadataJSON: "{\"shopItemId\":\"\(item.id)\",\"refund\":true,\"purchaseTransactionKey\":\"\(refundSource)\"}",
+                    transactionKey: "shop:\(item.id):refund:\(currentHuman.id.uuidString):\(refundSource)"
+                )
+            ],
+            context: modelContext,
+            save: false,
+            projectionManager: questManager
         )
         modelContext.safeSave()
     }

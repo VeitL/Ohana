@@ -4,7 +4,7 @@ import Testing
 @testable import Ohana
 
 struct OasisCritterDailyWishTests {
-    @Test func critterMilestonesStartAtLevelTenThenRepeatEveryTenLevels() {
+    @Test func critterMilestonesStayReachableWithinCurrentTreeLevels() {
         let levelFive = OasisUpgradeRewardCatalog.rule(for: 5)
         #expect(levelFive.rewardKind != .electronicPet)
 
@@ -13,9 +13,7 @@ struct OasisCritterDailyWishTests {
         #expect(levelTen.guaranteedCritterId == OasisUpgradeRewardCatalog.firstCritterId)
         #expect(OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId)?.sourceLevel == 10)
 
-        let levelTwenty = OasisUpgradeRewardCatalog.rule(for: 20)
-        #expect(levelTwenty.rewardKind == .electronicPet)
-        #expect(levelTwenty.guaranteedCritterId == OasisUpgradeRewardCatalog.legendaryCritterId)
+        #expect(OasisUpgradeRewardCatalog.critters.allSatisfy { $0.sourceLevel <= TreeLevel.maxSupportedLevel })
     }
 
     @MainActor
@@ -364,7 +362,7 @@ struct OasisCritterDailyWishTests {
 
     @MainActor
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV55.models)
+        let schema = Schema(ArkSchemaV58.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

@@ -15,6 +15,7 @@ struct ContentView: View {
     @StateObject private var appRoutes = AppRouteCoordinator()
     @State private var createdEntitySignal: HomeCreatedEntitySignal?
     @State private var onboardingJourneyEvaluationTask: Task<Void, Never>?
+    @State private var coconutWalletBootstrapTask: Task<Void, Never>?
     @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
@@ -80,6 +81,7 @@ struct ContentView: View {
         .animation(GoMotion.sheetEnter, value: onboardingJourneyPhase)
         .onAppear {
             AppLifecycleCoordinator.shared.handle(.rootAppeared(scenePhase: scenePhase))
+            scheduleCoconutWalletBootstrap()
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluation()
         }
@@ -215,6 +217,20 @@ struct ContentView: View {
             appRoutes.dismissFullScreen(.requiredHumanProfile)
         case .ready:
             appRoutes.dismissFullScreen(.requiredHumanProfile)
+        }
+    }
+
+    private func scheduleCoconutWalletBootstrap() {
+        guard coconutWalletBootstrapTask == nil else { return }
+        coconutWalletBootstrapTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
+            defer { coconutWalletBootstrapTask = nil }
+            do {
+                try CoconutEconomyBootstrapService.bootstrapIfNeeded(context: modelContext)
+            } catch {
+                #if DEBUG
+                print("❌ [ContentView] coconut wallet bootstrap failed: \(error.localizedDescription)")
+                #endif
+            }
         }
     }
 

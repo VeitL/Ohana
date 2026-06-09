@@ -14,6 +14,7 @@ import Observation
 /// 椰子树等级，rawValue 对应 1-10 级（显示级别）
 enum TreeLevel: Int, CaseIterable, Comparable {
     static func < (lhs: TreeLevel, rhs: TreeLevel) -> Bool { lhs.rawValue < rhs.rawValue }
+    static var maxSupportedLevel: Int { allCases.map(\.rawValue).max() ?? 10 }
 
     case lv1  = 1   // 希望之种   0–49
     case lv2  = 2   // 破土嫩芽  50–149
@@ -43,18 +44,8 @@ enum TreeLevel: Int, CaseIterable, Comparable {
 
     /// 升级奖励椰子数（升到该级时获得）
     var levelUpReward: Int {
-        switch self {
-        case .lv1:  return 0
-        case .lv2:  return 10
-        case .lv3:  return 15
-        case .lv4:  return 25
-        case .lv5:  return 40
-        case .lv6:  return 60
-        case .lv7:  return 90
-        case .lv8:  return 125
-        case .lv9:  return 165
-        case .lv10: return 220
-        }
+        guard self != .lv1 else { return 0 }
+        return OasisUpgradeRewardCatalog.rule(for: rawValue).coconutAmount
     }
 
     var glowColor: Color {
@@ -161,11 +152,20 @@ final class OasisTreeManager {
         guard current > lastRewardedLevel else { return nil }
         let firstRewardLevel = max(2, lastRewardedLevel + 1)
         if firstRewardLevel <= current {
-            OasisUpgradeRewardService.ensureUpgradeCoconuts(
-                from: firstRewardLevel,
-                through: current,
-                context: modelContext
-            )
+            do {
+                try OasisUpgradeRewardService.ensureUpgradeCoconuts(
+                    from: firstRewardLevel,
+                    through: current,
+                    context: modelContext
+                )
+            } catch {
+                AppPerformanceMonitor.shared.record(
+                    "oasis_upgrade_reward_failed",
+                    valueMS: 0,
+                    note: "\(firstRewardLevel)-\(current):\(error.localizedDescription)"
+                )
+                return nil
+            }
         }
         lastRewardedLevel = current
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -318,12 +318,44 @@ final class OasisTreeManager {
         checkAndRewardLevelUp(modelContext: modelContext)
     }
 
+    @discardableResult
+    @MainActor
+    func refreshLedgerEnergy(modelContext: ModelContext) -> TreeLevel {
+        islandEnergy = Self.calculatedLedgerEnergy(modelContext: modelContext)
+        checkAndRewardLevelUp(modelContext: modelContext)
+        return treeLevel
+    }
+
     private static func calculatedIslandEnergy(
         modelContext: ModelContext,
         pets: [Pet],
         humans: [Human]
     ) -> Int {
         let ledgerEvents = (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        return calculatedIslandEnergy(
+            ledgerEvents: ledgerEvents,
+            modelContext: modelContext,
+            pets: pets,
+            humans: humans
+        )
+    }
+
+    private static func calculatedLedgerEnergy(modelContext: ModelContext) -> Int {
+        let ledgerEvents = (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        return calculatedIslandEnergy(
+            ledgerEvents: ledgerEvents,
+            modelContext: modelContext,
+            pets: [],
+            humans: []
+        )
+    }
+
+    private static func calculatedIslandEnergy(
+        ledgerEvents: [CareLedgerEvent],
+        modelContext: ModelContext,
+        pets: [Pet],
+        humans: [Human]
+    ) -> Int {
         let v2GrowthXP = ledgerEvents.reduce(0) { partial, event in
             partial + CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: event.metadataJSON)
         }

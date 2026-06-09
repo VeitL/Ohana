@@ -43,6 +43,7 @@ struct VerticalSolidHomeView: View {
     @AppStorage("quickActionItems_v2") private var quickActionItemsRaw = ""
     @AppStorage("home_cards_enable_ambient_float") private var enablesHomeCardAmbientFloat = false
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
@@ -129,7 +130,7 @@ struct VerticalSolidHomeView: View {
     }
 
     private var commandExecutor: HomeCommandExecutor {
-        HomeCommandExecutor(modelContext: modelContext)
+        HomeCommandExecutor(modelContext: modelContext, careEvents: appServices.careEvents)
     }
 
     private var l: L10n {

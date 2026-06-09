@@ -20,6 +20,7 @@ struct FamilyCollaborationDashboardHost: View {
     var onOpenWeeklyReport: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     @AppStorage("bountyTasks") private var legacyBountyTasksRaw = ""
 
     var body: some View {
@@ -29,7 +30,11 @@ struct FamilyCollaborationDashboardHost: View {
             pendingReminders: pendingReminders,
             familyTasks: familyTasks,
             legacyBountySyncToken: legacyBountyTasksRaw,
-            commandExecutor: FamilyCollaborationCommandExecutor(modelContext: modelContext),
+            commandExecutor: FamilyCollaborationCommandExecutor(
+                modelContext: modelContext,
+                familyTasks: appServices.familyTasks,
+                revisions: appServices.domainRevisions
+            ),
             createTaskTrigger: createTaskTrigger,
             onEditorVisibilityChanged: onEditorVisibilityChanged,
             onOpenPetActivity: onOpenPetActivity,

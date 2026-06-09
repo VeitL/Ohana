@@ -399,6 +399,10 @@ enum SharedPetActionRecorder {
             reward: reward,
             context: context
         )
+        CareLedgerService.syncOasisTreeEnergyIfNeeded(
+            metadataJSON: CareLedgerService.rewardMetadata(reward),
+            context: context
+        )
 
         if let careType = descriptor.reminderCareType {
             targets.forEach {

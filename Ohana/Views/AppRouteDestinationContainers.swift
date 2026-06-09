@@ -315,8 +315,15 @@ private struct AppSheetRouteDestination: View {
             )
             .ohanaSheetPagePresentation()
         case let .coconutShop(category):
-            CoconutShopRouteContainer(initialCategory: category)
-                .ohanaSheetPagePresentation()
+            if AppFeatureRouteGuard.allowsSheetRoute(route, currentLevel: currentFeatureLevel) {
+                CoconutShopRouteContainer(initialCategory: category)
+                    .ohanaSheetPagePresentation()
+            } else {
+                HiddenRouteInterceptView(
+                    note: AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: currentFeatureLevel)
+                )
+                .onAppear(perform: onDismiss)
+            }
         case let .crewRoster(mode):
             NavigationStack {
                 CrewRosterOverlayRouteContainer(
@@ -586,6 +593,10 @@ private struct AppSheetRouteDestination: View {
             )
                 .ohanaSheetPagePresentation()
         }
+    }
+
+    private var currentFeatureLevel: Int {
+        OasisTreeManager.shared.treeLevel.rawValue
     }
 
     private func openPetAllFeatureDestination(_ petID: UUID, destination: PetAllFeatureDestination) {

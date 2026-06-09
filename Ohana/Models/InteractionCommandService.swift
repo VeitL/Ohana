@@ -350,18 +350,9 @@ enum HumanWishlistCommandService {
             throw HumanWishlistCommandError.insufficientCoconuts(missing: item.cost - human.coconutBalance)
         }
 
-        human.coconutBalance -= item.cost
         item.isRedeemed = true
         item.redeemedById = normalizedId(redeemedById)
 
-        let questManager = providedQuestManager ?? QuestManager.shared
-        questManager.recordCoconutDelta(
-            -item.cost,
-            emoji: "🎁",
-            title: "兑换「\(item.title)」",
-            actorId: human.id.uuidString,
-            actorName: human.name
-        )
         let ledger = CareLedgerService.record(
             actorKind: .human,
             actorId: item.redeemedById ?? human.id.uuidString,
@@ -377,6 +368,30 @@ enum HumanWishlistCommandService {
             privacyFieldRaw: HumanPrivateField.wishlist.rawValue,
             context: context,
             save: false
+        )
+        try CoconutWalletService.apply(
+            deltas: [
+                .human(
+                    human,
+                    delta: -item.cost,
+                    entryKind: .spend,
+                    source: .shop,
+                    title: "兑换「\(item.title)」",
+                    emoji: "🎁",
+                    actorId: human.id.uuidString,
+                    actorName: human.name,
+                    subjectKind: .human,
+                    subjectId: human.id.uuidString,
+                    sourceModelName: "WishlistItem",
+                    sourceModelId: item.id.uuidString,
+                    careLedgerEventId: ledger.id.uuidString,
+                    metadataJSON: "{\"wishlistItemId\":\"\(item.id.uuidString)\"}",
+                    transactionKey: "wishlist:\(item.id.uuidString):redeem"
+                )
+            ],
+            context: context,
+            save: false,
+            projectionManager: providedQuestManager ?? .shared
         )
         context.safeSave()
 
@@ -1904,6 +1919,7 @@ enum PetHealthCommandService {
             ? CoconutEconomyService.awardCareAction(type: .health, pet: pet, context: context)
             : (humanGot: 0, petGot: 0)
         let coconutDelta = CareLedgerService.rewardDelta(reward)
+        let rewardMetadataJSON = CareLedgerService.rewardMetadata(reward)
 
         CareLedgerService.record(
             occurredAt: log.date,
@@ -1921,7 +1937,7 @@ enum PetHealthCommandService {
             legacyModelName: "PetHealthLog",
             legacyModelId: log.id.uuidString,
             coconutDelta: coconutDelta,
-            metadataJSON: CareLedgerService.rewardMetadata(reward),
+            metadataJSON: rewardMetadataJSON,
             context: context,
             save: false
         )
@@ -1947,6 +1963,7 @@ enum PetHealthCommandService {
         }
 
         context.safeSave()
+        CareLedgerService.syncOasisTreeEnergyIfNeeded(metadataJSON: rewardMetadataJSON, context: context)
         if schedulesReminderNotification, let reminder {
             Task { @MainActor in
                 await ReminderSchedulingService.scheduleIfNeeded(
@@ -3754,20 +3771,61 @@ enum AchievementRewardCommandService {
         }
 
         let totalAmount = claimable.count * amountPerBadge
-        if let human {
-            human.coconutBalance += totalAmount
-        } else {
-            pet.coconutBalance += totalAmount
-        }
-
         let questManager = providedQuestManager ?? QuestManager.shared
-        for claim in claimable {
-            questManager.recordCoconutDelta(
-                amountPerBadge,
-                emoji: claim.emoji,
+        let walletDeltas: [CoconutWalletDelta] = claimable.map { claim in
+            if let human {
+                return .human(
+                    human,
+                    delta: amountPerBadge,
+                    entryKind: .reward,
+                    source: .service,
+                    title: claim.logTitle,
+                    emoji: claim.emoji,
+                    actorId: human.id.uuidString,
+                    actorName: human.name,
+                    subjectKind: .human,
+                    subjectId: human.id.uuidString,
+                    sourceModelName: "AchievementReward",
+                    sourceModelId: claim.rewardKey,
+                    metadataJSON: "{\"badgeId\":\"\(claim.badgeID)\",\"entityKind\":\"\(entityKind)\"}",
+                    transactionKey: "achievement:\(claim.rewardKey)"
+                )
+            }
+            return .pet(
+                pet,
+                delta: amountPerBadge,
+                entryKind: .reward,
+                source: .service,
                 title: claim.logTitle,
-                actorId: entityID.uuidString,
-                actorName: human?.name ?? pet.name
+                emoji: claim.emoji,
+                actorId: pet.id.uuidString,
+                actorName: pet.name,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                sourceModelName: "AchievementReward",
+                sourceModelId: claim.rewardKey,
+                metadataJSON: "{\"badgeId\":\"\(claim.badgeID)\",\"entityKind\":\"\(entityKind)\"}",
+                transactionKey: "achievement:\(claim.rewardKey)"
+            )
+        }
+        do {
+            try CoconutWalletService.apply(
+                deltas: walletDeltas,
+                context: context,
+                save: false,
+                projectionManager: questManager
+            )
+        } catch {
+            #if DEBUG
+            print("❌ [AchievementRewardCommandService] wallet write failed: \(error.localizedDescription)")
+            #endif
+            return AchievementRewardCommandResult(
+                entityID: entityID,
+                entityKind: entityKind,
+                badgeIDs: claims.map(\.badgeID),
+                totalAmount: 0,
+                updatedClaimedRewardRaw: claimedRewardRaw,
+                didClaim: false
             )
         }
         let updatedRaw = claimedIDs.sorted().joined(separator: ",")
@@ -3841,6 +3899,7 @@ struct ShopPurchaseCommandResult: Equatable {
     let didPurchase: Bool
     let failure: ShopPurchaseFailure?
     let ledgerEventID: UUID?
+    let transactionKey: String?
 }
 
 enum ShopPurchaseCommandService {
@@ -3860,7 +3919,8 @@ enum ShopPurchaseCommandService {
                 cost: item.cost,
                 didPurchase: true,
                 failure: nil,
-                ledgerEventID: nil
+                ledgerEventID: nil,
+                transactionKey: nil
             )
         }
         guard let buyer else {
@@ -3870,7 +3930,8 @@ enum ShopPurchaseCommandService {
                 cost: item.cost,
                 didPurchase: false,
                 failure: .missingActiveHuman,
-                ledgerEventID: nil
+                ledgerEventID: nil,
+                transactionKey: nil
             )
         }
         guard buyer.coconutBalance >= item.cost else {
@@ -3880,19 +3941,18 @@ enum ShopPurchaseCommandService {
                 cost: item.cost,
                 didPurchase: false,
                 failure: .insufficientBalance(missing: item.cost - buyer.coconutBalance),
-                ledgerEventID: nil
+                ledgerEventID: nil,
+                transactionKey: nil
             )
         }
 
-        buyer.coconutBalance -= item.cost
-        let questManager = providedQuestManager ?? QuestManager.shared
-        questManager.recordCoconutDelta(
-            -item.cost,
-            emoji: item.emoji,
-            title: itemName,
-            actorId: buyer.id.uuidString,
-            actorName: buyer.name
-        )
+        let purchaseID = UUID()
+        let transactionKey = item.isConsumable
+            ? "shop:\(item.id):\(buyer.id.uuidString):\(purchaseID.uuidString)"
+            : "shop:\(item.id):\(buyer.id.uuidString)"
+        let metadataJSON = item.isConsumable
+            ? "{\"shopItemId\":\"\(item.id)\",\"purchaseId\":\"\(purchaseID.uuidString)\",\"consumable\":true}"
+            : "{\"shopItemId\":\"\(item.id)\"}"
         let ledger = CareLedgerService.record(
             actorKind: .human,
             actorId: buyer.id.uuidString,
@@ -3903,10 +3963,47 @@ enum ShopPurchaseCommandService {
             note: itemName,
             source: .economy,
             coconutDelta: -item.cost,
-            metadataJSON: "{\"shopItemId\":\"\(item.id)\"}",
+            metadataJSON: metadataJSON,
             context: context,
             save: false
         )
+        do {
+            try CoconutWalletService.apply(
+                deltas: [
+                    .human(
+                        buyer,
+                        delta: -item.cost,
+                        entryKind: .spend,
+                        source: .shop,
+                        title: itemName,
+                        emoji: item.emoji,
+                        actorId: buyer.id.uuidString,
+                        actorName: buyer.name,
+                        subjectKind: .system,
+                        subjectId: nil,
+                        sourceModelName: "ShopCatalog",
+                        sourceModelId: item.id,
+                        careLedgerEventId: ledger.id.uuidString,
+                        metadataJSON: metadataJSON,
+                        transactionKey: transactionKey
+                    )
+                ],
+                context: context,
+                save: false,
+                projectionManager: providedQuestManager ?? .shared
+            )
+        } catch {
+            context.rollback()
+            return ShopPurchaseCommandResult(
+                humanID: buyer.id,
+                itemID: item.id,
+                cost: item.cost,
+                didPurchase: false,
+                failure: .insufficientBalance(missing: item.cost),
+                ledgerEventID: nil,
+                transactionKey: nil
+            )
+        }
         context.safeSave()
 
         return ShopPurchaseCommandResult(
@@ -3915,7 +4012,8 @@ enum ShopPurchaseCommandService {
             cost: item.cost,
             didPurchase: true,
             failure: nil,
-            ledgerEventID: ledger.id
+            ledgerEventID: ledger.id,
+            transactionKey: transactionKey
         )
     }
 }
@@ -3951,16 +4049,6 @@ enum PetBondVaultUnlockCommandService {
             )
         }
 
-        pet.coconutBalance -= item.cost
-        PetBondVaultStore.unlock(item.kind, for: pet.id)
-        let questManager = providedQuestManager ?? QuestManager.shared
-        questManager.recordCoconutDelta(
-            -item.cost,
-            emoji: "🐾",
-            title: title,
-            actorId: pet.id.uuidString,
-            actorName: pet.name
-        )
         let ledger = CareLedgerService.record(
             actorKind: .pet,
             actorId: pet.id.uuidString,
@@ -3975,6 +4063,43 @@ enum PetBondVaultUnlockCommandService {
             context: context,
             save: false
         )
+        do {
+            try CoconutWalletService.apply(
+                deltas: [
+                    .pet(
+                        pet,
+                        delta: -item.cost,
+                        entryKind: .spend,
+                        source: .shop,
+                        title: title,
+                        emoji: "🐾",
+                        actorId: pet.id.uuidString,
+                        actorName: pet.name,
+                        subjectKind: .pet,
+                        subjectId: pet.id.uuidString,
+                        sourceModelName: "PetBondVaultItem",
+                        sourceModelId: item.id,
+                        careLedgerEventId: ledger.id.uuidString,
+                        metadataJSON: "{\"itemId\":\"\(item.id)\",\"economy\":\"petBondVault\"}",
+                        transactionKey: "petBondVault:\(item.id):\(pet.id.uuidString)"
+                    )
+                ],
+                context: context,
+                save: false,
+                projectionManager: providedQuestManager ?? .shared
+            )
+        } catch {
+            context.rollback()
+            return PetBondVaultUnlockCommandResult(
+                petID: pet.id,
+                itemID: item.id,
+                cost: item.cost,
+                didUnlock: false,
+                failure: .insufficientBalance,
+                ledgerEventID: nil
+            )
+        }
+        PetBondVaultStore.unlock(item.kind, for: pet.id)
         context.safeSave()
 
         return PetBondVaultUnlockCommandResult(
@@ -4663,19 +4788,48 @@ enum SettingsCommandService {
         context: ModelContext
     ) -> SettingsCoconutBalanceCommandResult {
         let amount = max(0, rawAmount)
-        human?.coconutBalance = amount
-        if human != nil {
-            context.safeSave()
+        let current = human?.coconutBalance ?? CoconutWalletService.totalBalance(context: context)
+        let delta = amount - current
+        if delta != 0 {
+            do {
+                let walletDelta: CoconutWalletDelta
+                if let human {
+                    walletDelta = .human(
+                        human,
+                        delta: delta,
+                        entryKind: .adjustment,
+                        source: .service,
+                        title: title,
+                        emoji: "🧪",
+                        actorId: human.id.uuidString,
+                        actorName: actorName ?? human.name,
+                        subjectKind: .human,
+                        subjectId: human.id.uuidString
+                    )
+                } else {
+                    walletDelta = .system(
+                        delta: delta,
+                        entryKind: .adjustment,
+                        source: .service,
+                        title: title,
+                        emoji: "🧪",
+                        actorId: "system",
+                        actorName: actorName ?? "System"
+                    )
+                }
+                try CoconutWalletService.apply(
+                    deltas: [walletDelta],
+                    context: context,
+                    save: false,
+                    projectionManager: questManager
+                )
+                context.safeSave()
+            } catch {
+                #if DEBUG
+                print("❌ [SettingsCoconutBalanceCommandService] wallet adjustment failed: \(error.localizedDescription)")
+                #endif
+            }
         }
-
-        let delta = amount - questManager.coconutCount
-        questManager.recordCoconutDelta(
-            delta,
-            emoji: "🧪",
-            title: title,
-            actorId: human?.id.uuidString,
-            actorName: actorName
-        )
 
         return SettingsCoconutBalanceCommandResult(
             humanID: human?.id,

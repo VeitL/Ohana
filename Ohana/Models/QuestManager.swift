@@ -24,11 +24,11 @@ struct CoconutLogEntry: Codable, Identifiable {
     var budgetStage: String?
     var feedbackMessage: String?
 
-    init(emoji: String, title: String, amount: Int, date: Date = Date(),
+    init(id: UUID = UUID(), emoji: String, title: String, amount: Int, date: Date = Date(),
          actorId: String? = nil, actorName: String? = nil,
          growthXP: Int? = nil, economyReason: String? = nil,
          budgetStage: String? = nil, feedbackMessage: String? = nil) {
-        self.id = UUID()
+        self.id = id
         self.emoji = emoji
         self.title = title
         self.amount = amount
@@ -104,15 +104,46 @@ final class QuestManager {
     var isThemeColorSet: Bool = false
 
     // MARK: - Flush（原子写入 UserDefaults）
-    /// 将内存状态一次性写入 UserDefaults，确保和 SwiftData save 同步
+    /// Persists quest flags only. Coconut balance and history are SwiftData-backed in V58.
     func flushToDefaults() {
-        Self.defaults.set(coconutCount, forKey: Keys.coconut)
         Self.defaults.set(isPetWizardCompleted, forKey: Keys.petWizard)
         Self.defaults.set(isFirstMealRecorded, forKey: Keys.firstMeal)
         Self.defaults.set(isThemeColorSet, forKey: Keys.themeColor)
-        if let data = try? JSONEncoder().encode(coconutLogs) {
-            Self.defaults.set(data, forKey: Keys.coconutLogs)
+    }
+
+    func replaceCoconutProjection(count: Int, logs: [CoconutLogEntry]) {
+        coconutCount = max(0, count)
+        coconutLogs = Array(logs.prefix(200))
+        NotificationCenter.default.post(name: NSNotification.Name("coconutCountChanged"), object: nil)
+    }
+
+    func recordWalletProjection(entries: [CoconutLedgerEntry], postsRewardFeedback: Bool) {
+        guard !entries.isEmpty else { return }
+        let totalDelta = entries
+            .filter(\.affectsBalance)
+            .reduce(0) { $0 + $1.delta }
+        coconutCount = max(0, coconutCount + totalDelta)
+
+        let projectedLogs = entries
+            .filter { $0.delta != 0 }
+            .sorted { $0.occurredAt > $1.occurredAt }
+            .map { $0.asCoconutLogEntry() }
+        if !projectedLogs.isEmpty {
+            coconutLogs.insert(contentsOf: projectedLogs, at: 0)
+            if coconutLogs.count > 200 {
+                coconutLogs = Array(coconutLogs.prefix(200))
+            }
         }
+
+        if postsRewardFeedback {
+            for entry in projectedLogs where entry.amount > 0 || (entry.growthXP ?? 0) > 0 {
+                NotificationCenter.default.post(
+                    name: .ohanaCoconutRewardEvent,
+                    object: OhanaCoconutRewardEvent(entry: entry)
+                )
+            }
+        }
+        NotificationCenter.default.post(name: NSNotification.Name("coconutCountChanged"), object: nil)
     }
 
     // MARK: - Constants
@@ -481,17 +512,7 @@ final class QuestManager {
 
         let finalHuman = result.humanCoconuts
         let finalPet = result.petCoconuts
-        let islandDelta = result.totalCoconuts
-
-        // ── 2. 宠物账户
-        if finalPet > 0 { pet?.coconutBalance += finalPet }
-
-        // ── 3. 人类账户
-        if finalHuman > 0 { human?.coconutBalance += finalHuman }
-
-        if islandDelta > 0 { coconutCount += islandDelta }
-
-        // ── 5. 日志（拆分：宠物和人类各生成独立条目）
+        // ── 2. 钱包流水（拆分：宠物和人类各生成独立条目）
         let logEmoji = result.luck == .golden ? "🎁" : type.emoji
         var baseTitle = type.title(pet: pet)
         if let badge = quality.badgeLabel {
@@ -501,38 +522,46 @@ final class QuestManager {
             baseTitle += result.luck == .golden ? " · 金色幸运" : " · 小幸运"
         }
 
-        var insertedLogCount = 0
+        var walletDeltas: [CoconutWalletDelta] = []
         if let p = pet, finalPet > 0 {
-            appendLog(CoconutLogEntry(
-                emoji: logEmoji,
+            walletDeltas.append(.pet(
+                p,
+                delta: finalPet,
+                entryKind: .reward,
+                source: .careEvent,
                 title: baseTitle,
-                amount: finalPet,
+                emoji: logEmoji,
                 actorId: p.id.uuidString,
                 actorName: p.name,
-                growthXP: result.growthXP,
-                economyReason: result.reason,
-                budgetStage: result.budgetStage.rawValue,
-                feedbackMessage: result.feedbackMessage
-            ), postsRewardFeedback: false)
-            insertedLogCount += 1
+                subjectKind: .pet,
+                subjectId: p.id.uuidString,
+                metadataJSON: result.metadataJSON
+            ))
         }
         if let h = human, finalHuman > 0 {
-            appendLog(CoconutLogEntry(
+            walletDeltas.append(.human(
+                h,
+                delta: finalHuman,
+                entryKind: .reward,
+                source: .careEvent,
+                title: baseTitle,
                 emoji: "🥥",
-                title: result.luck == .golden ? "金色幸运协助奖励" : "协助奖励",
-                amount: finalHuman,
                 actorId: h.id.uuidString,
                 actorName: h.name,
-                growthXP: result.growthXP,
-                economyReason: result.reason,
-                budgetStage: result.budgetStage.rawValue,
-                feedbackMessage: result.feedbackMessage
-            ), postsRewardFeedback: false)
-            insertedLogCount += 1
+                subjectKind: .human,
+                subjectId: h.id.uuidString,
+                metadataJSON: result.metadataJSON
+            ))
         }
 
-        // ── 6. 持久化（先存 SwiftData，成功后再 flush UserDefaults）
+        // ── 3. 持久化（同一个 ModelContext 事务）
         do {
+            try CoconutWalletService.apply(
+                deltas: walletDeltas,
+                context: context,
+                save: false,
+                postsRewardFeedback: false
+            )
             try context.save()
             if consumesBoost {
                 UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
@@ -550,14 +579,8 @@ final class QuestManager {
             // TASK C: 检查 Streak 里程碑奖励
             if let pet { StreakRewardManager.shared.checkAndAward(pet: pet) }
         } catch {
-            // SwiftData 保存失败 → 回滚内存状态防止坏账
-            if finalPet > 0 { pet?.coconutBalance -= finalPet }
-            if finalHuman > 0 { human?.coconutBalance -= finalHuman }
-            coconutCount -= islandDelta
-            // 移除刚插入的日志
-            if insertedLogCount > 0, coconutLogs.count >= insertedLogCount {
-                coconutLogs.removeFirst(insertedLogCount)
-            }
+            context.rollback()
+            CoconutWalletService.refreshQuestProjection(context: context)
             #if DEBUG
             print("❌ [QuestManager] SwiftData save 失败，已回滚: \(error.localizedDescription)")
             #endif
@@ -603,19 +626,9 @@ final class QuestManager {
         lastEconomyRewardResult = result
 
         let petAwards = Self.distribute(result.petCoconuts, count: livePets.count)
-        for (index, pet) in livePets.enumerated() where petAwards[index] > 0 {
-            pet.coconutBalance += petAwards[index]
-        }
-        if result.humanCoconuts > 0 {
-            human?.coconutBalance += result.humanCoconuts
-        }
 
         let petTotal = petAwards.reduce(0, +)
         let humanTotal = human == nil ? 0 : result.humanCoconuts
-        let islandDelta = result.totalCoconuts
-        if islandDelta > 0 {
-            coconutCount += islandDelta
-        }
 
         let logEmoji = result.luck == .golden ? "🎁" : type.emoji
         let petNames = livePets.prefix(3).map(\.name).joined(separator: "、") + (livePets.count > 3 ? " 等\(livePets.count)只" : "")
@@ -624,37 +637,45 @@ final class QuestManager {
             sharedTitle += result.luck == .golden ? " · 金色幸运" : " · 小幸运"
         }
 
-        var insertedLogCount = 0
+        var walletDeltas: [CoconutWalletDelta] = []
         for (index, pet) in livePets.enumerated() where petAwards[index] > 0 {
-            appendLog(CoconutLogEntry(
-                emoji: logEmoji,
+            walletDeltas.append(.pet(
+                pet,
+                delta: petAwards[index],
+                entryKind: .reward,
+                source: .careEvent,
                 title: sharedTitle,
-                amount: petAwards[index],
+                emoji: logEmoji,
                 actorId: pet.id.uuidString,
                 actorName: pet.name,
-                growthXP: result.growthXP,
-                economyReason: result.reason,
-                budgetStage: result.budgetStage.rawValue,
-                feedbackMessage: result.feedbackMessage
-            ), postsRewardFeedback: false)
-            insertedLogCount += 1
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                metadataJSON: result.metadataJSON
+            ))
         }
         if let human, humanTotal > 0 {
-            appendLog(CoconutLogEntry(
-                emoji: "🥥",
+            walletDeltas.append(.human(
+                human,
+                delta: humanTotal,
+                entryKind: .reward,
+                source: .careEvent,
                 title: result.luck == .golden ? "金色幸运共同照护奖励" : "共同照护奖励",
-                amount: humanTotal,
+                emoji: "🥥",
                 actorId: human.id.uuidString,
                 actorName: human.name,
-                growthXP: result.growthXP,
-                economyReason: result.reason,
-                budgetStage: result.budgetStage.rawValue,
-                feedbackMessage: result.feedbackMessage
-            ), postsRewardFeedback: false)
-            insertedLogCount += 1
+                subjectKind: .human,
+                subjectId: human.id.uuidString,
+                metadataJSON: result.metadataJSON
+            ))
         }
 
         do {
+            try CoconutWalletService.apply(
+                deltas: walletDeltas,
+                context: context,
+                save: false,
+                postsRewardFeedback: false
+            )
             try context.save()
             if consumesBoost {
                 UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
@@ -675,16 +696,8 @@ final class QuestManager {
                 StreakRewardManager.shared.checkAndAward(pet: pet)
             }
         } catch {
-            for (index, pet) in livePets.enumerated() where petAwards[index] > 0 {
-                pet.coconutBalance -= petAwards[index]
-            }
-            if humanTotal > 0 {
-                human?.coconutBalance -= humanTotal
-            }
-            coconutCount -= islandDelta
-            if insertedLogCount > 0, coconutLogs.count >= insertedLogCount {
-                coconutLogs.removeFirst(insertedLogCount)
-            }
+            context.rollback()
+            CoconutWalletService.refreshQuestProjection(context: context)
             #if DEBUG
             print("❌ [QuestManager] shared care save failed: \(error.localizedDescription)")
             #endif
@@ -700,20 +713,29 @@ final class QuestManager {
     func addCoconuts(_ amount: Int, emoji: String = "🥥", title: String = "打卡奖励", reason: String? = nil,
                       actorId: String? = nil, actorName: String? = nil) {
         lastEconomyRewardResult = nil
-        guard amount > 0 else {
-            coconutCount += amount
-            appendLog(CoconutLogEntry(emoji: emoji, title: reason ?? title, amount: amount,
-                                      actorId: actorId, actorName: actorName))
-            flushToDefaults()
-            return
-        }
-        let finalAmount = amount
         let finalTitle = reason ?? title
-        let finalEmoji = emoji
-        coconutCount += finalAmount
-        appendLog(CoconutLogEntry(emoji: finalEmoji, title: finalTitle, amount: finalAmount,
-                                  actorId: actorId, actorName: actorName))
-        flushToDefaults()
+        guard amount != 0 else { return }
+        let context = ModelContext(SharedModelContainer.make())
+        do {
+            try CoconutWalletService.applyActorDelta(
+                amount: amount,
+                emoji: emoji,
+                title: finalTitle,
+                actorId: actorId,
+                actorName: actorName,
+                entryKind: amount > 0 ? .reward : .spend,
+                source: .service,
+                context: context,
+                save: true
+            )
+        } catch {
+            appendLog(CoconutLogEntry(emoji: emoji, title: finalTitle, amount: amount,
+                                      actorId: actorId, actorName: actorName))
+            coconutCount = max(0, coconutCount + amount)
+            #if DEBUG
+            print("❌ [QuestManager] coconut wallet add failed: \(error.localizedDescription)")
+            #endif
+        }
     }
 
     /// 记录确定金额的椰子变动，不触发暴击、双倍券或质量加成。用于商店消费、兑换退款等经济账。
@@ -726,18 +748,36 @@ final class QuestManager {
         postsRewardFeedback: Bool = true
     ) {
         guard amount != 0 else { return }
-        coconutCount += amount
-        appendLog(
-            CoconutLogEntry(
+        let context = ModelContext(SharedModelContainer.make())
+        do {
+            try CoconutWalletService.applyActorDelta(
+                amount: amount,
                 emoji: emoji,
                 title: title,
-                amount: amount,
                 actorId: actorId,
-                actorName: actorName
-            ),
-            postsRewardFeedback: postsRewardFeedback
-        )
-        flushToDefaults()
+                actorName: actorName,
+                entryKind: amount > 0 ? .refund : .spend,
+                source: .service,
+                context: context,
+                save: true,
+                postsRewardFeedback: postsRewardFeedback
+            )
+        } catch {
+            coconutCount = max(0, coconutCount + amount)
+            appendLog(
+                CoconutLogEntry(
+                    emoji: emoji,
+                    title: title,
+                    amount: amount,
+                    actorId: actorId,
+                    actorName: actorName
+                ),
+                postsRewardFeedback: postsRewardFeedback
+            )
+            #if DEBUG
+            print("❌ [QuestManager] coconut wallet delta failed: \(error.localizedDescription)")
+            #endif
+        }
     }
 
     /// 旧版签名兼容；内部映射到新规则。
@@ -764,12 +804,9 @@ final class QuestManager {
             humanGet = 0; petGet = 0
         }
 
-        if petGet > 0   { pet?.coconutBalance += petGet }
-        if humanGet > 0 { human?.coconutBalance += humanGet }
         let islandDelta = (petGet > 0 && pet != nil ? petGet : 0)
                         + (humanGet > 0 && human != nil ? humanGet : 0)
         let fallback    = (islandDelta == 0) ? amount : 0  // potty/general 无实体时保底给全岛
-        coconutCount += islandDelta + fallback
 
         let titleStr: String
         let emojiStr = type.emoji
@@ -781,9 +818,60 @@ final class QuestManager {
         case .water:   titleStr = "\(pet?.name ?? "") 喂水奖励"
         case .general: titleStr = "打卡奖励"
         }
-        appendLog(CoconutLogEntry(emoji: emojiStr, title: titleStr, amount: islandDelta + fallback,
-                                  actorId: aId, actorName: aName))
-        flushToDefaults()
+        let context = ModelContext(SharedModelContainer.make())
+        do {
+            if let pet, petGet > 0 {
+                try CoconutWalletService.applyActorDelta(
+                    amount: petGet,
+                    emoji: emojiStr,
+                    title: titleStr,
+                    actorId: pet.id.uuidString,
+                    actorName: pet.name,
+                    entryKind: .reward,
+                    source: .service,
+                    context: context,
+                    save: false
+                )
+            }
+            if let human, humanGet > 0 {
+                try CoconutWalletService.applyActorDelta(
+                    amount: humanGet,
+                    emoji: emojiStr,
+                    title: titleStr,
+                    actorId: human.id.uuidString,
+                    actorName: human.name,
+                    entryKind: .reward,
+                    source: .service,
+                    context: context,
+                    save: false
+                )
+            }
+            if fallback != 0 {
+                try CoconutWalletService.applyActorDelta(
+                    amount: fallback,
+                    emoji: emojiStr,
+                    title: titleStr,
+                    actorId: aId,
+                    actorName: aName,
+                    entryKind: .reward,
+                    source: .service,
+                    context: context,
+                    save: false
+                )
+            }
+            try context.save()
+            if petGet > 0 { pet?.coconutBalance += petGet }
+            if humanGet > 0 { human?.coconutBalance += humanGet }
+        } catch {
+            context.rollback()
+            CoconutWalletService.refreshQuestProjection(context: context)
+            appendLog(CoconutLogEntry(emoji: emojiStr, title: titleStr, amount: islandDelta + fallback,
+                                      actorId: aId, actorName: aName))
+            coconutCount = max(0, coconutCount + islandDelta + fallback)
+            #if DEBUG
+            print("❌ [QuestManager] legacy award wallet write failed: \(error.localizedDescription)")
+            #endif
+        }
     }
 
     // MARK: - 批量打卡（任务三）
@@ -844,7 +932,7 @@ final class QuestManager {
         default:      careTypeEnum = nil
         }
 
-        for (index, pet) in livePets.enumerated() {
+        for pet in livePets {
             if let ct = careTypeEnum {
                 let log = PetCareLog(type: ct, pet: pet, executorId: executorId)
                 context.insert(log)
@@ -852,19 +940,12 @@ final class QuestManager {
                 let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: executorId)
                 context.insert(log)
             }
-            // 更新宠物椰子账户
-            pet.coconutBalance += petAwards[index]
         }
 
-        // ── 2. 人类账户（只发一次，不乘以宠物数量）
-        if humanTotal > 0 { human?.coconutBalance += humanTotal }
-
-        // ── 3. 全岛总库
+        // ── 2. 钱包账户（人类只发一次，不乘以宠物数量）
         let petTotal = petAwards.reduce(0, +)
-        let islandDelta = result.totalCoconuts
-        if islandDelta > 0 { coconutCount += islandDelta }
 
-        // ── 4. 一条合并日志
+        // ── 3. 钱包流水
         let logEmoji = result.luck == .golden ? "🎁" : type.emoji
         let petNames = livePets.prefix(3).map(\.name).joined(separator: "、")
             + (livePets.count > 3 ? " 等\(livePets.count)只" : "")
@@ -872,22 +953,46 @@ final class QuestManager {
         if result.luck != .none {
             baseTitle += result.luck == .golden ? " · 金色幸运" : " · 小幸运"
         }
-        if islandDelta > 0 {
-            appendLog(CoconutLogEntry(
-                emoji: logEmoji,
+        var walletDeltas: [CoconutWalletDelta] = []
+        for (index, pet) in livePets.enumerated() where petAwards[index] > 0 {
+            walletDeltas.append(.pet(
+                pet,
+                delta: petAwards[index],
+                entryKind: .reward,
+                source: .careEvent,
                 title: baseTitle,
-                amount: islandDelta,
-                actorId: human?.id.uuidString ?? "batch",
-                actorName: human?.name ?? "全家打卡",
-                growthXP: result.growthXP,
-                economyReason: result.reason,
-                budgetStage: result.budgetStage.rawValue,
-                feedbackMessage: result.feedbackMessage
-            ), postsRewardFeedback: false)
+                emoji: logEmoji,
+                actorId: pet.id.uuidString,
+                actorName: pet.name,
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                metadataJSON: result.metadataJSON
+            ))
+        }
+        if let human, humanTotal > 0 {
+            walletDeltas.append(.human(
+                human,
+                delta: humanTotal,
+                entryKind: .reward,
+                source: .careEvent,
+                title: baseTitle,
+                emoji: "🥥",
+                actorId: human.id.uuidString,
+                actorName: human.name,
+                subjectKind: .human,
+                subjectId: human.id.uuidString,
+                metadataJSON: result.metadataJSON
+            ))
         }
 
-        // ── 5. 持久化
+        // ── 4. 持久化
         do {
+            try CoconutWalletService.apply(
+                deltas: walletDeltas,
+                context: context,
+                save: false,
+                postsRewardFeedback: false
+            )
             try context.save()
             if consumesBoost {
                 UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
@@ -908,13 +1013,8 @@ final class QuestManager {
                 actorName: human?.name ?? "全家打卡"
             )
         } catch {
-            // 回滚
-            for (index, pet) in livePets.enumerated() {
-                pet.coconutBalance -= petAwards[index]
-            }
-            human?.coconutBalance -= humanTotal
-            coconutCount -= islandDelta
-            if islandDelta > 0, !coconutLogs.isEmpty { coconutLogs.removeFirst() }
+            context.rollback()
+            CoconutWalletService.refreshQuestProjection(context: context)
             #if DEBUG
             print("❌ [batchAward] save 失败: \(error)")
             #endif

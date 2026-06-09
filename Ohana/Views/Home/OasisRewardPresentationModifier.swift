@@ -54,26 +54,62 @@ struct OasisRewardPresentationModifier: ViewModifier {
             InventoryView()
                 .ohanaSheetPagePresentation() // ui-v4: allow long inventory overview
         case let .coconutShop(category):
-            CoconutShopRouteContainer(initialCategory: category)
-                .ohanaSheetPagePresentation() // ui-v4: allow long shop overview
+            if AppFeatureRouteGuard.allowsOasisSheetRoute(route, currentLevel: currentFeatureLevel) {
+                CoconutShopRouteContainer(initialCategory: category)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long shop overview
+            } else {
+                lockedOasisRoute(route)
+            }
         case .gacha:
-            GachaRouteContainer(onPresentCoconutLog: onPresentCoconutLog)
-                .ohanaSheetPagePresentation() // ui-v4: allow long blind-box overview
+            if AppFeatureRouteGuard.allowsOasisSheetRoute(route, currentLevel: currentFeatureLevel) {
+                GachaRouteContainer(onPresentCoconutLog: onPresentCoconutLog)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long blind-box overview
+            } else {
+                lockedOasisRoute(route)
+            }
         case .checkInDetail:
             DailyStreakDetailRouteContainer(
                 onClose: { sheetRoute = nil },
                 onPresentCoconutLog: onPresentCoconutLog,
                 onPresentCoconutShop: { category in
-                    sheetRoute = .coconutShop(category)
+                    presentOasisSheet(.coconutShop(category))
                 }
             )
                 .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
         case .critterCodex:
-            OasisCritterCodexRouteContainer(
-                mode: .codex,
-                onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
-            )
-                .ohanaSheetPagePresentation() // ui-v4: allow long critter codex overview
+            if AppFeatureRouteGuard.allowsOasisSheetRoute(route, currentLevel: currentFeatureLevel) {
+                OasisCritterCodexRouteContainer(
+                    mode: .codex,
+                    onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
+                )
+                    .ohanaSheetPagePresentation() // ui-v4: allow long critter codex overview
+            } else {
+                lockedOasisRoute(route)
+            }
         }
+    }
+
+    private var currentFeatureLevel: Int {
+        OasisTreeManager.shared.treeLevel.rawValue
+    }
+
+    private func presentOasisSheet(_ route: OasisSheetRoute) {
+        guard AppFeatureRouteGuard.allowsOasisSheetRoute(route, currentLevel: currentFeatureLevel) else {
+            AppFeatureRouteGuard.recordIntercept(
+                AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: currentFeatureLevel)
+            )
+            return
+        }
+        sheetRoute = route
+    }
+
+    private func lockedOasisRoute(_ route: OasisSheetRoute) -> some View {
+        Color.clear
+            .onAppear {
+                AppFeatureRouteGuard.recordIntercept(
+                    AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: currentFeatureLevel)
+                )
+                sheetRoute = nil
+            }
     }
 }

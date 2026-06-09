@@ -134,12 +134,12 @@ enum GrowthUnlockCatalog {
         GrowthUnlockStep(
             id: .oasisPlants,
             requiredLevel: 5,
-            titleZh: "绿洲树冠",
-            titleEn: "Oasis Canopy",
-            titleDe: "Oase entsteht",
-            detailZh: "解锁 Oasis 椰子树、被动收益和每周轻加速包，让成长开始反哺日常管理。",
-            detailEn: "Unlock the Oasis tree, passive income, and the weekly light boost so growth feeds back into daily utility.",
-            detailDe: "Schalte den Oasis-Baum, passive Erträge und den Wochen-Boost frei.",
+            titleZh: "绿洲收益",
+            titleEn: "Oasis Yield",
+            titleDe: "Oasis-Ertrag",
+            detailZh: "生命之树从 Lv.1 开始可见；Lv.5 后开放树上椰子收益，让成长开始反哺日常管理。",
+            detailEn: "The Life Tree is visible from Lv.1; Lv.5 opens tree coconut yield so growth feeds back into daily utility.",
+            detailDe: "Der Lebensbaum ist ab Lv.1 sichtbar; ab Lv.5 öffnen sich Baum-Erträge.",
             icon: "tree.fill",
             tintHex: "84CC16"
         ),

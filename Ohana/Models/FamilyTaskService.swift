@@ -461,15 +461,7 @@ enum FamilyTaskService {
         let existing = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
         guard !existing.contains(where: { $0.metadataJSON == marker }) else { return }
 
-        human.coconutBalance += task.rewardCoconuts
-        QuestManager.shared.addCoconuts(
-            task.rewardCoconuts,
-            emoji: "🎯",
-            title: "完成家庭任务",
-            actorId: human.id.uuidString,
-            actorName: human.name
-        )
-        CareLedgerService.record(
+        let ledger = CareLedgerService.record(
             actorKind: .human,
             actorId: human.id.uuidString,
             subjectKind: task.relatedPetId == nil ? .household : .pet,
@@ -481,8 +473,39 @@ enum FamilyTaskService {
             sourceReminderId: task.relatedReminderId,
             coconutDelta: task.rewardCoconuts,
             metadataJSON: marker,
-            context: context
+            context: context,
+            save: false
         )
+        do {
+            try CoconutWalletService.apply(
+                deltas: [
+                    .human(
+                        human,
+                        delta: task.rewardCoconuts,
+                        entryKind: .reward,
+                        source: .familyTask,
+                        title: "完成家庭任务",
+                        emoji: "🎯",
+                        actorId: human.id.uuidString,
+                        actorName: human.name,
+                        subjectKind: task.relatedPetId == nil ? .household : .pet,
+                        subjectId: task.relatedPetId,
+                        sourceModelName: "FamilyCollaborationTask",
+                        sourceModelId: task.id.uuidString,
+                        careLedgerEventId: ledger.id.uuidString,
+                        metadataJSON: marker
+                    )
+                ],
+                context: context,
+                save: false
+            )
+            context.safeSave()
+        } catch {
+            context.rollback()
+            #if DEBUG
+            print("❌ [FamilyTaskService] reward wallet write failed: \(error.localizedDescription)")
+            #endif
+        }
     }
 
     @MainActor
@@ -496,10 +519,7 @@ enum FamilyTaskService {
         let existing = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
         guard !existing.contains(where: { $0.metadataJSON.hasPrefix(marker) }) else { return }
 
-        payer.coconutBalance -= task.rewardCoconuts
-        receiver.coconutBalance += task.rewardCoconuts
-
-        CareLedgerService.record(
+        let payerLedger = CareLedgerService.record(
             actorKind: .human,
             actorId: payer.id.uuidString,
             subjectKind: .human,
@@ -514,7 +534,7 @@ enum FamilyTaskService {
             context: context,
             save: false
         )
-        CareLedgerService.record(
+        let receiverLedger = CareLedgerService.record(
             actorKind: .human,
             actorId: receiver.id.uuidString,
             subjectKind: task.relatedPetId == nil ? .household : .pet,
@@ -529,5 +549,52 @@ enum FamilyTaskService {
             context: context,
             save: false
         )
+        do {
+            try CoconutWalletService.apply(
+                deltas: [
+                    .human(
+                        payer,
+                        delta: -task.rewardCoconuts,
+                        entryKind: .transferOut,
+                        source: .familyTask,
+                        title: "家庭任务悬赏支付",
+                        emoji: "🎯",
+                        actorId: payer.id.uuidString,
+                        actorName: payer.name,
+                        subjectKind: .human,
+                        subjectId: receiver.id.uuidString,
+                        sourceModelName: "FamilyCollaborationTask",
+                        sourceModelId: task.id.uuidString,
+                        careLedgerEventId: payerLedger.id.uuidString,
+                        metadataJSON: "\(marker):payer",
+                        transactionKey: "\(marker):payer"
+                    ),
+                    .human(
+                        receiver,
+                        delta: task.rewardCoconuts,
+                        entryKind: .transferIn,
+                        source: .familyTask,
+                        title: "家庭任务悬赏收入",
+                        emoji: "🎯",
+                        actorId: receiver.id.uuidString,
+                        actorName: receiver.name,
+                        subjectKind: task.relatedPetId == nil ? .household : .pet,
+                        subjectId: task.relatedPetId,
+                        sourceModelName: "FamilyCollaborationTask",
+                        sourceModelId: task.id.uuidString,
+                        careLedgerEventId: receiverLedger.id.uuidString,
+                        metadataJSON: "\(marker):receiver",
+                        transactionKey: "\(marker):receiver"
+                    )
+                ],
+                context: context,
+                save: false
+            )
+        } catch {
+            context.rollback()
+            #if DEBUG
+            print("❌ [FamilyTaskService] transfer wallet write failed: \(error.localizedDescription)")
+            #endif
+        }
     }
 }

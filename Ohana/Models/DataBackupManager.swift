@@ -11,7 +11,7 @@ import SwiftData
 
 // MARK: - 顶层备份结构
 nonisolated struct OhanaBackup: Codable {
-    var schemaVersion: Int = 22
+    var schemaVersion: Int = 23
     var exportedAt: String
     // 核心实体
     var pets: [PetBackup]
@@ -46,6 +46,8 @@ nonisolated struct OhanaBackup: Codable {
     var waterLogs: [WaterLogBackup]
     var wishlistItems: [WishlistItemBackup]
     var careLedgerEvents: [CareLedgerEventBackup]?
+    var coconutAccounts: [CoconutAccountBackup]?
+    var coconutLedgerEntries: [CoconutLedgerEntryBackup]?
     var familyCollaborationTasks: [FamilyCollaborationTaskBackup]?
     var sharedCareSessions: [SharedCareSessionBackup]?
     var coconutExchangeRequests: [CoconutExchangeRequestBackup]?
@@ -381,6 +383,45 @@ nonisolated struct CareLedgerEventBackup: Codable {
     var createdAt: String
 }
 
+nonisolated struct CoconutAccountBackup: Codable {
+    var id: String
+    var accountKey: String
+    var ownerKindRaw: String
+    var ownerId: String
+    var displayName: String
+    var balance: Int
+    var createdAt: String
+    var updatedAt: String
+    var metadataJSON: String
+}
+
+nonisolated struct CoconutLedgerEntryBackup: Codable {
+    var id: String
+    var transactionKey: String
+    var accountKey: String
+    var ownerKindRaw: String
+    var ownerId: String
+    var ownerName: String
+    var delta: Int
+    var balanceBefore: Int
+    var balanceAfter: Int
+    var affectsBalance: Bool
+    var entryKindRaw: String
+    var sourceRaw: String
+    var title: String
+    var emoji: String
+    var actorId: String?
+    var actorName: String?
+    var subjectKindRaw: String
+    var subjectId: String?
+    var sourceModelName: String
+    var sourceModelId: String
+    var careLedgerEventId: String?
+    var metadataJSON: String
+    var occurredAt: String
+    var createdAt: String
+}
+
 nonisolated struct FamilyCollaborationTaskBackup: Codable {
     var id: String
     var title: String
@@ -621,7 +662,7 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 22 else {
+        guard backup.schemaVersion <= 23 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -661,6 +702,8 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         let waterLogs   = try context.fetch(FetchDescriptor<WaterLog>())
         let wishlist    = try context.fetch(FetchDescriptor<WishlistItem>())
         let ledger      = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let coconutAccounts = try context.fetch(FetchDescriptor<CoconutAccount>())
+        let coconutLedgerEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         let familyTasks = try context.fetch(FetchDescriptor<FamilyCollaborationTask>())
         let sharedCareSessions = try context.fetch(FetchDescriptor<SharedCareSession>())
         let exchanges   = try context.fetch(FetchDescriptor<CoconutExchangeRequest>())
@@ -673,15 +716,20 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         let gachaDrawLogs = try context.fetch(FetchDescriptor<GachaDrawLog>())
 
         let ud = UserDefaults.standard
+        let coconutLogProjection = coconutLedgerEntries
+            .sorted { $0.occurredAt > $1.occurredAt }
+            .prefix(200)
+            .filter { $0.delta != 0 }
+            .map { $0.asCoconutLogEntry() }
         let coconutLogsJSON: String = {
-            if let data = ud.data(forKey: "quest_coconutLogs"),
-               let string = String(data: data, encoding: .utf8) {
-                return string
+            guard let data = try? JSONEncoder().encode(Array(coconutLogProjection)),
+                  let string = String(data: data, encoding: .utf8) else {
+                return "[]"
             }
-            return ud.string(forKey: "coconutLogs") ?? "[]"
+            return string
         }()
         let appState = AppStateBackup(
-            coconutCount:           ud.integer(forKey: "quest_coconutCount"),
+            coconutCount:           coconutAccounts.reduce(0) { $0 + $1.balance },
             coconutLogsJSON:        coconutLogsJSON,
             bountyTasksJSON:        ud.string(forKey: "bountyTasks") ?? "[]",
             purchasedShopItems:     ud.string(forKey: "purchasedShopItems") ?? "",
@@ -723,6 +771,8 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
             waterLogs:        waterLogs.map(encodeWaterLog),
             wishlistItems:    wishlist.map(encodeWishlist),
             careLedgerEvents: ledger.map(encodeCareLedgerEvent),
+            coconutAccounts: coconutAccounts.map(encodeCoconutAccount),
+            coconutLedgerEntries: coconutLedgerEntries.map(encodeCoconutLedgerEntry),
             familyCollaborationTasks: familyTasks.map(encodeFamilyCollaborationTask),
             sharedCareSessions: sharedCareSessions.map(encodeSharedCareSession),
             coconutExchangeRequests: exchanges.map(encodeCoconutExchangeRequest),
@@ -739,6 +789,7 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
 
     // MARK: - Apply Backup
 
+    @MainActor
     private func applyBackup(_ backup: OhanaBackup, context: ModelContext) throws {
         // 以 UUID 为主键去重：先构建现有 ID 集合，再 upsert
         let existingPetIds   = Set((try? context.fetch(FetchDescriptor<Pet>()))?.map { $0.id.uuidString } ?? [])
@@ -748,6 +799,8 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         let existingEventIds = Set((try? context.fetch(FetchDescriptor<Event>()))?.map { $0.id.uuidString } ?? [])
         let existingReminderIds = Set((try? context.fetch(FetchDescriptor<Reminder>()))?.map { $0.id.uuidString } ?? [])
         let existingLedgerIds = Set((try? context.fetch(FetchDescriptor<CareLedgerEvent>()))?.map { $0.id.uuidString } ?? [])
+        let existingCoconutAccountIds = Set((try? context.fetch(FetchDescriptor<CoconutAccount>()))?.map { $0.id.uuidString } ?? [])
+        let existingCoconutLedgerEntryIds = Set((try? context.fetch(FetchDescriptor<CoconutLedgerEntry>()))?.map { $0.id.uuidString } ?? [])
         let existingFamilyTaskIds = Set((try? context.fetch(FetchDescriptor<FamilyCollaborationTask>()))?.map { $0.id.uuidString } ?? [])
         let existingSharedCareSessionIds = Set((try? context.fetch(FetchDescriptor<SharedCareSession>()))?.map { $0.id.uuidString } ?? [])
         let existingExchangeIds = Set((try? context.fetch(FetchDescriptor<CoconutExchangeRequest>()))?.map { $0.id.uuidString } ?? [])
@@ -860,6 +913,12 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         for dto in backup.careLedgerEvents ?? [] where !existingLedgerIds.contains(dto.id) {
             context.insert(decodeCareLedgerEvent(dto))
         }
+        for dto in backup.coconutAccounts ?? [] where !existingCoconutAccountIds.contains(dto.id) {
+            context.insert(decodeCoconutAccount(dto))
+        }
+        for dto in backup.coconutLedgerEntries ?? [] where !existingCoconutLedgerEntryIds.contains(dto.id) {
+            context.insert(decodeCoconutLedgerEntry(dto))
+        }
         for dto in backup.familyCollaborationTasks ?? [] where !existingFamilyTaskIds.contains(dto.id) {
             context.insert(decodeFamilyCollaborationTask(dto))
         }
@@ -896,13 +955,16 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         // 恢复 UserDefaults appState
         let ud = UserDefaults.standard
         let s = backup.appState
-        if s.coconutCount > 0 {
-            ud.set(s.coconutCount, forKey: "quest_coconutCount")
-            ud.set(s.coconutCount, forKey: "coconutCount")
-        }
-        if !s.coconutLogsJSON.isEmpty {
-            ud.set(Data(s.coconutLogsJSON.utf8), forKey: "quest_coconutLogs")
-            ud.set(s.coconutLogsJSON, forKey: "coconutLogs")
+        let isLegacyCoconutBackup = backup.coconutAccounts?.isEmpty != false
+        if isLegacyCoconutBackup {
+            if s.coconutCount > 0 {
+                ud.set(s.coconutCount, forKey: "quest_coconutCount")
+                ud.set(s.coconutCount, forKey: "coconutCount")
+            }
+            if !s.coconutLogsJSON.isEmpty {
+                ud.set(Data(s.coconutLogsJSON.utf8), forKey: "quest_coconutLogs")
+                ud.set(s.coconutLogsJSON, forKey: "coconutLogs")
+            }
         }
         if !s.bountyTasksJSON.isEmpty    { ud.set(s.bountyTasksJSON,    forKey: "bountyTasks") }
         if !s.purchasedShopItems.isEmpty { ud.set(s.purchasedShopItems, forKey: "purchasedShopItems") }
@@ -911,6 +973,11 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         }
         if !s.gachaHistoryJSON.isEmpty   { ud.set(s.gachaHistoryJSON,   forKey: "gachaHistory") }
         if !s.celebratedMilestoneDays.isEmpty { ud.set(s.celebratedMilestoneDays, forKey: "celebratedMilestoneDays") }
+        if isLegacyCoconutBackup {
+            try? CoconutEconomyBootstrapService.bootstrapIfNeeded(context: context)
+        } else {
+            CoconutWalletService.refreshQuestProjection(context: context)
+        }
     }
 
     // MARK: - Encode helpers
@@ -1316,6 +1383,49 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
             privacyFieldRaw: e.privacyFieldRaw,
             metadataJSON: e.metadataJSON,
             createdAt: d(e.createdAt)
+        )
+    }
+
+    private func encodeCoconutAccount(_ account: CoconutAccount) -> CoconutAccountBackup {
+        CoconutAccountBackup(
+            id: account.id.uuidString,
+            accountKey: account.accountKey,
+            ownerKindRaw: account.ownerKindRaw,
+            ownerId: account.ownerId,
+            displayName: account.displayName,
+            balance: account.balance,
+            createdAt: d(account.createdAt),
+            updatedAt: d(account.updatedAt),
+            metadataJSON: account.metadataJSON
+        )
+    }
+
+    private func encodeCoconutLedgerEntry(_ entry: CoconutLedgerEntry) -> CoconutLedgerEntryBackup {
+        CoconutLedgerEntryBackup(
+            id: entry.id.uuidString,
+            transactionKey: entry.transactionKey,
+            accountKey: entry.accountKey,
+            ownerKindRaw: entry.ownerKindRaw,
+            ownerId: entry.ownerId,
+            ownerName: entry.ownerName,
+            delta: entry.delta,
+            balanceBefore: entry.balanceBefore,
+            balanceAfter: entry.balanceAfter,
+            affectsBalance: entry.affectsBalance,
+            entryKindRaw: entry.entryKindRaw,
+            sourceRaw: entry.sourceRaw,
+            title: entry.title,
+            emoji: entry.emoji,
+            actorId: entry.actorId,
+            actorName: entry.actorName,
+            subjectKindRaw: entry.subjectKindRaw,
+            subjectId: entry.subjectId,
+            sourceModelName: entry.sourceModelName,
+            sourceModelId: entry.sourceModelId,
+            careLedgerEventId: entry.careLedgerEventId,
+            metadataJSON: entry.metadataJSON,
+            occurredAt: d(entry.occurredAt),
+            createdAt: d(entry.createdAt)
         )
     }
 
@@ -1977,6 +2087,51 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         )
         if let uuid = UUID(uuidString: dto.id) { event.id = uuid }
         return event
+    }
+
+    private func decodeCoconutAccount(_ dto: CoconutAccountBackup) -> CoconutAccount {
+        let account = CoconutAccount(
+            accountKey: dto.accountKey,
+            ownerKind: CoconutWalletOwnerKind(rawValue: dto.ownerKindRaw) ?? .system,
+            ownerId: dto.ownerId,
+            displayName: dto.displayName,
+            balance: dto.balance,
+            createdAt: parseDate(dto.createdAt) ?? Date(),
+            updatedAt: parseDate(dto.updatedAt) ?? Date(),
+            metadataJSON: dto.metadataJSON
+        )
+        if let uuid = UUID(uuidString: dto.id) { account.id = uuid }
+        return account
+    }
+
+    private func decodeCoconutLedgerEntry(_ dto: CoconutLedgerEntryBackup) -> CoconutLedgerEntry {
+        let entry = CoconutLedgerEntry(
+            transactionKey: dto.transactionKey,
+            accountKey: dto.accountKey,
+            ownerKind: CoconutWalletOwnerKind(rawValue: dto.ownerKindRaw) ?? .system,
+            ownerId: dto.ownerId,
+            ownerName: dto.ownerName,
+            delta: dto.delta,
+            balanceBefore: dto.balanceBefore,
+            balanceAfter: dto.balanceAfter,
+            affectsBalance: dto.affectsBalance,
+            entryKind: CoconutWalletEntryKind(rawValue: dto.entryKindRaw) ?? .adjustment,
+            source: CoconutWalletSource(rawValue: dto.sourceRaw) ?? .importData,
+            title: dto.title,
+            emoji: dto.emoji,
+            actorId: dto.actorId,
+            actorName: dto.actorName,
+            subjectKind: CareLedgerSubjectKind(rawValue: dto.subjectKindRaw) ?? .system,
+            subjectId: dto.subjectId,
+            sourceModelName: dto.sourceModelName,
+            sourceModelId: dto.sourceModelId,
+            careLedgerEventId: dto.careLedgerEventId,
+            metadataJSON: dto.metadataJSON,
+            occurredAt: parseDate(dto.occurredAt) ?? Date(),
+            createdAt: parseDate(dto.createdAt) ?? Date()
+        )
+        if let uuid = UUID(uuidString: dto.id) { entry.id = uuid }
+        return entry
     }
 
     private func decodeFamilyCollaborationTask(_ dto: FamilyCollaborationTaskBackup) -> FamilyCollaborationTask {

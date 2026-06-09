@@ -71,253 +71,6 @@ private struct OhanaIconView: View {
     }
 }
 
-private struct OnboardingCompanionStage: View {
-    var isActive: Bool
-    var focusMode: Bool = false
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            let mainSize = min(width * (focusMode ? 0.46 : 0.42), 150)
-            let sideSize = min(width * 0.3, 112)
-
-            ZStack(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(OnboardingPalette.panelFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
-                    )
-                    .shadow(color: OnboardingPalette.cardShadow, radius: 18, y: 10) // ui-v4: allow onboarding hero stage lift
-
-                Capsule()
-                    .fill(Color.arkInk.opacity(0.24))
-                    .frame(width: width * 0.66, height: 22)
-                    .blur(radius: 10)
-                    .offset(y: -18)
-
-                petBubble(
-                    species: "狗",
-                    coat: Color(hex: "D9944A"),
-                    eye: Color(hex: "4A2C17"),
-                    size: mainSize,
-                    rotation: focusMode ? -2 : -5
-                )
-                .offset(x: focusMode ? -34 : -46, y: isActive ? -20 : -12)
-                .zIndex(2)
-
-                petBubble(
-                    species: "猫",
-                    coat: Color(hex: "F1E5D0"),
-                    eye: Color(hex: "3A6EA5"),
-                    size: sideSize,
-                    rotation: focusMode ? 5 : 8
-                )
-                .offset(x: focusMode ? 62 : 72, y: isActive ? -42 : -34)
-                .zIndex(1)
-
-                if !focusMode {
-                    petBubble(
-                        species: "兔子",
-                        coat: Color(hex: "F7D9E5"),
-                        eye: Color(hex: "9B3A60"),
-                        size: sideSize * 0.82,
-                        rotation: -8
-                    )
-                    .offset(x: -118, y: isActive ? -60 : -50)
-                    .zIndex(0)
-                }
-
-                HStack(spacing: 8) {
-                    stageBadge(icon: "fork.knife", label: focusMode ? "40g" : "+1")
-                    stageBadge(icon: "bell.fill", label: "09:00")
-                    stageBadge(icon: "bolt.fill", label: "+🥥")
-                }
-                .offset(y: -18)
-                .zIndex(3)
-            }
-            .animation(GoMotion.hero, value: isActive)
-        }
-    }
-
-    private func petBubble(
-        species: String,
-        coat: Color,
-        eye: Color,
-        size: CGFloat,
-        rotation: Double
-    ) -> some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.goCardWhite.opacity(0.14), coat.opacity(0.24)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: coat.opacity(0.28), radius: 18, y: 10) // ui-v4: allow onboarding companion depth
-
-            PetSilhouetteView(
-                species: species,
-                coatColor: coat,
-                eyeColor: eye,
-                isAnimationEnabled: false
-            )
-            .padding(size * 0.08)
-        }
-        .frame(width: size, height: size)
-        .rotationEffect(.degrees(rotation))
-    }
-
-    private func stageBadge(icon: String, label: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text(label)
-                .font(OhanaFont.caption2(.black))
-        }
-        .foregroundStyle(OnboardingPalette.selectedText)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(Color.goLime.opacity(0.92), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.arkInk.opacity(0.12), lineWidth: 1))
-    }
-}
-
-private struct OnboardingAvatarShowcase: View {
-    var isActive: Bool
-    var focusMode: Bool = false
-
-    private var dogAvatar: UIImage? {
-        onboardingImageData(filename: "dog_shiba_inu_girl_red.png", directory: PetAvatarAssetCatalog.assetDirectory)
-    }
-
-    private var catAvatar: UIImage? {
-        onboardingImageData(filename: "cat_ragdoll_girl_seal_bicolor.png", directory: PetAvatarAssetCatalog.assetDirectory)
-    }
-
-    private var humanAvatar: UIImage? {
-        onboardingImageData(filename: "human_female_young_adult.png", directory: HumanAvatarAssetCatalog.assetDirectory)
-    }
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            let mainHeight = min(proxy.size.height * 0.9, focusMode ? 218 : 200)
-            let sideHeight = mainHeight * 0.78
-
-            ZStack(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(OnboardingPalette.panelFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
-                    )
-                    .shadow(color: OnboardingPalette.cardShadow, radius: 18, y: 10) // ui-v4: allow onboarding avatar stage lift
-
-                Capsule()
-                    .fill(Color.arkInk.opacity(0.26))
-                    .frame(width: width * 0.72, height: 24)
-                    .blur(radius: 10)
-                    .offset(y: -16)
-
-                avatarFigure(
-                    image: humanAvatar,
-                    fallback: {
-                        HumanSilhouetteView(gender: "女", accent: Color.goTeal.opacity(0.82))
-                    },
-                    height: sideHeight
-                )
-                .offset(x: focusMode ? -96 : -108, y: isActive ? -34 : -24)
-                .rotationEffect(.degrees(-5))
-                .zIndex(0)
-
-                avatarFigure(
-                    image: dogAvatar,
-                    fallback: {
-                        PetSilhouetteView(
-                            species: "狗",
-                            coatColor: Color(hex: "D9944A"),
-                            eyeColor: Color(hex: "4A2C17"),
-                            isAnimationEnabled: false
-                        )
-                    },
-                    height: mainHeight
-                )
-                .offset(x: focusMode ? -12 : -22, y: isActive ? -18 : -8)
-                .rotationEffect(.degrees(focusMode ? -2 : -4))
-                .zIndex(2)
-
-                avatarFigure(
-                    image: catAvatar,
-                    fallback: {
-                        PetSilhouetteView(
-                            species: "猫",
-                            coatColor: Color(hex: "F1E5D0"),
-                            eyeColor: Color(hex: "3A6EA5"),
-                            isAnimationEnabled: false
-                        )
-                    },
-                    height: sideHeight
-                )
-                .offset(x: focusMode ? 98 : 110, y: isActive ? -50 : -40)
-                .rotationEffect(.degrees(6))
-                .zIndex(1)
-
-                HStack(spacing: 8) {
-                    stageBadge(icon: "fork.knife", label: focusMode ? "40g" : "+1")
-                    stageBadge(icon: "bell.fill", label: "09:00")
-                    stageBadge(icon: "bolt.fill", label: "+🥥")
-                }
-                .offset(y: -18)
-                .zIndex(3)
-            }
-            .animation(GoMotion.hero, value: isActive)
-        }
-    }
-
-    private func onboardingImageData(filename: String, directory: String) -> UIImage? {
-        let name = (filename as NSString).deletingPathExtension
-        let ext = (filename as NSString).pathExtension
-        guard let url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: directory) else { return nil }
-        return UIImage(contentsOfFile: url.path) // smoothness: allow small bundled onboarding avatar asset
-    }
-
-    private func avatarFigure<Fallback: View>(
-        image: UIImage?,
-        @ViewBuilder fallback: () -> Fallback,
-        height: CGFloat
-    ) -> some View {
-        ZStack {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: height)
-            } else {
-                fallback()
-                    .frame(width: height * 0.72, height: height)
-            }
-        }
-        .shadow(color: Color.arkInk.opacity(0.34), radius: 18, x: 0, y: 12) // ui-v4: allow onboarding avatar grounding
-    }
-
-    private func stageBadge(icon: String, label: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text(label)
-                .font(OhanaFont.caption2(.black))
-        }
-        .foregroundStyle(OnboardingPalette.selectedText)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(Color.goLime.opacity(0.92), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.arkInk.opacity(0.12), lineWidth: 1))
-    }
-}
-
 // MARK: - OnboardingView
 
 struct OnboardingView: View {
@@ -325,22 +78,18 @@ struct OnboardingView: View {
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @AppStorage("ohana_show_first_success_card") private var showFirstSuccessCard: Bool = false
     @AppStorage("ohana_first_quick_checkin_completed") private var firstQuickCheckInCompleted: Bool = false
-    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.fallbackCode
-    @AppStorage(AppCountry.storageKey) private var appCountry: String = AppCountry.detectedCode
-    @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem: String = AppMeasurementSystem.fallbackCode
-    @AppStorage(AppCurrency.storageKey) private var appCurrency: String = AppCurrency.fallbackCode
+    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var isReplay: Bool = false
     var onReplayFinished: (() -> Void)?
 
-    private enum FlowStep: Int, Equatable {
-        case region = 0
-        case intro = 1
-        case profile = 2
+    private enum FlowStep: Equatable {
+        case intro
+        case profile
     }
 
-    @State private var step: FlowStep = .region
+    @State private var step: FlowStep = .intro
     /// 每次进入「添加人类」步骤刷新，避免从欢迎页返回后残留半填状态
     @State private var humanWizardSessionId = UUID()
 
@@ -349,7 +98,6 @@ struct OnboardingView: View {
     private let introPageCount = 3
 
     private var languageCode: String { AppLanguage.normalize(appLanguage) }
-    private var selectedCountry: AppCountry.Option { AppCountry.option(for: appCountry) }
     private var shouldReduceWork: Bool {
         powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
     }
@@ -384,9 +132,6 @@ struct OnboardingView: View {
     @ViewBuilder
     private var content: some View {
         switch step {
-        case .region:
-            regionLanguageFlow
-                .transition(.opacity.combined(with: .move(edge: .leading)))
         case .intro:
             introFlow
                 .transition(.asymmetric(
@@ -396,19 +141,6 @@ struct OnboardingView: View {
         case .profile:
             humanOnboardingWizard
                 .transition(.opacity)
-        }
-    }
-
-    // MARK: - Progress bar
-
-    private var progressBar: some View {
-        HStack(spacing: 8) {
-            ForEach(0 ..< FlowStep.profile.rawValue + 1, id: \.self) { i in
-                Capsule()
-                    .fill(i <= step.rawValue ? Color.goLime : OnboardingPalette.mutedFill)
-                    .frame(width: i == step.rawValue ? 28 : nil, height: 4)
-                    .animation(GoMotion.feedback, value: step)
-            }
         }
     }
 
@@ -450,158 +182,6 @@ struct OnboardingView: View {
         .environment(\.colorScheme, .dark)
     }
 
-    // MARK: - Region and language
-
-    private var regionLanguageFlow: some View {
-        GeometryReader { proxy in
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    HStack {
-                        OhanaIconView(size: 38)
-                        Spacer()
-                        progressBar
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 54)
-
-                    Spacer(minLength: 26)
-
-                    VStack(spacing: 12) {
-                        Text(AppLocalizedText(
-                            zh: "先选择语言，再选择国家/地区",
-                            en: "Choose language, then region",
-                            de: "Sprache wählen, dann Region"
-                        ).resolve(languageCode))
-                        .font(OhanaFont.largeTitle(.black))
-                        .foregroundStyle(OnboardingPalette.primaryText)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.76)
-
-                        Text(AppLocalizedText(
-                            zh: "语言决定界面文字；国家/地区会预设货币和计量单位，之后都可以调整。",
-                            en: "Language controls the app text. Region presets currency and units, both editable later.",
-                            de: "Die Sprache steuert den App-Text. Die Region setzt Währung und Einheiten."
-                        ).resolve(languageCode))
-                        .font(OhanaFont.body(.semibold))
-                        .foregroundStyle(OnboardingPalette.secondaryText)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.horizontal, 30)
-                    .padding(.top, 12)
-
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text(AppLocalizedText(zh: "语言", en: "Language", de: "Sprache").resolve(languageCode))
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(OnboardingPalette.tertiaryText)
-                            .textCase(.uppercase)
-
-                        HStack(spacing: 10) {
-                            ForEach(AppLanguage.supported) { language in
-                                languageChoiceButton(language)
-                            }
-                        }
-
-                        Text(AppLocalizedText(zh: "国家/地区", en: "Country/Region", de: "Land/Region").resolve(languageCode))
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(OnboardingPalette.tertiaryText)
-                            .textCase(.uppercase)
-                            .padding(.top, 6)
-
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
-                            ForEach(AppCountry.supported) { country in
-                                regionChoiceButton(country)
-                            }
-                        }
-                    }
-                    .padding(18)
-                    .background(OnboardingPalette.panelFill, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.top, 28)
-
-                    Spacer(minLength: 22)
-
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        withAnimation(GoMotion.page) { step = .intro }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text(AppLocalizedText(zh: "继续", en: "Continue", de: "Weiter").resolve(languageCode))
-                                .font(OhanaFont.title3(.black))
-                            Image(systemName: "arrow.right") // a11y: allow decorative icon covered by surrounding text or control
-                                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        }
-                        .foregroundStyle(OnboardingPalette.selectedText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 17)
-                        .background(Color.goLime, in: Capsule())
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 42)
-                }
-                .frame(minHeight: proxy.size.height)
-            }
-        }
-    }
-
-    private func regionChoiceButton(_ country: AppCountry.Option) -> some View {
-        let isSelected = country.code == selectedCountry.code
-        return Button {
-            applyCountryDefaults(country)
-        } label: {
-            HStack(spacing: 8) {
-                Text(country.flag)
-                    .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                Text(country.displayName.resolve(languageCode))
-                    .font(OhanaFont.subheadline(isSelected ? .black : .bold))
-                    .foregroundStyle(isSelected ? OnboardingPalette.selectedText : OnboardingPalette.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Spacer(minLength: 0)
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(OnboardingPalette.selectedText)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
-            .background(isSelected ? Color.goLime : OnboardingPalette.mutedFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-
-    private func languageChoiceButton(_ language: AppLanguage.Option) -> some View {
-        let isSelected = AppLanguage.normalize(appLanguage) == language.code
-        return Button {
-            appLanguage = language.code
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        } label: {
-            Text(language.displayName)
-                .font(OhanaFont.subheadline(isSelected ? .black : .bold))
-                .foregroundStyle(isSelected ? OnboardingPalette.selectedText : OnboardingPalette.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.74)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(isSelected ? Color.goLime : OnboardingPalette.mutedFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-
-    private func applyCountryDefaults(_ country: AppCountry.Option) {
-        appCountry = country.code
-        appMeasurementSystem = AppMeasurementSystem.normalize(country.defaultMeasurementSystemCode)
-        appCurrency = AppCurrency.normalize(country.defaultCurrencyCode)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-
     // MARK: - Intro flow
 
     private var introFlow: some View {
@@ -611,12 +191,11 @@ struct OnboardingView: View {
                     HStack {
                         OhanaIconView(size: 38)
                         Spacer()
-                        progressBar
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 54)
 
-                    Spacer(minLength: 14)
+                    Spacer(minLength: 18)
 
                     TabView(selection: $introPageIndex) {
                         ForEach(0..<introPageCount, id: \.self) { index in
@@ -626,12 +205,12 @@ struct OnboardingView: View {
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
-                    .frame(height: min(max(proxy.size.height * 0.64, 430), 560))
+                    .frame(height: min(max(proxy.size.height * 0.68, 440), 590))
 
                     introPageDots
-                        .padding(.top, 4)
+                        .padding(.top, 12)
 
-                    Spacer(minLength: 18)
+                    Spacer(minLength: 20)
 
                     ctaArea
                         .padding(.horizontal, 24)
@@ -647,43 +226,38 @@ struct OnboardingView: View {
         switch index {
         case 1:
             introPage(
-                title: localized(zh: "2.5D 档案，一眼认出", en: "2.5D profiles, easy to spot", de: "2.5D-Profile, sofort erkennbar"),
-                subtitle: localized(zh: "先建立你的本人档案，首页和记录都会从这个身份开始。", en: "Start with your profile so Home and records have a clear owner.", de: "Beginne mit deinem Profil, damit Startseite und Einträge klar zugeordnet sind."),
-                focusMode: true,
-                rows: [
-                    (icon: "person.crop.circle.fill", title: localized(zh: "本人头像", en: "Your avatar", de: "Dein Avatar"), subtitle: localized(zh: "先自动生成", en: "Auto generated", de: "Automatisch"), tint: Color.goTeal, filled: false),
-                    (icon: "person.text.rectangle.fill", title: localized(zh: "基础档案", en: "Basic profile", de: "Basisprofil"), subtitle: localized(zh: "稍后可改", en: "Editable later", de: "Später änderbar"), tint: Color.goBlue, filled: false),
-                    (icon: "photo.on.rectangle", title: localized(zh: "也可替换", en: "Replace anytime", de: "Ersetzbar"), subtitle: localized(zh: "拍照或相册", en: "Camera or photos", de: "Kamera/Fotos"), tint: Color.goLime, filled: true)
+                title: localized(zh: "游戏化成长", en: "Playful growth", de: "Spielerisches Wachstum"),
+                subtitle: localized(zh: "照顾会获得椰子，推动生命之树和 Oasis 成长。", en: "Care earns coconuts and grows the Life Tree and Oasis.", de: "Pflege bringt Kokosnüsse und lässt Lebensbaum und Oase wachsen."),
+                heroIcon: "tree.fill",
+                tint: Color.goLime,
+                badges: [
+                    (icon: "bolt.fill", title: localized(zh: "椰子", en: "Coconuts", de: "Kokos")),
+                    (icon: "arrow.up.forward.circle.fill", title: localized(zh: "等级", en: "Levels", de: "Level")),
+                    (icon: "sparkles", title: localized(zh: "Oasis", en: "Oasis", de: "Oase"))
                 ]
             )
         case 2:
             introPage(
-                title: localized(zh: "今天该做什么，自动排好", en: "Today’s care, sorted", de: "Heute sortiert"),
-                subtitle: localized(zh: "Today Focus 会把体重、喂食、用药和提醒放到最该看的地方。", en: "Today Focus brings weight, feeding, medication, and reminders forward.", de: "Today Focus zeigt Gewicht, Futter, Medikamente und Erinnerungen."),
-                focusMode: true,
-                rows: [
-                    (icon: "checklist.checked", title: localized(zh: "今日焦点", en: "Today Focus", de: "Today Focus"), subtitle: localized(zh: "先看最重要", en: "Important first", de: "Wichtiges zuerst"), tint: Color.goBlue, filled: false),
-                    (icon: "scalemass.fill", title: localized(zh: "人类体重", en: "Human weight", de: "Menschengewicht"), subtitle: localized(zh: "添加人类后出现", en: "Appears after adding", de: "Nach dem Hinzufügen"), tint: Color.goTeal, filled: false),
-                    (icon: "bolt.fill", title: localized(zh: "打卡反馈", en: "Check-in feedback", de: "Check-in Feedback"), subtitle: localized(zh: "椰子奖励", en: "Coconut reward", de: "Kokosnuss"), tint: Color.goLime, filled: true)
+                title: localized(zh: "健康追踪", en: "Health tracking", de: "Gesundheit verfolgen"),
+                subtitle: localized(zh: "体重、用药、提醒和趋势，帮你看清长期变化。", en: "Weight, medication, reminders, and trends show what changes over time.", de: "Gewicht, Medikamente, Erinnerungen und Trends zeigen Veränderungen."),
+                heroIcon: "heart.text.square.fill",
+                tint: Color.goTeal,
+                badges: [
+                    (icon: "scalemass.fill", title: localized(zh: "体重", en: "Weight", de: "Gewicht")),
+                    (icon: "pills.fill", title: localized(zh: "用药", en: "Meds", de: "Medis")),
+                    (icon: "chart.xyaxis.line", title: localized(zh: "趋势", en: "Trends", de: "Trends"))
                 ]
             )
         default:
             introPage(
-                title: localized(
-                    zh: "照顾，一眼看懂",
-                    en: "Care at a glance",
-                    de: "Pflege auf einen Blick"
-                ),
-                subtitle: localized(
-                    zh: "先用本人档案启动 Ohana，之后再逐步添加宠物、家人和更多记录。",
-                    en: "Start Ohana with your profile, then add pets, family, and more records when ready.",
-                    de: "Starte Ohana mit deinem Profil und füge später Tiere, Familie und weitere Einträge hinzu."
-                ),
-                focusMode: false,
-                rows: [
-                    (icon: "person.fill", title: localized(zh: "建立本人档案", en: "Create your profile", de: "Profil erstellen"), subtitle: localized(zh: "第一步", en: "First step", de: "Erster Schritt"), tint: Color.goBlue, filled: false),
-                    (icon: "list.clipboard.fill", title: localized(zh: "基础记录", en: "Basic records", de: "Basiseinträge"), subtitle: localized(zh: "进入首页后开始", en: "Start on Home", de: "Auf Home starten"), tint: Color(hex: "F59E0B"), filled: false),
-                    (icon: "gift.fill", title: localized(zh: "新人礼包", en: "Starter gift", de: "Startergeschenk"), subtitle: localized(zh: "完成后领取", en: "After setup", de: "Nach dem Setup"), tint: Color.goLime, filled: true)
+                title: localized(zh: "家庭成员管理", en: "Family care", de: "Familienpflege"),
+                subtitle: localized(zh: "人类、宠物、植物，都放在同一个家里管理。", en: "Humans, pets, and plants live in one shared care home.", de: "Menschen, Tiere und Pflanzen bleiben in einem Pflegezuhause."),
+                heroIcon: "house.fill",
+                tint: Color.goBlue,
+                badges: [
+                    (icon: "person.fill", title: localized(zh: "人类", en: "Humans", de: "Menschen")),
+                    (icon: "pawprint.fill", title: localized(zh: "宠物", en: "Pets", de: "Tiere")),
+                    (icon: "leaf.fill", title: localized(zh: "植物", en: "Plants", de: "Pflanzen"))
                 ]
             )
         }
@@ -692,12 +266,17 @@ struct OnboardingView: View {
     private func introPage(
         title: String,
         subtitle: String,
-        focusMode: Bool,
-        rows: [(icon: String, title: String, subtitle: String, tint: Color, filled: Bool)]
+        heroIcon: String,
+        tint: Color,
+        badges: [(icon: String, title: String)]
     ) -> some View {
-        VStack(spacing: 16) {
-            OnboardingAvatarShowcase(isActive: iconPulse && !shouldReduceWork, focusMode: focusMode)
-                .frame(height: 230)
+        VStack(spacing: 24) {
+            onboardingHeroGlyphCluster(
+                primaryIcon: heroIcon,
+                tint: tint,
+                badges: badges
+            )
+            .frame(height: 218)
 
             VStack(spacing: 10) {
                 Text(title)
@@ -716,19 +295,102 @@ struct OnboardingView: View {
             }
             .padding(.horizontal, 14)
 
-            VStack(spacing: 10) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    onboardingStepRow(
-                        icon: row.icon,
-                        title: row.title,
-                        subtitle: row.subtitle,
-                        tint: row.tint,
-                        usesFilledTint: row.filled
+            HStack(spacing: 8) {
+                ForEach(Array(badges.enumerated()), id: \.offset) { _, badge in
+                    onboardingBadgePill(
+                        icon: badge.icon,
+                        title: badge.title,
+                        tint: tint
                     )
                 }
             }
-            .padding(.horizontal, 4)
         }
+        .padding(24)
+        .frame(maxWidth: .infinity, minHeight: 420)
+        .background(OnboardingPalette.panelFill, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
+        )
+        .shadow(color: OnboardingPalette.cardShadow, radius: 20, y: 12) // ui-v4: allow onboarding primary card lift
+    }
+
+    private func onboardingHeroGlyphCluster(
+        primaryIcon: String,
+        tint: Color,
+        badges: [(icon: String, title: String)]
+    ) -> some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            let centerSize = min(width * 0.36, 136)
+
+            ZStack {
+                Circle()
+                    .fill(tint.opacity(0.18))
+                    .frame(width: centerSize * 1.45, height: centerSize * 1.45)
+                    .blur(radius: 1)
+                    .scaleEffect(iconPulse && !shouldReduceWork ? 1.04 : 0.98)
+
+                Circle()
+                    .fill(tint)
+                    .frame(width: centerSize, height: centerSize)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(Color.goCardWhite.opacity(0.22), lineWidth: 1)
+                    )
+                    .shadow(color: tint.opacity(0.34), radius: 18, y: 10) // ui-v4: allow onboarding hero glyph depth
+
+                Image(systemName: primaryIcon)
+                    .font(OhanaFont.adaptive(size: 54, weight: .black))
+                    .foregroundStyle(OnboardingPalette.selectedText)
+                    .symbolRenderingMode(.monochrome)
+
+                ForEach(Array(badges.enumerated()), id: \.offset) { index, badge in
+                    onboardingFloatingGlyph(icon: badge.icon, tint: tint)
+                        .offset(heroGlyphOffset(index: index, width: width, height: height))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .animation(GoMotion.hero, value: iconPulse)
+        }
+    }
+
+    private func onboardingFloatingGlyph(icon: String, tint: Color) -> some View {
+        Image(systemName: icon)
+            .font(OhanaFont.adaptive(size: 19, weight: .black))
+            .foregroundStyle(tint)
+            .frame(width: 54, height: 54)
+            .background(OnboardingPalette.mutedFill, in: Circle())
+            .overlay(Circle().strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1))
+    }
+
+    private func heroGlyphOffset(index: Int, width: CGFloat, height: CGFloat) -> CGSize {
+        switch index {
+        case 0:
+            return CGSize(width: -width * 0.28, height: -height * 0.18)
+        case 1:
+            return CGSize(width: width * 0.3, height: -height * 0.04)
+        default:
+            return CGSize(width: -width * 0.06, height: height * 0.27)
+        }
+    }
+
+    private func onboardingBadgePill(icon: String, title: String, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .foregroundStyle(tint)
+            Text(title)
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(OnboardingPalette.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+        }
+        .frame(maxWidth: .infinity, minHeight: 40)
+        .padding(.horizontal, 8)
+        .background(OnboardingPalette.mutedFill, in: Capsule())
+        .overlay(Capsule().strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1))
     }
 
     private var introPageDots: some View {
@@ -750,7 +412,7 @@ struct OnboardingView: View {
                 HStack(spacing: 8) {
                     Text(introPageIndex < introPageCount - 1
                          ? localized(zh: "下一页", en: "Next", de: "Weiter")
-                        : localized(zh: "开始设置", en: "Start setup", de: "Einrichten"))
+                        : localized(zh: "建立本人档案", en: "Create profile", de: "Profil erstellen"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(OnboardingPalette.selectedText)
                     Image(systemName: introPageIndex < introPageCount - 1 ? "chevron.right" : "arrow.right")
@@ -780,42 +442,6 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
             }
         }
-    }
-
-    private func onboardingStepRow(
-        icon: String,
-        title: String,
-        subtitle: String,
-        tint: Color,
-        usesFilledTint: Bool = false
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(usesFilledTint ? OnboardingPalette.selectedText : tint)
-                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(usesFilledTint ? tint : tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            Text(title)
-                .font(OhanaFont.headline(.black))
-                .foregroundStyle(OnboardingPalette.primaryText)
-                .lineLimit(1)
-
-            Spacer(minLength: 8)
-
-            Text(subtitle)
-                .font(OhanaFont.caption(.bold))
-                .foregroundStyle(OnboardingPalette.tertiaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.74)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(OnboardingPalette.panelFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
-        )
     }
 
     private func advanceFromWelcome() {

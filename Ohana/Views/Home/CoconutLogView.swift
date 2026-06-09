@@ -140,6 +140,8 @@ struct CoconutLogView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Bindable private var manager = QuestManager.shared
+    @Query(sort: \CoconutAccount.updatedAt, order: .reverse) private var walletAccounts: [CoconutAccount]
+    @Query(sort: \CoconutLedgerEntry.occurredAt, order: .reverse) private var walletLedgerEntries: [CoconutLedgerEntry]
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage("appLanguage") private var appLanguage = "zh"
 
@@ -186,7 +188,11 @@ struct CoconutLogView: View {
     }
 
     private var visibleLogs: [CoconutLogEntry] {
-        manager.coconutLogs.filter { !memberSnapshot.hiddenHumanIds.contains($0.actorId ?? "") }
+        let walletLogs = walletLedgerEntries
+            .filter { $0.delta != 0 }
+            .map { $0.asCoconutLogEntry() }
+        let sourceLogs = walletLogs.isEmpty ? manager.coconutLogs : walletLogs
+        return sourceLogs.filter { !memberSnapshot.hiddenHumanIds.contains($0.actorId ?? "") }
     }
 
     private var visibleCoconutTotal: Int {
@@ -196,12 +202,24 @@ struct CoconutLogView: View {
         if let selectedActorId {
             return balance(for: selectedActorId)
         }
+        if !walletAccounts.isEmpty {
+            return walletAccounts.reduce(0) { total, account in
+                guard !(account.ownerKind == .human && memberSnapshot.hiddenHumanIds.contains(account.ownerId)) else {
+                    return total
+                }
+                return total + account.balance
+            }
+        }
         return memberSnapshot.pets.reduce(0) { $0 + $1.balance } +
             memberSnapshot.visibleHumans.reduce(0) { $0 + $1.balance }
     }
 
     private func balance(for actorId: String) -> Int {
-        memberSnapshot.balance(for: actorId)
+        if let account = walletAccounts.first(where: { $0.ownerId == actorId }),
+           !(account.ownerKind == .human && memberSnapshot.hiddenHumanIds.contains(account.ownerId)) {
+            return account.balance
+        }
+        return memberSnapshot.balance(for: actorId)
     }
 
     private var filteredLogs: [CoconutLogEntry] {

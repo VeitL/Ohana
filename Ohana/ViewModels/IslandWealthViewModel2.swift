@@ -49,9 +49,9 @@ struct WealthLeaderRow: Identifiable {
     let percentage: Double
 }
 
-// MARK: - ViewModel
+// MARK: - Screen Model
 @Observable
-final class IslandWealthViewModel {
+final class IslandWealthScreenModel {
     var timeRange: WealthTimeRange = .week
     var showSystemCoconuts: Bool = true
     var selectedActorId: String? = nil
@@ -60,16 +60,42 @@ final class IslandWealthViewModel {
     var pets: [Pet] = []
     var humans: [Human] = []
     var hiddenHumanIds: Set<String> = []
+    var walletAccounts: [CoconutAccount] = []
+    var walletLedgerEntries: [CoconutLedgerEntry] = []
     // 宠物 id → 主题色（由 View 注入）
     var petColorMap: [String: Color] = [:]
 
+    func applyQuerySnapshot(
+        pets: [Pet],
+        visibleHumans: [Human],
+        hiddenHumanIds: Set<String>,
+        walletAccounts: [CoconutAccount],
+        walletLedgerEntries: [CoconutLedgerEntry],
+        petColorMap: [String: Color],
+        selectedActorId: String?
+    ) {
+        self.pets = pets
+        self.humans = visibleHumans
+        self.hiddenHumanIds = hiddenHumanIds
+        self.walletAccounts = walletAccounts
+        self.walletLedgerEntries = walletLedgerEntries
+        self.petColorMap = petColorMap
+        self.selectedActorId = selectedActorId
+    }
+
     // 当前查看者可见的全岛总资产；隐私成员的个人椰子余额不计入展示。
     var totalAssets: Int {
-        pets.reduce(0) { $0 + $1.coconutBalance } + humans.reduce(0) { $0 + $1.coconutBalance }
+        if !walletAccounts.isEmpty {
+            return visibleWalletAccounts.reduce(0) { $0 + $1.balance }
+        }
+        return pets.reduce(0) { $0 + $1.coconutBalance } + humans.reduce(0) { $0 + $1.coconutBalance }
     }
 
     var displayedAssets: Int {
         guard let selectedActorId else { return totalAssets }
+        if let balance = walletBalance(ownerId: selectedActorId) {
+            return balance
+        }
         if let pet = pets.first(where: { $0.id.uuidString == selectedActorId }) {
             return pet.coconutBalance
         }
@@ -85,17 +111,19 @@ final class IslandWealthViewModel {
         let total = max(1, totalAssets)
         all += pets.map { pet in
             let stats = periodStats(for: pet.id.uuidString)
+            let balance = walletBalance(ownerId: pet.id.uuidString) ?? pet.coconutBalance
             return WealthLeaderRow(emoji: pet.avatarEmoji, name: pet.name,
-                                   entityId: pet.id.uuidString, amount: pet.coconutBalance,
+                                   entityId: pet.id.uuidString, amount: balance,
                                    periodIncome: stats.income, periodSpending: stats.spending, periodNet: stats.net,
-                                   percentage: Double(pet.coconutBalance) / Double(total))
+                                   percentage: Double(balance) / Double(total))
         }
         all += humans.map { h in
             let stats = periodStats(for: h.id.uuidString)
+            let balance = walletBalance(ownerId: h.id.uuidString) ?? h.coconutBalance
             return WealthLeaderRow(emoji: h.avatarEmoji, name: h.name,
-                                   entityId: h.id.uuidString, amount: h.coconutBalance,
+                                   entityId: h.id.uuidString, amount: balance,
                                    periodIncome: stats.income, periodSpending: stats.spending, periodNet: stats.net,
-                                   percentage: Double(h.coconutBalance) / Double(total))
+                                   percentage: Double(balance) / Double(total))
         }
         return all
             .filter { $0.amount > 0 || $0.periodIncome > 0 || $0.periodSpending > 0 }
@@ -104,7 +132,11 @@ final class IslandWealthViewModel {
 
     // MARK: - 图表数据（按时间桶聚合 log，仅用于趋势图）
     private var visibleLogs: [CoconutLogEntry] {
-        QuestManager.shared.coconutLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+        let walletLogs = walletLedgerEntries
+            .filter { $0.delta != 0 }
+            .map { $0.asCoconutLogEntry() }
+        let sourceLogs = walletLogs.isEmpty ? QuestManager.shared.coconutLogs : walletLogs
+        return sourceLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
     }
 
     private var logs: [CoconutLogEntry] {
@@ -159,6 +191,18 @@ final class IslandWealthViewModel {
         let income = entries.filter { $0.amount > 0 }.reduce(0) { $0 + $1.amount }
         let spending = entries.filter { $0.amount < 0 }.reduce(0) { $0 + abs($1.amount) }
         return (income, spending, income - spending)
+    }
+
+    private var visibleWalletAccounts: [CoconutAccount] {
+        walletAccounts.filter { account in
+            !(account.ownerKind == .human && hiddenHumanIds.contains(account.ownerId))
+        }
+    }
+
+    private func walletBalance(ownerId: String) -> Int? {
+        visibleWalletAccounts.first { account in
+            account.ownerId == ownerId
+        }?.balance
     }
 
     // 时间段内活跃实体名集合（用于图例）
@@ -348,3 +392,5 @@ final class IslandWealthViewModel {
         return Self.palette[idx]
     }
 }
+
+typealias IslandWealthViewModel = IslandWealthScreenModel

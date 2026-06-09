@@ -201,13 +201,43 @@ struct OasisRewardView: View {
     private var commandExecutor: OasisRewardCommandExecutor {
         OasisRewardCommandExecutor(context: modelContext)
     }
+    private var shopUnlockLevel: Int {
+        GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
+    }
+    private var gachaUnlockLevel: Int {
+        GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
+    }
+    private var critterUnlockLevel: Int {
+        OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId)?.sourceLevel ?? 10
+    }
 
     private var openedUpgradeReward: OasisOpenedUpgradeReward? {
         activeOverlayRoute?.upgradeReward
     }
 
     private func openSheet(_ route: OasisSheetRoute) {
+        if lockedLevel(for: route) != nil {
+            OhanaFeedback.error()
+            return
+        }
         activeSheetRoute = route
+    }
+
+    private func lockedLevel(for route: OasisSheetRoute) -> Int? {
+        switch route {
+        case .coconutShop:
+            return lockedLevel(requiredLevel: shopUnlockLevel)
+        case .gacha:
+            return lockedLevel(requiredLevel: gachaUnlockLevel)
+        case .critterCodex:
+            return lockedLevel(requiredLevel: critterUnlockLevel)
+        case .coconutRules, .achievements, .inventory, .checkInDetail:
+            return nil
+        }
+    }
+
+    private func lockedLevel(requiredLevel: Int) -> Int? {
+        treeMgr.treeLevel.rawValue >= requiredLevel ? nil : requiredLevel
     }
 
     private func openFullScreen(_ route: OasisFullScreenRoute) {
@@ -1062,9 +1092,14 @@ struct OasisRewardView: View {
         let snapshot = critter.map { critterRenderSnapshot(for: $0).lifecycle }
         let tint = snapshot.map { critterLifecycleTint(for: $0.state) } ?? Color.goPrimary
         let statusIcon = snapshot.map { critterLifecycleIcon(for: $0.state) } ?? "lock.fill"
-        let isLocked = critter == nil
+        let lockedLevel = lockedLevel(requiredLevel: critterUnlockLevel)
+        let isLocked = lockedLevel != nil || critter == nil
 
         return Button {
+            guard lockedLevel == nil else {
+                OhanaFeedback.error()
+                return
+            }
             openCritterEntry()
         } label: {
             ZStack(alignment: .bottomTrailing) {
@@ -1100,7 +1135,7 @@ struct OasisRewardView: View {
                     .accessibilityHidden(true)
             }
             .overlay(alignment: .bottom) {
-                Text(critter?.displayName(l) ?? l.tr(zh: "Lv.10", en: "Lv.10", de: "Lv.10"))
+                Text(critterEntryBadgeTitle(critter: critter, lockedLevel: lockedLevel))
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -1114,7 +1149,25 @@ struct OasisRewardView: View {
             .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(critter == nil ? nextCritterGoalText : l.tr(zh: "电子宠物小窝", en: "Critter nest", de: "Critter-Nest"))
+        .accessibilityLabel(
+            lockedLevel.map {
+                lockedLevelAccessibility(
+                    l.tr(zh: "电子宠物", en: "Critters", de: "Critter"),
+                    level: $0
+                )
+            } ?? (critter == nil ? nextCritterGoalText : l.tr(zh: "电子宠物小窝", en: "Critter nest", de: "Critter-Nest"))
+        )
+    }
+
+    private func critterEntryBadgeTitle(critter: OasisElectronicPet?, lockedLevel: Int?) -> String {
+        if let lockedLevel {
+            return l.tr(zh: "Lv.\(lockedLevel) 解锁", en: "Lv.\(lockedLevel)", de: "Lv.\(lockedLevel)")
+        }
+        return critter?.displayName(l) ?? l.tr(zh: "Lv.10", en: "Lv.10", de: "Lv.10")
+    }
+
+    private func lockedLevelAccessibility(_ title: String, level: Int) -> String {
+        "\(title), \(l.tr(zh: "Lv.\(level) 解锁", en: "unlocks at level \(level)", de: "ab Level \(level)"))"
     }
 
     private var critterNestPopupOverlay: some View {
@@ -2439,6 +2492,9 @@ struct OasisRewardView: View {
         OasisBentoGridView(
             snapshot: bentoSnapshot,
             localization: l,
+            shopLockedLevel: lockedLevel(requiredLevel: shopUnlockLevel),
+            crittersLockedLevel: lockedLevel(requiredLevel: critterUnlockLevel),
+            gachaLockedLevel: lockedLevel(requiredLevel: gachaUnlockLevel),
             onOpenShop: {
                 openSheet(.coconutShop(.effect))
             },

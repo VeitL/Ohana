@@ -252,6 +252,16 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentCoconutShop(category: ShopItem.ShopCategory = .appIcon) {
+        guard AppFeatureRouteGuard.allowsSheetRoute(.coconutShop(category), currentLevel: currentFeatureLevel) else {
+            AppFeatureRouteGuard.recordIntercept(
+                AppFeatureRouteGuard.lockedRouteNote(
+                    for: AppSheetRoute.coconutShop(category),
+                    currentLevel: currentFeatureLevel
+                )
+            )
+            presentFunctionMenu(destination: .growthRoadmap)
+            return
+        }
         presentSheet(.coconutShop(category))
     }
 
@@ -264,6 +274,15 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentSheet(_ route: AppSheetRoute) {
+        guard AppFeatureRouteGuard.allowsSheetRoute(route, currentLevel: currentFeatureLevel) else {
+            AppFeatureRouteGuard.recordIntercept(
+                AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: currentFeatureLevel)
+            )
+            fullScreen = nil
+            overlay = nil
+            sheet = .functionMenu(destination: .growthRoadmap)
+            return
+        }
         fullScreen = nil
         overlay = nil
         sheet = route

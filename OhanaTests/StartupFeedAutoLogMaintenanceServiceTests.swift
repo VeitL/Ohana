@@ -82,7 +82,7 @@ struct StartupFeedAutoLogMaintenanceServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV56.models)
+        let schema = Schema(ArkSchemaV58.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

@@ -13,29 +13,7 @@ struct CareLedgerAnalysisView: View {
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
 
-    @State private var selectedRange: RangeFilter = .week
-    @State private var selectedKind: CareLedgerEventKind? = nil
-
-    private var filteredEvents: [CareLedgerEvent] {
-        let cutoff = selectedRange.cutoff
-        return ledgerEvents.filter { event in
-            let inRange = cutoff.map { event.occurredAt >= $0 } ?? true
-            let matchesKind = selectedKind.map { event.eventKindEnum == $0 } ?? true
-            return inRange && matchesKind
-        }
-    }
-
-    private var kindStats: [(CareLedgerEventKind, Int)] {
-        let grouped = Dictionary(grouping: filteredEvents, by: \.eventKindEnum)
-        return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }
-    }
-
-    private var actorStats: [(String, Int)] {
-        let grouped = Dictionary(grouping: filteredEvents) { event in
-            actorName(for: event.actorId, kind: event.actorKind)
-        }
-        return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }
-    }
+    @State private var screenModel = CareLedgerAnalysisScreenModel()
 
     var body: some View {
         ZStack {
@@ -54,6 +32,18 @@ struct CareLedgerAnalysisView: View {
         }
         .navigationTitle("照护账本分析")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear(perform: syncScreenModel)
+        .onChange(of: ledgerEvents.count) { syncScreenModel() }
+        .onChange(of: pets.count) { syncScreenModel() }
+        .onChange(of: humans.count) { syncScreenModel() }
+    }
+
+    private func syncScreenModel() {
+        screenModel.applyQuerySnapshot(
+            ledgerEvents: ledgerEvents,
+            pets: pets,
+            humans: humans
+        )
     }
 
     private var headerCard: some View {
@@ -69,9 +59,9 @@ struct CareLedgerAnalysisView: View {
                 Spacer()
             }
             HStack(spacing: 10) {
-                metric("事件", "\(filteredEvents.count)", .goPrimary)
-                metric("奖励", "\(filteredEvents.reduce(0) { $0 + max($1.coconutDelta, 0) })🥥", .goYellow)
-                metric("类型", "\(kindStats.count)", .goTeal)
+                metric("事件", "\(screenModel.filteredEvents.count)", .goPrimary)
+                metric("奖励", "\(screenModel.positiveRewardTotal)🥥", .goYellow)
+                metric("类型", "\(screenModel.kindStats.count)", .goTeal)
             }
         }
         .padding(16)
@@ -81,8 +71,8 @@ struct CareLedgerAnalysisView: View {
     private var filterCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("筛选", icon: "line.3.horizontal.decrease.circle.fill")
-            Picker("范围", selection: $selectedRange) {
-                ForEach(RangeFilter.allCases, id: \.self) { range in
+            Picker("范围", selection: $screenModel.selectedRange) {
+                ForEach(CareLedgerRangeFilter.allCases, id: \.self) { range in
                     Text(range.title).tag(range)
                 }
             }
@@ -106,11 +96,11 @@ struct CareLedgerAnalysisView: View {
     private var kindBreakdownCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("事件类型分布", icon: "chart.bar.xaxis")
-            if kindStats.isEmpty {
+            if screenModel.kindStats.isEmpty {
                 emptyText("暂无账本事件")
             } else {
-                ForEach(kindStats, id: \.0) { kind, count in
-                    statBar(title: kind.displayName, count: count, total: max(filteredEvents.count, 1), color: kind.color)
+                ForEach(screenModel.kindStats, id: \.0) { kind, count in
+                    statBar(title: kind.displayName, count: count, total: max(screenModel.filteredEvents.count, 1), color: kind.color)
                 }
             }
         }
@@ -121,11 +111,11 @@ struct CareLedgerAnalysisView: View {
     private var actorBreakdownCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("谁做得最多", icon: "person.fill.checkmark")
-            if actorStats.isEmpty {
+            if screenModel.actorStats.isEmpty {
                 emptyText("暂无成员统计")
             } else {
-                ForEach(actorStats.prefix(6), id: \.0) { name, count in
-                    statBar(title: name, count: count, total: max(filteredEvents.count, 1), color: .goPrimary)
+                ForEach(screenModel.actorStats.prefix(6), id: \.0) { name, count in
+                    statBar(title: name, count: count, total: max(screenModel.filteredEvents.count, 1), color: .goPrimary)
                 }
             }
         }
@@ -136,10 +126,10 @@ struct CareLedgerAnalysisView: View {
     private var latestEventsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("最近账本流水", icon: "list.bullet.rectangle")
-            if filteredEvents.isEmpty {
+            if screenModel.filteredEvents.isEmpty {
                 emptyText("完成一次照护、提醒或椰子操作后，这里会出现流水")
             } else {
-                ForEach(filteredEvents.prefix(20)) { event in
+                ForEach(screenModel.filteredEvents.prefix(20)) { event in
                     HStack(spacing: 10) {
                         Image(systemName: event.eventKindEnum.icon)
                             .font(OhanaFont.adaptive(size: 13, weight: .bold))
@@ -150,7 +140,7 @@ struct CareLedgerAnalysisView: View {
                             Text("\(event.eventKindEnum.displayName) · \(event.actionType)")
                                 .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                 .lineLimit(1)
-                            Text("\(actorName(for: event.actorId, kind: event.actorKind)) → \(subjectName(for: event.subjectId, kind: event.subjectKind))")
+                            Text("\(screenModel.actorName(for: event.actorId, kind: event.actorKind)) → \(screenModel.subjectName(for: event.subjectId, kind: event.subjectKind))")
                                 .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .lineLimit(1)
@@ -168,10 +158,10 @@ struct CareLedgerAnalysisView: View {
     }
 
     private func kindChip(title: String, kind: CareLedgerEventKind?) -> some View {
-        let isSelected = selectedKind == kind
+        let isSelected = screenModel.selectedKind == kind
         return Button {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-                selectedKind = kind
+                screenModel.selectedKind = kind
             }
         } label: {
             Text(title)
@@ -227,58 +217,6 @@ struct CareLedgerAnalysisView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func actorName(for id: String?, kind: String) -> String {
-        guard let id, !id.isEmpty else { return "系统/未指定" }
-        if kind == CareLedgerActorKind.human.rawValue {
-            return humans.first { $0.id.uuidString == id }?.name ?? "家人"
-        }
-        if kind == CareLedgerActorKind.pet.rawValue {
-            return pets.first { $0.id.uuidString == id }?.name ?? "宠物"
-        }
-        if kind == CareLedgerActorKind.plant.rawValue {
-            return "植物"
-        }
-        return "系统"
-    }
-
-    private func subjectName(for id: String?, kind: String) -> String {
-        guard let id, !id.isEmpty else { return "全家" }
-        if kind == CareLedgerSubjectKind.pet.rawValue {
-            return pets.first { $0.id.uuidString == id }?.name ?? "宠物"
-        }
-        if kind == CareLedgerSubjectKind.human.rawValue {
-            return humans.first { $0.id.uuidString == id }?.name ?? "家人"
-        }
-        if kind == CareLedgerSubjectKind.plant.rawValue {
-            return "植物"
-        }
-        return "全家"
-    }
-}
-
-private enum RangeFilter: CaseIterable {
-    case week
-    case month
-    case all
-
-    var title: String {
-        switch self {
-        case .week: return "本周"
-        case .month: return "本月"
-        case .all: return "全部"
-        }
-    }
-
-    var cutoff: Date? {
-        switch self {
-        case .week:
-            return Calendar.current.date(byAdding: .day, value: -7, to: Date())
-        case .month:
-            return Calendar.current.date(byAdding: .month, value: -1, to: Date())
-        case .all:
-            return nil
-        }
-    }
 }
 
 private extension CareLedgerEventKind {
