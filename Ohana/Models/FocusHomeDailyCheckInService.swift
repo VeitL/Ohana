@@ -20,6 +20,13 @@ enum FocusHomeDailyCheckInService {
         checkedInDates.insert(today)
         CheckInStreakStore.setCheckedInDates(checkedInDates, for: activeHumanId)
         QuestManager.shared.addCoconuts(1, emoji: "📅", title: rewardTitle)
+        let affected = UUID(uuidString: activeHumanId).map { Set([$0]) } ?? []
+        ReadModelRevisionCenter.shared.publishDomainMutation(
+            command: .dailyCheckIn(humanID: activeHumanId),
+            affectedEntityIDs: affected,
+            wroteBusinessFact: true,
+            note: "home.daily_check_in"
+        )
     }
 
     static func currentStreak(activeHumanId: String) -> Int {

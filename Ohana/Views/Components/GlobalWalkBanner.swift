@@ -10,18 +10,22 @@
 
 import SwiftUI
 import SwiftData
-import MapKit
+import CoreLocation
+import UIKit
 
 struct GlobalWalkBanner: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Household.createdAt) private var households: [Household]
 
     @State private var isMinimized = true
     @State private var showSummaryCard = false       // 结束后翻到背面
     @State private var summaryRotation: Double = 0   // 翻转角度
     @State private var isStopped = false             // B2: 结束状态，隐藏展开卡
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var summaryMapSnapshotWalkId: UUID?
+    @State private var summaryMapSnapshotPreparedSignature = "none"
+    @State private var summaryMapSnapshotImage: UIImage?
+    @State private var summaryMapSnapshotDecodeTask: Task<Void, Never>?
 
     // 气泡拖动位置（Y轴，锚点在屏幕右侧）
     @State private var bubbleAnchorY: CGFloat = 0    // B1: 拖动结束后保存的Y
@@ -33,7 +37,19 @@ struct GlobalWalkBanner: View {
         isActive && !mgr.isWalkCardExpandedSurfaceVisible
     }
     private var walkClockInterval: TimeInterval {
-        workloadPolicy.refreshInterval(default: 1, throttled: 15, paused: 60, isVisible: shouldShowFloatingControl)
+        workloadPolicy.refreshInterval(
+            default: 1,
+            throttled: 15,
+            paused: 60,
+            isVisible: shouldShowFloatingControl,
+            allowDuringActiveWalk: true
+        )
+    }
+    private var shouldRunWalkClock: Bool {
+        workloadPolicy.refreshBudget(
+            isVisible: shouldShowFloatingControl,
+            allowDuringActiveWalk: true
+        ) == .live
     }
     private var walkPanelFill: Color {
         colorScheme == .dark ? Color(hex: "10180F") : Color(hex: "F7FAEF")
@@ -108,11 +124,7 @@ struct GlobalWalkBanner: View {
                 .overlay(Circle().strokeBorder(Color.goPrimary.opacity(0.5), lineWidth: 2))
                 .shadow(color: Color.goPrimary.opacity(0.35), radius: 12) // ui-v4: allow active walk floating control glow
             VStack(spacing: 1) {
-                TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
-                    Text(formatElapsed(mgr.elapsedTime))
-                        .font(.system(size: 10, weight: .black, design: .monospaced))
-                        .foregroundStyle(Color.goPrimary)
-                }
+                walkElapsedLabel(fontSize: 10)
                 Image(systemName: "figure.walk")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -182,11 +194,7 @@ struct GlobalWalkBanner: View {
             // 数据行
             HStack(spacing: 0) {
                 walkStatCell(label: "时长", accent: .goPrimary) {
-                TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
-                        Text(formatElapsed(mgr.elapsedTime))
-                            .font(.system(size: 26, weight: .black, design: .monospaced))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                    }
+                    walkElapsedLabel(fontSize: 26)
                 }
                 Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40)
                 walkStatCell(label: "距离", accent: .goTeal) {
@@ -240,7 +248,7 @@ struct GlobalWalkBanner: View {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                     // B2: 先隐藏展开卡，同帧立即显示翻转卡（不中间消失）
                     isStopped = true
-                    mgr.stop(modelContext: modelContext, household: households.first)
+                    mgr.stop(modelContext: modelContext)
                     // 立即进入翻转卡，避免先露出旧背景再显示新卡
                     showSummaryCard = true
                 } label: {
@@ -281,12 +289,30 @@ struct GlobalWalkBanner: View {
             return mgr.poopCount
         }()
         let showBack = summaryRotation >= 90
+        let mapSnapshotSignature = summaryMapSnapshotSignature(for: latestWalk)
+        let preparedMapImage = summaryMapSnapshotPreparedSignature == mapSnapshotSignature
+            ? summaryMapSnapshotImage
+            : nil
 
         return ZStack {
-            summaryBackFace(pet: pet, elapsed: elapsed, distance: distance, poop: poop, latestWalk: latestWalk)
+            summaryBackFace(
+                pet: pet,
+                elapsed: elapsed,
+                distance: distance,
+                poop: poop,
+                latestWalk: latestWalk,
+                mapSnapshotImage: preparedMapImage
+            )
                 .opacity(showBack ? 0 : 1)
 
-            summaryBackFace(pet: pet, elapsed: elapsed, distance: distance, poop: poop, latestWalk: latestWalk)
+            summaryBackFace(
+                pet: pet,
+                elapsed: elapsed,
+                distance: distance,
+                poop: poop,
+                latestWalk: latestWalk,
+                mapSnapshotImage: preparedMapImage
+            )
                 .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                 .opacity(showBack ? 1 : 0)
         }
@@ -302,10 +328,17 @@ struct GlobalWalkBanner: View {
         .padding(.bottom, safeBottom(geo) + 160)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .onAppear {
+            prepareSummaryMapSnapshot(walkId: latestWalk?.id, data: latestWalk?.mapSnapshotData)
             summaryRotation = 0
             withAnimation(GoMotion.hero) {
                 summaryRotation = 180
             }
+        }
+        .onChange(of: mapSnapshotSignature) { _, _ in
+            prepareSummaryMapSnapshot(walkId: latestWalk?.id, data: latestWalk?.mapSnapshotData)
+        }
+        .onDisappear {
+            cancelSummaryMapSnapshotDecode()
         }
     }
 
@@ -314,7 +347,8 @@ struct GlobalWalkBanner: View {
         elapsed: TimeInterval,
         distance: Double,
         poop: Int,
-        latestWalk: PetWalkLog?
+        latestWalk: PetWalkLog?,
+        mapSnapshotImage: UIImage?
     ) -> some View {
         VStack(spacing: 0) {
             HStack {
@@ -350,7 +384,7 @@ struct GlobalWalkBanner: View {
 
             let coords = routeCoordinates(for: latestWalk, pet: pet)
             Group {
-                if let walk = latestWalk, let data = walk.mapSnapshotData, let ui = UIImage(data: data) {
+                if let ui = mapSnapshotImage {
                     Button {
                         if let url = URL(string: "maps://") { UIApplication.shared.open(url) }
                     } label: {
@@ -374,46 +408,13 @@ struct GlobalWalkBanner: View {
                             )
                     }
                     .buttonStyle(ScaleButtonStyle())
-                } else if !coords.isEmpty, let region = routeRegion(for: coords) {
-                    Map(initialPosition: .region(region)) {
-                        if coords.count >= 2 {
-                            MapPolyline(coordinates: coords)
-                                .stroke(Color.goPrimary, style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round))
-                        }
-                        if let first = coords.first {
-                            Annotation(coords.count >= 2 ? "出发" : "位置", coordinate: first) {
-                                Circle()
-                                    .fill(Color.goPrimary)
-                                    .frame(width: 16, height: 16)
-                                    .overlay(Circle().fill(Color.arkInk).frame(width: 6, height: 6))
-                            }
-                        }
-                        if coords.count >= 2, let last = coords.last {
-                            Annotation("到家", coordinate: last) {
-                                Circle()
-                                    .fill(Color.goRed)
-                                    .frame(width: 18, height: 18)
-                                    .overlay(Circle().fill(Color.ohanaPrimaryText).frame(width: 7, height: 7))
-                            }
-                        }
-                    }
-                    .mapStyle(.standard(elevation: .flat))
-                    .allowsHitTesting(false)
+                } else if !coords.isEmpty {
+                    WalkRouteTracePreview(
+                        coordinates: coords,
+                        title: coords.count >= 2 ? "本次轨迹" : "本次定位"
+                    )
                     .frame(maxWidth: .infinity)
                     .frame(height: 108)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(
-                        HStack(spacing: 4) {
-                            Image(systemName: "map.fill").font(.system(size: 11, weight: .bold))
-                            Text(coords.count >= 2 ? "本次轨迹" : "本次定位")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                        }
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(Color.arkInk.opacity(0.45), in: Capsule()) // ui-v4: allow map label scrim
-                        .padding(8),
-                        alignment: .bottomTrailing
-                    )
                 } else {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(Color.ohanaControlFill)
@@ -444,6 +445,45 @@ struct GlobalWalkBanner: View {
         }
     }
 
+    private func summaryMapSnapshotSignature(for walk: PetWalkLog?) -> String {
+        guard let walk, let data = walk.mapSnapshotData else {
+            return "none"
+        }
+        return "\(walk.id.uuidString)#\(data.count)"
+    }
+
+    private func prepareSummaryMapSnapshot(walkId: UUID?, data: Data?) {
+        let signature = summaryMapSnapshotSignature(walkId: walkId, data: data)
+        guard summaryMapSnapshotPreparedSignature != signature || summaryMapSnapshotImage == nil else { return }
+        summaryMapSnapshotDecodeTask?.cancel()
+        summaryMapSnapshotWalkId = walkId
+        summaryMapSnapshotPreparedSignature = signature
+        summaryMapSnapshotImage = nil
+        guard let walkId, let data else { return }
+
+        summaryMapSnapshotDecodeTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 64)
+            guard !Task.isCancelled else { return }
+            let image = await MapSnapshotImageDecoder.decode(data)
+            guard !Task.isCancelled else { return }
+            guard summaryMapSnapshotWalkId == walkId,
+                  summaryMapSnapshotPreparedSignature == signature
+            else { return }
+            summaryMapSnapshotImage = image
+            summaryMapSnapshotDecodeTask = nil
+        }
+    }
+
+    private func cancelSummaryMapSnapshotDecode() {
+        summaryMapSnapshotDecodeTask?.cancel()
+        summaryMapSnapshotDecodeTask = nil
+    }
+
+    private func summaryMapSnapshotSignature(walkId: UUID?, data: Data?) -> String {
+        guard let walkId, let data else { return "none" }
+        return "\(walkId.uuidString)#\(data.count)"
+    }
+
     // MARK: - 数据格（活跃中）
     private func walkStatCell<V: View>(label: String, accent: Color, @ViewBuilder value: () -> V) -> some View {
         VStack(spacing: 3) {
@@ -468,6 +508,23 @@ struct GlobalWalkBanner: View {
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func walkElapsedLabel(fontSize: CGFloat) -> some View {
+        if shouldRunWalkClock {
+            TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
+                walkElapsedText(fontSize: fontSize)
+            }
+        } else {
+            walkElapsedText(fontSize: fontSize)
+        }
+    }
+
+    private func walkElapsedText(fontSize: CGFloat) -> some View {
+        Text(formatElapsed(mgr.elapsedTime))
+            .font(.system(size: fontSize, weight: .black, design: .monospaced))
+            .foregroundStyle(fontSize > 12 ? Color.ohanaPrimaryText : Color.goPrimary)
     }
 
     // MARK: - 宠物头像
@@ -506,18 +563,4 @@ struct GlobalWalkBanner: View {
         }
     }
 
-    private func routeRegion(for coords: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
-        guard !coords.isEmpty else { return nil }
-        let lats = coords.map(\.latitude)
-        let lons = coords.map(\.longitude)
-        let center = CLLocationCoordinate2D(
-            latitude: (lats.min()! + lats.max()!) / 2,
-            longitude: (lons.min()! + lons.max()!) / 2
-        )
-        let span = MKCoordinateSpan(
-            latitudeDelta: max(0.008, (lats.max()! - lats.min()!) * 1.6),
-            longitudeDelta: max(0.008, (lons.max()! - lons.min()!) * 1.6)
-        )
-        return MKCoordinateRegion(center: center, span: span)
-    }
 }

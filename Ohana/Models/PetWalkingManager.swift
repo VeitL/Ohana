@@ -134,7 +134,7 @@ final class PetWalkingManager {
         startTimer()
     }
     
-    func stop(modelContext: ModelContext, household: Household? = nil) {
+    func stop(modelContext: ModelContext) {
         // 最终elapsed：已暂停部分 + 本次跑步部分
         if let r = resumeTime {
             pausedElapsed += Date().timeIntervalSince(r)

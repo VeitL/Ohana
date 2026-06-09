@@ -11,7 +11,23 @@ struct WalkInProgressPill: View {
     let pet: Pet
     var onTap: () -> Void = {}
 
+    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
+
     private var mgr: PetWalkingManager { PetWalkingManager.shared }
+
+    private var walkClockInterval: TimeInterval {
+        workloadPolicy.refreshInterval(
+            default: 1,
+            throttled: 15,
+            paused: 60,
+            isVisible: true,
+            allowDuringActiveWalk: true
+        )
+    }
+
+    private var shouldRunWalkClock: Bool {
+        workloadPolicy.refreshBudget(isVisible: true, allowDuringActiveWalk: true) != .paused
+    }
 
     var body: some View {
         Button(action: {
@@ -35,15 +51,7 @@ struct WalkInProgressPill: View {
                         .font(.system(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        let elapsed = Int(mgr.elapsedTime)
-                        let m = elapsed / 60, s = elapsed % 60
-                        Text(String(format: "已巡 %02d:%02d", m, s))
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                    }
+                    walkElapsedLabel
                 }
 
                 Spacer(minLength: 0)
@@ -65,5 +73,27 @@ struct WalkInProgressPill: View {
             )
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+
+    @ViewBuilder
+    private var walkElapsedLabel: some View {
+        if shouldRunWalkClock {
+            TimelineView(.periodic(from: .now, by: walkClockInterval)) { _ in
+                walkElapsedText
+            }
+        } else {
+            walkElapsedText
+        }
+    }
+
+    private var walkElapsedText: some View {
+        let elapsed = Int(mgr.elapsedTime)
+        let m = elapsed / 60
+        let s = elapsed % 60
+        return Text(String(format: "已巡 %02d:%02d", m, s))
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+            .monospacedDigit()
+            .contentTransition(.numericText())
     }
 }

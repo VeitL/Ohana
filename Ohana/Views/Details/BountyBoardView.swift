@@ -8,62 +8,6 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - 悬赏任务模型（用 WishlistItem 扩展，或用 UserDefaults 存储）
-struct BountyTask: Identifiable, Codable {
-    let id: UUID
-    var title: String
-    var description: String
-    var reward: Int          // 椰子奖励
-    var creatorId: String    // Human UUID
-    var creatorName: String
-    var creatorEmoji: String
-    var assigneeId: String?  // 接单人（实际完成者）UUID
-    var assigneeName: String?
-    // 指派字段（发布时 @ 某个家人，可选；nil = 所有人可接）
-    var assignedToId: String?
-    var assignedToName: String?
-    var assignedToEmoji: String?
-    var isCompleted: Bool
-    var createdAt: Date
-    var completedAt: Date?
-    var emoji: String
-
-    init(title: String, description: String, reward: Int,
-         creatorId: String, creatorName: String, creatorEmoji: String, emoji: String,
-         assignedToId: String? = nil, assignedToName: String? = nil, assignedToEmoji: String? = nil) {
-        self.id = UUID()
-        self.title = title
-        self.description = description
-        self.reward = reward
-        self.creatorId = creatorId
-        self.creatorName = creatorName
-        self.creatorEmoji = creatorEmoji
-        self.emoji = emoji
-        self.assignedToId = assignedToId
-        self.assignedToName = assignedToName
-        self.assignedToEmoji = assignedToEmoji
-        self.isCompleted = false
-        self.createdAt = Date()
-    }
-
-    /// 从 AppStorage 读取并解析当前存储的所有悬赏任务
-    static func loadAll() -> [BountyTask] {
-        guard let raw = UserDefaults.standard.string(forKey: "bountyTasks"),
-              let data = raw.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([BountyTask].self, from: data)
-        else { return [] }
-        return decoded
-    }
-
-    /// 计算指派给某家人且未完成的任务数（用于首页红点 / 入口 badge）
-    static func pendingAssignedCount(for humanIdString: String) -> Int {
-        guard !humanIdString.isEmpty else { return 0 }
-        return loadAll().filter {
-            !$0.isCompleted && $0.assignedToId == humanIdString
-        }.count
-    }
-}
-
 // MARK: - 悬赏榜主视图
 struct BountyBoardView: View {
     @Environment(\.dismiss) private var dismiss
@@ -72,7 +16,6 @@ struct BountyBoardView: View {
     @Query(sort: \Pet.createdAt)   private var pets:   [Pet]
     @AppStorage("bountyTasks") private var tasksRaw: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
-    @State private var questManager = QuestManager.shared
     @State private var showAddTask   = false
     @State private var selectedTab   = 0   // 0=进行中 1=已完成 2=周报
     @State private var completedTaskId: UUID? = nil
@@ -80,17 +23,7 @@ struct BountyBoardView: View {
     @State private var pendingCompleteId: UUID? = nil
 
     private var tasks: [BountyTask] {
-        guard let data = tasksRaw.data(using: .utf8),
-              let decoded = try? JSONDecoder().decode([BountyTask].self, from: data)
-        else { return [] }
-        return decoded
-    }
-
-    private func saveTasks(_ tasks: [BountyTask]) {
-        if let data = try? JSONEncoder().encode(tasks),
-           let str = String(data: data, encoding: .utf8) {
-            tasksRaw = str
-        }
+        BountyTask.decode(tasksRaw)
     }
 
     private var activeTasks: [BountyTask]    { tasks.filter { !$0.isCompleted } }
@@ -212,15 +145,17 @@ struct BountyBoardView: View {
             }
             .sheet(isPresented: $showAddTask) {
                 AddBountyTaskSheet(humans: humans, currentHumanId: activeHumanId) { newTask in
-                    var current = tasks
-                    current.insert(newTask, at: 0)
-                    saveTasks(current)
+                    runLegacyBountyCommand {
+                        createTask(newTask)
+                    }
                 }
             }
             .confirmationDialog("确认完成", isPresented: $showCompleteConfirm, titleVisibility: .visible) {
                 Button("完成并领取奖励") {
                     if let id = pendingCompleteId {
-                        completeTask(id: id)
+                        runLegacyBountyCommand {
+                            completeTask(id: id)
+                        }
                     }
                 }
                 Button("取消", role: .cancel) {}
@@ -383,7 +318,9 @@ struct BountyBoardView: View {
 
                     if isOwner {
                         Button {
-                            deleteTask(id: task.id)
+                            runLegacyBountyCommand {
+                                deleteTask(id: task.id)
+                            }
                         } label: {
                             Text("撤销")
                                 .font(OhanaFont.caption(.semibold))
@@ -471,27 +408,19 @@ struct BountyBoardView: View {
     }
 
     // MARK: - 完成任务（资产转移）
+    private func createTask(_ task: BountyTask) {
+        guard let raw = LegacyBountyCommandExecutor().createTask(task, in: tasks) else { return }
+        tasksRaw = raw
+    }
+
     private func completeTask(id: UUID) {
-        var current = tasks
-        guard let idx = current.firstIndex(where: { $0.id == id }) else { return }
-        var task = current[idx]
-
-        let reward = task.reward
-        task.isCompleted = true
-        task.completedAt = Date()
-        task.assigneeId = activeHumanId
-        task.assigneeName = currentHuman?.name
-        current[idx] = task
-        saveTasks(current)
-
-        // 奖励椰子
-        questManager.addCoconuts(
-            reward,
-            emoji: "📋",
-            title: "完成家庭任务",
-            actorId: activeHumanId.isEmpty ? nil : activeHumanId,
-            actorName: currentHuman?.name
-        )
+        guard let raw = LegacyBountyCommandExecutor().completeTask(
+            id: id,
+            in: tasks,
+            activeHumanId: activeHumanId,
+            currentHuman: currentHuman
+        ) else { return }
+        tasksRaw = raw
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -500,9 +429,15 @@ struct BountyBoardView: View {
 
     // MARK: - 删除任务
     private func deleteTask(id: UUID) {
-        var current = tasks
-        current.removeAll { $0.id == id }
-        saveTasks(current)
+        guard let raw = LegacyBountyCommandExecutor().deleteTask(id: id, in: tasks) else { return }
+        tasksRaw = raw
+    }
+
+    private func runLegacyBountyCommand(_ command: @escaping @MainActor () -> Void) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        OhanaFrameScheduler.runAfterNextFrame {
+            command()
+        }
     }
 
     // MARK: - 周报 Tab（每位家人本周护理打卡柱图）

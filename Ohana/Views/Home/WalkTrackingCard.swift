@@ -74,8 +74,8 @@ struct WalkTrackingSnapshot {
 struct WalkTrackingCommandExecutor {
     let modelContext: ModelContext
 
-    func stopWalk(manager: PetWalkingManager, household: Household?) {
-        manager.stop(modelContext: modelContext, household: household)
+    func stopWalk(manager: PetWalkingManager) {
+        manager.stop(modelContext: modelContext)
     }
 
     func saveWeeklyGoal(_ goal: Double, for pet: Pet) {
@@ -92,7 +92,6 @@ struct WalkTrackingCardHost: View {
     var onCloseSummaryToPetCard: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Household.createdAt) private var households: [Household]
 
     var body: some View {
         let commandExecutor = WalkTrackingCommandExecutor(modelContext: modelContext)
@@ -101,7 +100,7 @@ struct WalkTrackingCardHost: View {
             snapshot: WalkTrackingSnapshot.make(pet: pet, manager: PetWalkingManager.shared),
             onCloseSummaryToPetCard: onCloseSummaryToPetCard,
             onStopWalk: {
-                commandExecutor.stopWalk(manager: PetWalkingManager.shared, household: households.first)
+                commandExecutor.stopWalk(manager: PetWalkingManager.shared)
             },
             onSaveWeeklyGoal: { goal in
                 commandExecutor.saveWeeklyGoal(goal, for: pet)
@@ -642,7 +641,8 @@ struct WalkTrackingCard: View {
     private func summaryRouteMap(walk: PetWalkLog?) -> some View {
         let coords = snapshot.latestRouteCoordinates
         let poopMarkers = snapshot.latestPoopMarkers
-        let visibleCoords = coords + poopMarkers.compactMap(\.coordinate)
+        let markerCoords = poopMarkers.compactMap(\.coordinate)
+        let previewCoords = coords.isEmpty ? markerCoords : coords
         if walk != nil, let ui = snapshot.latestWalkMapImage, !(equipFxRainbowRoute || equipFxRainbowPoop) {
             GeometryReader { geo in
                 Image(uiImage: ui)
@@ -660,54 +660,11 @@ struct WalkTrackingCard: View {
                             .padding(10)
                     }
             }
-        } else if !visibleCoords.isEmpty, let region = routeRegion(for: visibleCoords) {
-            Map(initialPosition: .region(region)) {
-                if coords.count >= 2 {
-                    RainbowRoutePolyline(
-                        coordinates: coords,
-                        normalColor: .goPrimary,
-                        lineWidth: 5,
-                        isRainbow: equipFxRainbowRoute,
-                        isFlowing: shouldAnimateRainbowWalkEffects,
-                        flowPhase: rainbowRoutePhase
-                    )
-                }
-                if let first = coords.first {
-                    Annotation(coords.count >= 2 ? "出发" : "位置", coordinate: first) {
-                        Circle()
-                            .fill(Color.goPrimary)
-                            .frame(width: 16, height: 16)
-                            .overlay(Circle().fill(Color.arkInk).frame(width: 6, height: 6))
-                    }
-                }
-                if coords.count >= 2, let last = coords.last {
-                    Annotation("到家", coordinate: last) {
-                        Circle()
-                            .fill(Color.goRed)
-                            .frame(width: 18, height: 18)
-                            .overlay(Circle().fill(Color.goCardWhite).frame(width: 7, height: 7))
-                    }
-                }
-                ForEach(poopMarkers) { marker in
-                    if let coordinate = marker.coordinate {
-                        Annotation("便便", coordinate: coordinate) {
-                            poopMapPin
-                        }
-                    }
-                }
-            }
-            .mapStyle(.standard(elevation: .flat))
-            .allowsHitTesting(false)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(alignment: .bottomLeading) {
-                Label(coords.count >= 2 ? "本次轨迹" : "本次定位", systemImage: "map.fill")
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.goCardWhite)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(Color.arkInk.opacity(0.46), in: Capsule())
-                    .padding(10)
-            }
+        } else if !previewCoords.isEmpty {
+            WalkRouteTracePreview(
+                coordinates: previewCoords,
+                title: coords.count >= 2 ? "本次轨迹" : "本次定位"
+            )
         } else {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color.goCardWhite.opacity(0.08))
@@ -1133,7 +1090,7 @@ struct WalkTrackingCard: View {
             return
         }
         rainbowRoutePhase = 0
-        withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) { // ui-v4: allow route cosmetic loop; runtime-guardrail: allow gated by AppWorkloadPolicy and only used for visible equipped walk maps.
+        withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) { // ui-v4: allow route cosmetic loop; runtime-guardrail: allow gated by AppWorkloadPolicy and only used for visible equipped walk maps; smoothness: allow visible active-walk route effect gated by surfaceGate.
             rainbowRoutePhase = -68
         }
     }

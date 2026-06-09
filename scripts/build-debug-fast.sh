@@ -53,9 +53,16 @@ while ! mkdir "${LOCK_DIR}" 2>/dev/null; do
   if [[ -f "${LOCK_DIR}/pid" ]]; then
     LOCK_PID="$(cat "${LOCK_DIR}/pid" 2>/dev/null || true)"
     if [[ -n "${LOCK_PID}" ]] && ! kill -0 "${LOCK_PID}" 2>/dev/null; then
-      rm -rf "${LOCK_DIR}"
+      STALE_LOCK_DIR="${LOCK_DIR}.stale.$(date +%s).$$"
+      echo "Build lock owner ${LOCK_PID} is gone; moving stale lock to ${STALE_LOCK_DIR}."
+      mv "${LOCK_DIR}" "${STALE_LOCK_DIR}" 2>/dev/null || rm -rf "${LOCK_DIR}"
       continue
     fi
+  else
+    STALE_LOCK_DIR="${LOCK_DIR}.malformed.$(date +%s).$$"
+    echo "Build lock is missing pid; moving malformed lock to ${STALE_LOCK_DIR}."
+    mv "${LOCK_DIR}" "${STALE_LOCK_DIR}" 2>/dev/null || rm -rf "${LOCK_DIR}"
+    continue
   fi
   echo "Another build is already running for this worktree/branch."
   echo "Waiting on lock: ${LOCK_DIR}"

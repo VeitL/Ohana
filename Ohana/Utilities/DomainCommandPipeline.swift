@@ -82,10 +82,12 @@ enum DomainCommand: Hashable {
     case calendarEventDeletion(eventID: UUID, scope: String)
     case memberDeletion(entityID: UUID, kind: String)
     case reminderCompletion(reminderID: UUID)
+    case legacyBounty(taskID: UUID, action: String)
     case coconutExchange(requestID: UUID)
     case shopPurchase(humanID: UUID?, itemID: String)
     case achievementReward(entityID: UUID, kind: String, badgeIDs: [String])
     case backdateCheckIn(petID: UUID, action: String)
+    case dailyCheckIn(humanID: String)
     case unknown(action: String)
 }
 

@@ -275,15 +275,14 @@ private struct GoldenRewardRow: View {
     var onMilestoneRewardCompleted: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var didFeed = false
     @State private var feedScale: CGFloat = 1.0
     @State private var sparkleOpacity: CGFloat = 0.0
     @State private var showCoconutDrop = false
     private let milestoneReward = 20
-    private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    private var shouldRunSparkle: Bool {
+        workloadPolicy.shouldRunRepeatingAnimation(isVisible: true)
     }
 
     private var milestoneTitle: String {
@@ -354,13 +353,33 @@ private struct GoldenRewardRow: View {
         .shadow(color: Color.goYellow.opacity(sparkleOpacity * 0.5), radius: 28, x: 0, y: 4) // ui-v4: allow milestone reward glow
         .coconutRewardOverlay(trigger: $showCoconutDrop, amount: milestoneReward)
         .onAppear {
-            guard !shouldReduceWork else {
-                sparkleOpacity = 0.18
-                return
-            }
-            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { // ui-v4: allow gated milestone sparkle loop
-                sparkleOpacity = 0.65
-            }
+            updateSparkleMotion()
+        }
+        .onChange(of: shouldRunSparkle) { _, _ in
+            updateSparkleMotion()
+        }
+    }
+
+    private func updateSparkleMotion() {
+        guard shouldRunSparkle else {
+            stopSparkleMotion()
+            return
+        }
+        startSparkleMotion()
+    }
+
+    private func startSparkleMotion() {
+        sparkleOpacity = 0.18
+        withAnimation(.easeInOut(duration: 0.45)) {
+            sparkleOpacity = 0.42
+        }
+    }
+
+    private func stopSparkleMotion() {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            sparkleOpacity = 0.18
         }
     }
 

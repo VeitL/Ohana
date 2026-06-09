@@ -18,18 +18,18 @@ struct IslandMoodHeaderStrip: View {
     let pendingReminders: [Reminder]
     let activePet: Pet?
     let checkInStreak: Int
+    var isVisible: Bool = true
     var onExpand: () -> Void = {}
 
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var cloudOffsetA: CGFloat = -8
     @State private var cloudOffsetB: CGFloat = 8
     @State private var breath: CGFloat = 0
 
     // MARK: - 计算综合状态
-    private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    private var shouldRunAmbientMotion: Bool {
+        workloadPolicy.ambientMotionBudget(isVisible: isVisible).allowsMotion
     }
 
     private var mood: IslandMood {
@@ -190,22 +190,45 @@ struct IslandMoodHeaderStrip: View {
         .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
         .onAppear {
-            guard !shouldReduceWork else {
-                cloudOffsetA = -8
-                cloudOffsetB = 8
-                breath = 0
-                return
-            }
-            withAnimation(.easeInOut(duration: 4.5).repeatForever(autoreverses: true)) {
-                cloudOffsetA = 10
-            }
-            withAnimation(.easeInOut(duration: 6.2).repeatForever(autoreverses: true)) {
-                cloudOffsetB = -10
-            }
-            withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) {
-                breath = 1
-            }
+            updateAmbientMotion()
         }
+        .onChange(of: shouldRunAmbientMotion) { _, _ in
+            updateAmbientMotion()
+        }
+        .onChange(of: isVisible) { _, _ in
+            updateAmbientMotion()
+        }
+    }
+
+    private func updateAmbientMotion() {
+        guard shouldRunAmbientMotion else {
+            stopAmbientMotion()
+            return
+        }
+        startAmbientMotion()
+    }
+
+    private func startAmbientMotion() {
+        resetAmbientMotion()
+        withAnimation(.easeInOut(duration: 0.55)) {
+            cloudOffsetA = 4
+            cloudOffsetB = -4
+            breath = 0.45
+        }
+    }
+
+    private func stopAmbientMotion() {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            resetAmbientMotion()
+        }
+    }
+
+    private func resetAmbientMotion() {
+        cloudOffsetA = -8
+        cloudOffsetB = 8
+        breath = 0
     }
 }
 
