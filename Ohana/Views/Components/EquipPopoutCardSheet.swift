@@ -21,6 +21,7 @@ struct EquipPopoutCardSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = "zh"
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var previewData: Data?
     @State private var previewSource: PetPopoutCardSource?
@@ -249,10 +250,15 @@ struct EquipPopoutCardSheet: View {
 
             if isPopoutActive {
                 Button {
-                    pet.cardStyleRaw = "classic"
-                    modelContext.safeSave()
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    dismiss()
+                    commandQueue.enqueue(.petCardAppearance(petID: pet.id, action: "restoreClassic")) {
+                        _ = RewardEconomyCommandExecutor(context: modelContext).restoreClassicPetCard(
+                            pet: pet,
+                            note: "petCardAppearance.restoreClassic"
+                        )
+                        notifyPetProfileChanged()
+                        dismiss()
+                    }
                 } label: {
                     Text(l.tr(zh: "恢复普通卡片", en: "Restore regular card", de: "Normale Karte wiederherstellen"))
                         .font(OhanaFont.caption(.black))
@@ -329,20 +335,30 @@ struct EquipPopoutCardSheet: View {
 
     private func savePopout() {
         guard let data = currentPreviewData else { return }
-        pet.cardPopoutImageData = data
-        pet.cardPopoutSourceRaw = (previewSource ?? PetPopoutCardSource(rawValue: pet.cardPopoutSourceRaw ?? "") ?? .avatar2d).rawValue
-        pet.cardStyleRaw = "popout"
-        modelContext.safeSave()
+        let sourceRaw = (previewSource ?? PetPopoutCardSource(rawValue: pet.cardPopoutSourceRaw ?? "") ?? .avatar2d).rawValue
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(.petCardAppearance(petID: pet.id, action: "enablePopout")) {
+            _ = RewardEconomyCommandExecutor(context: modelContext).enablePetPopoutCard(
+                pet: pet,
+                imageData: data,
+                sourceRaw: sourceRaw,
+                note: "petCardAppearance.enablePopout"
+            )
+            notifyPetProfileChanged()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            showToast(l.tr(zh: "破框卡片已启用", en: "Popout card enabled", de: "Popout-Karte aktiviert"), icon: "checkmark.circle.fill", tint: Color.goPrimary)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+                dismiss()
+            }
+        }
+    }
+
+    private func notifyPetProfileChanged() {
         NotificationCenter.default.post(
             name: .ohanaMemberProfileDidChange,
             object: nil,
             userInfo: ["id": pet.id.uuidString, "kind": "pet"]
         )
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        showToast(l.tr(zh: "破框卡片已启用", en: "Popout card enabled", de: "Popout-Karte aktiviert"), icon: "checkmark.circle.fill", tint: Color.goPrimary)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
-            dismiss()
-        }
     }
 
     @MainActor

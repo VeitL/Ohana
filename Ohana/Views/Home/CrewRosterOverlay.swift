@@ -631,6 +631,11 @@ struct CrewRosterOverlay: View {
                 hiddenHomePetIDsRaw = HomeCardVisibility.rawBySettingPet(pet, visible: visible, raw: hiddenHomePetIDsRaw)
                 homeVisibilityOverrides[pet.id] = nil
             }
+            MemberCommandExecutor(context: modelContext).publishPetHomeVisibility(
+                petID: pet.id,
+                visible: visible,
+                note: "crew.member.homeVisibility.pet"
+            )
             postHomeVisibilityChanged(id: pet.id, kind: "pet")
         }
         return true
@@ -648,14 +653,17 @@ struct CrewRosterOverlay: View {
             homeVisibilityOverrides[human.id] = visible
         }
         scheduleHomeVisibilityCommit(id: human.id) {
+            let result = MemberCommandExecutor(context: modelContext).setHumanHomeVisibility(
+                human,
+                visible: visible,
+                note: "crew.member.homeVisibility.human"
+            )
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                human.shouldShowOnHome = visible
                 homeVisibilityOverrides[human.id] = nil
             }
-            modelContext.safeSave()
-            postHomeVisibilityChanged(id: human.id, kind: "human")
+            postHomeVisibilityChanged(id: result.entityID, kind: result.kind)
         }
         return true
     }
@@ -945,6 +953,7 @@ private struct CrewRosterProfilePanel: View {
     @State private var fertilizingDays = 30
     @State private var themeHex = ""
     @State private var notes = ""
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
     private let bloodTypeOptions = ["未填写", "A", "B", "AB", "O"]
@@ -989,9 +998,7 @@ private struct CrewRosterProfilePanel: View {
         .onAppear(perform: loadEditState)
         .alert("确认标记离世", isPresented: $showingPetPassedAlert) {
             Button("确认", role: .destructive) {
-                guard let pet else { return }
-                RainbowBridgeService.markPassedAway(pet: pet, date: passedDate, context: modelContext)
-                onSaved(pet.id, "pet")
+                markPetPassedAway()
             }
             Button("取消", role: .cancel) {}
         } message: {
@@ -999,9 +1006,7 @@ private struct CrewRosterProfilePanel: View {
         }
         .alert("撤销离世标记", isPresented: $showingPetUndoPassedAlert) {
             Button("撤销", role: .destructive) {
-                guard let pet else { return }
-                RainbowBridgeService.undoPassedAway(pet: pet, context: modelContext)
-                onSaved(pet.id, "pet")
+                undoPetPassedAway()
             }
             Button("取消", role: .cancel) {}
         } message: {
@@ -1010,20 +1015,15 @@ private struct CrewRosterProfilePanel: View {
         .alert("仅清空所有记录", isPresented: $showingPetClearAlert) {
             Button("取消", role: .cancel) {}
             Button("清空记录", role: .destructive) {
-                guard let pet else { return }
-                pet.clearAllActivityRecords(in: modelContext)
+                clearPetActivityRecords()
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-                onSaved(pet.id, "pet")
             }
         } message: {
             Text("将删除护理、体重、花费、健康、散步、喂食、清洁、里程碑、用药与相册等记录；保留名字、头像、品种与证件/保险档案。此操作不可撤销。")
         }
         .alert("确认标记纪念模式", isPresented: $showingHumanPassedAlert) {
             Button("确认", role: .destructive) {
-                guard let human else { return }
-                human.passedAwayDate = passedDate
-                modelContext.safeSave()
-                onSaved(human.id, "human")
+                markHumanPassedAway()
             }
             Button("取消", role: .cancel) {}
         } message: {
@@ -1031,10 +1031,7 @@ private struct CrewRosterProfilePanel: View {
         }
         .alert("撤销纪念模式", isPresented: $showingHumanUndoPassedAlert) {
             Button("撤销", role: .destructive) {
-                guard let human else { return }
-                human.passedAwayDate = nil
-                modelContext.safeSave()
-                onSaved(human.id, "human")
+                undoHumanPassedAway()
             }
             Button("取消", role: .cancel) {}
         } message: {
@@ -1044,8 +1041,10 @@ private struct CrewRosterProfilePanel: View {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
                 guard let plant else { return }
-                modelContext.delete(plant)
-                modelContext.safeSave()
+                MemberCommandExecutor(context: modelContext).deletePlant(
+                    plant,
+                    note: "crew.member.deleted.plant"
+                )
                 onDeleted()
             }
         } message: {
@@ -1512,60 +1511,141 @@ private struct CrewRosterProfilePanel: View {
 
     private func saveChanges() {
         if let pet {
-            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            pet.name = trimmedName.isEmpty ? pet.name : trimmedName
-            pet.avatarImageData = avatarImageData
-            pet.species = species
-            pet.breed = breed.trimmingCharacters(in: .whitespacesAndNewlines)
-            pet.gender = gender
-            pet.isNeutered = isNeutered
-            pet.birthday = hasBirthday ? birthday : nil
-            pet.homeDate = hasHomeDate ? homeDate : nil
-            pet.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(themeHex, fallback: OhanaThemeColorPolicy.petFallbackHex)
-            pet.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-            CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: modelContext)
-            modelContext.safeSave()
-            seedAvatarCache(id: pet.id, data: avatarImageData)
-            onSaved(pet.id, "pet")
+            let input = PetProfileCommandInput(
+                name: name,
+                avatarImageData: avatarImageData,
+                species: species,
+                breed: breed,
+                gender: gender,
+                isNeutered: isNeutered,
+                birthday: hasBirthday ? birthday : nil,
+                homeDate: hasHomeDate ? homeDate : nil,
+                themeHex: themeHex,
+                notes: notes
+            )
+            commandQueue.enqueue(.memberProfile(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
+                let result = MemberCommandExecutor(context: modelContext).updatePetProfile(
+                    pet,
+                    input: input,
+                    note: "crew.member.profile.pet"
+                )
+                seedAvatarCache(id: result.entityID, data: input.avatarImageData)
+                onSaved(result.entityID, result.kind)
+            }
         } else if let human {
-            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            human.name = trimmedName.isEmpty ? human.name : trimmedName
-            human.avatarImageData = avatarImageData
-            human.avatarEmoji = avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "👤" : avatarEmoji
-            human.role = HumanProfileOptions.normalizedRole(role)
-            human.birthday = hasBirthday ? birthday : nil
-            human.bloodType = bloodType == "未填写" ? "" : bloodType
-            human.heightCm = Double(heightText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
-            human.mbti = mbti == "未填写" ? "" : mbti.uppercased()
-            human.nationality = nationality.trimmingCharacters(in: .whitespacesAndNewlines)
-            human.city = city.trimmingCharacters(in: .whitespacesAndNewlines)
-            human.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(themeHex, fallback: OhanaThemeColorPolicy.humanFallbackHex)
-            var noteParts: [String] = []
-            let normalizedGender = HumanProfileOptions.normalizedGender(gender)
-            if !normalizedGender.isEmpty { noteParts.append("性别:\(normalizedGender)") }
-            noteParts.append(contentsOf: human.notes.split(separator: "｜").map(String.init).filter { $0.hasPrefix("关系:") })
-            let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmedNotes.isEmpty { noteParts.append(trimmedNotes) }
-            human.notes = noteParts.joined(separator: "｜")
-            modelContext.safeSave()
-            seedAvatarCache(id: human.id, data: avatarImageData)
-            onSaved(human.id, "human")
+            let preservedNoteParts = human.notes
+                .split(separator: "｜")
+                .map(String.init)
+                .filter { $0.hasPrefix("关系:") }
+            let input = HumanProfileCommandInput(
+                name: name,
+                avatarImageData: avatarImageData,
+                avatarEmoji: avatarEmoji,
+                role: role,
+                gender: gender,
+                birthday: hasBirthday ? birthday : nil,
+                bloodType: bloodType,
+                heightText: heightText,
+                mbti: mbti,
+                nationality: nationality,
+                city: city,
+                themeHex: themeHex,
+                notes: notes,
+                preservedNoteParts: preservedNoteParts
+            )
+            commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
+                let result = MemberCommandExecutor(context: modelContext).updateHumanProfile(
+                    human,
+                    input: input,
+                    note: "crew.member.profile.human"
+                )
+                seedAvatarCache(id: result.entityID, data: input.avatarImageData)
+                onSaved(result.entityID, result.kind)
+            }
         } else if let plant {
-            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            plant.name = trimmedName.isEmpty ? plant.name : trimmedName
-            plant.avatarImageData = avatarImageData
-            plant.avatarEmoji = avatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "🌱" : avatarEmoji
-            plant.species = species.trimmingCharacters(in: .whitespacesAndNewlines)
-            plant.location = location.trimmingCharacters(in: .whitespacesAndNewlines)
-            plant.wateringIntervalDays = wateringDays
-            plant.fertilizingIntervalDays = fertilizingDays
-            plant.themeColorHex = themeHex
-            plant.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-            modelContext.safeSave()
-            onSaved(plant.id, "plant")
+            let input = PlantProfileCommandInput(
+                name: name,
+                avatarImageData: avatarImageData,
+                avatarEmoji: avatarEmoji,
+                species: species,
+                location: location,
+                wateringIntervalDays: wateringDays,
+                fertilizingIntervalDays: fertilizingDays,
+                themeHex: themeHex,
+                notes: notes
+            )
+            commandQueue.enqueue(.memberProfile(entityID: plant.id, kind: EntityKind.plant.rawValue)) {
+                let result = MemberCommandExecutor(context: modelContext).updatePlantProfile(
+                    plant,
+                    input: input,
+                    note: "crew.member.profile.plant"
+                )
+                onSaved(result.entityID, result.kind)
+            }
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         withAnimation(GoMotion.feedback) { isEditing = false }
+    }
+
+    private func markPetPassedAway() {
+        guard let pet else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        commandQueue.enqueue(.memberLifecycle(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "passed.mark")) {
+            let result = MemberCommandExecutor(context: modelContext).markPetPassedAway(
+                pet,
+                date: passedDate,
+                note: "crew.member.lifecycle.pet.passed.mark"
+            )
+            onSaved(result.entityID, result.kind)
+        }
+    }
+
+    private func undoPetPassedAway() {
+        guard let pet else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        commandQueue.enqueue(.memberLifecycle(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "passed.undo")) {
+            let result = MemberCommandExecutor(context: modelContext).undoPetPassedAway(
+                pet,
+                note: "crew.member.lifecycle.pet.passed.undo"
+            )
+            onSaved(result.entityID, result.kind)
+        }
+    }
+
+    private func clearPetActivityRecords() {
+        guard let pet else { return }
+        commandQueue.enqueue(.memberLifecycle(entityID: pet.id, kind: EntityKind.pet.rawValue, action: "records.clear")) {
+            let result = MemberCommandExecutor(context: modelContext).clearPetActivityRecords(
+                pet,
+                note: "crew.member.lifecycle.pet.records.clear"
+            )
+            onSaved(result.entityID, result.kind)
+        }
+    }
+
+    private func markHumanPassedAway() {
+        guard let human else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        commandQueue.enqueue(.memberLifecycle(entityID: human.id, kind: EntityKind.human.rawValue, action: "passed.mark")) {
+            let result = MemberCommandExecutor(context: modelContext).markHumanPassedAway(
+                human,
+                date: passedDate,
+                note: "crew.member.lifecycle.human.passed.mark"
+            )
+            onSaved(result.entityID, result.kind)
+        }
+    }
+
+    private func undoHumanPassedAway() {
+        guard let human else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        commandQueue.enqueue(.memberLifecycle(entityID: human.id, kind: EntityKind.human.rawValue, action: "passed.undo")) {
+            let result = MemberCommandExecutor(context: modelContext).undoHumanPassedAway(
+                human,
+                note: "crew.member.lifecycle.human.passed.undo"
+            )
+            onSaved(result.entityID, result.kind)
+        }
     }
 
     private func seedAvatarCache(id: UUID, data: Data?) {
@@ -1580,55 +1660,36 @@ private struct CrewRosterProfilePanel: View {
 
     private func deletePetWithCascade() {
         guard let pet else { return }
-        let petIdStr = pet.id.uuidString
-        if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
-            for event in allEvents where event.relatedEntityId == petIdStr {
-                modelContext.delete(event)
-            }
-        }
-        removeQuickAccessItems(for: pet.id)
-        modelContext.delete(pet)
-        modelContext.safeSave()
+        MemberCommandExecutor(context: modelContext).deletePet(
+            pet,
+            note: "crew.member.deleted.pet"
+        )
         showingPetDeleteSheet = false
         onDeleted()
     }
 
-    private func removeQuickAccessItems(for petId: UUID) {
-        let key = "quickActionItems_v2"
-        guard let json = UserDefaults.standard.string(forKey: key),
-              let data = json.data(using: .utf8),
-              var items = try? JSONDecoder().decode([QuickActionItem].self, from: data)
-        else { return }
-        items.removeAll { $0.petId == petId }
-        if let newData = try? JSONEncoder().encode(items),
-           let newJSON = String(data: newData, encoding: .utf8) {
-            UserDefaults.standard.set(newJSON, forKey: key)
-        }
-    }
-
     private func deleteHumanAndReturnHome() {
         guard let human else { return }
-        let deletedHumanId = human.id.uuidString
-        let hasRemainingHuman = allHumans.contains { $0.id.uuidString != deletedHumanId }
-        let deletedCurrentHuman = activeHumanIdStr == deletedHumanId
-        let requiresReplacementHuman = !hasRemainingHuman
-        let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
-        if deletedCurrentHuman || requiresReplacementHuman {
+        let result = MemberCommandExecutor(context: modelContext).deleteHuman(
+            human,
+            activeHumanID: activeHumanIdStr,
+            note: "crew.member.deleted.human"
+        )
+        if result.clearsActiveHumanID {
             activeHumanIdStr = ""
         }
-        modelContext.delete(human)
-        modelContext.safeSave()
         NotificationCenter.default.post(
             name: .ohanaReturnHomeAfterHumanDeletion,
             object: nil,
             userInfo: [
-                "requiresReplacementHuman": requiresReplacementHuman,
-                "requiresAccountSwitch": requiresAccountSwitch
+                "requiresReplacementHuman": result.requiresReplacementHuman,
+                "requiresAccountSwitch": result.requiresAccountSwitch
             ]
         )
         showingHumanDeleteSheet = false
         onDeleted()
     }
+
 }
 
 private struct CrewRosterDeleteConfirmationSheet: View {
@@ -1794,6 +1855,7 @@ private struct CrewRosterPetProfileEditor: View {
     let onSave: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
     @State private var species = ""
     @State private var breed = ""
@@ -1852,21 +1914,26 @@ private struct CrewRosterPetProfileEditor: View {
     }
 
     private func saveChanges() {
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        pet.name = trimmedName.isEmpty ? pet.name : trimmedName
-        pet.species = species
-        pet.breed = breed.trimmingCharacters(in: .whitespacesAndNewlines)
-        pet.gender = gender
-        pet.isNeutered = isNeutered
-        pet.birthday = hasBirthday ? birthday : nil
-        pet.homeDate = hasHomeDate ? homeDate : nil
-        pet.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
-            themeHex,
-            fallback: OhanaThemeColorPolicy.petFallbackHex
+        let input = PetProfileCommandInput(
+            name: name,
+            avatarImageData: pet.avatarImageData,
+            species: species,
+            breed: breed,
+            gender: gender,
+            isNeutered: isNeutered,
+            birthday: hasBirthday ? birthday : nil,
+            homeDate: hasHomeDate ? homeDate : nil,
+            themeHex: themeHex,
+            notes: notes
         )
-        pet.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        modelContext.safeSave()
-        onSave()
+        commandQueue.enqueue(.memberProfile(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
+            MemberCommandExecutor(context: modelContext).updatePetProfile(
+                pet,
+                input: input,
+                note: "crew.inline.profile.pet"
+            )
+            onSave()
+        }
     }
 }
 
@@ -1876,6 +1943,7 @@ private struct CrewRosterHumanProfileEditor: View {
     let onSave: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
     @State private var role = "member"
     @State private var gender = ""
@@ -1941,31 +2009,30 @@ private struct CrewRosterHumanProfileEditor: View {
     }
 
     private func saveChanges() {
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        human.name = trimmedName.isEmpty ? human.name : trimmedName
-        human.role = HumanProfileOptions.normalizedRole(role)
-        human.birthday = hasBirthday ? birthday : nil
-        human.bloodType = bloodType == "未填写" ? "" : bloodType
-        human.mbti = mbti == "未填写" ? "" : mbti.uppercased()
-        human.nationality = nationality.trimmingCharacters(in: .whitespacesAndNewlines)
-        human.city = city.trimmingCharacters(in: .whitespacesAndNewlines)
-        human.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
-            themeHex,
-            fallback: OhanaThemeColorPolicy.humanFallbackHex
+        let input = HumanProfileCommandInput(
+            name: name,
+            avatarImageData: human.avatarImageData,
+            avatarEmoji: human.avatarEmoji,
+            role: role,
+            gender: gender,
+            birthday: hasBirthday ? birthday : nil,
+            bloodType: bloodType,
+            heightText: human.heightCm > 0 ? String(human.heightCm) : "",
+            mbti: mbti,
+            nationality: nationality,
+            city: city,
+            themeHex: themeHex,
+            notes: notes,
+            preservedNoteParts: []
         )
-
-        var noteParts: [String] = []
-        let normalizedGender = HumanProfileOptions.normalizedGender(gender)
-        if !normalizedGender.isEmpty {
-            noteParts.append("性别:\(normalizedGender)")
+        commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
+            MemberCommandExecutor(context: modelContext).updateHumanProfile(
+                human,
+                input: input,
+                note: "crew.inline.profile.human"
+            )
+            onSave()
         }
-        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedNotes.isEmpty {
-            noteParts.append(trimmedNotes)
-        }
-        human.notes = noteParts.joined(separator: "｜")
-        modelContext.safeSave()
-        onSave()
     }
 }
 
@@ -1975,6 +2042,7 @@ private struct CrewRosterPlantProfileEditor: View {
     let onSave: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
     @State private var species = ""
     @State private var location = ""
@@ -2017,16 +2085,25 @@ private struct CrewRosterPlantProfileEditor: View {
     }
 
     private func saveChanges() {
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        plant.name = trimmedName.isEmpty ? plant.name : trimmedName
-        plant.species = species.trimmingCharacters(in: .whitespacesAndNewlines)
-        plant.location = location.trimmingCharacters(in: .whitespacesAndNewlines)
-        plant.wateringIntervalDays = wateringDays
-        plant.fertilizingIntervalDays = fertilizingDays
-        plant.themeColorHex = themeHex
-        plant.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        modelContext.safeSave()
-        onSave()
+        let input = PlantProfileCommandInput(
+            name: name,
+            avatarImageData: plant.avatarImageData,
+            avatarEmoji: plant.avatarEmoji,
+            species: species,
+            location: location,
+            wateringIntervalDays: wateringDays,
+            fertilizingIntervalDays: fertilizingDays,
+            themeHex: themeHex,
+            notes: notes
+        )
+        commandQueue.enqueue(.memberProfile(entityID: plant.id, kind: EntityKind.plant.rawValue)) {
+            MemberCommandExecutor(context: modelContext).updatePlantProfile(
+                plant,
+                input: input,
+                note: "crew.inline.profile.plant"
+            )
+            onSave()
+        }
     }
 }
 

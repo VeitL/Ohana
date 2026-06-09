@@ -285,11 +285,7 @@ enum ExpandedQuickActionExecutor {
             return
         }
 
-        let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: executorId)
-        modelContext.insert(log)
-        modelContext.safeSave()
-        let got = QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)
-        QuickActionReminderCompletionSyncService.completeNearestPetHygieneReminder(
+        let got = CareEventService.recordHygiene(
             pet: pet,
             type: type,
             context: modelContext,
@@ -322,19 +318,25 @@ enum ExpandedQuickActionExecutor {
         openHealth: (Pet) -> Void,
         feedback: (Feedback) -> Void
     ) {
+        let type: HealthLogType
         switch raw {
         case "vaccine":
-            modelContext.insert(PetHealthLog(date: Date(), type: .vaccine, note: "快捷打卡", pet: pet, executorId: executorId))
+            type = .vaccine
         case "deworming":
-            modelContext.insert(PetHealthLog(date: Date(), type: .dewormingExternal, note: "快捷打卡", pet: pet, executorId: executorId))
+            type = .dewormingExternal
         case "visit":
-            modelContext.insert(PetHealthLog(date: Date(), type: .checkup, note: "快捷打卡", pet: pet, executorId: executorId))
+            type = .checkup
         default:
             openHealth(pet)
             return
         }
-        modelContext.safeSave()
-        let reward = QuestManager.shared.awardAction(type: .health, pet: pet, context: modelContext)
+        let reward = CareEventService.recordHealth(
+            pet: pet,
+            type: type,
+            note: "快捷打卡",
+            context: modelContext,
+            executorId: executorId
+        )
         let delta = reward.humanGot + reward.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "💉 +\(delta)🥥" : nil))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -369,80 +371,4 @@ enum ExpandedQuickActionExecutor {
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "\(type.emoji) +\(delta)🥥" : nil))
     }
 
-    static func performLegacyPetRoute(
-        _ route: ExpandedLegacyQuickActionRoute,
-        pet: Pet,
-        executorId: String?,
-        modelContext: ModelContext,
-        startWalk: (Pet) -> Void,
-        openWaterManagement: (Pet) -> Void,
-        openPetOverview: (Pet) -> Void,
-        feedback: (Feedback) -> Void
-    ) {
-        switch route {
-        case .recordFeed:
-            let log = PetCareLog(
-                date: Date(),
-                type: .feeding,
-                amountGrams: pet.dailyPortionGrams,
-                note: PetCareLog.manualFeedNoteMarker,
-                pet: pet,
-                executorId: executorId
-            )
-            modelContext.insert(log)
-            QuestManager.shared.recordFirstMeal()
-            QuestManager.shared.awardAction(type: .feed, pet: pet, context: modelContext)
-            QuickActionReminderCompletionSyncService.completeNearestPetCareReminder(
-                pet: pet,
-                type: .feeding,
-                context: modelContext,
-                executorId: executorId
-            )
-        case .recordWater:
-            let log = PetCareLog(
-                date: Date(),
-                type: .watering,
-                amountMl: 250,
-                pet: pet,
-                executorId: executorId
-            )
-            modelContext.insert(log)
-            QuestManager.shared.awardAction(type: .water, pet: pet, context: modelContext)
-            QuickActionReminderCompletionSyncService.completeNearestPetCareReminder(
-                pet: pet,
-                type: .watering,
-                context: modelContext,
-                executorId: executorId
-            )
-        case .startWalk:
-            startWalk(pet)
-        case .recordPotty:
-            let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: executorId)
-            modelContext.insert(log)
-            QuestManager.shared.awardAction(type: .potty(isLitter: false), pet: pet, context: modelContext)
-            QuickActionReminderCompletionSyncService.completeNearestPetPottyReminder(
-                pet: pet,
-                context: modelContext,
-                executorId: executorId
-            )
-        case .recordLitter:
-            let log = PetCareLog(date: Date(), type: .litter, pet: pet, executorId: executorId)
-            modelContext.insert(log)
-            QuestManager.shared.awardAction(type: .potty(isLitter: true), pet: pet, context: modelContext)
-            QuickActionReminderCompletionSyncService.completeNearestPetCareReminder(
-                pet: pet,
-                type: .litter,
-                context: modelContext,
-                executorId: executorId
-            )
-        case .specialCare(let type):
-            performSpecialCare(type, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback)
-        case .waterManagement:
-            openWaterManagement(pet)
-        case .selectPetOverview:
-            openPetOverview(pet)
-        case .selectHuman, .none:
-            break
-        }
-    }
 }

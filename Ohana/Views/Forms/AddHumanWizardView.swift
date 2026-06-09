@@ -23,7 +23,6 @@ struct AddHumanWizardView: View {
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
     @AppStorage(AppMeasurementSystem.storageKey) private var appMeasurementSystem = AppMeasurementSystem.fallbackCode
     @AppStorage(AppCurrency.storageKey) private var appCurrency = AppCurrency.fallbackCode
-    @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @Query(sort: \Pet.createdAt) private var existingPets: [Pet]
     @Query(sort: \Human.createdAt) private var existingHumans: [Human]
 
@@ -132,10 +131,6 @@ struct AddHumanWizardView: View {
             AddWizardStageItem(id: 3, title: l.tr(zh: "身体档案", en: "Body", de: "Körper"), systemImage: "heart.text.square.fill"),
             AddWizardStageItem(id: 4, title: l.tr(zh: "加入 Ohana", en: "Join", de: "Beitreten"), systemImage: "checkmark.seal.fill"),
         ]
-    }
-
-    private func fallbackAvatarEmoji(for gender: String) -> String {
-        HumanGenderIdentity.fallbackAvatarEmoji(for: gender)
     }
 
     /// 顶卡脚注：身份 · 国籍 · 现居 · 年龄（仅「岁」，不含月；星座单独显示在卡上）
@@ -1615,72 +1610,54 @@ struct AddHumanWizardView: View {
         guard !trimmed.isEmpty else { return }
         guard isGenderReady else { return }
 
-        let human = Human(
-            name: trimmed,
-            birthday: hasBirthday ? birthday : nil,
-            bloodType: bloodType,
-            avatarEmoji: fallbackAvatarEmoji(for: gender),
-            role: HumanProfileOptions.normalizedRole(role)
-        )
-        var parts: [String] = []
-        parts.append("性别:\(HumanProfileOptions.normalizedGender(gender))")
-        if !notes.isEmpty { parts.append(notes) }
-        human.notes = parts.joined(separator: "｜")
-        human.nationality = nationalityCountry
-        if residenceCountry.isEmpty, residenceCity.isEmpty {
-            human.city = ""
-        } else if !residenceCountry.isEmpty, !residenceCity.isEmpty {
-            human.city = "\(residenceCountry)·\(residenceCity)"
-        } else if !residenceCountry.isEmpty {
-            human.city = residenceCountry
-        } else {
-            human.city = residenceCity
-        }
         let shouldUseAutomaticAvatar = usesAutomaticAvatarAsset && canUseAutomatic2DAvatar
         let finalAvatarData = shouldUseAutomaticAvatar ? automaticHumanAvatarData() : avatarImageData
-        human.avatarImageData = finalAvatarData
-        human.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
-            themeColorHex,
-            fallback: OhanaThemeColorPolicy.humanFallbackHex
-        )
-        human.shouldShowOnHome = HomeCardVisibility.visibleCardCount(
-            pets: existingPets,
-            humans: existingHumans,
-            raw: hiddenHomePetIDsRaw
-        ) < HomeCardVisibility.maxVisibleCards
-        human.mbti = mbti.trimmingCharacters(in: .whitespaces).uppercased()
-        if let h = decimalValue(from: heightText), h > 0 { human.heightCm = h }
 
-        human.setPrivate(.weight, privateWeight)
-        human.setPrivate(.workout, privateWorkout)
-        human.setPrivate(.medication, privateMedication)
-        human.setPrivate(.wishlist, privateWishlist)
-        human.setPrivate(.expense, privateExpense)
+        var draft = MemberCreationDraft(kind: .human)
+        draft.name = trimmed
+        draft.themeColorHex = themeColorHex
+        draft.avatarSource = shouldUseAutomaticAvatar
+            ? .avatar2D
+            : (finalAvatarData == nil ? .placeholder : .customImage)
+        draft.avatarImageData = finalAvatarData
+        draft.humanGender = gender
+        draft.hasBirthday = hasBirthday
+        draft.birthday = birthday
+        draft.bloodType = bloodType
+        draft.mbti = mbti
+        draft.role = role
+        draft.usesExplicitHumanRole = true
+        draft.nationality = nationalityCountry
+        draft.residenceCountry = residenceCountry
+        draft.residenceCity = residenceCity
+        draft.notes = notes
+        draft.heightText = heightText
+        draft.weightText = weightText
+        draft.privateWeight = privateWeight
+        draft.privateWorkout = privateWorkout
+        draft.privateMedication = privateMedication
+        draft.privateWishlist = privateWishlist
+        draft.privateExpense = privateExpense
 
-        modelContext.insert(human)
-        if shouldUseAutomaticAvatar, finalAvatarData != nil {
-            Avatar2DAccess.consumeIfNeeded(kind: .human, existingCount: existingHumans.count)
-        }
-
-        if let w = decimalValue(from: weightText), w > 0 {
-            let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                .flatMap { $0.isEmpty ? nil : $0 }
-            modelContext.insert(HumanWeightLog(date: Date(), weight: w, human: human, executorId: executorId))
-            IslandQuestEngine.markInitialHumanWeightRecorded(humanId: human.id)
-        }
-        if hasBirthday {
-            let l10 = L10n.current
-            let ev = Event(
-                title: "\(trimmed)\(l10.humanWizBirthdayEventSuffix)",
-                startDate: birthday, isAllDay: true,
-                eventType: EventType.birthday.rawValue,
-                relatedEntityType: "Human", relatedEntityId: human.id.uuidString
+        let result: MemberCreationService.SaveResult
+        do {
+            result = try MemberCreationService.save(
+                draft: draft,
+                existingPets: existingPets,
+                existingHumans: existingHumans,
+                context: modelContext,
+                countryCode: appCountry
             )
-            ev.recurrenceDays = 365
-            modelContext.insert(ev)
+        } catch MemberCreationService.ServiceError.duplicateName {
+            showDuplicateNameAlert = true
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            return
+        } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            return
         }
 
-        modelContext.safeSave()
+        guard let human = result.human else { return }
         onHumanSaved?(human)
         joinedHumanName = trimmed
         withAnimation(GoMotion.sheet) {
@@ -1692,10 +1669,6 @@ struct AddHumanWizardView: View {
             }
             onComplete()
         }
-    }
-
-    private func decimalValue(from text: String) -> Double? {
-        CountryDecimalInput.parse(text, countryCode: appCountry)
     }
 }
 

@@ -113,6 +113,7 @@ struct MemberCreationDraft: Equatable {
     var bloodType = ""
     var mbti = ""
     var role = "owner"
+    var usesExplicitHumanRole = false
     var nationality = ""
     var residenceCountry = ""
     var residenceCity = ""
@@ -612,6 +613,7 @@ enum MemberCreationService {
         if shouldUse2D {
             Avatar2DAccess.consumeIfNeeded(kind: .pet, existingCount: existingCount)
         }
+        recordThemeColorIfNeeded(draft: draft)
         insertPetRelatedRecords(pet: pet, draft: draft, context: context)
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context)
         context.safeSave()
@@ -619,13 +621,14 @@ enum MemberCreationService {
         let isFirstPet = !QuestManager.shared.isPetWizardCompleted
         if isFirstPet {
             QuestManager.shared.isPetWizardCompleted = true
-            QuestManager.shared.addCoconuts(50, emoji: "2.5D", reason: "新家人入住欢迎奖励")
+            QuestManager.shared.addCoconuts(50, emoji: "🎉", reason: "新家人入住欢迎奖励")
         }
         NotificationCenter.default.post(
             name: .ohanaMemberProfileDidChange,
             object: nil,
             userInfo: ["id": pet.id.uuidString, "kind": "pet"]
         )
+        publishMemberCreation(id: pet.id, kind: "pet")
         return SaveResult(pet: pet, human: nil)
     }
 
@@ -647,7 +650,9 @@ enum MemberCreationService {
             birthday: draft.hasBirthday ? draft.birthday : nil,
             bloodType: draft.bloodType,
             avatarEmoji: HumanGenderIdentity.fallbackAvatarEmoji(for: draft.humanGender),
-            role: existingCount == 0 ? "owner" : "member",
+            role: existingCount == 0 || draft.usesExplicitHumanRole
+                ? HumanProfileOptions.normalizedRole(draft.role)
+                : "member",
             nationality: draft.nationality,
             city: residenceText(country: draft.residenceCountry, city: draft.residenceCity)
         )
@@ -697,11 +702,13 @@ enum MemberCreationService {
         if shouldUse2D {
             Avatar2DAccess.consumeIfNeeded(kind: .human, existingCount: existingCount)
         }
+        recordThemeColorIfNeeded(draft: draft)
         NotificationCenter.default.post(
             name: .ohanaMemberProfileDidChange,
             object: nil,
             userInfo: ["id": human.id.uuidString, "kind": "human"]
         )
+        publishMemberCreation(id: human.id, kind: "human")
         return SaveResult(pet: nil, human: human)
     }
 
@@ -752,6 +759,35 @@ enum MemberCreationService {
             event.recurrenceDays = 365
             context.insert(event)
         }
+        if draft.hasHomeDate {
+            let milestones = [100, 365, 500, 730, 1000, 1095]
+            for days in milestones {
+                if let date = Calendar.current.date(byAdding: .day, value: days, to: draft.homeDate) {
+                    context.insert(PetMilestone(
+                        date: date,
+                        title: L10n.current.petWizMilestoneTogether(days),
+                        emoji: days >= 1000 ? "🏆" : "🎉",
+                        pet: pet
+                    ))
+                }
+            }
+        }
+    }
+
+    private static func recordThemeColorIfNeeded(draft: MemberCreationDraft) {
+        guard draft.normalizedThemeHex != draft.kind.fallbackThemeHex else { return }
+        QuestManager.shared.recordThemeColorSet()
+    }
+
+    @MainActor
+    private static func publishMemberCreation(id: UUID, kind: String) {
+        ReadModelRevisionCenter.shared.publish(
+            DomainMutationResult(
+                command: .memberCreation(entityID: id, kind: kind),
+                affectedEntityIDs: [id],
+                note: kind
+            )
+        )
     }
 
     private static func speciesEmoji(_ species: String) -> String {

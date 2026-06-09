@@ -38,6 +38,7 @@ struct AchievementWallView: View {
     @State private var achievementShareImage: UIImage?
     @State private var showingAchievementShareSheet = false
     @State private var isRenderingAchievementShareImage = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private enum AchievementSubject: Hashable, Identifiable {
         case pet(UUID)
@@ -1204,8 +1205,8 @@ struct AchievementWallView: View {
                     .buttonStyle(ScaleButtonStyle())
 
                     Button {
-                        _ = claimReward(for: badge)
                         pendingClaimAchievement = nil
+                        claimReward(for: badge)
                     } label: {
                         Text(l.tr(zh: "确认", en: "Claim", de: "Abholen"))
                             .font(OhanaFont.subheadline(.black))
@@ -1739,44 +1740,68 @@ struct AchievementWallView: View {
         claimedRewardIDs.contains(rewardKey(for: badge))
     }
 
-    @discardableResult
-    private func claimReward(for badge: Achievement, playFeedback: Bool = true) -> Int {
-        guard badge.isUnlocked, !isRewardClaimed(badge) else { return 0 }
-        var ids = claimedRewardIDs
-        ids.insert(rewardKey(for: badge))
-        claimedRewardRaw = ids.sorted().joined(separator: ",")
-
-        let actor = creditActiveAccount(amount: rewardPerAchievement)
-        QuestManager.shared.recordCoconutDelta(
-            rewardPerAchievement,
-            emoji: badge.emoji,
-            title: l.tr(zh: "成就奖励 · \(badge.title)", en: "Badge reward · \(badge.title)", de: "Abzeichen-Belohnung · \(badge.title)"),
-            actorId: actor.id,
-            actorName: actor.name
-        )
-        modelContext.safeSave()
-
-        if playFeedback {
-            showReward(
-                rewardPerAchievement,
-                label: l.tr(
-                    zh: "成就奖励",
-                    en: "Badge reward",
-                    de: "Abzeichen-Belohnung"
-                )
+    private func claimReward(for badge: Achievement) {
+        guard badge.isUnlocked, !isRewardClaimed(badge) else { return }
+        let claim = rewardClaim(for: badge)
+        let claimedRaw = claimedRewardRaw
+        let targetHuman = activeHuman
+        let targetPet = activePet
+        let entityID = targetHuman?.id ?? targetPet.id
+        let entityKind = targetHuman == nil ? EntityKind.pet.rawValue : EntityKind.human.rawValue
+        commandQueue.enqueue(.achievementReward(entityID: entityID, kind: entityKind, badgeIDs: [badge.id])) {
+            let result = RewardEconomyCommandExecutor(context: modelContext).claimAchievementRewards(
+                [claim],
+                claimedRewardRaw: claimedRaw,
+                amountPerBadge: rewardPerAchievement,
+                human: targetHuman,
+                pet: targetPet,
+                note: "achievement.reward.claim"
             )
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            handleAchievementRewardResult(result)
         }
-        return rewardPerAchievement
     }
 
     private func claimAllRewards() {
-        let total = claimable.reduce(0) { partial, badge in
-            partial + claimReward(for: badge, playFeedback: false)
+        let badges = claimable
+        guard !badges.isEmpty else { return }
+        let claims = badges.map(rewardClaim(for:))
+        let claimedRaw = claimedRewardRaw
+        let targetHuman = activeHuman
+        let targetPet = activePet
+        let entityID = targetHuman?.id ?? targetPet.id
+        let entityKind = targetHuman == nil ? EntityKind.pet.rawValue : EntityKind.human.rawValue
+        commandQueue.enqueue(.achievementReward(entityID: entityID, kind: entityKind, badgeIDs: badges.map(\.id))) {
+            let result = RewardEconomyCommandExecutor(context: modelContext).claimAchievementRewards(
+                claims,
+                claimedRewardRaw: claimedRaw,
+                amountPerBadge: rewardPerAchievement,
+                human: targetHuman,
+                pet: targetPet,
+                note: "achievement.reward.claimAll"
+            )
+            handleAchievementRewardResult(result)
         }
-        guard total > 0 else { return }
+    }
+
+    private func rewardClaim(for badge: Achievement) -> AchievementRewardClaim {
+        AchievementRewardClaim(
+            badgeID: badge.id,
+            rewardKey: rewardKey(for: badge),
+            emoji: badge.emoji,
+            logTitle: l.tr(
+                zh: "成就奖励 · \(badge.title)",
+                en: "Badge reward · \(badge.title)",
+                de: "Abzeichen-Belohnung · \(badge.title)"
+            ),
+            isUnlocked: badge.isUnlocked
+        )
+    }
+
+    private func handleAchievementRewardResult(_ result: AchievementRewardCommandResult) {
+        guard result.didClaim else { return }
+        claimedRewardRaw = result.updatedClaimedRewardRaw
         showReward(
-            total,
+            result.totalAmount,
             label: l.tr(
                 zh: "成就奖励",
                 en: "Badge reward",
@@ -1796,12 +1821,4 @@ struct AchievementWallView: View {
         }
     }
 
-    private func creditActiveAccount(amount: Int) -> (id: String, name: String) {
-        if let human = activeHuman {
-            human.coconutBalance += amount
-            return (human.id.uuidString, human.name)
-        }
-        activePet.coconutBalance += amount
-        return (activePet.id.uuidString, activePet.name)
-    }
 }

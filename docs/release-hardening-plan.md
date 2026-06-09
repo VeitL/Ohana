@@ -8,7 +8,7 @@ Ship a stable first release before adding large new surfaces such as iCloud sync
 
 ## Current Blocker
 
-- `scripts/build-debug-fast.sh` must use `-sdk iphonesimulator` and `-destination 'platform=iOS Simulator,name=iPhone 17'`.
+- `scripts/build-debug-fast.sh` must use `-sdk iphonesimulator` and the fixed local destination `-destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66'`.
 - In the current Codex sandbox, `CoreSimulatorService` is unavailable, so the fixed simulator build cannot reach compilation.
 - The build script now fails fast during preflight when CoreSimulator or the `iPhone 17` simulator is unavailable.
 
@@ -16,7 +16,7 @@ Required local remediation before compile validation:
 
 1. Open Xcode.
 2. Confirm the iOS 26.5 simulator runtime is installed in Xcode Settings > Platforms.
-3. Create an available simulator named `iPhone 17` in Devices and Simulators.
+3. Confirm the local simulator `iPhone 17 (EC2C2B3B-3135-4427-89B7-F4B6A6049D66)` exists in Devices and Simulators. If it was deleted, recreate an `iPhone 17` simulator and deliberately update `REQUIRED_SIMULATOR_UDID` in `scripts/build-debug-fast.sh`.
 4. Rerun `scripts/build-debug-fast.sh`.
 
 ## Frozen First-Release Scope

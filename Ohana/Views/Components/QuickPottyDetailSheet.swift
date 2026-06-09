@@ -20,6 +20,7 @@ struct QuickPottyDetailSheet: View {
     @Query(sort: \Event.startDate) private var allEvents: [Event]
     @Query(sort: \Pet.createdAt) private var allPets: [Pet]
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     @State private var activeSheet: ActiveSheet?
     @State private var nestedInlineSheet: ActiveSheet?
@@ -1757,12 +1758,24 @@ struct QuickPottyDetailSheet: View {
     private func deleteItem(_ item: PoopLogItem) {
         switch item {
         case .potty(let log):
-            modelContext.delete(log)
-            modelContext.safeSave()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            commandQueue.enqueue(.petPottyDelete(petID: pet.id, logID: log.id)) {
+                _ = PetCareCommandExecutor(context: modelContext).deletePottyLog(
+                    log,
+                    pet: pet,
+                    note: "quickPotty.deletePotty"
+                )
+            }
         case .litter(let log):
-            modelContext.delete(log)
-            modelContext.safeSave()
-            syncScoopPlan(showToast: false)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
+                _ = PetCareCommandExecutor(context: modelContext).deleteCareLog(
+                    log,
+                    pet: pet,
+                    note: "quickPotty.deleteLitter"
+                )
+                syncScoopPlan(showToast: false)
+            }
         }
     }
 

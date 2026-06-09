@@ -19,6 +19,7 @@ struct PetPhotoAlbumView: View {
     @State private var internalPickerItems: [PhotosPickerItem] = []
     @State private var selectedPhoto: PetPhotoLog? = nil
     @State private var showingPhotoDetail = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var isHubEmbedded: Bool { hubPickerSelection != nil }
 
@@ -94,9 +95,10 @@ struct PetPhotoAlbumView: View {
         }
         .sheet(isPresented: $showingPhotoDetail) {
             if let photo = selectedPhoto {
-                PhotoDetailSheet(photo: photo)
+                PhotoDetailSheet(photo: photo, pet: pet)
             }
         }
+        .onDisappear { commandQueue.cancelAll() }
     }
 
     /// 供 `PetMomentsHubView` 等外层调用：从 PhotosPicker 项写入相册
@@ -108,14 +110,18 @@ struct PetPhotoAlbumView: View {
     static func consumePickerItems(_ newItems: [PhotosPickerItem], pet: Pet, modelContext: ModelContext) {
         guard !newItems.isEmpty else { return }
         Task { @MainActor in
+            var payloads: [Data] = []
             for item in newItems {
                 if let data = try? await item.loadTransferable(type: Data.self) {
-                    let log = PetPhotoLog(imageData: data, pet: pet)
-                    modelContext.insert(log)
+                    payloads.append(data)
                 }
             }
-            if !newItems.isEmpty {
-                modelContext.safeSave()
+            let result = PetPhotoAlbumCommandExecutor(context: modelContext).createPhotos(
+                data: payloads,
+                pet: pet,
+                note: "petPhoto.create"
+            )
+            if !result.photoIDs.isEmpty {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }
         }
@@ -158,8 +164,7 @@ struct PetPhotoAlbumView: View {
                                             }
                                             Divider()
                                             Button(role: .destructive) {
-                                                modelContext.delete(photo)
-                                                modelContext.safeSave()
+                                                deletePhoto(photo)
                                             } label: {
                                                 Label("删除", systemImage: "trash")
                                             }
@@ -204,6 +209,18 @@ struct PetPhotoAlbumView: View {
         }
     }
 
+    private func deletePhoto(_ photo: PetPhotoLog) {
+        let command = DomainCommand.petPhotoDelete(petID: pet.id, photoID: photo.id)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            PetPhotoAlbumCommandExecutor(context: modelContext).deletePhoto(
+                photo,
+                pet: pet,
+                note: "petPhoto.delete"
+            )
+        }
+    }
+
     @ViewBuilder
     private func photoThumbnail(_ photo: PetPhotoLog) -> some View {
         let side = (ScreenCompat.width - 6) / 3
@@ -226,15 +243,17 @@ struct PetPhotoAlbumView: View {
 
 private struct PhotoDetailSheet: View {
     let photo: PetPhotoLog
+    let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var noteText: String = ""
     @State private var isEditingNote = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color.black.ignoresSafeArea() // ui-v4: allow fullScreenPhotoViewer
                 VStack(spacing: 0) {
                     if let img = UIImage(data: photo.imageData) {
                         Image(uiImage: img)
@@ -246,23 +265,21 @@ private struct PhotoDetailSheet: View {
                     VStack(spacing: 10) {
                         Text(photo.date.formatted(.dateTime.year().month().day().weekday()))
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(.white.opacity(0.6)) // ui-v4: allow fullScreenPhotoViewer
 
                         if isEditingNote {
                             TextField("添加备注…", text: $noteText, axis: .vertical)
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(.white) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)
                                 .lineLimit(3)
                                 .onSubmit {
-                                    photo.note = noteText
-                                    modelContext.safeSave()
-                                    isEditingNote = false
+                                    saveNote()
                                 }
                         } else {
                             Text(photo.note.isEmpty ? "轻触添加备注" : photo.note)
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(photo.note.isEmpty ? .white.opacity(0.3) : .white.opacity(0.8))
+                                .foregroundStyle(photo.note.isEmpty ? .white.opacity(0.3) : .white.opacity(0.8)) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)
                                 .onTapGesture {
                                     noteText = photo.note
@@ -271,7 +288,7 @@ private struct PhotoDetailSheet: View {
                         }
                     }
                     .padding(.horizontal, 24).padding(.vertical, 20)
-                    .background(.black.opacity(0.6))
+                    .background(.black.opacity(0.6)) // ui-v4: allow fullScreenPhotoViewer
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -279,11 +296,25 @@ private struct PhotoDetailSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical).foregroundStyle(.white.opacity(0.7))
+                            .symbolRenderingMode(.hierarchical).foregroundStyle(.white.opacity(0.7)) // ui-v4: allow fullScreenPhotoViewer
                     }
                 }
             }
         }
         .onAppear { noteText = photo.note }
+        .onDisappear { commandQueue.cancelAll() }
+    }
+
+    private func saveNote() {
+        let command = DomainCommand.petPhotoUpdate(petID: pet.id, photoID: photo.id)
+        isEditingNote = false
+        commandQueue.enqueue(command) {
+            PetPhotoAlbumCommandExecutor(context: modelContext).updateNote(
+                noteText,
+                photo: photo,
+                pet: pet,
+                note: "petPhoto.updateNote"
+            )
+        }
     }
 }

@@ -31,7 +31,9 @@ struct QuickHumanWorkoutSheet: View {
     @State private var contentHeight: CGFloat = 0
     @State private var popupVisible = false
     @State private var isClosing = false
+    @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var duration: Int { Int(durationText) ?? 0 }
@@ -135,6 +137,9 @@ struct QuickHumanWorkoutSheet: View {
             withTransaction(transaction) {
                 contentHeight = height
             }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
 
@@ -269,18 +274,21 @@ struct QuickHumanWorkoutSheet: View {
     private var saveBar: some View {
         Button { save() } label: {
             HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
                     .font(.system(size: 16, weight: .black))
-                Text(l.tr(zh: "保存运动", en: "Save Workout", de: "Training speichern"))
+                Text(isSaving
+                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+                    : l.tr(zh: "保存运动", en: "Save Workout", de: "Training speichern")
+                )
                     .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
-            .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+            .background(canSave && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!canSave)
+        .disabled(!canSave || isSaving)
         .padding(.horizontal, 22)
         .padding(.top, 10)
         .padding(.bottom, 16)
@@ -300,33 +308,23 @@ struct QuickHumanWorkoutSheet: View {
 
     @MainActor
     private func save() {
-        guard canSave else { return }
-        let log = HumanWorkoutLog(
-            date: Date(),
-            type: selectedType,
-            durationMinutes: duration,
-            human: human
-        )
-        modelContext.insert(log)
-        CareLedgerService.record(
-            occurredAt: log.date,
-            actorKind: .human,
-            actorId: human.id.uuidString,
-            subjectKind: .human,
-            subjectId: human.id.uuidString,
-            eventKind: .workout,
-            actionType: log.typeRaw,
-            amountValue: Double(log.durationMinutes),
-            amountUnit: "min",
-            source: .quickAction,
-            legacyModelName: "HumanWorkoutLog",
-            legacyModelId: log.id.uuidString,
-            context: modelContext,
-            save: false
-        )
-        modelContext.safeSave()
+        guard !isSaving, canSave else { return }
+        isSaving = true
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        onSaved?()
-        close()
+        let savedType = selectedType
+        let savedDuration = duration
+        let command = DomainCommand.quickHumanWorkout(humanID: human.id)
+        commandQueue.enqueue(command) {
+            HumanCareCommandExecutor(context: modelContext).recordWorkout(
+                human: human,
+                type: savedType,
+                durationMinutes: savedDuration,
+                date: Date(),
+                command: command,
+                note: "quick.human.workout"
+            )
+            onSaved?()
+            close()
+        }
     }
 }

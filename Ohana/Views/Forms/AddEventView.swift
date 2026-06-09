@@ -35,6 +35,7 @@ struct AddEventView: View {
     @State private var showsTypePicker = false
     @State private var isSaving = false
     @State private var didSave = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @FocusState private var titleFocused: Bool
 
     private var l: L10n { L10n(appLanguage) }
@@ -170,6 +171,9 @@ struct AddEventView: View {
             if assigneeId == nil, humans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
                 assigneeId = currentActiveHumanId
             }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
 
@@ -503,6 +507,22 @@ struct AddEventView: View {
         return Calendar.current.date(byAdding: DateComponents(day: 1, second: -1), to: day) ?? recurrenceEndDate
     }
 
+    private var eventCommandInput: CalendarEventPlanCommandInput {
+        let repeats = recurrenceOption != .none
+        return CalendarEventPlanCommandInput(
+            title: title,
+            startDate: startDate,
+            isAllDay: isAllDay,
+            eventType: eventType,
+            relatedEntityType: relatedEntityType,
+            relatedEntityId: relatedEntityId,
+            recurrenceDays: repeats ? selectedRecurrenceDays : 0,
+            recurrenceEndDate: repeats ? recurrenceEndOfDay : nil,
+            reminderLeadMinutes: hasReminder ? reminderLeadOption.rawValue : nil,
+            assigneeId: assigneeId
+        )
+    }
+
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(OhanaFont.caption(.black))
@@ -711,62 +731,25 @@ struct AddEventView: View {
 
     private func saveEvent() {
         guard canSave else { return }
+        let input = eventCommandInput
+        let command = DomainCommand.calendarEventPlan(eventID: nil)
         isSaving = true
         titleFocused = false
         GoKeyboard.dismiss()
 
-        let repeats = recurrenceOption != .none
-        let event = Event(
-            title: trimmedTitle,
-            startDate: startDate,
-            endDate: nil,
-            isAllDay: isAllDay,
-            eventType: eventType.rawValue,
-            relatedEntityType: relatedEntityType,
-            relatedEntityId: relatedEntityId
-        )
-        event.recurrenceDays = repeats ? selectedRecurrenceDays : 0
-        event.recurrenceEndDate = repeats ? recurrenceEndOfDay : nil
-        event.assigneeId = assigneeId
-        modelContext.insert(event)
-        var createdReminders: [Reminder] = []
-
-        if hasReminder {
-            let cal = Calendar.current
-            if repeats && selectedRecurrenceDays >= 1 {
-                let hardCap = recurrenceEndOfDay
-                var cursor = startDate
-                var safetyCount = 0
-                let maxOccurrences = 500
-                while cursor <= hardCap && safetyCount < maxOccurrences {
-                    let scheduled = cal.date(byAdding: .minute, value: -reminderLeadOption.rawValue, to: cursor) ?? cursor
-                    let reminder = Reminder(event: event, scheduledAt: scheduled)
-                    modelContext.insert(reminder)
-                    createdReminders.append(reminder)
-                    guard let next = cal.date(byAdding: .day, value: selectedRecurrenceDays, to: cursor),
-                          next > cursor else { break }
-                    cursor = next
-                    safetyCount += 1
-                }
-            } else {
-                let scheduled = cal.date(byAdding: .minute, value: -reminderLeadOption.rawValue, to: startDate) ?? startDate
-                let reminder = Reminder(event: event, scheduledAt: scheduled)
-                modelContext.insert(reminder)
-                createdReminders.append(reminder)
+        commandQueue.enqueue(command) {
+            let executor = CalendarCommandExecutor(context: modelContext)
+            guard executor.createEvent(input: input) != nil else {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
             }
-        }
 
-        modelContext.safeSave()
-        if !createdReminders.isEmpty {
-            Task { @MainActor in
-                await ReminderSchedulingService.scheduleManyIfNeeded(reminders: createdReminders, context: modelContext, source: .calendar)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            withAnimation(GoMotion.feedback) { didSave = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+                closeEditor()
             }
-        }
-
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        withAnimation(GoMotion.feedback) { didSave = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            closeEditor()
         }
     }
 

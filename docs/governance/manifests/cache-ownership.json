@@ -1,0 +1,58 @@
+{
+  "schema": "ohana.governance.cache-ownership.v1",
+  "updated": "2026-06-08",
+  "policyDocuments": [
+    "AGENTS.md",
+    "docs/data-cache-sync-policy.md",
+    "docs/performance-and-observability.md",
+    "docs/startup-and-lazy-loading-policy.md"
+  ],
+  "caches": [
+    {
+      "id": "home-read-model-store",
+      "owner": "Home feature owner",
+      "scope": "screen",
+      "sourceOfTruth": "SwiftData models queried by the home screen container and shaped by snapshot builders.",
+      "invalidation": "Pet/human/reminder/care ledger/family task revision changes invalidate only affected home snapshots.",
+      "expiry": "Route-scoped; refresh when visible, after explicit command completion, or when revision tokens change.",
+      "recovery": "Render empty or placeholder snapshots, then refresh after the first frame.",
+      "paths": [
+        "Ohana/Views/Home/HomeReadModelStore.swift",
+        "Ohana/Views/Home/HomeSnapshotBuilder.swift",
+        "Ohana/Views/Home/VerticalSolidHomeSnapshotBuilder.swift",
+        "OhanaTests/HomeReadModelStoreTests.swift"
+      ]
+    },
+    {
+      "id": "quick-feed-snapshot-stores",
+      "owner": "Feeding feature owner",
+      "scope": "feature",
+      "sourceOfTruth": "Food, feeding plan, treat, stock, and care log SwiftData facts.",
+      "invalidation": "Feeding command executors invalidate the narrow feeding snapshot touched by the command.",
+      "expiry": "Visible feeding route or home presenter lifetime; avoid broad recompute on unrelated taps.",
+      "recovery": "Keep previous snapshot stable during visible transitions and refresh in route-scoped work.",
+      "paths": [
+        "Ohana/Views/Components/QuickFeedOverviewSnapshotStore.swift",
+        "Ohana/Views/Components/QuickFeedPlanCalendarSnapshotStore.swift",
+        "Ohana/Views/Components/QuickFeedStockSnapshotStore.swift",
+        "Ohana/Views/Components/QuickFeedTreatSnapshotStore.swift",
+        "OhanaTests/QuickFeedOverviewSnapshotStoreTests.swift"
+      ]
+    },
+    {
+      "id": "avatar-resource-catalogs",
+      "owner": "Avatar asset owner",
+      "scope": "global",
+      "sourceOfTruth": "Bundled avatar manifests under Resources/Avatars.",
+      "invalidation": "Only app release asset changes should alter bundled manifests.",
+      "expiry": "Static for the installed app build.",
+      "recovery": "Fallback to default avatar assets when a manifest entry or image is missing.",
+      "paths": [
+        "Resources/Avatars/PetAvatarAssets/manifest.json",
+        "Resources/Avatars/HumanAvatarAssets/manifest.json",
+        "OhanaTests/PetAvatarAssetCatalogTests.swift",
+        "OhanaTests/HumanAvatarAssetCatalogTests.swift"
+      ]
+    }
+  ]
+}

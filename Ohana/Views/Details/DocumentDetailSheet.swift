@@ -19,6 +19,7 @@ struct DocumentDetailSheet: View {
 
     @State private var previewImageData: Data?
     @State private var showingDeleteAlert = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -80,9 +81,15 @@ struct DocumentDetailSheet: View {
         .alert(l.tr(zh: "删除证件？", en: "Delete document?", de: "Dokument löschen?"), isPresented: $showingDeleteAlert) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
             Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
-                modelContext.delete(doc)
-                modelContext.safeSave()
-                dismiss()
+                let command = DomainCommand.petDocumentDelete(petID: pet.id, documentID: doc.id)
+                commandQueue.enqueue(command) {
+                    PetDocumentCommandExecutor(context: modelContext).deleteDocument(
+                        doc,
+                        pet: pet,
+                        note: "petDocument.delete"
+                    )
+                    dismiss()
+                }
             }
         } message: {
             Text(l.tr(

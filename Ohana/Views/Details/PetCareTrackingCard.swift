@@ -21,6 +21,7 @@ struct PetCareTrackingCard: View {
     @State private var showingDetail = false
     @State private var undoLog: PetCareLog? = nil
     @State private var undoLabel: String = ""
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var visibleTypes: [CareType] {
         var types: [CareType] = [.feeding, .watering]
@@ -87,8 +88,13 @@ struct PetCareTrackingCard: View {
                     Spacer()
                     Button {
                         if let log = undoLog {
-                            modelContext.delete(log)
-                            modelContext.safeSave()
+                            commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
+                                _ = PetCareCommandExecutor(context: modelContext).deleteCareLog(
+                                    log,
+                                    pet: pet,
+                                    note: "petCareTracking.delete"
+                                )
+                            }
                         }
                         withAnimation(GoMotion.feedback) { undoLog = nil }
                     } label: {
@@ -119,6 +125,7 @@ struct CareTrackingDetailSheet: View {
     @State private var showAddFeed = false
     @State private var showingCoconutLog = false
     @State private var addGrams: String = ""
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private let displayTypes: [CareType] = [.feeding, .watering, .litter]
 
@@ -279,9 +286,14 @@ struct CareTrackingDetailSheet: View {
         if let g = CountryDecimalInput.parse(addGrams, countryCode: AppCountry.code), g > 0 {
             let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
                 .flatMap { $0.isEmpty ? nil : $0 }
-            let log = PetCareLog(date: Date(), type: .feeding, amountGrams: g, pet: pet, executorId: executorId)
-            modelContext.insert(log)
-            modelContext.safeSave()
+            commandQueue.enqueue(.petCareRecord(petID: pet.id, type: CareType.feeding.rawValue)) {
+                _ = PetCareCommandExecutor(context: modelContext).recordCare(
+                    pet: pet,
+                    type: .feeding,
+                    amountGrams: g,
+                    executorId: executorId
+                )
+            }
         }
         closeAddFeedOverlay()
     }
@@ -341,7 +353,13 @@ struct CareTrackingDetailSheet: View {
                                     .foregroundStyle(accent)
                             }
                             Button {
-                                modelContext.delete(log); modelContext.safeSave()
+                                commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
+                                    _ = PetCareCommandExecutor(context: modelContext).deleteCareLog(
+                                        log,
+                                        pet: pet,
+                                        note: "petCareTracking.delete"
+                                    )
+                                }
                             } label: {
                                 Image(systemName: "trash")
                                     .font(.system(size: 11))
@@ -368,6 +386,7 @@ private struct CareTypeRow: View {
     var onUndo: ((PetCareLog) -> Void)? = nil  // U18: 撤回回调
 
     @Environment(\.modelContext) private var modelContext
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var todayLogs: [PetCareLog] {
         pet.careLogs
@@ -452,26 +471,17 @@ private struct CareTypeRow: View {
     private func checkIn() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetCareLog(date: Date(), type: type, pet: pet, executorId: eid)
-        var pottyLog: PetPottyLog?
-        modelContext.insert(log)
-
-        if type == .litter {
-            let log = PetPottyLog(date: Date(), type: .perfectPoop, pet: pet, executorId: eid)
-            pottyLog = log
-            modelContext.insert(log)
-        }
-
-        modelContext.safeSave()
-        CareLedgerService.recordPetCare(log: log, pet: pet, source: .detail, context: modelContext)
-        if let pottyLog {
-            CareLedgerService.recordPetPotty(log: pottyLog, pet: pet, source: .detail, context: modelContext)
-        }
         withAnimation(GoMotion.feedback) { justChecked = type }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             withAnimation { if justChecked == type { justChecked = nil } }
         }
-        // U18: 通知父视图显示撤回 toast
-        onUndo?(log)
+        commandQueue.enqueue(.petCareRecord(petID: pet.id, type: type.rawValue)) {
+            let recorded = PetCareCommandExecutor(context: modelContext).recordCare(
+                pet: pet,
+                type: type,
+                executorId: eid
+            )
+            onUndo?(recorded.log)
+        }
     }
 }

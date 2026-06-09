@@ -16,9 +16,12 @@ struct InsurancePolicyDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showEdit = false
     @State private var showAddClaim = false
     @State private var showDeleteConfirm = false
+    @State private var pendingPolicyCommand = false
+    @State private var pendingClaimIDs: Set<UUID> = []
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -88,9 +91,7 @@ struct InsurancePolicyDetailSheet: View {
         .alert(l.tr(zh: "删除保单？", en: "Delete policy?", de: "Police löschen?"), isPresented: $showDeleteConfirm) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
             Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
-                modelContext.delete(insurance)
-                modelContext.safeSave()
-                dismiss()
+                deletePolicy()
             }
         } message: {
             Text(l.tr(
@@ -266,8 +267,7 @@ struct InsurancePolicyDetailSheet: View {
             }
             Divider()
             Button(role: .destructive) {
-                modelContext.delete(claim)
-                modelContext.safeSave()
+                deleteClaim(claim)
             } label: {
                 Label("删除", systemImage: "trash")
             }
@@ -287,8 +287,7 @@ struct InsurancePolicyDetailSheet: View {
             .buttonStyle(ScaleButtonStyle())
 
             Button {
-                insurance.isActive.toggle()
-                modelContext.safeSave()
+                setPolicyActive(!insurance.isActive)
             } label: {
                 Image(systemName: insurance.isActive ? "pause.fill" : "play.fill")
                     .font(.system(size: 14, weight: .black))
@@ -311,37 +310,94 @@ struct InsurancePolicyDetailSheet: View {
 
     @MainActor
     private func updateClaimStatus(_ claim: InsuranceClaim, to status: ClaimStatus) {
-        claim.statusRaw = status.rawValue
-        if status == .approved && claim.approvedAmount == 0 {
-            claim.approvedAmount = claim.claimedAmount
-            let approvedDate = Date()
-            claim.approvedAt = approvedDate
-            writeReimbursementIfNeeded(amount: claim.approvedAmount, approvedDate: approvedDate)
-        }
-        modelContext.safeSave()
+        guard !pendingClaimIDs.contains(claim.id) else { return }
+        pendingClaimIDs.insert(claim.id)
+        let command = DomainCommand.insuranceClaim(
+            petID: pet.id,
+            policyID: insurance.id,
+            claimID: claim.id,
+            action: "status.\(status.rawValue)"
+        )
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            InsuranceCommandExecutor(context: modelContext).updateClaimStatus(
+                claim,
+                to: status,
+                insurance: insurance,
+                pet: pet,
+                executorId: activeExecutorID(),
+                note: "insurance.claim.status"
+            )
+            pendingClaimIDs.remove(claim.id)
+        }
     }
 
-    private func writeReimbursementIfNeeded(amount: Double, approvedDate: Date) {
-        guard amount > 0, let claimPet = insurance.pet else { return }
-        let productName = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
-        let note = InsuranceReimbursementExpenseWriter.reimbursementNote(productName: productName)
-        let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        if InsuranceReimbursementExpenseWriter.shouldInsertReimbursementLog(
-            existingLogs: claimPet.expenseLogs,
-            date: approvedDate,
-            amount: amount,
-            note: note
-        ) {
-            modelContext.insert(PetExpenseLog(
-                date: approvedDate,
-                amount: -amount,
-                category: .insurancePremium,
-                note: note,
-                pet: claimPet,
-                executorId: payerId
-            ))
+    private func deleteClaim(_ claim: InsuranceClaim) {
+        guard !pendingClaimIDs.contains(claim.id) else { return }
+        pendingClaimIDs.insert(claim.id)
+        let command = DomainCommand.insuranceClaim(
+            petID: pet.id,
+            policyID: insurance.id,
+            claimID: claim.id,
+            action: "delete"
+        )
+
+        OhanaFeedback.light()
+        commandQueue.enqueue(command) {
+            InsuranceCommandExecutor(context: modelContext).deleteClaim(
+                claim,
+                insurance: insurance,
+                pet: pet,
+                note: "insurance.claim.delete"
+            )
+            pendingClaimIDs.remove(claim.id)
         }
+    }
+
+    private func setPolicyActive(_ isActive: Bool) {
+        guard !pendingPolicyCommand else { return }
+        pendingPolicyCommand = true
+        let command = DomainCommand.insurancePolicy(
+            petID: pet.id,
+            policyID: insurance.id,
+            action: isActive ? "activate" : "deactivate"
+        )
+
+        OhanaFeedback.light()
+        commandQueue.enqueue(command) {
+            InsuranceCommandExecutor(context: modelContext).setPolicyActive(
+                insurance,
+                isActive: isActive,
+                pet: pet,
+                note: "insurance.policy.active"
+            )
+            pendingPolicyCommand = false
+        }
+    }
+
+    private func deletePolicy() {
+        guard !pendingPolicyCommand else { return }
+        pendingPolicyCommand = true
+        let command = DomainCommand.insurancePolicy(
+            petID: pet.id,
+            policyID: insurance.id,
+            action: "delete"
+        )
+
+        OhanaFeedback.light()
+        commandQueue.enqueue(command) {
+            InsuranceCommandExecutor(context: modelContext).deletePolicy(
+                insurance,
+                pet: pet,
+                note: "insurance.policy.delete"
+            )
+            pendingPolicyCommand = false
+            dismiss()
+        }
+    }
+
+    private func activeExecutorID() -> String? {
+        UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
@@ -353,6 +409,7 @@ private struct InsuranceClaimPopup: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var visible = false
     @State private var dragOffset: CGFloat = 0
     @State private var incidentDate = Date()
@@ -360,13 +417,16 @@ private struct InsuranceClaimPopup: View {
     @State private var claimedAmountInput = ""
     @State private var noteInput = ""
     @State private var initialStatus: ClaimStatus = .submitted
+    @State private var isSaving = false
 
     private var l: L10n { L10n(appLanguage) }
     private var animation: Animation { GoMotion.page }
     private var hiddenOffset: CGFloat { 740 }
     private var totalExpense: Double { CountryDecimalInput.parse(totalExpenseInput, countryCode: AppCountry.code) ?? 0 }
     private var claimedAmount: Double { CountryDecimalInput.parse(claimedAmountInput, countryCode: AppCountry.code) ?? 0 }
-    private var canSave: Bool { totalExpense > 0 && claimedAmount > 0 && claimedAmount <= totalExpense }
+    private var canSave: Bool {
+        !isSaving && totalExpense > 0 && claimedAmount > 0 && claimedAmount <= totalExpense
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -558,44 +618,37 @@ private struct InsuranceClaimPopup: View {
     }
 
     private func save() {
-        let claim = InsuranceClaim(
-            claimDate: Date(),
+        guard canSave else { return }
+        isSaving = true
+        let now = Date()
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let input = InsuranceClaimCommandInput(
+            claimDate: now,
             incidentDate: incidentDate,
             totalExpense: totalExpense,
             claimedAmount: claimedAmount,
-            approvedAmount: initialStatus == .approved ? claimedAmount : 0,
             status: initialStatus,
             note: noteInput,
-            insurance: insurance
+            executorId: executorId,
+            approvedAt: initialStatus == .approved ? now : nil
         )
-        if initialStatus == .approved {
-            claim.approvedAt = Date()
-        }
-        modelContext.insert(claim)
+        let command = DomainCommand.insuranceClaim(
+            petID: pet.id,
+            policyID: insurance.id,
+            claimID: nil,
+            action: "create"
+        )
 
-        if initialStatus == .approved, claimedAmount > 0 {
-            let productName = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
-            let note = InsuranceReimbursementExpenseWriter.reimbursementNote(productName: productName)
-            let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-            if InsuranceReimbursementExpenseWriter.shouldInsertReimbursementLog(
-                existingLogs: pet.expenseLogs,
-                date: Date(),
-                amount: claimedAmount,
-                note: note
-            ) {
-                modelContext.insert(PetExpenseLog(
-                    date: Date(),
-                    amount: -claimedAmount,
-                    category: .insurancePremium,
-                    note: note,
-                    pet: pet,
-                    executorId: payerId
-                ))
-            }
-        }
-
-        modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        close()
+        commandQueue.enqueue(command) {
+            InsuranceCommandExecutor(context: modelContext).createClaim(
+                insurance: insurance,
+                pet: pet,
+                input: input,
+                note: "insurance.claim.create"
+            )
+            close()
+        }
     }
 }

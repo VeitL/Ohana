@@ -1,4 +1,87 @@
+import Combine
 import Foundation
+import SwiftData
+
+struct OasisRewardLiveDataSnapshot {
+    var pets: [Pet] = []
+    var humans: [Human] = []
+    var plants: [Plant] = []
+    var upgradeCoconuts: [OasisUpgradeCoconut] = []
+    var electronicPets: [OasisElectronicPet] = []
+    var critterFragments: [OasisCritterFragmentBalance] = []
+}
+
+@MainActor
+final class OasisRewardLiveDataStore: ObservableObject {
+    @Published private(set) var snapshot = OasisRewardLiveDataSnapshot()
+
+    func refresh(context: ModelContext) {
+        snapshot = Self.fetchSnapshot(context: context)
+    }
+
+    func reset() {
+        snapshot = OasisRewardLiveDataSnapshot()
+    }
+
+    private static func fetchSnapshot(context: ModelContext) -> OasisRewardLiveDataSnapshot {
+        OasisRewardLiveDataSnapshot(
+            pets: fetchPets(context: context),
+            humans: fetchHumans(context: context),
+            plants: fetchPlants(context: context),
+            upgradeCoconuts: fetchUpgradeCoconuts(context: context),
+            electronicPets: fetchElectronicPets(context: context),
+            critterFragments: fetchCritterFragments(context: context)
+        )
+    }
+
+    private static func fetchPets(context: ModelContext) -> [Pet] {
+        var descriptor = FetchDescriptor<Pet>(
+            sortBy: [SortDescriptor(\Pet.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 80
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    private static func fetchHumans(context: ModelContext) -> [Human] {
+        var descriptor = FetchDescriptor<Human>(
+            sortBy: [SortDescriptor(\Human.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 40
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    private static func fetchPlants(context: ModelContext) -> [Plant] {
+        var descriptor = FetchDescriptor<Plant>(
+            sortBy: [SortDescriptor(\Plant.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 60
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    private static func fetchUpgradeCoconuts(context: ModelContext) -> [OasisUpgradeCoconut] {
+        var descriptor = FetchDescriptor<OasisUpgradeCoconut>(
+            sortBy: [SortDescriptor(\OasisUpgradeCoconut.level, order: .forward)]
+        )
+        descriptor.fetchLimit = 80
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    private static func fetchElectronicPets(context: ModelContext) -> [OasisElectronicPet] {
+        var descriptor = FetchDescriptor<OasisElectronicPet>(
+            sortBy: [SortDescriptor(\OasisElectronicPet.obtainedAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 48
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    private static func fetchCritterFragments(context: ModelContext) -> [OasisCritterFragmentBalance] {
+        var descriptor = FetchDescriptor<OasisCritterFragmentBalance>(
+            sortBy: [SortDescriptor(\OasisCritterFragmentBalance.updatedAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 120
+        return (try? context.fetch(descriptor)) ?? []
+    }
+}
 
 struct OasisBentoSnapshot: Equatable {
     var shopMetric: String = "—"

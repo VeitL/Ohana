@@ -291,18 +291,15 @@ struct HumanAccountSwitcherSheet: View {
     private func verifyPendingPasscode() {
         guard let human = pendingHuman else { return }
         now = Date()
-        switch HumanPasscodeService.verify(pin, for: human, now: now) {
+        switch HumanPrivacyCommandExecutor(context: modelContext).verifyPasscode(pin, for: human, now: now) {
         case .success:
-            modelContext.safeSave()
             completePendingAccess(for: human)
         case .incorrect(let remaining):
-            modelContext.safeSave()
             pin = ""
             isError = true
             statusMessage = "密码不正确，还可尝试 \(remaining) 次"
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .locked(let until):
-            modelContext.safeSave()
             pin = ""
             isError = true
             statusMessage = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"
@@ -352,30 +349,28 @@ struct HumanAccountSwitcherSheet: View {
     private func syncHomeCardStackAfterAccountSwitch(from oldHumanIdRaw: String, to human: Human) {
         guard let homePets else { return }
         let sourceHumans = homeHumans ?? humans
-        var updatedOrderRaw = homeCardOrderRaw
-        var didChange = false
+        let result = SettingsCommandExecutor(context: modelContext).syncHomeCardStackAfterActiveHumanSwitch(
+            from: oldHumanIdRaw,
+            to: human,
+            pets: homePets,
+            humans: sourceHumans,
+            electronicPets: homeElectronicPets ?? [],
+            hiddenPetIDsRaw: hiddenHomePetIDsRaw,
+            homeCardOrderRaw: homeCardOrderRaw,
+            note: "settings.activeHuman.switch"
+        )
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            didChange = HomeActiveHumanCardSync.applyAfterAccountSwitch(
-                from: oldHumanIdRaw,
-                to: human,
-                pets: homePets,
-                humans: sourceHumans,
-                electronicPets: homeElectronicPets ?? [],
-                hiddenPetIDsRaw: hiddenHomePetIDsRaw,
-                homeCardOrderRaw: &updatedOrderRaw
-            )
-            if updatedOrderRaw != homeCardOrderRaw {
-                homeCardOrderRaw = updatedOrderRaw
+            if result.updatedHomeCardOrderRaw != homeCardOrderRaw {
+                homeCardOrderRaw = result.updatedHomeCardOrderRaw
             }
         }
-        guard didChange else { return }
-        modelContext.safeSave()
+        guard result.didSyncHomeStack else { return }
         NotificationCenter.default.post(
             name: .ohanaMemberProfileDidChange,
             object: nil,
-            userInfo: ["id": human.id.uuidString, "kind": "human", "reason": "activeHumanSwitch"]
+            userInfo: ["id": result.humanID.uuidString, "kind": "human", "reason": "activeHumanSwitch"]
         )
     }
 
@@ -598,18 +593,15 @@ struct HumanExecutorSwitchSheet: View {
     private func verifyPendingPasscode() {
         guard let human = pendingHuman else { return }
         now = Date()
-        switch HumanPasscodeService.verify(pin, for: human, now: now) {
+        switch HumanPrivacyCommandExecutor(context: modelContext).verifyPasscode(pin, for: human, now: now) {
         case .success, .noPasscode:
-            modelContext.safeSave()
             switchTo(human)
         case .incorrect(let remaining):
-            modelContext.safeSave()
             pin = ""
             isError = true
             statusMessage = "密码不正确，还可尝试 \(remaining) 次"
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .locked(let until):
-            modelContext.safeSave()
             pin = ""
             isError = true
             statusMessage = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"
@@ -918,8 +910,11 @@ struct HumanPasscodeManagementSheet: View {
     private func setPasscode() {
         guard validateNewPins() else { return }
         do {
-            try HumanPasscodeService.setPasscode(newPin, for: human)
-            modelContext.safeSave()
+            _ = try HumanPrivacyCommandExecutor(context: modelContext).setPasscode(
+                newPin,
+                for: human,
+                note: "human.privacy.passcode.set"
+            )
             successAndDismiss("密码已开启")
         } catch {
             showError("请输入 4 位数字")
@@ -929,7 +924,12 @@ struct HumanPasscodeManagementSheet: View {
     private func changePasscode() {
         guard validateNewPins() else { return }
         do {
-            let result = try HumanPasscodeService.changePasscode(currentPin: currentPin, newPin: newPin, for: human)
+            let result = try HumanPrivacyCommandExecutor(context: modelContext).changePasscode(
+                currentPin: currentPin,
+                newPin: newPin,
+                for: human,
+                note: "human.privacy.passcode.change"
+            )
             handleManagementResult(result, success: "密码已修改")
         } catch {
             showError("请输入 4 位数字")
@@ -938,7 +938,11 @@ struct HumanPasscodeManagementSheet: View {
 
     private func removePasscode() {
         do {
-            let result = try HumanPasscodeService.removePasscode(currentPin: currentPin, for: human)
+            let result = try HumanPrivacyCommandExecutor(context: modelContext).removePasscode(
+                currentPin: currentPin,
+                for: human,
+                note: "human.privacy.passcode.remove"
+            )
             handleManagementResult(result, success: "密码已关闭")
         } catch {
             showError("请输入当前 4 位密码")
@@ -948,13 +952,10 @@ struct HumanPasscodeManagementSheet: View {
     private func handleManagementResult(_ result: HumanPasscodeVerification, success: String) {
         switch result {
         case .success:
-            modelContext.safeSave()
             successAndDismiss(success)
         case .incorrect(let remaining):
-            modelContext.safeSave()
             showError("当前密码不正确，还可尝试 \(remaining) 次")
         case .locked(let until):
-            modelContext.safeSave()
             showError("尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(Date()))))) 秒后再试")
         case .invalidFormat:
             showError("请输入 4 位数字")
@@ -1005,6 +1006,7 @@ struct HumanPasscodeManagementSheet: View {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? "未命名成员" : name
     }
+
 }
 
 struct HumanAccountSecuritySheet: View {
@@ -1155,8 +1157,12 @@ struct HumanAccountSecuritySheet: View {
         Toggle(isOn: Binding(
             get: { human.privateFields.contains(field.rawValue) },
             set: { isPrivate in
-                human.setPrivate(field, isPrivate)
-                modelContext.safeSave()
+                HumanPrivacyCommandExecutor(context: modelContext).setPrivateField(
+                    field,
+                    isPrivate: isPrivate,
+                    for: human,
+                    note: "human.privacy.field"
+                )
                 UISelectionFeedbackGenerator().selectionChanged()
             }
         )) {
@@ -1181,10 +1187,11 @@ struct HumanAccountSecuritySheet: View {
     }
 
     private func setAllPrivate(_ isPrivate: Bool) {
-        for field in HumanPrivateField.allCases {
-            human.setPrivate(field, isPrivate)
-        }
-        modelContext.safeSave()
+        HumanPrivacyCommandExecutor(context: modelContext).setAllPrivateFields(
+            isPrivate: isPrivate,
+            for: human,
+            note: isPrivate ? "human.privacy.allPrivate" : "human.privacy.allPublic"
+        )
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -1222,6 +1229,7 @@ struct HumanAccountSecuritySheet: View {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? "未命名成员" : name
     }
+
 }
 
 struct HumanPasscodePad: View {

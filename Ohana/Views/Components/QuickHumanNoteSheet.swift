@@ -50,7 +50,9 @@ struct QuickHumanNoteSheet: View {
     @State private var contentHeight: CGFloat = 0
     @State private var popupVisible = false
     @State private var isClosing = false
+    @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var trimmedNote: String { noteText.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -157,6 +159,9 @@ struct QuickHumanNoteSheet: View {
             withTransaction(transaction) {
                 contentHeight = height
             }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
         .fullScreenCover(isPresented: $showCamera) {
             PetCameraPickerView { image in
@@ -413,18 +418,21 @@ struct QuickHumanNoteSheet: View {
     private var saveBar: some View {
         Button { save() } label: {
             HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
                     .font(.system(size: 16, weight: .black))
-                Text(l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern"))
+                Text(isSaving
+                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+                    : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern")
+                )
                     .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
-            .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+            .background(canSave && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!canSave)
+        .disabled(!canSave || isSaving)
         .padding(.horizontal, 22)
         .padding(.top, 10)
         .padding(.bottom, 16)
@@ -455,7 +463,7 @@ struct QuickHumanNoteSheet: View {
     }
 
     private func close() {
-        guard !isClosing else { return }
+        guard !isClosing, !isSaving else { return }
         isClosing = true
         withAnimation(popupAnimation) {
             popupVisible = false
@@ -470,81 +478,38 @@ struct QuickHumanNoteSheet: View {
         }
     }
 
+    @MainActor
     private func save() {
-        guard canSave else { return }
-        let attachments = persistAttachments()
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        let entry = "[\(fmt.string(from: date))] \(recordBody(attachments: attachments))\(HumanNoteAttachmentStore.marker(for: attachments))"
-        human.notes = human.notes.isEmpty ? entry : human.notes + "\n\n" + entry
-
-        if reminderEnabled {
-            createReminder()
+        guard !isSaving, canSave else { return }
+        isSaving = true
+        let savedNote = noteText
+        let savedDate = date
+        let savedImages = selectedImages
+        let savedFiles = attachedFiles.map {
+            HumanNoteFileAttachmentPayload(fileName: $0.fileName, data: $0.data, isImage: $0.isImage)
         }
+        let savedReminderDate = reminderEnabled ? reminderDate : nil
+        let languageCode = appLanguage
+        let command = DomainCommand.humanNote(humanID: human.id)
 
-        modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        onSaved?()
-        close()
-    }
-
-    private func persistAttachments() -> [HumanNoteAttachmentReference] {
-        var references: [HumanNoteAttachmentReference] = []
-        for (index, image) in selectedImages.enumerated() {
-            if let ref = HumanNoteAttachmentStore.saveImage(image, humanId: human.id, index: index + 1) {
-                references.append(ref)
+        commandQueue.enqueue(command) {
+            guard HumanCareCommandExecutor(context: modelContext).recordNote(
+                human: human,
+                noteText: savedNote,
+                date: savedDate,
+                imageAttachments: savedImages,
+                fileAttachments: savedFiles,
+                reminderDate: savedReminderDate,
+                appLanguage: languageCode,
+                note: "human.note"
+            ) != nil else {
+                isSaving = false
+                return
             }
-        }
-        for file in attachedFiles {
-            if let ref = HumanNoteAttachmentStore.saveFile(
-                data: file.data,
-                originalFileName: file.fileName,
-                isImage: file.isImage,
-                humanId: human.id
-            ) {
-                references.append(ref)
-            }
-        }
-        return references
-    }
-
-    private func recordBody(attachments: [HumanNoteAttachmentReference]) -> String {
-        var parts: [String] = []
-        if !trimmedNote.isEmpty {
-            parts.append(trimmedNote)
-        }
-        let imageCount = attachments.filter(\.isImage).count
-        let fileNames = attachments.filter { !$0.isImage }.map(\.fileName)
-        if imageCount > 0 {
-            parts.append(l.tr(zh: "照片 \(imageCount) 张", en: "\(imageCount) photo(s)", de: "\(imageCount) Foto(s)"))
-        }
-        if !fileNames.isEmpty {
-            parts.append(l.tr(zh: "文件：\(fileNames.joined(separator: ", "))", en: "Files: \(fileNames.joined(separator: ", "))", de: "Dateien: \(fileNames.joined(separator: ", "))"))
-        }
-        if reminderEnabled {
-            parts.append(l.tr(zh: "提醒：\(reminderDate.formatted(date: .abbreviated, time: .shortened))", en: "Reminder: \(reminderDate.formatted(date: .abbreviated, time: .shortened))", de: "Erinnerung: \(reminderDate.formatted(date: .abbreviated, time: .shortened))"))
-        }
-        return parts.isEmpty ? l.tr(zh: "记录", en: "Record", de: "Eintrag") : parts.joined(separator: " · ")
-    }
-
-    private func createReminder() {
-        let title = trimmedNote.isEmpty
-            ? l.tr(zh: "\(human.name) 的记录提醒", en: "\(human.name)'s note reminder", de: "Notizerinnerung für \(human.name)")
-            : trimmedNote
-        let event = Event(
-            title: title,
-            startDate: reminderDate,
-            eventType: EventType.task.rawValue,
-            relatedEntityType: "human_note",
-            relatedEntityId: human.id.uuidString
-        )
-        event.assigneeId = human.id.uuidString
-        let reminder = Reminder(event: event, scheduledAt: reminderDate)
-        event.reminders.append(reminder)
-        modelContext.insert(event)
-        modelContext.insert(reminder)
-        Task {
-            await ReminderSchedulingService.scheduleIfNeeded(reminder: reminder, context: modelContext, source: .quickAction)
+            onSaved?()
+            isSaving = false
+            close()
         }
     }
 }

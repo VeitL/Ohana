@@ -32,8 +32,8 @@
 		4FDA02312F54E0D4004B725F /* Ohana.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ohana.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4FDA023E2F54E0D6004B725F /* OhanaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OhanaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4FDA02482F54E0D6004B725F /* OhanaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OhanaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		4FDA09002F7A0001004B725F /* PetAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = PetAvatarAssets; sourceTree = "<group>"; };
-		4FDA09102F7B0001004B725F /* HumanAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = HumanAvatarAssets; sourceTree = "<group>"; };
+		4FDA09002F7A0001004B725F /* PetAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PetAvatarAssets; path = Resources/Avatars/PetAvatarAssets; sourceTree = "<group>"; };
+		4FDA09102F7B0001004B725F /* HumanAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HumanAvatarAssets; path = Resources/Avatars/HumanAvatarAssets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */

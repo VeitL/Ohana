@@ -20,7 +20,9 @@ struct SwipeableEventRow: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
+    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var offsetX: CGFloat = 0
     @State private var isTriggerred = false
     @State private var showDeleteConfirmAlert = false
@@ -151,8 +153,8 @@ struct SwipeableEventRow: View {
             titleVisibility: .visible
         ) {
             if event.recurrenceDays > 0 {
-                Button("仅删除此条", role: .destructive) { deleteSingleOccurrence() }
-                Button("删除此条及之后所有重复", role: .destructive) { deleteThisAndAfter() }
+                Button("仅删除此条", role: .destructive) { deleteEvent(scope: .singleOccurrence) }
+                Button("删除此条及之后所有重复", role: .destructive) { deleteEvent(scope: .thisAndFuture) }
             } else {
                 Button("删除", role: .destructive) { triggerDelete() }
             }
@@ -396,16 +398,24 @@ struct SwipeableEventRow: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
-        // task38: 防重复奖励 — 检查今日该宠物是否已就打卡过
-        let alreadyCheckedIn = hasTodayCheckIn(for: event)
-        if !alreadyCheckedIn {
-            QuestManager.shared.addCoconuts(5, emoji: "🥥", title: event.title + " 完成奖励")
-            spawnCoconutFloat()
-        } else {
-            // 提示用户已打卡
-            withAnimation(GoMotion.feedback) { showSkipReason = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation(GoMotion.feedback) { showSkipReason = false }
+        if !event.isOccurrenceMarkedComplete(on: occurrenceDate) {
+            let eventID = event.id
+            let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
+            commandQueue.enqueue(.todayFocus(entityID: eventID, action: "eventCompleteReward"), delayMilliseconds: 70) {
+                let result = EventCompletionCommandExecutor(context: modelContext).awardCompletionIfEligible(
+                    event: event,
+                    occurrenceDate: occurrenceDate,
+                    executorId: executorId,
+                    note: "event.completion.reward"
+                )
+                if result.awarded {
+                    spawnCoconutFloat()
+                } else if result.skippedByExistingCare {
+                    withAnimation(GoMotion.feedback) { showSkipReason = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        withAnimation(GoMotion.feedback) { showSkipReason = false }
+                    }
+                }
             }
         }
         launchCelebrationParticles()
@@ -415,47 +425,6 @@ struct SwipeableEventRow: View {
             self.isTriggerred = false
             withAnimation(GoMotion.feedback) { self.offsetX = 0 }
         }
-    }
-
-    /// task38: 检查今日该宠物是否已有对应类型的打卡记录
-    private func hasTodayCheckIn(for event: Event) -> Bool {
-        guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet" else { return false }
-        let petIdStr = event.relatedEntityId
-        let title = event.title
-        // 判断事件类型
-        let isFeeding  = title.contains("喂") || title.contains("feed") || title.contains("吃")
-        let isWatering = title.contains("水") || title.contains("喝")
-        let isPotty    = title.contains("便") || title.contains("铲") || title.contains("potty")
-        let isWalk     = title.contains("遛") || title.contains("散步") || title.contains("巡岛") || title.contains("walk")
-        guard isFeeding || isWatering || isPotty || isWalk else { return false }
-        let today = Calendar.current.startOfDay(for: Date())
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
-        if isPotty {
-            let desc = FetchDescriptor<PetPottyLog>(
-                predicate: #Predicate { log in
-                    log.date >= today && log.date < tomorrow
-                }
-            )
-            guard let logs = try? modelContext.fetch(desc) else { return false }
-            return logs.contains { $0.pet?.id.uuidString == petIdStr }
-        }
-        if isWalk {
-            let desc = FetchDescriptor<PetWalkLog>(
-                predicate: #Predicate { log in
-                    log.startDate >= today && log.startDate < tomorrow
-                }
-            )
-            guard let logs = try? modelContext.fetch(desc) else { return false }
-            return logs.contains { $0.pet?.id.uuidString == petIdStr }
-        }
-        let careType: String = isFeeding ? CareType.feeding.rawValue : CareType.watering.rawValue
-        let desc = FetchDescriptor<PetCareLog>(
-            predicate: #Predicate { log in
-                log.date >= today && log.date < tomorrow
-            }
-        )
-        guard let logs = try? modelContext.fetch(desc) else { return false }
-        return logs.contains { $0.pet?.id.uuidString == petIdStr && $0.type == careType }
     }
 
     // E1: 右滑只弹确认 alert，回弹到原位
@@ -469,83 +438,25 @@ struct SwipeableEventRow: View {
         isTriggerred = true
         withAnimation(GoMotion.page) { offsetX = 800 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            modelContext.delete(event)
-            modelContext.safeSave()
+            CalendarCommandExecutor(context: modelContext).delete(
+                event: event,
+                occurrenceDate: occurrenceDate,
+                scope: .wholeEvent,
+                note: "calendar.event.delete.row"
+            )
             onDelete()
             isTriggerred = false
             withAnimation(GoMotion.feedback) { offsetX = 0 }
         }
     }
 
-    /// F1: 仅删除单条重复出现（修改 recurrenceEndDate 或 startDate 或拆分）
-    private func deleteSingleOccurrence() {
-        let cal = Calendar.current
-        let occStart = cal.startOfDay(for: occurrenceDate)
-        let eventStart = cal.startOfDay(for: event.startDate)
-
-        if occStart == eventStart {
-            // 第一条：将 startDate 推进到下一次
-            if let next = cal.date(byAdding: .day, value: event.recurrenceDays, to: eventStart) {
-                let hasMore: Bool
-                if let end = event.recurrenceEndDate {
-                    hasMore = next <= cal.startOfDay(for: end)
-                } else {
-                    hasMore = true
-                }
-                if hasMore {
-                    event.startDate = next
-                } else {
-                    modelContext.delete(event)
-                }
-            } else {
-                modelContext.delete(event)
-            }
-        } else {
-            // 中间或末尾：截断当前事件到前一天，如果后面还有则创建新事件
-            let dayBefore = cal.date(byAdding: .day, value: -1, to: occStart)!
-            let nextOcc = cal.date(byAdding: .day, value: event.recurrenceDays, to: occStart)!
-            let hasAfter: Bool
-            if let endDate = event.recurrenceEndDate {
-                hasAfter = nextOcc <= cal.startOfDay(for: endDate)
-            } else {
-                hasAfter = true
-            }
-            if hasAfter {
-                let newEvent = Event(
-                    title: event.title,
-                    startDate: nextOcc,
-                    endDate: event.endDate,
-                    isAllDay: event.isAllDay,
-                    eventType: event.eventType,
-                    relatedEntityType: event.relatedEntityType,
-                    relatedEntityId: event.relatedEntityId
-                )
-                newEvent.recurrenceDays = event.recurrenceDays
-                newEvent.recurrenceEndDate = event.recurrenceEndDate
-                newEvent.assigneeId = event.assigneeId
-                modelContext.insert(newEvent)
-            }
-            event.recurrenceEndDate = dayBefore
-        }
-        modelContext.safeSave()
-        onDelete()
-    }
-
-    /// F1: 删除此条及之后所有重复
-    private func deleteThisAndAfter() {
-        let cal = Calendar.current
-        let occStart = cal.startOfDay(for: occurrenceDate)
-        let eventStart = cal.startOfDay(for: event.startDate)
-
-        if occStart <= eventStart {
-            // 选中的是第一条或之前 → 删除整个事件
-            modelContext.delete(event)
-        } else {
-            // 截断到选中日期的前一天
-            let dayBefore = cal.date(byAdding: .day, value: -1, to: occStart)!
-            event.recurrenceEndDate = dayBefore
-        }
-        modelContext.safeSave()
+    private func deleteEvent(scope: CalendarEventDeletionScope) {
+        CalendarCommandExecutor(context: modelContext).delete(
+            event: event,
+            occurrenceDate: occurrenceDate,
+            scope: scope,
+            note: "calendar.event.delete.row.menu"
+        )
         onDelete()
     }
 
@@ -687,8 +598,12 @@ private struct EventDetailSheet: View {
                         .buttonStyle(ScaleButtonStyle())
                         .confirmationDialog("确认删除", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                             Button("删除此事项", role: .destructive) {
-                                modelContext.delete(event)
-                                modelContext.safeSave()
+                                CalendarCommandExecutor(context: modelContext).delete(
+                                    event: event,
+                                    occurrenceDate: occurrenceDate,
+                                    scope: .wholeEvent,
+                                    note: "calendar.event.delete.detail"
+                                )
                                 onDelete()
                                 dismiss()
                             }

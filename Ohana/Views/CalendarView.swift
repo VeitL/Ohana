@@ -111,9 +111,9 @@ private struct CalendarPetChipFilterBar: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 13, weight: .bold))
+                    .font(OhanaFont.subheadline(.bold))
                     .symbolRenderingMode(.monochrome)
-                Text(label).font(.system(size: 13, weight: .bold, design: .rounded))
+                Text(label).font(OhanaFont.subheadline(.bold))
             }
             .foregroundStyle(chipForeground(isSelected: isSelected))
             .padding(.horizontal, 14).padding(.vertical, 8)
@@ -189,6 +189,8 @@ struct CalendarView: View {
     @State private var addEventPresentationTask: Task<Void, Never>?
     @State private var addEventContentMountTask: Task<Void, Never>?
     @State private var didScheduleCalendarMaintenance = false
+    @State private var calendarOpenStartedAt: CFAbsoluteTime?
+    @State private var addEventFlowStartedAt: CFAbsoluteTime?
 
     private var isMaterial: Bool { false }
     private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
@@ -530,6 +532,7 @@ struct CalendarView: View {
             syncCalendarFilterFromStorage(animated: true)
         }
         .onAppear {
+            recordCalendarOpen()
             syncCalendarViewModeFromStorage(viewModeRaw)
             syncCalendarFilterFromStorage(animated: false)
             if isCalendarPrepared, viewMode == .list {
@@ -611,11 +614,21 @@ struct CalendarView: View {
 
     private func openInlineAddEvent() {
         guard !showingAddEvent else { return }
+        let startedAt = AppFlowPerformance.start(
+            AppPerformanceFlows.calendarAddEventSheet,
+            note: ["source": hideToolbar ? "embedded" : "standalone"]
+        )
+        addEventFlowStartedAt = startedAt
         addEventPresentationTask?.cancel()
         addEventContentMountTask?.cancel()
         showingAddEvent = true
         addEventPresentationProgress = 0
         isAddEventContentMounted = false
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.calendarAddEventSheet,
+            AppPerformancePhases.shellReady,
+            startedAt: startedAt
+        )
         addEventPresentationTask = OhanaFrameScheduler.runAfterNextFrame {
             guard showingAddEvent else {
                 addEventPresentationTask = nil
@@ -634,6 +647,11 @@ struct CalendarView: View {
             withAnimation(GoMotion.quick) {
                 isAddEventContentMounted = true
             }
+            AppFlowPerformance.mark(
+                AppPerformanceFlows.calendarAddEventSheet,
+                AppPerformancePhases.contentMounted,
+                startedAt: startedAt
+            )
             addEventContentMountTask = nil
         }
     }
@@ -651,8 +669,16 @@ struct CalendarView: View {
                 addEventPresentationTask = nil
                 return
             }
+            if let addEventFlowStartedAt {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.calendarAddEventSheet,
+                    AppPerformancePhases.routeDismiss,
+                    startedAt: addEventFlowStartedAt
+                )
+            }
             showingAddEvent = false
             isAddEventContentMounted = false
+            addEventFlowStartedAt = nil
             addEventPresentationTask = nil
         }
     }
@@ -685,9 +711,19 @@ struct CalendarView: View {
 
     private func selectCalendarViewMode(_ mode: CalendarViewMode) {
         guard viewMode != mode else { return }
+        let startedAt = AppFlowPerformance.start(
+            AppPerformanceFlows.calendarModeSwitch,
+            note: ["to": mode.rawValue]
+        )
         withAnimation(GoMotion.selection) {
             displayedViewModeRaw = mode.rawValue
         }
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.calendarModeSwitch,
+            AppPerformancePhases.firstFrame,
+            startedAt: startedAt,
+            note: ["to": mode.rawValue]
+        )
         if mode == .list {
             resetCalendarListPositionForModeSwitch()
         }
@@ -726,11 +762,43 @@ struct CalendarView: View {
 
     private func selectCalendarFilter(_ selection: CalendarFilterSelection) {
         guard displayedFilterSelection != selection else { return }
+        let startedAt = AppFlowPerformance.start(
+            AppPerformanceFlows.calendarFilter,
+            note: ["scope": selection.selectedPetId != nil ? "pet" : (selection.selectedHumanId != nil ? "human" : "all")]
+        )
         withAnimation(GoMotion.selection) {
             visualFilterSelection = selection
             didSyncCalendarFilter = true
         }
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.calendarFilter,
+            AppPerformancePhases.firstFrame,
+            startedAt: startedAt
+        )
         scheduleCalendarFilterApply(selection)
+    }
+
+    private func recordCalendarOpen() {
+        let startedAt = AppFlowPerformance.start(
+            AppPerformanceFlows.calendarOpen,
+            note: ["source": hideToolbar ? "embedded" : "standalone", "mode": viewMode.rawValue]
+        )
+        calendarOpenStartedAt = startedAt
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.calendarOpen,
+            AppPerformancePhases.shellReady,
+            startedAt: startedAt,
+            note: ["prepared": isCalendarPrepared ? "true" : "false"]
+        )
+        OhanaFrameScheduler.runAfterNextFrame {
+            guard calendarOpenStartedAt == startedAt else { return }
+            AppFlowPerformance.mark(
+                AppPerformanceFlows.calendarOpen,
+                AppPerformancePhases.firstFrame,
+                startedAt: startedAt,
+                note: ["prepared": isCalendarPrepared ? "true" : "false"]
+            )
+        }
     }
 
     private func syncCalendarFilterFromStorage(animated: Bool) {
@@ -817,7 +885,8 @@ struct CalendarView: View {
     }
 
     private var classicCalendarHeader: some View {
-        HStack(spacing: 12) {
+        let l = L10n(AppLanguage.code)
+        return HStack(spacing: 12) {
             calendarHeaderTitle(fontSize: 20)
 
             Spacer()
@@ -832,14 +901,16 @@ struct CalendarView: View {
 
             // 添加事件按钮
             Button { requestAddEventPresentation() } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .bold))
+                Label(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"), systemImage: "plus")
+                    .labelStyle(.iconOnly)
+                    .font(OhanaFont.headline(.bold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 44)
                     .background(Color.goPrimary, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"))
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -868,17 +939,21 @@ struct CalendarView: View {
     private var calStickyHeader: some View {
         let bg: Color = colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C")
         let accent = Color(hex: "FF5A00")
+        let l = L10n(AppLanguage.code)
         return HStack(spacing: 10) {
             // Add event
             Button { requestAddEventPresentation() } label: {
-                Image(systemName: "calendar.badge.plus")
-                    .font(.system(size: 17, weight: .semibold))
+                Label(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"), systemImage: "calendar.badge.plus")
+                    .labelStyle(.iconOnly)
+                    .font(OhanaFont.title3(.semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
                     .background(accent, in: Circle())
                     .shadow(color: accent.opacity(0.35), radius: 8, x: 0, y: 2) // ui-v4: allow legacy material calendar floating action depth
-            }.buttonStyle(ScaleButtonStyle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen"))
 
             // View toggle pill
             HStack(spacing: 2) {
@@ -952,11 +1027,11 @@ struct CalendarView: View {
                     } label: {
                         VStack(spacing: 5) {
                             Text(day, format: .dateTime.weekday(.abbreviated))
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .font(OhanaFont.caption2(.bold))
                                 .foregroundStyle(isSelected ? chipSelFg : (isMaterial ? Color(hex: "8E8E93") : classicSoftText))
                             
                             Text("\(dayNumber)")
-                                .font(.system(size: 17, weight: .black, design: .rounded))
+                                .font(OhanaFont.title3(.black))
                                 .foregroundStyle(isSelected ? chipSelFg : (isToday ? chipAccent : (isMaterial ? .primary : classicPrimaryText)))
                                 .ohanaNumericMotion(dayNumber)
                             
@@ -965,20 +1040,20 @@ struct CalendarView: View {
                                 if hasEvents && !isSelected {
                                     HStack(spacing: 2) {
                                         ForEach(0..<dotColors.count, id: \.self) { i in
-                                            Circle().fill(dotColors[i]).frame(width: 5, height: 5)
+                                            Circle().fill(dotColors[i]).frame(width: 5, height: 5) // a11y: allow decorative event density dot
                                         }
                                     }
                                 } else {
                                     Circle()
                                         .fill(hasEvents && isSelected ? chipSelFg.opacity(0.7) : Color.clear)
-                                        .frame(width: 5, height: 5)
+                                        .frame(width: 5, height: 5) // a11y: allow decorative event density dot
                                 }
                             }
                             
                             // 首个事件剪影图标
                             if let first = dayEvents.first {
                                 Image(systemName: first.silhouetteListSymbol)
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(OhanaFont.caption(.bold))
                                     .symbolRenderingMode(.monochrome)
                                     .foregroundStyle(isSelected ? chipSelFg.opacity(0.9) : (isMaterial ? Color.primary.opacity(0.5) : classicPrimaryText.opacity(0.55)))
                             } else {
@@ -1016,40 +1091,52 @@ struct CalendarView: View {
             if isMaterial { return Color(hex: "8E8E93") }
             return Color.ohanaSecondaryText
         }()
+        let l = L10n(AppLanguage.code)
+        let label = mode == .month
+            ? l.tr(zh: "月视图", en: "Month view", de: "Monatsansicht")
+            : l.tr(zh: "列表视图", en: "List view", de: "Listenansicht")
         return Button {
             selectCalendarViewMode(mode)
         } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 14, weight: .bold))
+            Label(label, systemImage: systemName)
+                .labelStyle(.iconOnly)
+                .font(OhanaFont.callout(.bold))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(viewMode == mode ? chipSelFg : unselectedTint)
-                .frame(width: 36, height: 30)
+                .frame(width: 44, height: 44)
                 .background { if viewMode == mode { Capsule().fill(chipAccent) } }
         }
         .buttonStyle(ScaleButtonStyle())
         .ohanaSelectionMotion(isSelected: viewMode == mode, scale: 1.018)
+        .accessibilityLabel(label)
+        .accessibilityValue(viewMode == mode
+            ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
+            : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
     }
     
     // MARK: - Go Month View
     private var goMonthView: some View {
-        VStack(spacing: 12) {
+        let l = L10n(AppLanguage.code)
+        return VStack(spacing: 12) {
             // Month header — Go 风格
             HStack {
                 Button {
                     shiftMonth(by: -1)
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .bold))
+                    Label(l.tr(zh: "上个月", en: "Previous month", de: "Vorheriger Monat"), systemImage: "chevron.left")
+                        .labelStyle(.iconOnly)
+                        .font(OhanaFont.callout(.bold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(isMaterial ? matSurface : classicSubtleFill, in: Circle())
                 }
+                .accessibilityLabel(l.tr(zh: "上个月", en: "Previous month", de: "Vorheriger Monat"))
                 
                 Spacer()
                 
                 Text(selectedDate, format: .dateTime.year().month(.wide))
-                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 
                 Spacer()
@@ -1057,13 +1144,15 @@ struct CalendarView: View {
                 Button {
                     shiftMonth(by: 1)
                 } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .bold))
+                    Label(l.tr(zh: "下个月", en: "Next month", de: "Nächster Monat"), systemImage: "chevron.right")
+                        .labelStyle(.iconOnly)
+                        .font(OhanaFont.callout(.bold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(isMaterial ? matSurface : classicSubtleFill, in: Circle())
                 }
+                .accessibilityLabel(l.tr(zh: "下个月", en: "Next month", de: "Nächster Monat"))
             }
             .padding(.horizontal, 20)
             
@@ -1071,7 +1160,7 @@ struct CalendarView: View {
             HStack(spacing: 0) {
                 ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
                     Text(d)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         .frame(maxWidth: .infinity)
                 }
@@ -1099,13 +1188,13 @@ struct CalendarView: View {
                         } label: {
                             VStack(spacing: 3) {
                                 Text("\(dayNumber)")
-                                    .font(.system(size: 16, weight: isSelected || isToday ? .bold : .medium, design: .rounded))
+                                    .font(OhanaFont.headline(isSelected || isToday ? .bold : .medium))
                                     .foregroundStyle(isSelected ? chipSelFg : (isToday ? chipAccent : (isMaterial ? .primary : classicPrimaryText)))
                                     .ohanaNumericMotion(dayNumber)
                                 
                                 Circle()
                                     .fill(hasEvents ? (isSelected ? chipSelFg.opacity(0.7) : chipAccent) : .clear)
-                                    .frame(width: 5, height: 5)
+                                    .frame(width: 5, height: 5) // a11y: allow decorative event density dot
                             }
                             .frame(width: 40, height: 48)
                             .background(
@@ -1131,12 +1220,13 @@ struct CalendarView: View {
                 VStack(spacing: 8) {
                     if eventsForSelectedDate.isEmpty {
                         VStack(spacing: 8) {
-                            Image(systemName: "tray.fill")
-                                .font(.system(size: 32, weight: .medium))
+                            Image(systemName: "tray.fill") // a11y: allow decorative empty-state icon
+                                .font(OhanaFont.largeTitle(.medium))
                                 .symbolRenderingMode(.monochrome)
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
+                                .accessibilityHidden(true)
                             Text("暂无事件")
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                         .padding(.top, 20)
@@ -1245,12 +1335,12 @@ struct CalendarView: View {
                         .frame(width: 40)
 
                     Text(relativeDate(date))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.footnote(.black))
                         .foregroundStyle(isMaterial ? Color(hex: "8E8E93") : classicSoftText)
                         .tracking(0.5)
 
                     Text("·  \(occurrences.count)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                         .ohanaNumericMotion(occurrences.count)
 
@@ -1297,10 +1387,10 @@ struct CalendarView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Text("今天")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.subheadline(.black))
                         .foregroundStyle(chipAccent)
                     Text(count == 0 ? "暂无事件" : "\(count) 项")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.footnote(.bold))
                         .foregroundStyle(classicPrimaryText.opacity(0.55))
                         .ohanaNumericMotion(count)
                     Spacer()
@@ -1319,27 +1409,28 @@ struct CalendarView: View {
         let dayNumber = Calendar.current.component(.day, from: date)
         return VStack(spacing: 3) {
             Text(weekdayShort(date))
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.caption2(.black))
                 .foregroundStyle(isToday ? chipAccent : classicSoftText)
                 .textCase(.uppercase)
 
             Text("\(dayNumber)")
-                .font(.system(size: isToday ? 18 : 17, weight: .black, design: .rounded))
+                .font(OhanaFont.title3(.black))
                 .foregroundStyle(isToday ? chipSelFg : classicPrimaryText)
                 .ohanaNumericMotion(dayNumber)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow fixed-format noninteractive date badge
                 .background(isToday ? chipAccent : classicSubtleFill, in: Circle())
         }
     }
 
     private var emptyTodayPill: some View {
         HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 14, weight: .bold))
+            Image(systemName: "checkmark.circle.fill") // a11y: allow decorative empty-state icon
+                .font(OhanaFont.callout(.bold))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(chipAccent)
+                .accessibilityHidden(true)
             Text("今天没有安排，保持轻松")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.subheadline(.bold))
                 .foregroundStyle(classicPrimaryText.opacity(0.66))
             Spacer()
         }
@@ -1384,6 +1475,14 @@ struct CalendarView: View {
             }
             scrollTimeline(proxy, to: targetID, animated: false)
             didScrollListToToday = true
+            if let calendarOpenStartedAt {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.calendarOpen,
+                    AppPerformancePhases.dataReady,
+                    startedAt: calendarOpenStartedAt,
+                    note: ["timelineSections": "\(timelineSections.count)"]
+                )
+            }
             listInitialPositionTask = nil
         }
     }
@@ -1480,37 +1579,14 @@ struct CalendarView: View {
             occurrenceDate: occurrenceDate,
             petThemeColor: relatedPetColor,
             onComplete: {
-                withAnimation(GoMotion.feedback) {
-                    let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
-                    event.setOccurrenceMarkedComplete(shouldComplete, on: occurrenceDate)
-                    let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                    CalendarTaskCompletionSyncService.syncPetTask(
-                        event: event,
-                        occurrenceDate: occurrenceDate,
-                        isCompleted: shouldComplete,
-                        pets: pets,
-                        context: modelContext,
-                        executorId: activeHumanId
-                    )
-                    let now = Date()
-                    let cal = Calendar.current
-                    let today = cal.startOfDay(for: now)
-                    let tomorrow = cal.date(byAdding: .day, value: 1, to: today)!
-                    // 仅单次事件同步「今日」提醒状态；重复序列按日完成不写 isCompleted，避免误伤整批 Reminder
-                    if event.recurrenceDays == 0 {
-                        for reminder in event.reminders {
-                            if reminder.scheduledAt >= today && reminder.scheduledAt < tomorrow {
-                                if shouldComplete {
-                                    ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
-                                } else {
-                                    ReminderCompletionService.reopen(reminder, by: activeHumanId, context: modelContext)
-                                }
-                            }
-                        }
-                    } else {
-                        modelContext.safeSave()
-                    }
-                }
+                let executor = CalendarCommandExecutor(context: modelContext)
+                executor.toggleCompletion(
+                    event: event,
+                    occurrenceDate: occurrenceDate,
+                    pets: pets,
+                    executorId: UserDefaults.standard.string(forKey: "currentActiveHumanId"),
+                    note: "calendar.event.completion.toggle"
+                )
             },
             onDelete: { /* F2: 删除逻辑已在 SwipeableEventRow 内处理 */ },
             onOpenRelated: {

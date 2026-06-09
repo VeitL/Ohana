@@ -523,27 +523,59 @@ final class DataBackupManager: @unchecked Sendable {
 
     /// Filename prefix for exported backups in the temporary directory.
     private static let backupFilePrefix = "ohana_backup_"
+    private static let staleExportAge: TimeInterval = 60 * 60
 
     /// Builds and writes a full backup. The unbounded full-table fetch + JSON
     /// encode run on a dedicated background SwiftData context (`DataBackupActor`)
     /// so the main thread is never blocked; only the final file write happens
     /// here.
     func exportJSON(container: ModelContainer) async throws -> URL {
-        let data = try await DataBackupActor(modelContainer: container).exportData()
+        let flowStartedAt = await MainActor.run {
+            AppFlowPerformance.start(AppPerformanceFlows.backupExport)
+        }
+        do {
+            let data = try await DataBackupActor(modelContainer: container).exportData()
+            await MainActor.run {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.backupExport,
+                    AppPerformancePhases.dataReady,
+                    startedAt: flowStartedAt,
+                    note: ["bytes": "\(data.count)"]
+                )
+            }
 
-        // The export contains full plaintext health / medication / insurance /
-        // document / location data, so it must be written atomically and with
-        // complete file protection (encrypted at rest while the device is
-        // locked). Stale exports from previous runs are purged first so the
-        // sensitive temp file does not linger.
-        Self.purgeStaleExports()
+            // The export contains full plaintext health / medication / insurance /
+            // document / location data, so it must be written atomically and with
+            // complete file protection (encrypted at rest while the device is
+            // locked). Old exports are purged by age so concurrent export/import
+            // flows cannot delete each other's active backup files.
+            Self.purgeStaleExports()
 
-        let f = DateFormatter(); f.dateFormat = "yyyyMMdd_HHmmss"
-        let stamp = f.string(from: Date())
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(Self.backupFilePrefix)\(stamp).json")
-        try data.write(to: url, options: [.atomic, .completeFileProtection])
-        return url
+            let f = DateFormatter(); f.dateFormat = "yyyyMMdd_HHmmss"
+            let stamp = f.string(from: Date())
+            let uniqueId = UUID().uuidString
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(Self.backupFilePrefix)\(stamp)_\(uniqueId).json")
+            try data.write(to: url, options: [.atomic, .completeFileProtection])
+            await MainActor.run {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.backupExport,
+                    AppPerformancePhases.writeSuccess,
+                    startedAt: flowStartedAt,
+                    note: ["bytes": "\(data.count)"]
+                )
+            }
+            return url
+        } catch {
+            await MainActor.run {
+                AppFlowPerformance.markFailure(
+                    AppPerformanceFlows.backupExport,
+                    startedAt: flowStartedAt,
+                    error: error
+                )
+            }
+            throw error
+        }
     }
 
     /// Encodes a prepared backup snapshot. Used by `DataBackupActor` on its
@@ -554,17 +586,20 @@ final class DataBackupManager: @unchecked Sendable {
         return try encoder.encode(backup)
     }
 
-    /// Removes previously exported backup files from the temporary directory so
-    /// sensitive plaintext does not accumulate after a share/import completes.
-    static func purgeStaleExports() {
+    /// Removes old exported backup files from the temporary directory so
+    /// sensitive plaintext does not accumulate while active share/import flows
+    /// keep their current file available.
+    static func purgeStaleExports(olderThan maxAge: TimeInterval = staleExportAge, now: Date = Date()) {
         let fm = FileManager.default
         let tmp = fm.temporaryDirectory
         guard let entries = try? fm.contentsOfDirectory(
             at: tmp,
-            includingPropertiesForKeys: nil,
+            includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
         ) else { return }
         for url in entries where url.lastPathComponent.hasPrefix(backupFilePrefix) {
+            let modifiedAt = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            guard now.timeIntervalSince(modifiedAt) > maxAge else { continue }
             try? fm.removeItem(at: url)
         }
     }

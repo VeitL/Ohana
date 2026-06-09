@@ -266,6 +266,7 @@ struct AddHumanHealthReportSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var reportType: HealthReportType = .physical
     @State private var conclusion: ReportConclusion = .normal
     @State private var hospitalName = ""
@@ -275,6 +276,7 @@ struct AddHumanHealthReportSheet: View {
     @State private var nextCheckDate = Calendar.current.date(byAdding: .month, value: 6, to: Date()) ?? Date()
     @State private var summary = ""
     @State private var notes = ""
+    @State private var isSaving = false
 
     var body: some View {
         ZStack {
@@ -444,9 +446,7 @@ struct AddHumanHealthReportSheet: View {
                     // Delete button if editing
                     if let report = editing {
                         Button {
-                            modelContext.delete(report)
-                            modelContext.safeSave()
-                            dismiss()
+                            delete(report)
                         } label: {
                             Label("删除这条报告", systemImage: "trash")
                                 .font(OhanaFont.callout(.semibold))
@@ -457,6 +457,7 @@ struct AddHumanHealthReportSheet: View {
                                 .overlay(Capsule().strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .disabled(isSaving)
                         .padding(.horizontal, 16)
                     }
 
@@ -470,6 +471,7 @@ struct AddHumanHealthReportSheet: View {
                             .background(Color.goTeal, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .disabled(isSaving)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 40)
                 }
@@ -523,30 +525,53 @@ struct AddHumanHealthReportSheet: View {
     }
 
     private func save() {
-        if let r = editing {
-            r.reportType = reportType
-            r.conclusion = conclusion
-            r.hospitalName = hospitalName
-            r.doctorName = doctorName
-            r.reportDate = reportDate
-            r.nextCheckDate = hasNextCheck ? nextCheckDate : nil
-            r.summary = summary
-            r.notes = notes
+        guard !isSaving else { return }
+        isSaving = true
+        let input = HumanHealthReportCommandInput(
+            reportType: reportType,
+            conclusion: conclusion,
+            hospitalName: hospitalName,
+            doctorName: doctorName,
+            reportDate: reportDate,
+            nextCheckDate: hasNextCheck ? nextCheckDate : nil,
+            summary: summary,
+            notes: notes
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        if let report = editing {
+            commandQueue.enqueue(.humanHealthReport(humanID: human.id, reportID: report.id, action: "update")) {
+                HumanHealthReportCommandExecutor(context: modelContext).updateReport(
+                    report,
+                    human: human,
+                    input: input,
+                    note: "humanHealthReport.update"
+                )
+                dismiss()
+            }
         } else {
-            let r = HumanHealthReport(
-                humanId: human.id.uuidString,
-                reportType: reportType,
-                conclusion: conclusion,
-                hospitalName: hospitalName,
-                doctorName: doctorName,
-                reportDate: reportDate,
-                nextCheckDate: hasNextCheck ? nextCheckDate : nil,
-                summary: summary,
-                notes: notes
-            )
-            modelContext.insert(r)
+            commandQueue.enqueue(.humanHealthReport(humanID: human.id, reportID: nil, action: "create")) {
+                HumanHealthReportCommandExecutor(context: modelContext).createReport(
+                    human: human,
+                    input: input,
+                    note: "humanHealthReport.create"
+                )
+                dismiss()
+            }
         }
-        modelContext.safeSave()
-        dismiss()
+    }
+
+    private func delete(_ report: HumanHealthReport) {
+        guard !isSaving else { return }
+        isSaving = true
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(.humanHealthReport(humanID: human.id, reportID: report.id, action: "delete")) {
+            HumanHealthReportCommandExecutor(context: modelContext).deleteReport(
+                report,
+                human: human,
+                note: "humanHealthReport.delete"
+            )
+            dismiss()
+        }
     }
 }

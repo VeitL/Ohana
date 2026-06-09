@@ -17,6 +17,7 @@ struct PetInsuranceView: View {
     @State private var showingAdd = false
     @State private var selectedInsurance: PetInsurance?
     @State private var insuranceToEdit: PetInsurance?
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var sorted: [PetInsurance] {
         pet.insurances.sorted { $0.renewalDate > $1.renewalDate }
@@ -207,8 +208,7 @@ struct PetInsuranceView: View {
                 }
                 Divider()
                 Button(role: .destructive) {
-                    modelContext.delete(ins)
-                    modelContext.safeSave()
+                    deletePolicy(ins)
                 } label: {
                     Label("删除", systemImage: "trash")
                 }
@@ -219,6 +219,22 @@ struct PetInsuranceView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .padding(10)
             }
+        }
+    }
+
+    private func deletePolicy(_ insurance: PetInsurance) {
+        let command = DomainCommand.insurancePolicy(
+            petID: pet.id,
+            policyID: insurance.id,
+            action: "delete"
+        )
+        OhanaFeedback.light()
+        commandQueue.enqueue(command) {
+            InsuranceCommandExecutor(context: modelContext).deletePolicy(
+                insurance,
+                pet: pet,
+                note: "insurance.policy.delete"
+            )
         }
     }
 
@@ -238,6 +254,8 @@ struct AddPetInsuranceSheet: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @State private var isSaving = false
 
     // ── 基本信息 ──
     @State private var productName = ""
@@ -340,7 +358,7 @@ struct AddPetInsuranceSheet: View {
                                 .background(productName.isEmpty ? Color.primary.opacity(0.15) : Color.goPrimary,
                                             in: RoundedRectangle(cornerRadius: 16))
                         }
-                        .buttonStyle(ScaleButtonStyle()).disabled(productName.isEmpty)
+                        .buttonStyle(ScaleButtonStyle()).disabled(productName.isEmpty || isSaving)
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 16).padding(.top, 8)
@@ -698,95 +716,49 @@ struct AddPetInsuranceSheet: View {
     }
 
     private func save() {
-        let savedPolicyNumber = enablePolicyNumber ? policyNumber : ""
-        let coverageDouble = enableCoverage
-            ? (CountryDecimalInput.parse(coverageAmount, countryCode: AppCountry.code) ?? 0)
-            : 0
-        let otherDouble = CountryDecimalInput.parse(otherFeeInput, countryCode: AppCountry.code) ?? 0
-
-        if let ins = existing {
-            ins.productName         = productName
-            ins.companyName         = companyName
-            ins.policyNumber        = savedPolicyNumber
-            ins.annualPremium       = annualPremiumDouble
-            ins.coverageAmount      = coverageDouble
-            ins.startDate           = startDate
-            ins.renewalDate         = renewalDate
-            ins.notes               = notes
-            ins.paymentFrequencyRaw = paymentFrequency.rawValue
-            ins.paymentDayOfMonth   = paymentDay
-            ins.showInCalendar      = showInCalendar
-            ins.otherFeeAmount      = otherDouble
-            ins.otherFeeNote        = otherFeeNote
-        } else {
-            let ins = PetInsurance(
-                companyName: companyName,
-                policyNumber: savedPolicyNumber,
-                productName: productName,
-                annualPremium: annualPremiumDouble,
-                coverageAmount: coverageDouble,
-                startDate: startDate,
-                renewalDate: renewalDate,
-                notes: notes,
-                paymentFrequency: paymentFrequency,
-                paymentDayOfMonth: paymentDay,
-                showInCalendar: showInCalendar,
-                otherFeeAmount: otherDouble,
-                otherFeeNote: otherFeeNote,
-                pet: pet
-            )
-            modelContext.insert(ins)
-
-            // 生成全期付款计划（花费记录 + 可选日历事件）
-            if autoGenExpenses && annualPremiumDouble > 0 {
-                generatePaymentSchedule(for: ins)
-            }
-        }
-        modelContext.safeSave()
+        guard !isSaving else { return }
+        isSaving = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        dismiss()
+
+        let existingID = existing?.id
+        let command = DomainCommand.insurancePolicy(
+            petID: pet.id,
+            policyID: existingID ?? UUID(),
+            action: existing == nil ? "create" : "update"
+        )
+        let input = makePolicyInput()
+        commandQueue.enqueue(command) {
+            InsuranceCommandExecutor(context: modelContext).savePolicy(
+                existing: existing,
+                pet: pet,
+                input: input,
+                note: existing == nil ? "insurance.policy.create" : "insurance.policy.update"
+            )
+            isSaving = false
+            dismiss()
+        }
     }
 
-    /// 按频次生成从 startDate 到 renewalDate 的全部付款记录
-    private func generatePaymentSchedule(for ins: PetInsurance) {
-        let cal = Calendar.current
-        let otherDouble = CountryDecimalInput.parse(otherFeeInput, countryCode: AppCountry.code) ?? 0
-        let perPeriodBase = ins.paymentFrequency.periodAmount(fromAnnual: ins.annualPremium)
-        let perPeriod = perPeriodBase + otherDouble
-        let name = ins.productName.isEmpty ? ins.companyName : ins.productName
-
-        // 计算所有付款日期
-        let dates = InsurancePaymentSchedule.dates(for: ins, calendar: cal)
-        let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-
-        for (index, payDate) in dates.enumerated() {
-            // 花费记录
-            let expNote = index == 0
-                ? "\(name) 首期保费\(otherDouble > 0 ? "（含\(ins.otherFeeNote.isEmpty ? "其他费用" : ins.otherFeeNote)）" : "")"
-                : "\(name) 保费\(otherDouble > 0 ? "（含\(ins.otherFeeNote.isEmpty ? "其他费用" : ins.otherFeeNote)）" : "")"
-            let expense = PetExpenseLog(
-                date: payDate,
-                amount: perPeriod,
-                category: .insurancePremium,
-                note: expNote,
-                pet: pet,
-                executorId: payerId
-            )
-            modelContext.insert(expense)
-
-            // 日历事件
-            if ins.showInCalendar {
-                let event = Event(
-                    title: "🛡️ \(name) 缴费",
-                    startDate: payDate,
-                    isAllDay: true,
-                    eventType: EventType.insurancePremium.rawValue,
-                    relatedEntityType: "pet_insurance",
-                    relatedEntityId: ins.id.uuidString
-                )
-                modelContext.insert(event)
-            }
-        }
+    private func makePolicyInput() -> InsurancePolicySaveCommandInput {
+        InsurancePolicySaveCommandInput(
+            companyName: companyName,
+            policyNumber: enablePolicyNumber ? policyNumber : "",
+            productName: productName,
+            annualPremium: annualPremiumDouble,
+            coverageAmount: enableCoverage
+                ? (CountryDecimalInput.parse(coverageAmount, countryCode: AppCountry.code) ?? 0)
+                : 0,
+            startDate: startDate,
+            renewalDate: renewalDate,
+            notes: notes,
+            paymentFrequency: paymentFrequency,
+            paymentDayOfMonth: paymentDay,
+            showInCalendar: showInCalendar,
+            otherFeeAmount: CountryDecimalInput.parse(otherFeeInput, countryCode: AppCountry.code) ?? 0,
+            otherFeeNote: otherFeeNote,
+            autoGeneratesPayments: existing == nil && autoGenExpenses,
+            executorId: UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        )
     }
 
 }

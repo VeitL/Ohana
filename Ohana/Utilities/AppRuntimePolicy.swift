@@ -229,3 +229,72 @@ final class AppPerformanceMonitor: ObservableObject {
         samples.removeAll()
     }
 }
+
+enum AppPerformanceFlows {
+    static let homeCardExpand = "flow.home.card_expand"
+    static let homeCardCollapse = "flow.home.card_collapse"
+    static let homeTabSwitch = "flow.home.tab_switch"
+    static let quickCareCommand = "flow.quick_care.command"
+    static let calendarOpen = "flow.calendar.open"
+    static let calendarModeSwitch = "flow.calendar.mode_switch"
+    static let calendarFilter = "flow.calendar.filter"
+    static let calendarAddEventSheet = "flow.calendar.add_event_sheet"
+    static let oasisOpen = "flow.oasis.open"
+    static let backupExport = "flow.backup.export"
+}
+
+enum AppPerformancePhases {
+    static let flowStart = "flow_start"
+    static let firstFrame = "first_frame"
+    static let shellReady = "shell_ready"
+    static let contentMounted = "content_mounted"
+    static let dataReady = "data_ready"
+    static let stateSubmitted = "state_submitted"
+    static let animationComplete = "animation_complete"
+    static let writeSuccess = "write_success"
+    static let writeFailure = "write_failure"
+    static let noop = "noop"
+    static let routeDismiss = "route_dismiss"
+    static let outgoingUnmounted = "outgoing_unmounted"
+}
+
+@MainActor
+enum AppFlowPerformance {
+    @discardableResult
+    static func start(_ flow: String, note: [String: String] = [:]) -> CFAbsoluteTime {
+        let startedAt = CFAbsoluteTimeGetCurrent()
+        mark(flow, AppPerformancePhases.flowStart, note: note)
+        return startedAt
+    }
+
+    static func mark(
+        _ flow: String,
+        _ phase: String,
+        startedAt: CFAbsoluteTime? = nil,
+        note: [String: String] = [:]
+    ) {
+        let sampleName = "\(flow).\(phase)"
+        let noteString = formattedNote(note)
+        if let startedAt {
+            AppPerformanceMonitor.shared.record(sampleName, startedAt: startedAt, note: noteString)
+        } else {
+            AppPerformanceMonitor.shared.record(sampleName, valueMS: 0, note: noteString)
+        }
+    }
+
+    static func markFailure(_ flow: String, startedAt: CFAbsoluteTime? = nil, error: Error) {
+        mark(
+            flow,
+            AppPerformancePhases.writeFailure,
+            startedAt: startedAt,
+            note: ["errorType": String(describing: type(of: error))]
+        )
+    }
+
+    private static func formattedNote(_ note: [String: String]) -> String? {
+        guard !note.isEmpty else { return nil }
+        return note.keys.sorted().map { key in
+            "\(key)=\(note[key] ?? "")"
+        }.joined(separator: ", ")
+    }
+}

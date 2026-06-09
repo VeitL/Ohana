@@ -750,30 +750,28 @@ struct SettingsView: View {
 
     private func syncHomeCardStackAfterAccountSwitch(from oldHumanIdRaw: String, to human: Human) {
         guard let homePets, let homeHumans else { return }
-        var updatedOrderRaw = homeCardOrderRaw
-        var didChange = false
+        let result = SettingsCommandExecutor(context: modelContext).syncHomeCardStackAfterActiveHumanSwitch(
+            from: oldHumanIdRaw,
+            to: human,
+            pets: homePets,
+            humans: homeHumans,
+            electronicPets: homeElectronicPets ?? [],
+            hiddenPetIDsRaw: hiddenHomePetIDsRaw,
+            homeCardOrderRaw: homeCardOrderRaw,
+            note: "settings.activeHuman.switch"
+        )
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            didChange = HomeActiveHumanCardSync.applyAfterAccountSwitch(
-                from: oldHumanIdRaw,
-                to: human,
-                pets: homePets,
-                humans: homeHumans,
-                electronicPets: homeElectronicPets ?? [],
-                hiddenPetIDsRaw: hiddenHomePetIDsRaw,
-                homeCardOrderRaw: &updatedOrderRaw
-            )
-            if updatedOrderRaw != homeCardOrderRaw {
-                homeCardOrderRaw = updatedOrderRaw
+            if result.updatedHomeCardOrderRaw != homeCardOrderRaw {
+                homeCardOrderRaw = result.updatedHomeCardOrderRaw
             }
         }
-        guard didChange else { return }
-        modelContext.safeSave()
+        guard result.didSyncHomeStack else { return }
         NotificationCenter.default.post(
             name: .ohanaMemberProfileDidChange,
             object: nil,
-            userInfo: ["id": human.id.uuidString, "kind": "human", "reason": "activeHumanSwitch"]
+            userInfo: ["id": result.humanID.uuidString, "kind": "human", "reason": "activeHumanSwitch"]
         )
     }
 
@@ -1365,35 +1363,20 @@ private struct SettingsPetManagementSheet: View {
             return
         }
 
-        let petId = pet.id
-        let petIdString = petId.uuidString
-        if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
-            for event in allEvents where event.relatedEntityId == petIdString {
-                modelContext.delete(event)
-            }
-        }
-        removeQuickAccessItems(for: petId)
-        modelContext.delete(pet)
-        modelContext.safeSave()
+        MemberCommandExecutor(context: modelContext).deletePet(
+            pet,
+            note: "settings.pet.deleted"
+        )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         petToDelete = nil
         deleteConfirmName = ""
     }
 
-    private func removeQuickAccessItems(for petId: UUID) {
-        let key = "quickActionItems_v2"
-        guard let json = UserDefaults.standard.string(forKey: key),
-              let data = json.data(using: .utf8),
-              var items = try? JSONDecoder().decode([QuickActionItem].self, from: data) else { return }
-        items.removeAll { $0.petId == petId }
-        if let newData = try? JSONEncoder().encode(items),
-           let newJSON = String(data: newData, encoding: .utf8) {
-            UserDefaults.standard.set(newJSON, forKey: key)
-        }
-    }
-
     private func resetPetLogs(_ pet: Pet) {
-        pet.clearAllActivityRecords(in: modelContext)
+        MemberCommandExecutor(context: modelContext).clearPetActivityRecords(
+            pet,
+            note: "settings.pet.lifecycle.records.clear"
+        )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 }
@@ -1758,20 +1741,17 @@ private struct HumanQuickSwitchPasscodeSheet: View {
 
     private func verify() {
         let now = Date()
-        switch HumanPasscodeService.verify(pin, for: human, now: now) {
+        switch HumanPrivacyCommandExecutor(context: modelContext).verifyPasscode(pin, for: human, now: now) {
         case .success, .noPasscode:
-            modelContext.safeSave()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onVerified()
             dismiss()
         case .incorrect(let remaining):
-            modelContext.safeSave()
             pin = ""
             isError = true
             message = "密码不正确，还可尝试 \(remaining) 次"
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .locked(let until):
-            modelContext.safeSave()
             pin = ""
             isError = true
             message = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"
@@ -2078,24 +2058,21 @@ private struct CoconutBalanceTestView: View {
     private func applyAmount() {
         let amount = parsedAmount
         let human = selectedHuman
-        human?.coconutBalance = amount
-        modelContext.safeSave()
-
-        let delta = amount - questManager.coconutCount
-        questManager.recordCoconutDelta(
-            delta,
-            emoji: "🧪",
+        let result = SettingsCommandExecutor(context: modelContext).applyCoconutBalanceTest(
+            amount: amount,
+            human: human,
+            questManager: questManager,
             title: l.tr(zh: "测试调整椰子数量", en: "Test coconut balance adjustment", de: "Testanpassung Kokosnüsse"),
-            actorId: human?.id.uuidString,
-            actorName: human.map { displayName($0) }
+            actorName: human.map { displayName($0) },
+            note: "settings.coconut.test"
         )
 
         withAnimation(GoMotion.feedback) {
-            amountText = "\(amount)"
+            amountText = "\(result.amount)"
             message = l.tr(
-                zh: "已设置为 \(amount)🥥",
-                en: "Set to \(amount)🥥",
-                de: "Auf \(amount)🥥 gesetzt"
+                zh: "已设置为 \(result.amount)🥥",
+                en: "Set to \(result.amount)🥥",
+                de: "Auf \(result.amount)🥥 gesetzt"
             )
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)

@@ -22,7 +22,7 @@ It is not a source of truth for Ohana tokens.
 When UI advice conflicts, follow this order:
 
 1. `ui规范.selection.json`
-2. `ui规范.md`
+2. `docs/design/ui规范.md`
 3. `AGENTS.md`
 4. `docs/ui-v4-new-page-template.md`
 5. This adaptation document

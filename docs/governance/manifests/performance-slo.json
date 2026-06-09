@@ -1,0 +1,177 @@
+{
+  "schema": "ohana.governance.performance-slo.v1",
+  "updated": "2026-06-08",
+  "policyDocuments": [
+    "AGENTS.md",
+    "docs/performance-and-observability.md",
+    "docs/reliability-slo.md",
+    "docs/app-architecture-governance.md"
+  ],
+  "flows": [
+    {
+      "id": "home-card-expand",
+      "owner": "Home feature owner",
+      "interactionClass": "interaction-heavy",
+      "budgets": [
+        "Finger frame 0 mutates only local visual state or frozen snapshot state.",
+        "Visible expansion starts within one frame.",
+        "SwiftData reads, image decoding, reward/task/reminder fan-out, and dashboard aggregation are deferred until after handoff."
+      ],
+      "measurement": "MetricKit plus local signposts for high-traffic home expansion paths when changed.",
+      "evidence": "Stable AppPerformanceMonitor probes: flow.home.card_expand and flow.home.card_collapse, plus HomeSnapshotBuilder/HomeRouteCoordinator tests.",
+      "probeNames": [
+        "flow.home.card_expand",
+        "flow.home.card_collapse"
+      ],
+      "paths": [
+        "Ohana/Views/Home/VerticalSolidHomeView.swift",
+        "Ohana/Views/Home/FocusHomeWalletController.swift",
+        "Ohana/Views/Home/FocusHomeSnapshotController.swift",
+        "Ohana/Views/Home/WalletHeroMotion.swift",
+        "OhanaTests/VerticalSolidHomeControllerTests.swift"
+      ]
+    },
+    {
+      "id": "tab-switch-home",
+      "owner": "Home feature owner",
+      "interactionClass": "route transition",
+      "budgets": [
+        "Tab selection mutates only local tab state in the first frame.",
+        "Outgoing page cleanup happens after the visible switch.",
+        "Destination heavy work is prepared, deferred, or route-scoped."
+      ],
+      "measurement": "Stable AppPerformanceMonitor probes around home tab switch first frame and outgoing unmount.",
+      "evidence": "flow.home.tab_switch plus VerticalHomeTabMountPolicyTests and VerticalSolidHomeControllerTests.",
+      "probeNames": [
+        "flow.home.tab_switch"
+      ],
+      "paths": [
+        "Ohana/Views/Home/VerticalSolidHomeController.swift",
+        "Ohana/Views/Home/VerticalSolidHomeComponents.swift",
+        "OhanaTests/VerticalHomeTabMountPolicyTests.swift",
+        "OhanaTests/VerticalSolidHomeControllerTests.swift"
+      ]
+    },
+    {
+      "id": "quick-care-command",
+      "owner": "Care services owner",
+      "interactionClass": "business-command",
+      "budgets": [
+        "Tap frame starts visual feedback only.",
+        "Exactly one domain command writes the business fact.",
+        "Rewards, ledger, reminders, tasks, widgets, and read-model revisions synchronize after the fact is committed."
+      ],
+      "measurement": "Stable AppPerformanceMonitor probes for flow start, query data readiness, write success, and noop.",
+      "evidence": "flow.quick_care.command plus CareLedgerBackfillActorTests, HomeCommandExecutorTests, ReminderActionCoordinatorTests.",
+      "probeNames": [
+        "flow.quick_care.command"
+      ],
+      "paths": [
+        "Ohana/Views/Home/HomeCommandExecutor.swift",
+        "Ohana/Models/CareEventService.swift",
+        "Ohana/Models/CareLedgerService.swift",
+        "OhanaTests/HomeCommandExecutorTests.swift"
+      ]
+    },
+    {
+      "id": "startup-shell",
+      "owner": "App runtime owner",
+      "interactionClass": "startup",
+      "budgets": [
+        "Cold launch p90 target stays aligned with docs/reliability-slo.md.",
+        "Startup initializes shell, route host, model container, localization, design tokens, runtime policy, and required migrations only.",
+        "Feature scans, media decode, broad dashboard aggregation, notification reconciliation, and reward sync stay lazy."
+      ],
+      "measurement": "MetricKit launch metrics and startup signposts after any startup-path change.",
+      "evidence": "AppLifecycleCoordinatorTests and release quality note for startup changes.",
+      "probeNames": [
+        "launch_shell_ready",
+        "first_render",
+        "metrickit_metrics"
+      ],
+      "paths": [
+        "Ohana/OhanaApp.swift",
+        "Ohana/Utilities/MetricKitObserver.swift",
+        "OhanaTests/AppLifecycleCoordinatorTests.swift"
+      ]
+    },
+    {
+      "id": "calendar-open",
+      "owner": "Calendar feature owner",
+      "interactionClass": "route transition",
+      "budgets": [
+        "Calendar shell appears before list positioning and maintenance work.",
+        "Initial list positioning waits until the calendar is prepared.",
+        "Maintenance work is deferred and cancelled when the embedded calendar is inactive."
+      ],
+      "measurement": "Stable AppPerformanceMonitor probes for calendar open shell, first frame, and list data readiness.",
+      "evidence": "flow.calendar.open plus CalendarView changed-file smoothness audit.",
+      "probeNames": [
+        "flow.calendar.open",
+        "flow.calendar.mode_switch",
+        "flow.calendar.filter"
+      ],
+      "paths": [
+        "Ohana/Views/CalendarView.swift"
+      ]
+    },
+    {
+      "id": "calendar-add-event-sheet",
+      "owner": "Calendar feature owner",
+      "interactionClass": "custom presentation scene",
+      "budgets": [
+        "Entry starts with lightweight shell state.",
+        "AddEvent content mounts after the visual handoff.",
+        "Route clearing happens after the exit handoff."
+      ],
+      "measurement": "Stable AppPerformanceMonitor probes for add-event sheet shell, mounted content, and dismissal.",
+      "evidence": "flow.calendar.add_event_sheet.",
+      "probeNames": [
+        "flow.calendar.add_event_sheet"
+      ],
+      "paths": [
+        "Ohana/Views/CalendarView.swift",
+        "Ohana/Views/Forms/AddEventView.swift"
+      ]
+    },
+    {
+      "id": "oasis-open",
+      "owner": "Oasis feature owner",
+      "interactionClass": "route transition",
+      "budgets": [
+        "Home tab shows an Oasis preview before live content mounts.",
+        "Live Oasis content is mounted only after prepare/visible/live handoff.",
+        "Oasis heavy snapshot migration remains tracked for Round 3."
+      ],
+      "measurement": "Stable AppPerformanceMonitor probes in the lightweight Oasis home tab host.",
+      "evidence": "flow.oasis.open plus runtime guardrails for Oasis ambient work.",
+      "probeNames": [
+        "flow.oasis.open"
+      ],
+      "paths": [
+        "Ohana/Views/Home/OasisHomeTabHost.swift",
+        "Ohana/Views/Home/OasisRewardView.swift"
+      ]
+    },
+    {
+      "id": "backup-export",
+      "owner": "Privacy and data safety owner",
+      "interactionClass": "release-risk",
+      "budgets": [
+        "Full SwiftData fetch and JSON encode stay off the main actor.",
+        "Plaintext export writes atomically with complete file protection.",
+        "Failures are recorded without private payload details."
+      ],
+      "measurement": "Stable AppPerformanceMonitor probes for export start, data ready, write success, and write failure.",
+      "evidence": "flow.backup.export plus release data-safety and resource integrity audits.",
+      "probeNames": [
+        "flow.backup.export"
+      ],
+      "paths": [
+        "Ohana/Models/DataBackupManager.swift",
+        "Ohana/Views/SettingsView.swift",
+        "scripts/audit-release-data-safety.sh"
+      ]
+    }
+  ]
+}

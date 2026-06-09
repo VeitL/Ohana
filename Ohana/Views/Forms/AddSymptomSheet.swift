@@ -19,10 +19,12 @@ struct AddSymptomSheet: View {
     @State private var symptomName: String = ""
     @State private var severity: SymptomSeverity = .mild
     @State private var note: String = ""
+    @State private var isSaving = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
     private var l: L10n { L10n(appLanguage) }
-    private var canSave: Bool { !symptomName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var canSave: Bool { !symptomName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSaving }
 
     var body: some View {
         ZStack {
@@ -51,6 +53,10 @@ struct AddSymptomSheet: View {
         }
         .safeAreaInset(edge: .bottom) {
             saveBar
+        }
+        .interactiveDismissDisabled(isSaving)
+        .onDisappear {
+            commandQueue.cancelAll()
         }
         .toolbar(.hidden, for: .navigationBar)
     }
@@ -250,19 +256,35 @@ struct AddSymptomSheet: View {
         }
     }
 
-    private func save() {
-        guard canSave else { return }
-        let log = SymptomLog(
+    private var symptomCommandInput: PetSymptomCommandInput {
+        PetSymptomCommandInput(
             date: selectedDate,
             category: category,
-            symptomName: symptomName.trimmingCharacters(in: .whitespacesAndNewlines),
+            symptomName: symptomName,
             severity: severity,
             note: note,
-            pet: pet
+            photoData: nil
         )
-        modelContext.insert(log)
-        modelContext.safeSave()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        dismiss()
+    }
+
+    private func save() {
+        guard canSave else { return }
+        let input = symptomCommandInput
+        let command = DomainCommand.petHealthRecord(petID: pet.id, type: "symptom")
+        isSaving = true
+
+        commandQueue.enqueue(command) {
+            guard PetHealthCommandExecutor(context: modelContext).recordSymptom(
+                pet: pet,
+                input: input,
+                note: "pet.symptom.recorded"
+            ) != nil else {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        }
     }
 }

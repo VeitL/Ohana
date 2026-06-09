@@ -15,6 +15,7 @@ struct EditPetSheet: View {
     @Query(sort: \Pet.createdAt) private var allPets: [Pet]
     @Query(sort: \Human.createdAt) private var allHumans: [Human]
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showDuplicateNameAlert = false
     @State private var name = ""
     @State private var species = ""
@@ -137,7 +138,7 @@ struct EditPetSheet: View {
                                     ZStack {
                                         Circle().fill(tc.color).frame(width: 38, height: 38)
                                         if themeColorHex.uppercased() == tc.hexValue.uppercased() {
-                                            Circle().strokeBorder(.white, lineWidth: 2.5).frame(width: 38, height: 38)
+                                            Circle().strokeBorder(Color.ohanaCardSurface, lineWidth: 2.5).frame(width: 38, height: 38)
                                             Image(systemName: "checkmark")
                                                 .font(.system(size: 11, weight: .black))
                                                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -240,28 +241,34 @@ struct EditPetSheet: View {
     }
     
     private func save() {
-        pet.name = name
-        pet.species = species
-        pet.breed = breed
-        pet.avatarEmoji = avatarEmoji.isEmpty ? "🐾" : avatarEmoji
-        pet.birthday = hasBirthday ? birthday : nil
-        pet.gender = gender
-        pet.isNeutered = isNeutered
-        pet.microchipID = microchipID
-        pet.vetContact = vetContact
-        pet.allergies = allergies
-        pet.birthCountry = birthCountry
-        pet.birthCity = birthCity
-        pet.foodBrand = foodBrand
-        pet.dailyPortionGrams = dailyPortionGrams
-        pet.notes = notes
-        if !themeColorHex.isEmpty {
-            pet.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
-                themeColorHex,
-                fallback: OhanaThemeColorPolicy.petFallbackHex
+        let input = PetProfileCommandInput(
+            name: name,
+            avatarImageData: pet.avatarImageData,
+            avatarEmoji: avatarEmoji,
+            species: species,
+            breed: breed,
+            gender: gender,
+            isNeutered: isNeutered,
+            birthday: hasBirthday ? birthday : nil,
+            homeDate: pet.homeDate,
+            themeHex: themeColorHex.isEmpty ? pet.safeThemeColorHex : themeColorHex,
+            notes: notes,
+            microchipID: microchipID,
+            vetContact: vetContact,
+            allergies: allergies,
+            birthCountry: birthCountry,
+            birthCity: birthCity,
+            foodBrand: foodBrand,
+            dailyPortionGrams: dailyPortionGrams
+        )
+        commandQueue.enqueue(.memberProfile(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
+            MemberCommandExecutor(context: modelContext).updatePetProfile(
+                pet,
+                input: input,
+                note: "editPet.profile"
             )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
         }
-        modelContext.safeSave()
-        dismiss()
     }
 }

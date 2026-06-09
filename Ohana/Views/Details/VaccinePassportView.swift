@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import UserNotifications
 
 struct VaccinePassportView: View {
     let pet: Pet
@@ -15,7 +14,9 @@ struct VaccinePassportView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingAdd = false
+    @State private var deletingLogIDs: Set<UUID> = []
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -76,10 +77,7 @@ struct VaccinePassportView: View {
                     } else {
                         VStack(spacing: 10) {
                             ForEach(vaccineLogs) { log in
-                                VaccineRow(log: log, onDelete: {
-                                    modelContext.delete(log)
-                                    modelContext.safeSave()
-                                })
+                                VaccineRow(log: log, onDelete: { delete(log) })
                             }
                         }
                     }
@@ -103,6 +101,26 @@ struct VaccinePassportView: View {
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingAdd) {
             AddVaccineSheet(pet: pet)
+        }
+    }
+
+    private func delete(_ log: PetHealthLog) {
+        guard !deletingLogIDs.contains(log.id) else { return }
+        deletingLogIDs.insert(log.id)
+        let command = DomainCommand.petHealthDelete(
+            petID: pet.id,
+            kind: "vaccine",
+            recordID: log.id
+        )
+
+        OhanaFeedback.light()
+        commandQueue.enqueue(command) {
+            PetHealthCommandExecutor(context: modelContext).deleteHealthLog(
+                log,
+                pet: pet,
+                note: "pet.vaccine.delete"
+            )
+            deletingLogIDs.remove(log.id)
         }
     }
 
@@ -385,6 +403,7 @@ struct AddVaccineSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var vaccineName: String = ""
     @State private var date: Date = Date()
     @State private var hasExpiry: Bool = false
@@ -393,10 +412,13 @@ struct AddVaccineSheet: View {
     @State private var costText: String = ""
     @State private var reminderDaysBefore: Int = 7
     @State private var enableReminder: Bool = true
+    @State private var isSaving = false
 
     private let reminderOptions = [3, 7, 14, 30]
     private var l: L10n { L10n(appLanguage) }
-    private var canSave: Bool { !vaccineName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var canSave: Bool {
+        !isSaving && !vaccineName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     private var vaccineSuggestions: [String] {
         if pet.species == "猫" {
@@ -680,54 +702,34 @@ struct AddVaccineSheet: View {
     }
 
     private func save() {
+        guard canSave else { return }
+        isSaving = true
         let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
             .flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetHealthLog(date: date, type: .vaccine,
-                               note: vaccineName.isEmpty ? "疫苗接种" : vaccineName,
-                               pet: pet,
-                               executorId: executorId)
-        log.vetName = vetName
-        log.cost = CountryDecimalInput.parse(costText, countryCode: AppCountry.code) ?? 0
-        if hasExpiry { log.expirationDate = expiryDate }
-        modelContext.insert(log)
+        let input = PetHealthRecordCommandInput(
+            type: .vaccine,
+            date: date,
+            name: vaccineName,
+            note: "",
+            vetName: vetName,
+            cost: CountryDecimalInput.parse(costText, countryCode: AppCountry.code) ?? 0,
+            expirationDate: hasExpiry ? expiryDate : nil,
+            nextCheckupDate: nil,
+            executorId: executorId,
+            source: .detail,
+            includesNameInNote: true,
+            expirationReminderLeadDays: (hasExpiry && enableReminder) ? reminderDaysBefore : nil
+        )
+        let command = DomainCommand.petHealthRecord(petID: pet.id, type: HealthLogType.vaccine.rawValue)
 
-        // 费用同步
-        if let amount = CountryDecimalInput.parse(costText, countryCode: AppCountry.code), amount > 0 {
-            let expense = PetExpenseLog(date: date, amount: amount, category: .medical,
-                                        note: vaccineName.isEmpty ? "疫苗接种" : vaccineName, pet: pet, executorId: executorId)
-            modelContext.insert(expense)
-        }
-
-        // 到期提醒
-        var reminderToSchedule: Reminder?
-        if hasExpiry && enableReminder {
-            let reminderDate = Calendar.current.date(
-                byAdding: .day, value: -reminderDaysBefore, to: expiryDate
-            ) ?? expiryDate
-            if reminderDate > Date() {
-                let event = Event(
-                    title: "\(pet.name)疫苗即将到期",
-                    startDate: reminderDate,
-                    eventType: EventType.health.rawValue,
-                    relatedEntityType: EntityKind.pet.rawValue,
-                    relatedEntityId: pet.id.uuidString
-                )
-                modelContext.insert(event)
-                let reminder = Reminder(event: event, scheduledAt: reminderDate)
-                reminder.status = "pending"
-                modelContext.insert(reminder)
-                reminderToSchedule = reminder
-            }
-        }
-
-        modelContext.safeSave()
-        QuestManager.shared.awardAction(type: .health, pet: pet, context: modelContext)
-        if let reminderToSchedule {
-            Task { @MainActor in
-                await ReminderSchedulingService.scheduleIfNeeded(reminder: reminderToSchedule, context: modelContext, source: .detail)
-            }
-        }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        dismiss()
+        commandQueue.enqueue(command) {
+            PetHealthCommandExecutor(context: modelContext).recordHealth(
+                pet: pet,
+                input: input,
+                note: "pet.vaccine.record"
+            )
+            dismiss()
+        }
     }
 }

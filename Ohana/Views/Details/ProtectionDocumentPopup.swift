@@ -18,6 +18,7 @@ struct ProtectionDocumentPopup: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var visible = false
     @State private var dragOffset: CGFloat = 0
     @State private var title = ""
@@ -37,11 +38,12 @@ struct ProtectionDocumentPopup: View {
     @State private var attachmentFilename = ""
     @State private var attachmentIsImage = false
     @State private var hasNewAttachment = false
+    @State private var isSaving = false
 
     private var isEdit: Bool { existing != nil }
     private var animation: Animation { GoMotion.page }
     private var hiddenOffset: CGFloat { 760 }
-    private var canSave: Bool { !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var canSave: Bool { !isSaving && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var l: L10n { L10n(appLanguage) }
     private var formSpec: ProtectionDocumentFormSpec { ProtectionDocumentFormSpec.spec(for: category, petName: pet.name, l: l) }
 
@@ -470,47 +472,69 @@ struct ProtectionDocumentPopup: View {
     }
 
     private func save() {
-        let document = existing ?? PetDocument(title: title.trimmingCharacters(in: .whitespacesAndNewlines), category: category, pet: pet)
-        document.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        document.category = category.rawValue
-        document.pet = pet
-        document.issuingAuthority = issuingAuthority
-        document.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        document.issueDate = hasIssueDate ? issueDate : nil
-        document.expiryDate = hasExpiryDate ? expiryDate : nil
+        guard canSave else { return }
+        isSaving = true
         let amount = CountryDecimalInput.parse(costText, countryCode: AppCountry.code) ?? 0
-        document.cost = amount
-        if hasNewAttachment, let attachmentData {
-            document.attachmentData = attachmentData
-            document.attachmentFilename = attachmentFilename.isEmpty ? "attachment" : attachmentFilename
-            let attachment = PetDocumentAttachment(
-                data: attachmentData,
-                filename: document.attachmentFilename,
-                isImage: attachmentIsImage
+        let payerId = selectedPayerId.flatMap { id in humans.contains(where: { $0.id.uuidString == id }) ? id : nil }
+        let attachments: [PetDocumentAttachmentCommandInput] = {
+            guard hasNewAttachment, let attachmentData else { return [] }
+            return [
+                PetDocumentAttachmentCommandInput(
+                    data: attachmentData,
+                    filename: attachmentFilename.isEmpty ? "attachment" : attachmentFilename,
+                    isImage: attachmentIsImage
+                )
+            ]
+        }()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        if let existing {
+            let input = PetDocumentUpdateCommandInput(
+                title: title,
+                category: category,
+                issuingAuthority: issuingAuthority,
+                notes: notes,
+                issueDate: hasIssueDate ? issueDate : nil,
+                expiryDate: hasExpiryDate ? expiryDate : nil,
+                cost: amount,
+                attachmentData: nil,
+                clearsAttachment: false,
+                attachments: attachments
             )
-            document.attachments.append(attachment)
-        }
-        if existing == nil {
-            modelContext.insert(document)
-        }
-
-        if existing == nil, amount > 0 {
-            let payerId = selectedPayerId.flatMap { id in humans.contains(where: { $0.id.uuidString == id }) ? id : nil }
-            let expenseDate = hasIssueDate ? issueDate : Date()
-            for plan in DocumentExpenseSyncPlanner.plannedExpenses(
-                documentCategory: category,
-                amount: amount,
-                date: expenseDate,
-                note: document.title,
-                payerId: payerId
-            ) {
-                modelContext.insert(PetExpenseLog(date: plan.date, amount: plan.amount, category: plan.category, note: plan.note, pet: pet, executorId: plan.payerId))
+            commandQueue.enqueue(.petDocumentUpdate(petID: pet.id, documentID: existing.id)) {
+                PetDocumentCommandExecutor(context: modelContext).updateDocument(
+                    existing,
+                    pet: pet,
+                    input: input,
+                    note: "petDocument.update"
+                )
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                close()
             }
+            return
         }
 
-        modelContext.safeSave()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        close()
+        let input = PetDocumentCreateCommandInput(
+            title: title,
+            category: category,
+            issuingAuthority: issuingAuthority,
+            notes: notes,
+            issueDate: hasIssueDate ? issueDate : nil,
+            expiryDate: hasExpiryDate ? expiryDate : nil,
+            cost: amount,
+            payerId: payerId,
+            documentNumber: "",
+            attachments: attachments
+        )
+        commandQueue.enqueue(.petDocumentCreate(petID: pet.id, category: category.rawValue)) {
+            PetDocumentCommandExecutor(context: modelContext).createDocument(
+                input: input,
+                pet: pet,
+                note: "petDocument.create"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            close()
+        }
     }
 
     private func applyCategoryDefaults(

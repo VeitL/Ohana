@@ -33,7 +33,9 @@ struct QuickHumanExpenseSheet: View {
     @State private var contentHeight: CGFloat = 0
     @State private var popupVisible = false
     @State private var isClosing = false
+    @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var amount: Double? { CountryDecimalInput.parse(amountText, countryCode: appCountry) }
@@ -139,6 +141,9 @@ struct QuickHumanExpenseSheet: View {
             withTransaction(transaction) {
                 contentHeight = height
             }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
 
@@ -272,18 +277,21 @@ struct QuickHumanExpenseSheet: View {
     private var saveBar: some View {
         Button { save() } label: {
             HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
                     .font(.system(size: 16, weight: .black))
-                Text(l.tr(zh: "保存花费", en: "Save Expense", de: "Ausgabe speichern"))
+                Text(isSaving
+                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+                    : l.tr(zh: "保存花费", en: "Save Expense", de: "Ausgabe speichern")
+                )
                     .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
-            .background(isValid ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+            .background(isValid && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!isValid)
+        .disabled(!isValid || isSaving)
         .padding(.horizontal, 22)
         .padding(.top, 10)
         .padding(.bottom, 16)
@@ -307,40 +315,23 @@ struct QuickHumanExpenseSheet: View {
 
     @MainActor
     private func save() {
-        guard let amount, amount > 0 else { return }
-        let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        let log = PetExpenseLog(
-            date: date,
-            amount: amount,
-            category: .other,
-            note: cleanNote,
-            pet: nil,
-            executorId: human.id.uuidString
-        )
-        modelContext.insert(log)
-        modelContext.safeSave()
-
-        let reward = QuestManager.shared.awardAction(type: .expense, pet: nil, context: modelContext)
-        CareLedgerService.record(
-            occurredAt: date,
-            actorKind: .human,
-            actorId: human.id.uuidString,
-            subjectKind: .human,
-            subjectId: human.id.uuidString,
-            eventKind: .expense,
-            actionType: ExpenseCategory.other.rawValue,
-            amountValue: amount,
-            amountUnit: "currency",
-            note: cleanNote,
-            source: .quickAction,
-            legacyModelName: "PetExpenseLog",
-            legacyModelId: log.id.uuidString,
-            coconutDelta: CareLedgerService.rewardDelta(reward),
-            privacyFieldRaw: HumanPrivateField.expense.rawValue,
-            context: modelContext
-        )
+        guard !isSaving, let amount, amount > 0 else { return }
+        isSaving = true
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        onSaved?()
-        close()
+        let savedNote = note
+        let savedDate = date
+        let command = DomainCommand.quickHumanExpense(humanID: human.id)
+        commandQueue.enqueue(command) {
+            DashboardRecordCommandExecutor(context: modelContext).recordHumanExpense(
+                human: human,
+                amount: amount,
+                date: savedDate,
+                note: savedNote,
+                command: command,
+                revisionNote: "quick.human.expense"
+            )
+            onSaved?()
+            close()
+        }
     }
 }

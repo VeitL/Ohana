@@ -21,6 +21,7 @@ struct BackdateCheckInSheet: View {
     @State private var selectedAction: CheckInActionType = .feed
     @State private var isDone = false
     @State private var earnedCoconuts = 0
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     enum CheckInActionType: String, CaseIterable {
         case feed  = "喂食 🍗"
@@ -34,6 +35,14 @@ struct BackdateCheckInSheet: View {
             case .water: return .water
             case .potty: return .potty(isLitter: false)
             case .walk:  return .walk(distanceMeters: 300)
+            }
+        }
+        var commandKey: String {
+            switch self {
+            case .feed: return "feed"
+            case .water: return "water"
+            case .potty: return "potty"
+            case .walk: return "walk"
             }
         }
         var emoji: String { String(rawValue.suffix(2)) }
@@ -116,10 +125,10 @@ struct BackdateCheckInSheet: View {
                                     .font(.system(size: 11, weight: .medium, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                             }
-                            .foregroundStyle(selectedDaysAgo == days ? .black : .white.opacity(0.7))
+                            .foregroundStyle(selectedDaysAgo == days ? Color.arkInk : Color.ohanaSecondaryText)
                             .padding(.horizontal, 16).padding(.vertical, 10)
                             .background(
-                                selectedDaysAgo == days ? Color.goPrimary : Color.white.opacity(0.08),
+                                selectedDaysAgo == days ? Color.goPrimary : Color.ohanaControlFill,
                                 in: Capsule()
                             )
                         }
@@ -135,11 +144,11 @@ struct BackdateCheckInSheet: View {
                         Text("确认补打卡")
                             .font(.system(size: 16, weight: .black, design: .rounded))
                     }
-                    .foregroundStyle(selectedPet != nil ? .black : .white.opacity(0.3))
+                    .foregroundStyle(selectedPet != nil ? Color.arkInk : Color.ohanaTertiaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(
-                        selectedPet != nil ? Color.goPrimary : Color.white.opacity(0.08),
+                        selectedPet != nil ? Color.goPrimary : Color.ohanaControlFill,
                         in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                     )
                 }
@@ -179,7 +188,7 @@ struct BackdateCheckInSheet: View {
             }
             Button("关闭") { dismiss() }
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(.black)
+                .foregroundStyle(Color.arkInk)
                 .padding(.horizontal, 40).padding(.vertical, 14)
                 .background(Color.goPrimary, in: Capsule())
                 .buttonStyle(ScaleButtonStyle())
@@ -223,11 +232,11 @@ struct BackdateCheckInSheet: View {
                     .font(.system(size: 18))
                 Text(pet.name)
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(selectedPet?.id == pet.id ? .black : .white.opacity(0.8))
+                    .foregroundStyle(selectedPet?.id == pet.id ? Color.arkInk : Color.ohanaSecondaryText)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
             .background(
-                selectedPet?.id == pet.id ? Color.goPrimary : Color.white.opacity(0.1),
+                selectedPet?.id == pet.id ? Color.goPrimary : Color.ohanaControlFill,
                 in: Capsule()
             )
         }
@@ -238,11 +247,11 @@ struct BackdateCheckInSheet: View {
         Button { selectedAction = action } label: {
             Text(action.rawValue)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(selectedAction == action ? .black : .white.opacity(0.7))
+                .foregroundStyle(selectedAction == action ? Color.arkInk : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(
-                    selectedAction == action ? Color.goPrimary : Color.white.opacity(0.08),
+                    selectedAction == action ? Color.goPrimary : Color.ohanaControlFill,
                     in: RoundedRectangle(cornerRadius: 14, style: .continuous)
                 )
         }
@@ -252,15 +261,19 @@ struct BackdateCheckInSheet: View {
     // MARK: - 提交
     private func submitBackdate() {
         guard let pet = selectedPet else { return }
-        let result = QuestManager.shared.awardAction(
-            type: selectedAction.questType,
-            pet: pet,
-            context: modelContext
-        )
-        earnedCoconuts = result.humanGot + result.petGot
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-            isDone = true
+        let action = selectedAction
+        commandQueue.enqueue(.backdateCheckIn(petID: pet.id, action: action.commandKey)) {
+            let result = RewardEconomyCommandExecutor(context: modelContext).awardBackdateCheckIn(
+                action: action.questType,
+                actionKey: action.commandKey,
+                pet: pet,
+                note: "backdateCheckIn.award"
+            )
+            earnedCoconuts = result.totalCoconuts
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            withAnimation(GoMotion.feedback) {
+                isDone = true
+            }
         }
     }
 }

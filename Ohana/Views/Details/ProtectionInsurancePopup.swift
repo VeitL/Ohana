@@ -31,6 +31,8 @@ struct ProtectionInsurancePopup: View {
     @State private var autoGenExpenses = true
     @State private var showInCalendar = false
     @State private var notes = ""
+    @State private var isSaving = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var isEdit: Bool { existing != nil }
     private var animation: Animation { GoMotion.page }
@@ -100,7 +102,7 @@ struct ProtectionInsurancePopup: View {
                     .frame(maxHeight: min(proxy.size.height * 0.62, 590))
 
                     Button(action: save) {
-                        Text(isEdit ? "保存" : "添加")
+                        Text(isSaving ? "保存中" : (isEdit ? "保存" : "添加"))
                             .font(OhanaFont.subheadline(.black))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
@@ -108,7 +110,7 @@ struct ProtectionInsurancePopup: View {
                             .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    .disabled(!canSave)
+                    .disabled(!canSave || isSaving)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 22)
                 }
@@ -322,71 +324,43 @@ struct ProtectionInsurancePopup: View {
     }
 
     private func save() {
+        guard !isSaving else { return }
         let savedProduct = productName.trimmingCharacters(in: .whitespacesAndNewlines)
         let savedPolicyNumber = hasPolicyNumber ? policyNumber : ""
-        if let existing {
-            existing.productName = savedProduct
-            existing.companyName = companyName
-            existing.policyNumber = savedPolicyNumber
-            existing.annualPremium = annualPremium
-            existing.coverageAmount = coverageAmount
-            existing.startDate = startDate
-            existing.renewalDate = renewalDate
-            existing.paymentFrequencyRaw = paymentFrequency.rawValue
-            existing.paymentDayOfMonth = paymentDay
-            existing.showInCalendar = showInCalendar
-            existing.notes = notes
-        } else {
-            let insurance = PetInsurance(
-                companyName: companyName,
-                policyNumber: savedPolicyNumber,
-                productName: savedProduct,
-                annualPremium: annualPremium,
-                coverageAmount: coverageAmount,
-                startDate: startDate,
-                renewalDate: renewalDate,
-                notes: notes,
-                paymentFrequency: paymentFrequency,
-                paymentDayOfMonth: paymentDay,
-                showInCalendar: showInCalendar,
-                pet: pet
-            )
-            modelContext.insert(insurance)
-            if autoGenExpenses && annualPremium > 0 {
-                generatePaymentSchedule(for: insurance)
-            }
-        }
-        modelContext.safeSave()
+        let existingID = existing?.id
+        let command = DomainCommand.insurancePolicy(
+            petID: pet.id,
+            policyID: existingID ?? UUID(),
+            action: existing == nil ? "create" : "update"
+        )
+        let input = InsurancePolicySaveCommandInput(
+            companyName: companyName,
+            policyNumber: savedPolicyNumber,
+            productName: savedProduct,
+            annualPremium: annualPremium,
+            coverageAmount: coverageAmount,
+            startDate: startDate,
+            renewalDate: renewalDate,
+            notes: notes,
+            paymentFrequency: paymentFrequency,
+            paymentDayOfMonth: paymentDay,
+            showInCalendar: showInCalendar,
+            otherFeeAmount: 0,
+            otherFeeNote: "",
+            autoGeneratesPayments: existing == nil && autoGenExpenses,
+            executorId: UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        )
+        isSaving = true
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        close()
-    }
-
-    private func generatePaymentSchedule(for insurance: PetInsurance) {
-        let dates = InsurancePaymentSchedule.dates(for: insurance, calendar: .current)
-        let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let name = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
-        let perPeriod = insurance.paymentFrequency.periodAmount(fromAnnual: insurance.annualPremium)
-
-        for (index, payDate) in dates.enumerated() {
-            modelContext.insert(PetExpenseLog(
-                date: payDate,
-                amount: perPeriod,
-                category: .insurancePremium,
-                note: index == 0 ? "\(name) 首期保费" : "\(name) 保费",
+        commandQueue.enqueue(command) {
+            InsuranceCommandExecutor(context: modelContext).savePolicy(
+                existing: existing,
                 pet: pet,
-                executorId: payerId
-            ))
-
-            if insurance.showInCalendar {
-                modelContext.insert(Event(
-                    title: "🛡️ \(name) 缴费",
-                    startDate: payDate,
-                    isAllDay: true,
-                    eventType: EventType.insurancePremium.rawValue,
-                    relatedEntityType: "pet_insurance",
-                    relatedEntityId: insurance.id.uuidString
-                ))
-            }
+                input: input,
+                note: existing == nil ? "insurance.policy.create" : "insurance.policy.update"
+            )
+            isSaving = false
+            close()
         }
     }
 }

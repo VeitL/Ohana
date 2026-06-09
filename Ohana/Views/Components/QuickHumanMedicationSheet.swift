@@ -86,7 +86,6 @@ struct QuickHumanMedicationSheet: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
-    @Query private var allMeds: [HumanMedication]
 
     @State private var medicationName = ""
     @State private var form: QuickHumanMedicationForm = .tablet
@@ -101,7 +100,9 @@ struct QuickHumanMedicationSheet: View {
     @State private var contentHeight: CGFloat = 0
     @State private var popupVisible = false
     @State private var isClosing = false
+    @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var canSave: Bool { !medicationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -196,6 +197,9 @@ struct QuickHumanMedicationSheet: View {
             withTransaction(transaction) {
                 contentHeight = height
             }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
 
@@ -420,26 +424,31 @@ struct QuickHumanMedicationSheet: View {
     private var saveBar: some View {
         Button { save() } label: {
             HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
                     .font(.system(size: 16, weight: .black))
-                Text(l.tr(zh: "保存药物", en: "Save Medication", de: "Medikament speichern"))
+                Text(isSaving
+                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+                    : l.tr(zh: "保存药物", en: "Save Medication", de: "Medikament speichern")
+                )
                     .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
-            .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+            .background(canSave && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!canSave)
+        .disabled(!canSave || isSaving)
         .padding(.horizontal, 22)
         .padding(.top, 10)
         .padding(.bottom, 16)
     }
 
+    @MainActor
     private func save() {
         let cleanedName = medicationName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanedName.isEmpty else { return }
+        guard !isSaving, !cleanedName.isEmpty else { return }
+        isSaving = true
 
         let selectedFrequency = reminderEnabled ? frequency : MedicationFrequency.asNeeded
         let minute = HumanMedicationSchedulePlan.minuteOfDay(from: firstDoseTime)
@@ -450,28 +459,32 @@ struct QuickHumanMedicationSheet: View {
             )
             : nil
         let savedNotes = HumanMedicationScheduleMetadata.composeNotes(visibleNotes: notes, metadata: metadata)
-        let medication = HumanMedication(
-            humanId: human.id.uuidString,
-            name: cleanedName,
-            dosage: composedDosage,
-            frequency: selectedFrequency,
-            firstDoseTime: firstDoseTime,
-            startDate: startDate,
-            colorHex: "FF6B8A",
-            notes: savedNotes
-        )
-        medication.isActive = true
-        modelContext.insert(medication)
-        modelContext.safeSave()
-
-        if reminderEnabled {
-            let meds = allMeds.filter { $0.humanId == human.id.uuidString } + [medication]
-            MedicationReminderService.shared.scheduleHumanMedicationReminders(for: human, meds: meds, context: modelContext)
-        }
+        let savedDosage = composedDosage
+        let savedFirstDoseTime = firstDoseTime
+        let savedStartDate = startDate
+        let shouldScheduleReminders = reminderEnabled
+        let command = DomainCommand.quickHumanMedication(humanID: human.id)
 
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        onSaved?()
-        close()
+        commandQueue.enqueue(command) {
+            guard HumanCareCommandExecutor(context: modelContext).createQuickMedication(
+                human: human,
+                name: cleanedName,
+                dosage: savedDosage,
+                frequency: selectedFrequency,
+                firstDoseTime: savedFirstDoseTime,
+                startDate: savedStartDate,
+                colorHex: "FF6B8A",
+                notes: savedNotes,
+                reminderEnabled: shouldScheduleReminders,
+                note: "quick.human.medication"
+            ) != nil else {
+                isSaving = false
+                return
+            }
+            onSaved?()
+            close()
+        }
     }
 
     private func doseMinutes(for frequency: MedicationFrequency, firstMinute: Int) -> [Int] {

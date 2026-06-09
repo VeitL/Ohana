@@ -65,6 +65,8 @@ struct CoconutShopView: View {
         let delay: Double
     }
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+
     private var l: L10n { L10n(appLanguage) }
     private var primaryText: Color { Color.ohanaPrimaryText }
     private var secondaryText: Color { Color.ohanaSecondaryText }
@@ -1045,11 +1047,12 @@ struct CoconutShopView: View {
         AppIconService.setIcon(descriptor) { result in
             switch result {
             case .success:
-                guard spendCoconuts(item) else { return }
-                markPurchased(item)
-                selectedAppIcon = descriptor.itemId
-                pendingPurchaseItem = nil
-                showPurchaseSuccess(item)
+                enqueueShopPurchase(item, note: "coconutShop.appIcon") {
+                    markPurchased(item)
+                    selectedAppIcon = descriptor.itemId
+                    pendingPurchaseItem = nil
+                    showPurchaseSuccess(item)
+                }
             case .failure(let error):
                 pendingPurchaseItem = nil
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -1073,60 +1076,84 @@ struct CoconutShopView: View {
     }
 
     private func purchase(_ item: ShopItem) {
-        guard spendCoconuts(item) else { return }
-        if item.isConsumable {
-            activateBoost(item)
-        } else {
-            markPurchased(item)
-            activateOwnedItem(item)
-        }
-
-        pendingPurchaseItem = nil
-        showPurchaseSuccess(item)
-
-        if item.id == "fx_popout_card" {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                openPopoutPetPicker()
+        enqueueShopPurchase(item, note: "coconutShop.purchase") {
+            if item.isConsumable {
+                activateBoost(item)
+            } else {
+                markPurchased(item)
+                activateOwnedItem(item)
             }
-        } else if item.id == Avatar2DAccess.shopItemId {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                openAvatarUpgradeTargetPicker()
+
+            pendingPurchaseItem = nil
+            showPurchaseSuccess(item)
+
+            if item.id == "fx_popout_card" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    openPopoutPetPicker()
+                }
+            } else if item.id == Avatar2DAccess.shopItemId {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    openAvatarUpgradeTargetPicker()
+                }
             }
         }
     }
 
-    @discardableResult
-    private func spendCoconuts(_ item: ShopItem) -> Bool {
-        guard item.cost > 0 else { return true }
-        guard let currentHuman, currentHuman.coconutBalance >= item.cost else {
-            let missing = max(0, item.cost - currentHumanBalance)
+    private func enqueueShopPurchase(_ item: ShopItem, note: String, onSuccess: @escaping @MainActor () -> Void) {
+        commandQueue.enqueue(.shopPurchase(humanID: currentHuman?.id, itemID: item.id)) {
+            let result = RewardEconomyCommandExecutor(context: modelContext).purchase(
+                item: item,
+                buyer: currentHuman,
+                itemName: l.tr(
+                    zh: "兑换「\(item.name(l))」",
+                    en: "Redeemed \(item.name(l))",
+                    de: "\(item.name(l)) eingelöst"
+                ),
+                questManager: questManager,
+                note: note
+            )
+            guard handleShopPurchaseResult(result) else { return }
+            onSuccess()
+        }
+    }
+
+    private func handleShopPurchaseResult(_ result: ShopPurchaseCommandResult) -> Bool {
+        guard result.didPurchase else {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
-            showToast(l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig"), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
+            switch result.failure {
+            case .missingActiveHuman:
+                showToast(
+                    l.tr(
+                        zh: "请先选择一个家庭成员。",
+                        en: "Choose a family member first.",
+                        de: "Wähle zuerst ein Familienmitglied."
+                    ),
+                    icon: "exclamationmark.triangle.fill",
+                    tint: Color.goOrange
+                )
+            case let .insufficientBalance(missing):
+                showToast(
+                    l.tr(
+                        zh: "还差 \(missing)🥥",
+                        en: "Need \(missing)🥥 more",
+                        de: "Noch \(missing)🥥 nötig"
+                    ),
+                    icon: "exclamationmark.triangle.fill",
+                    tint: Color.goOrange
+                )
+            case nil:
+                showToast(
+                    l.tr(
+                        zh: "兑换失败，请稍后再试。",
+                        en: "Purchase failed. Try again.",
+                        de: "Einlösen fehlgeschlagen. Versuch es erneut."
+                    ),
+                    icon: "exclamationmark.triangle.fill",
+                    tint: Color.goOrange
+                )
+            }
             return false
         }
-        currentHuman.coconutBalance -= item.cost
-        questManager.recordCoconutDelta(
-            -item.cost,
-            emoji: item.emoji,
-            title: l.tr(zh: "兑换「\(item.name(l))」", en: "Redeemed \(item.name(l))", de: "\(item.name(l)) eingelöst"),
-            actorId: currentHuman.id.uuidString,
-            actorName: currentHuman.name
-        )
-        CareLedgerService.record(
-            actorKind: .human,
-            actorId: currentHuman.id.uuidString,
-            subjectKind: .system,
-            subjectId: nil,
-            eventKind: .coconut,
-            actionType: "shopPurchase",
-            note: item.name(l),
-            source: .economy,
-            coconutDelta: -item.cost,
-            metadataJSON: "{\"shopItemId\":\"\(item.id)\"}",
-            context: modelContext,
-            save: false
-        )
-        modelContext.safeSave()
         return true
     }
 
@@ -1343,58 +1370,48 @@ struct CoconutShopView: View {
     }
 
     private func upgradeHumanTo2DAvatar(_ human: Human) {
-        let rawGender = HumanProfileOptions.normalizedGender(human.genderRaw)
-        let avatarGender: String
-        switch rawGender {
-        case "男", "女", "非二元":
-            avatarGender = rawGender
-        default:
-            avatarGender = "非二元"
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(.avatar2DUpgrade(entityID: human.id, kind: EntityKind.human.rawValue)) {
+            let result = RewardEconomyCommandExecutor(context: modelContext).upgradeHumanTo2DAvatar(
+                human,
+                note: "coconutShop.avatar2D.human"
+            )
+            handleAvatar2DUpgradeResult(result, name: human.name)
         }
-        guard let data = HumanAvatarAssetCatalog.avatarData(gender: avatarGender, birthday: human.birthday) else {
-            showToast(l.tr(zh: "请先补充性别或生日资料后再试。", en: "Add gender or birthday details first.", de: "Ergänze zuerst Geschlecht oder Geburtstag."), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
-            return
-        }
-        guard Avatar2DAccess.consumeExtraPass() else {
-            showToast(l.tr(zh: "当前没有可用的 2.5D 头像券。", en: "No 2.5D avatar pass available.", de: "Kein 2,5D-Avatarpass verfügbar."), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
-            return
-        }
-        human.avatarImageData = data
-        human.avatarEmoji = HumanGenderIdentity.fallbackAvatarEmoji(for: avatarGender)
-        modelContext.safeSave()
-        NotificationCenter.default.post(
-            name: .ohanaMemberProfileDidChange,
-            object: nil,
-            userInfo: ["id": human.id.uuidString, "kind": "human"]
-        )
-        activePicker = nil
-        showToast(l.tr(zh: "\(human.name) 已升级 2.5D 头像", en: "\(human.name) now has a 2.5D avatar", de: "\(human.name) hat jetzt einen 2,5D-Avatar"), icon: "checkmark.circle.fill", tint: Color.goPrimary)
     }
 
     private func upgradePetTo2DAvatar(_ pet: Pet) {
-        guard let data = PetAvatarAssetCatalog.avatarData(
-            species: pet.species,
-            breed: pet.breed,
-            gender: pet.gender,
-            coatColor: pet.coatColor,
-            eyeColor: pet.eyeColor
-        ) else {
-            showToast(l.tr(zh: "请先补充物种或品种资料后再试。", en: "Add species or breed details first.", de: "Ergänze zuerst Art oder Rasse."), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(.avatar2DUpgrade(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
+            let result = RewardEconomyCommandExecutor(context: modelContext).upgradePetTo2DAvatar(
+                pet,
+                note: "coconutShop.avatar2D.pet"
+            )
+            handleAvatar2DUpgradeResult(result, name: pet.name)
+        }
+    }
+
+    private func handleAvatar2DUpgradeResult(_ result: Avatar2DUpgradeCommandResult, name: String) {
+        guard result.didUpgrade else {
+            let message: String
+            switch result.failure {
+            case .missingProfile:
+                message = result.kind == EntityKind.human.rawValue
+                    ? l.tr(zh: "请先补充性别或生日资料后再试。", en: "Add gender or birthday details first.", de: "Ergänze zuerst Geschlecht oder Geburtstag.")
+                    : l.tr(zh: "请先补充物种或品种资料后再试。", en: "Add species or breed details first.", de: "Ergänze zuerst Art oder Rasse.")
+            case .noPass, nil:
+                message = l.tr(zh: "当前没有可用的 2.5D 头像券。", en: "No 2.5D avatar pass available.", de: "Kein 2,5D-Avatarpass verfügbar.")
+            }
+            showToast(message, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             return
         }
-        guard Avatar2DAccess.consumeExtraPass() else {
-            showToast(l.tr(zh: "当前没有可用的 2.5D 头像券。", en: "No 2.5D avatar pass available.", de: "Kein 2,5D-Avatarpass verfügbar."), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
-            return
-        }
-        pet.avatarImageData = data
-        modelContext.safeSave()
         NotificationCenter.default.post(
             name: .ohanaMemberProfileDidChange,
             object: nil,
-            userInfo: ["id": pet.id.uuidString, "kind": "pet"]
+            userInfo: ["id": result.entityID.uuidString, "kind": result.kind]
         )
         activePicker = nil
-        showToast(l.tr(zh: "\(pet.name) 已升级 2.5D 头像", en: "\(pet.name) now has a 2.5D avatar", de: "\(pet.name) hat jetzt einen 2,5D-Avatar"), icon: "checkmark.circle.fill", tint: Color.goPrimary)
+        showToast(l.tr(zh: "\(name) 已升级 2.5D 头像", en: "\(name) now has a 2.5D avatar", de: "\(name) hat jetzt einen 2,5D-Avatar"), icon: "checkmark.circle.fill", tint: Color.goPrimary)
     }
 }
 

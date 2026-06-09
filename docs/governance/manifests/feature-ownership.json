@@ -1,0 +1,141 @@
+{
+  "schema": "ohana.governance.feature-ownership.v1",
+  "updated": "2026-06-08",
+  "policyDocuments": [
+    "AGENTS.md",
+    "docs/feature-module-contract.md",
+    "docs/app-architecture-governance.md",
+    "docs/startup-and-lazy-loading-policy.md",
+    "docs/release-quality-gates.md"
+  ],
+  "features": [
+    {
+      "id": "focus-home-workbench",
+      "owner": "Home feature owner",
+      "risk": "interaction-heavy",
+      "activationTriggers": [
+        "root route visible",
+        "home tab selected",
+        "home card expanded",
+        "quick action selected"
+      ],
+      "routes": [
+        "HomeRouteCoordinator",
+        "FocusHomeRouteSheetModifier",
+        "FocusHomeExpandedQuickRouteRouter"
+      ],
+      "services": [
+        "HomeCommandExecutor",
+        "CareEventService",
+        "FamilyTaskService",
+        "CoconutEconomyService or QuestManager reward pipeline"
+      ],
+      "readModels": [
+        "HomeSnapshotBuilder",
+        "VerticalSolidHomeSnapshotBuilder",
+        "HomeReadModelStore"
+      ],
+      "tests": [
+        "OhanaTests/HomeRouteCoordinatorTests.swift",
+        "OhanaTests/HomeSnapshotBuilderTests.swift",
+        "OhanaTests/HomeReadModelStoreTests.swift",
+        "OhanaTests/VerticalSolidHomeControllerTests.swift"
+      ],
+      "sloIds": [
+        "home-card-expand",
+        "tab-switch-home"
+      ],
+      "businessWriteBoundary": "Views emit user intent; service/command executor writes one business fact and downstream services fan out.",
+      "ownedPaths": [
+        "Ohana/Views/Home",
+        "Ohana/Views/Components/QuickFeedHomePresenter.swift",
+        "Ohana/Views/Components/QuickFeedHomeSnapshot.swift"
+      ]
+    },
+    {
+      "id": "reminders-and-care-ledger",
+      "owner": "Care services owner",
+      "risk": "cross-feature",
+      "activationTriggers": [
+        "care event command",
+        "reminder completion or skip",
+        "calendar route visible",
+        "notification action"
+      ],
+      "routes": [
+        "CalendarView",
+        "ReminderActionCoordinator",
+        "FocusHomeReminderDeepLinkRouter"
+      ],
+      "services": [
+        "CareEventService",
+        "CareLedgerService",
+        "ReminderSchedulingService",
+        "ReminderMaintenanceService",
+        "ReminderNotificationScheduling"
+      ],
+      "readModels": [
+        "CareLedgerStatsService",
+        "CareLedgerAnalysisView",
+        "ReminderObservabilityView"
+      ],
+      "tests": [
+        "OhanaTests/CareLedgerBackfillActorTests.swift",
+        "OhanaTests/ReminderActionCoordinatorTests.swift",
+        "OhanaTests/ReminderMaintenanceServiceTests.swift",
+        "OhanaTests/OhanaNotificationsSchedulingTests.swift"
+      ],
+      "sloIds": [
+        "quick-care-command",
+        "calendar-agenda-refresh"
+      ],
+      "businessWriteBoundary": "One domain service records the care/reminder fact; reminders, ledger, rewards, and read-model revisions synchronize after commit.",
+      "ownedPaths": [
+        "Ohana/Models/CareEventService.swift",
+        "Ohana/Models/CareLedgerService.swift",
+        "Ohana/Models/ReminderSchedulingService.swift",
+        "Ohana/Utilities/ReminderActionCoordinator.swift",
+        "Ohana/Views/CalendarView.swift"
+      ]
+    },
+    {
+      "id": "backup-privacy-reset",
+      "owner": "Privacy and data safety owner",
+      "risk": "release-risk",
+      "activationTriggers": [
+        "settings backup export",
+        "settings backup import",
+        "delete my data",
+        "privacy/PIN state change"
+      ],
+      "routes": [
+        "SettingsView",
+        "HumanAccountPrivacyViews"
+      ],
+      "services": [
+        "DataBackupManager",
+        "AppResetService",
+        "PrivacyService"
+      ],
+      "readModels": [
+        "MetricDiagnosticsStore",
+        "privacy placeholders in account/profile surfaces"
+      ],
+      "tests": [
+        "OhanaTests/AppResetServiceTests.swift",
+        "OhanaTests/OhanaTests.swift"
+      ],
+      "sloIds": [
+        "backup-export",
+        "delete-my-data"
+      ],
+      "businessWriteBoundary": "Export/import/delete flows go through domain services; views must not manually serialize sensitive model fields or bypass privacy filters.",
+      "ownedPaths": [
+        "Ohana/Models/DataBackupManager.swift",
+        "Ohana/Models/PrivacyService.swift",
+        "Ohana/Views/Components/HumanAccountPrivacyViews.swift",
+        "Ohana/PrivacyInfo.xcprivacy"
+      ]
+    }
+  ]
+}

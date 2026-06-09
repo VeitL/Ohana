@@ -18,6 +18,7 @@ struct QuickPlayDetailSheet: View {
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @Query(sort: \Event.startDate) private var allEvents: [Event]
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingPlayPlanEditor = false
     @State private var inlineSheetVisible = false
     @State private var inlineSheetDragOffset: CGFloat = 0
@@ -451,9 +452,15 @@ struct QuickPlayDetailSheet: View {
             Spacer()
 
             Button {
-                withAnimation(GoMotion.feedback) {
-                    modelContext.delete(log)
-                    modelContext.safeSave()
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
+                    withAnimation(GoMotion.feedback) {
+                        _ = PetCareCommandExecutor(context: modelContext).deleteCareLog(
+                            log,
+                            pet: pet,
+                            note: "quickPlay.deleteRecentLog"
+                        )
+                    }
                 }
             } label: {
                 Image(systemName: "trash")

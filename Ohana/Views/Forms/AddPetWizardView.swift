@@ -907,81 +907,29 @@ struct AddPetWizardView: View {
         }
     }
 
-    private func speciesEmoji(_ sp: String) -> String {
-        switch sp {
-        case "狗": return "🐕"; case "猫": return "🐈"; case "兔子": return "🐇"
-        case "鱼": return "🐟"; case "鸟": return "🦜"; case "爬宠": return "🦎"
-        case "仓鼠": return "🐹"; default: return "🐾"
-        }
-    }
-
     private func savePet() {
         guard !isSaving else { return }
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         guard !trimmedName.isEmpty, !isNameDuplicate else { return }
 
         isSaving = true
-        let finalBreed = isCustomBreed ? customBreedText : breed
-        let shouldUseAutomaticAvatar = usesAutomaticAvatarAsset && canUseAutomatic2DAvatar
-        let finalAvatarImageData = shouldUseAutomaticAvatar
-            ? automaticPetAvatarData()
-            : avatarImageData
-        let pet = Pet(
-            name: trimmedName, species: effectiveSpeciesForData, breed: finalBreed,
-            birthday: hasBirthday ? birthday : nil,
-            gender: gender, isNeutered: isNeutered,
-            avatarEmoji: speciesEmoji(effectiveSpeciesForData),
-            themeColorHex: OhanaThemeColorPolicy.normalizedMemberThemeHex(
-                themeColorHex,
-                fallback: OhanaThemeColorPolicy.petFallbackHex
-            ),
-            homeDate: hasHomeDate ? homeDate : nil
-        )
-        pet.avatarImageData = finalAvatarImageData
-        pet.coatColor = coatColor
-        pet.eyeColor = eyeColor
-        pet.personalityTagsRaw = selectedPersonalityTagIds.joined(separator: ",")
-        let previousHiddenHomePetIDsRaw = hiddenHomePetIDsRaw
-        let shouldShowOnHome = HomeCardVisibility.visibleCardCount(
-            pets: existingPets,
-            humans: existingHumans,
-            raw: hiddenHomePetIDsRaw
-        ) < HomeCardVisibility.maxVisibleCards
-        if !shouldShowOnHome {
-            hiddenHomePetIDsRaw = HomeCardVisibility.rawBySettingPet(
-                pet,
-                visible: false,
-                raw: hiddenHomePetIDsRaw
-            )
-        }
-        modelContext.insert(pet)
-        if shouldUseAutomaticAvatar, finalAvatarImageData != nil {
-            Avatar2DAccess.consumeIfNeeded(kind: .pet, existingCount: existingPets.count)
-        }
-
-        // 先单独持久化 Pet：若后续事件/里程碑等写入失败，用户仍能在首页看到新宠物
         do {
-            try modelContext.save()
+            let result = try MemberCreationService.save(
+                draft: memberCreationDraft(trimmedName: trimmedName),
+                existingPets: existingPets,
+                existingHumans: existingHumans,
+                context: modelContext,
+                countryCode: AppCountry.code
+            )
+            if let pet = result.pet {
+                hiddenHomePetIDsRaw = UserDefaults.standard.string(forKey: HomeCardVisibility.hiddenPetIDsKey) ?? ""
+                onPetSaved?(pet)
+            }
         } catch {
             isSaving = false
-            hiddenHomePetIDsRaw = previousHiddenHomePetIDsRaw
             saveFailedMessage = error.localizedDescription
             showSaveFailedAlert = true
-            modelContext.delete(pet)
-            try? modelContext.save()
             return
-        }
-
-        insertPetRelatedRecords(pet: pet, displayName: trimmedName)
-        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: modelContext)
-        modelContext.safeSave()
-        onPetSaved?(pet)
-
-        // Q4: 欢呼算结 — 岛屿第一家人成就
-        let isFirstPet = !QuestManager.shared.isPetWizardCompleted
-        if isFirstPet {
-            QuestManager.shared.isPetWizardCompleted = true
-            QuestManager.shared.addCoconuts(50, emoji: "🎉", reason: "新家人入住欢迎奖励")
         }
 
         isSaving = false
@@ -998,62 +946,39 @@ struct AddPetWizardView: View {
         }
     }
 
+    private func memberCreationDraft(trimmedName: String) -> MemberCreationDraft {
+        let shouldUseAutomaticAvatar = usesAutomaticAvatarAsset && canUseAutomatic2DAvatar
+        let finalAvatarImageData = shouldUseAutomaticAvatar
+            ? automaticPetAvatarData()
+            : avatarImageData
+        var draft = MemberCreationDraft(kind: .pet)
+        draft.name = trimmedName
+        draft.species = effectiveSpeciesForData
+        draft.breed = breed
+        draft.customBreed = customBreedText
+        draft.isCustomBreed = isCustomBreed
+        draft.petGender = gender
+        draft.isNeutered = isNeutered
+        draft.coatColor = coatColor
+        draft.eyeColor = eyeColor
+        draft.themeColorHex = themeColorHex
+        draft.hasBirthday = hasBirthday
+        draft.birthday = birthday
+        draft.hasHomeDate = hasHomeDate
+        draft.homeDate = homeDate
+        draft.personalityTagIds = selectedPersonalityTagIds
+        draft.avatarImageData = finalAvatarImageData
+        draft.avatarSource = shouldUseAutomaticAvatar && finalAvatarImageData != nil
+            ? .avatar2D
+            : (finalAvatarImageData == nil ? .placeholder : .customImage)
+        return draft
+    }
+
     private func restoreAutomaticAvatarAsset() {
         guard canUseAutomatic2DAvatar else { return }
         usesAutomaticAvatarAsset = true
         refreshAutomaticAvatarAssetData()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-
-    /// 生日/纪念日/里程碑/家庭关系等非核心数据；失败时 safeSave 仅打日志，不影响已写入的 Pet
-    private func insertPetRelatedRecords(pet: Pet, displayName: String) {
-        if themeColorHex != OhanaThemeColorPolicy.petFallbackHex {
-            QuestManager.shared.recordThemeColorSet()
-        }
-
-        if hasBirthday {
-            let birthdayEvent = Event(
-                title: "\(displayName) 的生日 🎂",
-                startDate: birthday,
-                isAllDay: true,
-                eventType: EventType.birthday.rawValue,
-                relatedEntityType: "Pet",
-                relatedEntityId: pet.id.uuidString
-            )
-            birthdayEvent.recurrenceDays = 365
-            modelContext.insert(birthdayEvent)
-
-            let reminder = Reminder(event: birthdayEvent, scheduledAt: birthday)
-            modelContext.insert(reminder)
-        }
-
-        if hasHomeDate {
-            let anniversaryEvent = Event(
-                title: "\(displayName) 的到家纪念日 🏠",
-                startDate: homeDate,
-                isAllDay: true,
-                eventType: EventType.anniversary.rawValue,
-                relatedEntityType: "Pet",
-                relatedEntityId: pet.id.uuidString
-            )
-            anniversaryEvent.recurrenceDays = 365
-            modelContext.insert(anniversaryEvent)
-        }
-
-        if hasHomeDate {
-            let milestones = [100, 365, 500, 730, 1000, 1095]
-            for days in milestones {
-                if let date = Calendar.current.date(byAdding: .day, value: days, to: homeDate) {
-                    let milestone = PetMilestone(
-                        date: date,
-                        title: wizardL10n.petWizMilestoneTogether(days),
-                        emoji: days >= 1000 ? "🏆" : "🎉",
-                        pet: pet
-                    )
-                    modelContext.insert(milestone)
-                }
-            }
-        }
     }
 
     // MARK: - W      izard Pager Helpers

@@ -19,7 +19,7 @@ Purpose:
 
 Options:
   --skip-build   Run checks that do not require CoreSimulator.
-  --ui-all-soft  Also print whole-repo UI V4 warnings without failing.
+  --ui-all-soft  Deprecated compatibility option; full-scope ratchet now runs by default.
 USAGE
 }
 
@@ -56,7 +56,13 @@ section "Shell syntax"
 bash -n scripts/build-debug-fast.sh
 bash -n scripts/audit-runtime-guardrails.sh
 bash -n scripts/audit-ui-v4.sh
+bash -n scripts/audit-accessibility.sh
+bash -n scripts/audit-localization-coverage.sh
+bash -n scripts/audit-smoothness-risk.sh
+bash -n scripts/audit-full-scope-ratchet.sh
 bash -n scripts/audit-release-data-safety.sh
+bash -n scripts/audit-governance-manifests.sh
+bash -n scripts/audit-resource-integrity.sh
 bash -n scripts/audit-git-size.sh
 bash -n scripts/release-hardening-check.sh
 
@@ -64,13 +70,31 @@ section "Diff whitespace"
 git diff --check
 
 section "Runtime guardrails"
-scripts/audit-runtime-guardrails.sh --all --soft
+scripts/audit-runtime-guardrails.sh --all
 
 section "Release data safety"
 scripts/audit-release-data-safety.sh
 
+section "Localization coverage"
+scripts/audit-localization-coverage.sh
+
+section "Governance manifests"
+scripts/audit-governance-manifests.sh
+
+section "Resource integrity"
+scripts/audit-resource-integrity.sh
+
 section "UI V4 changed files"
 scripts/audit-ui-v4.sh --changed
+
+section "Accessibility changed files"
+scripts/audit-accessibility.sh --changed
+
+section "Smoothness changed files"
+scripts/audit-smoothness-risk.sh --changed
+
+section "Full-scope UI/accessibility/smoothness ratchet"
+scripts/audit-full-scope-ratchet.sh
 
 if [[ "${SOFT_UI_ALL}" == "1" ]]; then
   section "UI V4 all files soft report"

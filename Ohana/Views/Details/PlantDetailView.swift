@@ -13,9 +13,12 @@ struct PlantDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Household.createdAt) private var households: [Household]
+    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
     
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirm = false
+    private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext) }
     
     var body: some View {
         ZStack {
@@ -49,12 +52,13 @@ struct PlantDetailView: View {
         .alert("确认删除", isPresented: $showingDeleteConfirm) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
-                modelContext.delete(plant)
-                modelContext.safeSave()
-                dismiss()
+                deletePlant()
             }
         } message: {
             Text("确定要删除 \(plant.name) 吗？")
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
     
@@ -74,7 +78,6 @@ struct PlantDetailView: View {
                 Text(plant.avatarEmoji)
                     .font(.system(size: 52))
             }
-            .shadow(color: Color.arkMint.opacity(0.3), radius: 12)
             
             VStack(spacing: 8) {
                 Text(plant.name)
@@ -87,14 +90,14 @@ struct PlantDetailView: View {
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .padding(.horizontal, 12).padding(.vertical, 5)
-                            .background(.white.opacity(0.18), in: Capsule())
+                            .background(Color.ohanaControlFill, in: Capsule())
                     }
                     if !plant.location.isEmpty {
                         Text("📍 \(plant.location)")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .padding(.horizontal, 12).padding(.vertical, 5)
-                            .background(.white.opacity(0.18), in: Capsule())
+                            .background(Color.ohanaControlFill, in: Capsule())
                     }
                 }
             }
@@ -218,7 +221,7 @@ struct PlantDetailView: View {
                 .background(Color.blue.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+                        .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
                 }
             }
             
@@ -236,7 +239,7 @@ struct PlantDetailView: View {
                 .background(Color.green.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+                        .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
                 }
             }
         }
@@ -291,73 +294,36 @@ struct PlantDetailView: View {
     private func waterPlant() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-        plant.lastWateredDate = Date()
-
-        let log = PlantCareLog(date: Date(), careType: .watering)
-        log.plant = plant
-        modelContext.insert(log)
-
-        let event = Event(
-            title: "💧 给 \(plant.name) 浇水",
-            startDate: Date(),
-            isAllDay: false,
-            eventType: EventType.watering.rawValue,
-            relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
-        )
-        modelContext.insert(event)
-        modelContext.safeSave()
-        CareLedgerService.record(
-            occurredAt: log.date,
-            actorKind: log.executorId == nil ? .unknown : .human,
-            actorId: log.executorId,
-            subjectKind: .plant,
-            subjectId: plant.id.uuidString,
-            eventKind: .plantCare,
-            actionType: PlantCareType.watering.rawValue,
-            note: log.note,
-            source: .detail,
-            sourceEventId: event.id.uuidString,
-            legacyModelName: "PlantCareLog",
-            legacyModelId: log.id.uuidString,
-            context: modelContext
-        )
+        let plantID = plant.id
+        commandQueue.enqueue(.plantCare(plantID: plantID, action: PlantCareType.watering.rawValue)) {
+            commandExecutor.recordPlantCare(.watering, plantID: plantID, executorId: currentExecutorId())
+        }
     }
 
     private func fertilizePlant() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-        plant.lastFertilizedDate = Date()
+        let plantID = plant.id
+        commandQueue.enqueue(.plantCare(plantID: plantID, action: PlantCareType.fertilizing.rawValue)) {
+            commandExecutor.recordPlantCare(.fertilizing, plantID: plantID, executorId: currentExecutorId())
+        }
+    }
 
-        let log = PlantCareLog(date: Date(), careType: .fertilizing)
-        log.plant = plant
-        modelContext.insert(log)
+    private func currentExecutorId() -> String? {
+        activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
+    }
 
-        let event = Event(
-            title: "🌿 给 \(plant.name) 施肥",
-            startDate: Date(),
-            isAllDay: false,
-            eventType: EventType.fertilizing.rawValue,
-            relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
-        )
-        modelContext.insert(event)
-        modelContext.safeSave()
-        CareLedgerService.record(
-            occurredAt: log.date,
-            actorKind: log.executorId == nil ? .unknown : .human,
-            actorId: log.executorId,
-            subjectKind: .plant,
-            subjectId: plant.id.uuidString,
-            eventKind: .plantCare,
-            actionType: PlantCareType.fertilizing.rawValue,
-            note: log.note,
-            source: .detail,
-            sourceEventId: event.id.uuidString,
-            legacyModelName: "PlantCareLog",
-            legacyModelId: log.id.uuidString,
-            context: modelContext
-        )
+    private func deletePlant() {
+        let command = DomainCommand.memberDeletion(entityID: plant.id, kind: EntityKind.plant.rawValue)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            MemberCommandExecutor(context: modelContext).deletePlant(
+                plant,
+                note: "plant.detail.delete"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        }
     }
 }
 
@@ -366,7 +332,8 @@ struct EditPlantSheet: View {
     let plant: Plant
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    
+
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
     @State private var species = ""
     @State private var location = ""
@@ -374,6 +341,7 @@ struct EditPlantSheet: View {
     @State private var wateringInterval = 7
     @State private var fertilizingInterval = 30
     @State private var notes = ""
+    @State private var isSaving = false
     
     var body: some View {
         OhanaSheetWrapper(title: "编辑植物", onDismiss: { dismiss() }) {
@@ -407,9 +375,10 @@ struct EditPlantSheet: View {
                 }
                 
                 Button { save() } label: {
-                    Text("保存").capsuleButton()
+                    Text(isSaving ? "保存中…" : "保存").capsuleButton()
                 }
                 .padding(.top, 8)
+                .disabled(isSaving)
             }
             .padding(.vertical, 16)
         }
@@ -421,6 +390,9 @@ struct EditPlantSheet: View {
             wateringInterval = plant.wateringIntervalDays
             fertilizingInterval = plant.fertilizingIntervalDays
             notes = plant.notes
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
     
@@ -435,14 +407,30 @@ struct EditPlantSheet: View {
     }
     
     private func save() {
-        plant.name = name
-        plant.species = species
-        plant.location = location
-        plant.avatarEmoji = avatarEmoji.isEmpty ? "🌱" : avatarEmoji
-        plant.wateringIntervalDays = wateringInterval
-        plant.fertilizingIntervalDays = fertilizingInterval
-        plant.notes = notes
-        modelContext.safeSave()
-        dismiss()
+        guard !isSaving else { return }
+        let input = PlantProfileCommandInput(
+            name: name,
+            avatarImageData: plant.avatarImageData,
+            avatarEmoji: avatarEmoji,
+            species: species,
+            location: location,
+            wateringIntervalDays: wateringInterval,
+            fertilizingIntervalDays: fertilizingInterval,
+            themeHex: plant.themeColorHex,
+            notes: notes
+        )
+        let command = DomainCommand.memberProfile(entityID: plant.id, kind: EntityKind.plant.rawValue)
+
+        isSaving = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            MemberCommandExecutor(context: modelContext).updatePlantProfile(
+                plant,
+                input: input,
+                note: "plant.detail.profile"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        }
     }
 }

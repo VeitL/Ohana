@@ -20,9 +20,10 @@ concurrency:
 
 jobs:
   # ----------------------------------------------------------------------------
-  # Repo audits: pure ripgrep/bash, fast, no Xcode needed. These are the cheap
-  # gates that catch most rule violations (UI tokens, runtime guardrails,
-  # localization coverage, accessibility heuristics, release data safety).
+  # Repo audits: pure ripgrep/bash/Python, fast, no Xcode needed. These are the
+  # cheap gates that catch most rule violations (UI tokens, runtime guardrails,
+  # localization coverage, accessibility heuristics, release data safety,
+  # governance manifests, and resource/signing detritus).
   # ----------------------------------------------------------------------------
   audits:
     runs-on: macos-15
@@ -32,9 +33,9 @@ jobs:
           fetch-depth: 0
       - name: Install ripgrep
         run: brew install ripgrep
-      # Compute the Swift files changed by this PR/push so per-file audits gate
-      # NEW code strictly without drowning in the legacy baseline. Whole-repo
-      # cleanup is tracked separately (run the scripts with --all locally).
+      # Changed-file audits gate NEW code strictly. The full-scope ratchet below
+      # runs the same audit families across the whole repo and blocks any
+      # file/rule debt increase until the baseline reaches zero.
       - name: Compute changed Swift files
         id: changed
         run: |
@@ -53,13 +54,22 @@ jobs:
       - name: Accessibility audit (changed files, strict)
         if: steps.changed.outputs.files != ''
         run: scripts/audit-accessibility.sh ${{ steps.changed.outputs.files }}
-      # Whole-repo audits that are already enforced in this repo today.
-      - name: Runtime guardrails audit
-        run: scripts/audit-runtime-guardrails.sh
+      - name: Smoothness risk audit (changed files, strict)
+        if: steps.changed.outputs.files != ''
+        run: scripts/audit-smoothness-risk.sh ${{ steps.changed.outputs.files }}
+      - name: UI/accessibility/smoothness audit (whole repo ratchet)
+        run: scripts/audit-full-scope-ratchet.sh
+      # Whole-repo hard gates for mature-app invariants.
+      - name: Runtime guardrails audit (whole repo, strict)
+        run: scripts/audit-runtime-guardrails.sh --all
       - name: Localization coverage audit
         run: scripts/audit-localization-coverage.sh
       - name: Release data-safety audit
         run: scripts/audit-release-data-safety.sh
+      - name: Governance manifests audit
+        run: scripts/audit-governance-manifests.sh
+      - name: Resource integrity / xattr pre-sign audit
+        run: scripts/audit-resource-integrity.sh
       - name: Git size audit
         run: scripts/audit-git-size.sh
 

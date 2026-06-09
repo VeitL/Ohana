@@ -1,5 +1,7 @@
 # Ohana 功能完成清单
 
+> **Planning / Reference only**：本文档是完成记录和历史清单，不是规则源。若与 `AGENTS.md`、`ui规范.selection.json`、`docs/governance/manifests/`、当前治理文档或源码冲突，以后者为准。
+
 > 最后更新: 2026-06-08（合规 + 备份安全 + 大文件拆分 + 测试）| Validation: Fixed iPhone 17 simulator build ✅ + 新增/相关单测 `xcodebuild test` ✅（DerivedData 置于 iCloud 范围外 /tmp 以绕过 CodeSign detritus）| Schema: ArkSchemaV56
 >
 > **规则**：仅在完成新的功能模块或重大 UI 重构时更新本文档，小 bug 修复不记录。

@@ -22,6 +22,8 @@ struct PetChartDashboard: View {
     @Binding var quickWeightInput: String
     let modelContext: ModelContext
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+
     private let cardWidth: CGFloat = 200
     private let cardHeight: CGFloat = 190
 
@@ -133,25 +135,19 @@ struct PetChartDashboard: View {
                         if let w = CountryDecimalInput.parse(quickWeightInput, countryCode: AppCountry.code) {
                             let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
                                 .flatMap { $0.isEmpty ? nil : $0 }
-                            let log = PetWeightLog(date: Date(), weight: w, pet: pet, executorId: executorId)
-                            modelContext.insert(log)
-                            modelContext.safeSave()
-                            CareLedgerService.record(
-                                occurredAt: log.date,
-                                actorKind: executorId == nil ? .unknown : .human,
-                                actorId: executorId,
-                                subjectKind: .pet,
-                                subjectId: pet.id.uuidString,
-                                eventKind: .weight,
-                                actionType: "petWeight",
-                                amountValue: log.weightInKg,
-                                amountUnit: "kg",
-                                source: .detail,
-                                legacyModelName: "PetWeightLog",
-                                legacyModelId: log.id.uuidString,
-                                context: modelContext
-                            )
+                            let command = DomainCommand.weightEntry(entityID: pet.id, entityKind: EntityKind.pet.rawValue)
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            commandQueue.enqueue(command) {
+                                DashboardRecordCommandExecutor(context: modelContext).recordPetWeight(
+                                    pet: pet,
+                                    weight: w,
+                                    date: Date(),
+                                    executorId: executorId,
+                                    ledgerSource: .detail,
+                                    command: command,
+                                    note: "dashboard.weight.entry"
+                                )
+                            }
                         }
                         quickWeightInput = ""; showingAddWeight = false
                     } label: {

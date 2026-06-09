@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum EntityType: String, CaseIterable, Identifiable {
+enum EntityType: String, CaseIterable, Hashable, Identifiable {
     case pet
     case human
     case plant

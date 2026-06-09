@@ -29,6 +29,7 @@ struct InventoryView: View {
     // Inventory states
     @AppStorage("inventory_backdate_1day_count") private var backdatePacks: Int = 0
     @AppStorage("shop_boostDoubleActive") private var doubleBoostActive: Bool = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var streakShieldExpiry: Date? = nil
     @State private var showPetPickerForPopout = false
     @State private var showAvatarTargetPicker = false
@@ -409,43 +410,37 @@ struct InventoryView: View {
     }
 
     private func upgradeHumanTo2DAvatar(_ human: Human) {
-        let rawGender = HumanProfileOptions.normalizedGender(human.genderRaw)
-        let avatarGender: String
-        switch rawGender {
-        case "男", "女", "非二元":
-            avatarGender = rawGender
-        default:
-            avatarGender = "非二元"
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(.avatar2DUpgrade(entityID: human.id, kind: EntityKind.human.rawValue)) {
+            let result = RewardEconomyCommandExecutor(context: modelContext).upgradeHumanTo2DAvatar(
+                human,
+                note: "inventory.avatar2D.human"
+            )
+            guard result.didUpgrade else { return }
+            notifyMemberProfileChanged(id: human.id, kind: EntityKind.human.rawValue)
+            showAvatarTargetPicker = false
         }
-        guard let data = HumanAvatarAssetCatalog.avatarData(gender: avatarGender, birthday: human.birthday),
-              Avatar2DAccess.consumeExtraPass() else { return }
-        human.avatarImageData = data
-        human.avatarEmoji = HumanGenderIdentity.fallbackAvatarEmoji(for: avatarGender)
-        modelContext.safeSave()
-        NotificationCenter.default.post(
-            name: .ohanaMemberProfileDidChange,
-            object: nil,
-            userInfo: ["id": human.id.uuidString, "kind": "human"]
-        )
-        showAvatarTargetPicker = false
     }
 
     private func upgradePetTo2DAvatar(_ pet: Pet) {
-        guard let data = PetAvatarAssetCatalog.avatarData(
-            species: pet.species,
-            breed: pet.breed,
-            gender: pet.gender,
-            coatColor: pet.coatColor,
-            eyeColor: pet.eyeColor
-        ), Avatar2DAccess.consumeExtraPass() else { return }
-        pet.avatarImageData = data
-        modelContext.safeSave()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(.avatar2DUpgrade(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
+            let result = RewardEconomyCommandExecutor(context: modelContext).upgradePetTo2DAvatar(
+                pet,
+                note: "inventory.avatar2D.pet"
+            )
+            guard result.didUpgrade else { return }
+            notifyMemberProfileChanged(id: pet.id, kind: EntityKind.pet.rawValue)
+            showAvatarTargetPicker = false
+        }
+    }
+
+    private func notifyMemberProfileChanged(id: UUID, kind: String) {
         NotificationCenter.default.post(
             name: .ohanaMemberProfileDidChange,
             object: nil,
-            userInfo: ["id": pet.id.uuidString, "kind": "pet"]
+            userInfo: ["id": id.uuidString, "kind": kind]
         )
-        showAvatarTargetPicker = false
     }
 }
 

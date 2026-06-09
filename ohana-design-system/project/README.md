@@ -14,7 +14,7 @@ Everything in this system was extracted from the `Ohana/` codebase mounted local
 
 | Source | Path |
 |---|---|
-| Root reference doc | `Ohana/OHANA_COMPLETE_REFERENCE.md` (1776 lines, v8.0.0) |
+| Root reference doc | `docs/reference/OHANA_COMPLETE_REFERENCE.md` (1776 lines, v8.0.0) |
 | AI navigation file | `Ohana/CONTEXT.md` (ArkSchemaV19, Phase 1–76) |
 | UI rules (authoritative) | `Ohana/UIRules.md` (415 lines, iOS 26 Liquid Glass) |
 | GO Club visual reference | `Ohana/GO_Club_UI_Design_Reference.md` (the "Go UI" style guide — blue + lime + glass cards) |

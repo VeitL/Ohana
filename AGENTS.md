@@ -6,6 +6,8 @@ In Ohana, a light interaction must stay light: visual feedback, route mutation, 
 
 `AGENTS.md` is the only root agent/navigation rule file for this repository. Do not maintain a parallel `CONTEXT.md`, `UIRules.md`, or other root Markdown as a second source of instructions. Legacy planning/reference documents may exist for history, but when they conflict with this file, `ui规范.selection.json`, the governance docs listed below, or the current code, treat the legacy document as stale.
 
+Do not keep editor-specific rule folders such as `.cursor/` or `.windsurf/` in this repository. If a tool needs local onboarding, it should read `AGENTS.md` and the governance docs below instead of carrying a separate rule copy.
+
 Rule precedence:
 
 1. Current user request.
@@ -33,27 +35,29 @@ Rule precedence:
 
 ## Project Structure & Module Organization
 
-This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohana/`, with `Models/`, `ViewModels/`, `Views/`, `Utilities/`, localized resources in `en.lproj/`, and app assets in `Assets.xcassets/`. Unit tests are in `OhanaTests/`; UI tests are in `OhanaUITests/`. Project-level documentation and design references live at the repository root, while helper automation belongs in `scripts/`. `Ai_Studio_New_UI/` and `ohana-design-system/` are separate design/reference projects; avoid changing them unless the task explicitly targets those folders.
+This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohana/`, with `Models/`, `ViewModels/`, `Views/`, `Utilities/`, localized resources in `*.lproj/`, and catalog assets in `Assets.xcassets/`. Active non-catalog app resources live under `Resources/` and must stay referenced through `Ohana.xcodeproj`. Unit tests are in `OhanaTests/`; UI tests are in `OhanaUITests/`. Project documentation, planning notes, design references, archived backups, and governance manifests live under `docs/`; active UI machine tokens stay at the repository root in `ui规范.selection.json`. Helper automation belongs in `scripts/`. `DesignExports/archive/` and `docs/archive/` hold historical artifacts only. `ohana-design-system/` is a separate design/reference project; avoid changing it unless the task explicitly targets that folder.
 
 ## Build, Test, and Development Commands
 
 - `open Ohana.xcodeproj` opens the app in Xcode for local development.
-- `scripts/build-debug-fast.sh` is the default quick Debug build. It intentionally uses `-sdk iphonesimulator` and the fixed destination `platform=iOS Simulator,name=iPhone 17` without an `OS=` pin so Xcode uses the installed default iOS 26.5 simulator runtime and does not try to download or resolve an older runtime.
-- `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build` builds the app directly when the script is not appropriate.
-- `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17'` runs unit and UI tests on the fixed simulator.
+- `scripts/build-debug-fast.sh` is the default quick Debug build. It intentionally uses `-sdk iphonesimulator` and the fixed local destination `platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66` without an `OS=` pin so Xcode uses the installed default iOS 26.5 simulator runtime and does not try to download or resolve an older runtime.
+- `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66' build` builds the app directly when the script is not appropriate.
+- `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66'` runs unit and UI tests on the fixed simulator.
 - `xcodebuild -list -project Ohana.xcodeproj` lists available targets, schemes, and configurations.
 
 ### Fixed Simulator Build Rule
 
-All command-line builds and tests must target the fixed simulator `platform=iOS Simulator,name=iPhone 17` with `-sdk iphonesimulator`. Do not build against a connected physical iPhone, `generic/platform=iOS`, `Any iOS Device`, or an auto-selected device. Do not switch simulator model or pin an older `OS=` unless the user explicitly asks for that validation. If Xcode prints passcode-protected physical-device discovery warnings while the command is still using `-sdk iphonesimulator` and the fixed iPhone 17 simulator destination, treat those warnings as environment noise; do not change the destination to a physical device to "fix" them.
+Local command-line builds and tests must target the fixed simulator `platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66` with `-sdk iphonesimulator`. This is the current local `iPhone 17` simulator; do not fall back to another simulator with the same name. Do not build against a connected physical iPhone, `generic/platform=iOS`, `Any iOS Device`, or an auto-selected device. Do not switch simulator model or pin an older `OS=` unless the user explicitly asks for that validation. If Xcode prints passcode-protected physical-device discovery warnings while the command is still using `-sdk iphonesimulator` and the fixed iPhone 17 simulator destination, treat those warnings as environment noise; do not change the destination to a physical device to "fix" them.
 
 ## Continuous Integration & Automated Gates
 
 Rules in this file and `docs/` are enforced mechanically, not only by memory.
 `.github/workflows/ci.yml` runs on every push and pull request:
 
-- `audits`: repo audits (UI V4 + accessibility on changed files, runtime
-  guardrails, localization coverage, release data-safety, git size).
+- `audits`: repo audits (UI V4, accessibility, and smoothness changed-file
+  strict gates plus the full-repo baseline ratchet; full-repo runtime guardrails,
+  localization coverage, release data-safety, governance manifests, resource
+  integrity / xattr pre-sign checks, git size).
 - `lint`: SwiftLint (`.swiftlint.yml`) and SwiftFormat (`.swiftformat`).
 - `build-test`: `xcodebuild test` on the fixed iPhone 17 simulator.
 
@@ -63,10 +67,15 @@ enforced automatically rather than as prose. The `build-test` job requires a
 runner whose Xcode ships the iOS 26 SDK and an iPhone 17 simulator; see
 `docs/os-support-matrix.md`.
 
-Lint/format and the accessibility audit are introduced as an adoptable ratchet:
-they gate new/changed code strictly and start lenient on the legacy baseline.
-Tighten them (enable `--strict`, enforce SwiftFormat, expand audit scope) as the
-baseline is cleaned.
+UI/accessibility/smoothness are no longer changed-file-only. CI runs changed-file
+strict gates and `scripts/audit-full-scope-ratchet.sh`, which scans the whole
+repo and fails if any file/rule warning count grows beyond
+`docs/governance/manifests/full-scope-audit-baseline.json`. That baseline may
+only shrink after cleanup. Once the full-scope baseline reaches zero, replace the
+ratchet with direct `scripts/audit-ui-v4.sh --all`,
+`scripts/audit-accessibility.sh --all`, and
+`scripts/audit-smoothness-risk.sh --all` strict gates. SwiftFormat remains the
+last report-only ratchet until its baseline is formatted and committed.
 
 ## Parallel Agent & Build Isolation
 
@@ -76,7 +85,7 @@ Do not create a new worktree or branch by default. Stay in the current worktree 
 
 Each conversation owns only its current worktree. Before editing, run `git status --short` and keep changes inside the requested task scope. If a file is already being changed for an unrelated task, do not patch it to satisfy the current build unless the user explicitly asks you to take over that blocker.
 
-Use `scripts/build-debug-fast.sh` for local Debug builds. The script uses `-sdk iphonesimulator`, the fixed iPhone 17 simulator destination, a per-worktree/per-branch DerivedData path under `.build/DerivedData/`, and a matching lock under `.build/locks/`, which avoids the common Xcode `build.db` lock failure when two conversations build at once. If you must call `xcodebuild` directly while other work is active, pass `-sdk iphonesimulator`, `-destination 'platform=iOS Simulator,name=iPhone 17'`, and a unique `-derivedDataPath` for the current worktree/task.
+Use `scripts/build-debug-fast.sh` for local Debug builds. The script uses `-sdk iphonesimulator`, the fixed local iPhone 17 simulator destination `platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66`, a per-worktree/per-branch DerivedData path under `.build/DerivedData/`, and a matching lock under `.build/locks/`, which avoids the common Xcode `build.db` lock failure when two conversations build at once. If you must call `xcodebuild` directly while other work is active, pass `-sdk iphonesimulator`, `-destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66'`, and a unique `-derivedDataPath` for the current worktree/task.
 
 When validation fails in files outside the current task scope or outside the files changed by this conversation, report it as an external blocker. Do not “fix forward” into another conversation's feature area just to make the build green unless the user explicitly authorizes that cross-task repair.
 
@@ -101,9 +110,9 @@ Default to fast-change mode unless the user explicitly asks for exhaustive valid
 
 Keep the development loop CLI-first. Start with the narrowest trustworthy check for the code touched, then expand only when needed:
 - Use `xcodebuild -list -project Ohana.xcodeproj` when schemes or targets are unclear.
-- Use `scripts/build-debug-fast.sh` for day-to-day validation; do not hardcode older simulator OS versions such as `OS=26.4.1`. Let Xcode select the installed default iOS 26.5 runtime for the fixed iPhone 17 simulator unless a task explicitly requires another destination.
-- Use `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build` only when a direct app build is necessary.
-- Use `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17'` for test validation when behavior or persistence changes.
+- Use `scripts/build-debug-fast.sh` for day-to-day validation; do not hardcode older simulator OS versions such as `OS=26.4.1`. Let Xcode select the installed default iOS 26.5 runtime for the fixed local iPhone 17 simulator unless a task explicitly requires another destination.
+- Use `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66' build` only when a direct app build is necessary.
+- Use `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66'` for test validation when behavior or persistence changes.
 - For pure UI changes, do not build by default. If a UI change has already been escalated to compile validation or the user asks for visual verification, prefer the fixed iPhone 17 simulator build/run and screenshots; if deeper simulator control is available through XcodeBuildMCP or similar tooling, use it to launch, inspect logs, and capture screenshots.
 
 For iPhone and iPad work, keep the implementation focused on those platforms unless the task explicitly asks for broader Apple-platform support. When reporting completion, include the scheme, simulator destination, and validation commands that were actually used.
@@ -276,13 +285,13 @@ Before reporting an interaction-heavy change complete, verify:
 
 Use `ui规范.selection.json` at the repository root as the single machine-readable source of truth for Ohana UI design tokens. Before changing app views, shared UI components, colors, cards, buttons, inputs, sheets, charts, calendars, or motion, read this file first and apply its selected tokens.
 
-Treat `ui规范.md` as the human-readable companion that explains the rules, rationale, and usage constraints for the same selection. If it appears to conflict with `ui规范.selection.json`, the JSON token selection wins and the Markdown should be updated to match.
+Treat `docs/design/ui规范.md` as the human-readable companion that explains the rules, rationale, and usage constraints for the same selection. If it appears to conflict with `ui规范.selection.json`, the JSON token selection wins and the Markdown should be updated to match.
 
 The in-app UI guidelines console under `设置 > 开发者工具 > UI/UX 规范查看` is an editor, preview, and export surface only. Its AppStorage state is not authoritative until the exported V4 JSON is copied back into `ui规范.selection.json` and the companion Markdown is updated.
 
 Implementation files such as `Ohana/Utilities/ColorExtensions.swift`, `Ohana/Views/OhanaDesignSystem.swift`, and `Ohana/Views/Details/DesignSpecTypesV4.swift` are consumers or mirrors of the design source. Do not treat hardcoded defaults in Swift as a separate design source; update them only to reflect `ui规范.selection.json`.
 
-Keep this file as workflow guidance, not a second UI spec. The detailed token values for primary colors, member/domain colors, card usage, navigation chrome, sheet/popup geometry, chart style, and motion behavior belong in `ui规范.selection.json` and are explained in `ui规范.md`.
+Keep this file as workflow guidance, not a second UI spec. The detailed token values for primary colors, member/domain colors, card usage, navigation chrome, sheet/popup geometry, chart style, and motion behavior belong in `ui规范.selection.json` and are explained in `docs/design/ui规范.md`.
 
 High-risk reminders for agents:
 - Color semantics are reserved; do not reuse `goPrimary`, `goLime`, `goBlue`, or their aliases outside the roles allowed by the JSON tokens.

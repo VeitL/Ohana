@@ -1,0 +1,88 @@
+{
+  "schema": "ohana.governance.release-resource-ownership.v1",
+  "updated": "2026-06-08",
+  "policyDocuments": [
+    "AGENTS.md",
+    "docs/release-quality-gates.md",
+    "docs/privacy-compliance.md",
+    "docs/dependency-governance.md"
+  ],
+  "resourceBudgets": [
+    {
+      "id": "all-bundled-resources",
+      "owner": "Release owner",
+      "path": "Resources",
+      "limitMiB": 230,
+      "rationale": "Top-level bundled resources must stay below an intentional pre-sign budget so app size regressions are visible before archive.",
+      "releaseGate": "scripts/audit-resource-integrity.sh",
+      "evidence": "Current local size is reported by release hardening; CI fails if the budget is exceeded."
+    },
+    {
+      "id": "pet-avatar-assets",
+      "owner": "Avatar asset owner",
+      "path": "Resources/Avatars/PetAvatarAssets",
+      "limitMiB": 210,
+      "rationale": "Pet avatars are the largest bundled resource family and need an explicit owner before more variants are added.",
+      "releaseGate": "scripts/audit-resource-integrity.sh",
+      "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
+    },
+    {
+      "id": "human-avatar-assets",
+      "owner": "Avatar asset owner",
+      "path": "Resources/Avatars/HumanAvatarAssets",
+      "limitMiB": 10,
+      "rationale": "Human avatar resources should remain compact relative to pet assets.",
+      "releaseGate": "scripts/audit-resource-integrity.sh",
+      "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
+    },
+    {
+      "id": "asset-catalog",
+      "owner": "Design system owner",
+      "path": "Ohana/Assets.xcassets",
+      "limitMiB": 60,
+      "rationale": "Asset catalogs carry launch, icon, and UI imagery; growth must be intentional before signing.",
+      "releaseGate": "scripts/audit-resource-integrity.sh",
+      "evidence": "Resource integrity audit prints the current directory size and blocks over-budget growth."
+    }
+  ],
+  "preSignChecks": [
+    {
+      "id": "finder-appledouble-detritus",
+      "owner": "Release owner",
+      "check": "Reject .DS_Store, AppleDouble files, and __MACOSX directories under packaged resource roots.",
+      "releaseGate": "scripts/audit-resource-integrity.sh",
+      "paths": [
+        "Resources",
+        "Ohana/Assets.xcassets"
+      ]
+    },
+    {
+      "id": "packaged-resource-xattrs",
+      "owner": "Release owner",
+      "check": "Reject signing-risk extended attributes such as FinderInfo, ResourceFork, quarantine, and unknown xattrs from packaged resources.",
+      "releaseGate": "scripts/audit-resource-integrity.sh",
+      "paths": [
+        "Resources",
+        "Ohana/Assets.xcassets"
+      ]
+    },
+    {
+      "id": "privacy-manifest-packaging",
+      "owner": "Privacy and release owner",
+      "check": "Require a valid Ohana/PrivacyInfo.xcprivacy before release hardening can pass.",
+      "releaseGate": "scripts/audit-resource-integrity.sh",
+      "paths": [
+        "Ohana/PrivacyInfo.xcprivacy"
+      ]
+    },
+    {
+      "id": "strip-bundle-xattrs-build-phase",
+      "owner": "Release owner",
+      "check": "Keep the Xcode build phase that strips bundle extended attributes before CodeSign.",
+      "releaseGate": "fixed simulator build and archive-equivalent build logs",
+      "paths": [
+        "Ohana.xcodeproj/project.pbxproj"
+      ]
+    }
+  ]
+}

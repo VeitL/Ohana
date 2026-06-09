@@ -1,5 +1,7 @@
 # Ohana App 完整代码参考文档
 
+> **历史参考 / 非规则源**：本文档保留为旧实现索引，可能包含过时 schema、模拟器、App Group、UI token、构建状态或目录结构。若与 `AGENTS.md`、`ui规范.selection.json`、`docs/governance/manifests/`、当前治理文档或源码冲突，以后者为准。
+
 > **版本**: v8.0.0 | **平台**: iOS 17+ | **框架**: SwiftUI + SwiftData + Swift Charts
 > **语言**: Swift 6 | **模拟器**: iPhone 17 Pro (iOS 26.2) | **编译状态**: ✅ Build Succeeded
 > **原名**: Ark | **品牌名**: Ohana（代码中部分标识符保留 Ark 前缀）

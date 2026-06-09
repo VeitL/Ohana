@@ -122,7 +122,7 @@ private enum HealthFabActionKind: String, Identifiable {
     }
 }
 
-enum PetHealthInitialSection {
+enum PetHealthInitialSection: Hashable {
     case preventive
     case medication
     case symptomVisit
@@ -177,6 +177,8 @@ struct PetHealthDetailView: View {
     @State private var showingMedicationPopup = false
     @State private var medicationDoseRefreshToken = UUID()
     @State private var didOpenInitialSection = false
+    @State private var deletingHealthRecordIDs: Set<UUID> = []
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private func playScatterReveal() {
         scatterRevealProgress = 0
@@ -221,6 +223,61 @@ struct PetHealthDetailView: View {
     private func daysUntil(_ date: Date?) -> Int? {
         guard let d = date else { return nil }
         return Calendar.current.dateComponents([.day], from: Date(), to: d).day
+    }
+
+    private func deleteHealthLog(_ log: PetHealthLog) {
+        deleteHealthRecord(
+            recordID: log.id,
+            kind: "health"
+        ) {
+            PetHealthCommandExecutor(context: modelContext).deleteHealthLog(
+                log,
+                pet: pet,
+                note: "pet.health.delete.health"
+            )
+        }
+    }
+
+    private func deleteSymptomLog(_ log: SymptomLog) {
+        deleteHealthRecord(
+            recordID: log.id,
+            kind: "symptom"
+        ) {
+            PetHealthCommandExecutor(context: modelContext).deleteSymptomLog(
+                log,
+                pet: pet,
+                note: "pet.health.delete.symptom"
+            )
+        }
+    }
+
+    private func deleteHeatCycleLog(_ log: HeatCycleLog) {
+        deleteHealthRecord(
+            recordID: log.id,
+            kind: "heat"
+        ) {
+            PetHealthCommandExecutor(context: modelContext).deleteHeatCycleLog(
+                log,
+                pet: pet,
+                note: "pet.health.delete.heat"
+            )
+        }
+    }
+
+    private func deleteHealthRecord(
+        recordID: UUID,
+        kind: String,
+        operation: @escaping @MainActor () -> PetHealthDeleteResult
+    ) {
+        guard !deletingHealthRecordIDs.contains(recordID) else { return }
+        deletingHealthRecordIDs.insert(recordID)
+        let command = DomainCommand.petHealthDelete(petID: pet.id, kind: kind, recordID: recordID)
+
+        OhanaFeedback.light()
+        commandQueue.enqueue(command) {
+            _ = operation()
+            deletingHealthRecordIDs.remove(recordID)
+        }
     }
 
     private func colorForType(_ type: HealthLogType) -> Color {
@@ -765,6 +822,9 @@ struct PetHealthDetailView: View {
         }
         .navigationDestination(isPresented: $showingPassport) {
             VaccinePassportView(pet: pet)
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
 
@@ -2126,11 +2186,13 @@ struct PetHealthDetailView: View {
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                             }
                             Button {
-                                modelContext.delete(log); modelContext.safeSave()
+                                deleteHealthLog(log)
                             } label: {
-                                Image(systemName: "trash").font(.system(size: 11))
+                                Image(systemName: deletingHealthRecordIDs.contains(log.id) ? "hourglass" : "trash")
+                                    .font(.system(size: 11))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
+                            .disabled(deletingHealthRecordIDs.contains(log.id))
                         }
                     }
                     .padding(.vertical, 6)
@@ -2188,11 +2250,13 @@ struct PetHealthDetailView: View {
                     }
                     Spacer()
                     Button {
-                        modelContext.delete(log); modelContext.safeSave()
+                        deleteSymptomLog(log)
                     } label: {
-                        Image(systemName: "trash").font(.system(size: 11))
+                        Image(systemName: deletingHealthRecordIDs.contains(log.id) ? "hourglass" : "trash")
+                            .font(.system(size: 11))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
+                    .disabled(deletingHealthRecordIDs.contains(log.id))
                 }
                 .padding(.vertical, 6)
                 if log.id != pet.symptomLogs.sorted(by: { $0.date > $1.date }).last?.id {
@@ -2244,11 +2308,13 @@ struct PetHealthDetailView: View {
                     }
                     Spacer()
                     Button {
-                        modelContext.delete(log); modelContext.safeSave()
+                        deleteHeatCycleLog(log)
                     } label: {
-                        Image(systemName: "trash").font(.system(size: 11))
+                        Image(systemName: deletingHealthRecordIDs.contains(log.id) ? "hourglass" : "trash")
+                            .font(.system(size: 11))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
+                    .disabled(deletingHealthRecordIDs.contains(log.id))
                 }
                 .padding(.vertical, 6)
                 if log.id != pet.heatCycleLogs.sorted(by: { $0.startDate > $1.startDate }).last?.id {
@@ -2338,6 +2404,7 @@ private struct PetHealthRecordInlinePopup: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var selectedType: HealthLogType
     @State private var date = Date()
@@ -2349,6 +2416,8 @@ private struct PetHealthRecordInlinePopup: View {
     @State private var expirationDate = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var hasNextCheckup = false
     @State private var nextCheckupDate = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
+    @State private var isSaving = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     init(
         pet: Pet,
@@ -2367,6 +2436,10 @@ private struct PetHealthRecordInlinePopup: View {
     private var l: L10n { L10n(appLanguage) }
     private var isDark: Bool { colorScheme == .dark }
     private var accent: Color { isDark ? Color.goPrimary : Color.goBlue }
+    private var activeExecutorID: String? {
+        activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
+    }
+
     private var showsNameField: Bool {
         selectedType == .vaccine || selectedType == .dewormingInternal || selectedType == .dewormingExternal || selectedType == .medication
     }
@@ -2421,7 +2494,10 @@ private struct PetHealthRecordInlinePopup: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
-                OhanaPopupCloseButton(tint: Color.ohanaPrimaryText, action: onClose)
+                OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) {
+                    guard !isSaving else { return }
+                    onClose()
+                }
             }
             .padding(.horizontal, 18)
 
@@ -2500,16 +2576,20 @@ private struct PetHealthRecordInlinePopup: View {
 
             Button(action: save) {
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text(l.tr(zh: "保存记录", en: "Save record", de: "Eintrag speichern"))
+                    Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
+                    Text(isSaving
+                        ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+                        : l.tr(zh: "保存记录", en: "Save record", de: "Eintrag speichern")
+                    )
                 }
                 .font(OhanaFont.body(.black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 15)
-                .background(accent, in: Capsule())
+                .background(isSaving ? Color.ohanaControlFill : accent, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
+            .disabled(isSaving)
             .padding(.horizontal, 18)
             .padding(.bottom, 14)
         }
@@ -2522,6 +2602,9 @@ private struct PetHealthRecordInlinePopup: View {
             if hasExpiration {
                 expirationDate = defaultExpirationDate(from: newDate)
             }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
 
@@ -2636,51 +2719,32 @@ private struct PetHealthRecordInlinePopup: View {
     }
 
     private func save() {
-        let finalNote = showsNameField ? (name.isEmpty ? note : name + (note.isEmpty ? "" : " - " + note)) : note
-        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-            .flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetHealthLog(date: date, type: selectedType, note: finalNote, pet: pet, executorId: executorId)
-        log.vetName = vetName
-        log.cost = CountryDecimalInput.parse(cost, countryCode: AppCountry.code) ?? 0
-        log.expirationDate = (showsExpiration && hasExpiration) ? expirationDate : nil
-        log.nextCheckupDate = (showsNextCheckup && hasNextCheckup) ? nextCheckupDate : nil
-        modelContext.insert(log)
+        guard !isSaving else { return }
+        isSaving = true
+        let input = PetHealthRecordCommandInput(
+            type: selectedType,
+            date: date,
+            name: name,
+            note: note,
+            vetName: vetName,
+            cost: CountryDecimalInput.parse(cost, countryCode: AppCountry.code) ?? 0,
+            expirationDate: (showsExpiration && hasExpiration) ? expirationDate : nil,
+            nextCheckupDate: (showsNextCheckup && hasNextCheckup) ? nextCheckupDate : nil,
+            executorId: activeExecutorID,
+            source: .detail,
+            includesNameInNote: showsNameField
+        )
+        let command = DomainCommand.petHealthRecord(petID: pet.id, type: selectedType.rawValue)
 
-        if log.cost > 0 {
-            modelContext.insert(PetExpenseLog(date: date, amount: log.cost, category: .medical, note: typeLabel, pet: pet, executorId: executorId))
-        }
-
-        if showsExpiration && hasExpiration {
-            autoCreateReminderEvent(on: expirationDate)
-        }
-
-        modelContext.safeSave()
-        QuestManager.shared.awardAction(type: .health, pet: pet, context: modelContext)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        onSaved()
-    }
-
-    private func autoCreateReminderEvent(on dueDate: Date) {
-        let eventType: EventType
-        switch selectedType {
-        case .vaccine:
-            eventType = .vaccine
-        case .dewormingInternal:
-            eventType = .internalDeworming
-        case .dewormingExternal:
-            eventType = .externalDeworming
-        default:
-            return
+        commandQueue.enqueue(command) {
+            PetHealthCommandExecutor(context: modelContext).recordHealth(
+                pet: pet,
+                input: input,
+                note: "pet.health.inline.record"
+            )
+            onSaved()
         }
-        let recordName = name.isEmpty ? typeLabel : name
-        modelContext.insert(Event(
-            title: "\(pet.name) · \(recordName)到期提醒",
-            startDate: dueDate,
-            isAllDay: true,
-            eventType: eventType.rawValue,
-            relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: pet.id.uuidString
-        ))
     }
 }
 
@@ -2706,6 +2770,28 @@ private struct PetHealthArchiveItem: Identifiable {
     let tint: Color
     let filter: PetHealthArchiveFilter
     let source: Source
+
+    var recordID: UUID {
+        switch source {
+        case .health(let log):
+            return log.id
+        case .symptom(let log):
+            return log.id
+        case .heat(let log):
+            return log.id
+        }
+    }
+
+    var commandKind: String {
+        switch source {
+        case .health:
+            return "health"
+        case .symptom:
+            return "symptom"
+        case .heat:
+            return "heat"
+        }
+    }
 }
 
 private struct PetHealthArchiveView: View {
@@ -2714,6 +2800,8 @@ private struct PetHealthArchiveView: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var filter: PetHealthArchiveFilter = .all
+    @State private var deletingItemIDs: Set<String> = []
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var isDark: Bool { colorScheme == .dark }
     private var accent: Color { isDark ? Color.goPrimary : Color(hex: pet.themeColorHex) }
@@ -2782,6 +2870,9 @@ private struct PetHealthArchiveView: View {
         }
         .navigationTitle(l.tr(zh: "健康档案", en: "Health archive", de: "Gesundheitsakte"))
         .navigationBarTitleDisplayMode(.inline)
+        .onDisappear {
+            commandQueue.cancelAll()
+        }
     }
 
     private var filterBar: some View {
@@ -2841,11 +2932,12 @@ private struct PetHealthArchiveView: View {
                 Button(role: .destructive) {
                     delete(item)
                 } label: {
-                    Image(systemName: "trash")
+                    Image(systemName: deletingItemIDs.contains(item.id) ? "hourglass" : "trash")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .disabled(deletingItemIDs.contains(item.id))
             }
         }
         .padding(14)
@@ -2936,14 +3028,26 @@ private struct PetHealthArchiveView: View {
     }
 
     private func delete(_ item: PetHealthArchiveItem) {
-        switch item.source {
-        case .health(let log):
-            modelContext.delete(log)
-        case .symptom(let log):
-            modelContext.delete(log)
-        case .heat(let log):
-            modelContext.delete(log)
+        guard !deletingItemIDs.contains(item.id) else { return }
+        deletingItemIDs.insert(item.id)
+        let command = DomainCommand.petHealthDelete(
+            petID: pet.id,
+            kind: item.commandKind,
+            recordID: item.recordID
+        )
+
+        OhanaFeedback.light()
+        commandQueue.enqueue(command) {
+            let executor = PetHealthCommandExecutor(context: modelContext)
+            switch item.source {
+            case .health(let log):
+                executor.deleteHealthLog(log, pet: pet, note: "pet.health.archive.delete.health")
+            case .symptom(let log):
+                executor.deleteSymptomLog(log, pet: pet, note: "pet.health.archive.delete.symptom")
+            case .heat(let log):
+                executor.deleteHeatCycleLog(log, pet: pet, note: "pet.health.archive.delete.heat")
+            }
+            deletingItemIDs.remove(item.id)
         }
-        modelContext.safeSave()
     }
 }

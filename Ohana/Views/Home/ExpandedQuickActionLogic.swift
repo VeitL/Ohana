@@ -50,19 +50,6 @@ enum ExpandedHumanQuickRoute {
     case none
 }
 
-enum ExpandedLegacyQuickActionRoute {
-    case selectHuman
-    case recordFeed
-    case recordWater
-    case startWalk
-    case recordPotty
-    case recordLitter
-    case specialCare(CareType)
-    case waterManagement
-    case selectPetOverview
-    case none
-}
-
 enum ExpandedQuickActionLogic {
     static func feedDashboard(
         for pet: Pet,
@@ -600,30 +587,6 @@ enum ExpandedQuickActionLogic {
         case "WORKOUT": return "运动"
         case "NOTE": return "记录"
         default: return raw.capitalized
-        }
-    }
-
-    static func legacyRoute(action: FocusCard.Action, card: FocusCard, pet: Pet?) -> ExpandedLegacyQuickActionRoute {
-        if card.isHuman { return .selectHuman }
-        guard card.isReal, pet != nil else { return .none }
-
-        switch action.label.uppercased() {
-        case "FEED": return .recordFeed
-        case "WATER":
-            if let pet, WaterQuickActionPolicy.isAquatic(species: pet.species) {
-                return .waterManagement
-            }
-            return .recordWater
-        case "WALK": return .startWalk
-        case "POTTY": return .recordPotty
-        case "LITTER": return .recordLitter
-        case "PLAY": return .specialCare(.play)
-        case "FILTER": return .waterManagement
-        case "CAGE": return .specialCare(.cageCleaning)
-        case "FLIGHT": return .specialCare(.freeFlight)
-        case "MIST": return .specialCare(.misting)
-        case "SUBSTRATE": return .specialCare(.substrateChange)
-        default: return .selectPetOverview
         }
     }
 

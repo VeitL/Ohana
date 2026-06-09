@@ -279,11 +279,7 @@ enum FeedRuleMetadata {
         if event.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue {
             return true
         }
-        guard event.feedRuleKindRaw.isEmpty,
-              event.recurrenceDays > 0,
-              !event.reminders.isEmpty
-        else { return false }
-        return hasLegacyManualReminderTitle(event.title)
+        return event.feedRuleKindRaw.isEmpty && hasLegacyManualReminderTitle(event.title)
     }
 
     static func isAutoFeederEvent(_ event: Event, pet: Pet) -> Bool {
@@ -558,6 +554,10 @@ enum FeedStockCalculator {
         if calculationMode == nil {
             let planTotal = activePlanRuleDailyTotalGrams(for: pet, events: events, foodKind: foodKind, now: now, calendar: calendar)
             if planTotal > 0 { return (planTotal, .autoRules) }
+            if FeedOperatingMode.stored(for: pet.id) == nil {
+                let autoTotal = autoRuleDailyTotalGrams(for: pet, events: events, foodKind: foodKind)
+                if autoTotal > 0 { return (autoTotal, .autoRules) }
+            }
         }
         if foodKind == nil || foodKind == .dry, pet.dailyPortionGrams > 0 { return (pet.dailyPortionGrams, .defaultPortion) }
         return (0, .unavailable)
@@ -584,7 +584,7 @@ enum FeedStockCalculator {
         calendar: Calendar = .current
     ) -> FeedStockSnapshot {
         let stockRecord = activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: now)
-        let calculationMode = FeedStockRecordMetadata.calculationMode(for: stockRecord)
+        let calculationMode = stockRecord.map { FeedStockRecordMetadata.calculationMode(for: $0) }
         let sourceRecords = foodRecords ?? pet.foodRecords
         let hasModernRecord = sourceRecords.contains { record in
             (foodRecords == nil || record.pet?.id == pet.id) &&

@@ -12,6 +12,7 @@ struct DailyStreakDetailView: View {
     let pets: [Pet]
     var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query(sort: \CareLedgerEvent.occurredAt, order: .reverse) private var ledgerEvents: [CareLedgerEvent]
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
@@ -24,8 +25,10 @@ struct DailyStreakDetailView: View {
     @State private var showingCoconutLog = false
     @State private var lastClaimedMilestone = 0
     @State private var monthSlideDirection = 1
+    @State private var checkInCommandTask: Task<Void, Never>?
 
     private let cal = Calendar.current
+    private var commandExecutor: OasisRewardCommandExecutor { OasisRewardCommandExecutor(context: modelContext) }
     private var activeHuman: Human? {
         humans.first { $0.id.uuidString == currentActiveHumanId } ?? humans.first
     }
@@ -67,12 +70,12 @@ struct DailyStreakDetailView: View {
         .onAppear {
             selectedMonth = Date()
             loadCheckInData()
-            triggerTodayCheckIn()
+            scheduleTodayCheckIn()
         }
         .onChange(of: currentActiveHumanId) { _, _ in
             selectedMonth = Date()
             loadCheckInData()
-            triggerTodayCheckIn()
+            scheduleTodayCheckIn()
         }
         .alert(
             "补签确认",
@@ -97,6 +100,10 @@ struct DailyStreakDetailView: View {
         }
         .onChange(of: showCoconutShop) { _, isShowing in
             if !isShowing { loadCheckInData() }
+        }
+        .onDisappear {
+            checkInCommandTask?.cancel()
+            checkInCommandTask = nil
         }
     }
 
@@ -618,10 +625,6 @@ struct DailyStreakDetailView: View {
         monthYearFormatter.string(from: date)
     }
 
-    private func todayStr() -> String {
-        CheckInStreakStore.dateString()
-    }
-
     private var currentStreak: Int {
         CheckInStreakStore.currentStreak(for: activeHumanIdForStreak, calendar: cal)
     }
@@ -650,35 +653,67 @@ struct DailyStreakDetailView: View {
     }
 
     private func loadCheckInData() {
-        checkedInDates = CheckInStreakStore.checkedInDates(for: activeHumanIdForStreak)
-        makeupDates = CheckInStreakStore.makeupDates(for: activeHumanIdForStreak)
-        makeupPackCount = UserDefaults.standard.integer(forKey: CheckInStreakStore.makeupPackKey)
-        lastClaimedMilestone = CheckInStreakStore.lastClaimedMilestone(for: activeHumanIdForStreak)
+        applyCheckInSnapshot(commandExecutor.loadCheckInData(currentActiveHumanId: activeHumanIdForStreak))
     }
 
     private func triggerTodayCheckIn() {
-        let today = todayStr()
-        guard !checkedInDates.contains(today) else { return }
-        checkedInDates.insert(today)
-        CheckInStreakStore.setCheckedInDates(checkedInDates, for: activeHumanIdForStreak)
-        QuestManager.shared.addCoconuts(1, emoji: "📅", title: "每日打卡奖励")
+        guard let updatedDates = commandExecutor.triggerTodayCheckIn(
+            currentActiveHumanId: activeHumanIdForStreak,
+            checkedInDates: checkedInDates
+        ) else { return }
+        checkedInDates = updatedDates
+    }
+
+    private func scheduleTodayCheckIn() {
+        checkInCommandTask?.cancel()
+        checkInCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 140) {
+            triggerTodayCheckIn()
+            checkInCommandTask = nil
+        }
     }
 
     private func applyMakeup(date: String) {
-        guard makeupPackCount > 0, !checkedInDates.contains(date) else { return }
-        makeupPackCount -= 1
-        UserDefaults.standard.set(makeupPackCount, forKey: CheckInStreakStore.makeupPackKey)
-        checkedInDates.insert(date)
-        makeupDates.insert(date)
-        CheckInStreakStore.setCheckedInDates(checkedInDates, for: activeHumanIdForStreak)
-        CheckInStreakStore.setMakeupDates(makeupDates, for: activeHumanIdForStreak)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let snapshot = OasisCheckInSnapshot(
+            checkedInDates: checkedInDates,
+            makeupDates: makeupDates,
+            makeupPackCount: makeupPackCount,
+            lastClaimedMilestone: lastClaimedMilestone
+        )
+        OhanaFeedback.medium()
+        checkInCommandTask?.cancel()
+        checkInCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 70) {
+            guard let updated = commandExecutor.applyMakeup(
+                date: date,
+                currentActiveHumanId: activeHumanIdForStreak,
+                snapshot: snapshot
+            ) else {
+                checkInCommandTask = nil
+                return
+            }
+            applyCheckInSnapshot(updated)
+            checkInCommandTask = nil
+        }
     }
 
     private func claimMilestone(_ days: Int, reward: Int, emoji: String) {
-        QuestManager.shared.addCoconuts(reward, emoji: emoji, title: "\(days)天连胜奖励")
         lastClaimedMilestone = days
-        CheckInStreakStore.setLastClaimedMilestone(days, for: activeHumanIdForStreak)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        OhanaFeedback.success()
+        checkInCommandTask?.cancel()
+        checkInCommandTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 70) {
+            commandExecutor.claimMilestone(
+                days: days,
+                reward: reward,
+                emoji: emoji,
+                currentActiveHumanId: activeHumanIdForStreak
+            )
+            checkInCommandTask = nil
+        }
+    }
+
+    private func applyCheckInSnapshot(_ snapshot: OasisCheckInSnapshot) {
+        checkedInDates = snapshot.checkedInDates
+        makeupDates = snapshot.makeupDates
+        makeupPackCount = snapshot.makeupPackCount
+        lastClaimedMilestone = snapshot.lastClaimedMilestone
     }
 }

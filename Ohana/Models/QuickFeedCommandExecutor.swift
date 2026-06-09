@@ -64,6 +64,7 @@ struct QuickFeedCommandExecutor {
             defaultEnabled: defaultEnabled,
             context: context
         )
+        publishFeedMutation(.feedSettings(petID: pet.id), affectedEntityIDs: [pet.id])
     }
 
     func recordManual(
@@ -76,7 +77,7 @@ struct QuickFeedCommandExecutor {
         allEvents: [Event],
         executorId: String?
     ) -> ManualFeedCommandResult {
-        ManualFeedCommand.recordManual(
+        let result = ManualFeedCommand.recordManual(
             pet: pet,
             targets: targets,
             grams: grams,
@@ -87,6 +88,12 @@ struct QuickFeedCommandExecutor {
             context: context,
             executorId: executorId
         )
+        publishFeedMutation(
+            .feedLog(petID: pet.id, source: "manual"),
+            affectedEntityIDs: targetIDs(pet: pet, targets: targets),
+            note: result.targetCount > 1 ? "shared_manual_feed" : "manual_feed"
+        )
+        return result
     }
 
     func completePlanned(
@@ -96,7 +103,7 @@ struct QuickFeedCommandExecutor {
         allEvents: [Event],
         executorId: String?
     ) -> ManualFeedCommandResult {
-        ManualFeedCommand.completePlanned(
+        let result = ManualFeedCommand.completePlanned(
             pet: pet,
             reminder: reminder,
             foodRecords: foodRecords,
@@ -104,6 +111,13 @@ struct QuickFeedCommandExecutor {
             context: context,
             executorId: executorId
         )
+        publishFeedMutation(
+            .feedLog(petID: pet.id, source: "planned"),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didRecord,
+            note: result.didRecord ? "planned_feed_completed" : "planned_feed_noop"
+        )
+        return result
     }
 
     func recordTreat(
@@ -112,13 +126,19 @@ struct QuickFeedCommandExecutor {
         treatKind: FeedTreatKind,
         executorId: String?
     ) -> TreatFeedCommandResult {
-        TreatFeedCommand.record(
+        let result = TreatFeedCommand.record(
             pet: pet,
             grams: grams,
             treatKind: treatKind,
             context: context,
             executorId: executorId
         )
+        publishFeedMutation(
+            .feedLog(petID: pet.id, source: "treat"),
+            affectedEntityIDs: [pet.id],
+            note: treatKind.rawValue
+        )
+        return result
     }
 
     func savePlan(
@@ -128,7 +148,7 @@ struct QuickFeedCommandExecutor {
         draft: FeedPlanDraft,
         allEvents: [Event]
     ) -> SaveFeedPlanCommandResult {
-        SaveFeedPlanCommand.run(
+        let result = SaveFeedPlanCommand.run(
             pet: pet,
             targets: targets,
             kind: kind,
@@ -136,6 +156,12 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
+        publishFeedMutation(
+            .feedPlan(petID: pet.id, action: "save_\(kind.rawValue)"),
+            affectedEntityIDs: targetIDs(pet: pet, targets: targets),
+            note: "targets:\(result.targetCount)"
+        )
+        return result
     }
 
     func switchToManual(pet: Pet, allEvents: [Event]) {
@@ -144,6 +170,7 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
+        publishFeedMutation(.feedMode(petID: pet.id, mode: FeedOperatingMode.manual.rawValue), affectedEntityIDs: [pet.id])
     }
 
     func activateExistingRule(
@@ -151,16 +178,31 @@ struct QuickFeedCommandExecutor {
         kind: FeedRuleKind,
         allEvents: [Event]
     ) -> SwitchFeedModeCommandResult {
-        SwitchFeedModeCommand.activateExistingRule(
+        let result = SwitchFeedModeCommand.activateExistingRule(
             pet: pet,
             kind: kind,
             allEvents: allEvents,
             context: context
         )
+        let targetMode: FeedOperatingMode = kind == .manualReminder ? .manualReminder : .autoFeeder
+        publishFeedMutation(
+            .feedMode(petID: pet.id, mode: targetMode.rawValue),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.didSwitch,
+            note: kind.rawValue
+        )
+        return result
     }
 
     func setFeedMode(_ mode: FeedOperatingMode, pet: Pet) {
+        let previousMode = FeedOperatingMode.stored(for: pet.id)
         SetFeedModeCommand.run(mode, pet: pet)
+        publishFeedMutation(
+            .feedMode(petID: pet.id, mode: mode.rawValue),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: previousMode != mode,
+            note: "optimistic_mode"
+        )
     }
 
     func deletePlan(
@@ -169,13 +211,19 @@ struct QuickFeedCommandExecutor {
         activeMode: FeedOperatingMode,
         allEvents: [Event]
     ) -> DeleteFeedPlanCommandResult {
-        DeleteFeedPlanCommand.run(
+        let result = DeleteFeedPlanCommand.run(
             pet: pet,
             kind: kind,
             activeMode: activeMode,
             allEvents: allEvents,
             context: context
         )
+        publishFeedMutation(
+            .feedPlan(petID: pet.id, action: "delete_\(kind.rawValue)"),
+            affectedEntityIDs: [pet.id],
+            note: result.shouldSwitchToManual ? "switch_to_manual" : nil
+        )
+        return result
     }
 
     func saveStock(
@@ -197,7 +245,7 @@ struct QuickFeedCommandExecutor {
         expenseDate: Date,
         expenseNote: String
     ) -> SaveFoodStockCommandResult {
-        SaveFoodStockCommand.run(
+        let result = SaveFoodStockCommand.run(
             pet: pet,
             brand: brand,
             totalGrams: totalGrams,
@@ -218,6 +266,12 @@ struct QuickFeedCommandExecutor {
             expenseDate: expenseDate,
             expenseNote: expenseNote
         )
+        publishFeedMutation(
+            .feedStock(petID: pet.id, action: recordToUpdate == nil ? "create" : "update"),
+            affectedEntityIDs: [pet.id],
+            note: foodKind.rawValue
+        )
+        return result
     }
 
     func saveStockReminderSettings(
@@ -226,13 +280,19 @@ struct QuickFeedCommandExecutor {
         advanceDays: Int,
         allEvents: [Event]
     ) -> FeedStockCommandResult {
-        StockReminderSettingsCommand.run(
+        let result = StockReminderSettingsCommand.run(
             pet: pet,
             enabled: enabled,
             advanceDays: advanceDays,
             allEvents: allEvents,
             context: context
         )
+        publishFeedMutation(
+            .feedStock(petID: pet.id, action: "reminder_settings"),
+            affectedEntityIDs: [pet.id],
+            note: enabled ? "enabled" : "disabled"
+        )
+        return result
     }
 
     func correctStock(
@@ -241,13 +301,19 @@ struct QuickFeedCommandExecutor {
         remainingGrams: Double,
         allEvents: [Event]
     ) -> FeedStockCommandResult {
-        CorrectStockCommand.run(
+        let result = CorrectStockCommand.run(
             pet: pet,
             record: record,
             remainingGrams: remainingGrams,
             allEvents: allEvents,
             context: context
         )
+        publishFeedMutation(
+            .feedStock(petID: pet.id, action: "correct"),
+            affectedEntityIDs: [pet.id],
+            note: record.foodKind.rawValue
+        )
+        return result
     }
 
     func updateLog(
@@ -257,7 +323,7 @@ struct QuickFeedCommandExecutor {
         pet: Pet,
         allEvents: [Event]
     ) -> FeedStockCommandResult {
-        FeedRecordCommand.updateLog(
+        let result = FeedRecordCommand.updateLog(
             log,
             grams: grams,
             date: date,
@@ -265,32 +331,49 @@ struct QuickFeedCommandExecutor {
             allEvents: allEvents,
             context: context
         )
+        publishFeedMutation(.feedLog(petID: pet.id, source: "update"), affectedEntityIDs: [pet.id])
+        return result
     }
 
     func deleteLog(_ log: PetCareLog, pet: Pet, allEvents: [Event]) -> FeedStockCommandResult {
-        FeedRecordCommand.deleteLog(
+        let result = FeedRecordCommand.deleteLog(
             log,
             pet: pet,
             allEvents: allEvents,
             context: context
         )
+        publishFeedMutation(.feedLog(petID: pet.id, source: "delete"), affectedEntityIDs: [pet.id])
+        return result
     }
 
     func deleteFoodRecord(_ record: PetFoodRecord, pet: Pet, allEvents: [Event]) -> FeedStockCommandResult {
-        FeedRecordCommand.deleteFoodRecord(
+        let result = FeedRecordCommand.deleteFoodRecord(
             record,
             pet: pet,
             allEvents: allEvents,
             context: context
         )
+        publishFeedMutation(
+            .feedStock(petID: pet.id, action: "delete_record"),
+            affectedEntityIDs: [pet.id],
+            note: record.foodKind.rawValue
+        )
+        return result
     }
 
     func materializeDueAutoLogs(pet: Pet, allEvents: [Event]) -> FeedAutoMaterializeCommandResult {
-        FeedMaintenanceCommand.materializeDueAutoLogs(
+        let result = FeedMaintenanceCommand.materializeDueAutoLogs(
             pet: pet,
             allEvents: allEvents,
             context: context
         )
+        publishFeedMutation(
+            .feedMaintenance(petID: pet.id, action: "materialize_auto_logs"),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: result.insertedCount > 0,
+            note: "inserted:\(result.insertedCount)"
+        )
+        return result
     }
 
     func ensureUpcomingPlanReminders(pet: Pet, allEvents: [Event], now: Date = Date(), calendar: Calendar = .current) -> [Reminder] {
@@ -304,16 +387,31 @@ struct QuickFeedCommandExecutor {
     }
 
     func reminder(for event: Event, scheduledAt: Date, existing: Reminder?) -> Reminder {
-        FeedMaintenanceCommand.reminder(
+        let reminder = FeedMaintenanceCommand.reminder(
             for: event,
             scheduledAt: scheduledAt,
             existing: existing,
             context: context
         )
+        if existing == nil, let petID = UUID(uuidString: event.relatedEntityId) {
+            publishFeedMutation(
+                .feedMaintenance(petID: petID, action: "create_plan_reminder"),
+                affectedEntityIDs: [petID],
+                note: event.id.uuidString
+            )
+        }
+        return reminder
     }
 
     func setMainFoodKind(pet: Pet, foodKind: FeedFoodKind) {
+        let previousKind = pet.mainFoodKind
         SetMainFoodKindCommand.run(pet: pet, foodKind: foodKind, context: context)
+        publishFeedMutation(
+            .feedSettings(petID: pet.id),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: previousKind != foodKind,
+            note: "main_food_kind:\(foodKind.rawValue)"
+        )
     }
 
     func schedulePlanReminders(_ reminders: [Reminder]) async {
@@ -324,5 +422,37 @@ struct QuickFeedCommandExecutor {
     func scheduleStockReminders(_ reminders: [Reminder]) async {
         guard !reminders.isEmpty, !Task.isCancelled else { return }
         await ReminderSchedulingService.scheduleManyIfNeeded(reminders: reminders, context: context, source: .detail)
+    }
+
+    private func publishFeedMutation(
+        _ command: DomainCommand,
+        affectedEntityIDs: Set<UUID>,
+        wroteBusinessFact: Bool = true,
+        note: String? = nil
+    ) {
+        guard wroteBusinessFact else {
+            AppPerformanceMonitor.shared.record("domain_command_noop", valueMS: 0, note: note ?? "\(command)")
+            return
+        }
+        ReadModelRevisionCenter.shared.publish(
+            DomainMutationResult(
+                command: command,
+                affectedEntityIDs: affectedEntityIDs,
+                wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+
+    private func targetIDs(pet: Pet, targets: [Pet]) -> Set<UUID> {
+        let ids = targets.isEmpty ? [pet.id] : targets.map(\.id)
+        return Set(ids)
+    }
+}
+
+private extension SwitchFeedModeCommandResult {
+    var didSwitch: Bool {
+        if case .switched = self { return true }
+        return false
     }
 }

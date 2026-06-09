@@ -79,8 +79,11 @@ struct WalkTrackingCommandExecutor {
     }
 
     func saveWeeklyGoal(_ goal: Double, for pet: Pet) {
-        pet.weeklyWalkGoalKm = goal
-        modelContext.safeSave()
+        PetWalkCommandExecutor(context: modelContext).saveWeeklyGoal(
+            goal,
+            for: pet,
+            note: "walk.card.goal"
+        )
     }
 }
 

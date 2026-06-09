@@ -17,6 +17,7 @@ struct HumanHealthMetricDetailView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var selectedUnitCode = ""
     @State private var showingEntrySheet = false
 
@@ -468,8 +469,20 @@ struct HumanHealthMetricDetailView: View {
             }
 
             Button {
-                modelContext.delete(log)
-                modelContext.safeSave()
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                commandQueue.enqueue(
+                    .humanHealthMetricDelete(
+                        humanID: human.id,
+                        metricKey: log.metricKey,
+                        logID: log.id
+                    )
+                ) {
+                    HumanCareCommandExecutor(context: modelContext).deleteHealthMetric(
+                        log,
+                        human: human,
+                        note: "humanHealthMetric.delete"
+                    )
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 14, weight: .semibold))

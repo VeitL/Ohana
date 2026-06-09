@@ -9,6 +9,14 @@ import Foundation
 import SwiftData
 
 enum CareEventService {
+    struct CareRecordResult: Equatable {
+        let logID: UUID
+        let subjectID: UUID
+        let careType: CareType
+        let linkedPottyLogID: UUID?
+        let coconutDelta: Int
+    }
+
     @discardableResult
     @MainActor
     static func recordManualFeed(
@@ -20,6 +28,29 @@ enum CareEventService {
         date: Date = Date(),
         foodKind: FeedFoodKind = .dry
     ) -> (humanGot: Int, petGot: Int) {
+        recordManualFeedFact(
+            pet: pet,
+            amountGrams: amountGrams,
+            context: context,
+            executorId: executorId,
+            quality: quality,
+            date: date,
+            foodKind: foodKind
+        ).reward
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordManualFeedFact(
+        pet: Pet,
+        amountGrams: Double,
+        context: ModelContext,
+        executorId: String? = nil,
+        quality: QuestManager.QualityBonus = .none,
+        date: Date = Date(),
+        foodKind: FeedFoodKind = .dry,
+        source: CareLedgerSource = .quickAction
+    ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog) {
         let log = PetCareLog(
             date: date,
             type: .feeding,
@@ -37,7 +68,7 @@ enum CareEventService {
         CareLedgerService.recordPetCare(
             log: log,
             pet: pet,
-            source: .quickAction,
+            source: source,
             coconutDelta: CareLedgerService.rewardDelta(reward),
             metadataJSON: CareLedgerService.rewardMetadata(reward),
             context: context
@@ -49,7 +80,17 @@ enum CareEventService {
             executorId: executorId,
             now: date
         )
-        return reward
+        return (
+            CareRecordResult(
+                logID: log.id,
+                subjectID: pet.id,
+                careType: .feeding,
+                linkedPottyLogID: nil,
+                coconutDelta: CareLedgerService.rewardDelta(reward)
+            ),
+            reward,
+            log
+        )
     }
 
     @discardableResult
@@ -219,6 +260,32 @@ enum CareEventService {
         quality: QuestManager.QualityBonus = .none,
         date: Date = Date()
     ) -> (humanGot: Int, petGot: Int) {
+        recordCareFact(
+            pet: pet,
+            type: type,
+            amountMl: amountMl,
+            context: context,
+            executorId: executorId,
+            reward: reward,
+            quality: quality,
+            date: date
+        ).reward
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordCareFact(
+        pet: Pet,
+        type: CareType,
+        amountMl: Double = 0,
+        context: ModelContext,
+        executorId: String? = nil,
+        reward: QuestManager.OhanaActionType,
+        quality: QuestManager.QualityBonus = .none,
+        date: Date = Date(),
+        source: CareLedgerSource = .quickAction,
+        createsLinkedPottyLog: Bool = false
+    ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?) {
         let log = PetCareLog(
             date: date,
             type: type,
@@ -227,17 +294,34 @@ enum CareEventService {
             executorId: executorId
         )
         context.insert(log)
+        let pottyLog: PetPottyLog?
+        if createsLinkedPottyLog, type == .litter {
+            let linked = PetPottyLog(date: date, type: .perfectPoop, pet: pet, executorId: executorId)
+            context.insert(linked)
+            pottyLog = linked
+        } else {
+            pottyLog = nil
+        }
         context.safeSave()
 
         let award = CoconutEconomyService.awardCareAction(type: reward, pet: pet, context: context, quality: quality)
         CareLedgerService.recordPetCare(
             log: log,
             pet: pet,
-            source: .quickAction,
+            source: source,
             coconutDelta: CareLedgerService.rewardDelta(award),
             metadataJSON: CareLedgerService.rewardMetadata(award),
             context: context
         )
+        if let pottyLog {
+            CareLedgerService.recordPetPotty(
+                log: pottyLog,
+                pet: pet,
+                source: source,
+                coconutDelta: 0,
+                context: context
+            )
+        }
         QuickActionReminderCompletionSyncService.completeNearestPetCareReminder(
             pet: pet,
             type: type,
@@ -245,7 +329,18 @@ enum CareEventService {
             executorId: executorId,
             now: date
         )
-        return award
+        return (
+            CareRecordResult(
+                logID: log.id,
+                subjectID: pet.id,
+                careType: type,
+                linkedPottyLogID: pottyLog?.id,
+                coconutDelta: CareLedgerService.rewardDelta(award)
+            ),
+            award,
+            log,
+            pottyLog
+        )
     }
 
     @discardableResult
@@ -275,6 +370,110 @@ enum CareEventService {
             context: context,
             executorId: executorId,
             now: date
+        )
+        return reward
+    }
+
+    struct HygieneRecordResult: Equatable {
+        let logID: UUID
+        let subjectID: UUID
+        let hygieneType: HygieneType
+        let coconutDelta: Int
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordHygiene(
+        pet: Pet,
+        type: HygieneType,
+        context: ModelContext,
+        executorId: String? = nil,
+        date: Date = Date()
+    ) -> (humanGot: Int, petGot: Int) {
+        recordHygieneFact(
+            pet: pet,
+            type: type,
+            context: context,
+            executorId: executorId,
+            date: date
+        ).reward
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordHygieneFact(
+        pet: Pet,
+        type: HygieneType,
+        context: ModelContext,
+        executorId: String? = nil,
+        date: Date = Date()
+    ) -> (result: HygieneRecordResult, reward: (humanGot: Int, petGot: Int), log: PetHygieneLog) {
+        let log = PetHygieneLog(date: date, type: type, pet: pet, executorId: executorId)
+        context.insert(log)
+        context.safeSave()
+
+        let reward = CoconutEconomyService.awardCareAction(type: .care(type: type), pet: pet, context: context)
+        CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: executorId == nil ? .unknown : .human,
+            actorId: executorId,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .hygiene,
+            actionType: type.rawValue,
+            source: .quickAction,
+            legacyModelName: "PetHygieneLog",
+            legacyModelId: log.id.uuidString,
+            coconutDelta: CareLedgerService.rewardDelta(reward),
+            metadataJSON: CareLedgerService.rewardMetadata(reward),
+            context: context
+        )
+        QuickActionReminderCompletionSyncService.completeNearestPetHygieneReminder(
+            pet: pet,
+            type: type,
+            context: context,
+            executorId: executorId,
+            now: date
+        )
+        let result = HygieneRecordResult(
+            logID: log.id,
+            subjectID: pet.id,
+            hygieneType: type,
+            coconutDelta: CareLedgerService.rewardDelta(reward)
+        )
+        return (result, reward, log)
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordHealth(
+        pet: Pet,
+        type: HealthLogType,
+        note: String,
+        context: ModelContext,
+        executorId: String? = nil,
+        date: Date = Date()
+    ) -> (humanGot: Int, petGot: Int) {
+        let log = PetHealthLog(date: date, type: type, note: note, pet: pet, executorId: executorId)
+        context.insert(log)
+        context.safeSave()
+
+        let reward = CoconutEconomyService.awardCareAction(type: .health, pet: pet, context: context)
+        CareLedgerService.record(
+            occurredAt: log.date,
+            actorKind: executorId == nil ? .unknown : .human,
+            actorId: executorId,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            eventKind: .health,
+            actionType: type.rawValue,
+            note: note,
+            source: .quickAction,
+            legacyModelName: "PetHealthLog",
+            legacyModelId: log.id.uuidString,
+            coconutDelta: CareLedgerService.rewardDelta(reward),
+            metadataJSON: CareLedgerService.rewardMetadata(reward),
+            context: context
         )
         return reward
     }

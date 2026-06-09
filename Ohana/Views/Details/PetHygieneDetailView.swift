@@ -23,6 +23,7 @@ struct PetHygieneDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var groomingPlanTarget: HygieneType? = nil
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     /// 用于匹配 `HygieneTodoSheet` 写入的 Event 标题前缀：`\(pet.name) — \(type.rawValue)`
     @Query(sort: \Reminder.scheduledAt, order: .forward) private var allReminders: [Reminder]
@@ -352,19 +353,7 @@ struct PetHygieneDetailView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 Button {
-                    guard !doneToday else {
-                        singleUseNoticeMessage = "\(pet.name) 今天已经记录过\(type.rawValue)了，这类护理一天记录一次就够了。"
-                        showSingleUseNotice = true
-                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                        return
-                    }
-                    let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                        .flatMap { $0.isEmpty ? nil : $0 }
-                    let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: executorId)
-                    modelContext.insert(log)
-                    modelContext.safeSave()
-                    QuestManager.shared.awardAction(type: .care(type: type), pet: pet, context: modelContext)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    recordHygiene(type, doneToday: doneToday)
                 } label: {
                     if doneToday {
                         Image(systemName: "checkmark")
@@ -450,7 +439,7 @@ struct PetHygieneDetailView: View {
                                 .font(.system(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                             Spacer()
-                            Button { modelContext.delete(log); modelContext.safeSave() } label: {
+                            Button { deleteHygieneLog(log) } label: {
                                 Image(systemName: "trash").font(.system(size: 10))
                                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
@@ -467,5 +456,39 @@ struct PetHygieneDetailView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         )
+    }
+
+    private func recordHygiene(_ type: HygieneType, doneToday: Bool) {
+        guard !doneToday else {
+            singleUseNoticeMessage = "\(pet.name) 今天已经记录过\(type.rawValue)了，这类护理一天记录一次就够了。"
+            showSingleUseNotice = true
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return
+        }
+
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let command = DomainCommand.petHygieneRecord(petID: pet.id, type: type.rawValue)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            PetHygieneCommandExecutor(context: modelContext).record(
+                pet: pet,
+                type: type,
+                executorId: executorId,
+                note: "pet.hygiene.detail.record"
+            )
+        }
+    }
+
+    private func deleteHygieneLog(_ log: PetHygieneLog) {
+        let command = DomainCommand.petHygieneDelete(petID: pet.id, recordID: log.id)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            PetHygieneCommandExecutor(context: modelContext).delete(
+                log,
+                pet: pet,
+                note: "pet.hygiene.detail.delete"
+            )
+        }
     }
 }

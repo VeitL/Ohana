@@ -19,6 +19,7 @@ struct PetMedicationDetailSheet: View {
 
     @Query(sort: \Event.startDate, order: .reverse) private var allEvents: [Event]
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingEdit = false
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
@@ -134,15 +135,12 @@ struct PetMedicationDetailSheet: View {
 
             Menu {
                 Button(role: .destructive) {
-                    modelContext.delete(medication)
-                    modelContext.safeSave()
-                    dismiss()
+                    deleteMedication()
                 } label: {
                     Label(l.tr(zh: "删除此用药", en: "Delete medication", de: "Medikation löschen"), systemImage: "trash")
                 }
                 Button {
-                    medication.isActive.toggle()
-                    modelContext.safeSave()
+                    setMedicationActive(!medication.isActive)
                 } label: {
                     Label(
                         medication.isActive ? l.tr(zh: "标记为停用", en: "Pause medication", de: "Medikation pausieren") : l.tr(zh: "恢复用药", en: "Resume medication", de: "Medikation fortsetzen"),
@@ -208,6 +206,38 @@ struct PetMedicationDetailSheet: View {
             .background(chromeAccent, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func deleteMedication() {
+        let command = DomainCommand.petMedicationPlanDelete(petID: pet.id, medicationID: medication.id)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            PetMedicationCommandExecutor(context: modelContext).deletePlan(
+                pet: pet,
+                medication: medication,
+                note: "pet.medication.detail.delete"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        }
+    }
+
+    private func setMedicationActive(_ isActive: Bool) {
+        let command = DomainCommand.petMedicationPlanActivation(
+            petID: pet.id,
+            medicationID: medication.id,
+            isActive: isActive
+        )
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            PetMedicationCommandExecutor(context: modelContext).setPlanActive(
+                pet: pet,
+                medication: medication,
+                isActive: isActive,
+                note: "pet.medication.detail.activation"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
     }
 
     private var courseProgressCard: some View {

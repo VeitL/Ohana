@@ -184,7 +184,7 @@ enum DesignSpecExporterV4 {
         ## Notes
         - 预览只使用固定样例数据，不读取真实 SwiftData。
         - 本选择不动态改变全 app，只作为后续 UI 修改的设计依据。
-        - 后续实现页面时优先遵循 `ui规范.md` 与 `ui规范.selection.json`。
+        - 后续实现页面时优先遵循 `docs/design/ui规范.md` 与 `ui规范.selection.json`。
         """
     }
 

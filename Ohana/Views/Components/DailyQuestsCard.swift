@@ -69,9 +69,11 @@ struct IslandQuestEngine {
             }
         }
 
-        for quest in oasisBuildQuests(activePets: activePets, humans: humans) {
-            guard quests.count < 3 else { break }
-            quests.append(quest)
+        if activePets.isEmpty {
+            for quest in oasisBuildQuests(activePets: activePets, humans: humans) {
+                guard quests.count < 3 else { break }
+                quests.append(quest)
+            }
         }
 
         if quests.count < 3,
@@ -134,6 +136,13 @@ struct IslandQuestEngine {
                 targetPetId: pet.id,
                 targetPlantId: nil
             ))
+        }
+
+        if !activePets.isEmpty {
+            for quest in oasisBuildQuests(activePets: activePets, humans: humans) {
+                guard quests.count < 3 else { break }
+                quests.append(quest)
+            }
         }
 
         // ── 植物浇水（需要浇水的植物）
@@ -634,10 +643,10 @@ struct CoconutDropSheet: View {
                             .frame(width: 120, height: 120)
                             .shadow(color: Color(hex: "A8711A").opacity(0.5), radius: 20, y: 8) // ui-v4: allow reward coconut lift in modal prize reveal.
                             .scaleEffect(bounce ? 1.08 : 1.0)
-                            .animation(shouldAnimate ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : nil, value: bounce)
+                            .animation(shouldAnimate ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : nil, value: bounce) // smoothness: allow AppWorkloadPolicy-gated visible-only prize pulse.
 
                         Text(revealed ? reward.emoji : "🥥")
-                            .font(.system(size: 52))
+                            .font(OhanaFont.metric(size: 52))
                             .scaleEffect(revealed ? 1.3 : 1.0)
                             .animation(GoMotion.feedback, value: revealed)
                     }
@@ -647,11 +656,11 @@ struct CoconutDropSheet: View {
 
                 VStack(spacing: 12) {
                     Text(revealed ? "今日盲盒已开启！" : "敲开你的椰子")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.title2(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
 
                     Text(revealed ? reward.text : "完成所有委托换取的神秘礼物")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .font(OhanaFont.body(.medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 40)
@@ -662,7 +671,7 @@ struct CoconutDropSheet: View {
                         isPresented = false
                     } label: {
                         Text("收下！")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(OhanaFont.headline(.bold))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -750,7 +759,7 @@ struct DailyQuestsCard: View {
         .overlay(alignment: .top) {
             if showRewardToast {
                 Text(toastMessage)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 20).padding(.vertical, 11)
                     .background(Color.goPrimary, in: Capsule())
@@ -775,14 +784,15 @@ struct DailyQuestsCard: View {
     private var collapsedCompletedCard: some View {
         HStack(spacing: 10) {
             Text("✅")
-                .font(.system(size: 20))
+                .font(OhanaFont.title2())
             Text("今日岛屿委托全部完成！")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(OhanaFont.callout(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 18))
+            Image(systemName: "checkmark.seal.fill") // a11y: allow decorative completion seal paired with completed text.
+                .font(OhanaFont.title3(.bold))
                 .foregroundStyle(Color.goPrimary)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
         .goTranslucentCard(cornerRadius: 16)
@@ -796,9 +806,9 @@ struct DailyQuestsCard: View {
             HStack {
                 HStack(spacing: 8) {
                     Text("🏝️")
-                        .font(.system(size: 16))
+                        .font(OhanaFont.headline())
                     Text("岛屿委托")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .tracking(1)
                 }
@@ -816,7 +826,7 @@ struct DailyQuestsCard: View {
                             .foregroundStyle(Color.goYellow)
                     }
                 }
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.footnote(.black))
                 .padding(.horizontal, 10).padding(.vertical, 4)
                 .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
             }
@@ -833,22 +843,23 @@ struct DailyQuestsCard: View {
                 } label: {
                     HStack(spacing: 10) {
                         Text("🥥")
-                            .font(.system(size: 20))
+                            .font(OhanaFont.title2())
                         VStack(alignment: .leading, spacing: 2) {
                             Text(coconutClaimed ? "今日盲盒已领取" : "领取今日椰子盲盒！")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .font(OhanaFont.callout(.bold))
                                 .foregroundStyle(coconutClaimed ? Color.goCardWhite.opacity(0.4) : Color.arkInk)
                             if !coconutClaimed {
                                 Text("+5🥥")
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(OhanaFont.caption(.medium))
                                     .foregroundStyle(Color.arkInk.opacity(0.6))
                             }
                         }
                         Spacer()
                         if !coconutClaimed {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .bold))
+                            Image(systemName: "chevron.right") // a11y: allow decorative disclosure cue inside labeled reward button.
+                                .font(OhanaFont.caption(.bold))
                                 .foregroundStyle(Color.arkInk.opacity(0.4))
+                                .accessibilityHidden(true)
                         }
                     }
                     .padding(.horizontal, 14).padding(.vertical, 10)
@@ -872,20 +883,21 @@ struct DailyQuestsCard: View {
             ZStack {
                 Circle()
                     .fill(quest.isCompleted ? Color.goPrimary : .clear)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 20, height: 20) // a11y: allow noninteractive quest completion glyph.
                     .overlay(
                         Circle()
                             .strokeBorder(quest.isCompleted ? .clear : Color.primary.opacity(0.35), lineWidth: 2)
                     )
                 if quest.isCompleted {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
+                    Image(systemName: "checkmark") // a11y: allow decorative checkmark paired with quest completion state.
+                        .font(OhanaFont.caption2(.bold))
                         .foregroundStyle(Color.arkInk)
+                        .accessibilityHidden(true)
                 }
             }
 
             Text(quest.title)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(OhanaFont.callout(.bold))
                 .foregroundStyle(quest.isCompleted ? Color.secondary : Color.primary)
                 .strikethrough(quest.isCompleted, color: Color.secondary.opacity(0.8))
 
@@ -894,14 +906,15 @@ struct DailyQuestsCard: View {
             // 右侧：已完成显示 ✅，未完成显示椰子奖励
             if quest.isCompleted {
                 Text("✅")
-                    .font(.system(size: 14))
+                    .font(OhanaFont.callout())
+                    .accessibilityHidden(true)
             } else {
                 HStack(spacing: 3) {
                     Text("+\(reward)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.footnote(.black))
                         .foregroundStyle(Color.goYellow)
                     Text("🥥")
-                        .font(.system(size: 12))
+                        .font(OhanaFont.footnote())
                 }
             }
         }

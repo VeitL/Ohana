@@ -23,6 +23,7 @@ struct PetMilestoneListView: View {
     @State private var newPhotoItem: PhotosPickerItem? = nil
     @State private var newPhotoData: Data? = nil
     @State private var selectedMilestone: PetMilestone? = nil
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var sortedMilestones: [PetMilestone] {
         pet.milestones.sorted { $0.date > $1.date }
@@ -54,10 +55,9 @@ struct PetMilestoneListView: View {
                     Text("记录里程碑")
                         .font(.system(size: 14, weight: .black, design: .rounded))
                 }
-                .foregroundStyle(.black)
+                .foregroundStyle(Color.arkInk)
                 .padding(.horizontal, 24).padding(.vertical, 14)
                 .background(Color.goPrimary, in: Capsule())
-                .shadow(color: Color.goPrimary.opacity(0.4), radius: 12, y: 4)
             }
             .padding(.bottom, 28)
         }
@@ -65,44 +65,17 @@ struct PetMilestoneListView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddSheet) { addMilestoneSheet }
         .sheet(item: $selectedMilestone) { m in MilestoneDetailSheet(milestone: m, pet: pet) }
-        .onAppear { autoCreateMilestones() }
+        .onAppear { seedSystemMilestones() }
     }
 
     // MARK: - 自动生成里程碑（生日、到家日、最重/最轻体重）
-    private func autoCreateMilestones() {
-        let existingTitles = Set(pet.milestones.map { $0.title })
-
-        // 生日
-        if let bday = pet.birthday {
-            let title = "\(pet.name)的生日 🎂"
-            if !existingTitles.contains(title) {
-                let m = PetMilestone(date: bday, title: title, emoji: "🎂",
-                    notes: "出生啦！", pet: pet)
-                modelContext.insert(m)
-            }
+    private func seedSystemMilestones() {
+        commandQueue.enqueue(.petMilestoneSeed(petID: pet.id)) {
+            PetMilestoneCommandExecutor(context: modelContext).seedSystemMilestones(
+                for: pet,
+                note: "petMilestone.seed"
+            )
         }
-
-        // 到家日（领养/购买）
-        if let homeDate = pet.homeDate {
-            let title = "\(pet.name)到家了 🏠"
-            if !existingTitles.contains(title) {
-                let m = PetMilestone(date: homeDate, title: title, emoji: "🏠",
-                    notes: "第一天回家!", pet: pet)
-                modelContext.insert(m)
-            }
-        }
-
-        // 最重体重记录
-        if let heaviest = pet.weightLogs.max(by: { $0.weight < $1.weight }) {
-            let title = "最重记录：\(String(format: "%.1f", heaviest.weight))kg"
-            if !existingTitles.contains(title) {
-                let m = PetMilestone(date: heaviest.date, title: title, emoji: "⚖️",
-                    notes: "历史最高体重记录", pet: pet)
-                modelContext.insert(m)
-            }
-        }
-
-        modelContext.safeSave()
     }
 
     // MARK: - Header
@@ -355,7 +328,7 @@ struct PetMilestoneListView: View {
                                             Image(systemName: "xmark.circle.fill")
                                                 .font(.system(size: 20))
                                                 .symbolRenderingMode(.hierarchical)
-                                                .foregroundStyle(.white)
+                                                .foregroundStyle(Color.ohanaCardSurface)
                                                 .padding(8)
                                         }
                                     }
@@ -389,25 +362,26 @@ struct PetMilestoneListView: View {
                 // 保存按钮（渐变）
                 Button {
                     GoKeyboard.dismiss()
-                    DispatchQueue.main.async {
-                        guard !newTitle.isEmpty else { return }
-                        let m = PetMilestone(
-                            date: newDate,
-                            title: newTitle,
-                            emoji: newEmoji.isEmpty ? "🎉" : newEmoji,
-                            notes: newNotes,
+                    guard !newTitle.isEmpty else { return }
+                    let input = PetMilestoneCommandInput(
+                        date: newDate,
+                        title: newTitle,
+                        emoji: newEmoji,
+                        notes: newNotes,
+                        photoData: newPhotoData,
+                        location: newLocation
+                    )
+                    commandQueue.enqueue(.petMilestoneRecord(petID: pet.id)) {
+                        PetMilestoneCommandExecutor(context: modelContext).createMilestone(
+                            input: input,
                             pet: pet,
-                            photoData: newPhotoData,
-                            location: newLocation
+                            note: "petMilestone.record"
                         )
-                        modelContext.insert(m)
-                        modelContext.safeSave()
-                        QuestManager.shared.awardAction(type: .milestone, pet: pet, context: modelContext)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        newTitle = ""; newEmoji = "🎉"; newNotes = ""; newLocation = ""
-                        newPhotoData = nil; newPhotoItem = nil
-                        showAddSheet = false
                     }
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    newTitle = ""; newEmoji = "🎉"; newNotes = ""; newLocation = ""
+                    newPhotoData = nil; newPhotoItem = nil
+                    showAddSheet = false
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark").font(.system(size: 14, weight: .black))
@@ -424,7 +398,6 @@ struct PetMilestoneListView: View {
                         ),
                         in: RoundedRectangle(cornerRadius: 18)
                     )
-                    .shadow(color: newTitle.isEmpty ? .clear : Color.goPrimary.opacity(0.4), radius: 10, y: 4)
                 }
                 .disabled(newTitle.isEmpty)
                 .padding(.horizontal, 24).padding(.bottom, 32).padding(.top, 8)
@@ -609,6 +582,7 @@ private struct MilestoneDetailSheet: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showingPhoto = false
     @State private var showingDeleteAlert = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     var body: some View {
         NavigationStack {
@@ -641,19 +615,19 @@ private struct MilestoneDetailSheet: View {
                                     .overlay(alignment: .bottomTrailing) {
                                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                                             .font(.system(size: 12, weight: .semibold))
-                                            .foregroundStyle(.white)
+                                            .foregroundStyle(Color.ohanaCardSurface)
                                             .padding(8)
-                                            .background(.black.opacity(0.45), in: Circle())
+                                            .background(Color.arkInk.opacity(0.45), in: Circle())
                                             .padding(10)
                                     }
                             }
                             .buttonStyle(ScaleButtonStyle())
                             .fullScreenCover(isPresented: $showingPhoto) {
                                 ZStack {
-                                    Color.black.ignoresSafeArea()
+                                    Color.arkInk.ignoresSafeArea()
                                     Image(uiImage: img).resizable().scaledToFit().ignoresSafeArea()
                                     VStack { HStack { Spacer(); Button { showingPhoto = false } label: {
-                                        Image(systemName: "xmark.circle.fill").font(.system(size: 28)).foregroundStyle(.white).padding(16)
+                                        Image(systemName: "xmark.circle.fill").font(.system(size: 28)).foregroundStyle(Color.ohanaCardSurface).padding(16)
                                     }}; Spacer() }
                                 }
                             }
@@ -722,8 +696,13 @@ private struct MilestoneDetailSheet: View {
             .alert("删除里程碑？", isPresented: $showingDeleteAlert) {
                 Button("取消", role: .cancel) {}
                 Button("删除", role: .destructive) {
-                    modelContext.delete(milestone)
-                    modelContext.safeSave()
+                    commandQueue.enqueue(.petMilestoneDelete(petID: pet.id, milestoneID: milestone.id)) {
+                        PetMilestoneCommandExecutor(context: modelContext).deleteMilestone(
+                            milestone,
+                            pet: pet,
+                            note: "petMilestone.delete"
+                        )
+                    }
                     dismiss()
                 }
             } message: { Text("「\(milestone.title)」将被永久删除。") }

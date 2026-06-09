@@ -12,8 +12,9 @@ struct QuickFeedOverviewSnapshotStoreTests {
         let today = calendar.startOfDay(for: now)
         let yesterday = calendar.date(byAdding: .day, value: -1, to: today) ?? today
         let oldDay = calendar.date(byAdding: .day, value: -8, to: today) ?? today
-        let planEvent = Event(title: "Feed", startDate: today)
-        let planReminder = Reminder(event: planEvent, scheduledAt: calendar.date(byAdding: .hour, value: 2, to: today) ?? today)
+        let upcomingReminderDate = calendar.date(byAdding: .hour, value: 1, to: now) ?? now
+        let planEvent = Event(title: "Feed", startDate: upcomingReminderDate)
+        let planReminder = Reminder(event: planEvent, scheduledAt: upcomingReminderDate)
         planEvent.reminders = [planReminder]
 
         let manualLog = PetCareLog(date: today.addingTimeInterval(3600), amountGrams: 40, foodKind: .dry, pet: pet)

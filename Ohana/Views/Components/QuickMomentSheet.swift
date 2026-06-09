@@ -30,7 +30,9 @@ struct QuickMomentSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var noteText = ""
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var selectedPhotos: [MomentDraftPhoto] = []
@@ -172,6 +174,9 @@ struct QuickMomentSheet: View {
             withTransaction(transaction) {
                 contentHeight = height
             }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
         .fullScreenCover(isPresented: $showCamera) {
             PetCameraPickerView { img in
@@ -625,70 +630,39 @@ struct QuickMomentSheet: View {
         let lat = locationModel.latitude
         let lon = locationModel.longitude
         let hasCoords = lat != 0 || lon != 0
-        var savedLogs: [PetPhotoLog] = []
         let baseDate = Date()
-
-        if !selectedPhotos.isEmpty {
-            for (index, photo) in selectedPhotos.enumerated() {
-                guard let data = photo.image.jpegData(compressionQuality: 0.82) else { continue }
-                let log = PetPhotoLog(
-                    imageData: data,
-                    date: baseDate.addingTimeInterval(Double(index) * 0.01),
-                    note: note,
-                    pet: pet,
-                    locationLatitude: hasCoords ? lat : 0,
-                    locationLongitude: hasCoords ? lon : 0,
-                    locationPlacename: placeName
-                )
-                modelContext.insert(log)
-                savedLogs.append(log)
+        let draftPhotos = selectedPhotos
+        let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
+        commandQueue.enqueue(.quickMoment(petID: pet?.id)) {
+            let photoData = draftPhotos.compactMap { photo in
+                photo.image.jpegData(compressionQuality: 0.82) ?? photo.image.pngData()
             }
-        } else if !note.isEmpty {
-            let placeholder = UIImage()
-            let data = placeholder.pngData() ?? Data(count: 1)
-            let log = PetPhotoLog(
-                imageData: data, date: baseDate, note: note, pet: pet,
+            _ = MomentCommandExecutor(context: modelContext).recordMoment(
+                pet: pet,
+                note: note,
+                photoData: photoData,
                 locationLatitude: hasCoords ? lat : 0,
                 locationLongitude: hasCoords ? lon : 0,
-                locationPlacename: placeName
+                locationPlacename: placeName,
+                executorId: executorId,
+                date: baseDate,
+                revisionNote: "quickMoment.record"
             )
-            modelContext.insert(log)
-            savedLogs.append(log)
-        }
-
-        modelContext.safeSave()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        QuestManager.shared.addCoconuts(1, emoji: "📸", title: "记录时刻 +1🥥")
-        if let savedLog = savedLogs.first {
-            CareLedgerService.record(
-                occurredAt: savedLog.date,
-                actorKind: .unknown,
-                subjectKind: pet == nil ? .system : .pet,
-                subjectId: pet?.id.uuidString,
-                eventKind: .milestone,
-                actionType: "petMoment",
-                note: savedLog.note,
-                source: .quickAction,
-                legacyModelName: "PetPhotoLog",
-                legacyModelId: savedLog.id.uuidString,
-                coconutDelta: 1,
-                context: modelContext
-            )
-        }
-
-        withAnimation(GoMotion.feedback) { savedSuccess = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            isSaving = false
-            onSaved?()
-            close()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            noteText = ""
-            selectedPhotos = []
-            selectedItems = []
-            manualPlace = ""
-            locationModel.reset()
-            withAnimation(GoMotion.quick) { savedSuccess = false }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            withAnimation(GoMotion.feedback) { savedSuccess = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                isSaving = false
+                onSaved?()
+                close()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                noteText = ""
+                selectedPhotos = []
+                selectedItems = []
+                manualPlace = ""
+                locationModel.reset()
+                withAnimation(GoMotion.quick) { savedSuccess = false }
+            }
         }
     }
 

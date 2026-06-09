@@ -15,6 +15,7 @@ struct PetBondVaultView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @State private var questManager = QuestManager.shared
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var unlockedIDs: Set<String> = []
     @State private var toast: String?
     @State private var activePreviewItem: PetBondVaultItem?
@@ -295,39 +296,29 @@ struct PetBondVaultView: View {
     }
 
     private func unlock(_ item: PetBondVaultItem) {
-        guard !unlockedIDs.contains(item.id), pet.coconutBalance >= item.cost else { return }
-        pet.coconutBalance -= item.cost
-        PetBondVaultStore.unlock(item.kind, for: pet.id)
-        unlockedIDs = PetBondVaultStore.unlockedIDs(for: pet.id)
-
         let title = l.tr(
             zh: "\(pet.name) 解锁 \(l.text(item.title))",
             en: "\(pet.name) unlocked \(l.text(item.title))",
             de: "\(pet.name) hat \(l.text(item.title)) freigeschaltet"
         )
-        QuestManager.shared.recordCoconutDelta(
-            -item.cost,
-            emoji: "🐾",
-            title: title,
-            actorId: pet.id.uuidString,
-            actorName: pet.name
-        )
-        CareLedgerService.record(
-            actorKind: .pet,
-            actorId: pet.id.uuidString,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .coconut,
-            actionType: "petBondVaultUnlock",
-            note: title,
-            source: .economy,
-            coconutDelta: -item.cost,
-            metadataJSON: "{\"itemId\":\"\(item.id)\",\"economy\":\"petBondVault\"}",
-            context: modelContext
-        )
-        modelContext.safeSave()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        showToast(l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet"))
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(.petBondVaultUnlock(petID: pet.id, itemID: item.id)) {
+            let result = RewardEconomyCommandExecutor(context: modelContext).unlockBondVaultItem(
+                item,
+                pet: pet,
+                title: title,
+                questManager: questManager,
+                note: "petBondVault.unlock"
+            )
+            unlockedIDs = PetBondVaultStore.unlockedIDs(for: pet.id)
+            if result.didUnlock {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                showToast(l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet"))
+            } else if result.failure == .insufficientBalance {
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                showToast(l.tr(zh: "椰子不足", en: "Not enough coconuts", de: "Nicht genug Kokosnüsse"))
+            }
+        }
     }
 
     private func openPreview(_ item: PetBondVaultItem) {

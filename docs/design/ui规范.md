@@ -7,7 +7,7 @@
 ## 0. 规范分层
 
 - `ui规范.selection.json`：唯一机器源头，保存 token、选项值、规则 ID 和当前正式选择。
-- `ui规范.md`：解释同一选择的意图、适用场景、例外和人工检查方式；不另起 token。
+- `docs/design/ui规范.md`：解释同一选择的意图、适用场景、例外和人工检查方式；不另起 token。
 - `docs/ui-v4-new-page-template.md`：新页面和重构页面的代码起点，只演示最小可执行结构。
 - `AGENTS.md`：代理工作流提示，只保留源头、验证命令和高风险提醒。
 - `docs/ui-ux-pro-max-ohana-adaptation.md`：外部 UI/UX 建议如何翻译进 Ohana；不得覆盖 V4 token。

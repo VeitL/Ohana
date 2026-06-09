@@ -27,6 +27,7 @@ struct HumanNoteHistorySheet: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var showAddSheet = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -68,6 +69,9 @@ struct HumanNoteHistorySheet: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
+            .onDisappear {
+                commandQueue.cancelAll()
+            }
         }
     }
 
@@ -293,14 +297,13 @@ struct HumanNoteHistorySheet: View {
     }
 
     private func deleteNote(_ entry: HumanNoteEntry) {
-        let parts = human.notes.components(separatedBy: "\n\n")
-        let remaining = parts.filter { part in
-            part.trimmingCharacters(in: .whitespacesAndNewlines) != entry.rawString
-        }
-        human.notes = remaining
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-            .joined(separator: "\n\n")
-        modelContext.safeSave()
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let command = DomainCommand.humanNote(humanID: human.id)
+        commandQueue.enqueue(command) {
+            HumanCareCommandExecutor(context: modelContext).deleteNote(
+                human: human,
+                rawString: entry.rawString
+            )
+        }
     }
 }

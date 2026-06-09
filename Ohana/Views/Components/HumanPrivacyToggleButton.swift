@@ -18,9 +18,14 @@ struct HumanPrivacyToggleButton: View {
 
     @Environment(\.modelContext) private var modelContext
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @State private var optimisticIsPrivate: Bool?
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var isFieldPrivate: Bool {
         human.privateFields.contains(field.rawValue)
+    }
+    private var displayIsPrivate: Bool {
+        optimisticIsPrivate ?? isFieldPrivate
     }
     private var isOwner: Bool {
         UUID(uuidString: activeHumanIdStr) == human.id
@@ -29,9 +34,8 @@ struct HumanPrivacyToggleButton: View {
     var body: some View {
         Button {
             guard isOwner else { return }
-            human.setPrivate(field, !isFieldPrivate)
-            modelContext.safeSave()
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            togglePrivacy()
         } label: {
             ZStack {
                 Capsule()
@@ -47,43 +51,63 @@ struct HumanPrivacyToggleButton: View {
                     .frame(width: 26, height: 26)
                     .overlay {
                         Circle()
-                            .strokeBorder(Color.ohanaCardStroke.opacity(isFieldPrivate ? 0.25 : 0.9), lineWidth: 1)
+                            .strokeBorder(Color.ohanaCardStroke.opacity(displayIsPrivate ? 0.25 : 0.9), lineWidth: 1)
                     }
                     .overlay {
-                        Image(systemName: isFieldPrivate ? "lock.fill" : "lock.open.fill")
+                        Image(systemName: displayIsPrivate ? "lock.fill" : "lock.open.fill")
                             .font(.system(size: 10, weight: .black))
                             .foregroundStyle(knobIconColor)
                     }
-                    .offset(x: isFieldPrivate ? 17 : -17)
+                    .offset(x: displayIsPrivate ? 17 : -17)
             }
             .frame(width: 74, height: 44)
             .contentShape(Rectangle())
-            .animation(GoMotion.feedback, value: isFieldPrivate)
-            .accessibilityLabel(isFieldPrivate ? "隐私已开启，仅本人可见" : "隐私已关闭，家庭成员可见")
+            .animation(GoMotion.feedback, value: displayIsPrivate)
+            .accessibilityLabel(displayIsPrivate ? "隐私已开启，仅本人可见" : "隐私已关闭，家庭成员可见")
         }
         .buttonStyle(ScaleButtonStyle())
         .opacity(isOwner ? 1 : 0.5)
         .disabled(!isOwner)
+        .onDisappear {
+            commandQueue.cancelAll()
+            optimisticIsPrivate = nil
+        }
+    }
+
+    private func togglePrivacy() {
+        let nextValue = !displayIsPrivate
+        optimisticIsPrivate = nextValue
+        let action = "field.\(field.rawValue).\(nextValue ? "private" : "public")"
+        let command = DomainCommand.humanPrivacy(humanID: human.id, action: action)
+        commandQueue.enqueue(command) {
+            HumanPrivacyCommandExecutor(context: modelContext).setPrivateField(
+                field,
+                isPrivate: nextValue,
+                for: human,
+                note: "human.privacy.field"
+            )
+            optimisticIsPrivate = nil
+        }
     }
 
     private var trackFill: Color {
-        isFieldPrivate
+        displayIsPrivate
             ? Color.goYellow.opacity(0.16)
             : Color.ohanaControlFill
     }
 
     private var trackStroke: Color {
-        isFieldPrivate
+        displayIsPrivate
             ? Color.goYellow.opacity(0.55)
             : Color.ohanaCardStroke.opacity(0.95)
     }
 
     private var knobFill: Color {
-        isFieldPrivate ? Color.goYellow : Color.ohanaCardSurfaceElevated
+        displayIsPrivate ? Color.goYellow : Color.ohanaCardSurfaceElevated
     }
 
     private var knobIconColor: Color {
-        isFieldPrivate ? Color.arkInk : Color.ohanaSecondaryText
+        displayIsPrivate ? Color.arkInk : Color.ohanaSecondaryText
     }
 }
 

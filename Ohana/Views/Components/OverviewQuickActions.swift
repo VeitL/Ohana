@@ -1030,7 +1030,11 @@ struct GoQuickActionCard: View {
                     if let reminder = pendingReminder {
                         Button {
                             let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                            ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
+                            ReminderCommandExecutor(context: modelContext).complete(
+                                reminder,
+                                by: activeHumanId,
+                                note: "overview.quick.action.reminder.complete"
+                            )
                             UINotificationFeedbackGenerator().notificationOccurred(.success)
                         } label: {
                             Label("完成待办", systemImage: "checkmark.circle.fill")

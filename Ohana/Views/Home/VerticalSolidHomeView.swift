@@ -12,6 +12,18 @@ struct VerticalSolidHomeView: View {
     let onOpenPet: (UUID, PetDetailTab) -> Void
     let onOpenHuman: (UUID) -> Void
     let onOpenPlant: (UUID) -> Void
+    let createdEntitySignal: HomeCreatedEntitySignal?
+    let onPresentAccountSwitcher: () -> Void
+    let onPresentAddEntity: (EntityType) -> Void
+    let onPresentAppSheet: (AppSheetRoute) -> Void
+    let onPresentCoconutLog: (CoconutLogSubject) -> Void
+    let onPresentCrewRoster: (CrewRosterMode) -> Void
+    let onPresentFunctionMenu: (FMDest?) -> Void
+    let onPresentOasisReward: () -> Void
+    let onPresentQuickMoment: (UUID) -> Void
+    let onPresentSettings: () -> Void
+    let onPresentStreakDetail: () -> Void
+    let onPresentWalk: (UUID) -> Void
 
     let payload: HomeReadModelPayload
 
@@ -68,11 +80,35 @@ struct VerticalSolidHomeView: View {
         onOpenPet: @escaping (UUID, PetDetailTab) -> Void,
         onOpenHuman: @escaping (UUID) -> Void,
         onOpenPlant: @escaping (UUID) -> Void,
+        createdEntitySignal: HomeCreatedEntitySignal?,
+        onPresentAccountSwitcher: @escaping () -> Void,
+        onPresentAddEntity: @escaping (EntityType) -> Void,
+        onPresentAppSheet: @escaping (AppSheetRoute) -> Void,
+        onPresentCoconutLog: @escaping (CoconutLogSubject) -> Void,
+        onPresentCrewRoster: @escaping (CrewRosterMode) -> Void,
+        onPresentFunctionMenu: @escaping (FMDest?) -> Void,
+        onPresentOasisReward: @escaping () -> Void,
+        onPresentQuickMoment: @escaping (UUID) -> Void,
+        onPresentSettings: @escaping () -> Void,
+        onPresentStreakDetail: @escaping () -> Void,
+        onPresentWalk: @escaping (UUID) -> Void,
         payload: HomeReadModelPayload
     ) {
         self.onOpenPet = onOpenPet
         self.onOpenHuman = onOpenHuman
         self.onOpenPlant = onOpenPlant
+        self.createdEntitySignal = createdEntitySignal
+        self.onPresentAccountSwitcher = onPresentAccountSwitcher
+        self.onPresentAddEntity = onPresentAddEntity
+        self.onPresentAppSheet = onPresentAppSheet
+        self.onPresentCoconutLog = onPresentCoconutLog
+        self.onPresentCrewRoster = onPresentCrewRoster
+        self.onPresentFunctionMenu = onPresentFunctionMenu
+        self.onPresentOasisReward = onPresentOasisReward
+        self.onPresentQuickMoment = onPresentQuickMoment
+        self.onPresentSettings = onPresentSettings
+        self.onPresentStreakDetail = onPresentStreakDetail
+        self.onPresentWalk = onPresentWalk
         self.payload = payload
         AvatarPipeline.shared.seedPreviewEntries(
             payload.avatarPreloadPayloads
@@ -391,6 +427,7 @@ struct VerticalSolidHomeView: View {
         .ignoresSafeArea(.container, edges: [.top, .bottom])
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
+            bindHomeAppRouteSink()
             controller.applySnapshot(makeSnapshot(), signature: dataSignature, force: !controller.snapshot.isReady)
             AppPerformanceMonitor.shared.record("home_first_render", valueMS: 0)
             refreshHeaderStreak()
@@ -424,6 +461,10 @@ struct VerticalSolidHomeView: View {
             if phase != .active {
                 clearArrivalState()
             }
+        }
+        .onChange(of: createdEntitySignal) { _, signal in
+            guard let signal else { return }
+            handleNewHomeMemberSaved(id: signal.entityID)
         }
         .focusHomeRouteSheets(
             pets: pets,
@@ -460,6 +501,51 @@ struct VerticalSolidHomeView: View {
         }
         .onChange(of: treeManager.treeLevel.rawValue) { _, _ in
             scheduleGrowthUnlockFeedbackIfNeeded()
+        }
+    }
+
+    private func bindHomeAppRouteSink() {
+        routeCoordinator.bindAppRouteSink { route in
+            switch route {
+            case let .petProfile(id, initialTab):
+                onOpenPet(id, initialTab)
+            case let .humanProfile(id):
+                onOpenHuman(id)
+            }
+        }
+        routeCoordinator.bindAppSheetRouteSink { route in
+            switch route {
+            case .accountSwitcher:
+                onPresentAccountSwitcher()
+            case let .addEntity(type):
+                onPresentAddEntity(type)
+            case let .appSheet(route):
+                onPresentAppSheet(route)
+            case let .functionMenu(destination):
+                onPresentFunctionMenu(destination)
+            case .streakDetail:
+                onPresentStreakDetail()
+            }
+        }
+        routeCoordinator.bindAppFullScreenRouteSink { route in
+            switch route {
+            case .oasisReward:
+                onPresentOasisReward()
+            case let .walk(petID):
+                onPresentWalk(petID)
+            }
+        }
+        routeCoordinator.bindAppOverlayRouteSink { route in
+            switch route {
+            case let .coconutLog(subject):
+                onPresentCoconutLog(subject)
+            case let .crewRoster(mode):
+                onPresentCrewRoster(mode)
+            case let .quickMoment(petID):
+                onPresentQuickMoment(petID)
+            case .settings:
+                onPresentSettings()
+            }
         }
     }
 

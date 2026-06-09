@@ -21,6 +21,7 @@ struct HumanWeightHistoryView: View {
     @State private var newWeightText = ""
     @State private var newWeightDate = Date()
     @State private var includesWeightTime = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
@@ -418,8 +419,18 @@ struct HumanWeightHistoryView: View {
                     .foregroundStyle(Color.goPrimary.opacity(0.7))
             }
             Button {
-                modelContext.delete(log)
-                modelContext.safeSave()
+                let command = DomainCommand.weightDelete(
+                    entityID: human.id,
+                    entityKind: EntityKind.human.rawValue,
+                    recordID: log.id
+                )
+                commandQueue.enqueue(command) {
+                    DashboardRecordCommandExecutor(context: modelContext).deleteHumanWeight(
+                        log,
+                        human: human,
+                        note: "dashboard.weight.delete.\(EntityKind.human.rawValue)"
+                    )
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(OhanaFont.subheadline())
@@ -433,16 +444,24 @@ struct HumanWeightHistoryView: View {
     private func saveInlineWeight() {
         guard let value = parsedInlineWeight, value > 0 else { return }
         let executorId = activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
-        let log = HumanWeightLog(date: inlineWeightRecordDate, weight: value, human: human, executorId: executorId)
-        modelContext.insert(log)
-        human.weightLogs.append(log)
-        modelContext.safeSave()
+        let savedDate = inlineWeightRecordDate
+        let command = DomainCommand.weightEntry(entityID: human.id, entityKind: EntityKind.human.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withAnimation(GoMotion.feedback) {
             newWeightText = ""
             newWeightDate = Date()
             includesWeightTime = false
             isInlineWeightComposerVisible = false
+        }
+        commandQueue.enqueue(command) {
+            DashboardRecordCommandExecutor(context: modelContext).recordHumanWeight(
+                human: human,
+                weight: value,
+                date: savedDate,
+                executorId: executorId,
+                command: command,
+                note: "dashboard.weight.entry"
+            )
         }
     }
 

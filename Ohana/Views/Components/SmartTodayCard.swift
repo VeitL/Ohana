@@ -366,7 +366,14 @@ private struct GoldenRewardRow: View {
 
     private func completeMilestone() {
         let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-        ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
+        ReminderCommandExecutor(context: modelContext).completeWithCoconutReward(
+            reminder,
+            by: activeHumanId,
+            amount: milestoneReward,
+            title: reminder.event?.title ?? "里程碑奖励",
+            emoji: "🎁",
+            note: "smart.today.milestone.complete.reward"
+        )
 
         // 2. 强触觉反馈 × 2（多巴胺闭环）
         let gen = UIImpactFeedbackGenerator(style: .heavy)
@@ -384,7 +391,6 @@ private struct GoldenRewardRow: View {
 
         // 4. 全屏椰子爆出动效 + 写入余额 + 回调
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            QuestManager.shared.addCoconuts(milestoneReward)
             showCoconutDrop = true
             onMilestoneRewardCompleted?()
         }

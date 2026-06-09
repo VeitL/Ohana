@@ -13,17 +13,25 @@ struct HumanWishlistView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-    @Query(sort: \WishlistItem.createdAt, order: .reverse) private var allItems: [WishlistItem]
-    @Query(sort: \Human.createdAt) private var allHumans: [Human]
+    @Query private var myItems: [WishlistItem]
 
     @State private var showAddSheet = false
     @State private var showConfetti = false
     @State private var newTitle = ""
     @State private var newCost = 10
+    @State private var redeemingItemIDs: Set<UUID> = []
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
-    private var myItems: [WishlistItem] {
-        allItems.filter { $0.creatorId == human.id.uuidString }
+    init(human: Human) {
+        self.human = human
+        let humanId = human.id.uuidString
+        _myItems = Query(
+            filter: #Predicate<WishlistItem> { $0.creatorId == humanId },
+            sort: \WishlistItem.createdAt,
+            order: .reverse
+        )
     }
+
     private var pendingItems: [WishlistItem] { myItems.filter { !$0.isRedeemed } }
     private var redeemedItems: [WishlistItem] { myItems.filter { $0.isRedeemed } }
     private var isPrivacyLocked: Bool {
@@ -55,6 +63,7 @@ struct HumanWishlistView: View {
         .confettiOverlay(isShowing: $showConfetti)
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showAddSheet) { addWishSheet }
+        .onDisappear { commandQueue.cancelAll() }
     }
 
     private var wishlistContent: some View {
@@ -152,23 +161,22 @@ struct HumanWishlistView: View {
                 Spacer()
 
                 if !redeemed {
+                    let isRedeeming = redeemingItemIDs.contains(item.id)
+                    let canRedeem = human.coconutBalance >= item.cost && !isRedeeming
                     Button { redeem(item: item) } label: {
-                        Text("兑换")
+                        Text(isRedeeming ? "兑换中" : "兑换")
                             .font(OhanaFont.callout(.black))
-                            .foregroundStyle(human.coconutBalance >= item.cost ? Color.arkInk : .primary.opacity(0.3))
+                            .foregroundStyle(canRedeem ? Color.arkInk : .primary.opacity(0.3))
                             .padding(.horizontal, 14).padding(.vertical, 8)
                             .background(
-                                human.coconutBalance >= item.cost ? Color.goYellow : Color.ohanaControlFill,
+                                canRedeem ? Color.goYellow : Color.ohanaControlFill,
                                 in: Capsule()
                             )
                     }
-                    .disabled(human.coconutBalance < item.cost)
+                    .disabled(!canRedeem)
                     .buttonStyle(ScaleButtonStyle())
 
-                    Button {
-                        modelContext.delete(item)
-                        modelContext.safeSave()
-                    } label: {
+                    Button { delete(item: item) } label: {
                         Image(systemName: "trash")
                             .font(OhanaFont.footnote())
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
@@ -271,13 +279,7 @@ struct HumanWishlistView: View {
                 Spacer()
 
                 Button {
-                    let item = WishlistItem(title: newTitle, cost: newCost,
-                                           creatorId: human.id.uuidString)
-                    modelContext.insert(item)
-                    modelContext.safeSave()
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    newTitle = ""; newCost = 10
-                    showAddSheet = false
+                    createWish()
                 } label: {
                     Text("保存心愿")
                         .font(OhanaFont.headline(.black))
@@ -295,25 +297,72 @@ struct HumanWishlistView: View {
         .presentationDragIndicator(.hidden)
     }
 
-    // MARK: - Redeem Logic
+    // MARK: - Command Intents
+
+    private func createWish() {
+        let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        let cost = newCost
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        newTitle = ""
+        newCost = 10
+        showAddSheet = false
+
+        let command = DomainCommand.humanWishlistCreate(humanID: human.id)
+        commandQueue.enqueue(command) {
+            do {
+                try HumanWishlistCommandExecutor(context: modelContext).createItem(
+                    input: HumanWishlistCommandInput(title: title, cost: cost),
+                    for: human,
+                    note: "humanWishlist.create"
+                )
+            } catch {
+                ReadModelRevisionCenter.shared.publishFailure(command: command, error: error)
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
+    }
+
+    private func delete(item: WishlistItem) {
+        let command = DomainCommand.humanWishlistDelete(humanID: human.id, itemID: item.id)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            do {
+                try HumanWishlistCommandExecutor(context: modelContext).deleteItem(
+                    item,
+                    for: human,
+                    note: "humanWishlist.delete"
+                )
+            } catch {
+                ReadModelRevisionCenter.shared.publishFailure(command: command, error: error)
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
+    }
+
     private func redeem(item: WishlistItem) {
-        guard human.coconutBalance >= item.cost else { return }
-        human.coconutBalance -= item.cost
-        item.isRedeemed = true
+        guard human.coconutBalance >= item.cost, !redeemingItemIDs.contains(item.id) else { return }
+        redeemingItemIDs.insert(item.id)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
-        let currentId = UserDefaults.standard.string(forKey: "currentActiveHumanId") ?? ""
-        item.redeemedById = currentId.isEmpty ? nil : currentId
-
-        QuestManager.shared.addCoconuts(
-            -item.cost,
-            emoji: "🎁",
-            title: "兑换「\(item.title)」",
-            actorId: human.id.uuidString,
-            actorName: human.name
-        )
-        modelContext.safeSave()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        withAnimation { showConfetti = true }
+        let command = DomainCommand.humanWishlistRedeem(humanID: human.id, itemID: item.id)
+        let redeemerId = activeHumanIdStr
+        commandQueue.enqueue(command) {
+            defer { redeemingItemIDs.remove(item.id) }
+            do {
+                try HumanWishlistCommandExecutor(context: modelContext).redeemItem(
+                    item,
+                    for: human,
+                    redeemedById: redeemerId,
+                    note: "humanWishlist.redeem"
+                )
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                withAnimation { showConfetti = true }
+            } catch {
+                ReadModelRevisionCenter.shared.publishFailure(command: command, error: error)
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
     }
 
     private func wishlistSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {

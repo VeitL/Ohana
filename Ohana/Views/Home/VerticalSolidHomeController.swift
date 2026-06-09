@@ -74,13 +74,16 @@ final class VerticalSolidHomeController: ObservableObject {
     }
 
     func select(_ tab: VerticalSolidHomeTab) {
-        let startedAt = CFAbsoluteTimeGetCurrent()
         guard selectedTab != tab else {
             deferredPrepareTask?.cancel()
             deferredPrepareTask = nil
             preparingTab = nil
             return
         }
+        let startedAt = AppFlowPerformance.start(
+            AppPerformanceFlows.homeTabSwitch,
+            note: ["to": tab.rawValue]
+        )
 
         deferredPrepareTask?.cancel()
         if preparedTabs.contains(tab) {
@@ -158,6 +161,12 @@ final class VerticalSolidHomeController: ObservableObject {
             startedAt: startedAt,
             note: String(describing: tab)
         )
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.homeTabSwitch,
+            AppPerformancePhases.firstFrame,
+            startedAt: startedAt,
+            note: ["from": previousTab.rawValue, "to": tab.rawValue]
+        )
 
         outgoingCleanupTask = OhanaFrameScheduler.runAfterNextFrame(
             milliseconds: outgoingCleanupDelayMilliseconds
@@ -168,6 +177,12 @@ final class VerticalSolidHomeController: ObservableObject {
             withTransaction(transaction) {
                 self.outgoingTab = nil
             }
+            AppFlowPerformance.mark(
+                AppPerformanceFlows.homeTabSwitch,
+                AppPerformancePhases.outgoingUnmounted,
+                startedAt: startedAt,
+                note: ["from": previousTab.rawValue, "to": tab.rawValue]
+            )
             self.outgoingCleanupTask = nil
         }
     }

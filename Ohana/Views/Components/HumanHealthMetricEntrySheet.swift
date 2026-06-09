@@ -36,7 +36,9 @@ struct HumanHealthMetricEntrySheet: View {
     @State private var scrollContentHeight: CGFloat = 0
     @State private var popupVisible = false
     @State private var isClosing = false
+    @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     init(
         human: Human,
@@ -192,6 +194,9 @@ struct HumanHealthMetricEntrySheet: View {
             withTransaction(transaction) {
                 scrollContentHeight = height
             }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
 
@@ -409,19 +414,22 @@ struct HumanHealthMetricEntrySheet: View {
     private var saveBar: some View {
         Button { save() } label: {
             HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
                     .font(.system(size: 16, weight: .bold))
-                Text(l.tr(zh: "保存指标", en: "Save metric", de: "Wert speichern"))
+                Text(isSaving
+                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+                    : l.tr(zh: "保存指标", en: "Save metric", de: "Wert speichern")
+                )
                     .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(isValid ? Color.goPrimary : Color.goPrimary.opacity(0.38), in: Capsule())
-            .opacity(isValid ? 1 : 0.62)
+            .background(isValid && !isSaving ? Color.goPrimary : Color.goPrimary.opacity(0.38), in: Capsule())
+            .opacity(isValid && !isSaving ? 1 : 0.62)
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!isValid)
+        .disabled(!isValid || isSaving)
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 14)
@@ -448,23 +456,32 @@ struct HumanHealthMetricEntrySheet: View {
         .padding(.horizontal, 20)
     }
 
+    @MainActor
     private func save() {
-        guard let value = parsedValue, value > 0, value.isFinite else { return }
+        guard !isSaving, let value = parsedValue, value > 0, value.isFinite else { return }
+        isSaving = true
+        let savedUnitCode = selectedUnit.code
+        let savedDate = recordDate
+        let savedNotes = notes
+        let command = DomainCommand.humanHealthMetric(humanID: human.id, metricKey: metric.key)
 
-        let log = HumanHealthMetricLog(
-            metricKey: metric.key,
-            unitCode: selectedUnit.code,
-            value: value,
-            date: recordDate,
-            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
-            human: human
-        )
-        modelContext.insert(log)
-        human.healthMetricLogs.append(log)
-        modelContext.safeSave()
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        onSaved?(log)
-        close()
+        commandQueue.enqueue(command) {
+            guard let result = HumanCareCommandExecutor(context: modelContext).recordHealthMetric(
+                human: human,
+                metricKey: metric.key,
+                unitCode: savedUnitCode,
+                value: value,
+                date: savedDate,
+                notes: savedNotes,
+                note: "human.health.metric"
+            ) else {
+                isSaving = false
+                return
+            }
+            onSaved?(result.log)
+            close()
+        }
     }
 
     private func close() {

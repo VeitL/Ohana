@@ -14,10 +14,13 @@ struct PlantDashboardView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Plant.createdAt) private var plants: [Plant]
     @AppStorage("appLanguage") private var appLanguage = "zh"
+    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingAddPlant = false
 
     private var l: L10n { L10n(appLanguage) }
+    private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext) }
 
     private var plantsNeedingWater: [Plant] {
         plants.filter { $0.needsWatering }
@@ -48,6 +51,9 @@ struct PlantDashboardView: View {
         }
         .sheet(isPresented: $showingAddPlant) {
             AddPlantView { }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
 
@@ -155,7 +161,7 @@ struct PlantDashboardView: View {
             } label: {
                 Image(systemName: "drop.fill")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.arkInk)
                     .frame(width: 28, height: 28)
                     .background(.cyan, in: Circle())
             }
@@ -235,7 +241,7 @@ struct PlantDashboardView: View {
                 Text(l.tr(zh: "需浇水", en: "Water", de: "Gießen"))
                     .font(.system(size: 9, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(.cyan, in: Capsule())
@@ -246,7 +252,7 @@ struct PlantDashboardView: View {
                 Text(l.tr(zh: "需施肥", en: "Fertilize", de: "Düngen"))
                     .font(.system(size: 9, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(.orange, in: Capsule())
@@ -297,39 +303,22 @@ struct PlantDashboardView: View {
 
     private func waterPlant(_ plant: Plant) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        plant.lastWateredDate = Date()
-        let log = PlantCareLog(date: Date(), careType: .watering)
-        log.plant = plant
-        modelContext.insert(log)
-        let event = Event(
-            title: l.tr(zh: "💧 给 \(plant.name) 浇水", en: "💧 Water \(plant.name)", de: "💧 \(plant.name) gießen"),
-            startDate: Date(),
-            isAllDay: false,
-            eventType: EventType.watering.rawValue,
-            relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
-        )
-        modelContext.insert(event)
-        modelContext.safeSave()
+        let plantID = plant.id
+        commandQueue.enqueue(.plantCare(plantID: plantID, action: PlantCareType.watering.rawValue)) {
+            commandExecutor.recordPlantCare(.watering, plantID: plantID, executorId: currentExecutorId())
+        }
     }
 
     private func waterAll() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        for plant in plantsNeedingWater {
-            plant.lastWateredDate = Date()
-            let log = PlantCareLog(date: Date(), careType: .watering)
-            log.plant = plant
-            modelContext.insert(log)
-            let event = Event(
-                title: l.tr(zh: "💧 给 \(plant.name) 浇水", en: "💧 Water \(plant.name)", de: "💧 \(plant.name) gießen"),
-                startDate: Date(),
-                isAllDay: false,
-                eventType: EventType.watering.rawValue,
-                relatedEntityType: EntityKind.plant.rawValue,
-                relatedEntityId: plant.id.uuidString
-            )
-            modelContext.insert(event)
+        for plantID in plantsNeedingWater.map(\.id) {
+            commandQueue.enqueue(.plantCare(plantID: plantID, action: PlantCareType.watering.rawValue)) {
+                commandExecutor.recordPlantCare(.watering, plantID: plantID, executorId: currentExecutorId())
+            }
         }
-        modelContext.safeSave()
+    }
+
+    private func currentExecutorId() -> String? {
+        activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
     }
 }

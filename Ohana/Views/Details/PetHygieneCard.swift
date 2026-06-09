@@ -11,6 +11,7 @@ struct PetHygieneCard: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Household.createdAt) private var households: [Household]
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var longPressedType: HygieneType? = nil
     @State private var showHygieneDetail = false
     @State private var undoLog: PetHygieneLog? = nil
@@ -75,8 +76,7 @@ struct PetHygieneCard: View {
                     Spacer()
                     Button {
                         if let log = undoLog {
-                            modelContext.delete(log)
-                            modelContext.safeSave()
+                            delete(log)
                         }
                         withAnimation(GoMotion.feedback) { undoLog = nil }
                     } label: {
@@ -97,6 +97,18 @@ struct PetHygieneCard: View {
                     .presentationDragIndicator(.hidden)
             }
     }
+
+    private func delete(_ log: PetHygieneLog) {
+        let command = DomainCommand.petHygieneDelete(petID: pet.id, recordID: log.id)
+        OhanaFeedback.light()
+        commandQueue.enqueue(command) {
+            PetHygieneCommandExecutor(context: modelContext).delete(
+                log,
+                pet: pet,
+                note: "pet.hygiene.undo"
+            )
+        }
+    }
 }
 
 // MARK: - U16 护理详情 Sheet（GO Club 沉浸式重构）
@@ -104,6 +116,7 @@ private struct HygieneDetailSheet: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var isLitterPet: Bool {
         ["猫", "兔子", "仓鼠", "龙猫", "豚鼠"].contains(pet.species)
@@ -276,7 +289,7 @@ private struct HygieneDetailSheet: View {
                                 .foregroundStyle(Color.arkInk.opacity(0.7))
                             Spacer()
                             Button {
-                                modelContext.delete(log); modelContext.safeSave()
+                                delete(log)
                             } label: {
                                 Image(systemName: "trash")
                                     .font(.system(size: 11))
@@ -292,6 +305,18 @@ private struct HygieneDetailSheet: View {
         .padding(14)
         .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
+
+    private func delete(_ log: PetHygieneLog) {
+        let command = DomainCommand.petHygieneDelete(petID: pet.id, recordID: log.id)
+        OhanaFeedback.light()
+        commandQueue.enqueue(command) {
+            PetHygieneCommandExecutor(context: modelContext).delete(
+                log,
+                pet: pet,
+                note: "pet.hygiene.detail.delete"
+            )
+        }
+    }
 }
 
 // MARK: - C6 Hygiene Check Button（仅打卡按钮，状态颜色+长按设置）
@@ -303,6 +328,7 @@ private struct HygieneCheckButton: View {
     let onLongPress: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var justChecked = false
 
     private var logs: [PetHygieneLog] {
@@ -350,16 +376,21 @@ private struct HygieneCheckButton: View {
         guard !isDoneToday else { return }
         let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
             .flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetHygieneLog(date: Date(), type: type, pet: pet, executorId: executorId)
-        modelContext.insert(log)
-        modelContext.safeSave()
+        let command = DomainCommand.petHygieneRecord(petID: pet.id, type: type.rawValue)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         withAnimation(GoMotion.feedback) { justChecked = true }
+        commandQueue.enqueue(command) {
+            let recorded = PetHygieneCommandExecutor(context: modelContext).record(
+                pet: pet,
+                type: type,
+                executorId: executorId,
+                note: "pet.hygiene.card.record"
+            )
+            onUndo?(recorded.log)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation { justChecked = false }
         }
-        // U16: 通知父视图显示撤回 toast
-        onUndo?(log)
     }
 }
 
@@ -374,6 +405,7 @@ struct HygieneTodoSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var startDate: Date = Date()
     @State private var isAllDay: Bool = true
     @State private var startTime: Date = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
@@ -381,6 +413,7 @@ struct HygieneTodoSheet: View {
     @State private var hasEndDate: Bool = false
     @State private var repeatDays: Int = 0
     @State private var customNote: String = ""
+    @State private var isSaving = false
 
     private var repeatDescription: String {
         switch repeatDays {
@@ -534,6 +567,7 @@ struct HygieneTodoSheet: View {
                 .background(accent, in: RoundedRectangle(cornerRadius: 14))
             }
             .buttonStyle(ScaleButtonStyle())
+            .disabled(isSaving)
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
         }
@@ -559,58 +593,30 @@ struct HygieneTodoSheet: View {
 
     // MARK: - Save（写单个 Event + recurrenceDays，不展开实例）
     private func save() {
-        let cal = Calendar.current
-        let title = "\(pet.name) — \(type.rawValue)"
-        let fullTitle = customNote.isEmpty ? title : "\(title) — \(customNote)"
-
-        let dayStart = cal.startOfDay(for: startDate)
-        let time = cal.dateComponents([.hour, .minute], from: startTime)
-        let eventStart = isAllDay
-        ? dayStart
-        : (cal.date(bySettingHour: time.hour ?? 9, minute: time.minute ?? 0, second: 0, of: dayStart) ?? dayStart)
-        let reminderTime = isAllDay
-        ? (cal.date(bySettingHour: 9, minute: 0, second: 0, of: dayStart) ?? dayStart)
-        : eventStart
-        var eventEndDate: Date? = nil
-        if hasEndDate {
-            let endDay = cal.startOfDay(for: endDate)
-            eventEndDate = isAllDay
-            ? endDay
-            : (cal.date(bySettingHour: time.hour ?? 9, minute: time.minute ?? 0, second: 0, of: endDay) ?? endDay)
-        }
-
-        let event = Event(
-            title: fullTitle,
-            startDate: eventStart,
-            endDate: eventEndDate,
+        guard !isSaving else { return }
+        isSaving = true
+        let input = PetHygienePlanCommandInput(
+            startDate: startDate,
             isAllDay: isAllDay,
-            eventType: EventType.grooming.rawValue,
-            relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: pet.id.uuidString
+            startTime: startTime,
+            hasEndDate: hasEndDate,
+            endDate: endDate,
+            repeatDays: repeatDays,
+            customNote: customNote
         )
-        event.recurrenceDays = repeatDays
-        if hasEndDate {
-            event.recurrenceEndDate = cal.startOfDay(for: endDate)
-        } else if repeatDays > 0 {
-            event.recurrenceEndDate = cal.date(byAdding: .year, value: 1, to: dayStart)
-        }
-        if repeatDays > 0 {
-            CarePlanCalendarSync.suppressDefaultPlan(kind: "groom", pet: pet, context: modelContext)
-            HygieneType.setCustomCycleDays(repeatDays, for: type, petId: pet.id)
-        }
-        modelContext.insert(event)
+        let command = DomainCommand.petHygienePlan(petID: pet.id, type: type.rawValue)
 
-        let reminder = Reminder(event: event, scheduledAt: reminderTime)
-        reminder.status = "pending"
-        modelContext.insert(reminder)
-
-        modelContext.safeSave()
-        Task { @MainActor in
-            await ReminderSchedulingService.scheduleIfNeeded(reminder: reminder, context: modelContext, source: .detail)
-        }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        onSave?()
-        dismiss()
+        commandQueue.enqueue(command) {
+            PetHygieneCommandExecutor(context: modelContext).createPlan(
+                pet: pet,
+                type: type,
+                input: input,
+                note: "pet.hygiene.plan"
+            )
+            onSave?()
+            dismiss()
+        }
     }
 }
 

@@ -14,14 +14,19 @@ struct OasisHomeTabHost: View {
 
     @State private var showsLiveContent = false
     @State private var forwardedInjectEnergyTrigger = 0
+    @State private var liveContentMountTask: Task<Void, Never>?
     @State private var injectHandoffTask: Task<Void, Never>?
+    @State private var oasisFlowStartedAt: CFAbsoluteTime?
+    @State private var didRecordShellReady = false
+    @State private var didRecordLiveReady = false
+    @State private var didRecordContentMounted = false
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     private var l: L10n { L10n(appLanguage) }
 
     private var shouldRenderLiveContent: Bool {
         guard !lifecycle.isPreparingForDisplay else { return false }
-        return showsLiveContent || lifecycle.isPrepared || lifecycle.isVisible || lifecycle.isLive
+        return showsLiveContent && lifecycle.isLive
     }
 
     var body: some View {
@@ -49,10 +54,26 @@ struct OasisHomeTabHost: View {
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 10)
         .padding(.top, 4)
-        .onAppear(perform: updateLiveContentGate)
+        .onAppear {
+            resetFlowIfNeeded()
+            updateLiveContentGate()
+        }
         .onDisappear {
+            liveContentMountTask?.cancel()
+            liveContentMountTask = nil
             injectHandoffTask?.cancel()
             injectHandoffTask = nil
+            if let oasisFlowStartedAt {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.oasisOpen,
+                    AppPerformancePhases.routeDismiss,
+                    startedAt: oasisFlowStartedAt
+                )
+            }
+            oasisFlowStartedAt = nil
+            didRecordShellReady = false
+            didRecordLiveReady = false
+            didRecordContentMounted = false
         }
         .onChange(of: lifecycle) { _, _ in
             updateLiveContentGate()
@@ -64,36 +85,121 @@ struct OasisHomeTabHost: View {
 
     private func updateLiveContentGate() {
         if lifecycle.isPreparingForDisplay {
+            liveContentMountTask?.cancel()
+            liveContentMountTask = nil
             injectHandoffTask?.cancel()
-            var transaction = Transaction(animation: nil)
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                showsLiveContent = false
-            }
+            unmountLiveContent()
             injectHandoffTask = nil
             return
         }
 
-        if lifecycle.isPrepared || lifecycle.isVisible || lifecycle.isLive {
-            if !showsLiveContent {
-                var transaction = Transaction(animation: nil)
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    showsLiveContent = true
-                }
+        if lifecycle.isLive {
+            let startedAt = ensureFlowStarted()
+            recordShellReadyIfNeeded(startedAt: startedAt, source: "live_preview_shell")
+            if !didRecordLiveReady {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.oasisOpen,
+                    AppPerformancePhases.firstFrame,
+                    startedAt: startedAt,
+                    note: ["source": "preview_shell"]
+                )
+                didRecordLiveReady = true
             }
-            if lifecycle.isLive {
-                schedulePendingInjectHandoff()
-            }
+            scheduleLiveContentMount(startedAt: startedAt)
+            schedulePendingInjectHandoff()
+        } else if lifecycle.isVisible || lifecycle.isPrepared {
+            let startedAt = ensureFlowStarted()
+            recordShellReadyIfNeeded(startedAt: startedAt, source: "preview_shell")
+            liveContentMountTask?.cancel()
+            liveContentMountTask = nil
+            unmountLiveContent()
         } else {
+            liveContentMountTask?.cancel()
+            liveContentMountTask = nil
             injectHandoffTask?.cancel()
+            unmountLiveContent()
+            injectHandoffTask = nil
+        }
+    }
+
+    private func resetFlowIfNeeded() {
+        guard lifecycle.isPrepared || lifecycle.isVisible || lifecycle.isLive else {
+            oasisFlowStartedAt = nil
+            didRecordShellReady = false
+            didRecordLiveReady = false
+            didRecordContentMounted = false
+            return
+        }
+    }
+
+    private func ensureFlowStarted() -> CFAbsoluteTime {
+        if let oasisFlowStartedAt {
+            return oasisFlowStartedAt
+        }
+        let startedAt = AppFlowPerformance.start(
+            AppPerformanceFlows.oasisOpen,
+            note: ["source": "home_tab"]
+        )
+        oasisFlowStartedAt = startedAt
+        return startedAt
+    }
+
+    private func recordShellReadyIfNeeded(startedAt: CFAbsoluteTime, source: String) {
+        guard !didRecordShellReady else { return }
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.oasisOpen,
+            AppPerformancePhases.shellReady,
+            startedAt: startedAt,
+            note: [
+                "prepared": lifecycle.isPrepared ? "true" : "false",
+                "source": source
+            ]
+        )
+        didRecordShellReady = true
+    }
+
+    private func scheduleLiveContentMount(startedAt: CFAbsoluteTime) {
+        guard lifecycle.isLive else { return }
+        guard !showsLiveContent else {
+            recordContentMountedIfNeeded(startedAt: startedAt)
+            return
+        }
+        liveContentMountTask?.cancel()
+        liveContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
+            guard lifecycle.isLive else {
+                liveContentMountTask = nil
+                return
+            }
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                showsLiveContent = false
+                showsLiveContent = true
             }
-            injectHandoffTask = nil
+            recordContentMountedIfNeeded(startedAt: startedAt)
+            liveContentMountTask = nil
+            schedulePendingInjectHandoff()
         }
+    }
+
+    private func recordContentMountedIfNeeded(startedAt: CFAbsoluteTime) {
+        guard !didRecordContentMounted else { return }
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.oasisOpen,
+            AppPerformancePhases.contentMounted,
+            startedAt: startedAt,
+            note: ["source": "home_tab_live"]
+        )
+        didRecordContentMounted = true
+    }
+
+    private func unmountLiveContent() {
+        guard showsLiveContent else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            showsLiveContent = false
+        }
+        didRecordContentMounted = false
     }
 
     private func handleInjectEnergyTriggerChanged(_ newValue: Int) {
@@ -217,10 +323,11 @@ private struct OasisHomeTabPreview: View {
                     .frame(height: 10)
 
                     HStack {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "bolt.fill") // a11y: allow decorative progress icon paired with numeric text
+                            .font(OhanaFont.footnote(.black))
                             .symbolRenderingMode(.monochrome)
                             .foregroundStyle(Color.goPrimary)
+                            .accessibilityHidden(true)
                         Text("\(Int(progress * 100))%")
                             .font(OhanaFont.caption(.black))
                             .foregroundStyle(Color.ohanaSecondaryText)
@@ -246,19 +353,20 @@ private struct OasisHomeTabPreview: View {
     private func previewTile(icon: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .black))
+                .font(OhanaFont.title3(.black))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 32, height: 32)
+                .frame(width: 32, height: 32) // a11y: allow decorative preview icon frame
                 .background(Color.ohanaControlFill, in: Circle())
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 6) {
                 Capsule()
                     .fill(Color.ohanaSecondaryText.opacity(0.22))
-                    .frame(width: 58, height: 7)
+                    .frame(width: 58, height: 7) // a11y: allow decorative skeleton bar
                 Capsule()
                     .fill(Color.ohanaSecondaryText.opacity(0.14))
-                    .frame(width: 38, height: 6)
+                    .frame(width: 38, height: 6) // a11y: allow decorative skeleton bar
             }
             Spacer(minLength: 0)
         }

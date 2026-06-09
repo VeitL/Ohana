@@ -1,5 +1,7 @@
 # Ohana (欧哈纳) iOS App 完整技术文档
 
+> **历史参考 / 非规则源**：本文档记录旧 Ark/Ohana 实现历史，包含过时 schema、模拟器、App Group、UI token 或目录结构时，以 `AGENTS.md`、`ui规范.selection.json`、`docs/governance/manifests/`、当前 `docs/` 治理文档和源码为准。
+
 > 最后更新: 2026-03-28 | Schema: ArkSchemaV22 | Phase 1-79 + 第二十章～第四十七章 | 编译: iPhone 17 Pro Simulator, iOS 26.2
 
 ---

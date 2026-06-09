@@ -1,0 +1,153 @@
+{
+  "schema": "ohana.governance.runtime-energy-ownership.v1",
+  "updated": "2026-06-08",
+  "policyDocuments": [
+    "AGENTS.md",
+    "docs/app-architecture-governance.md",
+    "docs/startup-and-lazy-loading-policy.md",
+    "docs/performance-and-observability.md",
+    "docs/reliability-slo.md"
+  ],
+  "runtimeSurfaces": [
+    {
+      "id": "app-workload-policy-root",
+      "owner": "App runtime owner",
+      "scope": "global policy",
+      "runtimeClasses": [
+        "scene phase",
+        "low power mode",
+        "reduce motion",
+        "user power saving",
+        "motion budget",
+        "refresh budget"
+      ],
+      "visibilityGate": "All runtime consumers must ask AppWorkloadPolicy for visible, hidden, foreground, background, and active-walk budgets.",
+      "lowPowerGate": "ambientMotionBudget returns static and refreshBudget returns throttled when Low Power Mode is active.",
+      "reduceMotionGate": "interactionMotionBudget downgrades to efficient and ambientMotionBudget returns static when Reduce Motion is active.",
+      "backgroundGate": "ambient work pauses in background except explicitly active walk refreshes.",
+      "policyGate": "scripts/audit-runtime-guardrails.sh --all plus this manifest audit.",
+      "evidence": "AppWorkloadPolicy probes policy changes through AppPerformanceMonitor and is invoked by high-traffic views.",
+      "paths": [
+        "Ohana/Utilities/AppRuntimePolicy.swift",
+        "Ohana/Utilities/AppLifecycleCoordinator.swift",
+        "Ohana/Utilities/SurfaceActivityGate.swift"
+      ]
+    },
+    {
+      "id": "active-walk-location",
+      "owner": "Walking and location owner",
+      "scope": "active walk only",
+      "runtimeClasses": [
+        "Core Location",
+        "background location",
+        "idle timer",
+        "map route refresh"
+      ],
+      "visibilityGate": "Location can stay active only while PetWalkingManager has an active dog walk.",
+      "lowPowerGate": "Non-walk refreshes are throttled or paused by AppWorkloadPolicy; active-walk refreshes use the explicit active-walk exception.",
+      "reduceMotionGate": "Map cosmetic motion must use ambientMotionBudget and can be disabled without stopping location safety.",
+      "backgroundGate": "Background location is allowed only for a running walk; paused/stopped/non-walk states stop updates.",
+      "policyGate": "scripts/audit-runtime-guardrails.sh --all restricts CLLocationManager and background location to the centralized location files.",
+      "evidence": "Runtime guardrails pass full repo; route cosmetic effects are AppWorkloadPolicy gated.",
+      "paths": [
+        "Ohana/Models/LocationManager.swift",
+        "Ohana/Models/PetWalkingManager.swift",
+        "Ohana/Views/Home/WalkTrackingCard.swift",
+        "Ohana/Views/Home/WalkInProgressPill.swift",
+        "Ohana/Views/Components/RainbowWalkEffects.swift",
+        "Ohana/Views/Details/WalkDetailView.swift"
+      ]
+    },
+    {
+      "id": "home-high-traffic-ambient-motion",
+      "owner": "Home feature owner",
+      "scope": "visible home surfaces",
+      "runtimeClasses": [
+        "repeatForever",
+        "TimelineView animation",
+        "ambient particles",
+        "deferred frame tasks"
+      ],
+      "visibilityGate": "Home ambient work may run only while the surface is visible, live, and not covered by a frozen handoff.",
+      "lowPowerGate": "Ambient loops must ask AppWorkloadPolicy or SurfaceActivityGate and fall back to static/reduced visuals.",
+      "reduceMotionGate": "Reduce Motion disables decorative loops and keeps interaction feedback lightweight.",
+      "backgroundGate": "Hidden/off-tab home surfaces are unmounted or rendered as static shells.",
+      "policyGate": "scripts/audit-smoothness-risk.sh --changed and scripts/audit-runtime-guardrails.sh --all block new unowned loops.",
+      "evidence": "Round 3 Oasis host/live snapshot repair; Today Focus and streak particles are policy gated.",
+      "paths": [
+        "Ohana/Views/Home/OasisHomeTabHost.swift",
+        "Ohana/Views/Home/OasisRewardView.swift",
+        "Ohana/Views/Home/OasisRewardSnapshots.swift",
+        "Ohana/Views/Home/TodayFocusCard.swift",
+        "Ohana/Views/Home/StreakFlameParticles.swift",
+        "Ohana/Views/Home/BeautifulCoconutTree.swift",
+        "Ohana/Views/Home/FocusHomeVerticalSolidScene.swift"
+      ]
+    },
+    {
+      "id": "app-background-ambient-surfaces",
+      "owner": "Design system owner",
+      "scope": "full-screen background",
+      "runtimeClasses": [
+        "repeatForever",
+        "Canvas",
+        "custom photo decode",
+        "static handoff background"
+      ],
+      "visibilityGate": "Use OhanaStaticAppBackground for high-frequency presentation handoffs; animated backgrounds run only when chosen and visible.",
+      "lowPowerGate": "ArkBackgroundView switches to static gradients when AppWorkloadPolicy requests static ambient motion.",
+      "reduceMotionGate": "Reduce Motion participates in AppWorkloadPolicy and disables ambient background loops.",
+      "backgroundGate": "Background ambient loops stop when the app is not foreground through AppWorkloadPolicy.",
+      "policyGate": "Runtime guardrails require AppWorkloadPolicy for repeatForever/TimelineView animation files.",
+      "evidence": "OhanaStaticAppBackground exists for route opens and ArkBackgroundView consumes AppWorkloadPolicy.",
+      "paths": [
+        "Ohana/Views/ArkBackgroundView.swift",
+        "Ohana/Views/OhanaDesignSystem.swift"
+      ]
+    },
+    {
+      "id": "route-presentation-deferrals",
+      "owner": "Navigation and presentation owner",
+      "scope": "route-scoped handoff tasks",
+      "runtimeClasses": [
+        "OhanaFrameScheduler",
+        "sheet entry",
+        "sheet exit",
+        "route-scoped cancellation"
+      ],
+      "visibilityGate": "Deferred mount tasks are owned by the route/sheet host and cancelled when dismissed or hidden.",
+      "lowPowerGate": "Reduced-work modes shorten or remove nonessential visual delays through interactionMotionBudget.",
+      "reduceMotionGate": "Reduced Motion uses GoMotion.reduced or shorter delays before content mount.",
+      "backgroundGate": "Route-scoped tasks cancel on disappearance rather than continuing in background.",
+      "policyGate": "Changed-file smoothness audit and performance SLO manifest track high-frequency route handoffs.",
+      "evidence": "Calendar add-event, settings sheets, and Oasis host use cancellable OhanaFrameScheduler tasks.",
+      "paths": [
+        "Ohana/Utilities/AppRuntimePolicy.swift",
+        "Ohana/Views/CalendarView.swift",
+        "Ohana/Views/Home/FocusHomeRouteSheetModifier.swift",
+        "Ohana/Views/Home/OasisHomeTabHost.swift",
+        "Ohana/Views/SettingsView.swift"
+      ]
+    },
+    {
+      "id": "design-preview-labs",
+      "owner": "Design tooling owner",
+      "scope": "non-production design/reference tooling",
+      "runtimeClasses": [
+        "TimelineView animation",
+        "preview canvas",
+        "motion lab delays"
+      ],
+      "visibilityGate": "Design preview loops must remain isolated to explicit design/spec routes and never mount in app startup or high-frequency home paths.",
+      "lowPowerGate": "Preview canvases must expose reduced-work paths when used in app surfaces.",
+      "reduceMotionGate": "Preview canvases consume AppWorkloadPolicy or explicit reduced-work parameters.",
+      "backgroundGate": "Preview/lab surfaces are route scoped and should not continue when dismissed.",
+      "policyGate": "Runtime guardrails and changed-file smoothness audit catch new TimelineView(.animation) usage.",
+      "evidence": "Design preview files are isolated under design/spec and lab views, not startup.",
+      "paths": [
+        "Ohana/Views/Details/DesignSpecPreviewCanvasV4.swift",
+        "Ohana/Views/MotionPreviewLabView.swift"
+      ]
+    }
+  ]
+}

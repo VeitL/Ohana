@@ -29,6 +29,7 @@ struct ExpandedHumanFeaturesSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @Query private var allPets: [Pet]
     @Query private var allHumans: [Human]
     @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
@@ -598,36 +599,44 @@ struct ExpandedHumanFeaturesSheet: View {
 
     private func completeReminder(_ reminder: Reminder) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        ReminderCompletionService.complete(reminder, by: human.id.uuidString, context: modelContext)
+        ReminderCommandExecutor(context: modelContext).complete(
+            reminder,
+            by: human.id.uuidString,
+            note: "expanded.human.reminder.complete"
+        )
     }
 
     private func skipReminder(_ reminder: Reminder) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        ReminderCompletionService.skip(reminder, by: human.id.uuidString, context: modelContext)
+        ReminderCommandExecutor(context: modelContext).skip(
+            reminder,
+            by: human.id.uuidString,
+            note: "expanded.human.reminder.skip"
+        )
     }
 
     private func deleteHumanAndDismiss() {
-        let deletedHumanId = human.id.uuidString
-        let hasRemainingHuman = allHumans.contains { $0.id.uuidString != deletedHumanId }
-        let deletedCurrentHuman = activeHumanIdStr == deletedHumanId
-        let requiresReplacementHuman = !hasRemainingHuman
-        let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
-
-        if deletedCurrentHuman || requiresReplacementHuman {
-            activeHumanIdStr = ""
+        let command = DomainCommand.memberDeletion(entityID: human.id, kind: EntityKind.human.rawValue)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            let result = MemberCommandExecutor(context: modelContext).deleteHuman(
+                human,
+                activeHumanID: activeHumanIdStr,
+                note: "expandedHumanFeatures.delete"
+            )
+            if result.clearsActiveHumanID {
+                activeHumanIdStr = ""
+            }
+            NotificationCenter.default.post(
+                name: .ohanaReturnHomeAfterHumanDeletion,
+                object: nil,
+                userInfo: [
+                    "requiresReplacementHuman": result.requiresReplacementHuman,
+                    "requiresAccountSwitch": result.requiresAccountSwitch
+                ]
+            )
+            dismiss()
         }
-
-        modelContext.delete(human)
-        modelContext.safeSave()
-        NotificationCenter.default.post(
-            name: .ohanaReturnHomeAfterHumanDeletion,
-            object: nil,
-            userInfo: [
-                "requiresReplacementHuman": requiresReplacementHuman,
-                "requiresAccountSwitch": requiresAccountSwitch
-            ]
-        )
-        dismiss()
     }
 
     private var rowBackground: some View {

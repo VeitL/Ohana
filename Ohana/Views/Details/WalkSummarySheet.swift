@@ -13,6 +13,7 @@ struct WalkSummarySheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var selectedWalk: PetWalkLog? = nil
     @State private var showingGoalSetter = false
     @State private var goalDraft: Double = 0
@@ -179,11 +180,19 @@ struct WalkSummarySheet: View {
 
             // 保存按钮
             Button {
-                walk.moodRating = draftMoodRating
-                walk.behaviorNotes = draftNotes.isEmpty ? nil : draftNotes
-                modelContext.safeSave()
+                let rating = draftMoodRating
+                let notes = draftNotes
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 withAnimation { moodSaved = true }
+                commandQueue.enqueue(.petWalkSummary(petID: pet.id, walkID: walk.id)) {
+                    PetWalkCommandExecutor(context: modelContext).saveSummary(
+                        for: walk,
+                        pet: pet,
+                        moodRating: rating,
+                        notes: notes,
+                        note: "walk.summary.mood"
+                    )
+                }
             } label: {
                 Text("保存")
                     .font(.system(size: 14, weight: .black, design: .rounded))
@@ -323,10 +332,16 @@ struct WalkSummarySheet: View {
             }
 
             Button {
-                pet.weeklyWalkGoalKm = goalDraft
-                modelContext.safeSave()
+                let goal = goalDraft
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 showingGoalSetter = false
+                commandQueue.enqueue(.petWalkGoal(petID: pet.id)) {
+                    PetWalkCommandExecutor(context: modelContext).saveWeeklyGoal(
+                        goal,
+                        for: pet,
+                        note: "walk.summary.goal"
+                    )
+                }
             } label: {
                 Text(goalDraft == 0 ? "清除目标" : "保存目标")
                     .font(.system(size: 15, weight: .black, design: .rounded))

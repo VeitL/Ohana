@@ -15,7 +15,7 @@ Ohana 需要一套视觉统一、适合 iOS 宠物卡片展示的默认宠物头
 - coat：毛色 / 花纹
 - eye：不作为资产维度；所有头像统一黑色卡通眼睛
 
-每一个有效组合生成一张透明背景 PNG。资源将放入 App Bundle 的 `PetAvatarAssets/` 中，并通过 Swift 侧静态索引读取。
+每一个有效组合生成一张透明背景 PNG。源码资源位于 `Resources/Avatars/PetAvatarAssets/`，构建后作为 App Bundle 的 `PetAvatarAssets/` 子目录，并通过 Swift 侧静态索引读取。
 
 生成方式要求：正式入库头像必须逐张独立生成。不能用单张底图批量换毛色、换瞳色或做后期批量涂色来代替独立渲染。
 
@@ -314,7 +314,7 @@ teal neckerchief
 3. 将源图保存到 `tmp/imagegen/<breed>_sources/`，文件名后缀使用 `_chroma.png`。
 4. 用本地透明处理脚本移除色键，输出到 `tmp/imagegen/<breed>_alpha/`。
 5. 验证 alpha 源图必须为 `RGBA`，四角 alpha 为 `0`，主体 alpha bbox 高度约占画布 `92% - 98%`，且边缘没有明显色键残留。
-6. 将通过验证的 alpha 源图校正为 `600x800` RGBA PNG 后，才能复制到 `PetAvatarAssets/`，并使用正式文件名替换旧图。禁止把 `1200x1600` 作为默认中间产物。
+6. 将通过验证的 alpha 源图校正为 `600x800` RGBA PNG 后，才能复制到 `Resources/Avatars/PetAvatarAssets/`，并使用正式文件名替换旧图。禁止把 `1200x1600` 作为默认中间产物。
 7. 禁止用一张或两张底图批量调色生成整套头像；每个 `gender + coat` 组合都必须由生成模型独立渲染。
 
 透明处理建议命令：

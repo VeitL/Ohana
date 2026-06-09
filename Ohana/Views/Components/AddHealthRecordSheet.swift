@@ -21,6 +21,7 @@ struct AddHealthRecordSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var selectedType: HealthLogType
 
@@ -33,6 +34,8 @@ struct AddHealthRecordSheet: View {
     @State private var expirationDate: Date = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var hasNextCheckup: Bool = false
     @State private var nextCheckupDate: Date = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
+    @State private var isSaving = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     init(pet: Pet, type: HealthLogType, entryMode: HealthRecordEntryMode? = nil) {
         self.pet = pet
@@ -83,6 +86,10 @@ struct AddHealthRecordSheet: View {
         case .surgery:           return "就诊记录"
         default:                 return selectedType.rawValue
         }
+    }
+
+    private var activeExecutorID: String? {
+        activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
     }
 
     var body: some View {
@@ -251,14 +258,22 @@ struct AddHealthRecordSheet: View {
 
                         // 保存按钮
                         Button(action: save) {
-                            Text("保存记录")
-                                .font(.system(size: 16, weight: .black, design: .rounded))
-                                .foregroundStyle(Color.arkInk)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            HStack(spacing: 8) {
+                                Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
+                                    .font(.system(size: 16, weight: .black))
+                                Text(isSaving ? "保存中" : "保存记录")
+                                    .font(.system(size: 16, weight: .black, design: .rounded))
+                            }
+                            .foregroundStyle(Color.arkInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                isSaving ? Color.ohanaControlFill : Color.goPrimary,
+                                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            )
                         }
                         .buttonStyle(ScaleButtonStyle())
+                        .disabled(isSaving)
 
                         Spacer(minLength: 40)
                     }
@@ -286,6 +301,9 @@ struct AddHealthRecordSheet: View {
                 if hasExpiration {
                     expirationDate = defaultExpirationDate(from: newDate)
                 }
+            }
+            .onDisappear {
+                commandQueue.cancelAll()
             }
         }
     }
@@ -359,59 +377,31 @@ struct AddHealthRecordSheet: View {
     }
 
     private func save() {
-        // N9: 名称字段内容写入 note（如果填了名称则用它，否则用备注）
-        let finalNote = showsNameField ? (name.isEmpty ? note : name + (note.isEmpty ? "" : " - " + note)) : note
-        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-            .flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetHealthLog(date: date, type: selectedType, note: finalNote, pet: pet, executorId: executorId)
-        log.vetName = vetName
-        log.cost = CountryDecimalInput.parse(cost, countryCode: AppCountry.code) ?? 0
-        log.expirationDate = (showsExpiration && hasExpiration) ? expirationDate : nil
-        log.nextCheckupDate = (showsNextCheckup && hasNextCheckup) ? nextCheckupDate : nil
-        modelContext.insert(log)
-
-        // 同步费用记录
-        if let amount = CountryDecimalInput.parse(cost, countryCode: AppCountry.code), amount > 0 {
-            let expense = PetExpenseLog(date: date, amount: amount, category: .medical, note: typeLabel, pet: pet, executorId: executorId)
-            modelContext.insert(expense)
-        }
-
-        // 自动在日历创建到期提醒事件（疫苗 / 体内驱虫 / 体外驱虫）
-        if showsExpiration && hasExpiration {
-            autoCreateReminderEvent(on: expirationDate)
-        }
-
-        modelContext.safeSave()
-        QuestManager.shared.awardAction(type: .health, pet: pet, context: modelContext)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        dismiss()
-    }
-
-    private func autoCreateReminderEvent(on dueDate: Date) {
-        let eventType: EventType
-        let emoji: String
-        switch selectedType {
-        case .vaccine:
-            eventType = .vaccine
-            emoji = "💉"
-        case .dewormingInternal:
-            eventType = .internalDeworming
-            emoji = "🪱"
-        case .dewormingExternal:
-            eventType = .externalDeworming
-            emoji = "🛡️"
-        default:
-            return  // 其他类型不自动创建
-        }
-        let recordName = name.isEmpty ? typeLabel : name
-        let event = Event(
-            title: "\(emoji) \(pet.name) · \(recordName)到期提醒",
-            startDate: dueDate,
-            isAllDay: true,
-            eventType: eventType.rawValue,
-            relatedEntityType: EntityKind.pet.rawValue,
-            relatedEntityId: pet.id.uuidString
+        guard !isSaving else { return }
+        isSaving = true
+        let input = PetHealthRecordCommandInput(
+            type: selectedType,
+            date: date,
+            name: name,
+            note: note,
+            vetName: vetName,
+            cost: CountryDecimalInput.parse(cost, countryCode: AppCountry.code) ?? 0,
+            expirationDate: (showsExpiration && hasExpiration) ? expirationDate : nil,
+            nextCheckupDate: (showsNextCheckup && hasNextCheckup) ? nextCheckupDate : nil,
+            executorId: activeExecutorID,
+            source: .detail,
+            includesNameInNote: showsNameField
         )
-        modelContext.insert(event)
+        let command = DomainCommand.petHealthRecord(petID: pet.id, type: selectedType.rawValue)
+
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            PetHealthCommandExecutor(context: modelContext).recordHealth(
+                pet: pet,
+                input: input,
+                note: "pet.health.record"
+            )
+            dismiss()
+        }
     }
 }

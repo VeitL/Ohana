@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum CrewRosterMode: String, Equatable {
+enum CrewRosterMode: String, Hashable {
     case collaboration
     case members
 }

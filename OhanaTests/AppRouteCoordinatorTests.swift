@@ -31,6 +31,204 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet == .requiredAccountSwitch)
     }
 
+    @Test func accountSwitcherUsesGlobalSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentRequiredHumanProfile()
+        coordinator.presentAccountSwitcher()
+
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .accountSwitcher)
+    }
+
+    @Test func functionMenuUsesGlobalSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentSettings()
+        coordinator.presentFunctionMenu(destination: .plantsDashboard)
+
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .functionMenu(destination: .plantsDashboard))
+    }
+
+    @Test func calendarUsesGlobalSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+        let petID = UUID().uuidString
+
+        coordinator.presentSettings()
+        coordinator.presentCalendar(entityID: petID)
+
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .calendar(entityID: petID, humanID: nil))
+    }
+
+    @Test func addEntityUsesGlobalSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentSettings()
+        coordinator.presentAddEntity(.pet)
+
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .addEntity(.pet))
+    }
+
+    @Test func detailSheetUsesGlobalSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+        let petID = UUID()
+        let humanID = UUID()
+
+        coordinator.presentSettings()
+        coordinator.presentSheet(.petAllFeatures(petID))
+
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .petAllFeatures(petID))
+
+        coordinator.presentSheet(.petFood(petID))
+        #expect(coordinator.sheet == .petFood(petID))
+
+        coordinator.presentSheet(.petBasicInfo(petID))
+        #expect(coordinator.sheet == .petBasicInfo(petID))
+
+        coordinator.presentSheet(.petHealth(petID, initialSection: .preventive))
+        #expect(coordinator.sheet == .petHealth(petID, initialSection: .preventive))
+
+        coordinator.presentSheet(.petFeed(petID, opensManualSheet: true))
+        #expect(coordinator.sheet == .petFeed(petID, opensManualSheet: true))
+
+        coordinator.presentSheet(.petDocuments(petID))
+        #expect(coordinator.sheet == .petDocuments(petID))
+
+        coordinator.presentSheet(.petAchievements(petID))
+        #expect(coordinator.sheet == .petAchievements(petID))
+
+        coordinator.presentSheet(.petRetention(petID))
+        #expect(coordinator.sheet == .petRetention(petID))
+
+        coordinator.presentSheet(.petBondVault(petID))
+        #expect(coordinator.sheet == .petBondVault(petID))
+
+        coordinator.presentSheet(.humanAllFeatures(humanID))
+        #expect(coordinator.sheet == .humanAllFeatures(humanID))
+
+        coordinator.presentSheet(.humanBasicInfo(humanID))
+        #expect(coordinator.sheet == .humanBasicInfo(humanID))
+
+        coordinator.presentSheet(.humanMedication(humanID))
+        #expect(coordinator.sheet == .humanMedication(humanID))
+
+        coordinator.presentSheet(.humanWorkoutDashboard(humanID))
+        #expect(coordinator.sheet == .humanWorkoutDashboard(humanID))
+
+        coordinator.presentSheet(.humanMetrics(humanID))
+        #expect(coordinator.sheet == .humanMetrics(humanID))
+
+        coordinator.presentSheet(.humanReport(humanID))
+        #expect(coordinator.sheet == .humanReport(humanID))
+
+        coordinator.presentSheet(.humanWishlist(humanID))
+        #expect(coordinator.sheet == .humanWishlist(humanID))
+    }
+
+    @Test func walkUsesGlobalFullScreenRoute() {
+        let coordinator = AppRouteCoordinator()
+        let petID = UUID()
+
+        coordinator.presentFunctionMenu(destination: .plantsDashboard)
+        coordinator.presentWalk(petID: petID)
+
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == .walk(petID: petID))
+        #expect(coordinator.suppressesGlobalWalkBanner)
+    }
+
+    @Test func oasisRewardUsesGlobalFullScreenRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentFunctionMenu(destination: .plantsDashboard)
+        coordinator.presentOasisReward()
+
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == .oasisReward)
+        #expect(coordinator.suppressesGlobalWalkBanner)
+    }
+
+    @Test func crewRosterUsesGlobalOverlayRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentRequiredAccountSwitch()
+        coordinator.presentCrewRoster(mode: .collaboration)
+
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.overlay == .crewRoster(.collaboration))
+        #expect(coordinator.suppressesGlobalWalkBanner)
+
+        coordinator.dismissOverlay(.crewRoster(.members))
+        #expect(coordinator.overlay == .crewRoster(.collaboration))
+
+        coordinator.dismissOverlay(.crewRoster(.collaboration))
+        #expect(coordinator.overlay == nil)
+    }
+
+    @Test func coconutLogUsesGlobalOverlayRoute() {
+        let coordinator = AppRouteCoordinator()
+        let humanID = UUID()
+
+        coordinator.presentRequiredAccountSwitch()
+        coordinator.presentCoconutLog(.human(humanID))
+
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.overlay == .coconutLog(.human(humanID)))
+        #expect(coordinator.suppressesGlobalWalkBanner)
+    }
+
+    @Test func quickMomentUsesGlobalOverlayRoute() {
+        let coordinator = AppRouteCoordinator()
+        let petID = UUID()
+
+        coordinator.presentFunctionMenu(destination: .plantsDashboard)
+        coordinator.presentQuickMoment(petID: petID)
+
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.fullScreen == nil)
+        guard case let .quickMoment(_, routedPetID) = coordinator.overlay else {
+            Issue.record("Expected quick moment overlay route")
+            return
+        }
+        #expect(routedPetID == petID)
+        #expect(coordinator.suppressesGlobalWalkBanner)
+    }
+
+    @Test func settingsUsesGlobalOverlayRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentRequiredAccountSwitch()
+        coordinator.presentSettings()
+
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.overlay == .settings)
+        #expect(coordinator.suppressesGlobalWalkBanner)
+    }
+
+    @Test func streakDetailUsesGlobalSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentCrewRoster(mode: .members)
+        coordinator.presentStreakDetail()
+
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .streakDetail)
+    }
+
     @Test func dismissOnlyClearsMatchingPresentationRoute() {
         let coordinator = AppRouteCoordinator()
 
@@ -61,5 +259,73 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet == nil)
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.overlay == nil)
+    }
+
+    @Test func rootIdentityRebuildsOnlyWhenRequested() {
+        let coordinator = AppRouteCoordinator()
+        let initialRoot = coordinator.rootIdentity
+
+        coordinator.resetToHome()
+
+        #expect(coordinator.rootIdentity == initialRoot)
+
+        coordinator.resetToHome(rebuildRoot: true)
+
+        #expect(coordinator.rootIdentity != initialRoot)
+    }
+
+    @Test func humanDeletionNotificationRoutesThroughCoordinator() {
+        let coordinator = AppRouteCoordinator()
+        let initialRoot = coordinator.rootIdentity
+
+        coordinator.openPet(UUID())
+        let outcome = coordinator.handleNotificationEvent(
+            .humanDeleted(requiresReplacementHuman: true, requiresAccountSwitch: false)
+        )
+
+        #expect(outcome == .clearActiveHuman)
+        #expect(coordinator.path.isEmpty)
+        #expect(coordinator.rootIdentity != initialRoot)
+        #expect(coordinator.fullScreen == .requiredHumanProfile)
+        #expect(coordinator.sheet == nil)
+    }
+
+    @Test func accountSwitchNotificationRoutesThroughCoordinator() {
+        let coordinator = AppRouteCoordinator()
+
+        let outcome = coordinator.handleNotificationEvent(
+            .humanDeleted(requiresReplacementHuman: false, requiresAccountSwitch: true)
+        )
+
+        #expect(outcome == .clearActiveHuman)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .requiredAccountSwitch)
+    }
+
+    @Test func plainHumanDeletionRequestsRequirementReconciliation() {
+        let coordinator = AppRouteCoordinator()
+
+        let outcome = coordinator.handleNotificationEvent(
+            .humanDeleted(requiresReplacementHuman: false, requiresAccountSwitch: false)
+        )
+
+        #expect(outcome == .reconcileHumanRequirement)
+        #expect(coordinator.path.isEmpty)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == nil)
+    }
+
+    @Test func reminderNotificationOnlyResetsToHome() {
+        let coordinator = AppRouteCoordinator()
+        let initialRoot = coordinator.rootIdentity
+
+        coordinator.openHuman(UUID())
+        coordinator.presentRequiredAccountSwitch()
+        let outcome = coordinator.handleNotificationEvent(.reminderRouteRequested)
+
+        #expect(outcome == .none)
+        #expect(coordinator.path.isEmpty)
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.rootIdentity == initialRoot)
     }
 }

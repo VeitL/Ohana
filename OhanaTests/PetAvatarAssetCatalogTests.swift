@@ -105,7 +105,7 @@ struct PetAvatarAssetCatalogTests {
         #expect(shibaCoats.map(\.name) == ["赤色", "黑褐色", "奶油色", "胡麻色"])
 
         let goldenCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "金毛") ?? []
-        #expect(goldenCoats.map(\.name) == ["浅金色", "金色", "深金色"])
+        #expect(goldenCoats.map(\.name) == ["浅金色"])
 
         let frenchBulldogCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "法斗") ?? []
         #expect(frenchBulldogCoats.map(\.name) == ["虎斑", "奶油色", "白色", "花斑", "蓝灰色", "巧克力色"])
@@ -144,7 +144,7 @@ struct PetAvatarAssetCatalogTests {
         #expect(poodleCoats.map(\.name) == ["白色", "杏色", "红色", "黑色", "棕色", "银色", "蓝灰色"])
 
         let shihTzuCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "西施犬") ?? []
-        #expect(shihTzuCoats.map(\.name) == ["金白色", "白色", "黑白", "红白", "多色"])
+        #expect(shihTzuCoats.map(\.name) == ["金白色", "黑白", "红白"])
 
         let chineseRuralDogCoats = PetAvatarAssetCatalog.coatColors(species: "狗", breed: "Chinese Native Dog") ?? []
         #expect(chineseRuralDogCoats.map(\.name) == ["黄色", "黑色", "白色", "花斑"])
@@ -204,7 +204,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "金黄色",
                 eyeColor: "棕色"
-            ) == "dog_golden_retriever_girl_golden.png"
+            ) == "dog_golden_retriever_girl_light_golden.png"
         )
 
         #expect(
@@ -1055,7 +1055,7 @@ struct PetAvatarAssetCatalogTests {
                 gender: "female",
                 coatColor: "深金色",
                 eyeColor: "黑色"
-            ) == "dog_golden_retriever_girl_dark_golden.png"
+            ) == "dog_golden_retriever_girl_light_golden.png"
         )
     }
 

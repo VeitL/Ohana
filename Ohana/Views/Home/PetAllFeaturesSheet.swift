@@ -50,9 +50,17 @@ extension PetAllFeatureDestination: Identifiable {
 
 struct PetAllFeaturesSheet: View {
     let pet: Pet
+    let onOpenDestination: (PetAllFeatureDestination) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var activeDestination: PetAllFeatureDestination?
+
+    init(
+        pet: Pet,
+        onOpenDestination: @escaping (PetAllFeatureDestination) -> Void
+    ) {
+        self.pet = pet
+        self.onOpenDestination = onOpenDestination
+    }
 
     private var l: L10n { L10n() }
     private var isDog: Bool {
@@ -92,53 +100,17 @@ struct PetAllFeaturesSheet: View {
 
                 ForEach(petSections) { section in
                     FeatureHubSectionActionView(section: section) { destination in
-                        withAnimation(GoMotion.page) {
-                            activeDestination = destination
-                        }
+                        open(destination)
                     }
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
             .petMemorialTone(isActive: pet.hasPassedAway)
         }
-        .fullScreenCover(item: $activeDestination) { destination in
-            FeatureHubDestinationHost(
-                onClose: { activeDestination = nil },
-                showsCloseButton: destinationNeedsHostClose(destination)
-            ) {
-                destView(destination)
-            }
-        }
     }
 
-    @ViewBuilder
-    private func destView(_ dest: PetAllFeatureDestination) -> some View {
-        switch dest {
-        case .health:        PetHealthDetailView(pet: pet, isModal: false)
-        case .medications:   PetMedicationView(pet: pet)
-        case .food:          PetFoodManagementView(pet: pet)
-        case .hygiene:       PetHygieneDetailView(pet: pet)
-        case .walks:         WalkSummarySheet(pet: pet)
-        case .potty:         QuickPottyDetailSheet(pet: pet) {}
-        case .basicInfo:     PetBasicInfoDetailView(pet: pet)
-        case .documents:     DocumentsListView(pet: pet, showsCloseButton: true)
-        case .moments:       PetMomentsHubView(pet: pet)
-        case .timeline:      PetMomentsHubView(pet: pet)
-        case .achievements:  AchievementWallView(pet: pet)
-        case .retention:     PetRetentionHubView(pet: pet, showsCloseButton: true)
-        case .weight:        WeightHistoryView(pet: pet, showsCloseButton: true)
-        case .expense:       ExpenseHistoryView(pet: pet, showsCloseButton: true)
-        case .bondVault:     PetBondVaultView(pet: pet)
-        }
-    }
-
-    private func destinationNeedsHostClose(_ destination: PetAllFeatureDestination) -> Bool {
-        switch destination {
-        case .food, .basicInfo:
-            return true
-        case .health, .medications, .hygiene, .walks, .potty, .documents, .moments, .timeline, .achievements, .retention, .weight, .expense, .bondVault:
-            return false
-        }
+    private func open(_ destination: PetAllFeatureDestination) {
+        onOpenDestination(destination)
     }
 
     private var petSections: [FeatureHubSectionData<PetAllFeatureDestination>] {
@@ -471,9 +443,7 @@ struct ArchiveMemorySnapshot {
         let hasBasicProfile = Self.hasBasicProfile(pet)
         let hasHealthOrWeight = !pet.healthLogs.isEmpty || !pet.weightLogs.isEmpty
         let hasMemory = !pet.photoLogs.isEmpty || !pet.milestones.isEmpty
-        let hasProtectionDocument = pet.documents.contains { doc in
-            doc.documentCategory != .vaccine && doc.documentCategory != .insurance
-        }
+        let hasProtectionDocument = !pet.documents.isEmpty
         let hasProtection = hasProtectionDocument || !pet.insurances.isEmpty || !pet.medications.isEmpty
         let hasContinuity = pet.currentStreak > 0 || !pet.milestones.isEmpty
         let checks = [hasBasicProfile, hasHealthOrWeight, hasMemory, hasProtection, hasContinuity]

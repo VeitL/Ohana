@@ -1,5 +1,7 @@
 # Ohana iOS App 项目文档
 
+> **Planning / Reference only**：本文档顶部快照可帮助理解历史决策，但不是当前规则源；下方长章节包含旧计划和旧事实。任何冲突都以 `AGENTS.md`、`ui规范.selection.json`、`docs/governance/manifests/`、当前治理文档和源码为准。
+
 > 最后更新: 2026-06-07（成熟度工程强化：MetricKit 可观测性 / 后台 @ModelActor / 通知调度依赖注入接缝 / 持久化模型拆分 / 历史 fetch 安全上限）| Build: ✅ `scripts/build-debug-fast.sh`（默认 iPhone 17 / Xcode installed default iOS 26.5 simulator runtime；在 iCloud 同步目录构建时用 `DERIVED_DATA_PATH=/tmp/OhanaDD` 绕过 CodeSign detritus 失败）| Schema: ArkSchemaV56
 >
 > **当前事实优先级**：本文件顶部“当前快照”代表 2026-05-25 的实现状态；下方早期长章节保留为历史实现记录，若与当前快照、`AGENTS.md`、`ui规范.selection.json` 或 `docs/app-architecture-governance.md` 冲突，以后四者为准。
@@ -13,7 +15,7 @@
 ### 1. 设计系统与 UI 源头
 
 - **唯一机器可读 UI 源头**：根目录 `ui规范.selection.json`。
-- **人类可读 companion**：`ui规范.md`。若 Markdown 与 JSON 冲突，JSON token 胜出。
+- **人类可读 companion**：`docs/design/ui规范.md`。若 Markdown 与 JSON 冲突，JSON token 胜出。
 - **毛绒 Icon 样张源头**：`docs/plush-icon-sample-care-prompts.md` 记录 Feed / Water / Walk 三个照护快捷入口的 3D 毛绒 icon 生成规范、统一负面 prompt、命名与导入建议；`docs/plush-icon-samples/` 保存对应 SVG 构图预览稿。
 - **开发者 UI 控制台**：设置 > 开发者工具 > UI/UX 规范查看，只是编辑、预览、导出界面；只有导出的 V4 JSON 写回 `ui规范.selection.json` 后才成为正式规范。
 - **全局主色**：`goPrimary` 自适应，深色 = `goLime`，浅色 = `goBlue`。成员主题色、宠物主题色、领域专有色不得复用 `goLime/goBlue` 或 primary alias。
@@ -43,7 +45,7 @@
 - **P1 备份性能**：✅ 导出全表 fetch + encode 已迁到后台 `@ModelActor DataBackupActor`（见 2C）。
 - **P1 导入去重**：备份恢复 UI 写“自动去重”，但部分日志类当前直接插入，可能污染统计、提醒和账本。后续按 UUID 对全模型 upsert/skip，并给导入前加 schema、大小和来源预检。
 - **P1 后台任务与定位透明度**：`BGAppRefreshTask` 需要 expiration/cancel/failure 路径，避免后台任务超时仍占资源。后台定位总体集中在 `LocationManager` / `PetWalkingManager` 是正确方向，但 running walk 进入后台时应加强用户透明度，优先显示系统后台定位指示，并做真机锁屏路线验证。
-- **P2 包体与资源策略**：Debug app 包体约 432 MB，`PetAvatarAssets` 约 197 MB 作为 folder resource 整包复制。发布前压缩/重采样头像，评估 asset catalog、按需资源或下载型资源，并做 Release archive size audit。
+- **P2 包体与资源策略**：Debug app 包体约 432 MB，`Resources/Avatars/PetAvatarAssets` 约 197 MB 作为 folder resource 整包复制，并在 App Bundle 中保持 `PetAvatarAssets` 目录名。发布前压缩/重采样头像，评估 asset catalog、按需资源或下载型资源，并做 Release archive size audit。
 - **P2 SwiftUI 热点拆分**：进行中。`MemberCardCreationView.swift` 已 4002 → 1734 行（见 2C）。剩余最大文件为 `AddPetWizardView.swift`（3122）、`PetHealthDetailView.swift`（2949）等，可同法继续拆分 presenter / data loader / 子视图。
 - **P3 发布完整性**：设置里的隐私政策、联系开发者等入口需要真实 action；通知 action/title 需要三语本地化；App Group entitlement 若没有真实共享容器使用，应移除或补齐用途说明。
 - **实施顺序**：先修 `PrivacyInfo.xcprivacy` 和权限声明一致性；再修备份安全与导入去重；随后修后台任务和定位透明度；最后处理包体优化与大 SwiftUI 文件拆分。
@@ -258,7 +260,7 @@ scripts/audit-ui-v4.sh <changed paths>
 - **技术栈**：SwiftUI + SwiftData + Swift Charts, iOS 26+, Swift 6
 - **本地优先**：无账号，SwiftData（App Group `group.com.guanchen.li.Ohana`）
 - **全局主色**：`Color.goPrimary` — 深色模式解析为 `goLime`，浅色模式解析为 `goBlue`，仅用于全局品牌/系统主操作
-- **UI 规范**：`ui规范.selection.json` 是唯一机器可读源头；`ui规范.md` 是人类可读 companion；所有新页面必须符合 V4 规范
+- **UI 规范**：`ui规范.selection.json` 是唯一机器可读源头；`docs/design/ui规范.md` 是人类可读 companion；所有新页面必须符合 V4 规范
 
 ### 本地化（简体中文 / English / Deutsch）
 

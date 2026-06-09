@@ -287,6 +287,8 @@ struct AddWorkoutSheet: View {
     @State private var caloriesStr = ""
     @State private var date = Date()
     @State private var notes = ""
+    @State private var isSaving = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var duration: Int { Int(durationStr) ?? 0 }
     private var distance: Double { Double(distanceStr.replacingOccurrences(of: ",", with: ".")) ?? 0 }
@@ -363,10 +365,10 @@ struct AddWorkoutSheet: View {
                     Button("取消") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("保存") { save() }
+                    Button(isSaving ? "保存中" : "保存") { save() }
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(canSave ? Color.goPrimary : .secondary)
-                        .disabled(!canSave)
+                        .disabled(!canSave || isSaving)
                 }
             }
         }
@@ -458,40 +460,33 @@ struct AddWorkoutSheet: View {
     }
 
     private func save() {
-        guard canSave else { return }
-        let log = HumanWorkoutLog(
-            date: date,
-            type: selectedType,
-            durationMinutes: duration,
-            distanceKm: distance,
-            calories: calories,
-            steps: 0,
-            notes: notes,
-            sourceHealthKit: false,
-            human: human
-        )
-        modelContext.insert(log)
-        modelContext.safeSave()
-        CareLedgerService.record(
-            occurredAt: log.date,
-            actorKind: .human,
-            actorId: human.id.uuidString,
-            subjectKind: .human,
-            subjectId: human.id.uuidString,
-            eventKind: .workout,
-            actionType: log.typeRaw,
-            amountValue: Double(log.durationMinutes),
-            amountUnit: "min",
-            note: log.notes,
-            source: .detail,
-            legacyModelName: "HumanWorkoutLog",
-            legacyModelId: log.id.uuidString,
-            metadataJSON: "{\"distanceKm\":\(log.distanceKm),\"calories\":\(log.calories),\"steps\":\(log.steps)}",
-            context: modelContext
-        )
-        onSaved?()
+        guard canSave, !isSaving else { return }
+        isSaving = true
+        let savedType = selectedType
+        let savedDuration = duration
+        let savedDistance = distance
+        let savedCalories = calories
+        let savedDate = date
+        let savedNotes = notes
+        let command = DomainCommand.humanWorkoutEntry(humanID: human.id)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        dismiss()
+
+        commandQueue.enqueue(command) {
+            HumanCareCommandExecutor(context: modelContext).recordWorkout(
+                human: human,
+                type: savedType,
+                durationMinutes: savedDuration,
+                date: savedDate,
+                distanceKm: savedDistance,
+                calories: savedCalories,
+                notes: savedNotes,
+                source: .detail,
+                command: command,
+                note: "human.workout.create"
+            )
+            onSaved?()
+            dismiss()
+        }
     }
 }
 
@@ -502,6 +497,7 @@ struct HumanWorkoutHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @StateObject private var hkManager = HumanHealthKitManager.shared
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     @State private var showAddSheet = false
 
@@ -676,8 +672,16 @@ struct HumanWorkoutHistoryView: View {
                             }
                         }
                         Button {
-                            modelContext.delete(log)
-                            modelContext.safeSave()
+                            let command = DomainCommand.humanWorkoutDelete(humanID: human.id, recordID: log.id)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            commandQueue.enqueue(command) {
+                                HumanCareCommandExecutor(context: modelContext).deleteWorkout(
+                                    log,
+                                    human: human,
+                                    command: command,
+                                    note: "human.workout.delete"
+                                )
+                            }
                         } label: {
                             Image(systemName: "trash")
                                 .font(OhanaFont.caption())

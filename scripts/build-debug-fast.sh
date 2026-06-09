@@ -11,7 +11,10 @@ export COPYFILE_DISABLE="${COPYFILE_DISABLE:-1}"
 SCHEME="${SCHEME:-Ohana}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
 SDK="${SDK:-iphonesimulator}"
-REQUIRED_DESTINATION="platform=iOS Simulator,name=iPhone 17"
+CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-NO}"
+REQUIRED_SIMULATOR_NAME="iPhone 17"
+REQUIRED_SIMULATOR_UDID="EC2C2B3B-3135-4427-89B7-F4B6A6049D66"
+REQUIRED_DESTINATION="platform=iOS Simulator,id=${REQUIRED_SIMULATOR_UDID}"
 DESTINATION="${DESTINATION:-${REQUIRED_DESTINATION}}"
 BRANCH_NAME="$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo detached)"
 if [[ "${BRANCH_NAME}" == "HEAD" ]]; then
@@ -65,6 +68,7 @@ echo "Building ${SCHEME} (${CONFIGURATION})"
 echo "SDK: ${SDK}"
 echo "Destination: ${DESTINATION}"
 echo "DerivedData: ${DERIVED_DATA_PATH}"
+echo "Code signing: CODE_SIGNING_ALLOWED=${CODE_SIGNING_ALLOWED_VALUE}"
 
 if [[ "${OHANA_SKIP_SIMULATOR_PREFLIGHT:-0}" != "1" ]]; then
   SIMCTL_OUTPUT="$(
@@ -74,17 +78,18 @@ if [[ "${OHANA_SKIP_SIMULATOR_PREFLIGHT:-0}" != "1" ]]; then
     echo "The fixed build destination is still required: ${REQUIRED_DESTINATION}" >&2
     echo "simctl output:" >&2
     printf '%s\n' "${SIMCTL_OUTPUT}" >&2
-    echo "Try opening Xcode > Settings > Platforms, installing the iOS simulator runtime, and creating an iPhone 17 simulator." >&2
+    echo "Try opening Xcode > Settings > Platforms and installing the iOS simulator runtime." >&2
     echo "If you are intentionally bypassing this preflight, set OHANA_SKIP_SIMULATOR_PREFLIGHT=1." >&2
     exit 70
   }
 
-  if ! printf '%s\n' "${SIMCTL_OUTPUT}" | grep -Eq '^[[:space:]]+iPhone 17 \('; then
-    echo "Simulator preflight failed: no available iPhone 17 simulator was found." >&2
+  if ! printf '%s\n' "${SIMCTL_OUTPUT}" | grep -Eq "^[[:space:]]+${REQUIRED_SIMULATOR_NAME} \\(${REQUIRED_SIMULATOR_UDID}\\)"; then
+    echo "Simulator preflight failed: required simulator was not found." >&2
+    echo "Required simulator: ${REQUIRED_SIMULATOR_NAME} (${REQUIRED_SIMULATOR_UDID})" >&2
     echo "The fixed build destination is required: ${REQUIRED_DESTINATION}" >&2
     echo "Available iPhone simulators:" >&2
     printf '%s\n' "${SIMCTL_OUTPUT}" | grep -E '^[[:space:]]+iPhone' >&2 || true
-    echo "Create an iPhone 17 simulator in Xcode > Devices and Simulators, then rerun this script." >&2
+    echo "Restore this simulator or deliberately update REQUIRED_SIMULATOR_UDID in scripts/build-debug-fast.sh." >&2
     echo "If you are intentionally bypassing this preflight, set OHANA_SKIP_SIMULATOR_PREFLIGHT=1." >&2
     exit 70
   fi
@@ -100,4 +105,5 @@ xcodebuild \
   -disableAutomaticPackageResolution \
   -skipPackagePluginValidation \
   -showBuildTimingSummary \
+  CODE_SIGNING_ALLOWED="${CODE_SIGNING_ALLOWED_VALUE}" \
   build

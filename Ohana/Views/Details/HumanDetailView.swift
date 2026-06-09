@@ -19,6 +19,7 @@ struct HumanDetailView: View {
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirm = false
     @State private var showWeightHistory = false
@@ -30,6 +31,7 @@ struct HumanDetailView: View {
     @State private var showingHealthReport = false
     @State private var showingHealthMetrics = false
     @State private var showingHomeStackFullAlert = false
+    @State private var homeVisibilityOverride: Bool?
 
     @Query private var allPets: [Pet]
     @Query private var allHumans: [Human]
@@ -615,20 +617,31 @@ struct HumanDetailView: View {
                 Text("在首页显示")
                     .font(OhanaFont.callout(.bold))
                     .foregroundStyle(Color(hex: "1E3A8A"))
-                Text(human.shouldShowOnHome ? "已加入首页卡堆与岛屿统计" : "不在首页卡堆与岛屿体重中显示")
+                Text(displayedHomeVisibility ? "已加入首页卡堆与岛屿统计" : "不在首页卡堆与岛屿体重中显示")
                     .font(OhanaFont.caption())
                     .foregroundStyle(Color(hex: "6B82C4"))
             }
             Spacer()
             Toggle("", isOn: Binding(
-                get: { human.shouldShowOnHome },
+                get: { displayedHomeVisibility },
                 set: { visible in
                     if visible && !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
                         showingHomeStackFullAlert = true
                         return
                     }
-                    human.shouldShowOnHome = visible
-                    modelContext.safeSave()
+                    homeVisibilityOverride = visible
+                    commandQueue.enqueue(.memberHomeVisibility(
+                        entityID: human.id,
+                        kind: EntityKind.human.rawValue,
+                        visible: visible
+                    )) {
+                        MemberCommandExecutor(context: modelContext).setHumanHomeVisibility(
+                            human,
+                            visible: visible,
+                            note: "human.detail.homeVisibility"
+                        )
+                        homeVisibilityOverride = nil
+                    }
                 }
             ))
             .tint(Color.goPrimary)
@@ -637,6 +650,10 @@ struct HumanDetailView: View {
         .padding(.horizontal, 16).padding(.vertical, 14)
         .goIslandModuleCard(cornerRadius: 24)
         .padding(.horizontal, 16)
+    }
+
+    private var displayedHomeVisibility: Bool {
+        homeVisibilityOverride ?? human.shouldShowOnHome
     }
 
     // MARK: - Asset Card
@@ -899,37 +916,44 @@ struct HumanDetailView: View {
     // MARK: - Actions
     private func completeReminder(_ reminder: Reminder) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        ReminderCompletionService.complete(reminder, by: human.id.uuidString, context: modelContext)
+        ReminderCommandExecutor(context: modelContext).complete(
+            reminder,
+            by: human.id.uuidString,
+            note: "human.detail.reminder.complete"
+        )
     }
 
     private func skipReminder(_ reminder: Reminder) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        ReminderCompletionService.skip(reminder, by: human.id.uuidString, context: modelContext)
+        ReminderCommandExecutor(context: modelContext).skip(
+            reminder,
+            by: human.id.uuidString,
+            note: "human.detail.reminder.skip"
+        )
     }
 
     private func deleteHumanAndReturnHome() {
-        let deletedHumanId = human.id.uuidString
-        let hasRemainingHuman = allHumans.contains { $0.id.uuidString != deletedHumanId }
-        let deletedCurrentHuman = activeHumanIdStr == deletedHumanId
-        let requiresReplacementHuman = !hasRemainingHuman
-        let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
-
-        if deletedCurrentHuman || requiresReplacementHuman {
-            activeHumanIdStr = ""
+        let command = DomainCommand.memberDeletion(entityID: human.id, kind: EntityKind.human.rawValue)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            let result = MemberCommandExecutor(context: modelContext).deleteHuman(
+                human,
+                activeHumanID: activeHumanIdStr,
+                note: "human.detail.delete"
+            )
+            if result.clearsActiveHumanID {
+                activeHumanIdStr = ""
+            }
+            NotificationCenter.default.post(
+                name: .ohanaReturnHomeAfterHumanDeletion,
+                object: nil,
+                userInfo: [
+                    "requiresReplacementHuman": result.requiresReplacementHuman,
+                    "requiresAccountSwitch": result.requiresAccountSwitch
+                ]
+            )
+            dismiss()
         }
-
-        modelContext.delete(human)
-        modelContext.safeSave()
-
-        NotificationCenter.default.post(
-            name: .ohanaReturnHomeAfterHumanDeletion,
-            object: nil,
-            userInfo: [
-                "requiresReplacementHuman": requiresReplacementHuman,
-                "requiresAccountSwitch": requiresAccountSwitch
-            ]
-        )
-        dismiss()
     }
 }
 
@@ -938,7 +962,8 @@ struct EditHumanSheet: View {
     let human: Human
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    
+
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name: String = ""
     @State private var avatarEmoji: String = ""
     @State private var birthday: Date = Date()
@@ -1053,32 +1078,37 @@ struct EditHumanSheet: View {
     }
     
     private func save() {
-        human.name = name
-        human.avatarEmoji = avatarEmoji.isEmpty ? "👤" : avatarEmoji
-        human.birthday = hasBirthday ? birthday : nil
-        human.bloodType = bloodType
-        human.role = HumanProfileOptions.normalizedRole(role)
-        var noteParts = ["性别:\(HumanProfileOptions.normalizedGender(gender))"]
-        noteParts.append(contentsOf: preservedRelationshipMetadataParts)
-        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedNotes.isEmpty { noteParts.append(trimmedNotes) }
-        human.notes = noteParts.joined(separator: "｜")
-        human.nationality = nationality
-        human.city = city
-        // FIX 1: 保存隐私设置
-        human.setPrivate(.weight, privateWeight)
-        human.setPrivate(.workout, privateWorkout)
-        human.setPrivate(.medication, privateMedication)
-        human.setPrivate(.note, privateNote)
-        human.setPrivate(.wishlist, privateWishlist)
-        human.setPrivate(.expense, privateExpense)
-        modelContext.safeSave()
-        NotificationCenter.default.post(
-            name: .ohanaMemberProfileDidChange,
-            object: nil,
-            userInfo: ["id": human.id.uuidString, "kind": "human"]
+        let input = HumanProfileCommandInput(
+            name: name,
+            avatarImageData: human.avatarImageData,
+            avatarEmoji: avatarEmoji,
+            role: role,
+            gender: gender,
+            birthday: hasBirthday ? birthday : nil,
+            bloodType: bloodType,
+            heightText: human.heightCm > 0 && human.heightCm.isFinite ? String(format: "%.0f", human.heightCm) : "",
+            mbti: human.mbti,
+            nationality: nationality,
+            city: city,
+            themeHex: human.safeThemeColorHex,
+            notes: notes,
+            preservedNoteParts: preservedRelationshipMetadataParts,
+            privateFieldsRaw: editedPrivateFieldsRaw
         )
-        dismiss()
+        commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
+            let result = MemberCommandExecutor(context: modelContext).updateHumanProfile(
+                human,
+                input: input,
+                note: "human.detail.profile"
+            )
+            NotificationCenter.default.post(
+                name: .ohanaMemberProfileDidChange,
+                object: nil,
+                userInfo: ["id": result.entityID.uuidString, "kind": result.kind]
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        }
     }
 
     private var preservedRelationshipMetadataParts: [String] {
@@ -1086,6 +1116,17 @@ struct EditHumanSheet: View {
             .split(separator: "｜", omittingEmptySubsequences: false)
             .map(String.init)
             .filter { $0.hasPrefix("关系:") }
+    }
+
+    private var editedPrivateFieldsRaw: Set<String> {
+        var fields = Set<String>()
+        if privateWeight { fields.insert(HumanPrivateField.weight.rawValue) }
+        if privateWorkout { fields.insert(HumanPrivateField.workout.rawValue) }
+        if privateMedication { fields.insert(HumanPrivateField.medication.rawValue) }
+        if privateNote { fields.insert(HumanPrivateField.note.rawValue) }
+        if privateWishlist { fields.insert(HumanPrivateField.wishlist.rawValue) }
+        if privateExpense { fields.insert(HumanPrivateField.expense.rawValue) }
+        return fields
     }
 
     private func editPrivacyRow(_ title: String, binding: Binding<Bool>) -> some View {

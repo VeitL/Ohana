@@ -2,7 +2,7 @@
 //  QuickWaterCommandExecutor.swift
 //  Ohana
 //
-//  Route-scoped write and service operations for the quick water sheet.
+//  Domain-scoped write and service operations for quick water flows.
 //
 
 import Foundation

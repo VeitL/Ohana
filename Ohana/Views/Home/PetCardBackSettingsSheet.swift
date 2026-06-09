@@ -13,6 +13,7 @@ struct PetCardBackSettingsSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showEditPet = false
     @State private var showSitterCard = false
 
@@ -64,10 +65,7 @@ struct PetCardBackSettingsSheet: View {
                 TextField("输入宠物名确认", text: $deleteNameInput)
                 Button("取消", role: .cancel) { deleteNameInput = "" }
                 Button("删除", role: .destructive) {
-                    guard ConfirmationNameMatcher.matches(deleteNameInput, expectedName: pet.name) else { return }
-                    modelContext.delete(pet)
-                    modelContext.safeSave()
-                    dismiss()
+                    deletePetIfConfirmed()
                 }
             } message: { Text("请输入 \"\(pet.name)\" 确认删除。") }
         }
@@ -123,5 +121,24 @@ struct PetCardBackSettingsSheet: View {
     private func clearPetLogs() {
         pet.clearAllActivityRecords(in: modelContext)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    private func deletePetIfConfirmed() {
+        guard ConfirmationNameMatcher.matches(deleteNameInput, expectedName: pet.name) else {
+            deleteNameInput = ""
+            return
+        }
+
+        let command = DomainCommand.memberDeletion(entityID: pet.id, kind: EntityKind.pet.rawValue)
+        deleteNameInput = ""
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            MemberCommandExecutor(context: modelContext).deletePet(
+                pet,
+                note: "pet.cardBack.delete"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        }
     }
 }

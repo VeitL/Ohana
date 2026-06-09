@@ -123,12 +123,7 @@ struct OasisRewardView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Pet.createdAt)   private var pets:   [Pet]
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-    @Query(sort: \Plant.createdAt) private var plants: [Plant]
-    @Query(sort: \OasisUpgradeCoconut.level) private var upgradeCoconuts: [OasisUpgradeCoconut]
-    @Query(sort: \OasisElectronicPet.obtainedAt) private var electronicPets: [OasisElectronicPet]
-    @Query(sort: \OasisCritterFragmentBalance.updatedAt) private var critterFragments: [OasisCritterFragmentBalance]
+    @StateObject private var liveDataStore = OasisRewardLiveDataStore()
 
     @State private var treeScale: CGFloat   = 1.0
     @State private var treeGlow: CGFloat    = 0.4
@@ -195,6 +190,13 @@ struct OasisRewardView: View {
 
     private let treeMgr = OasisTreeManager.shared
     private var l: L10n { L10n(appLanguage) }
+    private var liveData: OasisRewardLiveDataSnapshot { liveDataStore.snapshot }
+    private var pets: [Pet] { liveData.pets }
+    private var humans: [Human] { liveData.humans }
+    private var plants: [Plant] { liveData.plants }
+    private var upgradeCoconuts: [OasisUpgradeCoconut] { liveData.upgradeCoconuts }
+    private var electronicPets: [OasisElectronicPet] { liveData.electronicPets }
+    private var critterFragments: [OasisCritterFragmentBalance] { liveData.critterFragments }
     private var commandExecutor: OasisRewardCommandExecutor {
         OasisRewardCommandExecutor(context: modelContext)
     }
@@ -337,7 +339,7 @@ struct OasisRewardView: View {
             action()
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 15, weight: .semibold))
+                .font(OhanaFont.body(.semibold))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(width: 44, height: 44)
@@ -431,12 +433,13 @@ struct OasisRewardView: View {
 
     private var energyParticleLayer: some View {
         ForEach(energyParticles) { p in
-            Image(systemName: "sparkles")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "sparkles") // a11y: allow decorative energy particle
+                .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.goPrimary)
                 .offset(x: p.offsetX, y: p.offsetY)
                 .opacity(p.opacity)
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 
@@ -478,6 +481,7 @@ struct OasisRewardView: View {
 
     private func handleOasisAppear() {
         if isOasisPrepared {
+            refreshLiveDataSnapshot()
             prepareVisibleShell()
         }
         if shouldTreatEmbeddedAsVisible {
@@ -596,7 +600,12 @@ struct OasisRewardView: View {
         critterOutcomeCleanupTask = nil
         rescueBusyCleanupTask?.cancel()
         rescueBusyCleanupTask = nil
+        liveDataStore.reset()
         stopAmbientMotion()
+    }
+
+    private func refreshLiveDataSnapshot() {
+        liveDataStore.refresh(context: modelContext)
     }
 
     private func refreshOasisEnergyIfActive() {
@@ -637,6 +646,7 @@ struct OasisRewardView: View {
                 preparedWorkTask = nil
                 return
             }
+            refreshLiveDataSnapshot()
             commandExecutor.refreshPreviewEnergy(treeManager: treeMgr, pets: pets, humans: humans, plants: plants)
             lastLevel = treeMgr.treeLevel
             loadCheckInData()
@@ -647,6 +657,7 @@ struct OasisRewardView: View {
     }
 
     private func refreshVisibleState() {
+        refreshLiveDataSnapshot()
         commandExecutor.refreshEnergy(treeManager: treeMgr, pets: pets, humans: humans, plants: plants)
         commandExecutor.refreshFeaturedCritterLifecycle(electronicPets)
         lastLevel = treeMgr.treeLevel
@@ -680,6 +691,7 @@ struct OasisRewardView: View {
     }
 
     private func rebuildOasisRenderSnapshots() {
+        refreshLiveDataSnapshot()
         refreshTreeHarvestSnapshot()
         let nextActionSnapshot = commandExecutor.makeActionSnapshot(
             humans: humans,
@@ -765,11 +777,11 @@ struct OasisRewardView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "OASIS · 绿洲", en: "OASIS", de: "OASE"))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.caption(.semibold))
                     .kerning(1.2)
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(l.tr(zh: "生命之树", en: "Life Tree", de: "Lebensbaum"))
-                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .font(OhanaFont.title(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             Spacer()
@@ -804,7 +816,7 @@ struct OasisRewardView: View {
 
             Circle()
                 .fill(Color.goYellow)
-                .frame(width: 26, height: 26)
+                .frame(width: 26, height: 26) // a11y: allow decorative celestial dot
                 .shadow(color: Color.goYellow.opacity(0.68), radius: 14, x: 0, y: 0) // ui-v4: allow Oasis stage celestial glow
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .padding(.top, 24)
@@ -973,7 +985,7 @@ struct OasisRewardView: View {
                 .scaleEffect(glowBreathing ? 1.08 : 0.94)
                 .animation(
                     shouldRunAmbientMotion
-                    ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage glow
+                    ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage glow; smoothness: allow visible-only ambient tree glow
                     : nil,
                     value: glowBreathing
                 )
@@ -984,7 +996,7 @@ struct OasisRewardView: View {
                 .blur(radius: glowBreathing ? 7 : 2)
                 .animation(
                     shouldRunAmbientMotion
-                    ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage ring
+                    ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage ring; smoothness: allow visible-only ambient tree ring
                     : nil,
                     value: glowBreathing
                 )
@@ -1073,16 +1085,17 @@ struct OasisRewardView: View {
                     .offset(y: -2)
 
                 Image(systemName: statusIcon)
-                    .font(.system(size: 10, weight: .black))
+                    .font(OhanaFont.caption2(.black))
                     .foregroundStyle(snapshot?.state == .critical ? Color.arkInk : Color.ohanaPrimaryActionText)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 22, height: 22) // a11y: allow decorative critter status badge
                     .background(tint, in: Circle())
                     .overlay(Circle().strokeBorder(Color.ohanaCardSurface.opacity(0.84), lineWidth: 1))
                     .offset(x: 3, y: 3)
+                    .accessibilityHidden(true)
             }
             .overlay(alignment: .bottom) {
                 Text(critter?.displayName(l) ?? l.tr(zh: "Lv.10", en: "Lv.10", de: "Lv.10"))
-                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -1168,7 +1181,8 @@ struct OasisRewardView: View {
 
             if pendingUpgradeCoconuts.isEmpty {
                 HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
+                    Image(systemName: "sparkles") // a11y: allow decorative empty-state sparkle
+                        .accessibilityHidden(true)
                     Text(nextStageHint)
                         .lineLimit(1)
                 }
@@ -1182,7 +1196,7 @@ struct OasisRewardView: View {
                     Text("+\(pendingUpgradeCoconuts.count - 3)")
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 42, height: 42)
+                        .frame(width: 42, height: 42) // a11y: allow noninteractive overflow count chip
                         .background(Color.ohanaControlFill, in: Circle())
                 }
             }
@@ -1200,16 +1214,17 @@ struct OasisRewardView: View {
         } label: {
             ZStack(alignment: .bottomTrailing) {
                 Text("🥥")
-                    .font(.system(size: 28))
+                    .font(OhanaFont.metric(size: 28))
                     .rotationEffect(.degrees(isOpening ? -12 : 0))
                     .scaleEffect(isOpening ? 1.14 : 1)
                     .frame(width: 48, height: 48)
                     .background(isMilestone ? Color.goPrimary.opacity(0.18) : Color.ohanaControlFill, in: Circle())
-                Image(systemName: "hammer.fill")
-                    .font(.system(size: 9, weight: .black))
+                Image(systemName: "hammer.fill") // a11y: allow decorative button badge
+                    .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 19, height: 19)
+                    .frame(width: 19, height: 19) // a11y: allow decorative button badge
                     .background(Color.goPrimary, in: Circle())
+                    .accessibilityHidden(true)
             }
         }
         .buttonStyle(ScaleButtonStyle())
@@ -1252,8 +1267,9 @@ struct OasisRewardView: View {
             injectTreeEnergy()
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "bolt.fill") // a11y: allow decorative action icon paired with label
+                    .font(OhanaFont.subheadline(.black))
+                    .accessibilityHidden(true)
                 Text(l.tr(zh: "注入 +10", en: "Infuse +10", de: "+10 einspeisen"))
                     .font(OhanaFont.callout(.black))
                 Text("-10🥥")
@@ -1272,8 +1288,9 @@ struct OasisRewardView: View {
 
     private var stageLevelUpBadge: some View {
         HStack(spacing: 6) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 12, weight: .black))
+            Image(systemName: "sparkles") // a11y: allow decorative level badge icon
+                .font(OhanaFont.footnote(.black))
+                .accessibilityHidden(true)
             Text("Lv.\(treeVisualLevel.rawValue)")
                 .font(OhanaFont.caption(.black))
                 .monospacedDigit()
@@ -1495,17 +1512,17 @@ struct OasisRewardView: View {
                         VStack(alignment: .leading, spacing: 7) {
                             HStack(spacing: 7) {
                                 Text(l.tr(zh: "电子宠物小窝", en: "Critter Nest", de: "Critter-Nest"))
-                                    .font(.system(size: 18, weight: .black, design: .rounded))
+                                    .font(OhanaFont.title3(.black))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(l.tr(zh: critter.rarity.zh, en: critter.rarity.en, de: critter.rarity.de))
-                                    .font(.system(size: 9, weight: .black, design: .rounded))
+                                    .font(OhanaFont.caption2(.black))
                                     .foregroundStyle(Color.ohanaPrimaryActionText)
                                     .padding(.horizontal, 7)
                                     .padding(.vertical, 3)
                                     .background(critterRarityColor(critter.rarity), in: Capsule())
                             }
                             Text(critter.displayName(l))
-                                .font(.system(size: 24, weight: .black, design: .rounded))
+                                .font(OhanaFont.title(.black))
                                 .foregroundStyle(Color.goPrimary)
                                 .contentTransition(.numericText())
                             HStack(spacing: 8) {
@@ -1520,11 +1537,11 @@ struct OasisRewardView: View {
                         OasisCritterIllustration(catalogId: OasisUpgradeRewardCatalog.firstCritterId, locked: true, size: 104)
                         VStack(alignment: .leading, spacing: 8) {
                             Text(l.tr(zh: "升级生命树，唤醒电子宠物", en: "Level the tree. Wake critters.", de: "Baum leveln. Critter wecken."))
-                                .font(.system(size: 19, weight: .black, design: .rounded))
+                                .font(OhanaFont.title2(.black))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(2)
                             Text(nextCritterGoalText)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(OhanaFont.footnote(.black))
                                 .foregroundStyle(Color.goPrimary)
                             milestoneProgressBar
                         }
@@ -1532,9 +1549,10 @@ struct OasisRewardView: View {
 
                     Spacer(minLength: 4)
 
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "chevron.right") // a11y: allow decorative disclosure cue
+                        .font(OhanaFont.subheadline(.black))
                         .foregroundStyle(Color.ohanaSecondaryText)
+                        .accessibilityHidden(true)
                 }
 
                 if featuredCritter == nil {
@@ -1672,10 +1690,10 @@ struct OasisRewardView: View {
             OasisCritterIllustration(catalogId: catalogId, locked: !isReached, size: 38)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Lv.\(level)")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.footnote(.black))
                     .foregroundStyle(isReached ? Color.goPrimary : Color.ohanaPrimaryText)
                 Text(entry?.name(l) ?? "")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -1689,9 +1707,10 @@ struct OasisRewardView: View {
     private func critterQuickMetric(icon: String, value: String) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 8, weight: .black))
+                .font(OhanaFont.caption2(.black))
+                .accessibilityHidden(true)
             Text(value)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.caption2(.black))
                 .monospacedDigit()
                 .contentTransition(.numericText())
         }
@@ -1701,18 +1720,19 @@ struct OasisRewardView: View {
     private func critterLifeStrip(_ critter: OasisElectronicPet, snapshot: OasisCritterLifecycleSnapshot) -> some View {
         HStack(spacing: 9) {
             Image(systemName: critterLifecycleIcon(for: snapshot.state))
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.footnote(.black))
                 .foregroundStyle(snapshot.state == .critical ? Color.arkInk : Color.ohanaPrimaryActionText)
-                .frame(width: 32, height: 32)
+                .frame(width: 32, height: 32) // a11y: allow decorative lifecycle badge paired with state text
                 .background(critterLifecycleTint(for: snapshot.state), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(snapshot.state.name(l))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.footnote(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(l.text(critterRenderSnapshot(for: critter).prompt))
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.72)
@@ -1726,19 +1746,20 @@ struct OasisRewardView: View {
     private func critterWishStrip(_ wish: OasisCritterDailyWish, critter: OasisElectronicPet, isCompleted: Bool) -> some View {
         HStack(spacing: 9) {
             Image(systemName: isCompleted ? "checkmark.seal.fill" : wish.icon)
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.footnote(.black))
                 .foregroundStyle(isCompleted ? Color.arkInk : Color.ohanaPrimaryActionText)
-                .frame(width: 32, height: 32)
+                .frame(width: 32, height: 32) // a11y: allow decorative wish badge paired with text
                 .background(isCompleted ? Color.goPrimary : critterRarityColor(critter.rarity), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(isCompleted ? l.tr(zh: "今日小愿望完成", en: "Tiny wish complete", de: "Kleiner Wunsch erfüllt") : wish.title(l))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.footnote(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
                 Text(isCompleted ? l.tr(zh: "明天还有新的心愿。", en: "New wish tomorrow.", de: "Morgen gibt es einen neuen Wunsch.") : wish.rewardText(l))
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(isCompleted ? Color.goPrimary : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -1753,19 +1774,20 @@ struct OasisRewardView: View {
     private func critterOutcomeStrip(_ outcome: OasisCritterInteractionOutcome) -> some View {
         HStack(spacing: 8) {
             Image(systemName: outcome.completedDailyWish ? "sparkles" : "heart.fill")
-                .font(.system(size: 11, weight: .black))
+                .font(OhanaFont.caption(.black))
                 .foregroundStyle(outcome.completedDailyWish ? Color.arkInk : Color.goPrimary)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative outcome badge paired with text
                 .background(outcome.completedDailyWish ? Color.goYellow : Color.ohanaControlFill, in: Circle())
+                .accessibilityHidden(true)
             Text(outcome.message(l))
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
             Spacer(minLength: 0)
             let reward = outcome.rewardText(l)
             if !reward.isEmpty {
                 Text(reward)
-                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.goPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -1781,11 +1803,11 @@ struct OasisRewardView: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.footnote(.black))
                 Text(title)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.caption(.black))
                 Text(cost)
-                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.caption2(.black))
                     .opacity(0.62)
             }
             .foregroundStyle(highlighted ? Color.arkInk : Color.ohanaPrimaryActionText)
@@ -1864,15 +1886,16 @@ struct OasisRewardView: View {
             if !pendingUpgradeCoconuts.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 14, weight: .black))
+                        Image(systemName: "sparkles") // a11y: allow decorative section icon
+                            .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.goPrimary)
+                            .accessibilityHidden(true)
                         Text(l.tr(zh: "升级椰子", en: "Upgrade Coconuts", de: "Upgrade-Kokosnüsse"))
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.headline(.black))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Text("\(pendingUpgradeCoconuts.count)")
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.footnote(.black))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
@@ -1909,30 +1932,31 @@ struct OasisRewardView: View {
                         .fill(isMilestone ? Color.goPrimary.opacity(0.2) : Color.ohanaControlFill)
                         .frame(width: 46, height: 46)
                     Text("🥥")
-                        .font(.system(size: 26))
+                        .font(OhanaFont.metric(size: 26))
                         .rotationEffect(.degrees(isOpening ? -12 : 0))
                         .scaleEffect(isOpening ? 1.16 : 1)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Lv.\(coconut.level) · \(coconut.title(l))")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(isMilestone
                          ? l.tr(zh: "里程碑保底", en: "Milestone guaranteed", de: "Meilenstein garantiert")
-                         : coconut.description(l))
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        : coconut.description(l))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(isMilestone ? Color.goPrimary : Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
 
                 Spacer()
 
-                Image(systemName: "hammer.fill")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "hammer.fill") // a11y: allow decorative row action icon
+                    .font(OhanaFont.subheadline(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 44, height: 44)
                     .background(Color.goPrimary, in: Circle())
+                    .accessibilityHidden(true)
             }
             .padding(10)
             .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -1944,11 +1968,12 @@ struct OasisRewardView: View {
     private var critterCompanionStrip: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: "pawprint.fill")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "pawprint.fill") // a11y: allow decorative section icon
+                    .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.goPrimary)
+                    .accessibilityHidden(true)
                 Text(l.tr(zh: "电子宠物", en: "Critters", de: "Critter"))
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 fragmentSummary
@@ -1963,9 +1988,9 @@ struct OasisRewardView: View {
     private var fragmentSummary: some View {
         return HStack(spacing: 4) {
             Text("◇")
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.footnote(.black))
             Text("\(actionSnapshot.critterFragmentTotal)")
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.footnote(.black))
         }
         .foregroundStyle(Color.goPrimary)
     }
@@ -1981,10 +2006,10 @@ struct OasisRewardView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Text(critter.displayName(l))
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: critter.rarity.zh, en: critter.rarity.en, de: critter.rarity.de))
-                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .font(OhanaFont.caption2(.black))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
@@ -1998,7 +2023,7 @@ struct OasisRewardView: View {
                     critterMeter(value: snapshot.bondProgress, icon: "heart.fill")
                 }
                 Text(lifecycle.state.name(l))
-                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.caption2(.black))
                     .foregroundStyle(isDead ? Color.ohanaTertiaryText : Color.goPrimary)
                     .lineLimit(1)
             }
@@ -2042,9 +2067,10 @@ struct OasisRewardView: View {
     private func critterMeter(value: Int, icon: String) -> some View {
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 8, weight: .bold))
+                .font(OhanaFont.caption2(.bold))
+                .accessibilityHidden(true)
             Text("\(max(0, min(100, value)))")
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.caption2(.black))
                 .contentTransition(.numericText())
         }
         .foregroundStyle(Color.ohanaSecondaryText)
@@ -2054,12 +2080,13 @@ struct OasisRewardView: View {
         Button(action: action) {
             VStack(spacing: 1) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.footnote(.black))
+                    .accessibilityHidden(true)
                 Text(cost)
-                    .font(.system(size: 8, weight: .black, design: .rounded))
+                    .font(OhanaFont.caption2(.black))
             }
             .foregroundStyle(Color.ohanaPrimaryActionText)
-            .frame(width: 42, height: 42)
+            .frame(width: 44, height: 44)
             .background(enabled ? Color.goPrimary : Color.ohanaControlFill, in: Circle())
             .opacity(enabled ? 1 : 0.5)
         }
@@ -2248,12 +2275,13 @@ struct OasisRewardView: View {
             injectTreeEnergy()
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "bolt.fill")
+                Image(systemName: "bolt.fill") // a11y: allow decorative action icon paired with label
+                    .accessibilityHidden(true)
                 Text(l.tr(zh: "注入能量", en: "Inject energy", de: "Energie geben"))
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                 Text("(-10🥥)")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.55))
             }
             .frame(maxWidth: .infinity)
@@ -2438,7 +2466,7 @@ struct OasisRewardView: View {
             treeGlow = 0.4
             return
         }
-        withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) { // ui-v4: allow AppWorkloadPolicy-gated Oasis ambient breathing
+        withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) { // ui-v4: allow AppWorkloadPolicy-gated Oasis ambient breathing; smoothness: allow visible-only ambient tree scale
             treeScale = 1.055
             treeGlow  = 0.7
         }

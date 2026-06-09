@@ -31,6 +31,7 @@ struct GenericWeightEntrySheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
+    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
     @State private var weightText = ""
     @State private var selectedDate = Date()
@@ -40,7 +41,9 @@ struct GenericWeightEntrySheet: View {
     @State private var scrollContentHeight: CGFloat = 0
     @State private var popupVisible = false
     @State private var isClosing = false
+    @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -218,6 +221,9 @@ struct GenericWeightEntrySheet: View {
             withTransaction(transaction) {
                 scrollContentHeight = height
             }
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
         }
     }
 
@@ -455,19 +461,22 @@ struct GenericWeightEntrySheet: View {
     private var saveBar: some View {
         Button { save() } label: {
             HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
                     .font(.system(size: 16, weight: .bold))
-                Text(l.tr(zh: "保存体重记录", en: "Save weight", de: "Gewicht speichern"))
+                Text(isSaving
+                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+                    : l.tr(zh: "保存体重记录", en: "Save weight", de: "Gewicht speichern")
+                )
                     .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(isValid ? accentColor : accentColor.opacity(0.38), in: Capsule())
-            .opacity(isValid ? 1 : 0.62)
+            .background(isValid && !isSaving ? accentColor : accentColor.opacity(0.38), in: Capsule())
+            .opacity(isValid || isSaving ? 1 : 0.62)
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!isValid)
+        .disabled(!isValid || isSaving)
         .padding(.horizontal, 20)
         .padding(.top, 10)
         .padding(.bottom, 14)
@@ -570,29 +579,49 @@ struct GenericWeightEntrySheet: View {
     }
 
     private func save() {
-        guard let weight = parsedWeight, weight > 0 else { return }
-        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-            .flatMap { $0.isEmpty ? nil : $0 }
-        let coconutBefore = QuestManager.shared.coconutCount
+        guard !isSaving, let weight = parsedWeight, weight > 0 else { return }
+        isSaving = true
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
+        let savedDate = recordDate
+        let savedUnit = weightUnit
+        let savedBcs = autoBcsForPet ?? 0
 
         switch target {
         case .pet(let pet):
-            let bcs = autoBcsForPet ?? 0
-            let log = PetWeightLog(date: recordDate, weight: weight, weightUnit: weightUnit, bcsScore: bcs, pet: pet, executorId: executorId)
-            modelContext.insert(log)
-            QuestManager.shared.awardAction(type: .weight, pet: pet, context: modelContext)
+            let command = DomainCommand.weightEntry(entityID: pet.id, entityKind: "pet")
+            commandQueue.enqueue(command) {
+                let result = DashboardRecordCommandExecutor(context: modelContext).recordPetWeight(
+                    pet: pet,
+                    weight: weight,
+                    date: savedDate,
+                    executorId: executorId,
+                    weightUnit: savedUnit,
+                    bcsScore: savedBcs,
+                    awardsReward: true,
+                    command: command,
+                    note: "weight.entry"
+                )
+                onRewarded?(result.coconutDelta)
+                onSaved?()
+                closeSheet()
+            }
         case .human(let human):
-            let log = HumanWeightLog(date: recordDate, weight: weight, human: human, executorId: executorId)
-            modelContext.insert(log)
-            human.weightLogs.append(log)
+            let command = DomainCommand.weightEntry(entityID: human.id, entityKind: "human")
+            commandQueue.enqueue(command) {
+                let result = DashboardRecordCommandExecutor(context: modelContext).recordHumanWeight(
+                    human: human,
+                    weight: weight,
+                    date: savedDate,
+                    executorId: executorId,
+                    command: command,
+                    note: "weight.entry"
+                )
+                onRewarded?(result.coconutDelta)
+                onSaved?()
+                closeSheet()
+            }
         }
-
-        modelContext.safeSave()
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        let coconutDelta = max(0, QuestManager.shared.coconutCount - coconutBefore)
-        onRewarded?(coconutDelta)
-        onSaved?()
-        closeSheet()
     }
 
     private func closeSheet() {

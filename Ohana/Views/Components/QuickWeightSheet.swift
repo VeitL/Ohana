@@ -16,6 +16,8 @@ struct QuickWeightSheet: View {
     @State private var weightText: String = ""
     @State private var recordDate: Date = Date()
     @State private var didSave = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
     private var parsedWeight: Double? { CountryDecimalInput.parse(weightText, countryCode: AppCountry.code) }
     private var isValid: Bool {
@@ -131,17 +133,27 @@ struct QuickWeightSheet: View {
         }
         .background(Color.ohanaCardSurface)
         .presentationBackground(.clear)
+        .onDisappear {
+            commandQueue.cancelAll()
+        }
     }
 
     private func saveWeight() {
         guard let v = parsedWeight, v > 0 else { return }
-        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-            .flatMap { $0.isEmpty ? nil : $0 }
-        let log = PetWeightLog(date: recordDate, weight: v, pet: pet, executorId: executorId)
-        modelContext.insert(log)
-        modelContext.safeSave()
+        let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
+        let command = DomainCommand.quickWeight(petID: pet.id)
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         didSave = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
+        commandQueue.enqueue(command) {
+            DashboardRecordCommandExecutor(context: modelContext).recordPetWeight(
+                pet: pet,
+                weight: v,
+                date: recordDate,
+                executorId: executorId,
+                command: command,
+                note: "quick.weight"
+            )
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
+        }
     }
 }

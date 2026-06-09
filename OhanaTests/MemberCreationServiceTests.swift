@@ -228,6 +228,30 @@ struct MemberCreationServiceTests {
         #expect(second.map { FocusCard.from($0).kind } != second?.roleText)
     }
 
+    @Test func explicitHumanRoleDraftCanRespectWizardSelection() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+        let existing = Human(name: "Existing")
+        existing.role = "owner"
+        context.insert(existing)
+        try context.save()
+
+        var draft = humanDraft(name: "Nico", source: .placeholder)
+        draft.role = "owner"
+        draft.usesExplicitHumanRole = true
+
+        let result = try MemberCreationService.save(
+            draft: draft,
+            existingPets: [],
+            existingHumans: [existing],
+            context: context,
+            countryCode: "CN"
+        ).human
+
+        #expect(result?.role == "owner")
+    }
+
     @Test func homeVisibleCardsLimitToSixAndPromoteNewMember() throws {
         resetGlobalState()
         UserDefaults.standard.set("zh", forKey: "appLanguage")
@@ -301,6 +325,52 @@ struct MemberCreationServiceTests {
         #expect(HomeCardVisibility.visibleCardCount(pets: [pet], humans: humans, raw: hiddenRaw) == HomeCardVisibility.maxVisibleCards)
     }
 
+    @Test func petCreationWritesBirthdayHomeMilestonesAndRevision() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+        let birthday = makeDate(year: 2025, month: 6, day: 8)
+        let homeDate = makeDate(year: 2026, month: 1, day: 10)
+        let beforeRevision = ReadModelRevisionCenter.shared.homeRevision.value
+        var draft = petDraft(name: "Momo", source: .placeholder)
+        draft.avatarImageData = nil
+        draft.hasBirthday = true
+        draft.birthday = birthday
+        draft.hasHomeDate = true
+        draft.homeDate = homeDate
+        draft.themeColorHex = "00AAFF"
+
+        let result = try MemberCreationService.save(
+            draft: draft,
+            existingPets: [],
+            existingHumans: [],
+            context: context,
+            countryCode: "CN"
+        )
+        let pet = try #require(result.pet)
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        let milestones = try context.fetch(FetchDescriptor<PetMilestone>())
+        let mutation = try #require(ReadModelRevisionCenter.shared.lastMutation)
+        let birthdayEvent = try #require(events.first { $0.eventType == EventType.birthday.rawValue })
+        let anniversaryEvent = try #require(events.first { $0.eventType == EventType.anniversary.rawValue })
+
+        #expect(events.count >= 2)
+        #expect(birthdayEvent.relatedEntityId == pet.id.uuidString)
+        #expect(birthdayEvent.recurrenceDays == 365)
+        #expect(reminders.count == 1)
+        #expect(reminders.first?.event?.id == birthdayEvent.id)
+        #expect(reminders.first?.scheduledAt == birthday)
+        #expect(anniversaryEvent.relatedEntityId == pet.id.uuidString)
+        #expect(anniversaryEvent.recurrenceDays == 365)
+        #expect(milestones.count == 6)
+        #expect(milestones.allSatisfy { $0.pet?.id == pet.id })
+        #expect(QuestManager.shared.isThemeColorSet == true)
+        #expect(ReadModelRevisionCenter.shared.homeRevision.value == beforeRevision + 1)
+        #expect(mutation.command == .memberCreation(entityID: pet.id, kind: "pet"))
+        #expect(mutation.affectedEntityIDs == [pet.id])
+    }
+
     private var avatarData: Data { Data([0x89, 0x50, 0x4E, 0x47]) }
 
     private func petDraft(name: String, source: MemberAvatarSource) -> MemberCreationDraft {
@@ -337,6 +407,10 @@ struct MemberCreationServiceTests {
         let schema = Schema(ArkSchemaV56.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func makeDate(year: Int, month: Int, day: Int) -> Date {
+        Calendar(identifier: .gregorian).date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
     }
 
     private func resetGlobalState() {

@@ -47,8 +47,12 @@ struct HomeReadModelStoreTests {
             force: true
         )
 
-        try await Task.sleep(nanoseconds: 90_000_000)
+        let didPublish = try await waitUntil {
+            !store.payload.signature.isEmpty &&
+                store.payload.source.humans.map(\.id) == [human.id]
+        }
 
+        #expect(didPublish)
         #expect(!store.payload.signature.isEmpty)
         #expect(store.payload.source.humans.map(\.id) == [human.id])
     }
@@ -72,8 +76,13 @@ struct HomeReadModelStoreTests {
             force: true
         )
 
-        try await Task.sleep(nanoseconds: 90_000_000)
+        let didPreload = try await waitUntil {
+            store.payload.avatarPreloadSignature.contains(human.id.uuidString) &&
+                store.payload.avatarPreloadSignature.contains("8-") &&
+                store.payload.avatarPreloadPayloads.map(\.id) == [human.id]
+        }
 
+        #expect(didPreload)
         #expect(store.payload.avatarPreloadSignature.contains(human.id.uuidString))
         #expect(store.payload.avatarPreloadSignature.contains("8-"))
         #expect(store.payload.avatarPreloadPayloads.map(\.id) == [human.id])
@@ -100,8 +109,13 @@ struct HomeReadModelStoreTests {
             force: true
         )
 
-        try await Task.sleep(nanoseconds: 90_000_000)
+        let didPreload = try await waitUntil {
+            store.payload.activeHumanAvatar.id == human.id &&
+                store.payload.activeHumanAvatar.signature == FocusWalletAvatarCache.signature(for: avatarData) &&
+                store.payload.avatarPreloadPayloads.map(\.id) == [human.id]
+        }
 
+        #expect(didPreload)
         #expect(store.payload.snapshot.cards.isEmpty)
         #expect(store.payload.activeHumanAvatar.id == human.id)
         #expect(store.payload.activeHumanAvatar.signature == FocusWalletAvatarCache.signature(for: avatarData))
@@ -112,5 +126,19 @@ struct HomeReadModelStoreTests {
         let schema = Schema(ArkSchemaV56.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func waitUntil(
+        timeout: TimeInterval = 3,
+        condition: () -> Bool
+    ) async throws -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() {
+                return true
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        return condition()
     }
 }

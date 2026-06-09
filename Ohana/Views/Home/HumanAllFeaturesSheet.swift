@@ -57,6 +57,7 @@ extension HumanAllFeatureDestination: Identifiable {
 
 struct HumanAllFeaturesSheet: View {
     let human: Human
+    let onOpenDestination: (HumanAllFeatureDestination) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
@@ -68,8 +69,15 @@ struct HumanAllFeaturesSheet: View {
     @Query private var allReports: [HumanHealthReport]
     @Query(sort: \PetExpenseLog.date, order: .reverse) private var allExpenses: [PetExpenseLog]
 
-    @State private var activeDestination: HumanAllFeatureDestination?
     @State private var lockedField: HumanPrivateField?
+
+    init(
+        human: Human,
+        onOpenDestination: @escaping (HumanAllFeatureDestination) -> Void
+    ) {
+        self.human = human
+        self.onOpenDestination = onOpenDestination
+    }
 
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -113,14 +121,6 @@ struct HumanAllFeaturesSheet: View {
             .grayscale(human.hasPassedAway ? 0.86 : 0)
             .animation(GoMotion.page, value: human.hasPassedAway)
         }
-        .fullScreenCover(item: $activeDestination) { destination in
-            FeatureHubDestinationHost(
-                onClose: { activeDestination = nil },
-                showsCloseButton: destinationNeedsHostClose(destination)
-            ) {
-                destinationView(destination)
-            }
-        }
         .alert(
             l.tr(zh: "仅本人可见", en: "Private to owner", de: "Nur selbst sichtbar"),
             isPresented: Binding(
@@ -136,39 +136,6 @@ struct HumanAllFeaturesSheet: View {
         }
     }
 
-    @ViewBuilder
-    private func destinationView(_ destination: HumanAllFeatureDestination) -> some View {
-        switch destination {
-        case .basicInfo:
-            HumanBasicInfoDetailView(human: human)
-        case .weight:
-            HumanWeightHistoryView(human: human)
-        case .workout:
-            CoHealthDashboardFullView(human: human)
-        case .metrics:
-            HumanHealthCheckupView(human: human)
-        case .medication:
-            HumanMedicationView(human: human)
-        case .report:
-            HumanHealthReportView(human: human)
-        case .expense:
-            HumanExpenseDetailView(human: human)
-        case .wishlist:
-            HumanWishlistView(human: human)
-        case .notes:
-            HumanNoteHistorySheet(human: human)
-        }
-    }
-
-    private func destinationNeedsHostClose(_ destination: HumanAllFeatureDestination) -> Bool {
-        switch destination {
-        case .basicInfo, .workout, .metrics, .report, .wishlist:
-            return true
-        case .weight, .medication, .expense, .notes:
-            return false
-        }
-    }
-
     private func open(_ destination: HumanAllFeatureDestination) {
         if let field = destination.privacyField,
            PrivacyService.isLocked(field, for: human, viewedBy: activeHumanId) {
@@ -176,9 +143,7 @@ struct HumanAllFeaturesSheet: View {
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             return
         }
-        withAnimation(GoMotion.page) {
-            activeDestination = destination
-        }
+        onOpenDestination(destination)
     }
 
     private var headerSubtitle: String {

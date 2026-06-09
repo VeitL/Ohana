@@ -21,6 +21,7 @@ struct WeightHistoryView: View {
     @State private var newWeightText = ""
     @State private var newWeightUnit = "kg"
     @State private var newWeightDate = Date()
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var sortedLogs: [PetWeightLog] {
         pet.weightLogs.sorted(by: { $0.date > $1.date })
@@ -440,8 +441,18 @@ struct WeightHistoryView: View {
             }
 
             Button {
-                modelContext.delete(log)
-                modelContext.safeSave()
+                let command = DomainCommand.weightDelete(
+                    entityID: pet.id,
+                    entityKind: EntityKind.pet.rawValue,
+                    recordID: log.id
+                )
+                commandQueue.enqueue(command) {
+                    DashboardRecordCommandExecutor(context: modelContext).deletePetWeight(
+                        log,
+                        pet: pet,
+                        note: "dashboard.weight.delete.\(EntityKind.pet.rawValue)"
+                    )
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .semibold))
@@ -454,23 +465,32 @@ struct WeightHistoryView: View {
 
     private func saveInlineWeight() {
         guard let value = parsedInlineWeight, value > 0 else { return }
-        let log = PetWeightLog(
-            date: newWeightDate,
-            weight: value,
-            weightUnit: newWeightUnit,
-            bcsScore: autoBCS(for: value, unit: newWeightUnit),
-            pet: pet,
-            executorId: UserDefaults.standard.string(forKey: "currentActiveHumanId")
-        )
-        modelContext.insert(log)
-        QuestManager.shared.awardAction(type: .weight, pet: pet, context: modelContext)
-        modelContext.safeSave()
+        let savedDate = newWeightDate
+        let savedUnit = newWeightUnit
+        let savedBcs = autoBCS(for: value, unit: newWeightUnit)
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap {
+            $0.isEmpty ? nil : $0
+        }
+        let command = DomainCommand.weightEntry(entityID: pet.id, entityKind: EntityKind.pet.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withAnimation(GoMotion.feedback) {
             newWeightText = ""
             newWeightUnit = "kg"
             newWeightDate = Date()
             isInlineWeightComposerVisible = false
+        }
+        commandQueue.enqueue(command) {
+            DashboardRecordCommandExecutor(context: modelContext).recordPetWeight(
+                pet: pet,
+                weight: value,
+                date: savedDate,
+                executorId: executorId,
+                weightUnit: savedUnit,
+                bcsScore: savedBcs,
+                awardsReward: true,
+                command: command,
+                note: "dashboard.weight.entry"
+            )
         }
     }
 

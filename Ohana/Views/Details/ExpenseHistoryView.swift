@@ -32,6 +32,7 @@ struct ExpenseHistoryView: View {
     @State private var newDate = Date()
     @Query(sort: \Human.createdAt) private var allHumans: [Human]
     @State private var selectedPayerId: String? = nil
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var filteredLogs: [PetExpenseLog] {
         let cal = Calendar.current
@@ -546,8 +547,18 @@ struct ExpenseHistoryView: View {
                 .foregroundStyle(accentColor)
 
             Button {
-                modelContext.delete(log)
-                modelContext.safeSave()
+                let command = DomainCommand.expenseDelete(
+                    entityID: pet.id,
+                    entityKind: EntityKind.pet.rawValue,
+                    recordID: log.id
+                )
+                commandQueue.enqueue(command) {
+                    DashboardRecordCommandExecutor(context: modelContext).deletePetExpense(
+                        log,
+                        pet: pet,
+                        note: "dashboard.expense.delete.\(EntityKind.pet.rawValue)"
+                    )
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .semibold))
@@ -566,36 +577,10 @@ struct ExpenseHistoryView: View {
     private func saveInlineExpense() {
         guard let amount = parsedNewAmount, amount > 0 else { return }
         let note = newNote.trimmingCharacters(in: .whitespacesAndNewlines)
-        let log = PetExpenseLog(
-            date: newDate,
-            amount: amount,
-            category: newCategory,
-            note: note,
-            pet: pet,
-            executorId: selectedPayerId
-        )
-        modelContext.insert(log)
-        modelContext.safeSave()
-        let reward = QuestManager.shared.awardAction(type: .expense, pet: pet, context: modelContext)
-        let rewardDelta = CareLedgerService.rewardDelta(reward)
-        CareLedgerService.record(
-            occurredAt: log.date,
-            actorKind: selectedPayerId == nil ? .unknown : .human,
-            actorId: selectedPayerId,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .expense,
-            actionType: newCategory.rawValue,
-            amountValue: amount,
-            amountUnit: "currency",
-            note: note,
-            source: .detail,
-            legacyModelName: "PetExpenseLog",
-            legacyModelId: log.id.uuidString,
-            coconutDelta: rewardDelta,
-            context: modelContext,
-            save: true
-        )
+        let savedDate = newDate
+        let savedCategory = newCategory
+        let savedPayerId = selectedPayerId
+        let command = DomainCommand.expenseEntry(entityID: pet.id, entityKind: EntityKind.pet.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withAnimation(GoMotion.feedback) {
             newAmount = ""
@@ -603,6 +588,19 @@ struct ExpenseHistoryView: View {
             newDate = Date()
             selectedPayerId = currentActiveHumanId
             isInlineExpenseComposerVisible = false
+        }
+        commandQueue.enqueue(command) {
+            DashboardRecordCommandExecutor(context: modelContext).recordPetExpense(
+                pet: pet,
+                amount: amount,
+                date: savedDate,
+                category: savedCategory,
+                note: note,
+                executorId: savedPayerId,
+                source: .detail,
+                command: command,
+                revisionNote: "dashboard.expense.entry"
+            )
         }
     }
 }

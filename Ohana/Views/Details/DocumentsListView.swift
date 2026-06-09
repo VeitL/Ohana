@@ -20,6 +20,7 @@ struct DocumentsListView: View {
     @State private var selectedInsurance: PetInsurance?
     @State private var deleteDocument: PetDocument?
     @State private var deleteInsurance: PetInsurance?
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n() }
     private var state: PetProtectionDashboardState { PetProtectionDashboardState(pet: pet) }
@@ -94,9 +95,15 @@ struct DocumentsListView: View {
         )) {
             Button("取消", role: .cancel) { deleteDocument = nil }
             Button("删除", role: .destructive) {
-                if let deleteDocument {
-                    modelContext.delete(deleteDocument)
-                    modelContext.safeSave()
+                if let target = deleteDocument {
+                    let command = DomainCommand.petDocumentDelete(petID: pet.id, documentID: target.id)
+                    commandQueue.enqueue(command) {
+                        PetDocumentCommandExecutor(context: modelContext).deleteDocument(
+                            target,
+                            pet: pet,
+                            note: "petDocument.delete"
+                        )
+                    }
                 }
                 deleteDocument = nil
             }
@@ -107,9 +114,19 @@ struct DocumentsListView: View {
         )) {
             Button("取消", role: .cancel) { deleteInsurance = nil }
             Button("删除", role: .destructive) {
-                if let deleteInsurance {
-                    modelContext.delete(deleteInsurance)
-                    modelContext.safeSave()
+                if let target = deleteInsurance {
+                    let command = DomainCommand.insurancePolicy(
+                        petID: pet.id,
+                        policyID: target.id,
+                        action: "delete"
+                    )
+                    commandQueue.enqueue(command) {
+                        InsuranceCommandExecutor(context: modelContext).deletePolicy(
+                            target,
+                            pet: pet,
+                            note: "insurance.policy.delete"
+                        )
+                    }
                 }
                 deleteInsurance = nil
             }

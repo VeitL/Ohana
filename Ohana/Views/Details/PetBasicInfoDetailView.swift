@@ -13,6 +13,7 @@ struct PetBasicInfoDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var isEditing = false
 
     @State private var showingRainbowBridgeAlert = false
@@ -777,27 +778,15 @@ struct PetBasicInfoDetailView: View {
 
     // MARK: - Delete Helpers
     private func deletePetWithCascade(_ p: Pet) {
-        let petIdStr = p.id.uuidString
-        if let allEvents = try? modelContext.fetch(FetchDescriptor<Event>()) {
-            for event in allEvents where event.relatedEntityId == petIdStr {
-                modelContext.delete(event)
-            }
-        }
-        removeQuickAccessItems(for: p.id)
-        modelContext.delete(p)
-        modelContext.safeSave()
-        dismiss()
-    }
-
-    private func removeQuickAccessItems(for petId: UUID) {
-        let key = "quickActionItems_v2"
-        guard let json = UserDefaults.standard.string(forKey: key),
-              let data = json.data(using: .utf8),
-              var items = try? JSONDecoder().decode([QuickActionItem].self, from: data) else { return }
-        items.removeAll { $0.petId == petId }
-        if let newData = try? JSONEncoder().encode(items),
-           let newJSON = String(data: newData, encoding: .utf8) {
-            UserDefaults.standard.set(newJSON, forKey: key)
+        let command = DomainCommand.memberDeletion(entityID: p.id, kind: EntityKind.pet.rawValue)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            MemberCommandExecutor(context: modelContext).deletePet(
+                p,
+                note: "petBasicInfo.delete"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
         }
     }
 
@@ -826,32 +815,49 @@ struct PetBasicInfoDetailView: View {
     }
 
     private func saveChanges() {
-        pet.name = eName.trimmingCharacters(in: .whitespaces).isEmpty ? pet.name : eName.trimmingCharacters(in: .whitespaces)
-        pet.species = eSpecies; pet.breed = eBreed
-        pet.gender = eGender; pet.isNeutered = eIsNeutered
-        pet.birthday = eHasBirthday ? eBirthday : nil
-        pet.homeDate = eHasHomeDate ? eHomeDate : nil
-        pet.coatColor = eCoatColor; pet.eyeColor = eEyeColor
-        pet.microchipID = eMicrochipID; pet.vetContact = eVetContact
-        pet.vetClinicName = eVetClinicName; pet.vetDoctorName = eVetDoctorName; pet.vetAddress = eVetAddress
-        pet.allergies = eAllergies
-        pet.passportNumber = ePassportNumber
-        pet.passportExpiryDate = eHasPassportExpiry ? ePassportExpiry : nil
-        pet.formerName = eFormerName; pet.birthCountry = eBirthCountry; pet.birthCity = eBirthCity
-        pet.lineageInfo = eLineageInfo; pet.notes = eNotes
-        pet.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
-            eThemeColorHex,
-            fallback: OhanaThemeColorPolicy.petFallbackHex
+        let input = PetProfileCommandInput(
+            name: eName,
+            avatarImageData: eAvatarImageData,
+            avatarEmoji: pet.avatarEmoji,
+            species: eSpecies,
+            breed: eBreed,
+            gender: eGender,
+            isNeutered: eIsNeutered,
+            birthday: eHasBirthday ? eBirthday : nil,
+            homeDate: eHasHomeDate ? eHomeDate : nil,
+            themeHex: eThemeColorHex,
+            notes: eNotes,
+            coatColor: eCoatColor,
+            eyeColor: eEyeColor,
+            microchipID: eMicrochipID,
+            vetContact: eVetContact,
+            vetClinicName: eVetClinicName,
+            vetDoctorName: eVetDoctorName,
+            vetAddress: eVetAddress,
+            allergies: eAllergies,
+            passportNumber: ePassportNumber,
+            hasPassportExpiry: eHasPassportExpiry,
+            passportExpiryDate: ePassportExpiry,
+            formerName: eFormerName,
+            birthCountry: eBirthCountry,
+            birthCity: eBirthCity,
+            lineageInfo: eLineageInfo,
+            foodBrand: pet.foodBrand,
+            dailyPortionGrams: pet.dailyPortionGrams
         )
-        pet.avatarImageData = eAvatarImageData
-        CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: modelContext)
-        modelContext.safeSave()
-        NotificationCenter.default.post(
-            name: .ohanaMemberProfileDidChange,
-            object: nil,
-            userInfo: ["id": pet.id.uuidString, "kind": "pet"]
-        )
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        commandQueue.enqueue(.memberProfile(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
+            let result = MemberCommandExecutor(context: modelContext).updatePetProfile(
+                pet,
+                input: input,
+                note: "petBasicInfo.profile"
+            )
+            NotificationCenter.default.post(
+                name: .ohanaMemberProfileDidChange,
+                object: nil,
+                userInfo: ["id": result.entityID.uuidString, "kind": result.kind]
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
     }
 }
 

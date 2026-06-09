@@ -47,6 +47,7 @@ struct AddDocumentSheet: View {
     @State private var costText: String = ""
     @State private var hasCost: Bool = false
     @State private var selectedPayerId: String? = nil
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     // B4: 自动预填名称
     private var autoTitle: String { "\(pet.name)\(selectedCategory.rawValue)" }
     private var showDocumentNumber: Bool { selectedCategory == .passport || selectedCategory == .registration }
@@ -337,10 +338,8 @@ struct AddDocumentSheet: View {
 
                     Button {
                         GoKeyboard.dismiss()
-                        DispatchQueue.main.async {
-                            saveDocument()
-                            dismiss()
-                        }
+                        saveDocument()
+                        dismiss()
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark")
@@ -490,64 +489,29 @@ struct AddDocumentSheet: View {
     }
 
     private func saveDocument() {
-        // B4: 自动预填名称
-        let finalTitle = title.isEmpty ? autoTitle : title
-        let doc = PetDocument(
-            title: finalTitle,
+        let input = PetDocumentCreateCommandInput(
+            title: title,
             category: selectedCategory,
-            pet: pet
+            issuingAuthority: issuingAuthority,
+            notes: notes,
+            issueDate: hasIssueDate ? issueDate : nil,
+            expiryDate: hasExpiryDate ? expiryDate : nil,
+            cost: hasCost ? (Double(costText) ?? 0) : 0,
+            payerId: selectedPayerId,
+            documentNumber: documentNumber,
+            attachments: attachments.map {
+                PetDocumentAttachmentCommandInput(data: $0.data, filename: $0.filename, isImage: $0.isImage)
+            }
         )
-        doc.issuingAuthority = issuingAuthority
-        doc.notes = notes
-        if hasIssueDate { doc.issueDate = issueDate }
-        if hasExpiryDate { doc.expiryDate = expiryDate }
-        // B4: 存储第一个附件（PetDocument 单附件字段）
-        if let first = attachments.first {
-            doc.attachmentData = first.data
-            doc.attachmentFilename = first.filename.isEmpty
-                ? (first.isImage ? "image.jpg" : "attachment")
-                : first.filename
-        }
-        // N3: 费用同步（所有类型可选）
-        let amount = hasCost ? (Double(costText) ?? 0) : 0
-        doc.cost = amount
-        let expenseDate = issueDate.isAfterToday ? Date() : (hasIssueDate ? issueDate : Date())
-        if amount > 0 {
-            let payerId = selectedPayerId.flatMap { id in
-                humans.contains(where: { $0.id.uuidString == id }) ? id : nil
-            }
-            for plan in DocumentExpenseSyncPlanner.plannedExpenses(
-                documentCategory: selectedCategory,
-                amount: amount,
-                date: expenseDate,
-                note: doc.title,
-                payerId: payerId
-            ) {
-                let expense = PetExpenseLog(
-                    date: plan.date,
-                    amount: plan.amount,
-                    category: plan.category,
-                    note: plan.note,
-                    pet: pet,
-                    executorId: plan.payerId
-                )
-                modelContext.insert(expense)
-            }
-        }
-        modelContext.insert(doc)
-        modelContext.safeSave()
-        // Sync document number to Pet fields
-        if !documentNumber.isEmpty {
-            if selectedCategory == .passport { pet.passportNumber = documentNumber }
-            else if selectedCategory == .registration { /* could sync to microchip if field exists */ }
-            modelContext.safeSave()
+        commandQueue.enqueue(.petDocumentCreate(petID: pet.id, category: selectedCategory.rawValue)) {
+            PetDocumentCommandExecutor(context: modelContext).createDocument(
+                input: input,
+                pet: pet,
+                note: "petDocument.create"
+            )
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
-}
-
-private extension Date {
-    var isAfterToday: Bool { self > Date() }
 }
 
 // MARK: - P7: 编辑证件 Sheet（预填数据）
@@ -574,6 +538,7 @@ struct EditDocumentSheet: View {
     @State private var showingCamera = false
     @State private var showCameraPermissionAlert = false
     @State private var pendingCapturedImage: UIImage? = nil
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     init(doc: PetDocument, pet: Pet) {
         self.doc = doc
@@ -784,10 +749,8 @@ struct EditDocumentSheet: View {
 
                     Button {
                         GoKeyboard.dismiss()
-                        DispatchQueue.main.async {
-                            saveChanges()
-                            dismiss()
-                        }
+                        saveChanges()
+                        dismiss()
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark")
@@ -860,8 +823,13 @@ struct EditDocumentSheet: View {
         .alert("删除「\(doc.title.isEmpty ? doc.category : doc.title)」？", isPresented: $showingDelete) {
             Button("取消", role: .cancel) {}
             Button("删除", role: .destructive) {
-                modelContext.delete(doc)
-                modelContext.safeSave()
+                commandQueue.enqueue(.petDocumentDelete(petID: pet.id, documentID: doc.id)) {
+                    PetDocumentCommandExecutor(context: modelContext).deleteDocument(
+                        doc,
+                        pet: pet,
+                        note: "petDocument.delete"
+                    )
+                }
                 dismiss()
             }
         } message: { Text("此操作不可撤销。") }
@@ -886,18 +854,25 @@ struct EditDocumentSheet: View {
     }
 
     private func saveChanges() {
-        doc.title = title.isEmpty ? "\(pet.name)\(selectedCategory.rawValue)" : title
-        doc.category = selectedCategory.rawValue
-        doc.issuingAuthority = issuingAuthority
-        doc.notes = notes
-        doc.issueDate = hasIssueDate ? issueDate : nil
-        doc.expiryDate = hasExpiryDate ? expiryDate : nil
-        doc.cost = hasCost ? (Double(costText) ?? 0) : 0
-        if let img = attachmentImage {
-            doc.attachmentData = img.jpegData(compressionQuality: 0.85)
-            if doc.attachmentFilename.isEmpty { doc.attachmentFilename = "image.jpg" }
+        let input = PetDocumentUpdateCommandInput(
+            title: title,
+            category: selectedCategory,
+            issuingAuthority: issuingAuthority,
+            notes: notes,
+            issueDate: hasIssueDate ? issueDate : nil,
+            expiryDate: hasExpiryDate ? expiryDate : nil,
+            cost: hasCost ? (Double(costText) ?? 0) : 0,
+            attachmentData: attachmentImage?.jpegData(compressionQuality: 0.85),
+            clearsAttachment: attachmentImage == nil
+        )
+        commandQueue.enqueue(.petDocumentUpdate(petID: pet.id, documentID: doc.id)) {
+            PetDocumentCommandExecutor(context: modelContext).updateDocument(
+                doc,
+                pet: pet,
+                input: input,
+                note: "petDocument.update"
+            )
         }
-        modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 

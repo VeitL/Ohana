@@ -51,6 +51,7 @@ struct AddExpenseSheet: View {
     @State private var popupVisible = false
     @State private var isClosing = false
     @State private var popupDragOffset: CGFloat = 0
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     // 报销申请快捷入口
     @State private var savedExpenseId: String? = nil
@@ -1002,64 +1003,39 @@ struct AddExpenseSheet: View {
             humans.contains(where: { $0.id.uuidString == id }) ? id : nil
         }
         let cleanNote = noteInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        let log = PetExpenseLog(
-            date: date,
-            amount: amount,
-            category: selectedCategory,
-            note: cleanNote,
-            pet: pet,
-            executorId: payerId
-        )
-        modelContext.insert(log)
-
-        if !receiptAttachments.isEmpty {
-            let document = ExpenseReceiptDocumentBuilder.makeDocument(
-                title: receiptDocumentTitle(note: cleanNote),
-                category: receiptDocumentCategory(),
-                cost: amount,
-                date: log.date,
-                visibleNote: cleanNote,
-                linkedExpenseLogId: log.id.uuidString,
-                attachments: receiptDrafts(),
-                pet: pet
-            )
-            modelContext.insert(document)
-            for attachment in document.attachments {
-                modelContext.insert(attachment)
-            }
-        }
-
-        modelContext.safeSave()
-
+        let savedDate = date
+        let savedCategory = selectedCategory
+        let savedReceiptTitle = receiptDocumentTitle(note: cleanNote)
+        let savedReceiptCategory = receiptDocumentCategory()
+        let savedReceiptDrafts = receiptDrafts()
+        let hasActiveInsurance = !activeInsurances.isEmpty
+        let command = DomainCommand.expenseEntry(entityID: pet.id, entityKind: EntityKind.pet.rawValue)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        let reward = QuestManager.shared.awardAction(type: .expense, pet: pet, context: modelContext)
-        let rewardDelta = CareLedgerService.rewardDelta(reward)
-        CareLedgerService.record(
-            occurredAt: log.date,
-            actorKind: payerId == nil ? .unknown : .human,
-            actorId: payerId,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .expense,
-            actionType: selectedCategory.rawValue,
-            amountValue: amount,
-            amountUnit: "currency",
-            note: cleanNote,
-            source: .detail,
-            legacyModelName: "PetExpenseLog",
-            legacyModelId: log.id.uuidString,
-            coconutDelta: rewardDelta,
-            context: modelContext,
-            save: true
-        )
-        onSaved?()
-        onRewarded?(rewardDelta)
 
-        if selectedCategory == .medical, !activeInsurances.isEmpty {
-            savedExpenseId = log.id.uuidString
-            isSaving = false
-        } else {
-            closeSheet()
+        commandQueue.enqueue(command) {
+            let result = DashboardRecordCommandExecutor(context: modelContext).recordPetExpense(
+                pet: pet,
+                amount: amount,
+                date: savedDate,
+                category: savedCategory,
+                note: cleanNote,
+                executorId: payerId,
+                source: .detail,
+                receiptTitle: savedReceiptTitle,
+                receiptCategory: savedReceiptCategory,
+                receiptAttachments: savedReceiptDrafts,
+                command: command,
+                revisionNote: "dashboard.expense.entry"
+            )
+            onSaved?()
+            onRewarded?(result.coconutDelta)
+
+            if savedCategory == .medical, hasActiveInsurance {
+                savedExpenseId = result.logID.uuidString
+                isSaving = false
+            } else {
+                closeSheet()
+            }
         }
     }
 

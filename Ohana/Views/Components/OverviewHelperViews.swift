@@ -103,19 +103,20 @@ struct CompactTaskRow: View {
                 withAnimation(GoMotion.feedback) { isDone.toggle() }
                 let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
                 if isDone {
-                    ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
-                    QuestManager.shared.addCoconuts(2, emoji: "✅", reason: reminder.event?.title ?? "完成待办")
-                    CareLedgerService.recordCoconut(
-                        delta: 2,
+                    ReminderCommandExecutor(context: modelContext).completeWithCoconutReward(
+                        reminder,
+                        by: activeHumanId,
+                        amount: 2,
                         title: reminder.event?.title ?? "完成待办",
-                        actorId: activeHumanId,
-                        actorName: nil,
-                        source: .economy,
-                        context: modelContext
+                        note: "overview.reminder.complete.reward"
                     )
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } else {
-                    ReminderCompletionService.reopen(reminder, by: activeHumanId, context: modelContext)
+                    ReminderCommandExecutor(context: modelContext).reopen(
+                        reminder,
+                        by: activeHumanId,
+                        note: "overview.reminder.reopen"
+                    )
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
             } label: {
@@ -247,7 +248,11 @@ struct SwipeableReminderCard: View {
         isDismissed = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-            ReminderCompletionService.complete(reminder, by: activeHumanId, context: modelContext)
+            ReminderCommandExecutor(context: modelContext).complete(
+                reminder,
+                by: activeHumanId,
+                note: "overview.upcoming.reminder.complete"
+            )
         }
     }
 
@@ -255,7 +260,11 @@ struct SwipeableReminderCard: View {
         isDismissed = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
             let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-            ReminderCompletionService.skip(reminder, by: activeHumanId, context: modelContext)
+            ReminderCommandExecutor(context: modelContext).skip(
+                reminder,
+                by: activeHumanId,
+                note: "overview.upcoming.reminder.skip"
+            )
         }
     }
 }
@@ -266,6 +275,7 @@ struct PlantGardenCard: View {
     let onTap: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var isWatering = false
 
     var body: some View {
@@ -321,19 +331,15 @@ struct PlantGardenCard: View {
     private func waterPlant() {
         isWatering = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        plant.lastWateredDate = Date()
-        modelContext.safeSave()
-        CareLedgerService.record(
-            occurredAt: plant.lastWateredDate ?? Date(),
-            actorKind: .human,
-            actorId: UserDefaults.standard.string(forKey: "currentActiveHumanId"),
-            subjectKind: .plant,
-            subjectId: plant.id.uuidString,
-            eventKind: .plantCare,
-            actionType: PlantCareType.watering.rawValue,
-            source: .quickAction,
-            context: modelContext
-        )
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        commandQueue.enqueue(.plantCare(plantID: plant.id, action: PlantCareType.watering.rawValue)) {
+            PlantCareCommandExecutor(context: modelContext).recordCare(
+                .watering,
+                plant: plant,
+                executorId: executorId,
+                note: "overview.plantCare"
+            )
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             isWatering = false
         }

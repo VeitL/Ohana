@@ -24,6 +24,7 @@ final class FocusHomeWalletController: ObservableObject {
     private struct PendingTap {
         let startedAt: CFAbsoluteTime
         let cardName: String
+        let cardKind: String
         let action: String
     }
 
@@ -76,6 +77,12 @@ final class FocusHomeWalletController: ObservableObject {
         if let pending {
             lastExpandStartedAt = pending.startedAt
             AppPerformanceMonitor.shared.record("home.cardExpandStateSubmitted", startedAt: pending.startedAt, note: pending.cardName)
+            AppFlowPerformance.mark(
+                AppPerformanceFlows.homeCardExpand,
+                AppPerformancePhases.stateSubmitted,
+                startedAt: pending.startedAt,
+                note: ["cardKind": pending.cardKind]
+            )
         } else {
             lastExpandStartedAt = CFAbsoluteTimeGetCurrent()
         }
@@ -87,6 +94,13 @@ final class FocusHomeWalletController: ObservableObject {
             guard self.isCurrentTransition(session) else { return }
             self.transitionCardId = nil
             self.heroDirection = 0
+            if let startedAt = self.lastExpandStartedAt {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.homeCardExpand,
+                    AppPerformancePhases.animationComplete,
+                    startedAt: startedAt
+                )
+            }
             completion()
         }
 
@@ -95,6 +109,12 @@ final class FocusHomeWalletController: ObservableObject {
                 await OhanaFrameScheduler.waitAfterNextFrame()
                 guard isCurrentTransition(session) else { return }
                 AppPerformanceMonitor.shared.record("home.cardExpandFirstFrame", startedAt: pending.startedAt, note: pending.cardName)
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.homeCardExpand,
+                    AppPerformancePhases.firstFrame,
+                    startedAt: pending.startedAt,
+                    note: ["cardKind": pending.cardKind]
+                )
             }
         }
 
@@ -126,8 +146,13 @@ final class FocusHomeWalletController: ObservableObject {
         triggerTapFeedback()
 
         let action = (isHero || isExpanded) ? "collapse" : "expand"
-        pendingTap = PendingTap(startedAt: tapStartedAt, cardName: card.name, action: action)
+        pendingTap = PendingTap(startedAt: tapStartedAt, cardName: card.name, cardKind: card.kind, action: action)
         AppPerformanceMonitor.shared.record("home.cardTapAccepted", valueMS: 0, note: "\(action):\(card.name)")
+        AppFlowPerformance.mark(
+            action == "expand" ? AppPerformanceFlows.homeCardExpand : AppPerformanceFlows.homeCardCollapse,
+            AppPerformancePhases.flowStart,
+            note: ["cardKind": card.kind]
+        )
 
         if visibleCount <= 1 {
             isExpanded ? collapse() : expand(card.id)
@@ -163,6 +188,12 @@ final class FocusHomeWalletController: ObservableObject {
         let pending = consumePendingTap(action: "collapse")
         if let pending {
             AppPerformanceMonitor.shared.record("home.cardCollapseStateSubmitted", startedAt: pending.startedAt, note: pending.cardName)
+            AppFlowPerformance.mark(
+                AppPerformanceFlows.homeCardCollapse,
+                AppPerformancePhases.stateSubmitted,
+                startedAt: pending.startedAt,
+                note: ["cardKind": pending.cardKind]
+            )
         }
 
         withAnimation(animation, completionCriteria: .removed) {
@@ -180,6 +211,14 @@ final class FocusHomeWalletController: ObservableObject {
             } else {
                 clearRosterPreview()
             }
+            if let pending {
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.homeCardCollapse,
+                    AppPerformancePhases.animationComplete,
+                    startedAt: pending.startedAt,
+                    note: ["cardKind": pending.cardKind]
+                )
+            }
             completion()
         }
 
@@ -188,6 +227,12 @@ final class FocusHomeWalletController: ObservableObject {
                 await OhanaFrameScheduler.waitAfterNextFrame()
                 guard isCurrentTransition(session) else { return }
                 AppPerformanceMonitor.shared.record("home.cardCollapseFirstFrame", startedAt: pending.startedAt, note: pending.cardName)
+                AppFlowPerformance.mark(
+                    AppPerformanceFlows.homeCardCollapse,
+                    AppPerformancePhases.firstFrame,
+                    startedAt: pending.startedAt,
+                    note: ["cardKind": pending.cardKind]
+                )
             }
         }
 

@@ -220,6 +220,7 @@ struct PetWeightDashboardContent: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var selectedRange: WeightRange = .days30
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     enum WeightRange: Hashable, CaseIterable {
         case days7, days30, days90, all
@@ -395,8 +396,15 @@ struct PetWeightDashboardContent: View {
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Button {
-                modelContext.delete(log)
-                modelContext.safeSave()
+                commandQueue.enqueue(
+                    .weightDelete(entityID: pet.id, entityKind: EntityKind.pet.rawValue, recordID: log.id)
+                ) {
+                    DashboardRecordCommandExecutor(context: modelContext).deletePetWeight(
+                        log,
+                        pet: pet,
+                        note: "dashboard.weight.delete.\(EntityKind.pet.rawValue)"
+                    )
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .bold))
@@ -441,6 +449,7 @@ struct HumanWeightDashboardContent: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var selectedRange: PetWeightDashboardContent.WeightRange = .days30
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -556,8 +565,19 @@ struct HumanWeightDashboardContent: View {
                                 .font(OhanaFont.callout(.black))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Button {
-                                modelContext.delete(log)
-                                modelContext.safeSave()
+                                commandQueue.enqueue(
+                                    .weightDelete(
+                                        entityID: human.id,
+                                        entityKind: EntityKind.human.rawValue,
+                                        recordID: log.id
+                                    )
+                                ) {
+                                    DashboardRecordCommandExecutor(context: modelContext).deleteHumanWeight(
+                                        log,
+                                        human: human,
+                                        note: "dashboard.weight.delete.\(EntityKind.human.rawValue)"
+                                    )
+                                }
                             } label: {
                                 Image(systemName: "trash")
                                     .font(.system(size: 13, weight: .bold))
@@ -624,6 +644,7 @@ struct PetExpenseDashboardContent: View {
 
     @State private var selectedRange: ExpenseDashboardRange = .month
     @State private var selectedCategory: ExpenseCategory?
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var baseLogs: [PetExpenseLog] { pet.expenseLogs.sorted { $0.date > $1.date } }
@@ -782,8 +803,15 @@ struct PetExpenseDashboardContent: View {
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(log.amount >= 0 ? Color.ohanaPrimaryText : Color.goTeal)
             Button {
-                modelContext.delete(log)
-                modelContext.safeSave()
+                commandQueue.enqueue(
+                    .expenseDelete(entityID: pet.id, entityKind: EntityKind.pet.rawValue, recordID: log.id)
+                ) {
+                    DashboardRecordCommandExecutor(context: modelContext).deletePetExpense(
+                        log,
+                        pet: pet,
+                        note: "dashboard.expense.delete.\(EntityKind.pet.rawValue)"
+                    )
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 13, weight: .bold))
@@ -831,6 +859,7 @@ struct HumanExpenseDashboardContent: View {
 
     @State private var selectedRange: ExpenseDashboardRange = .month
     @State private var selectedCategory: ExpenseCategory?
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -960,8 +989,19 @@ struct HumanExpenseDashboardContent: View {
                                 .font(OhanaFont.callout(.black))
                                 .foregroundStyle(log.amount >= 0 ? Color.ohanaPrimaryText : Color.goTeal)
                             Button {
-                                modelContext.delete(log)
-                                modelContext.safeSave()
+                                commandQueue.enqueue(
+                                    .expenseDelete(
+                                        entityID: human.id,
+                                        entityKind: EntityKind.human.rawValue,
+                                        recordID: log.id
+                                    )
+                                ) {
+                                    DashboardRecordCommandExecutor(context: modelContext).deleteHumanExpense(
+                                        log,
+                                        human: human,
+                                        note: "dashboard.expense.delete.\(EntityKind.human.rawValue)"
+                                    )
+                                }
                             } label: {
                                 Image(systemName: "trash")
                                     .font(.system(size: 13, weight: .bold))

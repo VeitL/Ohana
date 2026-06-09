@@ -13,6 +13,7 @@ struct AddHeatCycleSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var startDate = Date()
     @State private var endDate = Date().addingTimeInterval(86400 * 7)
     @State private var hasEndDate = false
@@ -20,6 +21,7 @@ struct AddHeatCycleSheet: View {
     @State private var isMated = false
     @State private var expectedDeliveryDate = Date().addingTimeInterval(86400 * 63)
     @State private var note: String = ""
+    @State private var isSaving = false
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
 
@@ -67,13 +69,14 @@ struct AddHeatCycleSheet: View {
                     Button {
                         save()
                     } label: {
-                        Text("保存记录")
+                        Text(isSaving ? "保存中…" : "保存记录")
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                     }
                     .listRowBackground(themeColor)
+                    .disabled(isSaving)
                 }
             }
             .navigationTitle("记录生理期")
@@ -87,22 +90,34 @@ struct AddHeatCycleSheet: View {
             .onAppear {
                 if status == .pregnant { isMated = true }
             }
+            .onDisappear {
+                commandQueue.cancelAll()
+            }
         }
     }
 
     private func save() {
-        let log = HeatCycleLog(
+        guard !isSaving else { return }
+        let input = PetHeatCycleCommandInput(
             startDate: startDate,
             endDate: hasEndDate ? endDate : nil,
             status: status,
             note: note,
             isMated: isMated,
-            expectedDeliveryDate: (isMated || status == .pregnant) ? expectedDeliveryDate : nil,
-            pet: pet
+            expectedDeliveryDate: (isMated || status == .pregnant) ? expectedDeliveryDate : nil
         )
-        modelContext.insert(log)
-        modelContext.safeSave()
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        dismiss()
+        let command = DomainCommand.petHealthRecord(petID: pet.id, type: "heat")
+
+        isSaving = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            PetHealthCommandExecutor(context: modelContext).recordHeatCycle(
+                pet: pet,
+                input: input,
+                note: "pet.heat.record"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        }
     }
 }

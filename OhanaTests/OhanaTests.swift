@@ -1444,6 +1444,7 @@ struct OhanaTests {
             purchaseDate: dateForTest(year: 2026, month: 5, day: 7, hour: 0),
             dailyGrams: nil,
             foodKind: .wet,
+            calculationMode: .autoFeeder,
             reminderEnabled: false,
             reminderAdvanceDays: 7,
             executorId: nil,

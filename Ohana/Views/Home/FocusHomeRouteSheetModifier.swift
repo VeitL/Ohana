@@ -18,10 +18,6 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
 
     @Binding var activeHumanIdStr: String
     @State private var lastModalRoute: HomeModalRoute?
-    @State private var settingsPresentationProgress: CGFloat = 0
-    @State private var isSettingsContentMounted = false
-    @State private var settingsPresentationTask: Task<Void, Never>?
-    @State private var settingsContentMountTask: Task<Void, Never>?
 
     let onAddEntityDismissed: () -> Void
     let onPetSavedFromAddEntity: (Pet) -> Void
@@ -50,15 +46,6 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                     homeOverlayLayer()
                     inlineSettingsLayer()
                 }
-            }
-            .onAppear {
-                reconcileInlineSettingsPresentation()
-            }
-            .onChange(of: settingsRouteIsActive) { _, _ in
-                reconcileInlineSettingsPresentation()
-            }
-            .onDisappear {
-                cancelDeferredPresentationTasks()
             }
             .alert(antiRepeatTitleText, isPresented: antiRepeatAlertBinding) {
                 Button(l.homeConfirmCheckIn, role: .destructive) {
@@ -114,9 +101,6 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private var fullScreenRouteBinding: Binding<HomeFullScreenRoute?> {
         Binding(
             get: {
-                if case .settings = routes.fullScreen {
-                    return nil
-                }
                 if case .coconutLog = routes.fullScreen {
                     return nil
                 }
@@ -314,18 +298,9 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         }
     }
 
-    private func cancelDeferredPresentationTasks() {
-        settingsPresentationTask?.cancel()
-        settingsContentMountTask?.cancel()
-        settingsPresentationTask = nil
-        settingsContentMountTask = nil
-    }
-
     @ViewBuilder
     private func homeFullScreenDestination(for route: HomeFullScreenRoute) -> some View {
         switch route {
-        case .settings:
-            SettingsView(homePets: pets, homeHumans: humans, homeElectronicPets: electronicPets)
         case let .walk(id):
             if let pet = pet(id) {
                 WalkTrackingFullScreen(pet: pet)
@@ -341,100 +316,19 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
 
     @ViewBuilder
     private func inlineSettingsLayer() -> some View {
-        if settingsRouteIsActive || settingsPresentationProgress > 0.001 {
-            OhanaDeferredInlinePageCover(
-                progress: settingsPresentationProgress,
-                isContentMounted: isSettingsContentMounted
-            ) {
-                SettingsView(
-                    homePets: pets,
-                    homeHumans: humans,
-                    homeElectronicPets: electronicPets,
-                    onClose: dismissInlineSettings
-                )
-            }
-            .zIndex(120)
-        }
-    }
-
-    private func openInlineSettings() {
-        settingsPresentationTask?.cancel()
-        settingsContentMountTask?.cancel()
-        settingsPresentationTask = nil
-        settingsContentMountTask = nil
-        isSettingsContentMounted = false
-        settingsPresentationProgress = 0
-        settingsPresentationTask = OhanaFrameScheduler.runAfterNextFrame {
-            guard settingsRouteIsActive else {
-                settingsPresentationTask = nil
-                return
-            }
-            withAnimation(GoMotion.sheetEnter) {
-                settingsPresentationProgress = 1
-            }
-            settingsPresentationTask = nil
-        }
-        scheduleSettingsContentMount(milliseconds: 80)
-    }
-
-    private func reconcileInlineSettingsPresentation() {
         if settingsRouteIsActive {
-            openInlineSettingsIfNeeded()
-        } else {
-            collapseInlineSettings(clearRoute: false)
-        }
-    }
-
-    private func openInlineSettingsIfNeeded() {
-        guard settingsPresentationProgress <= 0.001,
-              !isSettingsContentMounted,
-              settingsPresentationTask == nil else {
-            if !isSettingsContentMounted, settingsContentMountTask == nil {
-                scheduleSettingsContentMount(milliseconds: 40)
-            }
-            return
-        }
-        openInlineSettings()
-    }
-
-    private func scheduleSettingsContentMount(milliseconds: UInt64) {
-        settingsContentMountTask?.cancel()
-        settingsContentMountTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
-            guard settingsRouteIsActive else {
-                settingsContentMountTask = nil
-                return
-            }
-            withAnimation(GoMotion.quick) {
-                isSettingsContentMounted = true
-            }
-            settingsContentMountTask = nil
-        }
-    }
-
-    private func dismissInlineSettings() {
-        OhanaFeedback.light()
-        collapseInlineSettings(clearRoute: true)
-    }
-
-    private func collapseInlineSettings(clearRoute: Bool) {
-        guard settingsRouteIsActive || settingsPresentationProgress > 0.001 || isSettingsContentMounted else { return }
-        settingsContentMountTask?.cancel()
-        settingsContentMountTask = nil
-        isSettingsContentMounted = false
-        withAnimation(GoMotion.sheetEnter) {
-            settingsPresentationProgress = 0
-        }
-        settingsPresentationTask?.cancel()
-        settingsPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 340) {
-            guard settingsPresentationProgress <= 0.02 else {
-                settingsPresentationTask = nil
-                return
-            }
-            if clearRoute, routes.settingsPresented {
-                routes.dismissSettings()
-            }
-            isSettingsContentMounted = false
-            settingsPresentationTask = nil
+            HomeSettingsInlineHost(
+                homePets: pets,
+                homeHumans: humans,
+                homeElectronicPets: electronicPets,
+                onClose: {
+                    if routes.settingsPresented {
+                        routes.dismissSettings()
+                    }
+                }
+            )
+            .ignoresSafeArea()
+            .zIndex(120)
         }
     }
 
@@ -621,14 +515,24 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         switch route {
         case let .petAllFeatures(id):
             if let pet = pet(id) {
-                PetAllFeaturesSheet(pet: pet)
+                PetAllFeaturesSheet(
+                    pet: pet,
+                    onOpenDestination: { destination in
+                        routes.openSheet(homePetFeatureRoute(petID: pet.id, destination: destination))
+                    }
+                )
                     .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
             } else {
                 missingRouteDismissView()
             }
         case let .humanAllFeatures(id):
             if let human = human(id) {
-                HumanAllFeaturesSheet(human: human)
+                HumanAllFeaturesSheet(
+                    human: human,
+                    onOpenDestination: { destination in
+                        routes.openSheet(homeHumanFeatureRoute(humanID: human.id, destination: destination))
+                    }
+                )
                     .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
             } else {
                 missingRouteDismissView()
@@ -643,6 +547,13 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .humanBasicInfo(id):
             if let human = human(id) {
                 NavigationStack { HumanBasicInfoDetailView(human: human) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petFood(id):
+            if let pet = pet(id) {
+                NavigationStack { PetFoodManagementView(pet: pet) }
                     .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()
@@ -744,6 +655,34 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             } else {
                 missingRouteDismissView()
             }
+        case let .petDocuments(id):
+            if let pet = pet(id) {
+                DocumentsListView(pet: pet, showsCloseButton: true)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petAchievements(id):
+            if let pet = pet(id) {
+                NavigationStack { AchievementWallView(pet: pet) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petRetention(id):
+            if let pet = pet(id) {
+                PetRetentionHubView(pet: pet, showsCloseButton: true)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petBondVault(id):
+            if let pet = pet(id) {
+                NavigationStack { PetBondVaultView(pet: pet) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
         case let .humanMedication(id):
             if let human = human(id) {
                 NavigationStack {
@@ -773,9 +712,37 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             } else {
                 missingRouteDismissView()
             }
+        case let .humanWorkoutDashboard(id):
+            if let human = human(id) {
+                CoHealthDashboardFullView(human: human)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanMetrics(id):
+            if let human = human(id) {
+                HumanHealthCheckupView(human: human)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanReport(id):
+            if let human = human(id) {
+                HumanHealthReportView(human: human)
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
         case let .humanExpense(id):
             if let human = human(id) {
                 NavigationStack { HumanExpenseDetailView(human: human) }
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanWishlist(id):
+            if let human = human(id) {
+                HumanWishlistView(human: human)
                     .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()
@@ -798,6 +765,68 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         humans.first { $0.id == id }
     }
 
+    private func homePetFeatureRoute(
+        petID: UUID,
+        destination: PetAllFeatureDestination
+    ) -> HomeSheetRoute {
+        switch destination {
+        case .health:
+            return .petHealth(petID, initialSection: nil)
+        case .medications:
+            return .petMedication(petID)
+        case .food:
+            return .petFood(petID)
+        case .hygiene:
+            return .petHygiene(petID)
+        case .walks:
+            return .petWalkSummary(petID)
+        case .potty:
+            return .petPotty(petID)
+        case .basicInfo:
+            return .petBasicInfo(petID)
+        case .documents:
+            return .petDocuments(petID)
+        case .moments, .timeline:
+            return .petMomentHistory(petID)
+        case .achievements:
+            return .petAchievements(petID)
+        case .retention:
+            return .petRetention(petID)
+        case .weight:
+            return .petWeight(petID)
+        case .expense:
+            return .petExpense(petID)
+        case .bondVault:
+            return .petBondVault(petID)
+        }
+    }
+
+    private func homeHumanFeatureRoute(
+        humanID: UUID,
+        destination: HumanAllFeatureDestination
+    ) -> HomeSheetRoute {
+        switch destination {
+        case .basicInfo:
+            return .humanBasicInfo(humanID)
+        case .weight:
+            return .humanWeight(humanID)
+        case .workout:
+            return .humanWorkoutDashboard(humanID)
+        case .metrics:
+            return .humanMetrics(humanID)
+        case .medication:
+            return .humanMedication(humanID)
+        case .report:
+            return .humanReport(humanID)
+        case .expense:
+            return .humanExpense(humanID)
+        case .wishlist:
+            return .humanWishlist(humanID)
+        case .notes:
+            return .humanNote(humanID)
+        }
+    }
+
     private func missingRouteDismissView() -> some View {
         Color.clear
             .onAppear {
@@ -814,7 +843,107 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
 
 }
 
-private struct HomeCrewRosterInlineHost: View {
+struct HomeSettingsInlineHost: View {
+    let homePets: [Pet]
+    let homeHumans: [Human]
+    let homeElectronicPets: [OasisElectronicPet]
+    let onClose: () -> Void
+
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var presentationProgress: CGFloat = 0
+    @State private var isContentMounted = false
+    @State private var isInteractionReady = false
+    @State private var isClosing = false
+    @State private var closeTask: Task<Void, Never>?
+
+    var body: some View {
+        OhanaDeferredInlinePageCover(
+            progress: presentationProgress,
+            isContentMounted: isContentMounted
+        ) {
+            SettingsView(
+                homePets: homePets,
+                homeHumans: homeHumans,
+                homeElectronicPets: homeElectronicPets,
+                onClose: requestClose
+            )
+        }
+        .allowsHitTesting(isInteractionReady && !isClosing)
+        .accessibilityAddTraits(.isModal)
+        .task {
+            await playEntrance()
+        }
+        .onDisappear {
+            closeTask?.cancel()
+        }
+    }
+
+    @MainActor
+    private func playEntrance() async {
+        closeTask?.cancel()
+        presentationProgress = 0
+        isContentMounted = false
+        isInteractionReady = false
+        isClosing = false
+
+        await OhanaFrameScheduler.waitAfterNextFrame()
+        guard !Task.isCancelled else { return }
+        setPresentationProgress(1)
+
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: contentMountDelayMilliseconds)
+        guard !Task.isCancelled, !isClosing else { return }
+        withAnimation(GoMotion.quick) {
+            isContentMounted = true
+        }
+
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: interactionReadyDelayMilliseconds)
+        guard !Task.isCancelled, !isClosing else { return }
+        isInteractionReady = true
+    }
+
+    private func requestClose() {
+        guard !isClosing else { return }
+        isClosing = true
+        isInteractionReady = false
+        OhanaFeedback.light()
+        withAnimation(GoMotion.quick) {
+            isContentMounted = false
+        }
+        setPresentationProgress(0)
+        closeTask?.cancel()
+        closeTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: closeDelayMilliseconds) {
+            onClose()
+        }
+    }
+
+    private func setPresentationProgress(_ progress: CGFloat) {
+        guard allowsMotion else {
+            presentationProgress = progress
+            return
+        }
+        withAnimation(GoMotion.sheetEnter) {
+            presentationProgress = progress
+        }
+    }
+
+    private var allowsMotion: Bool {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion
+    }
+
+    private var contentMountDelayMilliseconds: UInt64 {
+        allowsMotion ? 80 : 0
+    }
+
+    private var interactionReadyDelayMilliseconds: UInt64 {
+        allowsMotion ? 360 : 0
+    }
+
+    private var closeDelayMilliseconds: UInt64 {
+        allowsMotion ? 340 : 90
+    }
+}
+
+struct HomeCrewRosterInlineHost: View {
     let initialMode: CrewRosterMode
     let onClose: () -> Void
     let onSelectPet: (Pet) -> Void
@@ -1016,7 +1145,7 @@ private struct HomeCrewRosterOpeningShell: View {
     }
 }
 
-private struct HomeCoconutLogInlineHost: View {
+struct HomeCoconutLogInlineHost: View {
     let subject: CoconutLogSubject
     let onClose: () -> Void
 

@@ -17,6 +17,7 @@ struct HumanBasicInfoDetailView: View {
     @Query private var allPets: [Pet]
     @Query private var allHumans: [Human]
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
 
@@ -613,41 +614,48 @@ struct HumanBasicInfoDetailView: View {
             return
         }
 
-        human.name = eName.trimmingCharacters(in: .whitespacesAndNewlines)
-        human.avatarImageData = eAvatarImageData
-        human.avatarEmoji = eAvatarEmoji.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "👤" : eAvatarEmoji
-        human.role = HumanProfileOptions.normalizedRole(eRole)
-        human.birthday = eHasBirthday ? eBirthday : nil
-        human.bloodType = eBloodType.trimmingCharacters(in: .whitespacesAndNewlines)
-        human.heightCm = Double(eHeightText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
-        human.mbti = eMBTI.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        human.nationality = eNationality.trimmingCharacters(in: .whitespacesAndNewlines)
-        human.city = eCity.trimmingCharacters(in: .whitespacesAndNewlines)
-        human.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
-            eThemeColorHex,
-            fallback: OhanaThemeColorPolicy.humanFallbackHex
+        let input = HumanProfileCommandInput(
+            name: eName,
+            avatarImageData: eAvatarImageData,
+            avatarEmoji: eAvatarEmoji,
+            role: eRole,
+            gender: eGender,
+            birthday: eHasBirthday ? eBirthday : nil,
+            bloodType: eBloodType,
+            heightText: eHeightText,
+            mbti: eMBTI,
+            nationality: eNationality,
+            city: eCity,
+            themeHex: eThemeColorHex,
+            notes: eNotes,
+            preservedNoteParts: preservedMetadataParts,
+            shouldShowOnHome: eShouldShowOnHome,
+            privateFieldsRaw: editedPrivateFieldsRaw
         )
-        human.shouldShowOnHome = eShouldShowOnHome
+        commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
+            let result = MemberCommandExecutor(context: modelContext).updateHumanProfile(
+                human,
+                input: input,
+                note: "humanBasicInfo.profile"
+            )
+            NotificationCenter.default.post(
+                name: .ohanaMemberProfileDidChange,
+                object: nil,
+                userInfo: ["id": result.entityID.uuidString, "kind": result.kind]
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
 
-        var noteParts: [String] = []
-        if !eGender.isEmpty { noteParts.append("性别:\(HumanProfileOptions.normalizedGender(eGender))") }
-        noteParts.append(contentsOf: preservedMetadataParts)
-        let trimmedNotes = eNotes.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedNotes.isEmpty { noteParts.append(trimmedNotes) }
-        human.notes = noteParts.joined(separator: "｜")
-
-        human.setPrivate(.weight, ePrivateWeight)
-        human.setPrivate(.workout, ePrivateWorkout)
-        human.setPrivate(.medication, ePrivateMedication)
-        human.setPrivate(.wishlist, ePrivateWishlist)
-        human.setPrivate(.expense, ePrivateExpense)
-        human.setPrivate(.note, ePrivateNote)
-        modelContext.safeSave()
-        NotificationCenter.default.post(
-            name: .ohanaMemberProfileDidChange,
-            object: nil,
-            userInfo: ["id": human.id.uuidString, "kind": "human"]
-        )
+    private var editedPrivateFieldsRaw: Set<String> {
+        var fields = Set<String>()
+        if ePrivateWeight { fields.insert(HumanPrivateField.weight.rawValue) }
+        if ePrivateWorkout { fields.insert(HumanPrivateField.workout.rawValue) }
+        if ePrivateMedication { fields.insert(HumanPrivateField.medication.rawValue) }
+        if ePrivateWishlist { fields.insert(HumanPrivateField.wishlist.rawValue) }
+        if ePrivateExpense { fields.insert(HumanPrivateField.expense.rawValue) }
+        if ePrivateNote { fields.insert(HumanPrivateField.note.rawValue) }
+        return fields
     }
 
     private func deleteHumanAndReturnHome() {
@@ -655,26 +663,26 @@ struct HumanBasicInfoDetailView: View {
         isDeleting = true
 
         let target = human
-        let deletedHumanId = target.id.uuidString
-        let hasRemainingHuman = allHumans.contains { $0.id.uuidString != deletedHumanId }
-        let deletedCurrentHuman = activeHumanIdStr == deletedHumanId
-        let requiresReplacementHuman = !hasRemainingHuman
-        let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
+        let activeHumanID = activeHumanIdStr
+        let command = DomainCommand.memberDeletion(entityID: target.id, kind: EntityKind.human.rawValue)
 
-        if deletedCurrentHuman || requiresReplacementHuman {
-            activeHumanIdStr = ""
-        }
-
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         dismiss()
-        DispatchQueue.main.async {
-            modelContext.delete(target)
-            modelContext.safeSave()
+        commandQueue.enqueue(command) {
+            let result = MemberCommandExecutor(context: modelContext).deleteHuman(
+                target,
+                activeHumanID: activeHumanID,
+                note: "humanBasicInfo.delete"
+            )
+            if result.clearsActiveHumanID {
+                activeHumanIdStr = ""
+            }
             NotificationCenter.default.post(
                 name: .ohanaReturnHomeAfterHumanDeletion,
                 object: nil,
                 userInfo: [
-                    "requiresReplacementHuman": requiresReplacementHuman,
-                    "requiresAccountSwitch": requiresAccountSwitch
+                    "requiresReplacementHuman": result.requiresReplacementHuman,
+                    "requiresAccountSwitch": result.requiresAccountSwitch
                 ]
             )
         }

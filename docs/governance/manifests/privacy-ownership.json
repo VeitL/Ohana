@@ -1,0 +1,61 @@
+{
+  "schema": "ohana.governance.privacy-ownership.v1",
+  "updated": "2026-06-08",
+  "policyDocuments": [
+    "AGENTS.md",
+    "docs/privacy-compliance.md",
+    "docs/release-quality-gates.md",
+    "docs/app-architecture-governance.md"
+  ],
+  "surfaces": [
+    {
+      "id": "app-privacy-manifest",
+      "owner": "Privacy and release owner",
+      "dataCategories": [
+        "local SwiftData facts",
+        "UserDefaults runtime preferences",
+        "privacy-safe MetricKit diagnostics"
+      ],
+      "storage": "Local device storage and app group container only unless a future feature explicitly adds network sync.",
+      "userControl": "Settings privacy/account flows, backup export, backup import, delete-my-data reset.",
+      "manifestEvidence": "Ohana/PrivacyInfo.xcprivacy must match actual required-reason API usage and collected data posture.",
+      "deletionPaths": [
+        "AppResetService delete-my-data flow"
+      ],
+      "exportPaths": [
+        "DataBackupManager.exportJSON"
+      ],
+      "paths": [
+        "Ohana/PrivacyInfo.xcprivacy",
+        "Ohana/Models/DataBackupManager.swift",
+        "Ohana/Utilities/AppResetService.swift",
+        "scripts/audit-release-data-safety.sh"
+      ]
+    },
+    {
+      "id": "member-privacy-pin",
+      "owner": "Privacy feature owner",
+      "dataCategories": [
+        "human profile privacy state",
+        "PIN hash and salt",
+        "private health/medication/account fields"
+      ],
+      "storage": "SwiftData local store; PIN secrets must not be exported in backups.",
+      "userControl": "Human account privacy UI and member privacy toggle controls.",
+      "manifestEvidence": "Backups reject PIN hash/salt fields and UI surfaces must use privacy placeholders.",
+      "deletionPaths": [
+        "AppResetService delete-my-data flow",
+        "human/member deletion flows"
+      ],
+      "exportPaths": [
+        "DataBackupManager.exportJSON excludes PIN hash/salt/lockout fields"
+      ],
+      "paths": [
+        "Ohana/Models/PrivacyService.swift",
+        "Ohana/Views/Components/HumanAccountPrivacyViews.swift",
+        "Ohana/Views/Components/HumanPrivacyToggleButton.swift",
+        "scripts/audit-release-data-safety.sh"
+      ]
+    }
+  ]
+}

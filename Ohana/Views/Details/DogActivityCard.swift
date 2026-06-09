@@ -14,6 +14,8 @@ struct DogActivityCard: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+
     private var walkCountToday: Int {
         pet.walkLogs.filter { Calendar.current.isDateInToday($0.startDate) }.count
     }
@@ -37,15 +39,15 @@ struct DogActivityCard: View {
 
     // 自适应文字颜色
     private var primaryText: Color {
-        colorScheme == .dark ? .white : .black
+        Color.ohanaPrimaryText
     }
     
     private var secondaryText: Color {
-        colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.6)
+        Color.ohanaSecondaryText
     }
     
     private var tertiaryText: Color {
-        colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4)
+        Color.ohanaTertiaryText
     }
 
     var body: some View {
@@ -80,7 +82,7 @@ struct DogActivityCard: View {
                     let capsuleColor = weeklyGoalReached ? Color.goPrimary : Color.goTeal.opacity(0.8)
                     Text(String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm))
                         .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(weeklyGoalReached ? .black : .white)
+                        .foregroundStyle(weeklyGoalReached ? Color.arkInk : Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(capsuleColor, in: Capsule())
                 }
@@ -99,16 +101,11 @@ struct DogActivityCard: View {
                     .foregroundStyle(tertiaryText)
                 Spacer()
                 Button {
-                    let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                        .flatMap { $0.isEmpty ? nil : $0 }
-                    let log = PetCareLog(date: Date(), type: .play, pet: pet, executorId: executorId)
-                    modelContext.insert(log)
-                    modelContext.safeSave()
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    recordPlay()
                 } label: {
                     Text("+ 打卡")
                         .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color(hex: "FF6B6B"), in: Capsule())
                 }
@@ -136,6 +133,22 @@ struct DogActivityCard: View {
                 content()
                     .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
             }
+        }
+    }
+
+    private func recordPlay() {
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let command = DomainCommand.petCareRecord(petID: pet.id, type: CareType.play.rawValue)
+
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = PetCareCommandExecutor(context: modelContext).recordCare(
+                pet: pet,
+                type: .play,
+                executorId: executorId,
+                note: "dog.activity.play"
+            )
         }
     }
 }

@@ -25,6 +25,8 @@ struct AddInsuranceClaimSheet: View {
     @State private var initialStatus: ClaimStatus = .submitted
     @State private var selectedExpenseLogId: String? = nil
     @State private var showExpensePicker = false
+    @State private var isSaving = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     // 该宠物的医疗 + 保险类花费（供关联选择）
     @Query private var allExpenses: [PetExpenseLog]
@@ -187,17 +189,17 @@ struct AddInsuranceClaimSheet: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "paperplane.fill")
                                     .font(.system(size: 14, weight: .bold))
-                                Text("提交报销申请")
+                                Text(isSaving ? "提交中" : "提交报销申请")
                                     .font(.system(size: 16, weight: .black, design: .rounded))
                             }
-                            .foregroundStyle(.black)
+                            .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity).padding(.vertical, 16)
                             .background(
-                                canSave ? Color.goPrimary : Color.primary.opacity(0.15),
+                                canSave && !isSaving ? Color.goPrimary : Color.primary.opacity(0.15),
                                 in: RoundedRectangle(cornerRadius: 16)
                             )
                         }
-                        .buttonStyle(ScaleButtonStyle()).disabled(!canSave)
+                        .buttonStyle(ScaleButtonStyle()).disabled(!canSave || isSaving)
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 16).padding(.top, 8)
@@ -273,47 +275,39 @@ struct AddInsuranceClaimSheet: View {
     // MARK: - Logic
 
     private func save() {
-        let claim = InsuranceClaim(
-            claimDate: Date(),
+        guard canSave, !isSaving else { return }
+        isSaving = true
+        let now = Date()
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        let input = InsuranceClaimCommandInput(
+            claimDate: now,
             incidentDate: incidentDate,
             totalExpense: totalExpenseDouble,
             claimedAmount: claimedDouble,
-            approvedAmount: initialStatus == .approved ? claimedDouble : 0,
             status: initialStatus,
             note: noteInput,
+            executorId: executorId,
             relatedExpenseLogId: selectedExpenseLogId,
-            insurance: insurance
+            approvedAt: initialStatus == .approved ? now : nil
         )
-        modelContext.insert(claim)
+        let command = DomainCommand.insuranceClaim(
+            petID: pet.id,
+            policyID: insurance.id,
+            claimID: nil,
+            action: "create"
+        )
 
-        // 若直接标记为已报销，写负值 ExpenseLog
-        if initialStatus == .approved && claimedDouble > 0 {
-            let approvedDate = Date()
-            claim.approvedAt = approvedDate
-            let productName = insurance.productName.isEmpty ? insurance.companyName : insurance.productName
-            let note = InsuranceReimbursementExpenseWriter.reimbursementNote(productName: productName)
-            let payerId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-            if InsuranceReimbursementExpenseWriter.shouldInsertReimbursementLog(
-                existingLogs: pet.expenseLogs,
-                date: approvedDate,
-                amount: claimedDouble,
-                note: note
-            ) {
-                let expense = PetExpenseLog(
-                    date: approvedDate,
-                    amount: -claimedDouble,
-                    category: .insurancePremium,
-                    note: note,
-                    pet: pet,
-                    executorId: payerId
-                )
-                modelContext.insert(expense)
-            }
-        }
-
-        modelContext.safeSave()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        dismiss()
+        commandQueue.enqueue(command) {
+            InsuranceCommandExecutor(context: modelContext).createClaim(
+                insurance: insurance,
+                pet: pet,
+                input: input,
+                note: "insurance.claim.create"
+            )
+            dismiss()
+        }
     }
 }
 

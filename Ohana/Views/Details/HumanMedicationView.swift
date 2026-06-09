@@ -50,6 +50,10 @@ struct HumanMedicationView: View {
     @State private var editingMed: HumanMedication? = nil
     @State private var showToast = false
     @State private var toastMessage = ""
+    @State private var pendingDoseStatusByID: [String: HumanMedicationStatus] = [:]
+    @State private var pendingMedicationActiveByID: [UUID: Bool] = [:]
+    @State private var pendingMedicationActivationIDs: Set<UUID> = []
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var myMeds: [HumanMedication] {
         allMeds.filter { $0.humanId == human.id.uuidString }
@@ -60,7 +64,7 @@ struct HumanMedicationView: View {
     private var notStartedMeds: [HumanMedication] { meds(in: .notStarted) }
     private var endedMeds: [HumanMedication] { meds(in: .ended) }
     private var stoppedMeds: [HumanMedication] { meds(in: .stopped) }
-    private var activeMeds: [HumanMedication] { myMeds.filter { $0.isActive } }
+    private var activeMeds: [HumanMedication] { myMeds.filter { effectiveMedicationActive($0) } }
     private var inactiveMeds: [HumanMedication] { stoppedMeds }
 
     private var primaryText: Color { Color.ohanaPrimaryText }
@@ -145,7 +149,7 @@ struct HumanMedicationView: View {
     }
 
     private func meds(in group: HumanMedicationDisplayGroup) -> [HumanMedication] {
-        myMeds.filter { HumanMedicationSchedulePlan.displayGroup(for: $0) == group }
+        myMeds.filter { displayGroup(for: $0) == group }
     }
 
     var body: some View {
@@ -164,6 +168,11 @@ struct HumanMedicationView: View {
         .sheet(item: $editingMed) { med in
             AddMedicationSheet(human: human, editing: med)
                 .ohanaSheetPagePresentation() // ui-v4: allow complex medication editor uses full-height system sheet
+        }
+        .onDisappear {
+            commandQueue.cancelAll()
+            pendingMedicationActiveByID.removeAll()
+            pendingMedicationActivationIDs.removeAll()
         }
     }
 
@@ -601,8 +610,9 @@ struct HumanMedicationView: View {
     // MARK: - Schedule Timeline
 
     private func scheduleRow(_ item: DailyDoseItem) -> some View {
-        let isTaken = item.log?.status == .taken
-        let isSkipped = item.log?.status == .skipped
+        let status = effectiveDoseStatus(for: item)
+        let isTaken = status == .taken
+        let isSkipped = status == .skipped
         let isResolved = isTaken || isSkipped
         let isOverdue = !isResolved && item.scheduledTime < Date()
         let tint = isTaken ? Color.goTeal : (isSkipped ? Color.goOrange : (isOverdue ? Color.goRed : Color.goPrimary))
@@ -612,7 +622,7 @@ struct HumanMedicationView: View {
                 Text(item.scheduledTime, style: .time)
                     .font(OhanaFont.callout(.bold))
                     .foregroundStyle(isResolved ? tertiaryText : primaryText)
-                Text(doseStatusText(item))
+                Text(doseStatusText(item, status: status))
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(tint)
             }
@@ -622,7 +632,7 @@ struct HumanMedicationView: View {
                 Circle()
                     .fill(tint.opacity(0.14))
                     .frame(width: 34, height: 34)
-                Image(systemName: doseStatusIcon(item))
+                Image(systemName: doseStatusIcon(item, status: status))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(tint)
             }
@@ -672,7 +682,11 @@ struct HumanMedicationView: View {
     }
 
     private func doseStatusText(_ item: DailyDoseItem) -> String {
-        switch item.log?.status {
+        doseStatusText(item, status: effectiveDoseStatus(for: item))
+    }
+
+    private func doseStatusText(_ item: DailyDoseItem, status: HumanMedicationStatus?) -> String {
+        switch status {
         case .taken:
             return l.tr(zh: "已服", en: "Taken", de: "Genommen")
         case .skipped:
@@ -685,7 +699,11 @@ struct HumanMedicationView: View {
     }
 
     private func doseStatusIcon(_ item: DailyDoseItem) -> String {
-        switch item.log?.status {
+        doseStatusIcon(item, status: effectiveDoseStatus(for: item))
+    }
+
+    private func doseStatusIcon(_ item: DailyDoseItem, status: HumanMedicationStatus?) -> String {
+        switch status {
         case .taken:
             return "checkmark"
         case .skipped:
@@ -695,41 +713,39 @@ struct HumanMedicationView: View {
         }
     }
 
+    private func effectiveDoseStatus(for item: DailyDoseItem) -> HumanMedicationStatus? {
+        pendingDoseStatusByID[item.id] ?? item.log?.status
+    }
+
     private func setDoseStatus(_ status: HumanMedicationStatus, for item: DailyDoseItem) {
         withAnimation(GoMotion.feedback) {
-            let update = HumanMedicationLogStore.applyDoseStatus(
-                humanId: human.id.uuidString,
-                medicationId: item.medication.id.uuidString,
-                scheduledTime: item.scheduledTime,
-                status: status,
-                existingLogs: allLogs,
-                context: modelContext
-            )
-
-            if update.shouldRecordLedgerEvent, let log = update.log {
-                CareLedgerService.record(
-                    occurredAt: log.recordedTime ?? Date(),
-                    actorKind: .human,
-                    actorId: human.id.uuidString,
-                    subjectKind: .human,
-                    subjectId: human.id.uuidString,
-                    eventKind: .medication,
-                    actionType: status == .taken ? "humanMedicationTaken" : "humanMedicationSkipped",
-                    source: .detail,
-                    legacyModelName: "HumanMedicationLog",
-                    legacyModelId: log.id.uuidString,
-                    metadataJSON: "{\"medicationId\":\"\(item.medication.id.uuidString)\"}",
-                    context: modelContext,
-                    save: false
-                )
-                if status == .taken { onDoseTaken?() }
-            }
-
-            modelContext.safeSave()
+            pendingDoseStatusByID[item.id] = status
             toastMessage = doseToastMessage(status, medicationName: item.medication.name)
             showToast = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 withAnimation { showToast = false }
+            }
+        }
+
+        let medicationID = item.medication.id
+        let scheduledTime = item.scheduledTime
+        let scheduledMinute = Int(scheduledTime.timeIntervalSince1970 / 60)
+        let command = DomainCommand.humanMedicationDose(
+            humanID: human.id,
+            medicationID: medicationID,
+            scheduledMinute: scheduledMinute,
+            status: status.rawValue
+        )
+
+        commandQueue.enqueue(command) {
+            let result = HumanCareCommandExecutor(context: modelContext).setMedicationDoseStatus(
+                human: human,
+                medicationID: medicationID,
+                scheduledTime: scheduledTime,
+                status: status
+            )
+            if result.status == .taken, result.didChange {
+                onDoseTaken?()
             }
         }
     }
@@ -749,11 +765,6 @@ struct HumanMedicationView: View {
         case .skipped: return l.tr(zh: "已跳过 \(name)", en: "Skipped \(name)", de: "\(name) übersprungen")
         case .pending: return l.tr(zh: "已恢复待记录", en: "Back to pending", de: "Wieder offen")
         }
-    }
-
-    private func scheduleHumanMedicationReminders(overrideMeds: [HumanMedication]?) {
-        let meds = overrideMeds ?? myMeds
-        MedicationReminderService.shared.scheduleHumanMedicationReminders(for: human, meds: meds, context: modelContext)
     }
 
     // MARK: - Medication Row
@@ -815,7 +826,9 @@ struct HumanMedicationView: View {
     }
 
     private func medicationRow(_ med: HumanMedication) -> some View {
-        medicationSurface {
+        let isMedicationActive = effectiveMedicationActive(med)
+        let isActivationPending = pendingMedicationActivationIDs.contains(med.id)
+        return medicationSurface {
             HStack(spacing: 14) {
                 medicationIcon(for: med)
 
@@ -846,11 +859,11 @@ struct HumanMedicationView: View {
                             .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color(hex: med.colorHex))
                             .lineLimit(1)
-                        if let days = med.daysRemaining, HumanMedicationSchedulePlan.displayGroup(for: med) == .current {
+                        if let days = med.daysRemaining, displayGroup(for: med) == .current {
                             Text(l.tr(zh: "· 剩 \(max(0, days)) 天", en: "· \(max(0, days)) d left", de: "· \(max(0, days)) T übrig"))
                                 .font(OhanaFont.caption())
                                 .foregroundStyle(days <= 3 ? Color.goRed : tertiaryText)
-                        } else if med.endDate == nil && HumanMedicationSchedulePlan.displayGroup(for: med) == .current {
+                        } else if med.endDate == nil && displayGroup(for: med) == .current {
                             Text(l.tr(zh: "· 长期", en: "· long-term", de: "· langfristig"))
                                 .font(OhanaFont.caption())
                                 .foregroundStyle(tertiaryText)
@@ -874,11 +887,13 @@ struct HumanMedicationView: View {
                 Button {
                     toggleMedicationActive(med)
                 } label: {
-                    Image(systemName: med.isActive ? "pause.circle.fill" : "play.circle.fill")
+                    Image(systemName: isMedicationActive ? "pause.circle.fill" : "play.circle.fill")
                         .font(OhanaFont.title3(.bold))
-                        .foregroundStyle(med.isActive ? Color.goOrange : Color.goTeal)
+                        .foregroundStyle(isMedicationActive ? Color.goOrange : Color.goTeal)
+                        .opacity(isActivationPending ? 0.55 : 1)
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .disabled(isActivationPending)
             }
             .padding(14)
         }
@@ -896,7 +911,7 @@ struct HumanMedicationView: View {
     }
 
     private func medicationStateBadge(for med: HumanMedication) -> some View {
-        let group = HumanMedicationSchedulePlan.displayGroup(for: med)
+        let group = displayGroup(for: med)
         let text: String
         let color: Color
         switch group {
@@ -924,6 +939,20 @@ struct HumanMedicationView: View {
             .background(color.opacity(0.15), in: Capsule())
     }
 
+    private func effectiveMedicationActive(_ med: HumanMedication) -> Bool {
+        pendingMedicationActiveByID[med.id] ?? med.isActive
+    }
+
+    private func displayGroup(for med: HumanMedication) -> HumanMedicationDisplayGroup {
+        guard effectiveMedicationActive(med) else { return .stopped }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        if today < calendar.startOfDay(for: med.startDate) { return .notStarted }
+        if let endDate = med.endDate, today > calendar.startOfDay(for: endDate) { return .ended }
+        if med.frequency.isManualEntry { return .manual }
+        return .current
+    }
+
     private func scheduleSummary(for med: HumanMedication) -> String {
         if med.frequency.isManualEntry {
             return l.tr(zh: "手动记录", en: "Manual log", de: "Manuell")
@@ -948,17 +977,34 @@ struct HumanMedicationView: View {
     }
 
     private func toggleMedicationActive(_ med: HumanMedication) {
+        guard !pendingMedicationActivationIDs.contains(med.id) else { return }
+        let nextIsActive = !effectiveMedicationActive(med)
         withAnimation(GoMotion.feedback) {
-            med.isActive.toggle()
-            modelContext.safeSave()
-            scheduleHumanMedicationReminders(overrideMeds: nil)
-            toastMessage = med.isActive
+            pendingMedicationActiveByID[med.id] = nextIsActive
+            pendingMedicationActivationIDs.insert(med.id)
+            toastMessage = nextIsActive
                 ? l.tr(zh: "\(med.name) 已恢复", en: "\(med.name) resumed", de: "\(med.name) fortgesetzt")
                 : l.tr(zh: "\(med.name) 已停药", en: "\(med.name) stopped", de: "\(med.name) pausiert")
             showToast = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                 withAnimation(GoMotion.quick) { showToast = false }
             }
+        }
+
+        let command = DomainCommand.humanMedicationPlanActivation(
+            humanID: human.id,
+            medicationID: med.id,
+            isActive: nextIsActive
+        )
+        commandQueue.enqueue(command) {
+            HumanCareCommandExecutor(context: modelContext).setMedicationPlanActive(
+                human: human,
+                medication: med,
+                isActive: nextIsActive,
+                appLanguage: appLanguage
+            )
+            pendingMedicationActivationIDs.remove(med.id)
+            pendingMedicationActiveByID[med.id] = nil
         }
     }
 
@@ -1012,8 +1058,6 @@ struct AddMedicationSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-    @Query private var allMeds: [HumanMedication]
-    @Query private var allEvents: [Event]
 
     @State private var name = ""
     @State private var doseForm: HumanMedicationDoseForm = .tablet
@@ -1031,6 +1075,8 @@ struct AddMedicationSheet: View {
     @State private var isActive = true
     @State private var showMore = false
     @State private var showDeleteConfirmation = false
+    @State private var isSaving = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @FocusState private var focusedField: FocusField?
 
     private enum FocusField: Hashable {
@@ -1078,7 +1124,6 @@ struct AddMedicationSheet: View {
     }
 
     private let colorOptions = ["FF4757", "FF8C42", "FFF44F", "00D4AA", "14B8A6", "9B5DE5", "64748B"]
-    private let humanMedicationEntityType = "human_medication"
 
     private var l: L10n { L10n(appLanguage) }
     private var primaryText: Color { Color.ohanaPrimaryText }
@@ -1086,7 +1131,7 @@ struct AddMedicationSheet: View {
     private var tertiaryText: Color { Color.ohanaTertiaryText }
     private var controlFill: Color { Color.ohanaControlFill }
     private var controlStroke: Color { Color.ohanaCardStroke }
-    private var canSave: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var canSave: Bool { !isSaving && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var isEditing: Bool { editing != nil }
     private var composedDosage: String {
         let amount = doseAmount.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1172,6 +1217,9 @@ struct AddMedicationSheet: View {
                 endDate = newValue
             }
         }
+        .onDisappear {
+            commandQueue.cancelAll()
+        }
     }
 
     private var header: some View {
@@ -1185,7 +1233,10 @@ struct AddMedicationSheet: View {
                     .foregroundStyle(secondaryText)
             }
             Spacer()
-            Button { dismiss() } label: {
+            Button {
+                guard !isSaving else { return }
+                dismiss()
+            } label: {
                 Image(systemName: "xmark")
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(primaryText)
@@ -1193,6 +1244,7 @@ struct AddMedicationSheet: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .disabled(isSaving)
             .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
         }
     }
@@ -1462,6 +1514,7 @@ struct AddMedicationSheet: View {
                         .overlay(Capsule().strokeBorder(Color.goRed.opacity(0.28), lineWidth: 1))
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .disabled(isSaving)
             }
         }
     }
@@ -1539,12 +1592,18 @@ struct AddMedicationSheet: View {
                     save()
                 }
             } label: {
-                Text(isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen sichern") : l.tr(zh: "保存药物", en: "Save medication", de: "Medikament sichern"))
-                    .font(OhanaFont.headline(.bold))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(canSave ? Color.goPrimary : Color.goPrimary.opacity(0.35), in: Capsule())
+                HStack(spacing: 8) {
+                    if isSaving {
+                        Image(systemName: "hourglass")
+                            .font(OhanaFont.callout(.bold))
+                    }
+                    Text(isSaving ? l.tr(zh: "保存中", en: "Saving", de: "Speichert") : (isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen sichern") : l.tr(zh: "保存药物", en: "Save medication", de: "Medikament sichern")))
+                        .font(OhanaFont.headline(.bold))
+                }
+                .foregroundStyle(Color.arkInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(canSave ? Color.goPrimary : Color.goPrimary.opacity(0.35), in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(!canSave)
@@ -1743,125 +1802,57 @@ struct AddMedicationSheet: View {
         }
     }
 
+    private var commandInput: HumanMedicationPlanCommandInput {
+        HumanMedicationPlanCommandInput(
+            name: name,
+            dosage: composedDosage,
+            frequency: frequency,
+            customFrequencyNote: customNote,
+            doseMinutes: doseMinutes,
+            weeklyWeekday: weeklyWeekday,
+            startDate: startDate,
+            endDate: hasEndDate ? endDate : nil,
+            colorHex: colorHex,
+            visibleNotes: notes,
+            isActive: isActive,
+            appLanguage: appLanguage
+        )
+    }
+
     private func save() {
-        let cleanedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanedName.isEmpty else { return }
+        let input = commandInput
+        guard !input.cleanName.isEmpty, !isSaving else { return }
+        isSaving = true
 
-        let metadata: HumanMedicationScheduleMetadata? = frequency.isManualEntry
-            ? nil
-            : HumanMedicationScheduleMetadata(
-                doseMinutes: doseMinutes.isEmpty ? HumanMedicationSchedulePlan.defaultDoseMinutes(for: frequency) : doseMinutes,
-                weeklyWeekday: frequency == .weekly ? weeklyWeekday : nil
-            )
-        let firstDoseTime = dateFromMinute(metadata?.doseMinutes.first ?? 8 * 60)
-        let savedNotes = HumanMedicationScheduleMetadata.composeNotes(visibleNotes: notes, metadata: metadata)
-        let savedMed: HumanMedication
+        let command = DomainCommand.humanMedicationPlan(humanID: human.id, medicationID: editing?.id)
+        commandQueue.enqueue(command) {
+            guard HumanCareCommandExecutor(context: modelContext).saveMedicationPlan(
+                human: human,
+                editing: editing,
+                input: input
+            ) != nil else {
+                isSaving = false
+                return
+            }
 
-        if let med = editing {
-            med.name = cleanedName
-            med.dosage = composedDosage
-            med.frequency = frequency
-            med.customFrequencyNote = frequency == .custom ? customNote.trimmingCharacters(in: .whitespacesAndNewlines) : ""
-            med.firstDoseTime = firstDoseTime
-            med.startDate = startDate
-            med.endDate = hasEndDate ? endDate : nil
-            med.colorHex = colorHex
-            med.notes = savedNotes
-            med.isActive = isActive
-            savedMed = med
-        } else {
-            let med = HumanMedication(
-                humanId: human.id.uuidString,
-                name: cleanedName,
-                dosage: composedDosage,
-                frequency: frequency,
-                firstDoseTime: firstDoseTime,
-                startDate: startDate,
-                endDate: hasEndDate ? endDate : nil,
-                colorHex: colorHex,
-                notes: savedNotes
-            )
-            med.customFrequencyNote = frequency == .custom ? customNote.trimmingCharacters(in: .whitespacesAndNewlines) : ""
-            med.isActive = isActive
-            modelContext.insert(med)
-            savedMed = med
+            isSaving = false
+            dismiss()
         }
-
-        modelContext.safeSave()
-        syncCalendarEvents(for: savedMed)
-        modelContext.safeSave()
-        scheduleHumanMedicationReminders(overrideMeds: mergedMeds(including: savedMed))
-        dismiss()
     }
 
     private func deleteMedication() {
-        guard let med = editing else { return }
-        removeCalendarEvents(for: med.id)
-        modelContext.delete(med)
-        modelContext.safeSave()
-        scheduleHumanMedicationReminders(overrideMeds: allMeds.filter {
-            $0.humanId == human.id.uuidString && $0.id != med.id
-        })
-        dismiss()
-    }
+        guard let med = editing, !isSaving else { return }
+        isSaving = true
 
-    private func syncCalendarEvents(for med: HumanMedication) {
-        removeCalendarEvents(for: med.id)
-        guard med.isActive, !frequency.isManualEntry else { return }
-
-        let calendar = Calendar.current
-        let firstDay = firstScheduledDay(calendar: calendar)
-        let sortedMinutes = HumanMedicationScheduleMetadata.normalizedDoseMinutes(
-            doseMinutes.isEmpty ? HumanMedicationSchedulePlan.defaultDoseMinutes(for: frequency) : doseMinutes
-        )
-
-        for (index, minute) in sortedMinutes.enumerated() {
-            guard let start = HumanMedicationSchedulePlan.date(on: firstDay, minuteOfDay: minute, calendar: calendar) else { continue }
-            let event = Event(
-                title: calendarEventTitle(for: med, doseIndex: index, totalDoses: sortedMinutes.count),
-                startDate: start,
-                eventType: EventType.medication.rawValue,
-                relatedEntityType: humanMedicationEntityType,
-                relatedEntityId: med.id.uuidString
+        let command = DomainCommand.humanMedicationPlanDelete(humanID: human.id, medicationID: med.id)
+        commandQueue.enqueue(command) {
+            HumanCareCommandExecutor(context: modelContext).deleteMedicationPlan(
+                human: human,
+                medication: med,
+                note: "human.medication.plan.deleted"
             )
-            event.recurrenceDays = frequency == .weekly ? 7 : 1
-            event.recurrenceEndDate = hasEndDate ? calendar.startOfDay(for: endDate) : nil
-            event.assigneeId = human.id.uuidString
-            modelContext.insert(event)
+            isSaving = false
+            dismiss()
         }
-    }
-
-    private func firstScheduledDay(calendar: Calendar) -> Date {
-        let start = calendar.startOfDay(for: startDate)
-        guard frequency == .weekly else { return start }
-        let startWeekday = calendar.component(.weekday, from: start)
-        let delta = (weeklyWeekday - startWeekday + 7) % 7
-        return calendar.date(byAdding: .day, value: delta, to: start) ?? start
-    }
-
-    private func calendarEventTitle(for med: HumanMedication, doseIndex: Int, totalDoses: Int) -> String {
-        let doseSuffix = totalDoses > 1
-            ? l.tr(zh: " · 第 \(doseIndex + 1) 次", en: " · Dose \(doseIndex + 1)", de: " · Dosis \(doseIndex + 1)")
-            : ""
-        let dosageSuffix = med.dosage.isEmpty ? "" : " · \(med.dosage)"
-        return "💊 \(human.name) · \(med.name)\(dosageSuffix)\(doseSuffix)"
-    }
-
-    private func removeCalendarEvents(for medicationId: UUID) {
-        for event in allEvents where
-            event.relatedEntityType == humanMedicationEntityType &&
-            event.relatedEntityId == medicationId.uuidString {
-            modelContext.delete(event)
-        }
-    }
-
-    private func mergedMeds(including savedMed: HumanMedication) -> [HumanMedication] {
-        var meds = allMeds.filter { $0.humanId == human.id.uuidString && $0.id != savedMed.id }
-        meds.append(savedMed)
-        return meds
-    }
-
-    private func scheduleHumanMedicationReminders(overrideMeds: [HumanMedication]) {
-        MedicationReminderService.shared.scheduleHumanMedicationReminders(for: human, meds: overrideMeds, context: modelContext)
     }
 }

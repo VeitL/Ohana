@@ -8,7 +8,7 @@
 import SwiftUI
 import SwiftData
 
-enum CoconutLogSubject: Identifiable, Equatable {
+enum CoconutLogSubject: Identifiable, Hashable {
     case pet(UUID)
     case human(UUID)
 

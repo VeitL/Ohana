@@ -22,6 +22,7 @@ struct AddPetMedicationSheet: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name = ""
     @State private var doseAmount = ""
     @State private var doseUnit = "片"
@@ -41,6 +42,7 @@ struct AddPetMedicationSheet: View {
 
     @State private var remainingText = ""
     @State private var notes = ""
+    @State private var isSaving = false
 
     @State private var colorHex = "FF6B6B"
     private let colorPresets = ["FF6B6B", "FF9500", "FFDD44", "4ECDC4", "5B9FFF", "A78BFA"]
@@ -134,8 +136,8 @@ struct AddPetMedicationSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { saveAfterKeyboardDismiss() }
                         .fontWeight(.bold)
-                        .disabled(!canSave)
-                        .foregroundStyle(canSave ? chromeAccent : Color.ohanaSecondaryText)
+                        .disabled(!canSave || isSaving)
+                        .foregroundStyle(canSave && !isSaving ? chromeAccent : Color.ohanaSecondaryText)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -403,15 +405,15 @@ struct AddPetMedicationSheet: View {
         Button {
             saveAfterKeyboardDismiss()
         } label: {
-            Text(existing == nil ? "开始记录这个疗程" : "保存修改")
+            Text(isSaving ? "保存中…" : (existing == nil ? "开始记录这个疗程" : "保存修改"))
                 .font(.system(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(canSave ? chromeAccent : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(canSave && !isSaving ? chromeAccent : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!canSave)
+        .disabled(!canSave || isSaving)
     }
 
     private func labeledField(_ title: String, @ViewBuilder content: () -> some View) -> some View {
@@ -663,7 +665,7 @@ struct AddPetMedicationSheet: View {
         }
         (administrationTag, notes) = splitAdministration(from: e.notes)
         colorHex = e.colorHex
-        let remainingKey = "medication_remaining_\(e.id.uuidString)"
+        let remainingKey = PetMedicationPlanCommandService.remainingAmountKey(medicationID: e.id)
         let remainingValue = UserDefaults.standard.double(forKey: remainingKey)
         if remainingValue > 0 {
             remainingText = String(format: "%.0f", remainingValue)
@@ -671,50 +673,49 @@ struct AddPetMedicationSheet: View {
     }
 
     private func save() {
-        let end = parsedEndDate
-        let dosageFinal = composedDosage
-
-        if let e = existing {
-            e.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            e.dosage = dosageFinal
-            e.frequency = frequency
-            e.customFrequencyNote = PetMedicationSchedulePlan.encodeDoseMinutes(doseMinutes)
-            e.startDate = startDate
-            e.endDate = end
-            e.colorHex = colorHex
-            e.notes = mergedNotes()
-            modelContext.safeSave()
-            MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
-            let rk = "medication_remaining_\(e.id.uuidString)"
-            if remainingText.trimmingCharacters(in: .whitespaces).isEmpty {
-                UserDefaults.standard.removeObject(forKey: rk)
-            } else if let v = Double(remainingText.replacingOccurrences(of: ",", with: ".")), v >= 0 {
-                UserDefaults.standard.set(v, forKey: rk)
-            }
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            finishSaved()
+        guard !isSaving else { return }
+        let remainingRaw = remainingText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let remainingAmount = parsedRemainingAmount
+        guard remainingRaw.isEmpty || remainingAmount != nil else {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
             return
         }
-
-        let med = PetMedication(
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            dosage: dosageFinal,
+        let input = PetMedicationPlanCommandInput(
+            name: name,
+            dosage: composedDosage,
             frequency: frequency,
+            doseMinutes: doseMinutes,
             startDate: startDate,
-            endDate: end,
+            endDate: parsedEndDate,
             colorHex: colorHex,
             notes: mergedNotes(),
-            pet: pet
+            isActive: existing?.isActive ?? true,
+            remainingAmount: remainingAmount
         )
-        med.customFrequencyNote = PetMedicationSchedulePlan.encodeDoseMinutes(doseMinutes)
-        modelContext.insert(med)
-        modelContext.safeSave()
-        MedicationReminderService.shared.scheduleMedicationReminders(for: pet, context: modelContext)
-        if let v = Double(remainingText.replacingOccurrences(of: ",", with: ".")), v > 0 {
-            UserDefaults.standard.set(v, forKey: "medication_remaining_\(med.id.uuidString)")
-        }
+        let command = DomainCommand.petMedicationPlan(petID: pet.id, medicationID: existing?.id)
+
+        isSaving = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        finishSaved()
+        commandQueue.enqueue(command) {
+            guard PetMedicationCommandExecutor(context: modelContext).savePlan(
+                pet: pet,
+                editing: existing,
+                input: input,
+                note: existing == nil ? "pet.medication.plan.create" : "pet.medication.plan.update"
+            ) != nil else {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            finishSaved()
+        }
+    }
+
+    private var parsedRemainingAmount: Double? {
+        let raw = remainingText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return nil }
+        return Double(raw.replacingOccurrences(of: ",", with: "."))
     }
 }
 
