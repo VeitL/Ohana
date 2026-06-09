@@ -7,6 +7,18 @@
 //
 
 import SwiftUI
+import UIKit
+
+private struct OhanaInlinePageSafeAreaInsetsKey: EnvironmentKey {
+    static let defaultValue = EdgeInsets()
+}
+
+extension EnvironmentValues {
+    var ohanaInlinePageSafeAreaInsets: EdgeInsets {
+        get { self[OhanaInlinePageSafeAreaInsetsKey.self] }
+        set { self[OhanaInlinePageSafeAreaInsetsKey.self] = newValue }
+    }
+}
 
 enum OhanaDeferredInlinePageCoverStyle {
     case fullScreen
@@ -62,14 +74,15 @@ struct OhanaDeferredInlinePageCover<Content: View>: View {
     var body: some View {
         GeometryReader { geo in
             let progress = clampedProgress
-            let topGap = style.topGap(safeTop: geo.safeAreaInsets.top)
+            let safeInsets = OhanaInlinePageSafeAreaResolver.insets(in: geo)
+            let topGap = style.topGap(safeTop: safeInsets.top)
             let contentTopInset = style.contentTopInset(
                 reservesSafeArea: reservesSafeArea,
-                safeTop: geo.safeAreaInsets.top
+                safeTop: safeInsets.top
             )
             let panelWidth = max(0, geo.size.width - style.horizontalInset * 2)
             let panelHeight = max(0, geo.size.height - topGap)
-            let hiddenOffset = panelHeight + geo.safeAreaInsets.bottom + 32
+            let hiddenOffset = panelHeight + safeInsets.bottom + 32
 
             ZStack(alignment: .bottom) {
                 Color.arkInk
@@ -84,8 +97,9 @@ struct OhanaDeferredInlinePageCover<Content: View>: View {
 
                     if isContentMounted {
                         content()
+                            .environment(\.ohanaInlinePageSafeAreaInsets, safeInsets)
                             .padding(.top, contentTopInset)
-                            .padding(.bottom, reservesSafeArea ? geo.safeAreaInsets.bottom : 0)
+                            .padding(.bottom, reservesSafeArea ? safeInsets.bottom : 0)
                             .transition(.opacity)
                     }
                 }
@@ -101,6 +115,132 @@ struct OhanaDeferredInlinePageCover<Content: View>: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(isContentMounted && progress > 0.98)
         }
+    }
+}
+
+struct OhanaInlinePageRouteHost<Content: View>: View {
+    let routeID: String
+    let onClose: () -> Void
+    var contentMountDelayMilliseconds: UInt64 = 64
+    var interactionReadyDelayMilliseconds: UInt64 = 320
+    var closeDelayMilliseconds: UInt64 = 340
+    var reservesSafeArea: Bool = false
+    var style: OhanaDeferredInlinePageCoverStyle = .fullScreen
+    @ViewBuilder let content: (_ requestClose: @escaping () -> Void) -> Content
+
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @State private var presentationProgress: CGFloat = 0
+    @State private var isContentMounted = false
+    @State private var isInteractionReady = false
+    @State private var isClosing = false
+    @State private var closeTask: Task<Void, Never>?
+
+    var body: some View {
+        OhanaDeferredInlinePageCover(
+            progress: presentationProgress,
+            isContentMounted: isContentMounted,
+            reservesSafeArea: reservesSafeArea,
+            style: style
+        ) {
+            content(requestClose)
+        }
+        .allowsHitTesting(isInteractionReady && !isClosing)
+        .accessibilityAddTraits(.isModal)
+        .task(id: routeID) {
+            await playEntrance()
+        }
+        .onDisappear {
+            closeTask?.cancel()
+        }
+    }
+
+    @MainActor
+    private func playEntrance() async {
+        closeTask?.cancel()
+        presentationProgress = 0
+        isContentMounted = false
+        isInteractionReady = false
+        isClosing = false
+
+        await OhanaFrameScheduler.waitAfterNextFrame()
+        guard !Task.isCancelled else { return }
+        setPresentationProgress(1)
+
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: contentMountDelay)
+        guard !Task.isCancelled, !isClosing else { return }
+        withAnimation(GoMotion.quick) {
+            isContentMounted = true
+        }
+
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: interactionReadyDelay)
+        guard !Task.isCancelled, !isClosing else { return }
+        isInteractionReady = true
+    }
+
+    private func requestClose() {
+        guard !isClosing else { return }
+        isClosing = true
+        isInteractionReady = false
+        OhanaFeedback.light()
+        withAnimation(GoMotion.quick) {
+            isContentMounted = false
+        }
+        setPresentationProgress(0)
+        closeTask?.cancel()
+        closeTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: closeDelay) {
+            onClose()
+        }
+    }
+
+    private func setPresentationProgress(_ progress: CGFloat) {
+        guard allowsMotion else {
+            presentationProgress = progress
+            return
+        }
+        withAnimation(GoMotion.sheetEnter) {
+            presentationProgress = progress
+        }
+    }
+
+    private var allowsMotion: Bool {
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion
+    }
+
+    private var contentMountDelay: UInt64 {
+        allowsMotion ? contentMountDelayMilliseconds : 0
+    }
+
+    private var interactionReadyDelay: UInt64 {
+        allowsMotion ? interactionReadyDelayMilliseconds : 0
+    }
+
+    private var closeDelay: UInt64 {
+        allowsMotion ? closeDelayMilliseconds : 90
+    }
+}
+
+private enum OhanaInlinePageSafeAreaResolver {
+    static func insets(in geo: GeometryProxy) -> EdgeInsets {
+        let windowInsets = activeWindowSafeAreaInsets()
+        return EdgeInsets(
+            top: resolvedInset(geo.safeAreaInsets.top, windowInsets.top, fallback: 59),
+            leading: max(geo.safeAreaInsets.leading, windowInsets.left),
+            bottom: resolvedInset(geo.safeAreaInsets.bottom, windowInsets.bottom, fallback: 34),
+            trailing: max(geo.safeAreaInsets.trailing, windowInsets.right)
+        )
+    }
+
+    private static func resolvedInset(_ geoValue: CGFloat, _ windowValue: CGFloat, fallback: CGFloat) -> CGFloat {
+        let measured = max(geoValue, windowValue)
+        return measured > 1 ? measured : fallback
+    }
+
+    private static func activeWindowSafeAreaInsets() -> UIEdgeInsets {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }?
+            .safeAreaInsets ?? .zero
     }
 }
 

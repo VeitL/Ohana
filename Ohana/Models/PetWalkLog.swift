@@ -16,6 +16,7 @@ final class PetWalkLog {
     var distanceMeters: Double
     var coconutsEarned: Int
     var executorId: String?  // ArkSchemaV11: 执行该动作的 Human.id.uuidString
+    var sharedSessionId: String = ""
     @Attribute(.externalStorage) var mapSnapshotData: Data?
     @Attribute(.externalStorage) var routeLocationsData: Data?
     var pet: Pet?
@@ -23,13 +24,14 @@ final class PetWalkLog {
     var behaviorNotes: String?   // 如"今天很兴奋，追了一只猫"
     var moodRating: Int = 0      // 1-5颗星，0 = 未评价
 
-    init(startDate: Date = Date(), pet: Pet? = nil, executorId: String? = nil) {
+    init(startDate: Date = Date(), pet: Pet? = nil, executorId: String? = nil, sharedSessionId: String = "") {
         self.id = UUID()
         self.startDate = startDate
         self.endDate = nil
         self.distanceMeters = 0
         self.coconutsEarned = 0
         self.executorId = executorId
+        self.sharedSessionId = sharedSessionId
         self.mapSnapshotData = nil
         self.routeLocationsData = nil
         self.pet = pet

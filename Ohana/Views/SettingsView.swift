@@ -19,6 +19,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.ohanaInlinePageSafeAreaInsets) private var inlinePageSafeAreaInsets
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
@@ -332,6 +333,30 @@ struct SettingsView: View {
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
                             NavigationLink {
+                                NavigationBarStyleLabView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    settingsIcon("rectangle.bottomthird.inset.filled", color: Color.goPrimary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(l.tr(zh: "导航栏样式测试", en: "Navigation bar style lab", de: "Navigationsleisten-Labor"))
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(primaryText)
+                                        Text(l.tr(zh: "3-tab、4-tab 与主题按钮候选", en: "3-tab, 4-tab, and theme button candidates", de: "3-Tab, 4-Tab und Designfarben-Taste"))
+                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(tertiaryText)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                }
+                                .frame(minHeight: 44)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                            NavigationLink {
                                 FamilyCollaborationPlaygroundView()
                             } label: {
                                 HStack(spacing: 12) {
@@ -543,7 +568,8 @@ struct SettingsView: View {
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 10)
+                    .padding(.top, max(10, inlinePageSafeAreaInsets.top + 10))
+                    .padding(.bottom, inlinePageSafeAreaInsets.bottom)
                 }
             }
             .navigationTitle("")

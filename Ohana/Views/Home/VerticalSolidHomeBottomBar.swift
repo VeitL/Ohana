@@ -15,30 +15,28 @@ struct HomeBottomNavigationLayoutMetrics: Equatable {
     let trailingPadding: CGFloat
     let tabSpacing: CGFloat
     let actionGap: CGFloat
-    let dividerWidth: CGFloat
     let actionDiameter: CGFloat
     let actionHitSize: CGFloat
-    let showsTabLabels: Bool
+    let showsSelectedLabel: Bool
 }
 
 enum HomeBottomNavigationLayoutPolicy {
     static func metrics(tabCount: Int, isAccessibilitySize: Bool = false) -> HomeBottomNavigationLayoutMetrics {
         let normalizedCount = max(tabCount, 1)
-        let showsTabLabels = normalizedCount <= 4 && !isAccessibilitySize
-        let actionDiameter: CGFloat = showsTabLabels ? 56 : 52
-        let barHeight: CGFloat = max(64, actionDiameter + 12)
+        let showsSelectedLabel = normalizedCount <= 4 && !isAccessibilitySize
+        let actionDiameter: CGFloat = 48
+        let barHeight: CGFloat = 58
 
         return HomeBottomNavigationLayoutMetrics(
             barHeight: barHeight,
-            horizontalPadding: 16,
-            leadingPadding: normalizedCount >= 5 ? 8 : 10,
-            trailingPadding: 8,
-            tabSpacing: normalizedCount >= 5 ? 2 : 4,
-            actionGap: normalizedCount >= 5 ? 6 : 8,
-            dividerWidth: 1,
+            horizontalPadding: 14,
+            leadingPadding: 8,
+            trailingPadding: 4,
+            tabSpacing: normalizedCount >= 5 ? 4 : 6,
+            actionGap: 6,
             actionDiameter: actionDiameter,
-            actionHitSize: max(actionDiameter, 56),
-            showsTabLabels: showsTabLabels
+            actionHitSize: max(actionDiameter, 52),
+            showsSelectedLabel: showsSelectedLabel
         )
     }
 
@@ -53,8 +51,7 @@ enum HomeBottomNavigationLayoutPolicy {
             + metrics.leadingPadding
             + metrics.trailingPadding
             + metrics.actionHitSize
-            + metrics.dividerWidth
-            + metrics.actionGap * 2
+            + metrics.actionGap
             + CGFloat(max(normalizedCount - 1, 0)) * metrics.tabSpacing
         let availableWidth = max(44 * CGFloat(normalizedCount), containerWidth - fixedWidth)
         return availableWidth / CGFloat(normalizedCount)
@@ -78,6 +75,7 @@ struct VerticalSolidHomeBottomBar: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private var l: L10n { localization }
     private var visibleTabs: [VerticalSolidHomeTab] { VerticalSolidHomeTab.visibleTabs }
@@ -110,11 +108,6 @@ struct VerticalSolidHomeBottomBar: View {
                 .frame(maxWidth: .infinity)
                 .layoutPriority(1)
 
-            Rectangle()
-                .fill(Color.ohanaGlassStroke.opacity(colorScheme == .dark ? 0.20 : 0.28))
-                .frame(width: metrics.dividerWidth, height: 32)
-                .accessibilityHidden(true)
-
             HomeBottomNavigationPrimaryAction(
                 icon: centerIcon,
                 isExpanded: isFabExpanded,
@@ -143,12 +136,13 @@ struct VerticalSolidHomeBottomBar: View {
                 HomeBottomNavigationTabButton(
                     tab: tab,
                     isSelected: selectedTab == tab,
-                    showsLabel: metrics.showsTabLabels,
+                    showsSelectedLabel: metrics.showsSelectedLabel,
                     localization: l,
+                    selectionAnimation: canAnimate ? GoMotion.selection : GoMotion.reduced,
                     action: onSelect
                 )
-                .frame(maxWidth: .infinity)
             }
+            Spacer(minLength: 0)
         }
     }
 
@@ -191,12 +185,34 @@ struct VerticalSolidHomeBottomBar: View {
 
     private var navBackground: some View {
         Capsule()
-            .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.44 : 0.76))
+            .fill(reduceTransparency ? Color.ohanaCardSurface.opacity(0.94) : Color.clear)
+            .glassEffect(.regular.tint(navGlassTint).interactive(true), in: Capsule()) // ui-v4: allow app-level Liquid Glass bottom navigation background
             .overlay {
                 Capsule()
-                    .strokeBorder(Color.ohanaGlassStroke.opacity(0.24), lineWidth: 1)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.ohanaPrimaryText.opacity(colorScheme == .dark ? 0.18 : 0.14),
+                                navSpecularStroke,
+                                Color.ohanaGlassStroke.opacity(0.20)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             }
-            .shadow(color: Color.arkInk.opacity(0.16), radius: 18, x: 0, y: 9) // ui-v4: allow home bottom navigation lift
+    }
+
+    private var navGlassTint: Color {
+        if reduceTransparency {
+            return Color.ohanaCardSurface.opacity(0.94)
+        }
+        return Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.30 : 0.36)
+    }
+
+    private var navSpecularStroke: Color {
+        colorScheme == .dark ? Color.ohanaPrimaryText.opacity(0.18) : Color.ohanaSecondaryText.opacity(0.10)
     }
 
     @ViewBuilder
@@ -280,25 +296,22 @@ struct VerticalSolidHomeBottomBar: View {
 private struct HomeBottomNavigationTabButton: View {
     let tab: VerticalSolidHomeTab
     let isSelected: Bool
-    let showsLabel: Bool
+    let showsSelectedLabel: Bool
     let localization: L10n
+    let selectionAnimation: Animation
     let action: (VerticalSolidHomeTab) -> Void
 
     var body: some View {
         Button {
-            action(tab)
+            withAnimation(selectionAnimation) {
+                action(tab)
+            }
         } label: {
             tabContent
-                .foregroundStyle(isSelected ? Color.goPrimary : Color.ohanaSecondaryText)
-                .frame(minWidth: 44, maxWidth: .infinity)
-                .frame(height: showsLabel ? 54 : 50)
-                .padding(.horizontal, 3)
-                .background {
-                    if isSelected {
-                        Capsule()
-                            .fill(Color.goPrimary.opacity(0.12))
-                    }
-                }
+                .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
+                .frame(width: isSelected && showsSelectedLabel ? 70 : 44)
+                .frame(height: 44)
+                .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                 .contentShape(Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
@@ -308,17 +321,13 @@ private struct HomeBottomNavigationTabButton: View {
 
     @ViewBuilder
     private var tabContent: some View {
-        if showsLabel {
-            ViewThatFits(in: .horizontal) {
-                VStack(spacing: 3) {
-                    icon
-                    Text(tab.title(localization))
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.68)
-                }
-
-                iconOnly
+        if isSelected && showsSelectedLabel {
+            HStack(spacing: 5) {
+                icon
+                Text(tab.title(localization))
+                    .font(OhanaFont.caption2(.black))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
             }
         } else {
             iconOnly
@@ -332,7 +341,7 @@ private struct HomeBottomNavigationTabButton: View {
 
     private var icon: some View {
         Image(systemName: tab.icon)
-            .font(OhanaFont.adaptive(size: isSelected ? 18 : 17, weight: .black))
+            .font(OhanaFont.adaptive(size: isSelected ? 16 : 15, weight: .black))
             .symbolRenderingMode(.monochrome)
             .contentTransition(.symbolEffect(.replace))
             .accessibilityHidden(true)
@@ -350,12 +359,11 @@ private struct HomeBottomNavigationPrimaryAction: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 23, weight: .black))
+                .font(OhanaFont.adaptive(size: 21, weight: .black))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: diameter, height: diameter)
                 .background(Color.goPrimary, in: Circle())
-                .shadow(color: Color.goPrimary.opacity(0.24), radius: 14, x: 0, y: 7) // ui-v4: allow elevated primary nav action
                 .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 .contentTransition(.symbolEffect(.replace))
         }

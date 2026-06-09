@@ -32,6 +32,7 @@ struct CrewRosterPresentationModifier: ViewModifier {
             }
             .sheet(item: $sheetRoute) { route in
                 sheetDestination(for: route)
+                    .ohanaSheetPagePresentation() // ui-v4: allow crew roster route sheets share page chrome
             }
     }
 

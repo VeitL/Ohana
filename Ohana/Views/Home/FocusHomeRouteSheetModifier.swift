@@ -59,10 +59,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 }
             }
             .overlay {
-                ZStack {
-                    homeOverlayLayer()
-                    inlineSettingsLayer()
-                }
+                homeOverlayLayer()
             }
             .alert(antiRepeatTitleText, isPresented: antiRepeatAlertBinding) {
                 Button(l.homeConfirmCheckIn, role: .destructive) {
@@ -100,16 +97,9 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private var modalSheetRouteBinding: Binding<HomeModalRoute?> {
         Binding(
             get: {
-                if activeCrewRosterMode != nil {
-                    return nil
-                }
                 return routes.modal
             },
             set: { route in
-                if route == nil,
-                   activeCrewRosterMode != nil {
-                    return
-                }
                 routes.modal = route
             }
         )
@@ -118,9 +108,6 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private var fullScreenRouteBinding: Binding<HomeFullScreenRoute?> {
         Binding(
             get: {
-                if case .coconutLog = routes.fullScreen {
-                    return nil
-                }
                 return routes.fullScreen
             },
             set: { route in
@@ -138,17 +125,6 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 routes.sheet = route
             }
         )
-    }
-
-    private var settingsRouteIsActive: Bool {
-        routes.settingsPresented
-    }
-
-    private var activeCrewRosterMode: CrewRosterMode? {
-        if case let .some(.crewRoster(mode)) = routes.modal {
-            return mode
-        }
-        return nil
     }
 
     @ViewBuilder
@@ -176,6 +152,13 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 }
             )
             .ohanaSheetPagePresentation() // ui-v4: allow role creation flow as long sheet
+        case let .coconutLog(subject):
+            CoconutLogView(
+                subject: subject,
+                onClose: { routes.dismissModal() },
+                historyContentDelayMilliseconds: 80
+            )
+            .ohanaSheetPagePresentation() // ui-v4: allow coconut history as long sheet
         case let .crewRoster(mode):
             NavigationStack {
                 CrewRosterOverlayRouteContainer(
@@ -221,6 +204,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 }
             )
             .ohanaSheetPagePresentation() // ui-v4: allow calendar as long sheet
+        case .settings:
+            SettingsView(
+                homePets: pets,
+                homeHumans: humans,
+                homeElectronicPets: electronicPets,
+                onClose: { routes.dismissModal() }
+            )
+            .ohanaSheetPagePresentation() // ui-v4: allow settings as long sheet
         }
     }
 
@@ -339,89 +330,12 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             }
         case .oasisReward:
             OasisRewardView()
-        case let .coconutLog(subject):
-            CoconutLogView(subject: subject)
-        }
-    }
-
-    @ViewBuilder
-    private func inlineSettingsLayer() -> some View {
-        if settingsRouteIsActive {
-            AppDeferredRouteContent(
-                routeID: "home-settings",
-                policy: AppPresentationPolicyProvider.policyForHomeSettings()
-            ) {
-                HomeSettingsInlineHost(
-                    homePets: pets,
-                    homeHumans: humans,
-                    homeElectronicPets: electronicPets,
-                    onClose: {
-                        if routes.settingsPresented {
-                            routes.dismissSettings()
-                        }
-                    }
-                )
-            }
-            .ignoresSafeArea()
-            .zIndex(120)
         }
     }
 
     @ViewBuilder
     private func homeOverlayLayer() -> some View {
         homeOverlayDestination()
-        inlineCoconutLogDestination()
-        crewRosterOverlayDestination()
-    }
-
-    @ViewBuilder
-    private func inlineCoconutLogDestination() -> some View {
-        if case let .coconutLog(subject) = routes.fullScreen {
-            AppDeferredRouteContent(
-                routeID: "home-coconut-log-\(subject?.id ?? "all")",
-                policy: AppPresentationPolicyProvider.policyForHomeCoconutLog()
-            ) {
-                HomeCoconutLogInlineHost(
-                    subject: subject,
-                    onClose: {
-                        routes.dismissFullScreen()
-                    }
-                )
-            }
-            .ignoresSafeArea()
-            .zIndex(130)
-        }
-    }
-
-    @ViewBuilder
-    private func crewRosterOverlayDestination() -> some View {
-        if case let .some(.crewRoster(mode)) = routes.modal {
-            AppDeferredRouteContent(
-                routeID: "home-crew-roster-\(mode.rawValue)",
-                policy: AppPresentationPolicyProvider.policyForHomeCrewRoster()
-            ) {
-                HomeCrewRosterInlineHost(
-                    initialMode: mode,
-                    onClose: {
-                        routes.dismissModal()
-                    },
-                    onSelectPet: { pet in
-                        routes.dismissModal()
-                        onCrewPetSelected(pet)
-                    },
-                    onSelectHuman: { human in
-                        routes.dismissModal()
-                        onCrewHumanSelected(human)
-                    },
-                    onPresentCoconutLog: { subject in
-                        routes.dismissModal()
-                        routes.openCoconutLog(subject)
-                    }
-                )
-            }
-            .ignoresSafeArea()
-            .zIndex(140)
-        }
     }
 
     @ViewBuilder
@@ -434,16 +348,18 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 switch route {
                 case let .quickMoment(routeID, petID):
                     if let pet = pet(petID) {
-                        QuickMomentSheet(
-                            pet: pet,
-                            onRemove: nil,
-                            onSaved: {
-                                onFirstSuccessMomentCompleted(pet)
-                            },
-                            onClose: {
-                                routes.dismissOverlay(routeID: routeID)
-                            }
-                        )
+                        OhanaInlinePageRouteHost(routeID: routeID.uuidString, onClose: {
+                            routes.dismissOverlay(routeID: routeID)
+                        }) { requestClose in
+                            QuickMomentSheet(
+                                pet: pet,
+                                onRemove: nil,
+                                onSaved: {
+                                    onFirstSuccessMomentCompleted(pet)
+                                },
+                                onClose: requestClose
+                            )
+                        }
                     } else {
                         Color.clear
                             .onAppear {
@@ -901,18 +817,8 @@ struct HomeSettingsInlineHost: View {
     let homeElectronicPets: [OasisElectronicPet]
     let onClose: () -> Void
 
-    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @State private var presentationProgress: CGFloat = 0
-    @State private var isContentMounted = false
-    @State private var isInteractionReady = false
-    @State private var isClosing = false
-    @State private var closeTask: Task<Void, Never>?
-
     var body: some View {
-        OhanaDeferredInlinePageCover(
-            progress: presentationProgress,
-            isContentMounted: isContentMounted
-        ) {
+        OhanaInlinePageRouteHost(routeID: "home-settings", onClose: onClose) { requestClose in
             SettingsView(
                 homePets: homePets,
                 homeHumans: homeHumans,
@@ -920,78 +826,6 @@ struct HomeSettingsInlineHost: View {
                 onClose: requestClose
             )
         }
-        .allowsHitTesting(isInteractionReady && !isClosing)
-        .accessibilityAddTraits(.isModal)
-        .task {
-            await playEntrance()
-        }
-        .onDisappear {
-            closeTask?.cancel()
-        }
-    }
-
-    @MainActor
-    private func playEntrance() async {
-        closeTask?.cancel()
-        presentationProgress = 0
-        isContentMounted = false
-        isInteractionReady = false
-        isClosing = false
-
-        await OhanaFrameScheduler.waitAfterNextFrame()
-        guard !Task.isCancelled else { return }
-        setPresentationProgress(1)
-
-        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: contentMountDelayMilliseconds)
-        guard !Task.isCancelled, !isClosing else { return }
-        withAnimation(GoMotion.quick) {
-            isContentMounted = true
-        }
-
-        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: interactionReadyDelayMilliseconds)
-        guard !Task.isCancelled, !isClosing else { return }
-        isInteractionReady = true
-    }
-
-    private func requestClose() {
-        guard !isClosing else { return }
-        isClosing = true
-        isInteractionReady = false
-        OhanaFeedback.light()
-        withAnimation(GoMotion.quick) {
-            isContentMounted = false
-        }
-        setPresentationProgress(0)
-        closeTask?.cancel()
-        closeTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: closeDelayMilliseconds) {
-            onClose()
-        }
-    }
-
-    private func setPresentationProgress(_ progress: CGFloat) {
-        guard allowsMotion else {
-            presentationProgress = progress
-            return
-        }
-        withAnimation(GoMotion.sheetEnter) {
-            presentationProgress = progress
-        }
-    }
-
-    private var allowsMotion: Bool {
-        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion
-    }
-
-    private var contentMountDelayMilliseconds: UInt64 {
-        allowsMotion ? 80 : 0
-    }
-
-    private var interactionReadyDelayMilliseconds: UInt64 {
-        allowsMotion ? 360 : 0
-    }
-
-    private var closeDelayMilliseconds: UInt64 {
-        allowsMotion ? 340 : 90
     }
 }
 
@@ -1002,204 +836,38 @@ struct HomeCrewRosterInlineHost: View {
     let onSelectHuman: (Human) -> Void
     var onPresentCoconutLog: (CoconutLogSubject?) -> Void = { _ in }
 
-    @StateObject private var safeAreaController = FocusHomeSafeAreaController()
-    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @State private var isShellVisible = false
-    @State private var isContentMounted = false
-    @State private var isContentVisible = false
-    @State private var isInteractionReady = false
-    @State private var isClosing = false
-    @State private var closeTask: Task<Void, Never>?
-
     var body: some View {
-        GeometryReader { proxy in
-            let safeTop = safeAreaController.resolvedTop(in: proxy)
-            let safeBottom = safeAreaController.resolvedBottom(in: proxy)
-
-            ZStack {
-                ZStack {
-                    OhanaAppBackground()
-                        .ignoresSafeArea()
-
-                    ZStack {
-                        HomeCrewRosterOpeningShell(
-                            initialMode: initialMode,
-                            safeTopInset: safeTop,
-                            onClose: requestClose
-                        )
-                        .opacity(isContentMounted ? 0 : 1)
-
-                        if isContentMounted {
-                            CrewRosterOverlayRouteContainer(
-                                initialMode: initialMode,
-                                onSelectPet: selectPet,
-                                onSelectHuman: selectHuman,
-                                onClose: requestClose,
-                                safeTopInset: safeTop,
-                                safeBottomInset: safeBottom,
-                                onPresentCoconutLog: { subject in
-                                    closeThen {
-                                        onPresentCoconutLog(subject)
-                                    }
-                                }
-                            )
-                            .opacity(isContentVisible ? 1 : 0)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .offset(y: presentationOffset(in: proxy, safeBottom: safeBottom))
-                .allowsHitTesting(isInteractionReady && !isClosing)
-            }
-            .accessibilityAddTraits(.isModal)
-            .onAppear {
-                safeAreaController.stabilize(from: proxy)
-            }
+        OhanaInlinePageRouteHost(routeID: "home-crew-roster-\(initialMode.rawValue)", onClose: onClose) { requestClose in
+            HomeCrewRosterInlineContent(
+                initialMode: initialMode,
+                onClose: requestClose,
+                onSelectPet: onSelectPet,
+                onSelectHuman: onSelectHuman,
+                onPresentCoconutLog: onPresentCoconutLog
+            )
         }
-        .task {
-            await playEntrance()
-        }
-        .onDisappear {
-            closeTask?.cancel()
-        }
-    }
-
-    @MainActor
-    private func playEntrance() async {
-        isShellVisible = false
-        isContentMounted = false
-        isContentVisible = false
-        isInteractionReady = false
-        isClosing = false
-
-        await OhanaFrameScheduler.waitAfterNextFrame()
-        guard !Task.isCancelled else { return }
-        isContentMounted = true
-        isContentVisible = true
-
-        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: contentPrepareDelayMilliseconds)
-        guard !Task.isCancelled, !isClosing else { return }
-        withAnimation(drawerEnterAnimation) {
-            isShellVisible = true
-        }
-
-        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: interactionReadyDelayMilliseconds)
-        guard !Task.isCancelled, !isClosing else { return }
-        isInteractionReady = true
-    }
-
-    private func requestClose() {
-        closeThen(onClose)
-    }
-
-    private func selectPet(_ pet: Pet) {
-        closeThen {
-            onSelectPet(pet)
-        }
-    }
-
-    private func selectHuman(_ human: Human) {
-        closeThen {
-            onSelectHuman(human)
-        }
-    }
-
-    private func closeThen(_ action: @escaping () -> Void) {
-        guard !isClosing else { return }
-        isClosing = true
-        isInteractionReady = false
-        OhanaFeedback.light()
-        withAnimation(drawerExitAnimation) {
-            isShellVisible = false
-        }
-        closeTask?.cancel()
-        closeTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: closeDelayMilliseconds) {
-            action()
-        }
-    }
-
-    private func presentationOffset(in proxy: GeometryProxy, safeBottom: CGFloat) -> CGFloat {
-        guard allowsMotion else { return 0 }
-        return isShellVisible ? 0 : proxy.size.height + safeBottom + 24
-    }
-
-    private var allowsMotion: Bool {
-        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion
-    }
-
-    private var drawerEnterAnimation: Animation {
-        allowsMotion ? .smooth(duration: 0.38, extraBounce: 0.0) : GoMotion.reduced
-    }
-
-    private var drawerExitAnimation: Animation {
-        allowsMotion ? .smooth(duration: 0.38, extraBounce: 0.0) : GoMotion.reduced
-    }
-
-    private var contentPrepareDelayMilliseconds: UInt64 {
-        allowsMotion ? 32 : 0
-    }
-
-    private var closeDelayMilliseconds: UInt64 {
-        allowsMotion ? 430 : 90
-    }
-
-    private var interactionReadyDelayMilliseconds: UInt64 {
-        allowsMotion ? 420 : 0
     }
 }
 
-private struct HomeCrewRosterOpeningShell: View {
+private struct HomeCrewRosterInlineContent: View {
     let initialMode: CrewRosterMode
-    let safeTopInset: CGFloat
     let onClose: () -> Void
+    let onSelectPet: (Pet) -> Void
+    let onSelectHuman: (Human) -> Void
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
 
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-
-    private var l: L10n { L10n(appLanguage) }
+    @Environment(\.ohanaInlinePageSafeAreaInsets) private var inlineSafeAreaInsets
 
     var body: some View {
-        let isCollaboration = initialMode == .collaboration
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: isCollaboration ? "hands.sparkles.fill" : "person.2.crop.square.stack.fill")
-                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(isCollaboration
-                         ? l.tr(zh: "家庭协作", en: "Family Care", de: "Familienpflege")
-                         : l.tr(zh: "Ohana 成员", en: "Ohana Members", de: "Ohana Mitglieder"))
-                        .font(OhanaFont.title3(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(isCollaboration
-                         ? l.tr(zh: "任务、悬赏和今日分工", en: "Tasks, bounties, and today's handoff", de: "Aufgaben, Prämien und heutige Übergabe")
-                         : l.tr(zh: "成员和首页显示", en: "Members and home cards", de: "Mitglieder und Startkarten"))
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-
-                Spacer()
-
-                Button(action: onClose) {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.ohanaControlFill, in: Circle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, safeTopInset + 16)
-            .padding(.bottom, 12)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        CrewRosterOverlayRouteContainer(
+            initialMode: initialMode,
+            onSelectPet: onSelectPet,
+            onSelectHuman: onSelectHuman,
+            onClose: onClose,
+            safeTopInset: inlineSafeAreaInsets.top,
+            safeBottomInset: inlineSafeAreaInsets.bottom,
+            onPresentCoconutLog: onPresentCoconutLog
+        )
     }
 }
 
@@ -1207,178 +875,41 @@ struct HomeCoconutLogInlineHost: View {
     let subject: CoconutLogSubject?
     let onClose: () -> Void
 
-    @StateObject private var safeAreaController = FocusHomeSafeAreaController()
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @State private var isShellVisible = false
-    @State private var isContentMounted = false
-    @State private var isContentVisible = false
-    @State private var isInteractionReady = false
-    @State private var isClosing = false
-    @State private var closeTask: Task<Void, Never>?
 
     var body: some View {
-        GeometryReader { proxy in
-            let safeTop = safeAreaController.resolvedTop(in: proxy)
-            let safeBottom = safeAreaController.resolvedBottom(in: proxy)
-
-            ZStack {
-                OhanaAppBackground()
-                    .ignoresSafeArea()
-
-                ZStack {
-                    HomeCoconutLogOpeningShell(
-                        safeTopInset: safeTop,
-                        onClose: requestClose
-                    )
-                    .opacity(isContentMounted ? 0 : 1)
-
-                    if isContentMounted {
-                        CoconutLogView(
-                            subject: subject,
-                            onClose: requestClose,
-                            safeTopInset: safeTop,
-                            safeBottomInset: safeBottom,
-                            historyContentDelayMilliseconds: historyContentDelayMilliseconds
-                        )
-                            .opacity(isContentVisible ? 1 : 0)
-                            .transition(.opacity)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .offset(y: presentationOffset(in: proxy, safeBottom: safeBottom))
-                .allowsHitTesting(isInteractionReady && !isClosing)
-            }
-            .accessibilityAddTraits(.isModal)
-            .onAppear {
-                safeAreaController.stabilize(from: proxy)
-            }
+        OhanaInlinePageRouteHost(routeID: "home-coconut-log-\(subject?.id ?? "all")", onClose: onClose) { requestClose in
+            HomeCoconutLogInlineContent(
+                subject: subject,
+                onClose: requestClose,
+                historyContentDelayMilliseconds: historyContentDelayMilliseconds
+            )
         }
-        .task(id: subject?.id ?? "all") {
-            await playEntrance()
-        }
-        .onDisappear {
-            closeTask?.cancel()
-        }
-    }
-
-    @MainActor
-    private func playEntrance() async {
-        closeTask?.cancel()
-        isShellVisible = false
-        isContentMounted = false
-        isContentVisible = false
-        isInteractionReady = false
-        isClosing = false
-
-        await OhanaFrameScheduler.waitAfterNextFrame()
-        guard !Task.isCancelled else { return }
-        isContentMounted = true
-        isContentVisible = true
-
-        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: contentPrepareDelayMilliseconds)
-        guard !Task.isCancelled, !isClosing else { return }
-        withAnimation(drawerEnterAnimation) {
-            isShellVisible = true
-        }
-
-        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: interactionReadyDelayMilliseconds)
-        guard !Task.isCancelled, !isClosing else { return }
-        isInteractionReady = true
-    }
-
-    private func requestClose() {
-        guard !isClosing else { return }
-        isClosing = true
-        isInteractionReady = false
-        OhanaFeedback.light()
-        withAnimation(drawerExitAnimation) {
-            isShellVisible = false
-        }
-        closeTask?.cancel()
-        closeTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: closeDelayMilliseconds) {
-            onClose()
-        }
-    }
-
-    private func presentationOffset(in proxy: GeometryProxy, safeBottom: CGFloat) -> CGFloat {
-        guard allowsMotion else { return 0 }
-        return isShellVisible ? 0 : proxy.size.height + safeBottom + 24
     }
 
     private var allowsMotion: Bool {
         workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion
     }
 
-    private var drawerEnterAnimation: Animation {
-        allowsMotion ? .smooth(duration: 0.38, extraBounce: 0.0) : GoMotion.reduced
-    }
-
-    private var drawerExitAnimation: Animation {
-        allowsMotion ? .smooth(duration: 0.38, extraBounce: 0.0) : GoMotion.reduced
-    }
-
-    private var contentPrepareDelayMilliseconds: UInt64 {
-        allowsMotion ? 32 : 0
-    }
-
-    private var closeDelayMilliseconds: UInt64 {
-        allowsMotion ? 430 : 90
-    }
-
-    private var interactionReadyDelayMilliseconds: UInt64 {
-        allowsMotion ? 420 : 0
-    }
-
     private var historyContentDelayMilliseconds: UInt64 {
-        allowsMotion ? 470 : 0
+        allowsMotion ? 220 : 0
     }
 }
 
-private struct HomeCoconutLogOpeningShell: View {
-    let safeTopInset: CGFloat
+private struct HomeCoconutLogInlineContent: View {
+    let subject: CoconutLogSubject?
     let onClose: () -> Void
-
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-
-    private var l: L10n { L10n(appLanguage) }
+    let historyContentDelayMilliseconds: UInt64
+    @Environment(\.ohanaInlinePageSafeAreaInsets) private var inlineSafeAreaInsets
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: "circle.hexagongrid.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goPrimary)
-                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(l.tr(zh: "椰子历史", en: "Coconut History", de: "Kokosnuss-Historie"))
-                        .font(OhanaFont.title3(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "每一笔收支", en: "Every coconut change", de: "Jede Bewegung"))
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-
-                Spacer()
-
-                Button(action: onClose) {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.ohanaControlFill, in: Circle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, safeTopInset + 16)
-            .padding(.bottom, 12)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        CoconutLogView(
+            subject: subject,
+            onClose: onClose,
+            safeTopInset: inlineSafeAreaInsets.top,
+            safeBottomInset: inlineSafeAreaInsets.bottom,
+            historyContentDelayMilliseconds: historyContentDelayMilliseconds
+        )
     }
 }
 
@@ -1399,10 +930,14 @@ private extension AppPresentationPolicyProvider {
             return homeSheetPagePolicy("home.streakDetail")
         case .addEntity:
             return homeSheetPagePolicy("home.addEntity")
+        case .coconutLog:
+            return homeSheetPagePolicy("home.coconutLog")
         case .crewRoster:
             return homeSheetPagePolicy("home.crewRoster")
         case .calendar:
             return homeSheetPagePolicy("home.calendar")
+        case .settings:
+            return homeSheetPagePolicy("home.settings")
         }
     }
 
@@ -1421,33 +956,21 @@ private extension AppPresentationPolicyProvider {
     static func policy(for route: HomeOverlayRoute) -> AppPresentationPolicy {
         AppPresentationPolicy(
             surface: .inlineOverlay,
-            loading: .shellFirst(delayMS: 64),
+            loading: .immediate,
             instrumentationName: "home.\(route.presentationName)"
         )
     }
 
     static func policyForHomeCoconutLog() -> AppPresentationPolicy {
-        AppPresentationPolicy(
-            surface: .inlineOverlay,
-            loading: .shellFirst(delayMS: 64),
-            instrumentationName: "home.coconutLog"
-        )
+        homeSheetPagePolicy("home.coconutLog")
     }
 
     static func policyForHomeCrewRoster() -> AppPresentationPolicy {
-        AppPresentationPolicy(
-            surface: .inlineOverlay,
-            loading: .shellFirst(delayMS: 64),
-            instrumentationName: "home.crewRoster"
-        )
+        homeSheetPagePolicy("home.crewRoster")
     }
 
     static func policyForHomeSettings() -> AppPresentationPolicy {
-        AppPresentationPolicy(
-            surface: .inlineOverlay,
-            loading: .shellFirst(delayMS: 64),
-            instrumentationName: "home.settings"
-        )
+        homeSheetPagePolicy("home.settings")
     }
 
     private static func homeSheetPagePolicy(_ name: String) -> AppPresentationPolicy {
@@ -1535,8 +1058,6 @@ private extension HomeFullScreenRoute {
             return "walk"
         case .oasisReward:
             return "oasisReward"
-        case .coconutLog:
-            return "coconutLog"
         }
     }
 }

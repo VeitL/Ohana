@@ -90,9 +90,11 @@ enum HomeModalRoute: Identifiable {
     case functionMenu(destination: FMDest?)
     case streakDetail
     case addEntity(EntityType)
+    case coconutLog(CoconutLogSubject?)
     case crewRoster(CrewRosterMode)
     case accountSwitcher
     case calendar(entityID: String?, humanID: String?)
+    case settings
 
     var id: String {
         switch self {
@@ -102,12 +104,16 @@ enum HomeModalRoute: Identifiable {
             return "streak-detail"
         case let .addEntity(type):
             return "add-entity-\(type.id)"
+        case let .coconutLog(subject):
+            return "coconut-log-\(subject?.id ?? "all")"
         case let .crewRoster(mode):
             return "crew-roster-\(mode.rawValue)"
         case .accountSwitcher:
             return "account-switcher"
         case let .calendar(entityID, humanID):
             return "calendar-\(entityID ?? "all")-\(humanID ?? "all")"
+        case .settings:
+            return "settings"
         }
     }
 }
@@ -115,7 +121,6 @@ enum HomeModalRoute: Identifiable {
 enum HomeFullScreenRoute: Identifiable {
     case walk(UUID)
     case oasisReward
-    case coconutLog(CoconutLogSubject?)
 
     var id: String {
         switch self {
@@ -123,8 +128,6 @@ enum HomeFullScreenRoute: Identifiable {
             return "walk-\(id.uuidString)"
         case .oasisReward:
             return "oasis-reward"
-        case let .coconutLog(subject):
-            return "coconut-log-\(subject?.id ?? "all")"
         }
     }
 }
@@ -183,10 +186,7 @@ enum HomeAppFullScreenRoute: Equatable {
 }
 
 enum HomeAppOverlayRoute: Equatable {
-    case coconutLog(CoconutLogSubject?)
-    case crewRoster(CrewRosterMode)
     case quickMoment(petID: UUID)
-    case settings
 }
 
 @MainActor
@@ -281,9 +281,10 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openCrewRoster(mode: CrewRosterMode = .members) {
-        if let appOverlayRouteSink {
-            appOverlayRouteSink(.crewRoster(mode))
+        if let appSheetRouteSink {
+            appSheetRouteSink(.appSheet(.crewRoster(mode)))
             modal = nil
+            fullScreen = nil
             return
         }
         modal = .crewRoster(mode)
@@ -322,12 +323,13 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openSettings() {
-        if let appOverlayRouteSink {
-            appOverlayRouteSink(.settings)
+        if let appSheetRouteSink {
+            appSheetRouteSink(.appSheet(.settings))
+            modal = nil
             settingsPresented = false
             return
         }
-        settingsPresented = true
+        modal = .settings
     }
 
     func dismissSettings() {
@@ -343,12 +345,14 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openCoconutLog(_ subject: CoconutLogSubject?) {
-        if let appOverlayRouteSink {
-            appOverlayRouteSink(.coconutLog(subject))
+        if let appSheetRouteSink {
+            appSheetRouteSink(.appSheet(.coconutLog(subject)))
             fullScreen = nil
+            modal = nil
             return
         }
-        fullScreen = .coconutLog(subject)
+        fullScreen = nil
+        modal = .coconutLog(subject)
     }
 
     func openQuickMoment(_ pet: Pet) {
@@ -580,8 +584,6 @@ private extension HomeFullScreenRoute {
             return .walk(petID: id)
         case .oasisReward:
             return .oasisReward
-        case .coconutLog:
-            return nil
         }
     }
 }

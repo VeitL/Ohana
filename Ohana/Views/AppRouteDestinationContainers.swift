@@ -280,6 +280,9 @@ private struct AppSheetRouteDestination: View {
     let onHumanSavedFromAddEntity: (Human) -> Void
     let onCalendarEventDestination: (FocusHomeReminderDestination) -> Void
     let onHumanDoseTaken: (UUID) -> Void
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         switch route {
@@ -304,9 +307,44 @@ private struct AppSheetRouteDestination: View {
                 }
             )
             .ohanaSheetPagePresentation()
+        case let .coconutLog(subject):
+            CoconutLogView(
+                subject: subject,
+                onClose: onDismiss,
+                historyContentDelayMilliseconds: 80
+            )
+            .ohanaSheetPagePresentation()
         case let .coconutShop(category):
             CoconutShopRouteContainer(initialCategory: category)
                 .ohanaSheetPagePresentation()
+        case let .crewRoster(mode):
+            NavigationStack {
+                CrewRosterOverlayRouteContainer(
+                    initialMode: mode,
+                    onSelectPet: { pet in
+                        onDismiss()
+                        coordinator.openPet(pet.id, initialTab: .overview)
+                    },
+                    onSelectHuman: { human in
+                        onDismiss()
+                        coordinator.openHuman(human.id)
+                    },
+                    onClose: onDismiss,
+                    onPresentCoconutLog: { subject in
+                        coordinator.presentCoconutLog(subject)
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(action: onDismiss) {
+                            Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark.circle.fill")
+                                .labelStyle(.iconOnly)
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                        }
+                    }
+                }
+            }
+            .ohanaSheetPagePresentation()
         case let .functionMenu(destination):
             FunctionMenuSheet(initialDestination: destination)
                 .ohanaSheetPagePresentation()
@@ -533,6 +571,9 @@ private struct AppSheetRouteDestination: View {
         case .requiredAccountSwitch:
             AppAccountSwitcherRouteContainer(onSwitched: onDismiss)
                 .interactiveDismissDisabled(true)
+        case .settings:
+            AppSettingsSheetRouteContainer(onClose: onDismiss)
+                .ohanaSheetPagePresentation()
         case .streakDetail:
             AppStreakDetailRouteContainer(
                 onClose: onDismiss,
@@ -1008,40 +1049,14 @@ private struct AppOverlayRouteDestination: View {
 
     var body: some View {
         switch route {
-        case let .coconutLog(subject):
-            HomeCoconutLogInlineHost(
-                subject: subject,
-                onClose: onDismiss
-            )
-            .ignoresSafeArea()
-        case let .crewRoster(mode):
-            HomeCrewRosterInlineHost(
-                initialMode: mode,
-                onClose: onDismiss,
-                onSelectPet: { pet in
-                    onDismiss()
-                    onOpenPet(pet.id, .overview)
-                },
-                onSelectHuman: { human in
-                    onDismiss()
-                    onOpenHuman(human.id)
-                },
-                onPresentCoconutLog: { subject in
-                    onDismiss()
-                    onPresentCoconutLog(subject)
-                }
-            )
-            .ignoresSafeArea()
         case let .quickMoment(_, petID):
-            AppQuickMomentOverlayRouteContainer(
-                id: petID,
-                onSaved: onFirstSuccessMomentCompleted,
-                onDismiss: onDismiss
-            )
-            .ignoresSafeArea()
-        case .settings:
-            AppSettingsOverlayRouteContainer(onClose: onDismiss)
-                .ignoresSafeArea()
+            OhanaInlinePageRouteHost(routeID: route.id, onClose: onDismiss) { requestClose in
+                AppQuickMomentOverlayRouteContainer(
+                    id: petID,
+                    onSaved: onFirstSuccessMomentCompleted,
+                    onDismiss: requestClose
+                )
+            }
         }
     }
 }
@@ -1154,7 +1169,7 @@ struct DailyStreakDetailRouteContainer: View {
     }
 }
 
-private struct AppSettingsOverlayRouteContainer: View {
+private struct AppSettingsSheetRouteContainer: View {
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query private var electronicPets: [OasisElectronicPet]
@@ -1162,7 +1177,7 @@ private struct AppSettingsOverlayRouteContainer: View {
     let onClose: () -> Void
 
     var body: some View {
-        HomeSettingsInlineHost(
+        SettingsView(
             homePets: pets,
             homeHumans: humans,
             homeElectronicPets: electronicPets,

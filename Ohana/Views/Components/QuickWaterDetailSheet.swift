@@ -2059,6 +2059,7 @@ struct QuickWaterDetailSheet: View {
     private func recordWaterChangeBusiness() {
         let reminders = commandExecutor.recordWaterChange(
             pet: pet,
+            targets: selectedWaterTargets,
             allEvents: allEvents,
             intervalDays: waterIntervalDays,
             reminderOn: waterReminderOn,
@@ -2078,6 +2079,7 @@ struct QuickWaterDetailSheet: View {
     private func recordFilterCleanBusiness() {
         let reminders = commandExecutor.recordFilterClean(
             pet: pet,
+            targets: selectedWaterTargets,
             allEvents: allEvents,
             cleanIntervalDays: filterCleanIntervalDays,
             replaceIntervalDays: filterReplaceIntervalDays,

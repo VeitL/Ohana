@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
+    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.code
     @Namespace private var heroNS
     
     var body: some View {
@@ -65,7 +66,18 @@ struct ContentView: View {
 
             CoconutRewardFeedbackOverlay()
                 .zIndex(120)
+
+            if let starterGiftAmount {
+                StarterGiftCeremonyOverlay(
+                    appLanguage: appLanguage,
+                    amount: starterGiftAmount,
+                    onFinish: completeStarterGiftCeremony
+                )
+                .zIndex(140)
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
         }
+        .animation(GoMotion.sheetEnter, value: onboardingJourneyPhase)
         .onAppear {
             AppLifecycleCoordinator.shared.handle(.rootAppeared(scenePhase: scenePhase))
             reconcileHumanProfileRequirement()
@@ -175,6 +187,14 @@ struct ContentView: View {
         )
     }
 
+    private var starterGiftAmount: Int? {
+        guard hasOnboarded,
+              case let .starterGiftReadyForCeremony(amount) = onboardingJourneyPhase else {
+            return nil
+        }
+        return amount
+    }
+
     private func reconcileHumanProfileRequirement() {
         let resolution = HumanRequirementCoordinator.resolve(
             hasOnboarded: hasOnboarded,
@@ -214,6 +234,14 @@ struct ContentView: View {
             onboardingJourneyPhase = evaluation.phase
             onboardingJourneyEvaluationTask = nil
         }
+    }
+
+    private func completeStarterGiftCeremony() {
+        OnboardingJourneyCoordinator.markStarterCeremonySeen()
+        withAnimation(GoMotion.sheetEnter) {
+            onboardingJourneyPhase = .complete
+        }
+        scheduleOnboardingJourneyEvaluation()
     }
 
     private func handleRouteNotificationOutcome(_ outcome: AppRouteNotificationOutcome) {

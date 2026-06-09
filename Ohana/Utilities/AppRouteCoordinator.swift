@@ -40,7 +40,9 @@ enum AppSheetRoute: Hashable, Identifiable {
     case accountSwitcher
     case addEntity(EntityType)
     case calendar(entityID: String?, humanID: String?)
+    case coconutLog(CoconutLogSubject?)
     case coconutShop(ShopItem.ShopCategory)
+    case crewRoster(CrewRosterMode)
     case functionMenu(destination: FMDest?)
     case petAllFeatures(UUID)
     case petBasicInfo(UUID)
@@ -73,6 +75,7 @@ enum AppSheetRoute: Hashable, Identifiable {
     case humanWishlist(UUID)
     case humanNote(UUID)
     case requiredAccountSwitch
+    case settings
     case streakDetail
 
     var id: String {
@@ -83,8 +86,12 @@ enum AppSheetRoute: Hashable, Identifiable {
             return "add-entity-\(type.id)"
         case let .calendar(entityID, humanID):
             return "calendar-\(entityID ?? "all")-\(humanID ?? "all")"
+        case let .coconutLog(subject):
+            return "coconut-log-\(subject?.id ?? "all")"
         case let .coconutShop(category):
             return "coconut-shop-\(category.rawValue)"
+        case let .crewRoster(mode):
+            return "crew-roster-\(mode.rawValue)"
         case let .functionMenu(destination):
             return "function-menu-\(String(describing: destination))"
         case let .petAllFeatures(id):
@@ -149,6 +156,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             return "human-note-\(id.uuidString)"
         case .requiredAccountSwitch:
             return "required-account-switch"
+        case .settings:
+            return "settings"
         case .streakDetail:
             return "streak-detail"
         }
@@ -173,21 +182,12 @@ enum AppFullScreenRoute: Hashable, Identifiable {
 }
 
 enum AppOverlayRoute: Hashable, Identifiable {
-    case coconutLog(CoconutLogSubject?)
-    case crewRoster(CrewRosterMode)
     case quickMoment(routeID: UUID = UUID(), petID: UUID)
-    case settings
 
     var id: String {
         switch self {
-        case let .coconutLog(subject):
-            return "coconut-log-\(subject?.id ?? "all")"
-        case let .crewRoster(mode):
-            return "crew-roster-\(mode.rawValue)"
         case let .quickMoment(routeID, _):
             return "quick-moment-\(routeID.uuidString)"
-        case .settings:
-            return "settings"
         }
     }
 }
@@ -270,15 +270,11 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentCrewRoster(mode: CrewRosterMode = .members) {
-        sheet = nil
-        fullScreen = nil
-        overlay = .crewRoster(mode)
+        presentSheet(.crewRoster(mode))
     }
 
     func presentCoconutLog(_ subject: CoconutLogSubject?) {
-        sheet = nil
-        fullScreen = nil
-        overlay = .coconutLog(subject)
+        presentSheet(.coconutLog(subject))
     }
 
     func presentQuickMoment(petID: UUID) {
@@ -288,9 +284,7 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentSettings() {
-        sheet = nil
-        fullScreen = nil
-        overlay = .settings
+        presentSheet(.settings)
     }
 
     func presentStreakDetail() {

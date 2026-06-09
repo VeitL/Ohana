@@ -201,9 +201,14 @@ nonisolated struct SharedCareSessionBackup: Codable {
     var speciesRaw: String
     var totalAmountGrams: Double
     var totalAmountMl: Double
+    var totalExpenseAmount: Double?
+    var expenseCategoryRaw: String?
+    var currencyCode: String?
     var allocationModeRaw: String
     var foodKindRaw: String
     var stockOwnerPetId: String
+    var primaryLegacyModelName: String?
+    var primaryLegacyModelId: String?
     var note: String
     var createdAt: String
 }
@@ -212,6 +217,7 @@ nonisolated struct PetWalkLogBackup: Codable {
     var id: String; var startDate: String; var endDate: String?
     var distanceMeters: Double; var coconutsEarned: Int
     var executorId: String?; var petId: String?
+    var sharedSessionId: String?
 }
 
 nonisolated struct PetWeightLogBackup: Codable {
@@ -223,6 +229,7 @@ nonisolated struct PetExpenseLogBackup: Codable {
     var id: String; var date: String; var amount: Double
     var category: String; var note: String; var petId: String?
     var executorId: String?
+    var sharedSessionId: String?
 }
 
 nonisolated struct PetHealthLogBackup: Codable {
@@ -1037,9 +1044,14 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
             speciesRaw: session.speciesRaw,
             totalAmountGrams: session.totalAmountGrams,
             totalAmountMl: session.totalAmountMl,
+            totalExpenseAmount: session.totalExpenseAmount,
+            expenseCategoryRaw: session.expenseCategoryRaw,
+            currencyCode: session.currencyCode.isEmpty ? nil : session.currencyCode,
             allocationModeRaw: session.allocationModeRaw,
             foodKindRaw: session.foodKindRaw,
             stockOwnerPetId: session.stockOwnerPetId,
+            primaryLegacyModelName: session.primaryLegacyModelName.isEmpty ? nil : session.primaryLegacyModelName,
+            primaryLegacyModelId: session.primaryLegacyModelId.isEmpty ? nil : session.primaryLegacyModelId,
             note: session.note,
             createdAt: d(session.createdAt)
         )
@@ -1049,7 +1061,8 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         PetWalkLogBackup(id: l.id.uuidString, startDate: d(l.startDate),
             endDate: d(l.endDate), distanceMeters: l.distanceMeters,
             coconutsEarned: l.coconutsEarned,
-            executorId: l.executorId, petId: l.pet?.id.uuidString)
+            executorId: l.executorId, petId: l.pet?.id.uuidString,
+            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
     }
 
     private func encodeWeightLog(_ l: PetWeightLog) -> PetWeightLogBackup {
@@ -1062,7 +1075,8 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
         PetExpenseLogBackup(id: l.id.uuidString, date: d(l.date),
             amount: l.amount, category: l.category, note: l.note,
             petId: l.pet?.id.uuidString,
-            executorId: l.executorId)
+            executorId: l.executorId,
+            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
     }
 
     private func encodeHealthLog(_ l: PetHealthLog) -> PetHealthLogBackup {
@@ -1640,9 +1654,14 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
             species: dto.speciesRaw,
             totalAmountGrams: dto.totalAmountGrams,
             totalAmountMl: dto.totalAmountMl,
+            totalExpenseAmount: dto.totalExpenseAmount ?? 0,
+            expenseCategory: ExpenseCategory(rawValue: dto.expenseCategoryRaw ?? "") ?? .other,
+            currencyCode: dto.currencyCode ?? "",
             allocationMode: SharedCareAllocationMode(rawValue: dto.allocationModeRaw) ?? .equal,
             foodKind: FeedFoodKind(rawValue: dto.foodKindRaw) ?? .dry,
             stockOwnerPetId: dto.stockOwnerPetId,
+            primaryLegacyModelName: dto.primaryLegacyModelName ?? "",
+            primaryLegacyModelId: dto.primaryLegacyModelId ?? "",
             note: dto.note
         )
         if let uuid = UUID(uuidString: dto.id) { session.id = uuid }
@@ -1652,7 +1671,9 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
 
     private func decodeWalkLog(_ dto: PetWalkLogBackup, pets: [String: Pet]) -> PetWalkLog {
         let l = PetWalkLog(startDate: parseDate(dto.startDate) ?? Date(),
-                           pet: dto.petId.flatMap { pets[$0] }, executorId: dto.executorId)
+                           pet: dto.petId.flatMap { pets[$0] },
+                           executorId: dto.executorId,
+                           sharedSessionId: dto.sharedSessionId ?? "")
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         l.endDate = parseDate(dto.endDate)
         l.distanceMeters = dto.distanceMeters
@@ -1672,7 +1693,8 @@ nonisolated final class DataBackupManager: @unchecked Sendable {
                               category: ExpenseCategory(rawValue: dto.category) ?? .other,
                               note: dto.note,
                               pet: dto.petId.flatMap { pets[$0] },
-                              executorId: dto.executorId)
+                              executorId: dto.executorId,
+                              sharedSessionId: dto.sharedSessionId ?? "")
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         return l
     }

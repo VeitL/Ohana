@@ -5199,6 +5199,33 @@ enum ExpenseCommandService {
 
     @discardableResult
     @MainActor
+    static func recordSharedPetExpense(
+        sourcePet: Pet,
+        targets: [Pet],
+        amount: Double,
+        date: Date,
+        category: ExpenseCategory,
+        note: String,
+        context: ModelContext,
+        executorId: String? = nil,
+        source: CareLedgerSource = .detail
+    ) -> SharedPetActionResult {
+        let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return CareEventService.recordSharedExpense(
+            sourcePet: sourcePet,
+            targets: targets,
+            amount: amount,
+            category: category,
+            note: cleanNote,
+            context: context,
+            executorId: executorId,
+            date: date,
+            source: source
+        )
+    }
+
+    @discardableResult
+    @MainActor
     static func recordHumanExpense(
         human: Human,
         amount: Double,

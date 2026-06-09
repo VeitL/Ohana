@@ -338,13 +338,11 @@ struct OnboardingView: View {
         case region = 0
         case intro = 1
         case profile = 2
-        case firstPet = 3
     }
 
     @State private var step: FlowStep = .region
     /// 每次进入「添加人类」步骤刷新，避免从欢迎页返回后残留半填状态
     @State private var humanWizardSessionId = UUID()
-    @State private var petWizardSessionId = UUID()
 
     @State private var iconPulse = false
     @State private var introPageIndex = 0
@@ -378,7 +376,7 @@ struct OnboardingView: View {
                 withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true } // ui-v4: allow gated onboarding icon pulse; smoothness: allow reduce-work gated onboarding pulse.
             }
             if !isReplay && !currentActiveHumanId.isEmpty && !hasOnboarded {
-                step = .firstPet
+                finishOnboarding(playsFeedback: false)
             }
         }
     }
@@ -398,12 +396,6 @@ struct OnboardingView: View {
         case .profile:
             humanOnboardingWizard
                 .transition(.opacity)
-        case .firstPet:
-            petChoiceFlow
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
         }
     }
 
@@ -411,7 +403,7 @@ struct OnboardingView: View {
 
     private var progressBar: some View {
         HStack(spacing: 8) {
-            ForEach(0 ..< FlowStep.firstPet.rawValue + 1, id: \.self) { i in
+            ForEach(0 ..< FlowStep.profile.rawValue + 1, id: \.self) { i in
                 Capsule()
                     .fill(i <= step.rawValue ? Color.goLime : OnboardingPalette.mutedFill)
                     .frame(width: i == step.rawValue ? 28 : nil, height: 4)
@@ -428,9 +420,7 @@ struct OnboardingView: View {
                     .ignoresSafeArea()
                 AddHumanWizardView(
                     onComplete: {
-                        withAnimation(GoMotion.page) {
-                            step = .firstPet
-                        }
+                        finishOnboarding()
                     },
                     onHumanSaved: { human in
                         currentActiveHumanId = human.id.uuidString
@@ -658,11 +648,11 @@ struct OnboardingView: View {
         case 1:
             introPage(
                 title: localized(zh: "2.5D 档案，一眼认出", en: "2.5D profiles, easy to spot", de: "2.5D-Profile, sofort erkennbar"),
-                subtitle: localized(zh: "第一位人类和第一只宠物默认获得 2.5D 头像，卡片和首页会保持同一种视觉语言。", en: "The first human and pet get 2.5D avatars by default, matching cards and Home.", de: "Die ersten Profile erhalten standardmäßig 2.5D-Avatare."),
+                subtitle: localized(zh: "先建立你的本人档案，首页和记录都会从这个身份开始。", en: "Start with your profile so Home and records have a clear owner.", de: "Beginne mit deinem Profil, damit Startseite und Einträge klar zugeordnet sind."),
                 focusMode: true,
                 rows: [
-                    (icon: "person.crop.circle.fill", title: localized(zh: "人类头像", en: "Human avatar", de: "Menschen-Avatar"), subtitle: localized(zh: "先自动生成", en: "Auto generated", de: "Automatisch"), tint: Color.goTeal, filled: false),
-                    (icon: "pawprint.fill", title: localized(zh: "宠物头像", en: "Pet avatar", de: "Tier-Avatar"), subtitle: localized(zh: "按外貌更新", en: "Matches appearance", de: "Nach Aussehen"), tint: Color(hex: "F59E0B"), filled: false),
+                    (icon: "person.crop.circle.fill", title: localized(zh: "本人头像", en: "Your avatar", de: "Dein Avatar"), subtitle: localized(zh: "先自动生成", en: "Auto generated", de: "Automatisch"), tint: Color.goTeal, filled: false),
+                    (icon: "person.text.rectangle.fill", title: localized(zh: "基础档案", en: "Basic profile", de: "Basisprofil"), subtitle: localized(zh: "稍后可改", en: "Editable later", de: "Später änderbar"), tint: Color.goBlue, filled: false),
                     (icon: "photo.on.rectangle", title: localized(zh: "也可替换", en: "Replace anytime", de: "Ersetzbar"), subtitle: localized(zh: "拍照或相册", en: "Camera or photos", de: "Kamera/Fotos"), tint: Color.goLime, filled: true)
                 ]
             )
@@ -685,15 +675,15 @@ struct OnboardingView: View {
                     de: "Pflege auf einen Blick"
                 ),
                 subtitle: localized(
-                    zh: "给家人、宠物和日常记录一个清爽首页。",
-                    en: "One calm home for family, pets, and daily logs.",
-                    de: "Ein ruhiger Ort für Familie, Tiere und tägliche Einträge."
+                    zh: "先用本人档案启动 Ohana，之后再逐步添加宠物、家人和更多记录。",
+                    en: "Start Ohana with your profile, then add pets, family, and more records when ready.",
+                    de: "Starte Ohana mit deinem Profil und füge später Tiere, Familie und weitere Einträge hinzu."
                 ),
                 focusMode: false,
                 rows: [
-                    (icon: "person.2.fill", title: localized(zh: "添加家人", en: "Add people", de: "Menschen"), subtitle: localized(zh: "谁在照顾", en: "Who helps", de: "Wer hilft"), tint: Color.goBlue, filled: false),
-                    (icon: "pawprint.fill", title: localized(zh: "添加宠物", en: "Add pets", de: "Tiere"), subtitle: localized(zh: "生成快捷照护", en: "Quick care ready", de: "Schnelle Pflege"), tint: Color(hex: "F59E0B"), filled: false),
-                    (icon: "bolt.heart.fill", title: localized(zh: "完成第一次打卡", en: "First check-in", de: "Erster Check-in"), subtitle: localized(zh: "马上得到反馈", en: "Instant feedback", de: "Sofort Feedback"), tint: Color.goLime, filled: true)
+                    (icon: "person.fill", title: localized(zh: "建立本人档案", en: "Create your profile", de: "Profil erstellen"), subtitle: localized(zh: "第一步", en: "First step", de: "Erster Schritt"), tint: Color.goBlue, filled: false),
+                    (icon: "list.clipboard.fill", title: localized(zh: "基础记录", en: "Basic records", de: "Basiseinträge"), subtitle: localized(zh: "进入首页后开始", en: "Start on Home", de: "Auf Home starten"), tint: Color(hex: "F59E0B"), filled: false),
+                    (icon: "gift.fill", title: localized(zh: "新人礼包", en: "Starter gift", de: "Startergeschenk"), subtitle: localized(zh: "完成后领取", en: "After setup", de: "Nach dem Setup"), tint: Color.goLime, filled: true)
                 ]
             )
         }
@@ -828,144 +818,6 @@ struct OnboardingView: View {
         )
     }
 
-    // MARK: - Optional first pet
-
-    private var petChoiceFlow: some View {
-        GeometryReader { proxy in
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    HStack {
-                        OhanaIconView(size: 38)
-                        Spacer()
-                        progressBar
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 54)
-
-                    Spacer(minLength: 20)
-
-                    OnboardingAvatarShowcase(isActive: iconPulse && !shouldReduceWork, focusMode: true)
-                        .frame(height: 250)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 12)
-
-                    VStack(spacing: 12) {
-                        Text(localized(
-                            zh: "添加第一个宠物？",
-                            en: "Add your first pet?",
-                            de: "Erstes Tier hinzufugen?"
-                        ))
-                        .font(OhanaFont.largeTitle(.black))
-                        .foregroundStyle(OnboardingPalette.primaryText)
-                        .multilineTextAlignment(.center)
-                        Text(localized(
-                            zh: "添加后，首页马上出现快捷照护入口。",
-                            en: "Quick care actions appear on Home right away.",
-                            de: "Schnelle Pflege erscheint direkt auf der Startseite."
-                        ))
-                        .font(OhanaFont.body(.semibold))
-                        .foregroundStyle(OnboardingPalette.secondaryText)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                    }
-                    .padding(.horizontal, 34)
-
-                    VStack(spacing: 10) {
-                        onboardingMiniTip(
-                            icon: "bolt.fill",
-                            text: localized(zh: "物种专属快捷操作", en: "Species-aware actions", de: "Aktionen nach Tierart")
-                        )
-                        onboardingMiniTip(
-                            icon: "calendar",
-                            text: localized(zh: "生日、疫苗之后再补", en: "Add dates later", de: "Termine spater erganzen")
-                        )
-                        onboardingMiniTip(
-                            icon: "sparkles",
-                            text: localized(zh: "首次打卡有椰子反馈", en: "First log earns feedback", de: "Erster Eintrag gibt Feedback")
-                        )
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 22)
-
-                    Spacer(minLength: 20)
-
-                    VStack(spacing: 12) {
-                        Button {
-                            petWizardSessionId = UUID()
-                            step = .firstPet
-                            showPetWizard = true
-                        } label: {
-                            Label(localized(zh: "添加第一个宠物", en: "Add First Pet", de: "Erstes Tier"), systemImage: "pawprint.fill")
-                                .font(OhanaFont.title3(.black))
-                                .foregroundStyle(OnboardingPalette.selectedText)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 17)
-                                .background(Color.goLime, in: Capsule())
-                        }
-
-                        Button(localized(zh: "先进入首页", en: "Enter Home First", de: "Erst zur Startseite")) {
-                            finishOnboarding()
-                        }
-                        .font(OhanaFont.subheadline(.bold))
-                        .foregroundStyle(OnboardingPalette.secondaryText)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 42)
-                }
-                .frame(minHeight: proxy.size.height)
-            }
-            .sheet(isPresented: $showPetWizard) {
-                NavigationStack {
-                    ZStack {
-                        GoIslandWizardBackdrop()
-                        AddPetWizardView {
-                            showPetWizard = false
-                            finishOnboarding()
-                        }
-                        .id(petWizardSessionId)
-                    }
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button(localized(zh: "稍后", en: "Later", de: "Spater")) {
-                                showPetWizard = false
-                            }
-                            .font(OhanaFont.headline(.semibold))
-                            .foregroundStyle(Color.goLime)
-                        }
-                    }
-                }
-                .preferredColorScheme(.dark)
-                .environment(\.colorScheme, .dark)
-                .ohanaSheetPagePresentation() // ui-v4: allow first-pet creation wizard
-                .interactiveDismissDisabled(false)
-            }
-        }
-    }
-
-    @State private var showPetWizard = false
-
-    private func onboardingMiniTip(icon: String, text: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.goBlue)
-                .frame(width: 24)
-            Text(text)
-                .font(OhanaFont.callout(.bold))
-                .foregroundStyle(OnboardingPalette.secondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-            Spacer()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background(OnboardingPalette.panelFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
-        )
-    }
-
     private func advanceFromWelcome() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         guard introPageIndex >= introPageCount - 1 else {
@@ -982,8 +834,10 @@ struct OnboardingView: View {
         withAnimation(GoMotion.page) { step = .profile }
     }
 
-    private func finishOnboarding() {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    private func finishOnboarding(playsFeedback: Bool = true) {
+        if playsFeedback {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
         if isReplay {
             onReplayFinished?()
             return

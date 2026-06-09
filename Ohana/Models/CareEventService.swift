@@ -504,64 +504,27 @@ enum CareEventService {
         }
 
         let stockOwner = stockOwnerPet(for: liveTargets, preferred: sourcePet, foodKind: foodKind, context: context)
-        let session = SharedCareSession(
-            date: date,
-            actionKind: .feeding,
-            executorId: executorId,
-            sourcePetId: sourcePet.id.uuidString,
-            targetPetIds: liveTargets.map { $0.id.uuidString },
-            species: sourcePet.species,
-            totalAmountGrams: totalGrams,
-            allocationMode: .equal,
-            foodKind: foodKind,
-            stockOwnerPetId: stockOwner.id.uuidString
-        )
-        context.insert(session)
-
-        let perPetGrams = max(0, totalGrams) / Double(liveTargets.count)
-        var logs: [(Pet, PetCareLog)] = []
-        for target in liveTargets {
-            let isStockOwner = target.id == stockOwner.id
-            let log = PetCareLog(
-                date: date,
-                type: .feeding,
-                amountGrams: perPetGrams,
-                note: SharedCareMetadata.note(
-                    prefix: SharedCareMetadata.sharedFeedNotePrefix,
-                    sessionId: session.id,
-                    stockTotalGrams: isStockOwner ? totalGrams : nil,
-                    isStockOwner: isStockOwner
-                ),
-                foodKind: foodKind,
-                sharedSessionId: session.id.uuidString,
-                pet: target,
-                executorId: executorId
-            )
-            context.insert(log)
-            logs.append((target, log))
-        }
-        context.safeSave()
-
         QuestManager.shared.recordFirstMeal()
-        let reward = CoconutEconomyService.awardSharedCareAction(
-            type: .feed,
-            pets: liveTargets,
-            context: context,
-            quality: quality,
-            title: "共同喂食 · \(liveTargets.count)只"
-        )
-        OasisUpgradeRewardService.rewardFeaturedCritterFromCare(type: .feed, context: context)
-        recordSharedCareLedger(logs: logs, reward: reward, context: context)
-        liveTargets.forEach {
-            QuickActionReminderCompletionSyncService.completeNearestPetCareReminder(
-                pet: $0,
-                type: .feeding,
-                context: context,
+        let result = SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: .feeding,
+                sourcePet: sourcePet,
+                targets: liveTargets,
+                date: date,
                 executorId: executorId,
-                now: date
-            )
-        }
-        return reward
+                allocationMode: .equal,
+                totalAmountGrams: totalGrams,
+                foodKind: foodKind,
+                stockOwnerPet: stockOwner,
+                childLogStrategy: .care(type: .feeding),
+                reward: .feed,
+                rewardQuality: quality,
+                rewardTitle: "共同喂食 · \(liveTargets.count)只",
+                reminderCareType: .feeding
+            ),
+            context: context
+        )
+        return result.reward
     }
 
     @discardableResult
@@ -587,53 +550,23 @@ enum CareEventService {
             )
         }
 
-        let session = SharedCareSession(
-            date: date,
-            actionKind: .watering,
-            executorId: executorId,
-            sourcePetId: sourcePet.id.uuidString,
-            targetPetIds: liveTargets.map { $0.id.uuidString },
-            species: sourcePet.species,
-            totalAmountMl: totalMl,
-            allocationMode: totalMl > 0 ? .equal : .unknown
-        )
-        context.insert(session)
-
-        let perPetMl = totalMl > 0 ? totalMl / Double(liveTargets.count) : 0
-        var logs: [(Pet, PetCareLog)] = []
-        for target in liveTargets {
-            let log = PetCareLog(
+        let result = SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: .watering,
+                sourcePet: sourcePet,
+                targets: liveTargets,
                 date: date,
-                type: .watering,
-                amountMl: perPetMl,
-                note: SharedCareMetadata.note(prefix: SharedCareMetadata.sharedWaterNotePrefix, sessionId: session.id),
-                sharedSessionId: session.id.uuidString,
-                pet: target,
-                executorId: executorId
-            )
-            context.insert(log)
-            logs.append((target, log))
-        }
-        context.safeSave()
-
-        let reward = CoconutEconomyService.awardSharedCareAction(
-            type: .water,
-            pets: liveTargets,
-            context: context,
-            title: "共同喂水 · \(liveTargets.count)只"
-        )
-        OasisUpgradeRewardService.rewardFeaturedCritterFromCare(type: .water, context: context)
-        recordSharedCareLedger(logs: logs, reward: reward, context: context)
-        liveTargets.forEach {
-            QuickActionReminderCompletionSyncService.completeNearestPetCareReminder(
-                pet: $0,
-                type: .watering,
-                context: context,
                 executorId: executorId,
-                now: date
-            )
-        }
-        return reward
+                allocationMode: totalMl > 0 ? .equal : .unknown,
+                totalAmountMl: totalMl,
+                childLogStrategy: .care(type: .watering),
+                reward: .water,
+                rewardTitle: "共同喂水 · \(liveTargets.count)只",
+                reminderCareType: .watering
+            ),
+            context: context
+        )
+        return result.reward
     }
 
     @discardableResult
@@ -658,50 +591,143 @@ enum CareEventService {
             )
         }
 
-        let session = SharedCareSession(
-            date: date,
-            actionKind: isFullChange ? .litterChange : .litterScoop,
-            executorId: executorId,
-            sourcePetId: sourcePet.id.uuidString,
-            targetPetIds: liveTargets.map { $0.id.uuidString },
-            species: sourcePet.species,
-            allocationMode: .equal
-        )
-        context.insert(session)
-
-        var logs: [(Pet, PetCareLog)] = []
-        for target in liveTargets {
-            let log = PetCareLog(
+        let result = SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: isFullChange ? .litterChange : .litterScoop,
+                sourcePet: sourcePet,
+                targets: liveTargets,
                 date: date,
-                type: .litter,
-                note: SharedCareMetadata.note(prefix: SharedCareMetadata.sharedLitterNotePrefix, sessionId: session.id),
-                sharedSessionId: session.id.uuidString,
-                pet: target,
-                executorId: executorId
-            )
-            context.insert(log)
-            logs.append((target, log))
-        }
-        context.safeSave()
-
-        let reward = CoconutEconomyService.awardSharedCareAction(
-            type: .potty(isLitter: true),
-            pets: liveTargets,
-            context: context,
-            title: isFullChange ? "共同换砂 · \(liveTargets.count)只" : "共同铲砂 · \(liveTargets.count)只"
+                executorId: executorId,
+                allocationMode: .equal,
+                childLogStrategy: .care(type: .litter),
+                reward: .potty(isLitter: true),
+                rewardTitle: isFullChange ? "共同换砂 · \(liveTargets.count)只" : "共同铲砂 · \(liveTargets.count)只",
+                reminderCareType: .litter
+            ),
+            context: context
         )
-        OasisUpgradeRewardService.rewardFeaturedCritterFromCare(type: .potty(isLitter: true), context: context)
-        recordSharedCareLedger(logs: logs, reward: reward, context: context)
-        liveTargets.forEach {
-            QuickActionReminderCompletionSyncService.completeNearestPetCareReminder(
-                pet: $0,
-                type: .litter,
+        return result.reward
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordSharedCare(
+        sourcePet: Pet,
+        targets: [Pet],
+        type: CareType,
+        actionKind: SharedCareActionKind,
+        context: ModelContext,
+        executorId: String? = nil,
+        reward: QuestManager.OhanaActionType,
+        rewardTitle: String? = nil,
+        quality: QuestManager.QualityBonus = .none,
+        date: Date = Date(),
+        source: CareLedgerSource = .quickAction
+    ) -> (humanGot: Int, petGot: Int) {
+        let liveTargets = normalizedTargets(targets, fallback: sourcePet)
+        guard liveTargets.count > 1 else {
+            return recordCare(
+                pet: sourcePet,
+                type: type,
                 context: context,
                 executorId: executorId,
-                now: date
+                reward: reward,
+                quality: quality,
+                date: date
             )
         }
-        return reward
+
+        let result = SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: actionKind,
+                sourcePet: sourcePet,
+                targets: liveTargets,
+                date: date,
+                executorId: executorId,
+                allocationMode: .equal,
+                childLogStrategy: .care(type: type),
+                reward: reward,
+                rewardQuality: quality,
+                rewardTitle: rewardTitle,
+                reminderCareType: type,
+                source: source
+            ),
+            context: context
+        )
+        return result.reward
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordSharedExpense(
+        sourcePet: Pet,
+        targets: [Pet],
+        amount: Double,
+        category: ExpenseCategory,
+        note: String,
+        context: ModelContext,
+        executorId: String? = nil,
+        date: Date = Date(),
+        currencyCode: String = "currency",
+        source: CareLedgerSource = .detail
+    ) -> SharedPetActionResult {
+        SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: .expense,
+                sourcePet: sourcePet,
+                targets: targets,
+                date: date,
+                executorId: executorId,
+                allocationMode: .equal,
+                totalExpenseAmount: amount,
+                currencyCode: currencyCode,
+                note: note,
+                childLogStrategy: .expense(category: category, note: note),
+                reward: .expense,
+                rewardTitle: "共享花费 · \(category.rawValue)",
+                source: source
+            ),
+            context: context
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func recordSharedWalk(
+        sourcePet: Pet,
+        targets: [Pet],
+        distanceMeters: Double,
+        endDate: Date?,
+        context: ModelContext,
+        executorId: String? = nil,
+        startDate: Date = Date(),
+        behaviorNotes: String? = nil,
+        moodRating: Int = 0,
+        source: CareLedgerSource = .quickAction
+    ) -> SharedPetActionResult {
+        let reward = QuestManager.OhanaActionType.walk(distanceMeters: distanceMeters)
+        let coconutsEarned = PetWalkLog.coconuts(for: distanceMeters)
+        return SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: .walk,
+                sourcePet: sourcePet,
+                targets: targets,
+                date: startDate,
+                executorId: executorId,
+                allocationMode: .equal,
+                childLogStrategy: .walk(
+                    distanceMeters: distanceMeters,
+                    endDate: endDate,
+                    coconutsEarned: coconutsEarned,
+                    behaviorNotes: behaviorNotes,
+                    moodRating: moodRating
+                ),
+                reward: reward,
+                rewardTitle: "共同散步 · \(SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet).count)只",
+                source: source
+            ),
+            context: context
+        )
     }
 
     @discardableResult
@@ -715,42 +741,19 @@ enum CareEventService {
         date: Date = Date()
     ) -> PetPottyLog {
         let liveTargets = normalizedTargets(targets, fallback: sourcePet)
-        let session = SharedCareSession(
-            date: date,
-            actionKind: .pottyUnknown,
-            executorId: executorId,
-            sourcePetId: sourcePet.id.uuidString,
-            targetPetIds: liveTargets.map { $0.id.uuidString },
-            species: sourcePet.species,
-            allocationMode: .unknown
-        )
-        context.insert(session)
-        let log = PetPottyLog(
-            date: date,
-            type: type,
-            pet: nil,
-            executorId: executorId,
-            sharedSessionId: session.id.uuidString
-        )
-        log.sharedSessionId = session.id.uuidString
-        context.insert(log)
-        context.safeSave()
-        CareLedgerService.record(
-            occurredAt: date,
-            actorKind: executorId == nil ? .unknown : .human,
-            actorId: executorId,
-            subjectKind: .unknown,
-            subjectId: nil,
-            eventKind: .potty,
-            actionType: type.rawValue,
-            note: SharedCareMetadata.note(prefix: SharedCareMetadata.unknownPottyNotePrefix, sessionId: session.id),
-            source: .quickAction,
-            legacyModelName: "PetPottyLog",
-            legacyModelId: log.id.uuidString,
-            metadataJSON: "{\"sharedSessionId\":\"\(session.id.uuidString)\",\"targets\":\(liveTargets.count)}",
+        let result = SharedPetActionRecorder.record(
+            SharedPetActionDescriptor(
+                actionKind: .pottyUnknown,
+                sourcePet: sourcePet,
+                targets: liveTargets,
+                date: date,
+                executorId: executorId,
+                allocationMode: .unknown,
+                childLogStrategy: .unknownPotty(type: type)
+            ),
             context: context
         )
-        return log
+        return result.pottyLog ?? PetPottyLog(date: date, type: type, executorId: executorId)
     }
 
     static func feedAmount(from event: Event, fallback: Double) -> Double {

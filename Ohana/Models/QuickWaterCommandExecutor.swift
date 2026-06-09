@@ -252,60 +252,76 @@ struct QuickWaterCommandExecutor {
 
     func recordWaterChange(
         pet: Pet,
+        targets: [Pet],
         allEvents: [Event],
         intervalDays: Int,
         reminderOn: Bool,
         cycleAnchor: Date,
         executorId: String?
     ) -> [Reminder] {
-        _ = CareEventService.recordCare(
-            pet: pet,
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
+        let reward = QuestManager.OhanaActionType.general(
+            humanReward: 15,
+            petReward: 2,
+            emoji: CareType.waterChange.emoji,
+            title: "\(pet.name) 换水奖励"
+        )
+        _ = CareEventService.recordSharedCare(
+            sourcePet: pet,
+            targets: liveTargets,
             type: .waterChange,
+            actionKind: .waterChange,
             context: context,
             executorId: executorId,
-            reward: .general(
-                humanReward: 15,
-                petReward: 2,
-                emoji: CareType.waterChange.emoji,
-                title: "\(pet.name) 换水奖励"
+            reward: reward,
+            rewardTitle: liveTargets.count > 1 ? "共同换水 · \(liveTargets.count)只" : nil
+        )
+        return liveTargets.flatMap {
+            saveWaterChangePlan(
+                pet: $0,
+                allEvents: allEvents,
+                intervalDays: intervalDays,
+                reminderOn: reminderOn,
+                cycleAnchor: cycleAnchor
             )
-        )
-        return saveWaterChangePlan(
-            pet: pet,
-            allEvents: allEvents,
-            intervalDays: intervalDays,
-            reminderOn: reminderOn,
-            cycleAnchor: cycleAnchor
-        )
+        }
     }
 
     func recordFilterClean(
         pet: Pet,
+        targets: [Pet],
         allEvents: [Event],
         cleanIntervalDays: Int,
         replaceIntervalDays: Int,
         reminderOn: Bool,
         executorId: String?
     ) -> [Reminder] {
-        _ = CareEventService.recordCare(
-            pet: pet,
+        let liveTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
+        let reward = QuestManager.OhanaActionType.general(
+            humanReward: 25,
+            petReward: 2,
+            emoji: CareType.filterClean.emoji,
+            title: "\(pet.name) 清理滤材报酬"
+        )
+        _ = CareEventService.recordSharedCare(
+            sourcePet: pet,
+            targets: liveTargets,
             type: .filterClean,
+            actionKind: .filterClean,
             context: context,
             executorId: executorId,
-            reward: .general(
-                humanReward: 25,
-                petReward: 2,
-                emoji: CareType.filterClean.emoji,
-                title: "\(pet.name) 清理滤材报酬"
+            reward: reward,
+            rewardTitle: liveTargets.count > 1 ? "共同清理滤材 · \(liveTargets.count)只" : nil
+        )
+        return liveTargets.flatMap {
+            syncFilterPlan(
+                pet: $0,
+                allEvents: allEvents,
+                cleanIntervalDays: cleanIntervalDays,
+                replaceIntervalDays: replaceIntervalDays,
+                reminderOn: reminderOn
             )
-        )
-        return syncFilterPlan(
-            pet: pet,
-            allEvents: allEvents,
-            cleanIntervalDays: cleanIntervalDays,
-            replaceIntervalDays: replaceIntervalDays,
-            reminderOn: reminderOn
-        )
+        }
     }
 
     func deleteLog(_ log: PetCareLog) -> QuickWaterDeletedLogKind {

@@ -27,8 +27,7 @@ struct GrowthLockedFeatureView: View {
                 appLanguage: appLanguage,
                 onClose: { ruleStatus = nil }
             )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+            .ohanaCompactSheetPresentation(detents: [.medium, .large])
         }
     }
 
@@ -470,8 +469,7 @@ struct GrowthUnlockRoadmapView: View {
                 appLanguage: appLanguage,
                 onClose: { ruleStatus = nil }
             )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+            .ohanaCompactSheetPresentation(detents: [.medium, .large])
         }
     }
 
@@ -480,7 +478,7 @@ struct GrowthUnlockRoadmapView: View {
             Image(systemName: "tree.fill").accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 17, weight: .black))
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 38, height: 38)
+                .frame(width: 44, height: 44)
                 .background(Color.ohanaControlFill, in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
@@ -600,11 +598,11 @@ struct StarterGiftCeremonyOverlay: View {
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
+            ZStack(alignment: .center) {
                 Color.ohanaPrimaryText.opacity(0.34)
                     .ignoresSafeArea()
 
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .center, spacing: 16) {
                     HStack(spacing: 11) {
                         Image(systemName: "gift.fill").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 18, weight: .black))
@@ -622,6 +620,7 @@ struct StarterGiftCeremonyOverlay: View {
                                 .monospacedDigit()
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     HStack(spacing: 9) {
                         levelBadge("Lv0", isActive: false)
@@ -639,10 +638,11 @@ struct StarterGiftCeremonyOverlay: View {
                     ))
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
+                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
                     Button(action: onFinish) {
-                        Text(localized(zh: "开始照护", en: "Start caring", de: "Pflege starten"))
+                        Text(localized(zh: "开始使用", en: "Start using Ohana", de: "Ohana starten"))
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity, minHeight: 44)
@@ -652,10 +652,12 @@ struct StarterGiftCeremonyOverlay: View {
                     .accessibilityLabel(localized(zh: "完成新人礼包仪式", en: "Finish starter gift ceremony", de: "Startergeschenk abschließen"))
                 }
                 .padding(18)
-                .padding(.bottom, max(8, proxy.safeAreaInsets.bottom + 6))
+                .frame(maxWidth: 340)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .padding(.horizontal, 6)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .padding(.horizontal, 24)
+                .padding(.top, max(16, proxy.safeAreaInsets.top))
+                .padding(.bottom, max(16, proxy.safeAreaInsets.bottom))
+                .transition(.scale(scale: 0.96).combined(with: .opacity))
             }
         }
     }

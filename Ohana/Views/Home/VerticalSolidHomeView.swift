@@ -40,8 +40,6 @@ struct VerticalSolidHomeView: View {
     @AppStorage("debugShowDummyCards") private var showDummyCards = false
     @AppStorage("ohanaGrowthOnboardingCompletedV1") private var growthOnboardingCompleted = false
     @AppStorage("ohanaGrowthLastSeenTreeLevelV1") private var growthLastSeenTreeLevel = 0
-    @AppStorage(StarterGiftService.Key.claimed) private var starterGiftClaimed = false
-    @AppStorage(StarterGiftService.Key.ceremonySeen) private var starterGiftCeremonySeen = false
     @AppStorage("quickActionItems_v2") private var quickActionItemsRaw = ""
     @AppStorage("home_cards_enable_ambient_float") private var enablesHomeCardAmbientFloat = false
     @Environment(\.modelContext) private var modelContext
@@ -73,8 +71,6 @@ struct VerticalSolidHomeView: View {
     @State private var treeManager = OasisTreeManager.shared
     @State private var showGrowthOnboarding = false
     @State private var growthOnboardingTask: Task<Void, Never>?
-    @State private var showStarterGiftCeremony = false
-    @State private var starterGiftCeremonyTask: Task<Void, Never>?
     @State private var growthUnlockToastStatus: GrowthUnlockStatus?
     @State private var growthUnlockToastPresentationTask: Task<Void, Never>?
     @State private var growthUnlockToastDismissTask: Task<Void, Never>?
@@ -437,7 +433,8 @@ struct VerticalSolidHomeView: View {
                 if isCalendarAddEventPresented || calendarAddEventProgress > 0.001 {
                     OhanaDeferredInlinePageCover(
                         progress: calendarAddEventProgress,
-                        isContentMounted: isCalendarAddEventContentMounted
+                        isContentMounted: isCalendarAddEventContentMounted,
+                        reservesSafeArea: false
                     ) {
                         AddEventView(onClose: closeCalendarAddEvent)
                     }
@@ -482,14 +479,6 @@ struct VerticalSolidHomeView: View {
                     .zIndex(70)
                 }
 
-                if showStarterGiftCeremony {
-                    StarterGiftCeremonyOverlay(
-                        appLanguage: appLanguage,
-                        amount: StarterGiftService.giftAmount,
-                        onFinish: completeStarterGiftCeremony
-                    )
-                    .zIndex(72)
-                }
             }
             .onAppear {
                 safeAreaController.stabilize(from: proxy)
@@ -504,7 +493,6 @@ struct VerticalSolidHomeView: View {
             refreshHeaderStreak()
             controller.startWarmup()
             scheduleGrowthOnboardingIfNeeded()
-            scheduleStarterGiftCeremonyIfNeeded()
             scheduleGrowthUnlockFeedbackIfNeeded()
         }
         .onChange(of: dataSignature) { _, _ in
@@ -522,7 +510,6 @@ struct VerticalSolidHomeView: View {
             calendarAddEventPresentationTask?.cancel()
             calendarAddEventContentMountTask?.cancel()
             growthOnboardingTask?.cancel()
-            starterGiftCeremonyTask?.cancel()
             growthUnlockToastPresentationTask?.cancel()
             growthUnlockToastDismissTask?.cancel()
             growthLoopSyncTask?.cancel()
@@ -575,16 +562,6 @@ struct VerticalSolidHomeView: View {
             closeVerticalFabMenu(immediate: true)
             requestExpandedExpensePreview()
         }
-        .onChange(of: starterGiftClaimed) { _, _ in
-            scheduleStarterGiftCeremonyIfNeeded()
-        }
-        .onChange(of: starterGiftCeremonySeen) { _, seen in
-            if seen {
-                showStarterGiftCeremony = false
-                starterGiftCeremonyTask?.cancel()
-                starterGiftCeremonyTask = nil
-            }
-        }
         .onChange(of: treeManager.treeLevel.rawValue) { _, _ in
             scheduleGrowthUnlockFeedbackIfNeeded()
         }
@@ -623,14 +600,8 @@ struct VerticalSolidHomeView: View {
         }
         routeCoordinator.bindAppOverlayRouteSink { route in
             switch route {
-            case let .coconutLog(subject):
-                onPresentCoconutLog(subject)
-            case let .crewRoster(mode):
-                onPresentCrewRoster(mode)
             case let .quickMoment(petID):
                 onPresentQuickMoment(petID)
-            case .settings:
-                onPresentSettings()
             }
         }
     }
@@ -829,35 +800,6 @@ struct VerticalSolidHomeView: View {
         growthOnboardingTask = nil
         withAnimation(GoMotion.feedback) {
             showGrowthOnboarding = false
-        }
-        scheduleStarterGiftCeremonyIfNeeded()
-    }
-
-    private func scheduleStarterGiftCeremonyIfNeeded() {
-        guard OnboardingJourneyCoordinator.shouldShowStarterCeremony(),
-              !showStarterGiftCeremony else {
-            return
-        }
-        starterGiftCeremonyTask?.cancel()
-        starterGiftCeremonyTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: showGrowthOnboarding ? 1_600 : 720) {
-            guard OnboardingJourneyCoordinator.shouldShowStarterCeremony(),
-                  !showGrowthOnboarding else {
-                starterGiftCeremonyTask = nil
-                return
-            }
-            withAnimation(GoMotion.feedback) {
-                showStarterGiftCeremony = true
-            }
-            starterGiftCeremonyTask = nil
-        }
-    }
-
-    private func completeStarterGiftCeremony() {
-        starterGiftCeremonyTask?.cancel()
-        starterGiftCeremonyTask = nil
-        OnboardingJourneyCoordinator.markStarterCeremonySeen()
-        withAnimation(GoMotion.feedback) {
-            showStarterGiftCeremony = false
         }
     }
 

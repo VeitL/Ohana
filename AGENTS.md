@@ -21,7 +21,7 @@ Rule precedence:
 
 - Ohana is an iOS SwiftUI app using SwiftData and Swift Charts.
 - The current app group in code is `group.com.guanchen.li.Ohana`; do not reintroduce older `Ark` app-group identifiers.
-- The latest SwiftData schema is defined in `Ohana/Models/SharedModelContainer.swift`; as of this consolidation it is `ArkSchemaV56`.
+- The latest SwiftData schema is defined in `Ohana/Models/SharedModelContainer.swift`; as of this consolidation it is `ArkSchemaV57`.
 - Before changing any SwiftData model field or adding a model, inspect the latest `ArkSchemaV*`, add the next schema version, append it to `ArkMigrationPlan.schemas`, and keep added fields lightweight-migration friendly with defaults when possible.
 - Keep `ArkMigrationPlan.stages` empty for add-only/lightweight changes. Add an explicit migration stage only when there is real custom migration logic.
 - User-facing copy must support Chinese, English, and German through the localization rules below.

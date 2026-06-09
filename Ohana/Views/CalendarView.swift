@@ -593,7 +593,8 @@ struct CalendarView: View {
         if showingAddEvent || addEventPresentationProgress > 0.001 {
             OhanaDeferredInlinePageCover(
                 progress: addEventPresentationProgress,
-                isContentMounted: isAddEventContentMounted
+                isContentMounted: isAddEventContentMounted,
+                reservesSafeArea: false
             ) {
                 AddEventView(onClose: closeInlineAddEvent)
             }

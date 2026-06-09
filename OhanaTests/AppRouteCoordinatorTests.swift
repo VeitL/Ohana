@@ -46,7 +46,7 @@ struct AppRouteCoordinatorTests {
             for: AppFullScreenRoute.walk(petID: petID)
         )
         let overlayPolicy = AppPresentationPolicyProvider.policy(
-            for: AppOverlayRoute.settings
+            for: AppOverlayRoute.quickMoment(petID: petID)
         )
 
         #expect(pushPolicy.surface == .navigationPush)
@@ -58,7 +58,7 @@ struct AppRouteCoordinatorTests {
         #expect(fullScreenPolicy.surface == .fullScreen)
         #expect(fullScreenPolicy.loading == .shellFirst(delayMS: 64))
         #expect(overlayPolicy.surface == .inlineOverlay)
-        #expect(overlayPolicy.loading == .shellFirst(delayMS: 64))
+        #expect(overlayPolicy.loading == .immediate)
     }
 
     @Test func accountSwitcherUsesGlobalSheetRoute() {
@@ -137,8 +137,8 @@ struct AppRouteCoordinatorTests {
         coordinator.presentSettings()
         coordinator.presentAddEntity(.plant)
 
-        #expect(coordinator.overlay == .settings)
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.sheet == .settings)
         #expect(coordinator.fullScreen == nil)
     }
 
@@ -225,39 +225,39 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.suppressesGlobalWalkBanner)
     }
 
-    @Test func crewRosterUsesGlobalOverlayRoute() {
+    @Test func crewRosterUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
 
         coordinator.presentRequiredAccountSwitch()
         coordinator.presentCrewRoster(mode: .collaboration)
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .crewRoster(.collaboration))
         #expect(coordinator.fullScreen == nil)
-        #expect(coordinator.overlay == .crewRoster(.collaboration))
-        #expect(coordinator.suppressesGlobalWalkBanner)
-
-        coordinator.dismissOverlay(.crewRoster(.members))
-        #expect(coordinator.overlay == .crewRoster(.collaboration))
-
-        coordinator.dismissOverlay(.crewRoster(.collaboration))
         #expect(coordinator.overlay == nil)
+        #expect(!coordinator.suppressesGlobalWalkBanner)
+
+        coordinator.dismissSheet(.crewRoster(.members))
+        #expect(coordinator.sheet == .crewRoster(.collaboration))
+
+        coordinator.dismissSheet(.crewRoster(.collaboration))
+        #expect(coordinator.sheet == nil)
     }
 
-    @Test func coconutLogUsesGlobalOverlayRoute() {
+    @Test func coconutLogUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
         let humanID = UUID()
 
         coordinator.presentRequiredAccountSwitch()
         coordinator.presentCoconutLog(.human(humanID))
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .coconutLog(.human(humanID)))
         #expect(coordinator.fullScreen == nil)
-        #expect(coordinator.overlay == .coconutLog(.human(humanID)))
-        #expect(coordinator.suppressesGlobalWalkBanner)
+        #expect(coordinator.overlay == nil)
+        #expect(!coordinator.suppressesGlobalWalkBanner)
 
         coordinator.presentCoconutLog(nil)
-        #expect(coordinator.overlay == .coconutLog(nil))
-        #expect(coordinator.overlay?.id == "coconut-log-all")
+        #expect(coordinator.sheet == .coconutLog(nil))
+        #expect(coordinator.sheet?.id == "coconut-log-all")
     }
 
     @Test func coconutLogClearsCoconutShopSheet() {
@@ -266,9 +266,9 @@ struct AppRouteCoordinatorTests {
         coordinator.presentCoconutShop(category: .boost)
         coordinator.presentCoconutLog(nil)
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .coconutLog(nil))
         #expect(coordinator.fullScreen == nil)
-        #expect(coordinator.overlay == .coconutLog(nil))
+        #expect(coordinator.overlay == nil)
     }
 
     @Test func quickMomentUsesGlobalOverlayRoute() {
@@ -288,16 +288,16 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.suppressesGlobalWalkBanner)
     }
 
-    @Test func settingsUsesGlobalOverlayRoute() {
+    @Test func settingsUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
 
         coordinator.presentRequiredAccountSwitch()
         coordinator.presentSettings()
 
-        #expect(coordinator.sheet == nil)
+        #expect(coordinator.sheet == .settings)
         #expect(coordinator.fullScreen == nil)
-        #expect(coordinator.overlay == .settings)
-        #expect(coordinator.suppressesGlobalWalkBanner)
+        #expect(coordinator.overlay == nil)
+        #expect(!coordinator.suppressesGlobalWalkBanner)
     }
 
     @Test func streakDetailUsesGlobalSheetRoute() {

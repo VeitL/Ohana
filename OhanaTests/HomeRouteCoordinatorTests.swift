@@ -291,36 +291,36 @@ struct HomeRouteCoordinatorTests {
         }
     }
 
-    @Test func appOverlaySinkInterceptsCrewRoster() {
+    @Test func appSheetSinkInterceptsCrewRoster() {
         let coordinator = HomeRouteCoordinator()
-        var appOverlays: [HomeAppOverlayRoute] = []
+        var appSheets: [HomeAppSheetRoute] = []
 
-        coordinator.bindAppOverlayRouteSink { route in
-            appOverlays.append(route)
+        coordinator.bindAppSheetRouteSink { route in
+            appSheets.append(route)
         }
 
         coordinator.openCrewRoster(mode: .collaboration)
 
-        #expect(appOverlays == [.crewRoster(.collaboration)])
+        #expect(appSheets == [.appSheet(.crewRoster(.collaboration))])
         #expect(coordinator.modal == nil)
     }
 
-    @Test func appOverlaySinkInterceptsCoconutLog() {
+    @Test func appSheetSinkInterceptsCoconutLog() {
         let humanID = UUID()
         let coordinator = HomeRouteCoordinator()
-        var appOverlays: [HomeAppOverlayRoute] = []
+        var appSheets: [HomeAppSheetRoute] = []
 
-        coordinator.bindAppOverlayRouteSink { route in
-            appOverlays.append(route)
+        coordinator.bindAppSheetRouteSink { route in
+            appSheets.append(route)
         }
 
         coordinator.openCoconutLog(.human(humanID))
 
-        #expect(appOverlays == [.coconutLog(.human(humanID))])
+        #expect(appSheets == [.appSheet(.coconutLog(.human(humanID)))])
         #expect(coordinator.fullScreen == nil)
 
         coordinator.openCoconutLog(nil)
-        #expect(appOverlays.last == .coconutLog(nil))
+        #expect(appSheets.last == .appSheet(.coconutLog(nil)))
     }
 
     @Test func appOverlaySinkInterceptsQuickMoment() {
@@ -338,21 +338,21 @@ struct HomeRouteCoordinatorTests {
         #expect(coordinator.overlay == nil)
     }
 
-    @Test func appOverlaySinkInterceptsSettings() {
+    @Test func appSheetSinkInterceptsSettings() {
         let coordinator = HomeRouteCoordinator()
-        var appOverlays: [HomeAppOverlayRoute] = []
+        var appSheets: [HomeAppSheetRoute] = []
 
-        coordinator.bindAppOverlayRouteSink { route in
-            appOverlays.append(route)
+        coordinator.bindAppSheetRouteSink { route in
+            appSheets.append(route)
         }
 
         coordinator.openSettings()
 
-        #expect(appOverlays == [.settings])
+        #expect(appSheets == [.appSheet(.settings)])
         #expect(!coordinator.settingsPresented)
     }
 
-    @Test func crewRosterFallsBackToLocalModalWithoutAppOverlaySink() {
+    @Test func crewRosterFallsBackToLocalModalWithoutAppSheetSink() {
         let coordinator = HomeRouteCoordinator()
 
         coordinator.openCrewRoster(mode: .members)
@@ -364,28 +364,31 @@ struct HomeRouteCoordinatorTests {
         #expect(mode == .members)
     }
 
-    @Test func coconutLogFallsBackToLocalFullScreenWithoutAppOverlaySink() {
+    @Test func coconutLogFallsBackToLocalModalWithoutAppSheetSink() {
         let petID = UUID()
         let coordinator = HomeRouteCoordinator()
 
         coordinator.openCoconutLog(.pet(petID))
 
-        guard case let .coconutLog(subject) = coordinator.fullScreen else {
-            Issue.record("Expected coconut log to remain local without app overlay sink")
+        guard case let .coconutLog(subject) = coordinator.modal else {
+            Issue.record("Expected coconut log to remain local without app sheet sink")
             return
         }
         #expect(subject == .pet(petID))
 
         coordinator.openCoconutLog(nil)
-        #expect(coordinator.fullScreen?.id == "coconut-log-all")
+        #expect(coordinator.modal?.id == "coconut-log-all")
     }
 
-    @Test func settingsFallsBackToLocalInlinePresentationWithoutAppOverlaySink() {
+    @Test func settingsFallsBackToLocalModalWithoutAppSheetSink() {
         let coordinator = HomeRouteCoordinator()
 
         coordinator.openSettings()
 
-        #expect(coordinator.settingsPresented)
+        guard case .settings = coordinator.modal else {
+            Issue.record("Expected settings to remain local without app sheet sink")
+            return
+        }
     }
 
     @Test func longDetailSheetRoutesCarryOnlyIdAndDismiss() {

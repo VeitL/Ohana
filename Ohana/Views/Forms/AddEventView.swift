@@ -14,6 +14,7 @@ struct AddEventView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.ohanaInlinePageSafeAreaInsets) private var inlinePageSafeAreaInsets
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
@@ -114,43 +115,50 @@ struct AddEventView: View {
     }
 
     var body: some View {
-        ZStack {
-            OhanaAppBackground()
-                .ignoresSafeArea()
-                .onTapGesture {
-                    titleFocused = false
-                    showsTypePicker = false
-                    GoKeyboard.dismiss()
-                }
+        GeometryReader { proxy in
+            let effectiveSafeTop = max(proxy.safeAreaInsets.top, inlinePageSafeAreaInsets.top)
+            let effectiveSafeBottom = max(proxy.safeAreaInsets.bottom, inlinePageSafeAreaInsets.bottom)
+            let headerTopInset = max(14, effectiveSafeTop + 12)
+            let bottomControlInset = max(18, effectiveSafeBottom + 14)
 
-            VStack(spacing: 0) {
-                header
-                    .padding(.horizontal, 20)
-                    .padding(.top, 14)
-                    .padding(.bottom, 10)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 14) {
-                        titleSection
-                            .zIndex(showsTypePicker ? 10 : 0)
-                        timeSection
-                        recurrenceSection
-                        if recurrenceOption != .none {
-                            recurrenceEndSection
-                        }
-                        reminderLeadSection
-                        relatedSection
-                        assigneeSection
+            ZStack {
+                OhanaAppBackground()
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        titleFocused = false
+                        showsTypePicker = false
+                        GoKeyboard.dismiss()
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 104)
+
+                VStack(spacing: 0) {
+                    header
+                        .padding(.horizontal, 20)
+                        .padding(.top, headerTopInset)
+                        .padding(.bottom, 10)
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 14) {
+                            titleSection
+                                .zIndex(showsTypePicker ? 10 : 0)
+                            timeSection
+                            recurrenceSection
+                            if recurrenceOption != .none {
+                                recurrenceEndSection
+                            }
+                            reminderLeadSection
+                            relatedSection
+                            assigneeSection
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, bottomControlInset + 86)
+                    }
+                    .scrollDismissesKeyboard(.interactively)
                 }
-                .scrollDismissesKeyboard(.interactively)
+
+                saveBar(safeBottom: bottomControlInset)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+
             }
-
-            saveBar
-                .frame(maxHeight: .infinity, alignment: .bottom)
-
         }
         .ohanaSheetPagePresentation() // ui-v4: allow long calendar editor uses system sheet
         .interactiveDismissDisabled(isSaving)
@@ -445,7 +453,7 @@ struct AddEventView: View {
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private var saveBar: some View {
+    private func saveBar(safeBottom: CGFloat) -> some View {
         VStack(spacing: 0) {
             LinearGradient(
                 colors: [Color.clear, Color.ohanaCardSurfaceElevated.opacity(0.92)],
@@ -470,10 +478,13 @@ struct AddEventView: View {
             .buttonStyle(ScaleButtonStyle())
             .disabled(!canSave)
             .padding(.horizontal, 20)
-            .padding(.bottom, 18)
-            .background(Color.ohanaCardSurfaceElevated.opacity(0.92))
+            .padding(.bottom, safeBottom)
+            .background {
+                Color.ohanaCardSurfaceElevated
+                    .opacity(0.92)
+                    .ignoresSafeArea(edges: .bottom)
+            }
         }
-        .ignoresSafeArea(edges: .bottom)
     }
 
     private var dateSummary: String {

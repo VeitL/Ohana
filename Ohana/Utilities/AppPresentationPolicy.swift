@@ -102,7 +102,7 @@ enum AppPresentationPolicyProvider {
     static func policy(for route: AppOverlayRoute) -> AppPresentationPolicy {
         AppPresentationPolicy(
             surface: .inlineOverlay,
-            loading: .shellFirst(delayMS: 64),
+            loading: .immediate,
             instrumentationName: route.presentationName
         )
     }
@@ -251,8 +251,12 @@ private extension AppSheetRoute {
             return "addEntity"
         case .calendar:
             return "calendar"
+        case .coconutLog:
+            return "coconutLog"
         case .coconutShop:
             return "coconutShop"
+        case .crewRoster:
+            return "crewRoster"
         case .functionMenu:
             return "functionMenu"
         case .petAllFeatures:
@@ -317,6 +321,8 @@ private extension AppSheetRoute {
             return "humanNote"
         case .requiredAccountSwitch:
             return "requiredAccountSwitch"
+        case .settings:
+            return "settings"
         case .streakDetail:
             return "streakDetail"
         }
@@ -339,14 +345,8 @@ private extension AppFullScreenRoute {
 private extension AppOverlayRoute {
     var presentationName: String {
         switch self {
-        case .coconutLog:
-            return "coconutLog"
-        case .crewRoster:
-            return "crewRoster"
         case .quickMoment:
             return "quickMoment"
-        case .settings:
-            return "settings"
         }
     }
 }

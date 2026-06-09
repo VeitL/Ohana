@@ -49,15 +49,17 @@ final class PetExpenseLog {
     var amount: Double
     var category: String
     var note: String
+    var sharedSessionId: String = ""
     var executorId: String?  // ArkSchemaV11: 花费支付者的 Human.id.uuidString
     var pet: Pet?
     
-    init(date: Date = Date(), amount: Double = 0, category: ExpenseCategory = .other, note: String = "", pet: Pet? = nil, executorId: String? = nil) {
+    init(date: Date = Date(), amount: Double = 0, category: ExpenseCategory = .other, note: String = "", pet: Pet? = nil, executorId: String? = nil, sharedSessionId: String = "") {
         self.id = UUID()
         self.date = date
         self.amount = amount
         self.category = category.rawValue
         self.note = note
+        self.sharedSessionId = sharedSessionId
         self.executorId = executorId
         self.pet = pet
     }

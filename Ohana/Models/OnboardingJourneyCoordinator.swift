@@ -76,18 +76,6 @@ enum OnboardingJourneyCoordinator {
             return .starterGiftReadyForCeremony(amount: StarterGiftService.giftAmount)
         }
 
-        if !defaults.bool(forKey: Key.firstCareCompleted) {
-            if hasRecordedCareBusinessFact(context: context) {
-                markFirstCareCompleted(defaults: defaults)
-            } else {
-                return .firstCarePending
-            }
-        }
-
-        if !defaults.bool(forKey: Key.roadmapPromptSeen) {
-            return .roadmapPromptPending
-        }
-
         return .complete
     }
 

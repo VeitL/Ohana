@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct OnboardingJourneyCoordinatorTests {
-    @Test func freshInstallJourneyMovesFromPendingGiftToRoadmapCompletion() throws {
+    @Test func freshInstallJourneyCompletesAfterHumanAndStarterGift() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -51,22 +51,6 @@ struct OnboardingJourneyCoordinatorTests {
         #expect(claimed.phase == .starterGiftReadyForCeremony(amount: StarterGiftService.giftAmount))
 
         OnboardingJourneyCoordinator.markStarterCeremonySeen(defaults: defaults)
-        let needsCare = OnboardingJourneyCoordinator.currentPhase(
-            activeHumanID: human.id.uuidString,
-            context: context,
-            defaults: defaults
-        )
-        #expect(needsCare == .firstCarePending)
-
-        OnboardingJourneyCoordinator.markFirstCareCompleted(defaults: defaults)
-        let roadmap = OnboardingJourneyCoordinator.currentPhase(
-            activeHumanID: human.id.uuidString,
-            context: context,
-            defaults: defaults
-        )
-        #expect(roadmap == .roadmapPromptPending)
-
-        OnboardingJourneyCoordinator.markRoadmapPromptSeen(defaults: defaults)
         let complete = OnboardingJourneyCoordinator.currentPhase(
             activeHumanID: human.id.uuidString,
             context: context,
