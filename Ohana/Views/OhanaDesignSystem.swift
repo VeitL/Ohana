@@ -113,11 +113,11 @@ struct CoconutBalanceCapsule: View {
         let tint = delta > 0 ? Color.goLime : Color.goRed
         return HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text(delta > 0 ? "+\(delta)" : "\(delta)")
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.subheadline(.black))
                 .monospacedDigit()
                 .contentTransition(.numericText())
             Text("🥥")
-                .font(.system(size: 11))
+                .font(OhanaFont.caption())
         }
         .foregroundStyle(tint)
         .shadow(color: tint.opacity(0.18), radius: 8, x: 0, y: 4) // ui-v4: allow minimal floating balance delta
@@ -238,11 +238,8 @@ struct ScreenCompat {
     static var displayCornerRadius: CGFloat {
         let screen = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
-            .first?.screen ?? UIScreen.main
-        if let r = screen.value(forKey: "_displayCornerRadius") as? CGFloat, r > 1 {
-            return r
-        }
-        if let r = UIScreen.main.value(forKey: "_displayCornerRadius") as? CGFloat, r > 1 {
+            .first?.screen
+        if let r = screen?.value(forKey: "_displayCornerRadius") as? CGFloat, r > 1 {
             return r
         }
         let s = bounds.size
@@ -686,11 +683,12 @@ struct OhanaSheetPageScaffold<Leading: View, Trailing: View, Content: View, Floa
 
             if showsCloseButton {
                 Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow close button has localized label; icon hidden below
+                        .font(OhanaFont.body(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
+                        .accessibilityHidden(true)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
@@ -787,41 +785,70 @@ struct CapsuleBarShape: Shape {
 
 // MARK: - Ohana Font System (SF Pro Rounded, always use these)
 enum OhanaFont {
+    static func adaptive(
+        size: CGFloat,
+        weight: Font.Weight = .regular,
+        design: Font.Design = .default
+    ) -> Font {
+        let style: Font.TextStyle
+        switch size {
+        case ..<11:
+            style = .caption2
+        case ..<13:
+            style = .caption
+        case ..<15:
+            style = .footnote
+        case ..<17:
+            style = .callout
+        case ..<20:
+            style = .headline
+        case ..<23:
+            style = .title3
+        case ..<28:
+            style = .title2
+        case ..<34:
+            style = .title
+        default:
+            style = .largeTitle
+        }
+        return .system(style, design: design).weight(weight)
+    }
+
     static func largeTitle(_ weight: Font.Weight = .black) -> Font {
-        .system(size: 34, weight: weight, design: .rounded)
+        adaptive(size: 34, weight: weight, design: .rounded)
     }
     static func title(_ weight: Font.Weight = .bold) -> Font {
-        .system(size: 24, weight: weight, design: .rounded)
+        adaptive(size: 24, weight: weight, design: .rounded)
     }
     static func title2(_ weight: Font.Weight = .bold) -> Font {
-        .system(size: 20, weight: weight, design: .rounded)
+        adaptive(size: 20, weight: weight, design: .rounded)
     }
     static func title3(_ weight: Font.Weight = .semibold) -> Font {
-        .system(size: 17, weight: weight, design: .rounded)
+        adaptive(size: 17, weight: weight, design: .rounded)
     }
     static func headline(_ weight: Font.Weight = .bold) -> Font {
-        .system(size: 16, weight: weight, design: .rounded)
+        adaptive(size: 16, weight: weight, design: .rounded)
     }
     static func body(_ weight: Font.Weight = .medium) -> Font {
-        .system(size: 15, weight: weight, design: .rounded)
+        adaptive(size: 15, weight: weight, design: .rounded)
     }
     static func callout(_ weight: Font.Weight = .medium) -> Font {
-        .system(size: 14, weight: weight, design: .rounded)
+        adaptive(size: 14, weight: weight, design: .rounded)
     }
     static func subheadline(_ weight: Font.Weight = .medium) -> Font {
-        .system(size: 13, weight: weight, design: .rounded)
+        adaptive(size: 13, weight: weight, design: .rounded)
     }
     static func footnote(_ weight: Font.Weight = .medium) -> Font {
-        .system(size: 12, weight: weight, design: .rounded)
+        adaptive(size: 12, weight: weight, design: .rounded)
     }
     static func caption(_ weight: Font.Weight = .medium) -> Font {
-        .system(size: 11, weight: weight, design: .rounded)
+        adaptive(size: 11, weight: weight, design: .rounded)
     }
     static func caption2(_ weight: Font.Weight = .medium) -> Font {
-        .system(size: 10, weight: weight, design: .rounded)
+        adaptive(size: 10, weight: weight, design: .rounded)
     }
     static func metric(size: CGFloat, _ weight: Font.Weight = .black) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
+        adaptive(size: size, weight: weight, design: .rounded)
     }
 }
 
@@ -898,10 +925,12 @@ struct AlertBanner: View {
             Spacer(minLength: 0)
             if let onDismiss {
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark")
+                    Image(systemName: "xmark") // a11y: allow toast dismiss button has localized label; icon hidden below
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(style.textColor.opacity(0.6))
+                        .accessibilityHidden(true)
                 }
+                .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
             }
         }
         .padding(.horizontal, 14)
@@ -1164,13 +1193,15 @@ struct OhanaPopupCloseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 13, weight: .black))
+            Image(systemName: "xmark") // a11y: allow popup close button has localized label; icon hidden below
+                .font(OhanaFont.subheadline(.black))
                 .foregroundStyle(tint)
                 .frame(width: 44, height: 40)
                 .contentShape(Rectangle())
+                .accessibilityHidden(true)
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
     }
 }
 
@@ -1244,7 +1275,8 @@ public struct OhanaChip: View {
     
     public var body: some View {
         let chipContent = HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 6, height: 6)
+            Circle().fill(color).frame(width: 6, height: 6) // a11y: allow decorative color swatch; hidden from accessibility below
+                .accessibilityHidden(true)
             Text(label).font(OhanaFont.callout(.bold))
                 .foregroundStyle(selected ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
         }

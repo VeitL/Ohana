@@ -91,6 +91,8 @@
       ],
       "businessWriteBoundary": "One domain service records the care/reminder fact; reminders, ledger, rewards, and read-model revisions synchronize after commit.",
       "ownedPaths": [
+        "Ohana/Models/HomeCommandExecutor.swift",
+        "Ohana/Models/ExpandedQuickActionExecutor.swift",
         "Ohana/Models/CareEventService.swift",
         "Ohana/Models/CareLedgerService.swift",
         "Ohana/Models/ReminderSchedulingService.swift",

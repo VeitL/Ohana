@@ -5,7 +5,6 @@
 //  Small rendering-only helpers used by the home flow.
 //
 
-import SwiftData
 import SwiftUI
 
 struct TodayFocusSnapshot {
@@ -90,12 +89,7 @@ struct TodayFocusSnapshot {
 }
 
 struct TodayFocusQuestCardHost: View {
-    let pets: [Pet]
-    let plants: [Plant]
-    let reminders: [Reminder]
-    let humans: [Human]
-    let events: [Event]
-    let activePet: Pet?
+    let snapshot: TodayFocusSnapshot
     let isLive: Bool
     var presentation: TodayFocusCardPresentation = .board
     var onOpenQuest: (IslandQuest) -> Void
@@ -105,23 +99,11 @@ struct TodayFocusQuestCardHost: View {
     var onTapFamilyTask: (FamilyCollaborationTask) -> Void
     var onConfirmExchange: (CoconutExchangeRequest) -> Void = { _ in }
 
-    @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
-    @Query(sort: \PetCareLog.date, order: .reverse) private var liveCare: [PetCareLog]
-    @Query(sort: \PetWalkLog.startDate, order: .reverse) private var liveWalks: [PetWalkLog]
-    @Query(sort: \PetPottyLog.date, order: .reverse) private var livePotty: [PetPottyLog]
-    @Query(sort: \HumanWeightLog.date, order: .reverse) private var liveHumanWeights: [HumanWeightLog]
-    @Query(sort: \FamilyCollaborationTask.updatedAt, order: .reverse) private var familyTasks: [FamilyCollaborationTask]
-    @Query(sort: \CoconutExchangeRequest.createdAt, order: .reverse) private var exchangeRequests: [CoconutExchangeRequest]
     @State private var renderSnapshot = TodayFocusSnapshot.empty
     @State private var renderSnapshotRefreshKey: SnapshotRefreshKey?
 
     init(
-        pets: [Pet],
-        plants: [Plant],
-        reminders: [Reminder],
-        humans: [Human],
-        events: [Event],
-        activePet: Pet?,
+        snapshot: TodayFocusSnapshot,
         isLive: Bool = true,
         presentation: TodayFocusCardPresentation = .board,
         onOpenQuest: @escaping (IslandQuest) -> Void,
@@ -131,12 +113,7 @@ struct TodayFocusQuestCardHost: View {
         onTapFamilyTask: @escaping (FamilyCollaborationTask) -> Void,
         onConfirmExchange: @escaping (CoconutExchangeRequest) -> Void = { _ in }
     ) {
-        self.pets = pets
-        self.plants = plants
-        self.reminders = reminders
-        self.humans = humans
-        self.events = events
-        self.activePet = activePet
+        self.snapshot = snapshot
         self.isLive = isLive
         self.presentation = presentation
         self.onOpenQuest = onOpenQuest
@@ -145,52 +122,8 @@ struct TodayFocusQuestCardHost: View {
         self.onTapOasis = onTapOasis
         self.onTapFamilyTask = onTapFamilyTask
         self.onConfirmExchange = onConfirmExchange
-
-        let todayStart = Calendar.current.startOfDay(for: Date())
-        let activeStatus = FamilyCollaborationTaskStatus.active.rawValue
-        let claimedStatus = FamilyCollaborationTaskStatus.claimed.rawValue
-        let pendingReviewStatus = FamilyCollaborationTaskStatus.pendingReview.rawValue
-        let pendingExchangeStatus = CoconutExchangeRequestStatus.pending.rawValue
-        _liveCare = Query(
-            filter: #Predicate<PetCareLog> { $0.date >= todayStart },
-            sort: \.date,
-            order: .reverse
-        )
-        _liveWalks = Query(
-            filter: #Predicate<PetWalkLog> { $0.startDate >= todayStart },
-            sort: \.startDate,
-            order: .reverse
-        )
-        _livePotty = Query(
-            filter: #Predicate<PetPottyLog> { $0.date >= todayStart },
-            sort: \.date,
-            order: .reverse
-        )
-        _liveHumanWeights = Query(
-            filter: #Predicate<HumanWeightLog> { $0.date >= todayStart },
-            sort: \.date,
-            order: .reverse
-        )
-        _familyTasks = Query(
-            filter: #Predicate<FamilyCollaborationTask> {
-                $0.statusRaw == activeStatus || $0.statusRaw == claimedStatus || $0.statusRaw == pendingReviewStatus
-            },
-            sort: \.updatedAt,
-            order: .reverse
-        )
-        _exchangeRequests = Query(
-            filter: #Predicate<CoconutExchangeRequest> { $0.statusRaw == pendingExchangeStatus },
-            sort: \.createdAt,
-            order: .reverse
-        )
-    }
-
-    private var activeHumanId: UUID? {
-        UUID(uuidString: activeHumanIdStr)
-    }
-
-    private var privacyVisibleHumans: [Human] {
-        PrivacyService.unlockedHumans(for: .weight, from: humans, viewedBy: activeHumanId)
+        _renderSnapshot = State(initialValue: snapshot)
+        _renderSnapshotRefreshKey = State(initialValue: SnapshotRefreshKey(snapshot: snapshot))
     }
 
     var body: some View {
@@ -221,18 +154,98 @@ struct TodayFocusQuestCardHost: View {
 
     private struct SnapshotRefreshKey: Equatable, Sendable {
         let language: String
-        let activeHumanId: String
         let pets: Int
         let plants: Int
-        let reminders: Int
-        let events: Int
         let humans: Int
-        let careLogs: Int
-        let walkLogs: Int
-        let pottyLogs: Int
-        let humanWeightLogs: Int
+        let quests: Int
         let familyTasks: Int
         let exchangeRequests: Int
+        let negativeSignals: Int
+
+        init(snapshot: TodayFocusSnapshot) {
+            language = AppLanguage.code
+            pets = Self.token(snapshot.pets.prefix(12)) { pet in
+                Self.combine(
+                    pet.id.hashValue,
+                    pet.name.hashValue,
+                    pet.currentStreak,
+                    pet.coconutBalance,
+                    pet.hasPassedAway ? 1 : 0
+                )
+            }
+            plants = Self.token(snapshot.plants.prefix(12)) { plant in
+                Self.combine(
+                    plant.id.hashValue,
+                    plant.name.hashValue,
+                    plant.wateringIntervalDays,
+                    plant.fertilizingIntervalDays,
+                    Self.timestampValue(plant.lastWateredDate),
+                    Self.timestampValue(plant.lastFertilizedDate)
+                )
+            }
+            humans = Self.token(snapshot.humans.prefix(12)) { human in
+                Self.combine(
+                    human.id.hashValue,
+                    human.name.hashValue,
+                    human.coconutBalance
+                )
+            }
+            quests = Self.token(snapshot.refreshedQuests) { quest in
+                Self.combine(
+                    quest.id.hashValue,
+                    quest.title.hashValue,
+                    quest.subtitle.hashValue,
+                    quest.isCompleted ? 1 : 0,
+                    quest.targetPetId?.hashValue ?? 0,
+                    quest.targetPlantId?.hashValue ?? 0
+                )
+            }
+            familyTasks = Self.token(snapshot.assignedFamilyTasks.prefix(12)) { task in
+                Self.combine(
+                    task.id.hashValue,
+                    task.statusRaw.hashValue,
+                    (task.assignedToId ?? "").hashValue,
+                    (task.claimedById ?? "").hashValue,
+                    Self.timestampValue(task.updatedAt)
+                )
+            }
+            exchangeRequests = Self.token(snapshot.pendingExchangeRequests.prefix(12)) { request in
+                Self.combine(
+                    request.id.hashValue,
+                    request.statusRaw.hashValue,
+                    request.receiverId.hashValue,
+                    Self.timestampValue(request.updatedAt)
+                )
+            }
+            negativeSignals = Self.token(snapshot.negativeSignals) { signal in
+                Self.combine(
+                    signal.title.hashValue,
+                    signal.detail.hashValue,
+                    signal.petId?.hashValue ?? 0
+                )
+            }
+        }
+
+        private static func token<S: Sequence>(_ items: S, token: (S.Element) -> Int) -> Int {
+            items.reduce(0) { partial, item in
+                combine(partial, token(item))
+            }
+        }
+
+        private static func combine(_ values: Int...) -> Int {
+            values.reduce(17) { partial, value in
+                partial &* 31 &+ value
+            }
+        }
+
+        private static func timestampValue(_ date: Date) -> Int {
+            Int(date.timeIntervalSince1970)
+        }
+
+        private static func timestampValue(_ date: Date?) -> Int {
+            guard let date else { return 0 }
+            return timestampValue(date)
+        }
     }
 
     private var snapshotTaskKey: SnapshotTaskKey {
@@ -240,142 +253,15 @@ struct TodayFocusQuestCardHost: View {
     }
 
     private var snapshotRefreshKey: SnapshotRefreshKey {
-        SnapshotRefreshKey(
-            language: AppLanguage.code,
-            activeHumanId: activeHumanIdStr,
-            pets: petRefreshToken,
-            plants: plantRefreshToken,
-            reminders: reminderRefreshToken,
-            events: eventRefreshToken,
-            humans: humanRefreshToken,
-            careLogs: logRefreshToken(liveCare.prefix(16)) { log in
-                combine(log.id.hashValue, timestampValue(log.date))
-            },
-            walkLogs: logRefreshToken(liveWalks.prefix(16)) { log in
-                combine(log.id.hashValue, timestampValue(log.startDate))
-            },
-            pottyLogs: logRefreshToken(livePotty.prefix(16)) { log in
-                combine(log.id.hashValue, timestampValue(log.date))
-            },
-            humanWeightLogs: logRefreshToken(liveHumanWeights.prefix(12)) { log in
-                combine(log.id.hashValue, timestampValue(log.date))
-            },
-            familyTasks: logRefreshToken(familyTasks.prefix(12)) { task in
-                combine(
-                    task.id.hashValue,
-                    task.statusRaw.hashValue,
-                    (task.assignedToId ?? "").hashValue,
-                    (task.claimedById ?? "").hashValue,
-                    timestampValue(task.updatedAt)
-                )
-            },
-            exchangeRequests: logRefreshToken(exchangeRequests.prefix(12)) { request in
-                combine(
-                    request.id.hashValue,
-                    request.statusRaw.hashValue,
-                    request.receiverId.hashValue,
-                    timestampValue(request.updatedAt)
-                )
-            }
-        )
-    }
-
-    private var petRefreshToken: Int {
-        logRefreshToken(pets.prefix(12)) { pet in
-            combine(
-                pet.id.hashValue,
-                pet.name.hashValue,
-                pet.currentStreak,
-                pet.coconutBalance,
-                pet.hasPassedAway ? 1 : 0
-            )
-        }
-    }
-
-    private var plantRefreshToken: Int {
-        logRefreshToken(plants.prefix(12)) { plant in
-            combine(
-                plant.id.hashValue,
-                plant.name.hashValue,
-                plant.wateringIntervalDays,
-                plant.fertilizingIntervalDays,
-                timestampValue(plant.lastWateredDate),
-                timestampValue(plant.lastFertilizedDate)
-            )
-        }
-    }
-
-    private var reminderRefreshToken: Int {
-        logRefreshToken(reminders.prefix(8)) { reminder in
-            combine(
-                reminder.id.hashValue,
-                timestampValue(reminder.scheduledAt),
-                reminder.status.hashValue
-            )
-        }
-    }
-
-    private var eventRefreshToken: Int {
-        logRefreshToken(events.prefix(16)) { event in
-            combine(
-                event.id.hashValue,
-                timestampValue(event.startDate),
-                event.isCompleted ? 1 : 0
-            )
-        }
-    }
-
-    private var humanRefreshToken: Int {
-        logRefreshToken(humans.prefix(12)) { human in
-            combine(
-                human.id.hashValue,
-                human.name.hashValue,
-                human.coconutBalance
-            )
-        }
-    }
-
-    private func logRefreshToken<S: Sequence>(_ items: S, token: (S.Element) -> Int) -> Int {
-        items.reduce(0) { partial, item in
-            combine(partial, token(item))
-        }
-    }
-
-    private func combine(_ values: Int...) -> Int {
-        values.reduce(17) { partial, value in
-            partial &* 31 &+ value
-        }
-    }
-
-    private func timestampValue(_ date: Date) -> Int {
-        Int(date.timeIntervalSince1970)
-    }
-
-    private func timestampValue(_ date: Date?) -> Int {
-        guard let date else { return 0 }
-        return timestampValue(date)
+        SnapshotRefreshKey(snapshot: snapshot)
     }
 
     private func refreshSnapshotIfNeeded(for key: SnapshotRefreshKey) {
         guard key != renderSnapshotRefreshKey else { return }
-        let next = TodayFocusSnapshot.make(
-            pets: pets,
-            plants: plants,
-            reminders: reminders,
-            events: events,
-            humans: privacyVisibleHumans,
-            activeHumanId: activeHumanIdStr,
-            careLogs: liveCare,
-            walkLogs: liveWalks,
-            pottyLogs: livePotty,
-            humanWeightLogs: liveHumanWeights,
-            familyTasks: familyTasks,
-            exchangeRequests: exchangeRequests
-        )
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            renderSnapshot = next
+            renderSnapshot = snapshot
             renderSnapshotRefreshKey = key
         }
     }
@@ -406,10 +292,10 @@ struct WalkLaunchBurst: View {
                 .scaleEffect(animate ? 1.02 : 0.96)
 
             HStack(spacing: 8) {
-                Image(systemName: "figure.walk.motion")
-                    .font(.system(size: 20, weight: .black))
+                Image(systemName: "figure.walk.motion") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 20, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text("开始巡岛")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 18)
@@ -419,8 +305,8 @@ struct WalkLaunchBurst: View {
             .opacity(animate ? 1 : 0)
 
             ForEach(paws.indices, id: \.self) { index in
-                Image(systemName: "pawprint.fill")
-                    .font(.system(size: 16, weight: .bold))
+                Image(systemName: "pawprint.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goLime.opacity(0.88))
                     .rotationEffect(.degrees(index.isMultiple(of: 2) ? -18 : 16))
                     .offset(

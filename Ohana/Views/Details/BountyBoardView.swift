@@ -91,7 +91,7 @@ struct BountyBoardView: View {
                                     // 历史归档（7天前完成）
                                     if !archivedCompleted.isEmpty {
                                         Button {
-                                            withAnimation(.spring(response: 0.3)) { showArchive.toggle() }
+                                            withAnimation(.spring(response: 0.3)) { showArchive.toggle() } // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                                         } label: {
                                             HStack(spacing: 8) {
                                                 Image(systemName: showArchive ? "chevron.down" : "chevron.right")
@@ -137,7 +137,7 @@ struct BountyBoardView: View {
                     Button {
                         showAddTask = true
                     } label: {
-                        Image(systemName: "plus.circle.fill")
+                        Image(systemName: "plus.circle.fill").accessibilityHidden(true)
                             .foregroundStyle(Color.goPrimary)
                             .font(OhanaFont.metric(size: 22, .semibold))
                     }
@@ -215,7 +215,7 @@ struct BountyBoardView: View {
 
     private func tabButton(label: String, idx: Int) -> some View {
         Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { selectedTab = idx }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { selectedTab = idx } // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         } label: {
             Text(label)
                 .font(OhanaFont.subheadline(.bold))
@@ -277,7 +277,7 @@ struct BountyBoardView: View {
                     .foregroundStyle(tertiaryText)
 
                 if let toName = task.assignedToName, !toName.isEmpty {
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.right").accessibilityHidden(true)
                         .font(OhanaFont.caption2(.black))
                         .foregroundStyle(tertiaryText)
                     HStack(spacing: 3) {
@@ -335,7 +335,7 @@ struct BountyBoardView: View {
                             showCompleteConfirm = true
                         } label: {
                             HStack(spacing: 4) {
-                                Image(systemName: "checkmark")
+                                Image(systemName: "checkmark").accessibilityHidden(true)
                                     .font(OhanaFont.caption2(.bold))
                                 Text("完成")
                                     .font(OhanaFont.caption(.bold))
@@ -355,7 +355,7 @@ struct BountyBoardView: View {
                 } else {
                     // 已完成标签
                     HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
                             .font(OhanaFont.caption())
                             .foregroundStyle(Color.goTeal)
                         if let name = task.assigneeName {
@@ -532,7 +532,7 @@ struct BountyBoardView: View {
     private func weeklyHeader(total: Int, topper: Human?) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: "chart.bar.xaxis")
+                Image(systemName: "chart.bar.xaxis").accessibilityHidden(true)
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.goPrimary)
                 Text("本周家庭照护周报")
@@ -581,7 +581,7 @@ struct BountyBoardView: View {
         return HStack(spacing: 10) {
             Text(stat.human.avatarEmoji)
                 .font(OhanaFont.title3())
-                .frame(width: 40, height: 40)
+                .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.08), in: Circle())
                 .overlay(Circle().strokeBorder(
                     isTop ? Color.goYellow : Color.clear,

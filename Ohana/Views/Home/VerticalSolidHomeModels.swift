@@ -14,6 +14,10 @@ enum VerticalSolidHomeTab: String, CaseIterable, Identifiable, Hashable {
     case oasis
     case plants
 
+    static var visibleTabs: [VerticalSolidHomeTab] {
+        AppFeatureRouteGuard.visibleHomeTabs
+    }
+
     var id: String { rawValue }
 
     var index: Int {

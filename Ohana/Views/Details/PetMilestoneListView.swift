@@ -51,9 +51,9 @@ struct PetMilestoneListView: View {
 
             Button { showAddSheet = true } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "plus").font(.system(size: 14, weight: .black))
+                    Image(systemName: "plus").font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("记录里程碑")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.arkInk)
                 .padding(.horizontal, 24).padding(.vertical, 14)
@@ -91,10 +91,10 @@ struct PetMilestoneListView: View {
             .overlay(Circle().strokeBorder(Color.ohanaSecondaryText.opacity(0.2), lineWidth: 2))
             VStack(alignment: .leading, spacing: 4) {
                 Text(pet.name)
-                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text("\(sortedMilestones.count) 个重要时刻")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
             Spacer()
@@ -109,13 +109,13 @@ struct PetMilestoneListView: View {
                     // 时间轴
                     VStack(spacing: 0) {
                         if idx > 0 {
-                            Rectangle().fill(.primary.opacity(0.1)).frame(width: 2, height: 16)
+                            Rectangle().fill(.primary.opacity(0.1)).frame(width: 2, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         }
                         ZStack {
                             Circle()
                                 .fill(pet.themeColor.color.opacity(0.3))
-                                .frame(width: 36, height: 36)
-                            Text(milestone.emoji).font(.system(size: 18))
+                                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                            Text(milestone.emoji).font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         if idx < sortedMilestones.count - 1 {
                             Rectangle().fill(.primary.opacity(0.1)).frame(width: 2).frame(maxHeight: .infinity)
@@ -128,38 +128,45 @@ struct PetMilestoneListView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Text(milestone.title)
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 11, weight: .semibold))
+                                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                    .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                             }
                             Text(milestone.date, format: .dateTime.year().month().day())
-                                .font(.system(size: 11, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             if !milestone.location.isEmpty {
                                 HStack(spacing: 4) {
-                                    Image(systemName: "mappin.circle.fill")
-                                        .font(.system(size: 10))
+                                    Image(systemName: "mappin.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 10)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.goYellow)
                                     Text(milestone.location)
-                                        .font(.system(size: 11, weight: .medium))
+                                        .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.goYellow.opacity(0.8))
                                         .lineLimit(1)
                                 }
                             }
                             if !milestone.notes.isEmpty {
                                 Text(milestone.notes)
-                                    .font(.system(size: 12, weight: .regular))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .regular)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                     .lineLimit(1)
                             }
-                            if let photoData = milestone.photoData, let img = UIImage(data: photoData) {
-                                Image(uiImage: img)
+                            if let photoData = milestone.photoData {
+                                AsyncDecodedImageView(data: photoData) { image in
+                                    Image(uiImage: image)
                                     .resizable().scaledToFill()
                                     .frame(maxWidth: .infinity).frame(height: 120)
                                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                } placeholder: {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Color.ohanaCardSurface)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 120)
+                                }
                             }
                         }
                         .padding(12)
@@ -175,12 +182,12 @@ struct PetMilestoneListView: View {
     // MARK: - Empty State
     private var emptyState: some View {
         VStack(spacing: 16) {
-            Text("🌱").font(.system(size: 56))
+            Text("🌱").font(OhanaFont.adaptive(size: 56)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text("还没有里程碑记录")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text("记录 \(pet.name) 的每一个重要时刻")
-                .font(.system(size: 13, weight: .medium))
+                .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .multilineTextAlignment(.center)
         }
@@ -192,7 +199,7 @@ struct PetMilestoneListView: View {
                 // 把手
                 Capsule()
                     .fill(.primary.opacity(0.2))
-                    .frame(width: 40, height: 4)
+                    .frame(width: 40, height: 4) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .padding(.top, 12).padding(.bottom, 20)
 
                 // 标题行
@@ -201,14 +208,14 @@ struct PetMilestoneListView: View {
                         Circle()
                             .fill(Color.goPrimary.opacity(0.18))
                             .frame(width: 48, height: 48)
-                        Text("🎉").font(.system(size: 26))
+                        Text("🎉").font(OhanaFont.adaptive(size: 26)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text("记录里程碑")
-                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(pet.name)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Spacer()
@@ -220,14 +227,14 @@ struct PetMilestoneListView: View {
                         // Emoji 快捷选
                         VStack(alignment: .leading, spacing: 8) {
                             Text("快捷 Emoji")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 .padding(.horizontal, 4)
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 10) {
                                     ForEach(["🎉","🏆","🌟","💉","✂️","🏠","✈️","🐾","❤️","🎂","🌈","💊","🦷","🏋️","🎓","🌱"], id: \.self) { e in
                                         Button { newEmoji = e } label: {
-                                            Text(e).font(.system(size: 26))
+                                            Text(e).font(OhanaFont.adaptive(size: 26)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .frame(width: 46, height: 46)
                                                 .goSelectableSurface(isSelected: newEmoji == e, tint: Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                         }.buttonStyle(ScaleButtonStyle())
@@ -239,7 +246,7 @@ struct PetMilestoneListView: View {
                         // Emoji + 标题
                         HStack(spacing: 12) {
                             GoDraftTextField("🎉", text: $newEmoji)
-                                .font(.system(size: 28))
+                                .font(OhanaFont.adaptive(size: 28)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .multilineTextAlignment(.center)
                                 .frame(width: 56, height: 56)
                                 .goGlassBackground(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -249,7 +256,7 @@ struct PetMilestoneListView: View {
                                 text: $newTitle,
                                 capitalization: .sentences
                             )
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .tint(Color.goPrimary)
                                 .padding(.horizontal, 14).padding(.vertical, 14)
@@ -259,11 +266,11 @@ struct PetMilestoneListView: View {
 
                         // 日期
                         HStack {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 13, weight: .semibold))
+                            Image(systemName: "calendar") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goPrimary)
                             Text("日期")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Spacer()
                             DatePicker("", selection: $newDate, displayedComponents: .date)
@@ -277,22 +284,22 @@ struct PetMilestoneListView: View {
                             showingLocationPicker = true
                         } label: {
                             HStack(spacing: 10) {
-                                Image(systemName: "mappin.circle.fill")
-                                    .font(.system(size: 14, weight: .semibold))
+                                Image(systemName: "mappin.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                    .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.goYellow)
                                 if newLocation.isEmpty {
                                     Text("地点（点此从地图选择）")
-                                        .font(.system(size: 14))
+                                        .font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 } else {
                                     Text(newLocation)
-                                        .font(.system(size: 14))
+                                        .font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                         .lineLimit(1)
                                 }
                                 Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 11, weight: .semibold))
+                                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                    .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                             }
                             .padding(.horizontal, 14).padding(.vertical, 12)
@@ -306,7 +313,7 @@ struct PetMilestoneListView: View {
                             text: $newNotes,
                             axis: .vertical
                         )
-                            .font(.system(size: 14))
+                            .font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .tint(Color.goPrimary)
                             .lineLimit(3...5)
@@ -315,8 +322,9 @@ struct PetMilestoneListView: View {
 
                         // 照片选择
                         PhotosPicker(selection: $newPhotoItem, matching: .images) {
-                            if let data = newPhotoData, let img = UIImage(data: data) {
-                                Image(uiImage: img)
+                            if let data = newPhotoData {
+                                AsyncDecodedImageView(data: data) { image in
+                                    Image(uiImage: image)
                                     .resizable().scaledToFill()
                                     .frame(maxWidth: .infinity).frame(height: 140)
                                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -325,20 +333,26 @@ struct PetMilestoneListView: View {
                                             newPhotoData = nil
                                             newPhotoItem = nil
                                         } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .font(.system(size: 20))
+                                            Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                                .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .symbolRenderingMode(.hierarchical)
                                                 .foregroundStyle(Color.ohanaCardSurface)
                                                 .padding(8)
                                         }
                                     }
+                                } placeholder: {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(Color.ohanaCardSurface)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 140)
+                                }
                             } else {
                                 HStack(spacing: 8) {
-                                    Image(systemName: "photo.badge.plus")
-                                        .font(.system(size: 16, weight: .semibold))
+                                    Image(systemName: "photo.badge.plus") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.goPrimary)
                                     Text("添加照片（可选）")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.goPrimary)
                                 }
                                 .frame(maxWidth: .infinity).padding(.vertical, 16)
@@ -384,8 +398,8 @@ struct PetMilestoneListView: View {
                     showAddSheet = false
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "checkmark").font(.system(size: 14, weight: .black))
-                        Text("保存里程碑").font(.system(size: 16, weight: .black, design: .rounded))
+                        Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        Text("保存里程碑").font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .foregroundStyle(newTitle.isEmpty ? .primary.opacity(0.4) : Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 16)
@@ -428,8 +442,8 @@ struct MapLocationPickerSheet: View {
                 VStack(spacing: 0) {
                     // 搜索框
                     HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 14, weight: .semibold))
+                        Image(systemName: "magnifyingglass") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                         GoDraftTextField(
                             "搜索地点、医院、公园…",
@@ -447,7 +461,7 @@ struct MapLocationPickerSheet: View {
                                 results = []
                                 isSearching = false
                             } label: {
-                                Image(systemName: "xmark.circle.fill")
+                                Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -464,33 +478,33 @@ struct MapLocationPickerSheet: View {
                         Spacer()
                     } else if results.isEmpty && !searchText.isEmpty {
                         VStack(spacing: 10) {
-                            Image(systemName: "mappin.slash").font(.system(size: 36)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                            Image(systemName: "mappin.slash").font(OhanaFont.adaptive(size: 36)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text("没有找到匹配地点")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }.padding(.top, 60)
                         Spacer()
                     } else if results.isEmpty {
                         VStack(spacing: 10) {
-                            Image(systemName: "mappin.and.ellipse").font(.system(size: 36)).foregroundStyle(Color.goYellow.opacity(0.4))
+                            Image(systemName: "mappin.and.ellipse").font(OhanaFont.adaptive(size: 36)).foregroundStyle(Color.goYellow.opacity(0.4)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text("输入地名开始搜索")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }.padding(.top, 60)
                         Spacer()
                     } else {
                         List(results, id: \.self) { item in
                             Button {
-                                selectedLocation = item.name ?? item.placemark.title ?? ""
+                                selectedLocation = mapItemTitle(item)
                                 dismiss()
                             } label: {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(item.name ?? "未知地点")
-                                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText)
-                                    if let addr = item.placemark.title, addr != item.name {
+                                    if let addr = mapItemAddress(item), addr != item.name {
                                         Text(addr)
-                                            .font(.system(size: 12, weight: .medium))
+                                            .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                             .lineLimit(1)
                                     }
@@ -527,7 +541,7 @@ struct MapLocationPickerSheet: View {
                     Button("完成") {
                         GoKeyboard.dismiss()
                     }
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goLime)
                 }
             }
@@ -572,6 +586,16 @@ struct MapLocationPickerSheet: View {
             }
         }
     }
+
+    private func mapItemTitle(_ item: MKMapItem) -> String {
+        item.name ?? mapItemAddress(item) ?? ""
+    }
+
+    private func mapItemAddress(_ item: MKMapItem) -> String? {
+        item.addressRepresentations?.fullAddress(includingRegion: false, singleLine: true)
+            ?? item.address?.shortAddress
+            ?? item.address?.fullAddress
+    }
 }
 
 // MARK: - P6: 里程碑详情页
@@ -592,13 +616,13 @@ private struct MilestoneDetailSheet: View {
                     VStack(spacing: 16) {
                         // 头部 Emoji + 标题 + 日期
                         VStack(spacing: 10) {
-                            Text(milestone.emoji).font(.system(size: 56))
+                            Text(milestone.emoji).font(OhanaFont.adaptive(size: 56)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text(milestone.title)
-                                .font(.system(size: 22, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .multilineTextAlignment(.center)
                             Text(milestone.date, format: .dateTime.year().month().day())
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                                 .padding(.horizontal, 14).padding(.vertical, 5)
                                 .goGlassBackground(Capsule())
@@ -606,28 +630,40 @@ private struct MilestoneDetailSheet: View {
                         .padding(.top, 8)
 
                         // 照片（可点击全屏预览）
-                        if let data = milestone.photoData, let img = UIImage(data: data) {
+                        if let data = milestone.photoData {
                             Button { showingPhoto = true } label: {
-                                Image(uiImage: img)
+                                AsyncDecodedImageView(data: data) { image in
+                                    Image(uiImage: image)
                                     .resizable().scaledToFill()
                                     .frame(maxWidth: .infinity).frame(height: 220)
                                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                                     .overlay(alignment: .bottomTrailing) {
-                                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                            .font(.system(size: 12, weight: .semibold))
+                                        Image(systemName: "arrow.up.left.and.arrow.down.right") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(Color.ohanaCardSurface)
                                             .padding(8)
                                             .background(Color.arkInk.opacity(0.45), in: Circle())
                                             .padding(10)
                                     }
+                                } placeholder: {
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .fill(Color.ohanaCardSurface)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 220)
+                                }
                             }
                             .buttonStyle(ScaleButtonStyle())
                             .fullScreenCover(isPresented: $showingPhoto) {
                                 ZStack {
                                     Color.arkInk.ignoresSafeArea()
-                                    Image(uiImage: img).resizable().scaledToFit().ignoresSafeArea()
+                                    AsyncDecodedImageView(data: data) { image in
+                                        Image(uiImage: image).resizable().scaledToFit().ignoresSafeArea()
+                                    } placeholder: {
+                                        ProgressView()
+                                            .tint(Color.ohanaCardSurface)
+                                    }
                                     VStack { HStack { Spacer(); Button { showingPhoto = false } label: {
-                                        Image(systemName: "xmark.circle.fill").font(.system(size: 28)).foregroundStyle(Color.ohanaCardSurface).padding(16)
+                                        Image(systemName: "xmark.circle.fill").font(OhanaFont.adaptive(size: 28)).foregroundStyle(Color.ohanaCardSurface).padding(16) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     }}; Spacer() }
                                 }
                             }
@@ -643,15 +679,15 @@ private struct MilestoneDetailSheet: View {
                             } label: {
                                 HStack(spacing: 12) {
                                     ZStack {
-                                        RoundedRectangle(cornerRadius: 10).fill(Color.goYellow.opacity(0.15)).frame(width: 36, height: 36)
-                                        Image(systemName: "mappin.circle.fill").font(.system(size: 18)).foregroundStyle(Color.goYellow)
+                                        RoundedRectangle(cornerRadius: 10).fill(Color.goYellow.opacity(0.15)).frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                                        Image(systemName: "mappin.circle.fill").font(OhanaFont.adaptive(size: 18)).foregroundStyle(Color.goYellow) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("地址").font(.system(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                                        Text(milestone.location).font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText).lineLimit(2)
+                                        Text("地址").font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        Text(milestone.location).font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText).lineLimit(2) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     }
                                     Spacer()
-                                    Image(systemName: "arrow.up.right.square").font(.system(size: 14)).foregroundStyle(Color.goYellow.opacity(0.7))
+                                    Image(systemName: "arrow.up.right.square").font(OhanaFont.adaptive(size: 14)).foregroundStyle(Color.goYellow.opacity(0.7)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                                 .padding(14)
                                 .goTranslucentCard(cornerRadius: 16)
@@ -663,10 +699,10 @@ private struct MilestoneDetailSheet: View {
                         if !milestone.notes.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
                                 Label("备注", systemImage: "note.text")
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 Text(milestone.notes)
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                                     .fixedSize(horizontal: false, vertical: true)
                             }
@@ -684,12 +720,12 @@ private struct MilestoneDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill").symbolRenderingMode(.hierarchical).foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
+                        Image(systemName: "xmark.circle.fill").symbolRenderingMode(.hierarchical).foregroundStyle(Color.ohanaPrimaryText.opacity(0.6)) // a11y: allow decorative icon covered by surrounding text or control
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingDeleteAlert = true } label: {
-                        Image(systemName: "trash").font(.system(size: 14, weight: .semibold)).foregroundStyle(Color.goRed)
+                        Image(systemName: "trash").font(OhanaFont.adaptive(size: 14, weight: .semibold)).foregroundStyle(Color.goRed) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                 }
             }

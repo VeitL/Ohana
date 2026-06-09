@@ -19,16 +19,9 @@ struct AssigneeChip: View {
     var body: some View {
         if let h = human {
             HStack(spacing: 4) {
-                if let data = h.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img).resizable().scaledToFill()
-                        .frame(width: 18, height: 18).clipShape(Circle())
-                } else {
-                    Text(h.avatarEmoji).font(.system(size: 13))
-                        .frame(width: 18, height: 18)
-                        .background(Color(hex: h.themeColor).opacity(0.25), in: Circle())
-                }
+                AssigneeAvatarBubble(human: h)
                 Text(h.name)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     .lineLimit(1)
             }
@@ -36,6 +29,19 @@ struct AssigneeChip: View {
             .background(Color(hex: h.themeColor).opacity(0.15), in: Capsule())
             .overlay(Capsule().strokeBorder(Color(hex: h.themeColor).opacity(0.3), lineWidth: 1))
         }
+    }
+}
+
+private struct AssigneeAvatarBubble: View {
+    let human: Human
+
+    var body: some View {
+        HumanAvatarPipelineView(
+            human: human,
+            size: 18,
+            fallbackScale: 0.72,
+            backgroundOpacity: 0.25
+        )
     }
 }
 
@@ -53,19 +59,19 @@ struct NudgeButton: View {
         } label: {
             HStack(spacing: 4) {
                 Text(nudged ? "✅" : "👋")
-                    .font(.system(size: 12))
+                    .font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(nudged ? "已催" : "催办")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(nudged ? Color.goPrimary : .white.opacity(0.6))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(nudged ? Color.goPrimary : Color.ohanaSecondaryText)
             }
             .padding(.horizontal, 10).padding(.vertical, 5)
             .background(
-                nudged ? Color.goPrimary.opacity(0.12) : Color.white.opacity(0.08),
+                nudged ? Color.goPrimary.opacity(0.12) : Color.ohanaCardSurfaceElevated.opacity(0.55),
                 in: Capsule()
             )
             .overlay(
                 Capsule().strokeBorder(
-                    nudged ? Color.goPrimary.opacity(0.35) : Color.white.opacity(0.12),
+                    nudged ? Color.goPrimary.opacity(0.35) : Color.ohanaPrimaryText.opacity(0.12),
                     lineWidth: 1
                 )
             )
@@ -87,7 +93,7 @@ struct AssigneePickerRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("指派给")
-                .font(.system(size: 13, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -97,7 +103,7 @@ struct AssigneePickerRow: View {
                         assigneeId = nil
                     } label: {
                         Text("任何人")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(assigneeId == nil ? .black : Color(.label))
                             .padding(.horizontal, 14).padding(.vertical, 8)
                             .background(
@@ -112,9 +118,9 @@ struct AssigneePickerRow: View {
                             assigneeId = human.id.uuidString
                         } label: {
                             HStack(spacing: 6) {
-                                Text(human.avatarEmoji).font(.system(size: 14))
+                                Text(human.avatarEmoji).font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 Text(human.name)
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(assigneeId == human.id.uuidString ? .black : Color(.label))
                             }
                             .padding(.horizontal, 14).padding(.vertical, 8)

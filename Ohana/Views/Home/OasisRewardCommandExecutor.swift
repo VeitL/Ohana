@@ -16,7 +16,7 @@ struct OasisRewardCommandExecutor {
         critterFragments: [OasisCritterFragmentBalance]
     ) -> OasisRewardActionSnapshot {
         OasisRewardActionSnapshot(
-            canInjectCoconuts: OasisCritterEconomyService.canSpendCurrentHumanCoconuts(10, context: context),
+            canInjectCoconuts: OasisCritterEconomyService.canSpendCurrentHumanCoconuts(80, context: context),
             activeCoconutBalance: currentHumanCoconutBalance(
                 humans: humans,
                 currentActiveHumanId: currentActiveHumanId
@@ -141,7 +141,7 @@ struct OasisRewardCommandExecutor {
         return true
     }
 
-    func injectTreeEnergy(treeManager: OasisTreeManager, cost: Int = 10) -> Bool {
+    func injectTreeEnergy(treeManager: OasisTreeManager, cost: Int = 80) -> Bool {
         treeManager.injectEnergy(cost: cost, modelContext: context)
     }
 

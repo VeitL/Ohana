@@ -20,17 +20,17 @@ struct HomeFirstSuccessCard: View {
                     Circle()
                         .fill(Color.goPrimary.opacity(0.18))
                         .frame(width: 44, height: 44)
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 18, weight: .black))
+                    Image(systemName: "sparkles").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 18, weight: .black))
                         .foregroundStyle(Color.goPrimary)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("3 分钟成功体验")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.white) // ui-v4: allow dark success card text contrast
                     Text("选一个 10 秒动作，马上看到反馈和椰子奖励。")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.white.opacity(0.62)) // ui-v4: allow dark success card secondary text contrast
                         .lineLimit(2)
                 }
@@ -63,9 +63,9 @@ struct HomeFirstSuccessCard: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
                 Text(title)
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)

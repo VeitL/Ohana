@@ -138,8 +138,8 @@ struct PetRetentionHubView: View {
 
             if showsCloseButton {
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .black))
+                    Image(systemName: "xmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 15, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -154,7 +154,7 @@ struct PetRetentionHubView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .lastTextBaseline) {
                 Text("\(archiveSnapshot.score)/\(archiveSnapshot.total)")
-                    .font(.system(size: 38, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 38, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion("\(archiveSnapshot.score)")
                 Text(l.tr(zh: "档案完整度", en: "archive complete", de: "Archiv komplett"))
@@ -192,9 +192,9 @@ struct PetRetentionHubView: View {
         NavigationLink(destination: nextStepDestination(archiveSnapshot.nextStep.kind)) {
             HStack(spacing: 12) {
                 Image(systemName: archiveSnapshot.nextStep.icon)
-                    .font(.system(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black))
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -207,8 +207,8 @@ struct PetRetentionHubView: View {
                         .lineLimit(2)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)
@@ -275,9 +275,9 @@ struct PetRetentionHubView: View {
             Button { renderPDF() } label: {
                 HStack(spacing: 12) {
                     Image(systemName: isRenderingPDF ? "hourglass" : "square.and.arrow.up.fill")
-                        .font(.system(size: 16, weight: .black))
+                        .font(OhanaFont.adaptive(size: 16, weight: .black))
                         .foregroundStyle(Color.goTeal)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "导出兽医档案", en: "Export Vet File", de: "Tierarztakte exportieren"))
                             .font(OhanaFont.callout(.black))
@@ -292,8 +292,8 @@ struct PetRetentionHubView: View {
                         ProgressView()
                             .tint(Color.goPrimary)
                     } else {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
@@ -359,7 +359,7 @@ struct PetRetentionHubView: View {
         NavigationLink(destination: destination) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 19, weight: .black))
+                    .font(OhanaFont.adaptive(size: 19, weight: .black))
                     .foregroundStyle(accent)
                     .frame(width: 44, height: 44)
 
@@ -379,8 +379,8 @@ struct PetRetentionHubView: View {
                         .lineLimit(2)
                 }
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)
@@ -404,7 +404,7 @@ struct PetRetentionHubView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: icon)
-                        .font(.system(size: 16, weight: .black))
+                        .font(OhanaFont.adaptive(size: 16, weight: .black))
                         .foregroundStyle(tint)
                     Spacer()
                     Text(value)

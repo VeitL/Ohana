@@ -1,35 +1,67 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct FunctionMenuDestinationRouter: View {
     let destination: FMDest
     @Binding var parentPath: NavigationPath
-    @Binding var selectedPlant: Plant?
+    let pets: [Pet]
+    let humans: [Human]
+    let plants: [Plant]
 
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-    @Query(sort: \Human.name) private var humans: [Human]
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var treeManager = OasisTreeManager.shared
 
     var body: some View {
-        let unlock = GrowthUnlockPolicy.status(
-            for: destination,
+        let decision = AppFeatureRouteGuard.functionDestinationDecision(
+            destination,
             currentLevel: treeManager.treeLevel.rawValue
         )
-        if unlock.isUnlocked {
+        switch decision {
+        case .rootMenu:
+            EmptyView()
+        case .allow:
             destinationView(destination)
-        } else {
-            GrowthLockedFeatureView(status: unlock, appLanguage: appLanguage)
+        case let .redirectToRoadmap(note):
+            GrowthUnlockRoadmapView(
+                currentLevel: treeManager.treeLevel.rawValue,
+                progressToNextLevel: treeManager.progressToNextLevel,
+                appLanguage: appLanguage
+            )
+            .onAppear {
+                AppFeatureRouteGuard.recordIntercept(note)
+            }
+        case let .suppress(note):
+            Color.clear
+                .onAppear {
+                    AppFeatureRouteGuard.recordIntercept(note)
+                }
         }
     }
 
     @ViewBuilder
     private func destinationView(_ dest: FMDest) -> some View {
         switch dest {
+        case .growthRoadmap:
+            GrowthUnlockRoadmapView(
+                currentLevel: treeManager.treeLevel.rawValue,
+                progressToNextLevel: treeManager.progressToNextLevel,
+                appLanguage: appLanguage
+            )
         case .featureGroup(let group):
-            FeatureGroupDashboardView(group: group, parentPath: $parentPath)
+            FeatureGroupDashboardView(
+                group: group,
+                parentPath: $parentPath,
+                pets: pets,
+                humans: humans
+            )
         case .featureAggregate(let feature):
-            FeatureAggregateView(feature: feature, parentPath: $parentPath, showsEntityChips: false)
+            FeatureAggregateView(
+                feature: feature,
+                parentPath: $parentPath,
+                pets: pets,
+                humans: humans,
+                showsEntityChips: false
+            )
         case .petHealth(let id):
             if let pet = pet(for: id) { PetHealthDetailView(pet: pet, isModal: false) }
         case .petMedications(let id):
@@ -41,7 +73,7 @@ struct FunctionMenuDestinationRouter: View {
         case .petWalks(let id):
             if let pet = pet(for: id) { WalkSummarySheet(pet: pet) }
         case .petPotty(let id):
-            if let pet = pet(for: id) { QuickPottyDetailSheet(pet: pet) {} }
+            if let pet = pet(for: id) { QuickPottyDetailRouteContainer(id: pet.id, onRemove: {}) }
         case .petBasicInfo(let id):
             if let pet = pet(for: id) { PetBasicInfoDetailView(pet: pet) }
         case .petDocuments(let id):
@@ -65,7 +97,16 @@ struct FunctionMenuDestinationRouter: View {
         case .humanExpense(let id):
             if let human = human(for: id) { HumanExpenseDetailView(human: human) }
         case .plantsDashboard:
-            PlantDashboardView(selectedPlant: $selectedPlant)
+            PlantDashboardView(
+                plants: plants,
+                onOpenPlant: { plantID in
+                    parentPath.append(FMDest.plantDetail(plantID))
+                }
+            )
+        case .plantDetail(let id):
+            if let plant = plant(for: id) {
+                PlantDetailView(plant: plant)
+            }
         case .wealthDashboard:
             IslandWealthDashboardView()
         case .bountyBoard:
@@ -77,11 +118,11 @@ struct FunctionMenuDestinationRouter: View {
         case .reminderObservability:
             ReminderObservabilityView()
         case .coconutShop:
-            CoconutShopView()
+            CoconutShopRouteContainer()
         case .gacha:
-            GachaView()
+            GachaRouteContainer()
         case .calendar:
-            CalendarView()
+            CalendarRouteContainer()
         }
     }
 
@@ -91,5 +132,9 @@ struct FunctionMenuDestinationRouter: View {
 
     private func human(for id: PersistentIdentifier) -> Human? {
         humans.first { $0.persistentModelID == id }
+    }
+
+    private func plant(for id: UUID) -> Plant? {
+        plants.first { $0.id == id }
     }
 }

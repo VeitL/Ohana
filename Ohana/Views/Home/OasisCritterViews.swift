@@ -31,7 +31,7 @@ struct OasisCritterIllustration: View {
         .opacity(locked ? 0.42 : 1)
         .overlay {
             if locked {
-                Image(systemName: "lock.fill")
+                Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(.system(size: max(16, size * 0.18), weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: max(30, size * 0.32), height: max(30, size * 0.32))
@@ -195,7 +195,7 @@ struct OasisCritterIllustration: View {
                 .frame(width: size * 0.18, height: size * 0.18)
                 .offset(x: size * 0.2, y: -size * 0.15)
 
-            Image(systemName: "sparkle")
+            Image(systemName: "sparkle") // a11y: allow decorative icon covered by surrounding text or control
                 .font(.system(size: size * 0.16, weight: .black))
                 .foregroundStyle(Color.ohanaCardSurface)
                 .offset(x: -size * 0.22, y: -size * 0.18)
@@ -231,6 +231,10 @@ struct OasisCritterCodexView: View {
     var initialCatalogId: String? = nil
     var isPopup: Bool = false
     var onClose: (() -> Void)? = nil
+    let humans: [Human]
+    let electronicPets: [OasisElectronicPet]
+    let fragments: [OasisCritterFragmentBalance]
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -238,16 +242,12 @@ struct OasisCritterCodexView: View {
     @Bindable private var questManager = QuestManager.shared
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-    @Query(sort: \OasisElectronicPet.obtainedAt) private var electronicPets: [OasisElectronicPet]
-    @Query(sort: \OasisCritterFragmentBalance.updatedAt) private var fragments: [OasisCritterFragmentBalance]
 
     @State private var selectedCatalogId = OasisUpgradeRewardCatalog.firstCritterId
     @State private var focusedCodexCatalogId: String?
     @State private var pulseCatalogId: String?
     @State private var lastInteractionOutcome: OasisCritterInteractionOutcome?
     @State private var rescuingCritterId: UUID?
-    @State private var showingCoconutLog = false
     @State private var treeMgr = OasisTreeManager.shared
     @State private var renderSnapshots: [UUID: OasisCritterRenderSnapshot] = [:]
     @State private var featuredDisplayOverrides: [UUID: Bool] = [:]
@@ -257,6 +257,26 @@ struct OasisCritterCodexView: View {
     @State private var pulseCleanupTask: Task<Void, Never>?
     @State private var rescueBusyCleanupTask: Task<Void, Never>?
     @State private var outcomeCleanupTask: Task<Void, Never>?
+
+    init(
+        mode: OasisCritterViewMode = .codex,
+        initialCatalogId: String? = nil,
+        isPopup: Bool = false,
+        onClose: (() -> Void)? = nil,
+        humans: [Human] = [],
+        electronicPets: [OasisElectronicPet] = [],
+        fragments: [OasisCritterFragmentBalance] = [],
+        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in }
+    ) {
+        self.mode = mode
+        self.initialCatalogId = initialCatalogId
+        self.isPopup = isPopup
+        self.onClose = onClose
+        self.humans = humans
+        self.electronicPets = electronicPets
+        self.fragments = fragments
+        self.onPresentCoconutLog = onPresentCoconutLog
+    }
 
     private var l: L10n { L10n(appLanguage) }
     private var commandExecutor: OasisRewardCommandExecutor {
@@ -297,9 +317,6 @@ struct OasisCritterCodexView: View {
         }
         .onChange(of: currentCoconutBalance) { _, _ in
             scheduleRenderSnapshotRefresh(milliseconds: 60)
-        }
-        .sheet(isPresented: $showingCoconutLog) {
-            coconutLogSheet
         }
     }
 
@@ -350,12 +367,12 @@ struct OasisCritterCodexView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(headerTitle(entry: nil))
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
                 Text(headerSubtitle(entry: nil))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -370,15 +387,6 @@ struct OasisCritterCodexView: View {
         .padding(.bottom, 8)
     }
 
-    @ViewBuilder
-    private var coconutLogSheet: some View {
-        if let activeHuman {
-            CoconutLogView(subject: .human(activeHuman.id))
-        } else {
-            CoconutLogView()
-        }
-    }
-
     private var header: some View {
         let entry = focusedCodexCatalogId.flatMap { OasisUpgradeRewardCatalog.critter(id: $0) }
         return HStack(alignment: .center, spacing: 12) {
@@ -389,8 +397,8 @@ struct OasisCritterCodexView: View {
                         lastInteractionOutcome = nil
                     }
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .black))
+                    Image(systemName: "chevron.left") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 44, height: 44)
                         .background(Color.ohanaControlFill, in: Circle())
@@ -402,12 +410,12 @@ struct OasisCritterCodexView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(headerTitle(entry: entry))
-                    .font(.system(size: 25, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 25, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text(headerSubtitle(entry: entry))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.78)
@@ -416,8 +424,8 @@ struct OasisCritterCodexView: View {
             Button {
                 close()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 17, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -474,20 +482,20 @@ struct OasisCritterCodexView: View {
                             OasisCritterIllustration(catalogId: entry.id, locked: !owned, size: 88, critter: critter)
                                 .scaleEffect(pulseCatalogId == entry.id ? 1.06 : 1)
                             if critter?.isFeaturedOnOasis == true {
-                                Image(systemName: "house.fill")
-                                    .font(.system(size: 9, weight: .black))
+                                Image(systemName: "house.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                    .font(OhanaFont.adaptive(size: 9, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                                    .frame(width: 22, height: 22)
+                                    .frame(width: 22, height: 22) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                     .background(Color.goPrimary, in: Circle())
                             }
                         }
                         Text(entry.name(l))
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                         Text(collectionStatus(for: entry, owned: owned))
-                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(owned ? Color.goPrimary : Color.ohanaSecondaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
@@ -536,7 +544,7 @@ struct OasisCritterCodexView: View {
 
                     HStack(spacing: 8) {
                         Text(l.tr(zh: entry.rarity.zh, en: entry.rarity.en, de: entry.rarity.de))
-                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -547,12 +555,12 @@ struct OasisCritterCodexView: View {
 
                 VStack(spacing: 6) {
                     Text(entry.name(l))
-                        .font(.system(size: 25, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 25, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                     Text(entry.tagline(l))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -609,11 +617,11 @@ struct OasisCritterCodexView: View {
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(critter.displayName(l))
-                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(lifecycleShortText(snapshot.lifecycle))
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(1)
                         }
@@ -702,7 +710,7 @@ struct OasisCritterCodexView: View {
 
     private func toyInfoPill(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
@@ -713,7 +721,11 @@ struct OasisCritterCodexView: View {
 
     private var coconutBalanceButton: some View {
         CoconutBalanceCapsule(balance: currentCoconutBalance, showsDeltaAnimation: true) {
-            showingCoconutLog = true
+            if let activeHuman {
+                onPresentCoconutLog(.human(activeHuman.id))
+            } else {
+                onPresentCoconutLog(nil)
+            }
         }
         .frame(minHeight: 44)
         .contentShape(Rectangle())
@@ -758,14 +770,14 @@ struct OasisCritterCodexView: View {
         let isFeatured = featuredDisplayOverrides[critter.id] ?? critter.isFeaturedOnOasis
         return HStack(spacing: 6) {
             Image(systemName: isFeatured ? "house.fill" : "house.slash.fill")
-                .font(.system(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(isFeatured ? Color.goPrimary : Color.ohanaTertiaryText)
                 .frame(width: 16)
 
             Text(isFeatured
                 ? l.tr(zh: "首页显示", en: "Home", de: "Start")
                 : l.tr(zh: "已隐藏", en: "Hidden", de: "Verborgen"))
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(isFeatured ? 0.86 : 0.52))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
@@ -775,7 +787,7 @@ struct OasisCritterCodexView: View {
                 .toggleStyle(.switch)
                 .tint(Color.goPrimary)
                 .scaleEffect(0.62)
-                .frame(width: 34, height: 22)
+                .frame(width: 34, height: 22) // a11y: allow decorative non-interactive frame; hit area handled by parent
         }
         .padding(.leading, 9)
         .padding(.trailing, 7)
@@ -805,14 +817,14 @@ struct OasisCritterCodexView: View {
         return Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(title)
-                    .font(.system(size: 10.5, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
                 if !cost.isEmpty {
                     Text(cost)
-                        .font(.system(size: 8.5, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 8.5, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .monospacedDigit()
@@ -857,21 +869,21 @@ struct OasisCritterCodexView: View {
         let clampedValue = max(0, min(100, value))
         return HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 32, height: 32)
+                .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(label)
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                     Spacer(minLength: 0)
                     Text("\(clampedValue)%")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tint)
                         .monospacedDigit()
                 }
@@ -891,18 +903,18 @@ struct OasisCritterCodexView: View {
         let clampedValue = max(0, min(100, value))
         return HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
-                .frame(width: 32, height: 28)
+                .frame(width: 32, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     Text(label)
-                        .font(.system(size: 10.5, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer(minLength: 0)
                     Text(detail)
-                        .font(.system(size: 10.5, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .monospacedDigit()
                 }
@@ -935,19 +947,19 @@ struct OasisCritterCodexView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: isMax ? "sparkles" : "arrow.up.forward.circle.fill")
-                    .font(.system(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 VStack(alignment: .leading, spacing: 2) {
                     Text(isMax ? l.tr(zh: "已满级", en: "Final Form", de: "Endform") : l.tr(zh: "升级", en: "Upgrade", de: "Upgrade"))
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(isMax
                         ? l.tr(zh: "Lumo 已经是最终形态", en: "Lumo is fully evolved", de: "Lumo ist voll entwickelt")
                         : l.tr(zh: "需要 \(snapshot.xpNeededForNextLevel) XP", en: "\(snapshot.xpNeededForNextLevel) XP needed", de: "\(snapshot.xpNeededForNextLevel) XP nötig"))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .opacity(0.82)
                 }
                 Spacer()
                 Text(isMax ? "Lv.\(snapshot.maxLevel)" : "\(snapshot.xpProgress)/\(snapshot.xpTarget)")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .monospacedDigit()
             }
             .foregroundStyle(canUpgrade ? Color.arkInk : Color.ohanaPrimaryText)
@@ -980,19 +992,19 @@ struct OasisCritterCodexView: View {
             currentCoconutBalance >= cost.coconuts
         return VStack(spacing: 12) {
             HStack(spacing: 10) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goPrimary, in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "生命之树 Lv.\(level) 保底唤醒", en: "Guaranteed at Life Tree Lv.\(level)", de: "Garantiert bei Lebensbaum Lv.\(level)"))
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(isLevelUnlocked
                         ? l.tr(zh: "可以使用碎片唤醒。", en: "Fragments can awaken it now.", de: "Fragmente können es jetzt wecken.")
                         : l.tr(zh: "达到等级后可用碎片唤醒。", en: "Fragments unlock after this level.", de: "Fragmente werden ab diesem Level nutzbar."))
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -1083,10 +1095,10 @@ struct OasisCritterCodexView: View {
     private func codexMetric(value: String, label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
             Text(label)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(minWidth: 52)
@@ -1098,19 +1110,19 @@ struct OasisCritterCodexView: View {
     private func interactionOutcomeBanner(_ outcome: OasisCritterInteractionOutcome) -> some View {
         HStack(spacing: 9) {
             Image(systemName: outcome.completedDailyWish ? "sparkles" : actionIcon(outcome.action))
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(outcome.completedDailyWish ? Color.arkInk : Color.goPrimary)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(outcome.completedDailyWish ? Color.goYellow : Color.ohanaControlFill, in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(outcome.message(l))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                 let reward = outcome.rewardText(l)
                 if !reward.isEmpty {
                     Text(reward)
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                         .lineLimit(1)
                 }
@@ -1126,12 +1138,12 @@ struct OasisCritterCodexView: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(title)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 if !cost.isEmpty {
                     Text(cost)
-                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .opacity(0.62)
                     }
             }

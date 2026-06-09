@@ -136,11 +136,11 @@ struct EditPetSheet: View {
                             ForEach(PetThemeColor.allCases, id: \.rawValue) { tc in
                                 Button { themeColorHex = tc.hexValue } label: {
                                     ZStack {
-                                        Circle().fill(tc.color).frame(width: 38, height: 38)
+                                        Circle().fill(tc.color).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                         if themeColorHex.uppercased() == tc.hexValue.uppercased() {
-                                            Circle().strokeBorder(Color.ohanaCardSurface, lineWidth: 2.5).frame(width: 38, height: 38)
-                                            Image(systemName: "checkmark")
-                                                .font(.system(size: 11, weight: .black))
+                                            Circle().strokeBorder(Color.ohanaCardSurface, lineWidth: 2.5).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                                            Image(systemName: "checkmark").accessibilityHidden(true)
+                                                .font(OhanaFont.adaptive(size: 11, weight: .black))
                                                 .foregroundStyle(Color.ohanaPrimaryText)
                                         }
                                     }

@@ -20,11 +20,11 @@ struct StreakBadgeView: View {
     var body: some View {
         HStack(spacing: 6) {
             Text(streak > 0 ? "🔥" : "💤")
-                .font(.system(size: 14))
+                .font(OhanaFont.adaptive(size: 14))
                 .scaleEffect(shouldRunPulse && flamePulse ? 1.15 : 1.0)
                 .animation(
                     shouldRunPulse
-                        ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
+                        ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                         : GoMotion.reduced,
                     value: flamePulse
                 )
@@ -43,15 +43,15 @@ struct StreakBadgeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 3) {
                     Text("\(streak)")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(streak >= 7 ? Color.goPrimary : Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Text("天")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 }
                 Text(streakSubtitle)
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             }
         }

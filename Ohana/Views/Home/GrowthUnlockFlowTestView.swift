@@ -33,9 +33,9 @@ struct OhanaGrowthOnboardingOverlay: View {
                 titleZh: "让生命之树带路",
                 titleEn: "Let the Life Tree guide you",
                 titleDe: "Der Lebensbaum führt dich",
-                detailZh: "照护越稳定，树等级越高，健康、家庭、植物和奖励会逐步打开。",
-                detailEn: "Consistent care grows the tree and gradually opens health, family, plants, and rewards.",
-                detailDe: "Stetige Pflege lässt den Baum wachsen und öffnet Gesundheit, Familie, Pflanzen und Belohnungen."
+                detailZh: "照护越稳定，树等级越高，健康、家庭、Oasis 和奖励会逐步打开。",
+                detailEn: "Consistent care grows the tree and gradually opens health, family, Oasis, and rewards.",
+                detailDe: "Stetige Pflege lässt den Baum wachsen und öffnet Gesundheit, Familie, Oasis und Belohnungen."
             )
         ]
     }
@@ -59,9 +59,9 @@ struct OhanaGrowthOnboardingOverlay: View {
         return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 Image(systemName: step.icon)
-                    .font(.system(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black))
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(Color.ohanaControlFill, in: Circle())
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -76,8 +76,8 @@ struct OhanaGrowthOnboardingOverlay: View {
                 Spacer()
 
                 Button(action: onSkip) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .black))
+                    Image(systemName: "xmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 14, weight: .black))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -151,9 +151,14 @@ struct GrowthUnlockFlowTestView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var simulatedLevel = 1
+    @State private var simulatedProgress = 0.48
     @State private var showsGuide = false
+    @State private var showsStarterCeremony = false
     @State private var unlockToastStatus: GrowthUnlockStatus?
     @State private var unlockToastDismissTask: Task<Void, Never>?
+    @State private var growthPulseStatus: GrowthLoopPulseStatus?
+    @State private var growthPulseDismissTask: Task<Void, Never>?
+    @State private var openedRecommendationStep: GrowthUnlockStep?
 
     var body: some View {
         GeometryReader { proxy in
@@ -169,8 +174,17 @@ struct GrowthUnlockFlowTestView: View {
                             progressToNextLevel: simulatedProgressToNextLevel,
                             appLanguage: appLanguage
                         )
+                        GrowthDailyLoopStrip(
+                            currentLevel: simulatedLevel,
+                            progressToNextLevel: simulatedProgressToNextLevel,
+                            pendingFocusCount: simulatedPendingFocusCount,
+                            hasAnyMember: true,
+                            appLanguage: appLanguage,
+                            onPrimaryAction: simulateDailyCompletion
+                        )
                         levelControl
                         onboardingPreview
+                        recommendationPreview
                         roadmap
                         featureMatrix
                     }
@@ -183,13 +197,28 @@ struct GrowthUnlockFlowTestView: View {
                     GrowthUnlockToastView(
                         status: unlockToastStatus,
                         appLanguage: appLanguage,
-                        onDismiss: dismissUnlockToast
+                        onDismiss: dismissUnlockToast,
+                        onOpen: {
+                            presentRecommendedEntry(for: unlockToastStatus.step)
+                        }
                     )
                     .padding(.horizontal, 12)
                     .padding(.bottom, max(16, proxy.safeAreaInsets.bottom + 12))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(16)
+                }
+
+                if let growthPulseStatus {
+                    GrowthLoopPulseToastView(
+                        status: growthPulseStatus,
+                        appLanguage: appLanguage
+                    )
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, max(16, proxy.safeAreaInsets.bottom + 12))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(15)
                 }
 
                 if showsGuide {
@@ -201,6 +230,15 @@ struct GrowthUnlockFlowTestView: View {
                     )
                     .zIndex(20)
                 }
+
+                if showsStarterCeremony {
+                    StarterGiftCeremonyOverlay(
+                        appLanguage: appLanguage,
+                        amount: StarterGiftService.giftAmount,
+                        onFinish: { withAnimation(GoMotion.feedback) { showsStarterCeremony = false } }
+                    )
+                    .zIndex(21)
+                }
             }
         }
         .navigationTitle("")
@@ -208,8 +246,8 @@ struct GrowthUnlockFlowTestView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { dismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 15, weight: .black))
+                    Image(systemName: "chevron.left").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 15, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 44, height: 44)
                 }
@@ -218,14 +256,15 @@ struct GrowthUnlockFlowTestView: View {
         }
         .onDisappear {
             unlockToastDismissTask?.cancel()
+            growthPulseDismissTask?.cancel()
         }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Image(systemName: "tree.fill")
-                    .font(.system(size: 20, weight: .black))
+                Image(systemName: "tree.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 20, weight: .black))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 44, height: 44)
                     .background(Color.ohanaCardSurface, in: Circle())
@@ -259,7 +298,7 @@ struct GrowthUnlockFlowTestView: View {
                     .background(Color.goPrimary, in: Capsule())
             }
 
-            Stepper(value: $simulatedLevel, in: 1...10) {
+            Stepper(value: $simulatedLevel, in: 0...10) {
                 Text(currentStage.title(language: appLanguage))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color(hex: currentStage.tintHex))
@@ -299,29 +338,88 @@ struct GrowthUnlockFlowTestView: View {
     }
 
     private var onboardingPreview: some View {
-        Button {
-            withAnimation(GoMotion.feedback) {
-                showsGuide = true
-            }
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "play.circle.fill")
-                    .font(.system(size: 18, weight: .black))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(localized(zh: "播放首次使用引导", en: "Play first-run guide", de: "Ersteinführung starten"))
-                        .font(OhanaFont.callout(.black))
-                    Text(localized(zh: "不写入真实完成状态", en: "Does not change real completion state", de: "Ändert keinen echten Status"))
-                        .font(OhanaFont.caption2(.semibold))
+        VStack(spacing: 10) {
+            Button {
+                withAnimation(GoMotion.feedback) {
+                    showsGuide = true
                 }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .black))
+            } label: {
+                previewActionRow(
+                    icon: "play.circle.fill",
+                    title: localized(zh: "播放首次使用引导", en: "Play first-run guide", de: "Ersteinführung starten"),
+                    detail: localized(zh: "不写入真实完成状态", en: "Does not change real completion state", de: "Ändert keinen echten Status")
+                )
             }
-            .foregroundStyle(Color.ohanaPrimaryText)
-            .padding(16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .buttonStyle(ScaleButtonStyle())
+
+            Button {
+                withAnimation(GoMotion.feedback) {
+                    simulatedLevel = 0
+                    showsStarterCeremony = true
+                }
+            } label: {
+                previewActionRow(
+                    icon: "gift.fill",
+                    title: localized(zh: "播放新人礼包 Lv0 → Lv1", en: "Play starter gift Lv0 → Lv1", de: "Startergeschenk Lv0 → Lv1"),
+                    detail: localized(zh: "+50🥥，不增加 Growth XP", en: "+50🥥, no Growth XP", de: "+50🥥, keine Growth XP")
+                )
+            }
+            .buttonStyle(ScaleButtonStyle())
         }
-        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func previewActionRow(icon: String, title: String, detail: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon).accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(OhanaFont.callout(.black))
+                Text(detail)
+                    .font(OhanaFont.caption2(.semibold))
+            }
+            Spacer()
+            Image(systemName: "chevron.right").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
+        }
+        .foregroundStyle(Color.ohanaPrimaryText)
+        .padding(16)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var recommendationPreview: some View {
+        if let openedRecommendationStep {
+            HStack(spacing: 10) {
+                Image(systemName: "arrowshape.turn.up.right.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .foregroundStyle(Color(hex: openedRecommendationStep.tintHex))
+                    .frame(width: 44, height: 44)
+                    .background(Color.ohanaControlFill, in: Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(localized(zh: "推荐入口已命中", en: "Recommended entry selected", de: "Empfohlener Einstieg gewählt"))
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(GrowthUnlockPolicy.primaryDestinationTitle(for: openedRecommendationStep, language: appLanguage))
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color(hex: openedRecommendationStep.tintHex))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 6)
+
+                Text("Lv.\(openedRecommendationStep.requiredLevel)")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.arkInk)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.goPrimary, in: Capsule())
+            }
+            .frame(minHeight: 64)
+            .padding(14)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
     }
 
     private var roadmap: some View {
@@ -346,8 +444,8 @@ struct GrowthUnlockFlowTestView: View {
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(previewDestinations, id: \.title) { item in
-                    let status = GrowthUnlockPolicy.status(for: item.destination, currentLevel: simulatedLevel)
-                    featureCell(title: item.title, icon: item.icon, status: status)
+                    let availability = AppFeatureRouteGuard.availability(for: item.destination, currentLevel: simulatedLevel)
+                    featureCell(title: item.title, icon: item.icon, availability: availability)
                 }
             }
         }
@@ -355,19 +453,19 @@ struct GrowthUnlockFlowTestView: View {
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private func featureCell(title: String, icon: String, status: GrowthUnlockStatus) -> some View {
+    private func featureCell(title: String, icon: String, availability: AppFeatureAvailability) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
-                Image(systemName: status.isUnlocked ? icon : "lock.fill")
-                    .font(.system(size: 14, weight: .black))
-                    .foregroundStyle(Color(hex: status.step.tintHex))
+                Image(systemName: featureIcon(defaultIcon: icon, availability: availability))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .foregroundStyle(featureTint(availability))
                 Spacer()
-                Text(status.isUnlocked ? localized(zh: "可用", en: "Open", de: "Offen") : "Lv.\(status.step.requiredLevel)")
+                Text(featureBadgeText(availability))
                     .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(status.isUnlocked ? Color.arkInk : Color(hex: status.step.tintHex))
+                    .foregroundStyle(featureBadgeForeground(availability))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 4)
-                    .background(status.isUnlocked ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                    .background(featureBadgeBackground(availability), in: Capsule())
             }
 
             Text(title)
@@ -375,7 +473,7 @@ struct GrowthUnlockFlowTestView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
 
-            Text(status.step.title(language: appLanguage))
+            Text(featureStageText(availability))
                 .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
@@ -391,7 +489,11 @@ struct GrowthUnlockFlowTestView: View {
     }
 
     private var simulatedProgressToNextLevel: Double {
-        simulatedLevel >= 10 ? 1 : 0.48
+        simulatedLevel >= 10 ? 1 : simulatedProgress
+    }
+
+    private var simulatedPendingFocusCount: Int {
+        max(0, 4 - simulatedLevel / 2)
     }
 
     private var previewDestinations: [(title: String, icon: String, destination: FMDest)] {
@@ -400,11 +502,72 @@ struct GrowthUnlockFlowTestView: View {
             ("健康", "cross.fill", .featureGroup(.healthBody)),
             ("成长档案", "folder.fill", .featureGroup(.archiveMemory)),
             ("家庭事务", "house.fill", .featureGroup(.householdHub)),
+            ("Oasis 收益", "tree.fill", .wealthDashboard),
             ("植物", "leaf.fill", .plantsDashboard),
             ("椰子商店", "bag.fill", .coconutShop),
             ("扭蛋机", "circle.grid.cross.fill", .gacha),
             ("家庭周报", "chart.bar.doc.horizontal", .familyWeeklyReport)
         ]
+    }
+
+    private func featureIcon(defaultIcon: String, availability: AppFeatureAvailability) -> String {
+        switch availability {
+        case .visible:
+            return defaultIcon
+        case .hiddenLocked:
+            return "lock.fill"
+        case .outOfScope:
+            return "eye.slash.fill"
+        }
+    }
+
+    private func featureTint(_ availability: AppFeatureAvailability) -> Color {
+        switch availability {
+        case let .visible(status), let .hiddenLocked(status):
+            return Color(hex: status.step.tintHex)
+        case .outOfScope:
+            return Color.ohanaSecondaryText
+        }
+    }
+
+    private func featureBadgeText(_ availability: AppFeatureAvailability) -> String {
+        switch availability {
+        case .visible:
+            return localized(zh: "可用", en: "Open", de: "Offen")
+        case let .hiddenLocked(status):
+            return "Lv.\(status.step.requiredLevel)"
+        case .outOfScope:
+            return localized(zh: "隐藏", en: "Hidden", de: "Verborgen")
+        }
+    }
+
+    private func featureBadgeForeground(_ availability: AppFeatureAvailability) -> Color {
+        switch availability {
+        case .visible:
+            return Color.arkInk
+        case let .hiddenLocked(status):
+            return Color(hex: status.step.tintHex)
+        case .outOfScope:
+            return Color.ohanaSecondaryText
+        }
+    }
+
+    private func featureBadgeBackground(_ availability: AppFeatureAvailability) -> Color {
+        switch availability {
+        case .visible:
+            return Color.goPrimary
+        case .hiddenLocked, .outOfScope:
+            return Color.ohanaControlFill
+        }
+    }
+
+    private func featureStageText(_ availability: AppFeatureAvailability) -> String {
+        switch availability {
+        case let .visible(status), let .hiddenLocked(status):
+            return status.step.title(language: appLanguage)
+        case .outOfScope:
+            return localized(zh: "当前版本不纳入范围", en: "Out of current scope", de: "Nicht im aktuellen Umfang")
+        }
     }
 
     private func localized(zh: String, en: String, de: String) -> String {
@@ -422,27 +585,53 @@ struct GrowthUnlockFlowTestView: View {
 
         withAnimation(GoMotion.feedback) {
             simulatedLevel = nextLevel
+            simulatedProgress = nextLevel >= 10 ? 1 : 0.08
         }
 
-        guard let step = GrowthUnlockPolicy.newlyUnlockedStages(from: previousLevel, to: nextLevel).last else {
+        guard let step = AppFeatureRouteGuard.newlyUnlockedStages(from: previousLevel, to: nextLevel).last else {
             return
         }
         presentUnlockToast(step: step, currentLevel: nextLevel)
     }
 
+    private func simulateDailyCompletion() {
+        guard simulatedLevel < 10 else {
+            presentGrowthPulse(level: simulatedLevel, energyDelta: 1, progress: 1)
+            return
+        }
+
+        let nextProgress = min(1, simulatedProgress + 0.22)
+        if nextProgress >= 1 {
+            simulateUpgrade()
+        } else {
+            withAnimation(GoMotion.feedback) {
+                simulatedProgress = nextProgress
+            }
+            presentGrowthPulse(level: simulatedLevel, energyDelta: 1, progress: nextProgress)
+        }
+    }
+
     private func resetSimulation() {
         unlockToastDismissTask?.cancel()
         unlockToastDismissTask = nil
+        growthPulseDismissTask?.cancel()
+        growthPulseDismissTask = nil
         withAnimation(GoMotion.feedback) {
             simulatedLevel = 1
+            simulatedProgress = 0.48
             showsGuide = false
             unlockToastStatus = nil
+            growthPulseStatus = nil
+            openedRecommendationStep = nil
         }
     }
 
     private func presentUnlockToast(step: GrowthUnlockStep, currentLevel: Int) {
         unlockToastDismissTask?.cancel()
+        growthPulseDismissTask?.cancel()
+        growthPulseDismissTask = nil
         withAnimation(GoMotion.sheetEnter) {
+            growthPulseStatus = nil
             unlockToastStatus = GrowthUnlockStatus(step: step, currentLevel: currentLevel)
         }
         unlockToastDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3_800) {
@@ -455,6 +644,35 @@ struct GrowthUnlockFlowTestView: View {
         unlockToastDismissTask = nil
         withAnimation(GoMotion.sheetEnter) {
             unlockToastStatus = nil
+        }
+    }
+
+    private func presentRecommendedEntry(for step: GrowthUnlockStep) {
+        dismissUnlockToast()
+        withAnimation(GoMotion.feedback) {
+            openedRecommendationStep = step
+        }
+    }
+
+    private func presentGrowthPulse(level: Int, energyDelta: Int, progress: Double) {
+        growthPulseDismissTask?.cancel()
+        withAnimation(GoMotion.sheetEnter) {
+            growthPulseStatus = GrowthLoopPulseStatus(
+                currentLevel: level,
+                energyDelta: energyDelta,
+                progressPercent: min(100, max(0, Int((progress * 100).rounded())))
+            )
+        }
+        growthPulseDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 2_600) {
+            dismissGrowthPulse()
+        }
+    }
+
+    private func dismissGrowthPulse() {
+        growthPulseDismissTask?.cancel()
+        growthPulseDismissTask = nil
+        withAnimation(GoMotion.sheetEnter) {
+            growthPulseStatus = nil
         }
     }
 }

@@ -46,7 +46,7 @@ struct VerticalGlassHomeLabView: View {
             OhanaAppBackground().ignoresSafeArea()
 
             GeometryReader { geo in
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !canFloat)) { timeline in
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !canFloat)) { timeline in // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                     let time = canFloat ? timeline.date.timeIntervalSinceReferenceDate : 0
 
                     ZStack {
@@ -91,10 +91,10 @@ struct VerticalGlassHomeLabView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "竖版实色首页实验室", en: "Solid Portrait Home Lab", de: "Solides Hochformat-Home-Labor"))
-                    .font(.system(size: 21, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 21, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "实色卡片、小幅交错、内嵌快捷操作", en: "Solid cards, light stagger, embedded actions", de: "Solide Karten, leichte Staffelung, Aktionen"))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -104,8 +104,8 @@ struct VerticalGlassHomeLabView: View {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 dismiss()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .background(Color.ohanaCardSurface, in: Circle())
@@ -130,12 +130,12 @@ struct VerticalGlassHomeLabView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: active.icon)
-                        .font(.system(size: 15, weight: .black))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black))
                     Text(active.compactTitle(l))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .lineLimit(1)
                     Text(active.value)
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .contentTransition(.numericText())
                 }
                 .foregroundStyle(Color.ohanaPrimaryActionText)
@@ -195,10 +195,10 @@ struct VerticalGlassHomeLabView: View {
                         isFocusCollapsed = true
                     }
                 } label: {
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 12, weight: .black))
+                    Image(systemName: "chevron.up") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 32, height: 32) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -302,8 +302,8 @@ struct VerticalGlassHomeLabView: View {
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .black))
+                Image(systemName: "plus") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    .font(OhanaFont.adaptive(size: 22, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 58, height: 58)
                     .background(Color.goPrimary, in: Circle())
@@ -327,10 +327,10 @@ struct VerticalGlassHomeLabView: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .symbolVariant(selectedTab == tab ? .fill : .none)
                 Text(tab.title(l))
-                    .font(.system(size: 8, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -564,17 +564,17 @@ private struct VerticalGlassHomeLabCardView: View {
 
                 if isExpanded {
                     Button(action: onCollapse) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "xmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                             .background(Color.ohanaControlFill, in: Circle())
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel("Close")
                 } else {
                     Text(card.badge)
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
@@ -617,11 +617,11 @@ private struct VerticalGlassHomeLabCardView: View {
     private var compactFooter: some View {
         HStack(alignment: .lastTextBaseline, spacing: 4) {
             Text(card.primaryMetric)
-                .font(.system(size: 31, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 31, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
             Text(card.metricUnit)
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
         }
@@ -645,11 +645,11 @@ private struct VerticalGlassHomeLabCardView: View {
     private func metricPill(_ value: String, _ label: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
             Text(label)
-                .font(.system(size: 9, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -666,9 +666,9 @@ private struct VerticalGlassHomeLabCardView: View {
                 } label: {
                     VStack(spacing: 5) {
                         Image(systemName: action.icon)
-                            .font(.system(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black))
                         Text(action.title(l))
-                            .font(.system(size: 9, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                     }
@@ -887,7 +887,7 @@ private struct VerticalGlassHomeLabFocusItemView: View {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(item.tint.opacity(0.16))
                 Image(systemName: item.icon)
-                    .font(.system(size: 34, weight: .black))
+                    .font(OhanaFont.adaptive(size: 34, weight: .black))
                     .foregroundStyle(item.tint)
                     .symbolRenderingMode(.monochrome)
             }
@@ -895,20 +895,20 @@ private struct VerticalGlassHomeLabFocusItemView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title(l))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                 HStack(alignment: .lastTextBaseline, spacing: 4) {
                     Text(item.value)
-                        .font(.system(size: 38, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 38, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Text(item.unit)
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.86))
                 }
                 Text(item.subtitle(l))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }

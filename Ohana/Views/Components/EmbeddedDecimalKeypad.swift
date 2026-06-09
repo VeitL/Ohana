@@ -58,8 +58,8 @@ struct EmbeddedDecimalKeypad: View {
                     onSubmit?()
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "keyboard.chevron.compact.down")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "keyboard.chevron.compact.down").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                         Text("OK")
                             .font(OhanaFont.caption(.black))
                     }
@@ -81,7 +81,7 @@ struct EmbeddedDecimalKeypad: View {
     @ViewBuilder
     private func keyContent(_ key: String) -> some View {
         if key == "delete" {
-            Image(systemName: "delete.left.fill")
+            Image(systemName: "delete.left.fill").accessibilityHidden(true)
                 .font(.system(size: isMini ? 13 : 17, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryText)
         } else {

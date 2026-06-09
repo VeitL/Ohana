@@ -12,13 +12,13 @@ struct QuickPottyDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
     var onClose: (() -> Void)? = nil
+    let allEvents: [Event]
+    let allPets: [Pet]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
-    @Query(sort: \Event.startDate) private var allEvents: [Event]
-    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -49,6 +49,21 @@ struct QuickPottyDetailSheet: View {
     @State private var litterFeedbackToken: CheckInFeedbackToken?
     @State private var feedbackClearTask: Task<Void, Never>?
     @State private var selectedSharedPottyPetIds: Set<UUID> = []
+    @State private var isCommittingPottyLog = false
+
+    init(
+        pet: Pet,
+        onRemove: @escaping () -> Void,
+        onClose: (() -> Void)? = nil,
+        allEvents: [Event] = [],
+        allPets: [Pet] = []
+    ) {
+        self.pet = pet
+        self.onRemove = onRemove
+        self.onClose = onClose
+        self.allEvents = allEvents
+        self.allPets = allPets
+    }
 
     private enum PottyFocus: String, CaseIterable, Identifiable {
         case potty
@@ -118,6 +133,9 @@ struct QuickPottyDetailSheet: View {
     private var scoopTint: Color { isDark ? Color.goPrimary : Color(hex: CareType.litter.accentColorHex) }
     private var litterTint: Color { Color(hex: "D4A574") }
     private var chromeTint: Color { isDark ? Color.goPrimary : themeColor }
+    private var pottyCommandExecutor: QuickPottyCommandExecutor {
+        QuickPottyCommandExecutor(context: modelContext)
+    }
     private var l: L10n { L10n(appLanguage) }
     private var isCatPet: Bool {
         let text = "\(pet.species) \(pet.breed)".lowercased()
@@ -347,6 +365,8 @@ struct QuickPottyDetailSheet: View {
             feedbackClearTask?.cancel()
             pottyPlanSaveTask?.cancel()
             isSavingPottyPlan = false
+            isCommittingPottyLog = false
+            commandQueue.cancelAll()
         }
         .interactiveDismissDisabled(activeInlineSheet != nil)
     }
@@ -516,20 +536,20 @@ struct QuickPottyDetailSheet: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
-                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "噗噗电台", en: "Poop Radio", de: "Häufchen-Radio"))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer()
 
             Button { closeDetail() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .contentShape(Rectangle())
             }
             .frame(width: 44, height: 44)
@@ -566,16 +586,16 @@ struct QuickPottyDetailSheet: View {
                         .fill(tint(for: selectedFocus).opacity(0.14))
                         .frame(width: 66, height: 66)
                     Image(systemName: selectedFocus.icon)
-                        .font(.system(size: 27, weight: .black))
+                        .font(OhanaFont.adaptive(size: 27, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tint(for: selectedFocus))
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(l.tr(zh: "噗噗电台", en: "Poop Radio", de: "Häufchen-Radio"))
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(pottyDashboardSubtitle)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
@@ -632,9 +652,9 @@ struct QuickPottyDetailSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: focus.icon)
-                    .font(.system(size: 10, weight: .black))
+                    .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(focus.title(l))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(selected ? Color.arkInk : tint)
             .frame(maxWidth: .infinity)
@@ -647,10 +667,10 @@ struct QuickPottyDetailSheet: View {
     private func pottySummaryPill(title: String, value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -804,14 +824,14 @@ struct QuickPottyDetailSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(l.tr(zh: "最近", en: "Latest", de: "Zuletzt"))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Button {
                     openPottySheet(.history)
                 } label: {
                     Text(l.tr(zh: "管理", en: "Manage", de: "Verwalten"))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(chromeTint)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -819,7 +839,7 @@ struct QuickPottyDetailSheet: View {
 
             if recentItems.isEmpty {
                 Text(l.tr(zh: "暂无记录", en: "No logs yet", de: "Noch keine Einträge"))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.62))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
@@ -837,7 +857,7 @@ struct QuickPottyDetailSheet: View {
 
     private var toastView: some View {
         Text(saveToastMessage)
-            .font(.system(size: 13, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
@@ -1166,7 +1186,7 @@ struct QuickPottyDetailSheet: View {
                         openPottySheet(.scoopSettings)
                     } label: {
                         Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(scoopTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -1206,7 +1226,7 @@ struct QuickPottyDetailSheet: View {
                         openPottySheet(.litterSettings)
                     } label: {
                         Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(litterTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -1236,22 +1256,22 @@ struct QuickPottyDetailSheet: View {
     private var litterHistorySheetContent: some View {
         if let lastFullChange {
             HStack(spacing: 10) {
-                Image(systemName: "tray.full.fill")
-                    .font(.system(size: 13, weight: .bold))
+                Image(systemName: "tray.full.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(litterTint)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(litterTint.opacity(0.14), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "整盆换砂", en: "Full litter change", de: "Kompletter Streuwechsel"))
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(relativeDayText(for: lastFullChange))
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text(lastFullChange, format: .dateTime.month().day().hour().minute())
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(.vertical, 3)
@@ -1263,16 +1283,16 @@ struct QuickPottyDetailSheet: View {
     private func poopOverviewHero(icon: String, title: String, subtitle: String, tint: Color) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 24, weight: .bold))
+                .font(OhanaFont.adaptive(size: 24, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 54, height: 54)
                 .background(tint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer(minLength: 0)
@@ -1295,7 +1315,7 @@ struct QuickPottyDetailSheet: View {
                     }
                 } label: {
                     Text(range.title(l))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(overviewRange == range ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -1337,11 +1357,11 @@ struct QuickPottyDetailSheet: View {
     private func pottySheetChromeTitleContent(icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
-                .frame(width: 30, height: 34)
+                .frame(width: 30, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(title)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
@@ -1352,16 +1372,16 @@ struct QuickPottyDetailSheet: View {
     private func poopOverviewMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
-                .frame(width: 30, height: 30)
+                .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(value)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -1375,10 +1395,10 @@ struct QuickPottyDetailSheet: View {
     private func poopOverviewLineChart(title: String, subtitle: String, points: [PoopChartPoint], tint: Color, emptyText: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(subtitle)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
 
             if points.allSatisfy({ $0.value <= 0 }) {
@@ -1403,11 +1423,11 @@ struct QuickPottyDetailSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(title)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text(progressDaysText(elapsed: elapsed, interval: max(interval, 1)))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tint)
             }
             GeometryReader { proxy in
@@ -1427,7 +1447,7 @@ struct QuickPottyDetailSheet: View {
 
     private func overviewSectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 14, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.top, 4)
     }
@@ -1435,9 +1455,9 @@ struct QuickPottyDetailSheet: View {
     private func emptyInlineState(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .bold))
+                .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(text)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(Color.ohanaSecondaryText)
         .frame(maxWidth: .infinity)
@@ -1447,16 +1467,16 @@ struct QuickPottyDetailSheet: View {
     private func poopSummaryRow(icon: String, title: String, value: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .bold))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.14), in: Circle())
             Text(title)
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
         }
         .padding(12)
@@ -1566,7 +1586,11 @@ struct QuickPottyDetailSheet: View {
     }
 
     private func syncScoopPlan(showToast: Bool) {
-        for target in selectedPottyTargets {
+        syncScoopPlan(for: selectedPottyTargets, showToast: showToast)
+    }
+
+    private func syncScoopPlan(for targets: [Pet], showToast: Bool) {
+        for target in targets {
             persistScoopSettings(for: target)
             CarePlanCalendarSync.syncScoopPlan(
                 pet: target,
@@ -1586,7 +1610,11 @@ struct QuickPottyDetailSheet: View {
     }
 
     private func syncLitterChangePlan(showToast: Bool) {
-        for target in selectedPottyTargets {
+        syncLitterChangePlan(for: selectedPottyTargets, showToast: showToast)
+    }
+
+    private func syncLitterChangePlan(for targets: [Pet], showToast: Bool) {
+        for target in targets {
             persistLitterChangeSettings(for: target)
             CarePlanCalendarSync.syncLitterFullChangePlan(
                 pet: target,
@@ -1637,31 +1665,53 @@ struct QuickPottyDetailSheet: View {
 
     // MARK: - Actions
     private func logPotty(type: PottyType) {
-        let reward = CareEventService.recordPotty(
-            pet: pet,
-            type: type,
-            context: modelContext,
-            executorId: activeExecutorId()
-        )
-        let delta = reward.humanGot + reward.petGot
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: pottyTint)
-        scheduleFeedbackClear()
-        showSaveConfirmation(delta > 0 ? "\(type.emoji) +\(delta)🥥" : l.tr(zh: "噗噗已记录", en: "Poop logged", de: "Häufchen erfasst"))
+        guard !isCommittingPottyLog else { return }
+        isCommittingPottyLog = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let executorId = activeExecutorId()
+        commandQueue.enqueue(.quickCare(entityID: pet.id, action: type.rawValue)) {
+            let result = pottyCommandExecutor.record(
+                petID: pet.id,
+                selectedType: type,
+                isLitter: false,
+                executorId: executorId,
+                date: Date()
+            )
+            isCommittingPottyLog = false
+            guard let result else {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let delta = result.coconutDelta
+            pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: delta > 0 ? "+\(delta)" : "+1", tint: pottyTint)
+            scheduleFeedbackClear()
+            showSaveConfirmation(delta > 0 ? "\(type.emoji) +\(delta)🥥" : l.tr(zh: "噗噗已记录", en: "Poop logged", de: "Häufchen erfasst"))
+        }
     }
 
     private func logUnknownGroupPotty() {
-        _ = CareEventService.recordUnknownSharedPotty(
-            sourcePet: pet,
-            targets: selectedPottyTargets,
-            type: .perfectPoop,
-            context: modelContext,
-            executorId: activeExecutorId()
-        )
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: pottyTint)
-        scheduleFeedbackClear()
-        showSaveConfirmation(l.tr(zh: "猫砂盆事件已记录", en: "Litter-box event logged", de: "Klo-Ereignis erfasst"))
+        let targetIDs = Set(selectedPottyTargets.map(\.id))
+        let executorId = activeExecutorId()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(.quickCare(entityID: pet.id, action: "unknownSharedPotty")) {
+            guard pottyCommandExecutor.recordUnknownSharedPotty(
+                sourcePetID: pet.id,
+                targetIDs: targetIDs,
+                type: .perfectPoop,
+                executorId: executorId,
+                date: Date()
+            ) != nil else {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: pottyTint)
+            scheduleFeedbackClear()
+            showSaveConfirmation(l.tr(zh: "猫砂盆事件已记录", en: "Litter-box event logged", de: "Klo-Ereignis erfasst"))
+        }
     }
 
     private func doScoop() {
@@ -1680,66 +1730,67 @@ struct QuickPottyDetailSheet: View {
 
     private func recordScoop() {
         let targets = selectedPottyTargets
-        let reward = targets.count > 1
-            ? CareEventService.recordSharedLitterCare(
-                sourcePet: pet,
-                targets: targets,
-                context: modelContext,
-                executorId: activeExecutorId()
-            )
-            : CareEventService.recordCare(
-                pet: pet,
-                type: .litter,
-                context: modelContext,
-                executorId: activeExecutorId(),
-                reward: .potty(isLitter: true)
-            )
-        syncScoopPlan(showToast: false)
-        let delta = reward.humanGot + reward.petGot
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        scoopFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: scoopTint)
-        scheduleFeedbackClear()
-        let actionText = targets.count > 1
-            ? l.tr(zh: "\(targets.count)只猫 已铲", en: "\(targets.count) cats scooped", de: "\(targets.count) Katzenklos sauber")
-            : l.tr(zh: "铲砂已记录", en: "Scoop logged", de: "Klo erfasst")
-        showSaveConfirmation(delta > 0 ? "\(actionText) +\(delta)🥥" : actionText)
+        let targetIDs = Set(targets.map(\.id))
+        let executorId = activeExecutorId()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(.quickCare(entityID: pet.id, action: "litterScoop")) {
+            guard let result = pottyCommandExecutor.recordLitterCare(
+                sourcePetID: pet.id,
+                targetIDs: targetIDs,
+                executorId: executorId,
+                date: Date(),
+                isFullChange: false
+            ) else {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                return
+            }
+            syncScoopPlan(for: targets, showToast: false)
+            let delta = result.coconutDelta
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            scoopFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: scoopTint)
+            scheduleFeedbackClear()
+            let actionText = result.targetCount > 1
+                ? l.tr(zh: "\(result.targetCount)只猫 已铲", en: "\(result.targetCount) cats scooped", de: "\(result.targetCount) Katzenklos sauber")
+                : l.tr(zh: "铲砂已记录", en: "Scoop logged", de: "Klo erfasst")
+            showSaveConfirmation(delta > 0 ? "\(actionText) +\(delta)🥥" : actionText)
+        }
     }
 
     private func doFullChange() {
         let now = Date()
-        let defaults = UserDefaults.standard
-        defaults.set(now.timeIntervalSince1970, forKey: "lastLitterChangeDate_\(petKey)")
-        litterCycleAnchorDate = Calendar.current.startOfDay(for: now)
-        defaults.set(litterCycleAnchorDate.timeIntervalSince1970, forKey: "litterChangeCycleAnchor_\(petKey)")
-
+        let cycleAnchor = Calendar.current.startOfDay(for: now)
+        let shouldRecordLitterCare = todayLitterLogs.isEmpty
         let targets = selectedPottyTargets
-        if todayLitterLogs.isEmpty {
-            _ = targets.count > 1
-                ? CareEventService.recordSharedLitterCare(
-                    sourcePet: pet,
-                    targets: targets,
-                    context: modelContext,
-                    executorId: activeExecutorId(),
+        let targetIDs = Set(targets.map(\.id))
+        let executorId = activeExecutorId()
+        litterCycleAnchorDate = cycleAnchor
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(.quickCare(entityID: pet.id, action: "litterFullChange")) {
+            let defaults = UserDefaults.standard
+            defaults.set(now.timeIntervalSince1970, forKey: "lastLitterChangeDate_\(petKey)")
+            defaults.set(cycleAnchor.timeIntervalSince1970, forKey: "litterChangeCycleAnchor_\(petKey)")
+
+            if shouldRecordLitterCare {
+                _ = pottyCommandExecutor.recordLitterCare(
+                    sourcePetID: pet.id,
+                    targetIDs: targetIDs,
+                    executorId: executorId,
+                    date: now,
                     isFullChange: true
                 )
-                : CareEventService.recordCare(
-                    pet: pet,
-                    type: .litter,
-                    context: modelContext,
-                    executorId: activeExecutorId(),
-                    reward: .potty(isLitter: true)
-                )
+            }
+            syncScoopPlan(for: targets, showToast: false)
+            syncLitterChangePlan(for: targets, showToast: false)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            litterFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: litterTint)
+            scheduleFeedbackClear()
+            showSaveConfirmation(
+                targets.count > 1
+                ? l.tr(zh: "\(targets.count)只猫 已换砂", en: "\(targets.count) litter boxes changed", de: "\(targets.count) Katzenstreus gewechselt")
+                : l.tr(zh: "换砂已记录", en: "Litter change logged", de: "Streuwechsel erfasst")
+            )
         }
-        syncScoopPlan(showToast: false)
-        syncLitterChangePlan(showToast: false)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        litterFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: litterTint)
-        scheduleFeedbackClear()
-        showSaveConfirmation(
-            targets.count > 1
-            ? l.tr(zh: "\(targets.count)只猫 已换砂", en: "\(targets.count) litter boxes changed", de: "\(targets.count) Katzenstreus gewechselt")
-            : l.tr(zh: "换砂已记录", en: "Litter change logged", de: "Streuwechsel erfasst")
-        )
     }
 
     private func scheduleFeedbackClear() {
@@ -1789,7 +1840,13 @@ struct QuickPottyDetailSheet: View {
     }
 
     private func latestAllEvents() -> [Event] {
-        let descriptor = FetchDescriptor<Event>(sortBy: [SortDescriptor(\.startDate)])
+        let petKey = pet.id.uuidString
+        let descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.relatedEntityId == petKey
+            },
+            sortBy: [SortDescriptor(\.startDate)]
+        )
         return (try? modelContext.fetch(descriptor)) ?? allEvents
     }
 

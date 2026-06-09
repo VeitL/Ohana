@@ -23,13 +23,13 @@ struct PetHygieneCard: View {
                 // Header — NavigationLink 进入护理详情页
                 NavigationLink(destination: PetHygieneDetailView(pet: pet)) {
                     HStack {
-                        Text("✨").font(.system(size: 14))
+                        Text("✨").font(OhanaFont.adaptive(size: 14))
                         Text("护理打卡")
                             .font(OhanaFont.headline(.black))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                 }
@@ -42,7 +42,7 @@ struct PetHygieneCard: View {
 
                     if recordedTypes.isEmpty {
                         Text("暂无记录")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             .padding(.vertical, 4)
                     } else {
@@ -71,7 +71,7 @@ struct PetHygieneCard: View {
             if undoLog != nil {
                 HStack(spacing: 8) {
                     Text("✨ \(undoLabel) 已打卡")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Button {
@@ -81,7 +81,7 @@ struct PetHygieneCard: View {
                         withAnimation(GoMotion.feedback) { undoLog = nil }
                     } label: {
                         Text("撤回")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goYellow)
                     }
                 }
@@ -150,24 +150,24 @@ private struct HygieneDetailSheet: View {
                 // ── 顶栏
                 HStack {
                     Button { dismiss() } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 15, weight: .bold))
+                        Image(systemName: "chevron.down").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 15, weight: .bold))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                            .frame(width: 34, height: 34)
+                            .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             .goGlassBackground(Circle())
                     }
                     Spacer()
                     VStack(spacing: 2) {
                         Text("护理打卡")
-                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(pet.name)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                     Spacer()
                     // 占位保持居中
-                    Color.clear.frame(width: 34, height: 34)
+                    Color.clear.frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 }
                 .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 14)
 
@@ -190,19 +190,19 @@ private struct HygieneDetailSheet: View {
                                     .frame(width: 52, height: 52)
                                     .rotationEffect(.degrees(-90))
                                 Image(systemName: type.systemIconName)
-                                    .font(.system(size: 18, weight: .semibold))
+                                    .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                                     .foregroundStyle(color)
                             }
                             Text(type.rawValue)
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                             if let d = days {
                                 Text(d == 0 ? "今天" : "\(d)天前")
-                                    .font(.system(size: 9, weight: .semibold))
+                                    .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                                     .foregroundStyle(color)
                             } else {
                                 Text("未记录")
-                                    .font(.system(size: 9, weight: .semibold))
+                                    .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
                         }
@@ -220,7 +220,7 @@ private struct HygieneDetailSheet: View {
                     VStack(spacing: 0) {
                         Capsule()
                             .fill(Color.arkInk.opacity(0.1))
-                            .frame(width: 36, height: 4)
+                            .frame(width: 36, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             .padding(.top, 10).padding(.bottom, 12)
 
                         ScrollView(.vertical, showsIndicators: false) {
@@ -250,15 +250,15 @@ private struct HygieneDetailSheet: View {
             // 标题行
             HStack(spacing: 6) {
                 Image(systemName: type.systemIconName)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(color)
                 Text(type.rawValue)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                 Spacer()
                 if let d = days {
                     Text(d == 0 ? "今天已打卡" : "\(d)天前 · 每\(type.cycleDays)天一次")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold))
                         .foregroundStyle(color)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(color.opacity(0.1), in: Capsule())
@@ -278,21 +278,21 @@ private struct HygieneDetailSheet: View {
 
             // 近期记录
             if logs.isEmpty {
-                Text("暂无记录").font(.system(size: 12)).foregroundStyle(Color.ohanaSecondaryText)
+                Text("暂无记录").font(OhanaFont.adaptive(size: 12)).foregroundStyle(Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 4)
             } else {
                 VStack(spacing: 5) {
                     ForEach(logs.prefix(3)) { log in
                         HStack {
                             Text(log.date, format: .dateTime.month().day().hour().minute())
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.arkInk.opacity(0.7))
                             Spacer()
                             Button {
                                 delete(log)
                             } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 11))
+                                Image(systemName: "trash").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 11))
                                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
                         }
@@ -351,14 +351,14 @@ private struct HygieneCheckButton: View {
                 ZStack {
                     Circle()
                         .fill(justChecked || isDoneToday ? statusColor : statusColor.opacity(0.12))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .overlay(Circle().strokeBorder(statusColor.opacity(0.3), lineWidth: 1))
                     Image(systemName: type.systemIconName)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                         .foregroundStyle(justChecked || isDoneToday ? .white : statusColor)
                 }
                 Text(type.rawValue)
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .rounded))
                     .foregroundStyle(isDoneToday ? statusColor : .primary.opacity(0.6))
                     .lineLimit(1)
             }
@@ -428,7 +428,7 @@ struct HygieneTodoSheet: View {
             // Handle
             Capsule()
                 .fill(Color.secondary.opacity(0.3))
-                .frame(width: 40, height: 4)
+                .frame(width: 40, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .padding(.top, 12)
                 .padding(.bottom, 18)
 
@@ -439,14 +439,14 @@ struct HygieneTodoSheet: View {
                         .fill(accent.opacity(0.15))
                         .frame(width: 44, height: 44)
                     Image(systemName: type.systemIconName)
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                         .foregroundStyle(accent)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text("设置护理计划")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     Text("\(pet.name) · \(type.rawValue)")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(accent.opacity(0.85))
                 }
                 Spacer()
@@ -498,8 +498,8 @@ struct HygieneTodoSheet: View {
                     // ── 护理周期
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
-                            Image(systemName: "repeat").font(.system(size: 13, weight: .semibold)).foregroundStyle(accent)
-                            Text("护理周期").font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                            Image(systemName: "repeat").accessibilityHidden(true).font(OhanaFont.adaptive(size: 13, weight: .semibold)).foregroundStyle(accent)
+                            Text("护理周期").font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
                         }
                         .padding(.horizontal, 4)
                         HStack(spacing: 14) {
@@ -507,10 +507,10 @@ struct HygieneTodoSheet: View {
                                 repeatDays = max(0, repeatDays - 1)
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             } label: {
-                                Image(systemName: "minus")
-                                    .font(.system(size: 15, weight: .black))
+                                Image(systemName: "minus").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                                     .foregroundStyle(repeatDays == 0 ? .secondary : accent)
-                                    .frame(width: 38, height: 38)
+                                    .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                     .background(Color(.systemBackground).opacity(0.82), in: Circle())
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -518,10 +518,10 @@ struct HygieneTodoSheet: View {
 
                             VStack(spacing: 2) {
                                 Text(repeatDays == 0 ? "不重复" : "\(repeatDays) 天")
-                                    .font(.system(size: 22, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(repeatDescription)
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .frame(maxWidth: .infinity)
@@ -530,10 +530,10 @@ struct HygieneTodoSheet: View {
                                 repeatDays = min(365, repeatDays + 1)
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             } label: {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 15, weight: .black))
+                                Image(systemName: "plus").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                                     .foregroundStyle(accent)
-                                    .frame(width: 38, height: 38)
+                                    .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                     .background(Color(.systemBackground).opacity(0.82), in: Circle())
                             }
                             .buttonStyle(ScaleButtonStyle())
@@ -548,7 +548,7 @@ struct HygieneTodoSheet: View {
                     // ── 备注
                     settingRow(icon: "note.text", iconColor: accent.opacity(0.65), label: "备注") {
                         TextField("可选备注", text: $customNote)
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
                             .tint(accent)
                     }
                 }
@@ -558,10 +558,10 @@ struct HygieneTodoSheet: View {
             // ── 保存按钮
             Button { save() } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "calendar.badge.plus")
+                    Image(systemName: "calendar.badge.plus").accessibilityHidden(true)
                     Text("添加到日历")
                 }
-                .font(.system(size: 16, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
                 .frame(maxWidth: .infinity).padding(.vertical, 14)
                 .background(accent, in: RoundedRectangle(cornerRadius: 14))
@@ -577,11 +577,11 @@ struct HygieneTodoSheet: View {
     private func settingRow<V: View>(icon: String, iconColor: Color, label: String, @ViewBuilder content: () -> V) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(iconColor)
                 .frame(width: 22)
             Text(label)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
             Spacer()
             content()
         }

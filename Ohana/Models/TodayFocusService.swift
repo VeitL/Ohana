@@ -107,6 +107,22 @@ enum TodayFocusService {
         }
     }
 
+    static func quest(_ quest: IslandQuest, matchesCompletedEntity entityId: UUID) -> Bool {
+        if quest.targetPetId == entityId || quest.targetPlantId == entityId {
+            return true
+        }
+        if IslandQuestEngine.eventId(fromQuestId: quest.id) == entityId {
+            return true
+        }
+        if IslandQuestEngine.medicationId(fromQuestId: quest.id) == entityId {
+            return true
+        }
+        if IslandQuestEngine.humanWeightId(fromQuestId: quest.id) == entityId {
+            return true
+        }
+        return false
+    }
+
     private static func isQuestCompletedToday(
         _ quest: IslandQuest,
         pets: [Pet],

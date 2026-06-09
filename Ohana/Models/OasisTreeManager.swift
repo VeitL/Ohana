@@ -45,15 +45,15 @@ enum TreeLevel: Int, CaseIterable, Comparable {
     var levelUpReward: Int {
         switch self {
         case .lv1:  return 0
-        case .lv2:  return 5
-        case .lv3:  return 10
-        case .lv4:  return 15
-        case .lv5:  return 25
-        case .lv6:  return 35
-        case .lv7:  return 50
-        case .lv8:  return 75
-        case .lv9:  return 100
-        case .lv10: return 200
+        case .lv2:  return 10
+        case .lv3:  return 15
+        case .lv4:  return 25
+        case .lv5:  return 40
+        case .lv6:  return 60
+        case .lv7:  return 90
+        case .lv8:  return 125
+        case .lv9:  return 165
+        case .lv10: return 220
         }
     }
 
@@ -99,6 +99,9 @@ final class OasisTreeManager {
     private static let dailyTreeCoconutDayKey = "oasis_dailyTreeCoconutDay"
     private static let dailyTreeCoconutCountKey = "oasis_dailyTreeCoconutCount"
     private static let dailyTreeCoconutHarvestedKey = "oasis_dailyTreeCoconutHarvestedIndices"
+    private static let v2LegacyBaselineXPKey = "oasis_v2LegacyBaselineXP"
+    private static let dailyInjectionDayKey = "oasis_v2DailyTreeInjectionDay"
+    private static let weeklyInjectionWeekKey = "oasis_v2WeeklyTreeInjectionWeek"
 
     // 基础繁荣度（来自数据库活动）
     var islandEnergy: Int = 0
@@ -174,9 +177,11 @@ final class OasisTreeManager {
 
     var passiveIncomeAmount: Int {
         switch treeLevel {
-        case .lv5, .lv6:   return 3
-        case .lv7, .lv8:   return 5
-        case .lv9:          return 8
+        case .lv5:          return 3
+        case .lv6:          return 4
+        case .lv7:          return 6
+        case .lv8:          return 8
+        case .lv9:          return 10
         case .lv10:         return 15
         default:            return 0
         }
@@ -318,6 +323,103 @@ final class OasisTreeManager {
         pets: [Pet],
         humans: [Human]
     ) -> Int {
+        let ledgerEvents = (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let v2GrowthXP = ledgerEvents.reduce(0) { partial, event in
+            partial + CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: event.metadataJSON)
+        }
+        return legacyCompatibilityXP(
+            ledgerEvents: ledgerEvents,
+            modelContext: modelContext,
+            pets: pets,
+            humans: humans
+        ) + v2GrowthXP
+    }
+
+    // MARK: - Inject Energy（消耗椰子，增加树经验）
+
+    @discardableResult
+    @MainActor
+    func injectEnergy(cost: Int = 80, modelContext: ModelContext) -> Bool {
+        let package = Self.injectionPackage(forRequestedCost: cost, currentLevel: treeLevel)
+        guard package.isAvailable else { return false }
+        guard Self.canUseInjectionPackage(package) else { return false }
+        guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
+            package.cost,
+            emoji: "✨",
+            title: package.title,
+            context: modelContext
+        ) else { return false }
+        return applyEnergyPackage(package, recordsCost: true, modelContext: modelContext)
+    }
+
+    @discardableResult
+    @MainActor
+    func applyPurchasedEnergyBoost(cost: Int, modelContext: ModelContext) -> Bool {
+        let package = Self.injectionPackage(forRequestedCost: cost, currentLevel: treeLevel)
+        guard package.isAvailable else { return false }
+        guard Self.canUseInjectionPackage(package) else { return false }
+        return applyEnergyPackage(package, recordsCost: false, modelContext: modelContext)
+    }
+
+    @discardableResult
+    @MainActor
+    private func applyEnergyPackage(_ package: InjectionPackage, recordsCost: Bool, modelContext: ModelContext) -> Bool {
+        injectedEnergy += package.xp
+        Self.markInjectionPackageUsed(package)
+        CareLedgerService.record(
+            actorKind: .human,
+            actorId: UserDefaults.standard.string(forKey: "currentActiveHumanId"),
+            subjectKind: .system,
+            subjectId: nil,
+            eventKind: .coconut,
+            actionType: package.actionType,
+            note: package.title,
+            source: .economy,
+            coconutDelta: recordsCost ? -package.cost : 0,
+            metadataJSON: "{\"economyVersion\":2,\"injectedXP\":\(package.xp),\"coconutCost\":\(package.cost),\"budgetMultiplier\":1.0,\"reason\":\"treeInjection\"}",
+            context: modelContext,
+            save: false
+        )
+
+        // 检查是否升级；升级奖励会以“升级椰子”形式等待用户敲开。
+        if checkAndRewardLevelUp(modelContext: modelContext) != nil {
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        } else {
+            // 普通注入，无奖励
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }
+        modelContext.safeSave()
+        return true
+    }
+
+    private static func legacyCompatibilityXP(
+        ledgerEvents: [CareLedgerEvent],
+        modelContext: ModelContext,
+        pets: [Pet],
+        humans: [Human]
+    ) -> Int {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: v2LegacyBaselineXPKey) != nil {
+            return defaults.integer(forKey: v2LegacyBaselineXPKey)
+        }
+
+        let legacyLedgerCount = ledgerEvents.filter {
+            !$0.metadataJSON.contains("\"economyVersion\":2") &&
+            [.care, .potty, .walk, .hygiene, .health, .weight, .medication, .workout, .plantCare, .milestone].contains($0.eventKindEnum)
+        }.count
+        let fallbackCount = legacyLedgerCount > 0
+            ? legacyLedgerCount
+            : legacyActivityCount(modelContext: modelContext, pets: pets, humans: humans)
+        let baseline = min(1_200, fallbackCount * 4)
+        defaults.set(baseline, forKey: v2LegacyBaselineXPKey)
+        return baseline
+    }
+
+    private static func legacyActivityCount(
+        modelContext: ModelContext,
+        pets: [Pet],
+        humans: [Human]
+    ) -> Int {
         var total = 0
         for pet in pets {
             total += pet.careLogs.count
@@ -331,30 +433,53 @@ final class OasisTreeManager {
         let plantEventCount = (try? modelContext.fetchCount(
             FetchDescriptor<Event>(predicate: #Predicate { $0.relatedEntityType == "Plant" })
         )) ?? 0
-        total += plantEventCount
-        return total
+        return total + plantEventCount
     }
 
-    // MARK: - Inject Energy（消耗椰子，增加树经验）
+    private struct InjectionPackage {
+        let cost: Int
+        let xp: Int
+        let actionType: String
+        let title: String
+        let limitKey: String
+        let isAvailable: Bool
+    }
 
-    @discardableResult
-    @MainActor
-    func injectEnergy(cost: Int = 10, modelContext: ModelContext) -> Bool {
-        guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
-            cost,
-            emoji: "✨",
-            title: "注入生命之树能量",
-            context: modelContext
-        ) else { return false }
-        injectedEnergy += cost
-        
-        // 检查是否升级；升级奖励会以“升级椰子”形式等待用户敲开。
-        if checkAndRewardLevelUp(modelContext: modelContext) != nil {
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        } else {
-            // 普通注入，无奖励
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    private static func injectionPackage(forRequestedCost cost: Int, currentLevel: TreeLevel) -> InjectionPackage {
+        if cost >= 220 {
+            return InjectionPackage(
+                cost: 220,
+                xp: 60,
+                actionType: "weeklyTreeInjection",
+                title: "生命之树周能量包 +60XP",
+                limitKey: weeklyInjectionWeekKey,
+                isAvailable: currentLevel >= .lv5
+            )
         }
-        return true
+        return InjectionPackage(
+            cost: 80,
+            xp: 20,
+            actionType: "dailyTreeInjection",
+            title: "注入生命之树能量 +20XP",
+            limitKey: dailyInjectionDayKey,
+            isAvailable: true
+        )
+    }
+
+    private static func canUseInjectionPackage(_ package: InjectionPackage, date: Date = Date()) -> Bool {
+        let usedKey = UserDefaults.standard.string(forKey: package.limitKey)
+        return usedKey != injectionPeriodKey(for: package, date: date)
+    }
+
+    private static func markInjectionPackageUsed(_ package: InjectionPackage, date: Date = Date()) {
+        UserDefaults.standard.set(injectionPeriodKey(for: package, date: date), forKey: package.limitKey)
+    }
+
+    private static func injectionPeriodKey(for package: InjectionPackage, date: Date) -> String {
+        if package.limitKey == weeklyInjectionWeekKey {
+            let components = Calendar(identifier: .gregorian).dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+            return String(format: "%04d-W%02d", components.yearForWeekOfYear ?? 0, components.weekOfYear ?? 0)
+        }
+        return EconomyDailyBudgetStore.dayKey(for: date)
     }
 }

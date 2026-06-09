@@ -41,7 +41,7 @@ struct PlantDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showingEditSheet = true } label: {
-                    Image(systemName: "pencil.circle")
+                    Image(systemName: "pencil.circle").accessibilityHidden(true)
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
             }
@@ -76,25 +76,25 @@ struct PlantDetailView: View {
                     )
                     .frame(width: 100, height: 100)
                 Text(plant.avatarEmoji)
-                    .font(.system(size: 52))
+                    .font(OhanaFont.adaptive(size: 52))
             }
             
             VStack(spacing: 8) {
                 Text(plant.name)
-                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 32, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 
                 HStack(spacing: 8) {
                     if !plant.species.isEmpty {
                         Text(plant.species)
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(Color.ohanaControlFill, in: Capsule())
                     }
                     if !plant.location.isEmpty {
                         Text("📍 \(plant.location)")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(Color.ohanaControlFill, in: Capsule())
@@ -112,10 +112,10 @@ struct PlantDetailView: View {
     private var wateringCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "drop.fill")
+                Image(systemName: "drop.fill").accessibilityHidden(true)
                     .foregroundStyle(.blue)
                 Text("浇水状态")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
             }
             
@@ -125,10 +125,10 @@ struct PlantDetailView: View {
                 
                 HStack {
                     Text("距上次浇水 \(days) 天")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 14, weight: .medium))
                     Spacer()
                     Text("周期 \(plant.wateringIntervalDays) 天")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 
@@ -137,17 +137,17 @@ struct PlantDetailView: View {
                 
                 if plant.needsWatering {
                     HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
                             .foregroundStyle(.orange)
-                            .font(.system(size: 12))
+                            .font(OhanaFont.adaptive(size: 12))
                         Text("该浇水了！")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                             .foregroundStyle(.orange)
                     }
                 }
             } else {
                 Text("还没有浇水记录")
-                    .font(.system(size: 14))
+                    .font(OhanaFont.adaptive(size: 14))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
@@ -160,10 +160,10 @@ struct PlantDetailView: View {
     private var fertilizingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "leaf.fill")
+                Image(systemName: "leaf.fill").accessibilityHidden(true)
                     .foregroundStyle(.green)
                 Text("施肥状态")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
             }
             
@@ -173,10 +173,10 @@ struct PlantDetailView: View {
                 
                 HStack {
                     Text("距上次施肥 \(days) 天")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 14, weight: .medium))
                     Spacer()
                     Text("周期 \(plant.fertilizingIntervalDays) 天")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 
@@ -185,17 +185,17 @@ struct PlantDetailView: View {
                 
                 if plant.needsFertilizing {
                     HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
                             .foregroundStyle(.orange)
-                            .font(.system(size: 12))
+                            .font(OhanaFont.adaptive(size: 12))
                         Text("该施肥了！")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                             .foregroundStyle(.orange)
                     }
                 }
             } else {
                 Text("还没有施肥记录")
-                    .font(.system(size: 14))
+                    .font(OhanaFont.adaptive(size: 14))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
@@ -211,10 +211,10 @@ struct PlantDetailView: View {
                 waterPlant()
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "drop.fill")
+                    Image(systemName: "drop.fill").accessibilityHidden(true)
                     Text("浇水")
                 }
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -229,10 +229,10 @@ struct PlantDetailView: View {
                 fertilizePlant()
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "leaf.fill")
+                    Image(systemName: "leaf.fill").accessibilityHidden(true)
                     Text("施肥")
                 }
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -252,14 +252,14 @@ struct PlantDetailView: View {
             if !plant.notes.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Image(systemName: "note.text")
+                        Image(systemName: "note.text").accessibilityHidden(true)
                             .foregroundStyle(.purple)
                         Text("备注")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                         Spacer()
                     }
                     Text(plant.notes)
-                        .font(.system(size: 14))
+                        .font(OhanaFont.adaptive(size: 14))
                 }
                 .padding(16)
                 .ohanaGlassStyle(cornerRadius: 20)
@@ -274,10 +274,10 @@ struct PlantDetailView: View {
             showingDeleteConfirm = true
         } label: {
             HStack {
-                Image(systemName: "trash")
+                Image(systemName: "trash").accessibilityHidden(true)
                 Text("删除植物")
             }
-            .font(.system(size: 14, weight: .semibold))
+            .font(OhanaFont.adaptive(size: 14, weight: .semibold))
             .foregroundStyle(.red)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
@@ -353,21 +353,21 @@ struct EditPlantSheet: View {
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("浇水周期")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Stepper("每 \(wateringInterval) 天", value: $wateringInterval, in: 1...90)
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("施肥周期")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Stepper("每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1...365)
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("备注")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     TextEditor(text: $notes)
                         .frame(height: 80)
@@ -399,7 +399,7 @@ struct EditPlantSheet: View {
     private func formField(_ title: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 13, weight: .medium))
+                .font(OhanaFont.adaptive(size: 13, weight: .medium))
                 .foregroundStyle(Color.ohanaSecondaryText)
             TextField(title, text: text)
                 .textFieldStyle(.roundedBorder)

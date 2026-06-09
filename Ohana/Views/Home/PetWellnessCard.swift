@@ -69,23 +69,23 @@ struct PetWellnessCard: View {
     private var headerRow: some View {
         HStack(spacing: 8) {
             Text(pet.avatarEmoji)
-                .font(.system(size: 28))
+                .font(OhanaFont.adaptive(size: 28))
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(todaySummaryText)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
             if pet.currentStreak > 0 {
                 HStack(spacing: 3) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 11, weight: .bold))
+                    Image(systemName: "flame.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold))
                         .foregroundStyle(streakColor)
                     Text("\(pet.currentStreak)")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(streakColor)
                 }
                 .padding(.horizontal, 10)
@@ -122,10 +122,10 @@ struct PetWellnessCard: View {
         let done = count > 0
         return HStack(spacing: 3) {
             Text(emoji)
-                .font(.system(size: 12))
+                .font(OhanaFont.adaptive(size: 12))
             if count > 1 {
                 Text("\(count)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(done ? themeColor : .secondary.opacity(0.5))
             }
         }
@@ -164,10 +164,10 @@ struct PetWellnessCard: View {
     private func foodCapsule(days: Int) -> some View {
         let urgent = days <= 3
         return HStack(spacing: 4) {
-            Image(systemName: "bag.fill")
-                .font(.system(size: 10, weight: .bold))
+            Image(systemName: "bag.fill").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 10, weight: .bold))
             Text("粮仓 \(days) 天")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
         }
         .foregroundStyle(urgent ? .white : .primary.opacity(0.7))
         .padding(.horizontal, 10)
@@ -180,9 +180,9 @@ struct PetWellnessCard: View {
     private func alertCapsule(_ alert: HealthAlert) -> some View {
         HStack(spacing: 3) {
             Text(alert.emoji)
-                .font(.system(size: 10))
+                .font(OhanaFont.adaptive(size: 10))
             Text(alert.title)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                 .lineLimit(1)
         }
         .foregroundStyle(alert.severity == .urgent ? .white : .primary.opacity(0.7))
@@ -244,13 +244,13 @@ struct FamilyWellnessCard: View {
     private func summaryBadge(value: String, label: String, icon: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .bold))
+                .font(OhanaFont.adaptive(size: 16, weight: .bold))
                 .foregroundStyle(color)
             Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(label)
-                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(minWidth: 54)

@@ -5,10 +5,10 @@ extension QuickFeedDetailContent {
     func modeInfoPill(title: String, value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
@@ -21,7 +21,7 @@ extension QuickFeedDetailContent {
 
     func overviewSectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 15, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.top, 2)
     }
@@ -33,17 +33,17 @@ extension QuickFeedDetailContent {
 
         return HStack(alignment: .center, spacing: 14) {
             Image(systemName: draftStore.selectedTreatOverviewKind?.systemIconName ?? "birthday.cake.fill")
-                .font(.system(size: 22, weight: .black))
+                .font(OhanaFont.adaptive(size: 22, weight: .black))
                 .foregroundStyle(treatTint)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(selectedTitle)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(treatLastSeenText(lastTreatDate(for: draftStore.selectedTreatOverviewKind)))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -52,11 +52,11 @@ extension QuickFeedDetailContent {
 
             VStack(alignment: .trailing, spacing: 3) {
                 Text("\(count)")
-                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
                     .foregroundStyle(treatTint)
                     .contentTransition(.numericText())
                 Text(l.tr(zh: "今日 · \(gramsText)", en: "Today · \(gramsText)", de: "Heute · \(gramsText)"))
-                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -109,11 +109,11 @@ extension QuickFeedDetailContent {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
                 Text(title)
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 Text("\(count)")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .contentTransition(.numericText())
             }
             .foregroundStyle(isSelected ? Color.arkInk : treatTint)

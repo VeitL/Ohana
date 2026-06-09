@@ -152,9 +152,23 @@ struct HomeRouteCoordinatorTests {
             appSheets.append(route)
         }
 
+        coordinator.openFunctionMenu(destination: .featureGroup(.dailyCare))
+
+        #expect(appSheets == [.functionMenu(destination: .featureGroup(.dailyCare))])
+        #expect(coordinator.modal == nil)
+    }
+
+    @Test func appSheetSinkSuppressesOutOfScopeFunctionMenuDestination() {
+        let coordinator = HomeRouteCoordinator()
+        var appSheets: [HomeAppSheetRoute] = []
+
+        coordinator.bindAppSheetRouteSink { route in
+            appSheets.append(route)
+        }
+
         coordinator.openFunctionMenu(destination: .plantsDashboard)
 
-        #expect(appSheets == [.functionMenu(destination: .plantsDashboard)])
+        #expect(appSheets == [.functionMenu(destination: nil)])
         #expect(coordinator.modal == nil)
     }
 
@@ -184,6 +198,20 @@ struct HomeRouteCoordinatorTests {
         coordinator.openAddEntity(.pet)
 
         #expect(appSheets == [.addEntity(.pet)])
+        #expect(coordinator.modal == nil)
+    }
+
+    @Test func appSheetSinkRedirectsHiddenPlantAddToGrowthRoadmap() {
+        let coordinator = HomeRouteCoordinator()
+        var appSheets: [HomeAppSheetRoute] = []
+
+        coordinator.bindAppSheetRouteSink { route in
+            appSheets.append(route)
+        }
+
+        coordinator.openAddEntity(.plant)
+
+        #expect(appSheets == [.functionMenu(destination: .growthRoadmap)])
         #expect(coordinator.modal == nil)
     }
 
@@ -231,25 +259,25 @@ struct HomeRouteCoordinatorTests {
     @Test func functionMenuFallsBackToLocalModalWithoutAppSheetSink() {
         let coordinator = HomeRouteCoordinator()
 
-        coordinator.openFunctionMenu(destination: .plantsDashboard)
+        coordinator.openFunctionMenu(destination: .featureGroup(.dailyCare))
 
         guard case let .functionMenu(destination) = coordinator.modal else {
             Issue.record("Expected function menu to remain local without app sheet sink")
             return
         }
-        #expect(destination == .plantsDashboard)
+        #expect(destination == .featureGroup(.dailyCare))
     }
 
-    @Test func addEntityFallsBackToLocalModalWithoutAppSheetSink() {
+    @Test func addPlantFallsBackToGrowthRoadmapWithoutAppSheetSink() {
         let coordinator = HomeRouteCoordinator()
 
         coordinator.openAddEntity(.plant)
 
-        guard case let .addEntity(type) = coordinator.modal else {
-            Issue.record("Expected add entity to remain local without app sheet sink")
+        guard case let .functionMenu(destination) = coordinator.modal else {
+            Issue.record("Expected hidden plant add route to fall back to the growth roadmap")
             return
         }
-        #expect(type == .plant)
+        #expect(destination == .growthRoadmap)
     }
 
     @Test func streakDetailFallsBackToLocalModalWithoutAppSheetSink() {
@@ -290,6 +318,9 @@ struct HomeRouteCoordinatorTests {
 
         #expect(appOverlays == [.coconutLog(.human(humanID))])
         #expect(coordinator.fullScreen == nil)
+
+        coordinator.openCoconutLog(nil)
+        #expect(appOverlays.last == .coconutLog(nil))
     }
 
     @Test func appOverlaySinkInterceptsQuickMoment() {
@@ -344,6 +375,9 @@ struct HomeRouteCoordinatorTests {
             return
         }
         #expect(subject == .pet(petID))
+
+        coordinator.openCoconutLog(nil)
+        #expect(coordinator.fullScreen?.id == "coconut-log-all")
     }
 
     @Test func settingsFallsBackToLocalInlinePresentationWithoutAppOverlaySink() {

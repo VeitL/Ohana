@@ -44,35 +44,35 @@ struct CoconutRulesSheet: View {
                 title: l.tr(zh: "清洁", en: "Cleanup", de: "Reinigung"),
                 desc: l.tr(zh: "记录如厕和清洁", en: "Log potty and cleanup", de: "Toilette und Reinigung erfassen"),
                 glowColor: Color(hex: "A8E6CF"),
-                reward: l.tr(zh: "每次 5-8🥥", en: "5-8🥥 each", de: "5-8🥥 je Aktion")
+                reward: l.tr(zh: "2-3🥥 · 5-7XP", en: "2-3🥥 · 5-7XP", de: "2-3🥥 · 5-7XP")
             ),
             RuleCard(
                 icon: "scissors",
                 title: l.tr(zh: "护理·梳毛", en: "Grooming", de: "Pflege"),
                 desc: l.tr(zh: "精心打理日常护理", en: "Track care routines", de: "Pflegeabläufe erfassen"),
                 glowColor: Color(hex: "DDA0DD"),
-                reward: l.tr(zh: "5-10🥥，洗澡 15🥥", en: "5-10🥥, bath 15🥥", de: "5-10🥥, Bad 15🥥")
+                reward: l.tr(zh: "5-8🥥 · 10-14XP", en: "5-8🥥 · 10-14XP", de: "5-8🥥 · 10-14XP")
             ),
             RuleCard(
                 icon: "cross.case.fill",
                 title: l.tr(zh: "健康打卡", en: "Health log", de: "Gesundheit"),
                 desc: l.tr(zh: "关注健康，守护生命", en: "Care for health", de: "Gesundheit schützen"),
                 glowColor: Color(hex: "FF6B6B"),
-                reward: l.tr(zh: "每次 20🥥", en: "20🥥 each", de: "20🥥 je Aktion")
+                reward: l.tr(zh: "10🥥 · 16XP", en: "10🥥 · 16XP", de: "10🥥 · 16XP")
             ),
             RuleCard(
                 icon: "creditcard.fill",
                 title: l.tr(zh: "记一笔账", en: "Expense log", de: "Ausgabe"),
                 desc: l.tr(zh: "记录爱的花销", en: "Track care spending", de: "Ausgaben erfassen"),
                 glowColor: Color(hex: "FFD93D"),
-                reward: l.tr(zh: "每次 10🥥", en: "10🥥 each", de: "10🥥 je Aktion")
+                reward: l.tr(zh: "2🥥 · 4XP", en: "2🥥 · 4XP", de: "2🥥 · 4XP")
             ),
             RuleCard(
                 icon: "gamecontroller.fill",
                 title: l.tr(zh: "逗玩互动", en: "Play time", de: "Spielzeit"),
                 desc: l.tr(zh: "记录玩耍陪伴", en: "Log play and company", de: "Spiel und Nähe erfassen"),
                 glowColor: Color(hex: "6BCB77"),
-                reward: l.tr(zh: "每次 10-12🥥", en: "10-12🥥 each", de: "10-12🥥 je Aktion")
+                reward: l.tr(zh: "走服务预算", en: "Service budget", de: "Service-Budget")
             ),
             RuleCard(
                 icon: "tree.fill",
@@ -83,10 +83,10 @@ struct CoconutRulesSheet: View {
             ),
             RuleCard(
                 icon: "sparkles",
-                title: l.tr(zh: "暴击加成", en: "Bonus chance", de: "Bonus-Chance"),
-                desc: l.tr(zh: "幸运时会翻倍", en: "Lucky logs can multiply", de: "Glück kann multiplizieren"),
+                title: l.tr(zh: "幸运奖励", en: "Lucky reward", de: "Glücksbonus"),
+                desc: l.tr(zh: "幸运只加额外奖励，不整笔翻倍", en: "Luck adds a small bonus, not a multiplier", de: "Glück addiert einen Bonus, ohne Multiplikator"),
                 glowColor: Color(hex: "FFCC00"),
-                reward: l.tr(zh: "10% 双倍 · 1% 五倍", en: "10% double · 1% fivefold", de: "10% doppelt · 1% fünffach")
+                reward: l.tr(zh: "8% +2🥥 · 1% +8🥥", en: "8% +2🥥 · 1% +8🥥", de: "8% +2🥥 · 1% +8🥥")
             )
         ]
     }
@@ -96,9 +96,9 @@ struct CoconutRulesSheet: View {
             RuleCard(
                 icon: "bolt.fill",
                 title: l.tr(zh: "注入生命之树", en: "Inject energy", de: "Energie geben"),
-                desc: l.tr(zh: "让生命之树更旺盛", en: "Grow the Life Tree", de: "Den Lebensbaum stärken"),
+                desc: l.tr(zh: "轻度加速，不能直接买穿等级", en: "Light acceleration without buying through levels", de: "Leichte Beschleunigung ohne Levelkauf"),
                 glowColor: Color(hex: "F59E0B"),
-                reward: l.tr(zh: "每次 10🥥", en: "10🥥 each", de: "10🥥 je Aktion")
+                reward: l.tr(zh: "80🥥 -> 20XP", en: "80🥥 -> 20XP", de: "80🥥 -> 20XP")
             ),
             RuleCard(
                 icon: "bag.fill",
@@ -197,15 +197,15 @@ struct CoconutRulesSheet: View {
                         HStack {
                             Spacer()
                             VStack(spacing: 6) {
-                                Image(systemName: "lightbulb.fill")
-                                    .font(.system(size: 24, weight: .black))
+                                Image(systemName: "lightbulb.fill").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 24, weight: .black))
                                     .foregroundStyle(Color.goPrimary)
                                 Text(l.tr(
-                                    zh: "打卡次数越多，椰子越多，生命之树越旺。",
-                                    en: "More care logs mean more coconuts and a stronger Life Tree.",
-                                    de: "Mehr Pflegeeinträge bringen mehr Kokosnüsse und einen stärkeren Lebensbaum."
+                                    zh: "真实照护获得成长 XP；椰子用于外观、玩法和轻度加速。",
+                                    en: "Real care earns Growth XP; coconuts power cosmetics, play, and light boosts.",
+                                    de: "Echte Pflege bringt Growth XP; Kokosnüsse treiben Kosmetik, Spiel und leichte Boosts an."
                                 ))
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                                 .multilineTextAlignment(.center)
                             }
@@ -223,8 +223,8 @@ struct CoconutRulesSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 17, weight: .black))
+                        Image(systemName: "xmark").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 17, weight: .black))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
@@ -244,15 +244,15 @@ struct CoconutRulesSheet: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 22, height: 22) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 Text(title)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             Text(subtitle)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
     }
@@ -261,22 +261,22 @@ struct CoconutRulesSheet: View {
     private func bentoCard(_ card: RuleCard, delay: Double) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: card.icon)
-                .font(.system(size: 20, weight: .black))
+                .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(card.glowColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             Text(card.title)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(card.desc)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                 .lineLimit(2)
             Spacer(minLength: 0)
             Text(card.reward)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(card.glowColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -300,16 +300,16 @@ struct CoconutRulesSheet: View {
     private func doubleAccountRow(icon: String, title: String, desc: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 32, height: 32)
+                .frame(width: 32, height: 32) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(desc)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()

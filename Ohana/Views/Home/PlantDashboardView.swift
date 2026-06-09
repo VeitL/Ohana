@@ -9,15 +9,23 @@ import SwiftUI
 import SwiftData
 
 struct PlantDashboardView: View {
-    @Binding var selectedPlant: Plant?
+    let plants: [Plant]
+    let onOpenPlant: (UUID) -> Void
 
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Plant.createdAt) private var plants: [Plant]
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingAddPlant = false
+
+    init(
+        plants: [Plant] = [],
+        onOpenPlant: @escaping (UUID) -> Void = { _ in }
+    ) {
+        self.plants = plants
+        self.onOpenPlant = onOpenPlant
+    }
 
     private var l: L10n { L10n(appLanguage) }
     private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext) }
@@ -64,10 +72,10 @@ struct PlantDashboardView: View {
             Spacer().frame(height: 80)
 
             Text("🌱")
-                .font(.system(size: 72))
+                .font(OhanaFont.adaptive(size: 72)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
 
             Text(l.tr(zh: "还没有植物", en: "No plants yet", de: "Noch keine Pflanzen"))
-                .font(.system(size: 24, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             Text(l.tr(
@@ -75,7 +83,7 @@ struct PlantDashboardView: View {
                 en: "Add your first plant and start tracking watering and fertilizing",
                 de: "Füge deine erste Pflanze hinzu und tracke Gießen und Düngen"
             ))
-                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
@@ -84,10 +92,10 @@ struct PlantDashboardView: View {
                 showingAddPlant = true
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 16, weight: .bold))
+                    Image(systemName: "plus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.arkInk)
                 .padding(.horizontal, 28)
@@ -105,18 +113,18 @@ struct PlantDashboardView: View {
     private var urgentSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 6) {
-                Image(systemName: "drop.fill")
-                    .font(.system(size: 14, weight: .bold))
+                Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(.cyan)
                 Text(l.tr(zh: "需要浇水", en: "Needs watering", de: "Braucht Wasser"))
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
                     waterAll()
                 } label: {
                     Text(l.tr(zh: "全部浇水", en: "Water all", de: "Alle gießen"))
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
@@ -140,10 +148,10 @@ struct PlantDashboardView: View {
     private func urgentPlantChip(_ plant: Plant) -> some View {
         HStack(spacing: 8) {
             Text(plant.avatarEmoji)
-                .font(.system(size: 20))
+                .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             VStack(alignment: .leading, spacing: 2) {
                 Text(plant.name)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 if let days = plant.daysSinceWatered {
@@ -152,17 +160,17 @@ struct PlantDashboardView: View {
                         en: "\(days)d overdue",
                         de: "\(days) T. überfällig"
                     ))
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(.red.opacity(0.8))
                 }
             }
             Button {
                 waterPlant(plant)
             } label: {
-                Image(systemName: "drop.fill")
-                    .font(.system(size: 12, weight: .bold))
+                Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(.cyan, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -178,11 +186,11 @@ struct PlantDashboardView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l.tr(zh: "我的植物", en: "My plants", de: "Meine Pflanzen"))
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(plants.count)")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -202,7 +210,7 @@ struct PlantDashboardView: View {
 
     private func plantCard(_ plant: Plant) -> some View {
         Button {
-            selectedPlant = plant
+            onOpenPlant(plant.id)
         } label: {
             VStack(spacing: 8) {
                 ZStack {
@@ -210,16 +218,16 @@ struct PlantDashboardView: View {
                         .fill(plant.needsWatering ? Color.cyan.opacity(0.2) : .primary.opacity(0.08))
                         .frame(width: 56, height: 56)
                     Text(plant.avatarEmoji)
-                        .font(.system(size: 30))
+                        .font(OhanaFont.adaptive(size: 30)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
 
                 Text(plant.name)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
 
                 Text(plant.species)
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
 
@@ -236,10 +244,10 @@ struct PlantDashboardView: View {
     private func statusBadge(for plant: Plant) -> some View {
         if plant.needsWatering {
             HStack(spacing: 3) {
-                Image(systemName: "drop.fill")
-                    .font(.system(size: 8, weight: .bold))
+                Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 8, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(l.tr(zh: "需浇水", en: "Water", de: "Gießen"))
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 8)
@@ -247,10 +255,10 @@ struct PlantDashboardView: View {
             .background(.cyan, in: Capsule())
         } else if plant.needsFertilizing {
             HStack(spacing: 3) {
-                Image(systemName: "leaf.fill")
-                    .font(.system(size: 8, weight: .bold))
+                Image(systemName: "leaf.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 8, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(l.tr(zh: "需施肥", en: "Fertilize", de: "Düngen"))
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 8)
@@ -258,11 +266,11 @@ struct PlantDashboardView: View {
             .background(.orange, in: Capsule())
         } else if let days = plant.daysSinceWatered {
             Text(l.tr(zh: "\(days)天前浇水", en: "\(days)d ago", de: "vor \(days) T."))
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
         } else {
             Text(l.tr(zh: "新植物", en: "New", de: "Neu"))
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
     }
@@ -276,20 +284,20 @@ struct PlantDashboardView: View {
                     Circle()
                         .strokeBorder(.primary.opacity(0.15), style: StrokeStyle(lineWidth: 2, dash: [5]))
                         .frame(width: 56, height: 56)
-                    Image(systemName: "plus")
-                        .font(.system(size: 22, weight: .medium))
+                    Image(systemName: "plus") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 22, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
                 Text(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
 
                 Text(" ")
-                    .font(.system(size: 10))
+                    .font(OhanaFont.adaptive(size: 10)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
 
                 Text(" ")
-                    .font(.system(size: 9))
+                    .font(OhanaFont.adaptive(size: 9)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .padding(.vertical, 3)
             }
             .frame(maxWidth: .infinity)

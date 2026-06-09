@@ -124,8 +124,8 @@ struct HumanNoteHistorySheet: View {
     private func noteRow(_ entry: HumanNoteEntry) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Image(systemName: "note.text")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "note.text") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                 Text(entry.date, format: .dateTime.year().month().day())
                     .font(OhanaFont.caption(.black))
@@ -136,10 +136,10 @@ struct HumanNoteHistorySheet: View {
                         deleteNote(entry)
                     }
                 } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaTertiaryText)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(l.tr(zh: "删除备注", en: "Delete note", de: "Notiz löschen"))
@@ -174,19 +174,12 @@ struct HumanNoteHistorySheet: View {
 
     @ViewBuilder
     private func attachmentPreview(_ attachment: HumanNoteAttachmentReference) -> some View {
-        if attachment.isImage,
-           let url = HumanNoteAttachmentStore.url(for: attachment),
-           let data = try? Data(contentsOf: url),
-           let image = UIImage(data: data) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 74, height: 74)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        if attachment.isImage, let url = HumanNoteAttachmentStore.url(for: attachment) {
+            HumanNoteAttachmentImagePreview(url: url, fileName: attachment.fileName)
         } else {
             HStack(spacing: 7) {
                 Image(systemName: attachment.isImage ? "photo.fill" : "doc.fill")
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPurple)
                 Text(attachment.fileName)
                     .font(OhanaFont.caption(.black))
@@ -201,8 +194,8 @@ struct HumanNoteHistorySheet: View {
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "note.text")
-                .font(.system(size: 38, weight: .black))
+            Image(systemName: "note.text") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 38, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
             Text(l.tr(zh: "还没有备注", en: "No notes yet", de: "Noch keine Notizen"))
                 .font(OhanaFont.title3(.black))
@@ -304,6 +297,43 @@ struct HumanNoteHistorySheet: View {
                 human: human,
                 rawString: entry.rawString
             )
+        }
+    }
+}
+
+private struct HumanNoteAttachmentImagePreview: View {
+    let url: URL
+    let fileName: String
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.goPurple.opacity(0.12))
+                .frame(width: 74, height: 74)
+
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 74, height: 74)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            } else {
+                VStack(spacing: 5) {
+                    Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.callout(.black))
+                        .accessibilityHidden(true)
+                    Text(fileName)
+                        .font(OhanaFont.caption2(.black))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(Color.goPurple)
+                .padding(8)
+            }
+        }
+        .task(id: url.path) {
+            image = await AttachmentImageDecoder.decodeFile(url)
         }
     }
 }

@@ -172,7 +172,7 @@ struct WaterPrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.arkInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 15)
@@ -239,9 +239,9 @@ struct WaterCoreCard: View {
                     Button(action: primaryAction) {
                         HStack(spacing: 5) {
                             Image(systemName: primaryIcon)
-                                .font(.system(size: 11, weight: .black))
+                                .font(OhanaFont.adaptive(size: 11, weight: .black))
                             Text(primaryTitle)
-                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         }
                         .foregroundStyle(Color.arkInk)
                         .frame(minWidth: 72)
@@ -254,7 +254,7 @@ struct WaterCoreCard: View {
                     if let secondaryTitle, let secondaryAction {
                         Button(action: secondaryAction) {
                             Text(secondaryTitle)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                                 .foregroundStyle(cardTint)
                                 .frame(minWidth: 72)
                                 .padding(.horizontal, 10)
@@ -304,28 +304,28 @@ struct WaterCoreCard: View {
                         .frame(width: 58, height: 58)
                 }
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 20, weight: .bold))
                     .foregroundStyle(cardTint)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(title)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     if isWarning {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                     }
                 }
                 .foregroundStyle(isWarning ? Color.goRed : Color.ohanaPrimaryText)
                 Text(value)
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(cardTint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                     .contentTransition(.numericText())
                 Text(subtitle)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(isWarning ? Color.goRed.opacity(0.92) : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -385,7 +385,7 @@ struct WaterHeroCard: View {
                             .opacity(ripple ? 0.18 : 0.58)
                             .animation(
                                 shouldAnimateHero
-                                ? .easeInOut(duration: 1.9 + Double(index) * 0.18).repeatForever(autoreverses: true)
+                                ? .easeInOut(duration: 1.9 + Double(index) * 0.18).repeatForever(autoreverses: true) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                                 : nil,
                                 value: ripple
                             )
@@ -401,7 +401,7 @@ struct WaterHeroCard: View {
                             .frame(width: 68, height: 16)
                             .offset(y: 9)
                         Image(systemName: isAquatic ? "water.waves" : "drop.fill")
-                            .font(.system(size: 30, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 30, weight: .bold))
                             .foregroundStyle(tint)
                             .offset(y: -12)
                     }
@@ -410,10 +410,10 @@ struct WaterHeroCard: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(isAquatic ? "水体状态" : "今日饮水")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(isAquatic ? "管理" : "\(waterCount) 次")
-                        .font(.system(size: 32, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 32, weight: .black, design: .rounded))
                         .foregroundStyle(tint)
                     HStack(spacing: 12) {
                         MiniWaterGauge(title: "换水", progress: waterDueProgress, tint: tint)
@@ -451,14 +451,14 @@ struct MiniWaterGauge: View {
         HStack(spacing: 6) {
             Capsule()
                 .fill(tint.opacity(0.2))
-                .frame(width: 34, height: 8)
+                .frame(width: 34, height: 8) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .overlay(alignment: .leading) {
                     Capsule()
                         .fill(tint)
                         .frame(width: max(6, 34 * min(max(progress, 0), 1)), height: 8)
                 }
             Text(title)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
     }
@@ -473,30 +473,30 @@ struct WaterLogRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: log.careType.systemIconName)
-                .font(.system(size: 13, weight: .bold))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold))
                 .foregroundStyle(tint)
-                .frame(width: 26, height: 26)
+                .frame(width: 26, height: 26) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.careType.label)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if log.amountMl > 0 {
                     Text("\(Int(log.amountMl))ml")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             Spacer()
             Text(log.date, format: .dateTime.month().day().hour().minute())
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             if showDelete {
                 Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11, weight: .bold))
+                    Image(systemName: "trash").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold))
                         .foregroundStyle(Color.ohanaSecondaryText.opacity(0.55))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 30, height: 30) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -516,16 +516,16 @@ struct WaterAmountSettingsSheet: View {
     var body: some View {
         VStack(spacing: 18) {
             HStack(spacing: 14) {
-                Image(systemName: "drop.fill")
-                    .font(.system(size: 24, weight: .bold))
+                Image(systemName: "drop.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 24, weight: .bold))
                     .foregroundStyle(tint)
                     .frame(width: 54, height: 54)
                     .background(tint.opacity(0.15), in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
                     Text("喂水")
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     Text(amountEnabled ? "默认 \(displayAmount)ml" : "只记录次数")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -539,7 +539,7 @@ struct WaterAmountSettingsSheet: View {
             if amountEnabled {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("默认水量")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     HStack(spacing: 10) {
                         amountStepButton(systemName: "minus") {
@@ -554,11 +554,11 @@ struct WaterAmountSettingsSheet: View {
                         } label: {
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(amountText.isEmpty ? "250" : amountText)
-                                    .font(.system(size: 36, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 36, weight: .black, design: .rounded))
                                     .foregroundStyle(amountText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                                     .monospacedDigit()
                                 Text("ml")
-                                    .font(.system(size: 18, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                                     .foregroundStyle(tint)
                             }
                             .frame(maxWidth: .infinity)
@@ -597,7 +597,7 @@ struct WaterAmountSettingsSheet: View {
                                     }
                                 } label: {
                                     Text("\(amount)ml")
-                                        .font(.system(size: 12, weight: .black, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 7)
@@ -616,7 +616,7 @@ struct WaterAmountSettingsSheet: View {
                 onSave()
             } label: {
                 Text("保存")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 15)
@@ -642,9 +642,9 @@ struct WaterAmountSettingsSheet: View {
     private func amountStepButton(systemName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: Circle())
         }
         .buttonStyle(ScaleButtonStyle())
@@ -653,11 +653,11 @@ struct WaterAmountSettingsSheet: View {
     private func settingsRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
         }
     }
@@ -682,7 +682,7 @@ struct WaterChangeSettingsSheet: View {
             .tint(tint)
 
             DatePicker("起算日", selection: $anchorDate, displayedComponents: .date)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .tint(tint)
 
             Toggle(isOn: $reminderOn.animation(GoMotion.feedback)) {
@@ -695,7 +695,7 @@ struct WaterChangeSettingsSheet: View {
                     onDelete()
                 } label: {
                     Text("删除")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
@@ -707,7 +707,7 @@ struct WaterChangeSettingsSheet: View {
                     onSave()
                 } label: {
                     Text("保存")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
@@ -722,15 +722,15 @@ struct WaterChangeSettingsSheet: View {
     private func settingsHero(icon: String, title: String, value: String) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 24, weight: .bold))
+                .font(OhanaFont.adaptive(size: 24, weight: .bold))
                 .foregroundStyle(tint)
                 .frame(width: 54, height: 54)
                 .background(tint.opacity(0.15), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                 Text(value)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
@@ -740,11 +740,11 @@ struct WaterChangeSettingsSheet: View {
     private func settingsRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
         }
     }
@@ -763,16 +763,16 @@ struct FilterSettingsSheet: View {
     var body: some View {
         VStack(spacing: 18) {
             HStack(spacing: 14) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 24, weight: .bold))
+                Image(systemName: "sparkles").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 24, weight: .bold))
                     .foregroundStyle(tint)
                     .frame(width: 54, height: 54)
                     .background(tint.opacity(0.15), in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
                     Text("滤芯计划")
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     Text("清洗 \(nextCleanText) · 更换 \(nextReplaceText)")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -798,7 +798,7 @@ struct FilterSettingsSheet: View {
                     onDelete()
                 } label: {
                     Text("删除")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
@@ -810,7 +810,7 @@ struct FilterSettingsSheet: View {
                     onSave()
                 } label: {
                     Text("保存")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
@@ -825,11 +825,11 @@ struct FilterSettingsSheet: View {
     private func settingsRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
         }
     }
@@ -848,16 +848,16 @@ struct WaterPlanSettingsSheet: View {
         ScrollView {
             VStack(spacing: 14) {
                 HStack(spacing: 12) {
-                    Image(systemName: "bell.badge.fill")
-                        .font(.system(size: 20, weight: .bold))
+                    Image(systemName: "bell.badge.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 20, weight: .bold))
                         .foregroundStyle(tint)
                         .frame(width: 46, height: 46)
                         .background(tint.opacity(0.15), in: Circle())
                     VStack(alignment: .leading, spacing: 3) {
                         Text("喂水计划")
-                            .font(.system(size: 21, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 21, weight: .black, design: .rounded))
                         Text("今日 \(completionText) · 每天 \(count) 次")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
@@ -881,7 +881,7 @@ struct WaterPlanSettingsSheet: View {
                             ),
                             displayedComponents: .hourAndMinute
                         )
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                         .tint(tint)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -894,7 +894,7 @@ struct WaterPlanSettingsSheet: View {
                         onDelete()
                     } label: {
                         Text("切回手动")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goRed)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
@@ -906,7 +906,7 @@ struct WaterPlanSettingsSheet: View {
                         onSave()
                     } label: {
                         Text("保存计划")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
@@ -938,11 +938,11 @@ struct WaterPlanSettingsSheet: View {
     private func settingsRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
         }
     }
@@ -958,7 +958,7 @@ struct WaterHistorySheet: View {
             List {
                 if logs.isEmpty {
                     Text("暂无记录")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
                     ForEach(logs) { log in

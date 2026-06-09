@@ -29,7 +29,7 @@ struct AddPlantView: View {
                 Spacer(minLength: 16)
 
                 Text(avatarEmoji)
-                    .font(.system(size: 64))
+                    .font(OhanaFont.adaptive(size: 64))
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 10) {
                     ForEach(plantEmojis, id: \.self) { emoji in
@@ -38,7 +38,7 @@ struct AddPlantView: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
                             Text(emoji)
-                                .font(.system(size: 28))
+                                .font(OhanaFont.adaptive(size: 28))
                                 .frame(width: 46, height: 46)
                                 .background(
                                     avatarEmoji == emoji
@@ -66,7 +66,7 @@ struct AddPlantView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("浇水周期")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .textCase(.uppercase)
                             .tracking(0.6)
@@ -80,7 +80,7 @@ struct AddPlantView: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("施肥周期")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .textCase(.uppercase)
                             .tracking(0.6)
@@ -98,7 +98,7 @@ struct AddPlantView: View {
                     savePlant()
                 } label: {
                     Text(name.isEmpty ? "请先输入名称" : (isSaving ? "正在添加…" : "添加植物 🌿"))
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(name.isEmpty ? Color.ohanaTertiaryText : Color.arkInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
@@ -123,13 +123,13 @@ struct AddPlantView: View {
     private func goFormField(_ title: String, text: Binding<String>, placeholder: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
             TextField(placeholder, text: text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(14)
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))

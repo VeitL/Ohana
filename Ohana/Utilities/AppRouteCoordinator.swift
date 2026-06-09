@@ -40,6 +40,7 @@ enum AppSheetRoute: Hashable, Identifiable {
     case accountSwitcher
     case addEntity(EntityType)
     case calendar(entityID: String?, humanID: String?)
+    case coconutShop(ShopItem.ShopCategory)
     case functionMenu(destination: FMDest?)
     case petAllFeatures(UUID)
     case petBasicInfo(UUID)
@@ -82,6 +83,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             return "add-entity-\(type.id)"
         case let .calendar(entityID, humanID):
             return "calendar-\(entityID ?? "all")-\(humanID ?? "all")"
+        case let .coconutShop(category):
+            return "coconut-shop-\(category.rawValue)"
         case let .functionMenu(destination):
             return "function-menu-\(String(describing: destination))"
         case let .petAllFeatures(id):
@@ -170,7 +173,7 @@ enum AppFullScreenRoute: Hashable, Identifiable {
 }
 
 enum AppOverlayRoute: Hashable, Identifiable {
-    case coconutLog(CoconutLogSubject)
+    case coconutLog(CoconutLogSubject?)
     case crewRoster(CrewRosterMode)
     case quickMoment(routeID: UUID = UUID(), petID: UUID)
     case settings
@@ -178,7 +181,7 @@ enum AppOverlayRoute: Hashable, Identifiable {
     var id: String {
         switch self {
         case let .coconutLog(subject):
-            return "coconut-log-\(subject.id)"
+            return "coconut-log-\(subject?.id ?? "all")"
         case let .crewRoster(mode):
             return "crew-roster-\(mode.rawValue)"
         case let .quickMoment(routeID, _):
@@ -221,7 +224,8 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func openPlant(_ id: UUID) {
-        push(.plantProfile(id: id))
+        AppFeatureRouteGuard.recordIntercept("plantProfile")
+        return
     }
 
     func presentAccountSwitcher() {
@@ -229,14 +233,33 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentFunctionMenu(destination: FMDest? = nil) {
-        presentSheet(.functionMenu(destination: destination))
+        switch AppFeatureRouteGuard.functionDestinationDecision(destination, currentLevel: currentFeatureLevel) {
+        case .rootMenu:
+            presentSheet(.functionMenu(destination: nil))
+        case let .allow(destination):
+            presentSheet(.functionMenu(destination: destination))
+        case let .redirectToRoadmap(note):
+            AppFeatureRouteGuard.recordIntercept(note)
+            presentSheet(.functionMenu(destination: .growthRoadmap))
+        case let .suppress(note):
+            AppFeatureRouteGuard.recordIntercept(note)
+            presentSheet(.functionMenu(destination: nil))
+        }
     }
 
     func presentCalendar(entityID: String? = nil, humanID: String? = nil) {
         presentSheet(.calendar(entityID: entityID, humanID: humanID))
     }
 
+    func presentCoconutShop(category: ShopItem.ShopCategory = .appIcon) {
+        presentSheet(.coconutShop(category))
+    }
+
     func presentAddEntity(_ type: EntityType) {
+        guard AppFeatureRouteGuard.allowsAddEntity(type) else {
+            AppFeatureRouteGuard.recordIntercept("addEntity:\(type.rawValue)")
+            return
+        }
         presentSheet(.addEntity(type))
     }
 
@@ -252,7 +275,7 @@ final class AppRouteCoordinator: ObservableObject {
         overlay = .crewRoster(mode)
     }
 
-    func presentCoconutLog(_ subject: CoconutLogSubject) {
+    func presentCoconutLog(_ subject: CoconutLogSubject?) {
         sheet = nil
         fullScreen = nil
         overlay = .coconutLog(subject)
@@ -299,6 +322,10 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func push(_ route: AppRoute) {
+        guard AppFeatureRouteGuard.allowsAppRoute(route) else {
+            AppFeatureRouteGuard.recordIntercept(route.id)
+            return
+        }
         path.append(route)
     }
 
@@ -349,6 +376,12 @@ final class AppRouteCoordinator: ObservableObject {
         if rebuildRoot {
             rootIdentity = UUID()
         }
+    }
+}
+
+private extension AppRouteCoordinator {
+    var currentFeatureLevel: Int {
+        OasisTreeManager.shared.treeLevel.rawValue
     }
 }
 

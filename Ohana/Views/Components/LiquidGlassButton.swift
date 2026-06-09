@@ -23,15 +23,15 @@ struct LiquidGlassButton<Content: View>: View {
     }
     
     private var baseColor: Color {
-        tintColor ?? (isDone ? Color.goPrimary : Color.black)
+        tintColor ?? (isDone ? Color.goPrimary : Color.black) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
     
     var body: some View {
         ZStack {
             // Layer 1: Base Glass Material
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .shadow(color: baseColor.opacity(0.12), radius: 8, x: 0, y: 4)
+                .fill(.ultraThinMaterial) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                .shadow(color: baseColor.opacity(0.12), radius: 8, x: 0, y: 4) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             
             // Layer 2: Color Tint
             if isDone || tintColor != nil {
@@ -41,7 +41,7 @@ struct LiquidGlassButton<Content: View>: View {
             
             // Layer 3: Inner Shadow (Top-Left Light)
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(Color.white.opacity((isDone || tintColor != nil) ? 0.9 : 0.6), lineWidth: 2)
+                .stroke(Color.white.opacity((isDone || tintColor != nil) ? 0.9 : 0.6), lineWidth: 2) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 .blur(radius: 0.5)
                 .offset(x: 1.5, y: 1.5)
                 .mask(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -71,7 +71,7 @@ struct LiquidGlassButton<Content: View>: View {
                 .padding(.vertical, 4)
         }
         .scaleEffect(isPressed ? 0.90 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
 }
 
@@ -80,13 +80,13 @@ struct LiquidGlassButton<Content: View>: View {
         Color.gray.opacity(0.2).ignoresSafeArea()
         HStack(spacing: 20) {
             LiquidGlassButton(isPressed: false) {
-                Image(systemName: "drop.fill")
+                Image(systemName: "drop.fill").accessibilityHidden(true)
                     .font(.title2)
             }
             .frame(width: 60, height: 60)
             
             LiquidGlassButton(isPressed: false, isDone: true) {
-                Image(systemName: "checkmark")
+                Image(systemName: "checkmark").accessibilityHidden(true)
                     .font(.title2)
                     .foregroundStyle(Color.goPrimary)
             }

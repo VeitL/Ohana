@@ -18,8 +18,102 @@ private struct ExpenseReceiptAttachment: Identifiable, Equatable {
     var isImage: Bool
 }
 
+private struct ExpenseReceiptThumbnail: View {
+    let data: Data
+    let tint: Color
+
+    @State private var image: UIImage?
+
+    private var signature: String {
+        FocusWalletAvatarCache.signature(for: data)
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(tint.opacity(0.12))
+                .frame(width: 44, height: 44)
+
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            } else {
+                Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(tint)
+                    .accessibilityHidden(true)
+            }
+        }
+        .task(id: signature) {
+            let decoded = await AttachmentImageDecoder.decode(data)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                image = decoded
+            }
+        }
+    }
+}
+
+private struct ExpenseReceiptPreviewViewer: View {
+    let receipt: ExpenseReceiptAttachment
+    let onClose: () -> Void
+
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @State private var image: UIImage?
+
+    private var l: L10n { L10n(appLanguage) }
+
+    private var signature: String {
+        FocusWalletAvatarCache.signature(for: receipt.data)
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea() // ui-v4: allow receipt preview full-screen black viewer
+
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .ignoresSafeArea()
+            } else {
+                Image(systemName: receipt.isImage ? "photo.fill" : "doc.fill")
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(Color.white.opacity(0.72)) // ui-v4: allow receipt preview placeholder on black viewer
+                    .accessibilityHidden(true)
+            }
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: onClose) {
+                        Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(.title.weight(.semibold))
+                            .foregroundStyle(Color.white) // ui-v4: allow receipt preview close control on black viewer
+                            .padding(16)
+                    }
+                    .accessibilityLabel(l.tr(zh: "关闭预览", en: "Close preview", de: "Vorschau schließen"))
+                }
+                Spacer()
+            }
+        }
+        .task(id: signature) {
+            guard receipt.isImage else { return }
+            let decoded = await AttachmentImageDecoder.decode(receipt.data)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                image = decoded
+            }
+        }
+    }
+}
+
 struct AddExpenseSheet: View {
     let pet: Pet
+    let humans: [Human]
     var preselectedPayerId: String? = nil
     var onSaved: (() -> Void)? = nil
     var onRewarded: ((Int) -> Void)? = nil
@@ -30,7 +124,6 @@ struct AddExpenseSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
-    @Query(sort: \Human.createdAt) private var humans: [Human]
     @FocusState private var inputFocused: Bool
 
     @State private var amountInput = ""
@@ -198,6 +291,7 @@ struct AddExpenseSheet: View {
                 AddInsuranceClaimSheet(
                     insurance: firstInsurance,
                     pet: pet,
+                    allExpenses: pet.expenseLogs,
                     prelinkedExpenseId: savedExpenseId
                 )
             }
@@ -216,26 +310,8 @@ struct AddExpenseSheet: View {
             }
         }
         .fullScreenCover(item: $previewReceipt) { receipt in
-            if let image = UIImage(data: receipt.data) {
-                ZStack {
-                    Color.black.ignoresSafeArea() // ui-v4: allow receipt preview full-screen black viewer
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .ignoresSafeArea()
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Button { previewReceipt = nil } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 28, weight: .semibold))
-                                    .foregroundStyle(.white) // ui-v4: allow receipt preview close control on black viewer
-                                    .padding(16)
-                            }
-                        }
-                        Spacer()
-                    }
-                }
+            ExpenseReceiptPreviewViewer(receipt: receipt) {
+                previewReceipt = nil
             }
         }
         .fileImporter(
@@ -426,8 +502,8 @@ struct AddExpenseSheet: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         payerChip(id: nil, name: l.quickExpenseUnspecified, color: sheetTint) {
-                            Image(systemName: "questionmark")
-                                .font(.system(size: 13, weight: .black))
+                            Image(systemName: "questionmark") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(selectedPayerId == nil ? Color.arkInk : secondaryText)
                         }
                         ForEach(humans) { human in
@@ -503,10 +579,10 @@ struct AddExpenseSheet: View {
 
     private var insurancePolicyNotice: some View {
         HStack(spacing: 10) {
-            Image(systemName: "shield.checkered")
-                .font(.system(size: 15, weight: .semibold))
+            Image(systemName: "shield.checkered") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(sheetTint)
-                .frame(width: 30, height: 30)
+                .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(sheetTint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.quickExpenseInsuranceSingleTitle)
@@ -533,8 +609,8 @@ struct AddExpenseSheet: View {
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "ellipsis.circle.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                    Image(systemName: "ellipsis.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText)
                     Text(l.quickExpenseMore)
                         .font(OhanaFont.callout(.bold))
@@ -543,8 +619,8 @@ struct AddExpenseSheet: View {
                     Text(moreSummary)
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(tertiaryText)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .black))
+                    Image(systemName: "chevron.down") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText)
                         .rotationEffect(.degrees(showMore ? 180 : 0))
                 }
@@ -585,10 +661,10 @@ struct AddExpenseSheet: View {
 
     private var claimHintCard: some View {
         HStack(spacing: 10) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 18, weight: .bold))
+            Image(systemName: "checkmark.seal.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 18, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goTeal)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goTeal.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.quickExpenseMedicalRecorded)
@@ -648,7 +724,7 @@ struct AddExpenseSheet: View {
     private func receiptActionContent(icon: String, title: String) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
                 .font(OhanaFont.caption(.black))
                 .lineLimit(1)
@@ -662,21 +738,18 @@ struct AddExpenseSheet: View {
 
     private func receiptAttachmentChip(_ receipt: ExpenseReceiptAttachment) -> some View {
         HStack(spacing: 8) {
-            if receipt.isImage, let image = UIImage(data: receipt.data) {
+            if receipt.isImage {
                 Button { previewReceipt = receipt } label: {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 34, height: 34)
-                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    ExpenseReceiptThumbnail(data: receipt.data, tint: sheetTint)
                 }
                 .buttonStyle(ScaleButtonStyle())
             } else {
-                Image(systemName: "doc.fill")
-                    .font(.system(size: 16, weight: .semibold))
+                Image(systemName: "doc.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(sheetTint)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(sheetTint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .accessibilityHidden(true)
             }
 
             Text(receiptLabel(receipt))
@@ -690,8 +763,8 @@ struct AddExpenseSheet: View {
                     receiptAttachments.removeAll { $0.id == receipt.id }
                 }
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(tertiaryText)
             }
             .accessibilityLabel(l.quickExpenseRemoveReceipt)
@@ -706,7 +779,7 @@ struct AddExpenseSheet: View {
     private func primaryActionContent(icon: String, title: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .bold))
+                .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
                 .font(OhanaFont.callout(.black))
         }
@@ -725,7 +798,7 @@ struct AddExpenseSheet: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: category.systemIconName)
-                    .font(.system(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(l.expenseCategoryTitle(category))
                     .font(OhanaFont.subheadline(.black))
             }
@@ -752,7 +825,7 @@ struct AddExpenseSheet: View {
         } label: {
             HStack(spacing: 7) {
                 avatar()
-                    .frame(width: 24, height: 24)
+                    .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaCardSurface, in: Circle())
                 Text(name)
                     .font(OhanaFont.subheadline(.black))
@@ -771,7 +844,7 @@ struct AddExpenseSheet: View {
     private func sectionLabel(icon: String, title: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tertiaryText)
             Text(title)
                 .font(OhanaFont.caption(.bold))
@@ -786,7 +859,7 @@ struct AddExpenseSheet: View {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tertiaryText)
             Text(label)
                 .font(OhanaFont.callout(.semibold))
@@ -813,17 +886,12 @@ struct AddExpenseSheet: View {
 
     @ViewBuilder
     private func humanAvatar(_ human: Human, size: CGFloat) -> some View {
-        if let data = human.avatarImageData, let img = UIImage(data: data) {
-            Image(uiImage: img)
-                .resizable()
-                .scaledToFill()
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-        } else {
-            Text(human.avatarEmoji)
-                .font(.system(size: size * 0.62))
-                .frame(width: size, height: size)
-        }
+        HumanAvatarPipelineView(
+            human: human,
+            size: size,
+            fallbackScale: 0.62,
+            showsBackground: false
+        )
     }
 
     // MARK: - Helpers
@@ -961,10 +1029,8 @@ struct AddExpenseSheet: View {
     private func handleReceiptFileImport(_ result: Result<URL, Error>) {
         guard case .success(let url) = result else { return }
         inputFocused = false
-        _ = url.startAccessingSecurityScopedResource()
-        defer { url.stopAccessingSecurityScopedResource() }
 
-        guard let data = try? Data(contentsOf: url) else { return }
+        guard let data = SecurityScopedFileDataReader.read(url) else { return }
         let type = UTType(filenameExtension: url.pathExtension)
         let isImage = type?.conforms(to: .image) ?? false
         let attachment = ExpenseReceiptAttachment(

@@ -375,8 +375,8 @@ struct MemberCardCreationView: View {
                 clearMediaReturnStepStorage()
                 onCancel?()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
             }
@@ -449,8 +449,8 @@ struct MemberCardCreationView: View {
                         retreatStep()
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 12, weight: .black))
+                            Image(systemName: "chevron.left").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 12, weight: .black))
                             Text(l.tr(zh: "上一步", en: "Back", de: "Zurück"))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
@@ -688,13 +688,13 @@ struct MemberCardCreationView: View {
             toggle2DAvatar()
         } label: {
             HStack(spacing: 7) {
-                Image(systemName: "wand.and.stars")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "wand.and.stars").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                 Text("2.5D")
                     .font(OhanaFont.caption(.black))
                 Circle()
                     .fill(isOn ? cardSelectedForeground : cardForeground)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 8, height: 8) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
             .foregroundStyle(isOn ? cardSelectedForeground : cardForeground)
             .padding(.horizontal, 12)
@@ -843,11 +843,11 @@ struct MemberCardCreationView: View {
                     } label: {
                         Circle()
                             .fill(Color(hex: option.hex))
-                            .frame(width: 34, height: 34)
+                            .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             .overlay {
                                 if draft.normalizedThemeHex.uppercased() == option.hex.uppercased() {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 13, weight: .black))
+                                    Image(systemName: "checkmark").accessibilityHidden(true)
+                                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                                         .foregroundStyle(WalletPetCardTheme.prefersDarkForeground(for: option.hex) ? Color.arkInk : Color.goCardWhite)
                                 }
                             }
@@ -1269,7 +1269,7 @@ struct MemberCardCreationView: View {
         let snapshot = data
         decodeTask = Task.detached(priority: .userInitiated) {
             let decodeID = MemberCreationPerformance.begin("Avatar Preview Decode")
-            let image = UIImage(data: snapshot)
+            let image = UIImage(data: snapshot) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
             let transparent = image.map { ImageCutoutService.imageHasTransparentPixels($0) } ?? false
             let rendered = image.map { image -> UIImage in
                 let downsampled = MemberAvatarImageProcessor.downsample(image, maxPixel: 900, preserveAlpha: transparent)
@@ -1619,8 +1619,8 @@ struct MemberCardCreationView: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 10, weight: .black))
+                Image(systemName: "chevron.up.chevron.down").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 10, weight: .black))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .frame(height: 42)
@@ -1646,8 +1646,8 @@ struct MemberCardCreationView: View {
                     .foregroundStyle(cardForeground)
                     .lineLimit(1)
                     .minimumScaleFactor(0.58)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .black))
+                Image(systemName: "chevron.up.chevron.down").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 9, weight: .black))
                     .foregroundStyle(cardSecondaryForeground)
             }
             .frame(maxWidth: .infinity)

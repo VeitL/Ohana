@@ -33,32 +33,14 @@ jobs:
           fetch-depth: 0
       - name: Install ripgrep
         run: brew install ripgrep
-      # Changed-file audits gate NEW code strictly. The full-scope ratchet below
-      # runs the same audit families across the whole repo and blocks any
-      # file/rule debt increase until the baseline reaches zero.
-      - name: Compute changed Swift files
-        id: changed
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-            RANGE="$BASE...HEAD"
-          else
-            RANGE="${{ github.event.before }}...HEAD"
-          fi
-          FILES=$(git diff --name-only --diff-filter=ACMR "$RANGE" -- 'Ohana/Views/**/*.swift' 'Ohana/Utilities/**/*.swift' 2>/dev/null | tr '\n' ' ' || true)
-          echo "files=$FILES" >> "$GITHUB_OUTPUT"
-          echo "Changed view/util Swift files: ${FILES:-<none>}"
-      - name: UI V4 audit (changed files, strict)
-        if: steps.changed.outputs.files != ''
-        run: scripts/audit-ui-v4.sh ${{ steps.changed.outputs.files }}
-      - name: Accessibility audit (changed files, strict)
-        if: steps.changed.outputs.files != ''
-        run: scripts/audit-accessibility.sh ${{ steps.changed.outputs.files }}
-      - name: Smoothness risk audit (changed files, strict)
-        if: steps.changed.outputs.files != ''
-        run: scripts/audit-smoothness-risk.sh ${{ steps.changed.outputs.files }}
-      - name: UI/accessibility/smoothness audit (whole repo ratchet)
-        run: scripts/audit-full-scope-ratchet.sh
+      # The full-scope baseline is now zero, so these run as direct whole-repo
+      # strict gates instead of changed-file gates plus a ratchet.
+      - name: UI V4 audit (whole repo, strict)
+        run: scripts/audit-ui-v4.sh --all
+      - name: Accessibility audit (whole repo, strict)
+        run: scripts/audit-accessibility.sh --all
+      - name: Smoothness risk audit (whole repo, strict)
+        run: scripts/audit-smoothness-risk.sh --all
       # Whole-repo hard gates for mature-app invariants.
       - name: Runtime guardrails audit (whole repo, strict)
         run: scripts/audit-runtime-guardrails.sh --all

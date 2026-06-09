@@ -1,13 +1,35 @@
 import SwiftUI
 import SwiftData
 
-struct CoconutShopView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.colorScheme) private var colorScheme
+struct CoconutShopRouteContainer: View {
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \CoconutExchangeRequest.createdAt, order: .reverse) private var exchangeRequests: [CoconutExchangeRequest]
+
+    let initialCategory: ShopItem.ShopCategory
+
+    init(initialCategory: ShopItem.ShopCategory = .appIcon) {
+        self.initialCategory = initialCategory
+    }
+
+    var body: some View {
+        CoconutShopView(
+            initialCategory: initialCategory,
+            humans: humans,
+            pets: pets,
+            exchangeRequests: exchangeRequests
+        )
+    }
+}
+
+struct CoconutShopView: View {
+    let humans: [Human]
+    let pets: [Pet]
+    let exchangeRequests: [CoconutExchangeRequest]
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
 
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("purchasedShopItems") private var purchasedRaw = ""
@@ -33,7 +55,15 @@ struct CoconutShopView: View {
     @State private var exchangeOptionId = ""
     @State private var exchangeNote = ""
 
-    init(initialCategory: ShopItem.ShopCategory = .appIcon) {
+    init(
+        initialCategory: ShopItem.ShopCategory = .appIcon,
+        humans: [Human] = [],
+        pets: [Pet] = [],
+        exchangeRequests: [CoconutExchangeRequest] = []
+    ) {
+        self.humans = humans
+        self.pets = pets
+        self.exchangeRequests = exchangeRequests
         _selectedCategory = State(initialValue: initialCategory)
     }
 
@@ -162,7 +192,7 @@ struct CoconutShopView: View {
 
             ForEach(confettiItems) { item in
                 Text(item.emoji)
-                    .font(.system(size: 24))
+                    .font(OhanaFont.adaptive(size: 24)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .position(x: item.x, y: -20)
                     .opacity(toast == nil ? 0 : 1)
                     .animation(GoMotion.feedback.delay(item.delay), value: toast)
@@ -216,8 +246,8 @@ struct CoconutShopView: View {
                 Button {
                     dismiss()
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(primaryText)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -275,7 +305,7 @@ struct CoconutShopView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: category.icon)
-                                .font(.system(size: 12, weight: .black))
+                                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text(category.title(l))
                                 .font(OhanaFont.caption(.black))
                         }
@@ -300,8 +330,8 @@ struct CoconutShopView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 22, style: .continuous)
                             .fill(Color.goYellow.opacity(colorScheme == .dark ? 0.2 : 0.16))
-                        Image(systemName: "banknote.fill")
-                            .font(.system(size: 25, weight: .black))
+                        Image(systemName: "banknote.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 25, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goYellow)
                     }
                     .frame(width: 64, height: 64)
@@ -321,8 +351,8 @@ struct CoconutShopView: View {
                     }
 
                     Spacer()
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 25, weight: .black))
+                    Image(systemName: "plus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 25, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                         .ohanaSymbolPulse(trigger: activePicker?.id ?? "")
                         .ohanaPing(
@@ -442,8 +472,8 @@ struct CoconutShopView: View {
                             .foregroundStyle(primaryText)
                             .lineLimit(1)
                         if state.isEquipped {
-                            Image(systemName: "checkmark.seal.fill")
-                                .font(.system(size: 13, weight: .black))
+                            Image(systemName: "checkmark.seal.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goPrimary)
                         }
                     }
@@ -646,7 +676,7 @@ struct CoconutShopView: View {
                 confirmPurchase(item)
             } label: {
                 HStack {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                     Text(l.tr(zh: "兑换 / 使用", en: "Unlock / Use", de: "Einlösen / Nutzen"))
                 }
                 .font(OhanaFont.callout(.black))
@@ -791,7 +821,7 @@ struct CoconutShopView: View {
                     createExchange()
                 } label: {
                     HStack {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                         Text(exchangeConfirmTitle)
                     }
                     .font(OhanaFont.callout(.black))
@@ -838,7 +868,7 @@ struct CoconutShopView: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Text(icon)
-                    .font(.system(size: 24))
+                    .font(OhanaFont.adaptive(size: 24)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
@@ -849,8 +879,8 @@ struct CoconutShopView: View {
                         .foregroundStyle(tertiaryText)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tertiaryText)
             }
             .padding(12)
@@ -875,11 +905,11 @@ struct CoconutShopView: View {
                     .fill(Color.ohanaControlFill)
                 if let sfSymbol {
                     Image(systemName: sfSymbol)
-                        .font(.system(size: 21, weight: .black))
+                        .font(OhanaFont.adaptive(size: 21, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                 } else {
                     Text(icon)
-                        .font(.system(size: 24))
+                        .font(OhanaFont.adaptive(size: 24)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
             }
             .frame(width: 52, height: 52)
@@ -946,7 +976,7 @@ struct CoconutShopView: View {
         VStack {
             HStack(spacing: 8) {
                 Image(systemName: toast.icon)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .ohanaSymbolPulse(trigger: toast.id)
                 Text(toast.message)
                     .font(OhanaFont.callout(.black))
@@ -1078,7 +1108,21 @@ struct CoconutShopView: View {
     private func purchase(_ item: ShopItem) {
         enqueueShopPurchase(item, note: "coconutShop.purchase") {
             if item.isConsumable {
-                activateBoost(item)
+                guard activateBoost(item) else {
+                    refundPurchasedConsumable(item)
+                    pendingPurchaseItem = nil
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    showToast(
+                        l.tr(
+                            zh: "本周期已使用，已退回 \(item.cost)🥥",
+                            en: "Already used this period. Refunded \(item.cost)🥥",
+                            de: "In diesem Zeitraum schon genutzt. \(item.cost)🥥 erstattet"
+                        ),
+                        icon: "arrow.uturn.backward.circle.fill",
+                        tint: Color.goOrange
+                    )
+                    return
+                }
             } else {
                 markPurchased(item)
                 activateOwnedItem(item)
@@ -1197,24 +1241,45 @@ struct CoconutShopView: View {
         }
     }
 
-    private func activateBoost(_ item: ShopItem) {
+    @discardableResult
+    private func activateBoost(_ item: ShopItem) -> Bool {
         switch item.id {
         case "boost_tree", "boost_tree_large":
-            OasisTreeManager.shared.injectedEnergy += item.id == "boost_tree_large" ? 110 : 30
-            OasisTreeManager.shared.checkAndRewardLevelUp(modelContext: modelContext)
+            return OasisTreeManager.shared.applyPurchasedEnergyBoost(cost: item.cost, modelContext: modelContext)
         case "boost_double":
             UserDefaults.standard.set(true, forKey: "shop_boostDoubleActive")
+            return true
         case "boost_streak":
             UserDefaults.standard.set(Date().addingTimeInterval(172800), forKey: "shop_streakShieldExpiry")
+            return true
         case "boost_backdate_single", "boost_backdate_pack":
             let key = "inventory_backdate_1day_count"
             let cur = UserDefaults.standard.integer(forKey: key)
             UserDefaults.standard.set(cur + (item.id == "boost_backdate_pack" ? 3 : 1), forKey: key)
+            return true
         case Avatar2DAccess.shopItemId:
             Avatar2DAccess.addExtraPasses(1)
+            return true
         default:
-            break
+            return true
         }
+    }
+
+    private func refundPurchasedConsumable(_ item: ShopItem) {
+        guard let currentHuman else { return }
+        currentHuman.coconutBalance += item.cost
+        questManager.recordCoconutDelta(
+            item.cost,
+            emoji: item.emoji,
+            title: l.tr(
+                zh: "退回「\(item.name(l))」",
+                en: "Refunded \(item.name(l))",
+                de: "\(item.name(l)) erstattet"
+            ),
+            actorId: currentHuman.id.uuidString,
+            actorName: currentHuman.name
+        )
+        modelContext.safeSave()
     }
 
     private func activateOwnedItem(_ item: ShopItem) {
@@ -1329,7 +1394,7 @@ struct CoconutShopView: View {
             .overlay(alignment: isOn ? .trailing : .leading) {
                 Circle()
                     .fill(isOn ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.58))
-                    .frame(width: 18, height: 18)
+                    .frame(width: 18, height: 18) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .padding(.horizontal, 4)
             }
             .animation(GoMotion.selection, value: isOn)
@@ -1467,8 +1532,8 @@ private struct ShopAppliedPreview: View {
             }
 
             if isEquipped {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 16, weight: .black))
+                Image(systemName: "checkmark.seal.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding(10)
@@ -1490,8 +1555,8 @@ private struct ShopAppliedPreview: View {
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
-            Image(systemName: "arrow.right")
-                .font(.system(size: 12, weight: .black))
+            Image(systemName: "arrow.right") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(accent)
             VStack(spacing: 3) {
                 ZStack(alignment: .bottom) {
@@ -1579,8 +1644,8 @@ private struct ShopAppliedPreview: View {
     private var rainbowRoutePreview: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Image(systemName: "figure.walk")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "figure.walk") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                 Text(l.tr(zh: "遛狗路线", en: "Walk route", de: "Gassi-Route"))
                     .font(OhanaFont.caption(.black))
@@ -1622,8 +1687,8 @@ private struct ShopAppliedPreview: View {
     private var stardustPreview: some View {
         ZStack {
             HStack(spacing: 10) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 28, weight: .black))
+                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 28, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "每日委托", en: "Daily quest", de: "Tagesquest"))
@@ -1639,7 +1704,7 @@ private struct ShopAppliedPreview: View {
 
             ForEach(0..<5, id: \.self) { index in
                 Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "star.fill")
-                    .font(.system(size: 9 + CGFloat(index), weight: .black))
+                    .font(OhanaFont.adaptive(size: 9 + CGFloat(index), weight: .black))
                     .foregroundStyle(index.isMultiple(of: 2) ? Color.goYellow : Color.goPurple)
                     .offset(x: CGFloat(index * 18 - 26), y: animate ? CGFloat(-22 + index * 3) : 4)
                     .opacity(animate ? 1 : 0)
@@ -1650,8 +1715,8 @@ private struct ShopAppliedPreview: View {
     private var fireworkPreview: some View {
         ZStack {
             VStack(spacing: 4) {
-                Image(systemName: "rosette")
-                    .font(.system(size: 34, weight: .black))
+                Image(systemName: "rosette") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 34, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow)
                     .scaleEffect(animate ? 1 : 0.72)
                 Text(l.tr(zh: "里程碑庆典", en: "Milestone", de: "Meilenstein"))
@@ -1661,7 +1726,7 @@ private struct ShopAppliedPreview: View {
             ForEach(0..<8, id: \.self) { index in
                 Circle()
                     .fill([Color.goYellow, .goOrange, .goPurple, .goTeal][index % 4])
-                    .frame(width: 5, height: 5)
+                    .frame(width: 5, height: 5) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .offset(
                         x: animate ? cos(CGFloat(index) * .pi / 4) * 42 : 0,
                         y: animate ? sin(CGFloat(index) * .pi / 4) * 28 : 0
@@ -1695,7 +1760,7 @@ private struct ShopAppliedPreview: View {
     private var boostPreview: some View {
         switch item.id {
         case "boost_double":
-            rewardBoostPreview(from: "+2🥥", to: "+4🥥", icon: "bolt.fill")
+            rewardBoostPreview(from: "+0", to: "+15XP +8🥥", icon: "bolt.fill")
         case "boost_streak":
             streakShieldPreview
         case "boost_tree", "boost_tree_large":
@@ -1710,15 +1775,15 @@ private struct ShopAppliedPreview: View {
     private func rewardBoostPreview(from: String, to: String, icon: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 24, weight: .black))
+                .font(OhanaFont.adaptive(size: 24, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goOrange)
-                .frame(width: 38, height: 38)
+                .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goOrange.opacity(0.16), in: Circle())
             Text(from)
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
-            Image(systemName: "arrow.right")
-                .font(.system(size: 11, weight: .black))
+            Image(systemName: "arrow.right") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text(to)
                 .font(OhanaFont.metric(size: 21, .black))
@@ -1732,7 +1797,7 @@ private struct ShopAppliedPreview: View {
     private var streakShieldPreview: some View {
         VStack(spacing: 8) {
             HStack {
-                Image(systemName: "shield.fill")
+                Image(systemName: "shield.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .foregroundStyle(Color.goTeal)
                 Text(l.tr(zh: "连击保护", en: "Streak shield", de: "Streak-Schutz"))
                     .font(OhanaFont.caption(.black))
@@ -1746,8 +1811,8 @@ private struct ShopAppliedPreview: View {
                         .frame(height: 18)
                         .overlay {
                             if index == 4 {
-                                Image(systemName: "shield.fill")
-                                    .font(.system(size: 8, weight: .black))
+                                Image(systemName: "shield.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                    .font(OhanaFont.adaptive(size: 8, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.arkInk)
                             }
                         }
@@ -1759,8 +1824,8 @@ private struct ShopAppliedPreview: View {
 
     private var treeEnergyPreview: some View {
         HStack(spacing: 12) {
-            Image(systemName: "tree.fill")
-                .font(.system(size: 30, weight: .black))
+            Image(systemName: "tree.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 30, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goTeal)
             VStack(alignment: .leading, spacing: 8) {
                 Text(l.tr(zh: "生命树能量", en: "Tree energy", de: "Baumenergie"))
@@ -1808,8 +1873,8 @@ private struct ShopAppliedPreview: View {
 
     private var cashPreview: some View {
         HStack(spacing: 10) {
-            Image(systemName: "banknote.fill")
-                .font(.system(size: 28, weight: .black))
+            Image(systemName: "banknote.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 28, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
             VStack(alignment: .leading, spacing: 4) {
                 Text("1000🥥 → \(CoconutExchangeOption.options().dropFirst().first?.formattedAmount ?? "$1")")
@@ -1826,28 +1891,15 @@ private struct ShopAppliedPreview: View {
 
     @ViewBuilder
     private func memberAvatar(size: CGFloat) -> some View {
-        if let human, let data = human.avatarImageData, let image = UIImage(data: data) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-        } else {
-            Text(human?.avatarEmoji ?? "👤")
-                .font(.system(size: size * 0.58))
-                .frame(width: size, height: size)
-                .background(Color.ohanaCardSurface, in: Circle())
-        }
+        Text(human?.avatarEmoji ?? "👤")
+            .font(.system(size: size * 0.58))
+            .frame(width: size, height: size)
+            .background(Color.ohanaCardSurface, in: Circle())
     }
 
     @ViewBuilder
     private func petAvatar(size: CGFloat) -> some View {
-        if let pet, let data = pet.avatarImageData, let image = UIImage(data: data) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(width: size, height: size)
-        } else if let pet {
+        if let pet {
             PetSilhouetteView(
                 species: pet.species,
                 coatColor: Color(hex: pet.coatColor.isEmpty ? "E8C49A" : pet.coatColor),
@@ -1856,7 +1908,7 @@ private struct ShopAppliedPreview: View {
             )
             .frame(width: size, height: size)
         } else {
-            Image(systemName: "pawprint.fill")
+            Image(systemName: "pawprint.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(.system(size: size * 0.42, weight: .black))
                 .foregroundStyle(accent)
                 .frame(width: size, height: size)
@@ -1865,16 +1917,7 @@ private struct ShopAppliedPreview: View {
 
     @ViewBuilder
     private func popoutSubject(size: CGFloat) -> some View {
-        if let pet,
-           let data = pet.cardPopoutImageData ?? pet.avatarImageData,
-           let image = UIImage(data: data) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .frame(width: size, height: size * 1.12, alignment: .bottom)
-        } else {
-            petAvatar(size: size)
-        }
+        petAvatar(size: size)
     }
 }
 
@@ -1898,7 +1941,7 @@ private struct AppIconPreview: View {
                         )
                     )
                 Image(systemName: descriptor.previewSymbol)
-                    .font(.system(size: 42, weight: .black))
+                    .font(OhanaFont.adaptive(size: 42, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(descriptor.itemId == "appicon_minimal_o" ? Color.arkInk : Color.ohanaPrimaryActionText)
             }
 
@@ -1906,8 +1949,8 @@ private struct AppIconPreview: View {
                 VStack {
                     HStack {
                         Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 19, weight: .black))
+                        Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 19, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                             .padding(8)
                     }

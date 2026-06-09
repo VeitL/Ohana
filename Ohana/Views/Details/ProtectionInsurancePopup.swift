@@ -62,8 +62,8 @@ struct ProtectionInsurancePopup: View {
                         .gesture(handleDrag)
 
                     HStack(spacing: 12) {
-                        Image(systemName: "shield.lefthalf.filled")
-                            .font(.system(size: 18, weight: .black))
+                        Image(systemName: "shield.lefthalf.filled").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 18, weight: .black))
                             .foregroundStyle(Color.arkInk)
                             .frame(width: 48, height: 48)
                             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -233,13 +233,13 @@ struct ProtectionInsurancePopup: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     Button { if paymentDay > 1 { paymentDay -= 1 } } label: {
-                        Image(systemName: "minus.circle.fill")
+                        Image(systemName: "minus.circle.fill").accessibilityHidden(true)
                     }
                     Text("\(paymentDay)")
                         .font(OhanaFont.headline(.black))
                         .frame(minWidth: 28)
                     Button { if paymentDay < 28 { paymentDay += 1 } } label: {
-                        Image(systemName: "plus.circle.fill")
+                        Image(systemName: "plus.circle.fill").accessibilityHidden(true)
                     }
                 }
                 .foregroundStyle(Color.goPrimary)

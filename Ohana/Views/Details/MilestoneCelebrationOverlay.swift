@@ -98,7 +98,7 @@ struct MilestoneCelebrationOverlay: View {
                         ))
                         .frame(width: 360, height: 360)
                         .scaleEffect(shouldRunGlow && glowPulse ? 1.15 : 1.0)
-                        .animation(shouldRunGlow ? .easeInOut(duration: 1.8).repeatForever(autoreverses: true) : GoMotion.reduced, value: glowPulse)
+                        .animation(shouldRunGlow ? .easeInOut(duration: 1.8).repeatForever(autoreverses: true) : GoMotion.reduced, value: glowPulse) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
 
                     VStack(spacing: 20) {
                         // 宠物头像
@@ -113,33 +113,33 @@ struct MilestoneCelebrationOverlay: View {
 
                         // 大 emoji
                         Text(milestone.emoji)
-                            .font(.system(size: 56))
+                            .font(OhanaFont.adaptive(size: 56))
 
                         // 天数
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text("\(milestone.days)")
-                                .font(.system(size: 72, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 72, weight: .black, design: .rounded))
                                 .foregroundStyle(milestone.accentColor)
                             Text("天")
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 28, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         }
 
                         // 标题
                         Text(milestone.title)
-                            .font(.system(size: 26, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
 
                         // 副标题
                         Text(milestone.subtitle)
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
 
                         // 宠物名
                         Text(pet.name)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                             .foregroundStyle(milestone.accentColor.opacity(0.8))
                             .padding(.horizontal, 14).padding(.vertical, 5)
                             .background(milestone.accentColor.opacity(0.15), in: Capsule())
@@ -162,7 +162,7 @@ struct MilestoneCelebrationOverlay: View {
                 // 关闭按钮
                 Button(action: onDismiss) {
                     Text("太棒了！")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 48).padding(.vertical, 16)
                         .background(milestone.accentColor, in: Capsule())

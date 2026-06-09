@@ -54,9 +54,9 @@ struct OverlappingAvatarsView: View {
                     Circle()
                         .fill(Color.goPrimary.mix(with: .black, by: 0.3))
                         .overlay(Circle().strokeBorder(Color.ohanaCardStroke, lineWidth: 1.5))
-                        .frame(width: 24, height: 24)
+                        .frame(width: 24, height: 24) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     Text(emoji)
-                        .font(.system(size: 12))
+                        .font(OhanaFont.adaptive(size: 12))
                 }
                 .offset(x: CGFloat(-i) * 8)
                 .zIndex(Double(shown.count - i))
@@ -66,9 +66,9 @@ struct OverlappingAvatarsView: View {
                     Circle()
                         .fill(Color.ohanaControlFill)
                         .overlay(Circle().strokeBorder(Color.ohanaCardStroke, lineWidth: 1.5))
-                        .frame(width: 24, height: 24)
+                        .frame(width: 24, height: 24) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     Text("+\(emojis.count - maxCount)")
-                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 }
                 .offset(x: CGFloat(-maxCount) * 8)
@@ -94,7 +94,7 @@ struct IslandStatCard<Chart: View>: View {
             // 顶部：icon + 标题
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
                     .foregroundStyle(accentColor)
                 Text(title)
                     .font(OhanaFont.footnote(.bold))
@@ -130,8 +130,8 @@ struct IslandStatCard<Chart: View>: View {
                     }
                     Spacer()
                     if onTap != nil {
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 9, weight: .bold))
+                        Image(systemName: "arrow.up.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 9, weight: .bold))
                             .foregroundStyle(accentColor.opacity(0.6))
                     }
                 }
@@ -239,7 +239,7 @@ struct MultiPetExpenseBar: View {
             let h = geo.size.height
             if series.isEmpty {
                 Text("暂无花费")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -259,7 +259,7 @@ struct MultiPetExpenseBar: View {
                                 .fill(color)
                                 .frame(width: barW, height: barH)
                             Text(name)
-                                .font(.system(size: 7, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 7, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 .frame(width: barW)
                                 .lineLimit(1)
@@ -453,11 +453,11 @@ struct SynergyFlashCard: View {
                 VStack(alignment: .leading, spacing: 14) {
                     // 顶部标签
                     HStack(spacing: 6) {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 11, weight: .black))
+                        Image(systemName: "bolt.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 11, weight: .black))
                             .foregroundStyle(brief.accentColor)
                         Text("家庭简报")
-                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             .tracking(2)
                         Spacer()
@@ -466,7 +466,7 @@ struct SynergyFlashCard: View {
                             ForEach(0..<engine.briefs.count, id: \.self) { i in
                                 Circle()
                                     .fill(i == currentIndex % engine.briefs.count ? brief.accentColor : .white.opacity(0.2))
-                                    .frame(width: 4, height: 4)
+                                    .frame(width: 4, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             }
                         }
                     }
@@ -479,11 +479,11 @@ struct SynergyFlashCard: View {
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(brief.headline)
-                                .font(.system(size: 16, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(2)
                             Text(brief.subtext)
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                                 .lineLimit(2)
                         }
@@ -584,14 +584,14 @@ struct CoconutWealthRankingCard: View {
                 // 标题行
                 HStack(spacing: 6) {
                     Text("🌴")
-                        .font(.system(size: 14))
+                        .font(OhanaFont.adaptive(size: 14))
                     Text("Ohana财富")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .tracking(1)
                     Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 }
 
@@ -602,7 +602,7 @@ struct CoconutWealthRankingCard: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .ohanaNumericMotion(computedTotal)
                     Text("🥥")
-                        .font(.system(size: 18))
+                        .font(OhanaFont.adaptive(size: 18))
                 }
 
             OhanaDashedDivider(color: Color.ohanaCardStroke).padding(.vertical, 4)
@@ -610,29 +610,29 @@ struct CoconutWealthRankingCard: View {
             // 排行榜
             if leaderboard.isEmpty {
                 Text("完成打卡即可解锁财富榜 ✨")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             } else {
                 VStack(spacing: 8) {
                     ForEach(Array(leaderboard.enumerated()), id: \.element.id) { i, entry in
                         HStack(spacing: 10) {
                             Text(rankEmojis[i])
-                                .font(.system(size: 14))
+                                .font(OhanaFont.adaptive(size: 14))
                                 .frame(width: 20)
                             ZStack {
                                 Circle()
                                     .fill(Color.goPrimary.mix(with: .black, by: 0.35))
-                                    .frame(width: 28, height: 28)
+                                    .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                                 Text(entry.emoji)
-                                    .font(.system(size: 14))
+                                    .font(OhanaFont.adaptive(size: 14))
                             }
                             Text(entry.name)
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(1)
                             Spacer()
                             Text("\(entry.balance) 🥥")
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                                 .foregroundStyle(i == 0 ? Color.goPrimary : Color.ohanaSecondaryText)
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(i == 0 ? Color.goPrimary.opacity(0.15) : Color.ohanaControlFill,
@@ -676,7 +676,7 @@ struct MiniRingChart: View {
                 .animation(GoMotion.quick, value: progress * Double(animPhase))
 
             Text("\(Int(progress * 100))%")
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(accentColor)
                 .ohanaNumericMotion(Int(progress * 100))
         }

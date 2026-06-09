@@ -103,7 +103,7 @@ struct FamilyCollaborationPlaygroundView: View {
         } label: {
             VStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                 Text(title)
                     .font(OhanaFont.caption2(.black))
                     .lineLimit(1)
@@ -152,7 +152,7 @@ struct FamilyCollaborationPlaygroundView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: done ? "checkmark.seal.fill" : icon)
-                    .font(.system(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black))
                     .foregroundStyle(tint)
                     .frame(width: 46, height: 46)
                     .background(tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
@@ -190,8 +190,8 @@ struct FamilyCollaborationPlaygroundView: View {
                 petNode(id: "momo", emoji: "🐶", name: "Momo", badge: "1", x: 88, y: -18, tint: Color.goPurple)
                 petNode(id: "rio", emoji: "🐟", name: "Rio", badge: "✓", x: -20, y: 82, tint: Color.goTeal)
                 VStack(spacing: 3) {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 24, weight: .black))
+                    Image(systemName: "house.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 24, weight: .black))
                         .foregroundStyle(Color.goPrimary)
                     Text(l.tr(zh: "家", en: "Home", de: "Zuhause"))
                         .font(OhanaFont.caption2(.black))
@@ -211,14 +211,14 @@ struct FamilyCollaborationPlaygroundView: View {
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
                     Text(emoji)
-                        .font(.system(size: 34))
+                        .font(OhanaFont.adaptive(size: 34))
                         .frame(width: 68, height: 68)
                         .background(selectedPetID == id ? tint.opacity(0.24) : Color.ohanaCardSurface, in: Circle())
                         .overlay(Circle().strokeBorder(selectedPetID == id ? tint : Color.ohanaCardStroke, lineWidth: selectedPetID == id ? 2 : 1))
                     Text(badge)
                         .font(OhanaFont.caption2(.black))
                         .foregroundStyle(Color.arkInk)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 22, height: 22) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .background(tint, in: Circle())
                         .offset(x: 2, y: -2)
                 }
@@ -240,7 +240,7 @@ struct FamilyCollaborationPlaygroundView: View {
             }
         }()
         return HStack(spacing: 10) {
-            Image(systemName: "sparkles")
+            Image(systemName: "sparkles").accessibilityHidden(true)
                 .foregroundStyle(Color.goPrimary)
             Text(label)
                 .font(OhanaFont.caption(.black))
@@ -258,7 +258,7 @@ struct FamilyCollaborationPlaygroundView: View {
             raceRow(id: "baba", emoji: "🧑", name: "Ben", score: boostedMemberID == "baba" ? 82 : 66, tint: Color.goTeal)
             raceRow(id: "kid", emoji: "🧒", name: "Noa", score: boostedMemberID == "kid" ? 78 : 58, tint: Color.goYellow)
             HStack(spacing: 8) {
-                Image(systemName: "flame.fill")
+                Image(systemName: "flame.fill").accessibilityHidden(true)
                     .foregroundStyle(Color.goOrange)
                 Text(l.tr(zh: "连击、悬赏和今日完成数会一起推动排名。", en: "Streaks, bounties, and check-ins drive rank.", de: "Serien, Prämien und Check-ins bestimmen den Rang."))
                     .font(OhanaFont.caption(.bold))
@@ -274,7 +274,7 @@ struct FamilyCollaborationPlaygroundView: View {
         } label: {
             HStack(spacing: 12) {
                 Text(emoji)
-                    .font(.system(size: 28))
+                    .font(OhanaFont.adaptive(size: 28))
                     .frame(width: 48, height: 48)
                     .background(tint.opacity(0.16), in: Circle())
                 VStack(alignment: .leading, spacing: 6) {

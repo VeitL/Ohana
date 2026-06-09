@@ -59,7 +59,7 @@ struct IslandDailyReportSheet: View {
                     // 顶部 emoji + 标题
                     VStack(spacing: 10) {
                         Text("🏝️")
-                            .font(.system(size: 64))
+                            .font(OhanaFont.adaptive(size: 64))
                             .scaleEffect(islandBounce ? 1.15 : 1.0)
                             .animation(
                                 .spring(response: 0.4, dampingFraction: 0.5)
@@ -68,11 +68,11 @@ struct IslandDailyReportSheet: View {
                             )
 
                         Text("今日任务盘")
-                            .font(.system(size: 28, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
 
                         Text("\(dateText) · \(greetingText)")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
 
@@ -82,7 +82,7 @@ struct IslandDailyReportSheet: View {
                             .fill(Color.primary.opacity(0.1))
                             .frame(height: 1)
                         Text("今日")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .fixedSize()
                         Rectangle()
@@ -94,7 +94,7 @@ struct IslandDailyReportSheet: View {
                     // 任务列表（staggered 入场）
                     if quests.isEmpty {
                         Text("🌴 已清空")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .multilineTextAlignment(.center)
                             .padding(.vertical, 8)
@@ -111,9 +111,9 @@ struct IslandDailyReportSheet: View {
                     if !quests.isEmpty {
                         HStack(spacing: 6) {
                             Text("🎁")
-                                .font(.system(size: 14))
+                                .font(OhanaFont.adaptive(size: 14))
                             Text("+5 🥥")
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 8)
@@ -133,9 +133,9 @@ struct IslandDailyReportSheet: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Text("开始")
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                                 Text("⚔️")
-                                    .font(.system(size: 16))
+                                    .font(OhanaFont.adaptive(size: 16))
                             }
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
@@ -148,7 +148,7 @@ struct IslandDailyReportSheet: View {
                             isPresented = false
                         } label: {
                             Text("跳过")
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -192,14 +192,14 @@ struct IslandDailyReportSheet: View {
             ZStack {
                 Circle()
                     .fill(quest.isCompleted ? Color.goPrimary : Color.primary.opacity(0.08))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 32, height: 32) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 Text(quest.isCompleted ? "✅" : quest.emoji)
-                    .font(.system(size: 15))
+                    .font(OhanaFont.adaptive(size: 15))
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(quest.title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(quest.isCompleted ? .secondary : .primary)
                     .strikethrough(quest.isCompleted)
             }
@@ -209,14 +209,14 @@ struct IslandDailyReportSheet: View {
             // 椰子奖励
             if quest.isCompleted {
                 Text("✅")
-                    .font(.system(size: 14))
+                    .font(OhanaFont.adaptive(size: 14))
             } else {
                 HStack(spacing: 3) {
                     Text("+\(reward)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goYellow)
                     Text("🥥")
-                        .font(.system(size: 12))
+                        .font(OhanaFont.adaptive(size: 12))
                 }
             }
         }

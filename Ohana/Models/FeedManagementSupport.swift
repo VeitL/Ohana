@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum FeedFoodKind: String, CaseIterable, Identifiable, Codable {
+nonisolated enum FeedFoodKind: String, CaseIterable, Identifiable, Codable {
     case dry
     case wet
 
@@ -36,7 +36,7 @@ enum FeedFoodKind: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-enum FeedTreatKind: String, CaseIterable, Identifiable, Codable {
+nonisolated enum FeedTreatKind: String, CaseIterable, Identifiable, Codable {
     case canned
     case lickable
     case freezeDried
@@ -69,7 +69,7 @@ enum FeedTreatKind: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-enum PetFoodBrandCatalog {
+nonisolated enum PetFoodBrandCatalog {
     static func brands(countryCode: String = AppCountry.code, foodKind: FeedFoodKind) -> [String] {
         let country = AppCountry.normalize(countryCode)
         let regional = brandMap[country]?[foodKind] ?? []

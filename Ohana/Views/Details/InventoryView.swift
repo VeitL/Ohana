@@ -115,14 +115,14 @@ struct InventoryView: View {
                         
                         if myAppIcons.isEmpty && myTitles.isEmpty && myEffects.isEmpty && Avatar2DAccess.extraPassCount == 0 && backdatePacks == 0 && !isShieldActive && !doubleBoostActive {
                             VStack(spacing: 12) {
-                                Image(systemName: "shippingbox")
-                                    .font(.system(size: 40))
+                                Image(systemName: "shippingbox").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 40))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                                 Text("百宝箱空空如也")
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 Text("前往椰子商店兑换更多有趣的道具吧！")
-                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
                             .padding(.top, 60)
@@ -165,13 +165,13 @@ struct InventoryView: View {
     private var avatarPassRow: some View {
         HStack(spacing: 14) {
             Text("🖼️")
-                .font(.system(size: 28))
+                .font(OhanaFont.adaptive(size: 28))
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "2.5D 头像券", en: "2.5D Avatar Pass", de: "2,5D-Avatarpass"))
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "库存 x\(Avatar2DAccess.extraPassCount) · 开关后指定成员", en: "x\(Avatar2DAccess.extraPassCount) available · toggle to assign", de: "x\(Avatar2DAccess.extraPassCount) verfügbar · Schalter zum Zuweisen"))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()
@@ -200,10 +200,10 @@ struct InventoryView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(isActive ? l.tr(zh: "当前使用中", en: "Currently active", de: "Aktuell aktiv") : l.tr(zh: "可随时切换", en: "Ready to switch", de: "Bereit zum Wechseln"))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()
@@ -216,7 +216,7 @@ struct InventoryView: View {
                 }
             } label: {
                 Text(isActive ? l.tr(zh: "使用中", en: "In use", de: "Aktiv") : l.tr(zh: "切换", en: "Switch", de: "Wechseln"))
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(isActive ? Color.goDarkBlue : Color.ohanaPrimaryText)
                     .padding(.horizontal, 14).padding(.vertical, 6)
                     .background(isActive ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -237,7 +237,7 @@ struct InventoryView: View {
                 Image(systemName: icon)
                     .foregroundStyle(Color.goPrimary)
                 Text(title)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .padding(.horizontal, 4)
@@ -255,14 +255,14 @@ struct InventoryView: View {
         let isEquipped = (equippedTitle == item.id)
         return HStack(spacing: 14) {
             Text(item.emoji)
-                .font(.system(size: 28))
+                .font(OhanaFont.adaptive(size: 28))
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(item.description)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()
@@ -321,14 +321,14 @@ struct InventoryView: View {
         
         return HStack(spacing: 14) {
             Text(item.emoji)
-                .font(.system(size: 28))
+                .font(OhanaFont.adaptive(size: 28))
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(item.description)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()
@@ -343,7 +343,7 @@ struct InventoryView: View {
                         }
                     } label: {
                         Text(l.tr(zh: "素材", en: "Asset", de: "Motiv"))
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.goDarkBlue)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 6)
@@ -367,18 +367,18 @@ struct InventoryView: View {
     private func consumableRow(emoji: String, name: String, count: Int, suffix: String? = nil) -> some View {
         HStack(spacing: 14) {
             Text(emoji)
-                .font(.system(size: 28))
+                .font(OhanaFont.adaptive(size: 28))
             Text(name)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             if let suf = suffix {
                 Text(suf)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
             } else {
                 Text("x\(count)")
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
         }
@@ -399,7 +399,7 @@ struct InventoryView: View {
             .overlay(alignment: isOn ? .trailing : .leading) {
                 Circle()
                     .fill(Color.ohanaPrimaryText)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 22, height: 22) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .padding(3)
             }
             .overlay {
@@ -458,7 +458,7 @@ private struct AppIconInventoryPreview: View {
                     )
                 )
             Image(systemName: descriptor.previewSymbol)
-                .font(.system(size: 20, weight: .black))
+                .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(descriptor.itemId == "appicon_minimal_o" ? Color.arkInk : Color.white) // ui-v4: allow asset-specific icon ink
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))

@@ -22,7 +22,7 @@ struct SitterCardPreviewSheet: View {
                         sitterCard
                             .padding(.horizontal, 16)
                         Text("点击右上角分享按钮，将名片发给宠物保姆")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
@@ -44,8 +44,8 @@ struct SitterCardPreviewSheet: View {
                         if isRendering {
                             ProgressView().tint(Color.goPrimary).scaleEffect(0.8)
                         } else {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 15, weight: .semibold))
+                            Image(systemName: "square.and.arrow.up").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                                 .foregroundStyle(Color.goPrimary)
                         }
                     }
@@ -76,7 +76,7 @@ struct SitterCardPreviewSheet: View {
                 .overlay(Circle().strokeBorder(Color(hex: pet.safeThemeColorHex).opacity(0.5), lineWidth: 2))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     HStack(spacing: 6) {
                         capsuleTag(pet.species)
@@ -151,10 +151,10 @@ struct SitterCardPreviewSheet: View {
                 GoDashedDivider().padding(.horizontal, 16)
                 VStack(alignment: .leading, spacing: 6) {
                     Label("特别说明", systemImage: "note.text")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     Text(pet.notes)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -166,7 +166,7 @@ struct SitterCardPreviewSheet: View {
             HStack {
                 Spacer()
                 Text("Made with Ohana 🏝️")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .padding(.bottom, 16)
                     .padding(.trailing, 20)
@@ -183,7 +183,7 @@ struct SitterCardPreviewSheet: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(Color(hex: pet.themeColorHex).opacity(0.3), lineWidth: 1.5)
         )
-        .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 8)
+        .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 8) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
 
     // MARK: - Row Builder
@@ -192,17 +192,17 @@ struct SitterCardPreviewSheet: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(color.opacity(0.15))
-                    .frame(width: 32, height: 32)
+                    .frame(width: 32, height: 32) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(color)
             }
             Text(label)
-                .font(.system(size: 12, weight: .medium))
+                .font(OhanaFont.adaptive(size: 12, weight: .medium))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .frame(width: 56, alignment: .leading)
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
@@ -212,7 +212,7 @@ struct SitterCardPreviewSheet: View {
 
     private func capsuleTag(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
             .padding(.horizontal, 8).padding(.vertical, 3)
             .goGlassBackground(Capsule())

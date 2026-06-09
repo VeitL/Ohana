@@ -217,8 +217,8 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
                 )
                 .shadow(color: Color.arkInk.opacity(0.28), radius: 6, y: 2) // ui-v4: allow readability shadow on image card
 
-            Image(systemName: "chevron.down")
-                .font(.system(size: 12, weight: .black))
+            Image(systemName: "chevron.down").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
                 .foregroundStyle(Color.goCardWhite.opacity(0.72))
                 .shadow(color: Color.arkInk.opacity(0.30), radius: 5, y: 2) // ui-v4: allow readability shadow on image card
         }
@@ -536,7 +536,7 @@ struct CrewRosterProfileSummaryHeader: View {
     private func inlineFact(_ text: String, icon: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .black))
             Text(text)
                 .font(OhanaFont.caption2(.black))
                 .lineLimit(1)
@@ -548,7 +548,7 @@ struct CrewRosterProfileSummaryHeader: View {
     private func plainMetric(_ metric: CrewRosterProfileSummaryMetric) -> some View {
         VStack(alignment: .trailing, spacing: 2) {
             Image(systemName: metric.icon)
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
                 .foregroundStyle(Color.goPrimary)
             Text(metric.value)
                 .font(OhanaFont.title3(.black))
@@ -569,7 +569,7 @@ struct CrewRosterProfileSummaryHeader: View {
     private func compactInfoTile(_ row: CrewRosterProfileSummaryRow) -> some View {
         HStack(spacing: 8) {
             Image(systemName: row.icon)
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {

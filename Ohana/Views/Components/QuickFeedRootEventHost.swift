@@ -39,6 +39,15 @@ struct QuickFeedRootEventHost: ViewModifier {
     let onKeyboardHide: () -> Void
     let onClockTick: (Date) -> Void
 
+    private var clockPublisher: AnyPublisher<Date, Never> {
+        guard workloadPolicy.refreshBudget(isVisible: true) != .paused else {
+            return Empty().eraseToAnyPublisher()
+        }
+        return Timer.publish(every: feedClockInterval, on: .main, in: .common) // smoothness: allow visible Quick Feed clock publisher is workload-policy gated and replaced by Empty when paused.
+            .autoconnect()
+            .eraseToAnyPublisher()
+    }
+
     func body(content: Content) -> some View {
         content
             .onAppear(perform: onAppear)
@@ -60,8 +69,7 @@ struct QuickFeedRootEventHost: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
                 onKeyboardHide()
             }
-            .onReceive(Timer.publish(every: feedClockInterval, on: .main, in: .common).autoconnect()) { date in
-                guard workloadPolicy.refreshBudget(isVisible: true) != .paused else { return }
+            .onReceive(clockPublisher) { date in
                 onClockTick(date)
             }
     }

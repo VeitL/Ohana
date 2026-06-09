@@ -213,7 +213,7 @@ extension Color {
     }
 }
 
-enum OhanaThemeColorPolicy {
+nonisolated enum OhanaThemeColorPolicy {
     static let darkPrimaryHex = "C8FF00"
     static let lightPrimaryHex = "3B82F6"
     static let petFallbackHex = "FF5252"

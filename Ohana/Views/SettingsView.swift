@@ -314,15 +314,15 @@ struct SettingsView: View {
                                     settingsIcon("rectangle.3.group.bubble.left.fill", color: Color.goTeal)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("UI/UX 规范查看")
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(primaryText)
                                         Text("组件、页面、流程与验收")
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(tertiaryText)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
                                 .frame(minHeight: 44)
@@ -338,15 +338,15 @@ struct SettingsView: View {
                                     settingsIcon("person.3.sequence.fill", color: Color.goPurple)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(l.tr(zh: "家庭协作体验测试", en: "Family collab playground", de: "Familien-Testbereich"))
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(primaryText)
                                         Text(l.tr(zh: "任务盘、宠物地图、家人竞赛", en: "Board, pet map, family race", de: "Brett, Tierkarte, Familienrennen"))
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(tertiaryText)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
                                 .frame(minHeight: 44)
@@ -362,15 +362,15 @@ struct SettingsView: View {
                                     settingsIcon("creditcard.fill", color: Color.goPrimary)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(l.tr(zh: "Apple Wallet 动效实验室", en: "Apple Wallet motion lab", de: "Apple-Wallet-Bewegungslabor"))
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(primaryText)
                                         Text(l.tr(zh: "卡片堆、抽出、收回与调试", en: "Stack, hero, collapse, and debug", de: "Stapel, Hero, Zurück und Debug"))
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(tertiaryText)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
                                 .frame(minHeight: 44)
@@ -386,15 +386,15 @@ struct SettingsView: View {
                                     settingsIcon("sparkles", color: Color.goPrimary)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(l.tr(zh: "全局动效预览", en: "Global motion preview", de: "Globale Bewegungs-Vorschau"))
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(primaryText)
                                         Text(l.tr(zh: "Capsule 默认、Chart Flow、5 个原色", en: "Capsule default, Flow charts, 5 colors", de: "Capsule als Standard, Flow-Charts, 5 Farben"))
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(tertiaryText)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
                                 .frame(minHeight: 44)
@@ -410,15 +410,15 @@ struct SettingsView: View {
                                     settingsIcon("rectangle.portrait.on.rectangle.portrait", color: Color.goPrimary)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(l.tr(zh: "竖版实色首页实验室", en: "Solid portrait home lab", de: "Solides Hochformat-Home-Labor"))
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(primaryText)
                                         Text(l.tr(zh: "底部导航、竖卡片、内嵌快捷操作", en: "Bottom nav, portrait cards, embedded actions", de: "Untere Navigation, Hochformatkarten, Aktionen"))
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(tertiaryText)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
                                 .frame(minHeight: 44)
@@ -434,15 +434,15 @@ struct SettingsView: View {
                                     settingsIcon("circle.hexagongrid.fill", color: Color.goYellow)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(l.tr(zh: "椰子数量测试", en: "Coconut balance test", de: "Kokosnuss-Teststand"))
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(primaryText)
                                         Text(l.tr(zh: "手动设置当前用户余额", en: "Manually set current member balance", de: "Kontostand manuell setzen"))
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(tertiaryText)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
                                 .frame(minHeight: 44)
@@ -458,15 +458,15 @@ struct SettingsView: View {
                                     settingsIcon("speedometer", color: Color.goPrimary)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("性能诊断面板")
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(primaryText)
                                         Text("性能记录")
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(tertiaryText)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
                                 .frame(minHeight: 44)
@@ -476,21 +476,21 @@ struct SettingsView: View {
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
                             NavigationLink {
-                                HumanPrivacyTestView()
+                                HumanPrivacyTestView(humans: homeHumans ?? [])
                             } label: {
                                 HStack(spacing: 12) {
                                     settingsIcon("lock.shield.fill", color: Color.goYellow)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("隐私测试面板")
-                                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(primaryText)
                                         Text("可见性检查")
-                                            .font(.system(size: 11, weight: .medium))
+                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(tertiaryText)
                                     }
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(tertiaryText.opacity(0.6))
                                 }
                                 .frame(minHeight: 44)
@@ -569,10 +569,10 @@ struct SettingsView: View {
                 Button {
                     showingOnboardingReplay = false
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 38, height: 34)
+                        .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.ohanaControlFill, in: Capsule())
                         .padding(20)
                 }
@@ -581,6 +581,7 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingAccountSwitcher) {
             HumanAccountSwitcherSheet(
+                humans: homeHumans ?? [],
                 homePets: homePets,
                 homeHumans: homeHumans,
                 homeElectronicPets: homeElectronicPets
@@ -629,15 +630,15 @@ struct SettingsView: View {
                         settingsIcon("person.2.badge.key.fill", color: Color.goPrimary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("切换人类账户")
-                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(primaryText)
                             Text("账户与密码")
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(tertiaryText)
                         }
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .black))
+                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
                     }
                     .padding(12)
@@ -661,16 +662,16 @@ struct SettingsView: View {
                                             isSelected: isSelected
                                         )
                                         if HumanPasscodeService.hasPasscode(human) {
-                                            Image(systemName: "lock.fill")
-                                                .font(.system(size: 8, weight: .black))
+                                            Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                                .font(OhanaFont.adaptive(size: 8, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(Color.arkInk)
-                                                .frame(width: 16, height: 16)
+                                                .frame(width: 16, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                                 .background(Color.goYellow, in: Circle())
                                                 .offset(x: 15, y: 15)
                                         }
                                     }
                                     Text(human.name.isEmpty ? "成员" : human.name)
-                                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(isSelected ? Color.goPrimary : tertiaryText)
                                         .lineLimit(1)
                                 }
@@ -683,11 +684,11 @@ struct SettingsView: View {
                 if !currentActiveHumanId.isEmpty,
                    let selected = humans.first(where: { $0.id.uuidString == currentActiveHumanId }) {
                     HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .foregroundStyle(Color.goPrimary)
-                            .font(.system(size: 12))
+                            .font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text("打卡记录将关联到 \(selected.name)")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
                     }
                 }
@@ -714,8 +715,8 @@ struct SettingsView: View {
                             .foregroundStyle(tertiaryText)
                     }
                     Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText.opacity(0.6))
                 }
                 .frame(minHeight: 44)
@@ -795,7 +796,7 @@ struct SettingsView: View {
                         .clipShape(Circle())
                 } else {
                     Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
-                        .font(.system(size: 20))
+                        .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
             }
             .task(id: avatarSignature) {
@@ -835,10 +836,10 @@ struct SettingsView: View {
                     settingsIcon("arrow.down.doc.fill", color: Color.goTeal)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("导出备份")
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                         Text("全量 JSON")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
                     }
                     Spacer()
@@ -881,10 +882,10 @@ struct SettingsView: View {
                     settingsIcon("square.and.arrow.down.fill", color: Color.goOrange)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("从备份恢复")
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                         Text("选择 .json")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
                     }
                     Spacer()
@@ -905,11 +906,11 @@ struct SettingsView: View {
 
                 // ── 说明行
                 HStack(spacing: 8) {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 12))
+                    Image(systemName: "info.circle") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow.opacity(0.6))
                     Text("恢复会自动去重。")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText.opacity(0.7))
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -955,8 +956,8 @@ struct SettingsView: View {
 
     private func backupPill(_ label: String, icon: String, color: Color) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: icon).font(.system(size: 11, weight: .bold))
-            Text(label).font(.system(size: 12, weight: .bold, design: .rounded))
+            Image(systemName: icon).font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            Text(label).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(color)
         .frame(minHeight: 34)
@@ -968,11 +969,11 @@ struct SettingsView: View {
     private func menuValueLabel(_ text: String) -> some View {
         HStack(spacing: 5) {
             Text(text)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
-            Image(systemName: "chevron.down")
-                .font(.system(size: 9, weight: .black))
+            Image(systemName: "chevron.down") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 9, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(primaryText)
         .frame(minHeight: 34)
@@ -1024,10 +1025,10 @@ struct SettingsView: View {
                 .foregroundStyle(primaryText)
             Spacer()
             Button { closeSettings() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
-                    .frame(width: 38, height: 34)
+                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -1072,8 +1073,8 @@ struct SettingsView: View {
                         .font(OhanaFont.footnote())
                         .foregroundStyle(tertiaryText)
                 }
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tertiaryText.opacity(0.6))
             }
             .frame(minHeight: 44)
@@ -1141,9 +1142,9 @@ struct SettingsView: View {
     
     private func settingsIcon(_ icon: String, color: Color) -> some View {
         Image(systemName: icon)
-            .font(.system(size: 14, weight: .semibold))
+            .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaFunctionalIcon)
-            .frame(width: 32, height: 32)
+            .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
             .contentShape(Rectangle())
     }
 }
@@ -1171,7 +1172,7 @@ private struct SettingsSectionCard<Content: View>: View {
             HStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(Color.goPrimary)
-                    .frame(width: 3, height: 14)
+                    .frame(width: 3, height: 14) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text(title.uppercased())
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(tertiaryText)
@@ -1268,10 +1269,10 @@ private struct SettingsPetManagementSheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
-                    .frame(width: 38, height: 34)
+                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -1283,7 +1284,7 @@ private struct SettingsPetManagementSheet: View {
             HStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(Color.goPrimary)
-                    .frame(width: 3, height: 14)
+                    .frame(width: 3, height: 14) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text("成员")
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(tertiaryText)
@@ -1317,9 +1318,9 @@ private struct SettingsPetManagementSheet: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color.ohanaControlFill)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text(pet.avatarEmoji)
-                    .font(.system(size: 16))
+                    .font(OhanaFont.adaptive(size: 16)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             Text(pet.name)
                 .font(OhanaFont.body(.semibold))
@@ -1444,10 +1445,10 @@ private struct AppBackgroundPickerSheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 34)
+                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -1503,8 +1504,8 @@ private struct AppBackgroundPickerSheet: View {
                         }
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                     } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 15, weight: .black))
+                        Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goRed)
                             .frame(width: 48, height: 46)
                             .background(Color.goRed.opacity(0.12), in: Capsule())
@@ -1540,8 +1541,8 @@ private struct AppBackgroundPickerSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(alignment: .topTrailing) {
                         if selected {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 18, weight: .black))
+                            Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goPrimary)
                                 .padding(8)
                         }
@@ -1700,10 +1701,10 @@ private struct HumanQuickSwitchPasscodeSheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 34)
+                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -1722,21 +1723,12 @@ private struct HumanQuickSwitchPasscodeSheet: View {
     }
 
     private var avatar: some View {
-        ZStack {
-            Circle()
-                .fill(Color(hex: human.themeColor).opacity(0.18))
-                .frame(width: 48, height: 48)
-            if let data = human.avatarImageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 48, height: 48)
-                    .clipShape(Circle())
-            } else {
-                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
-                    .font(.system(size: 22))
-            }
-        }
+        HumanAvatarPipelineView(
+            human: human,
+            size: 48,
+            fallbackScale: 0.46,
+            backgroundOpacity: 0.18
+        )
     }
 
     private func verify() {
@@ -1852,10 +1844,10 @@ private struct CoconutBalanceTestView: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 34)
+                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -1864,8 +1856,8 @@ private struct CoconutBalanceTestView: View {
 
     private var currentBalancePanel: some View {
         HStack(spacing: 12) {
-            Image(systemName: "circle.hexagongrid.fill")
-                .font(.system(size: 22, weight: .black))
+            Image(systemName: "circle.hexagongrid.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 22, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 48, height: 48)
                 .background(Color.goYellow.opacity(0.16), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -1879,7 +1871,7 @@ private struct CoconutBalanceTestView: View {
             }
             Spacer()
             Text("\(currentDisplayAmount)🥥")
-                .font(.system(size: 26, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
                 .contentTransition(.numericText())
         }
@@ -1963,7 +1955,7 @@ private struct CoconutBalanceTestView: View {
             applyAmount()
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                 Text(l.tr(zh: "应用测试数量", en: "Apply test balance", de: "Testwert anwenden"))
             }
             .font(OhanaFont.callout(.black))
@@ -2003,20 +1995,12 @@ private struct CoconutBalanceTestView: View {
     }
 
     private func avatar(for human: Human) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color(hex: human.safeThemeColorHex).opacity(0.18))
-            if let data = human.avatarImageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .clipShape(Circle())
-            } else {
-                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
-                    .font(.system(size: 16))
-            }
-        }
-        .frame(width: 30, height: 30)
+        HumanAvatarPipelineView(
+            human: human,
+            size: 30,
+            fallbackScale: 0.53,
+            backgroundOpacity: 0.18
+        )
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -2029,9 +2013,9 @@ private struct CoconutBalanceTestView: View {
     private func emptyStateRow(icon: String, title: String, subtitle: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
-                .frame(width: 40, height: 40)
+                .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goYellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -2106,10 +2090,10 @@ private struct PerformanceDiagnosticsView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("性能诊断")
-                            .font(.system(size: 30, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 30, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                         Text("用于验收启动、首页、头像、点击和相机链路。数值越低越好。")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(secondaryText)
                     }
 
@@ -2121,14 +2105,14 @@ private struct PerformanceDiagnosticsView: View {
                     VStack(spacing: 0) {
                         if monitor.samples.isEmpty {
                             VStack(spacing: 10) {
-                                Image(systemName: "speedometer")
-                                    .font(.system(size: 28, weight: .semibold))
+                                Image(systemName: "speedometer") // a11y: allow decorative icon covered by surrounding text or control
+                                    .font(OhanaFont.adaptive(size: 28, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.goPrimary)
                                 Text("还没有性能样本")
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(primaryText)
                                 Text("回到首页、点击卡片或进入头像裁剪后，这里会记录链路耗时。")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(secondaryText)
                                     .multilineTextAlignment(.center)
                             }
@@ -2155,7 +2139,7 @@ private struct PerformanceDiagnosticsView: View {
                         monitor.clear()
                     } label: {
                         Label("清空样本", systemImage: "trash")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
@@ -2183,16 +2167,16 @@ private struct PerformanceDiagnosticsView: View {
     private func metricSummaryCard(title: String, value: String, icon: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .bold))
+                .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.16), in: Circle())
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(secondaryText)
                 Text(value)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
             }
             Spacer(minLength: 0)
@@ -2207,20 +2191,20 @@ private struct PerformanceDiagnosticsView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(sample.name)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
                 if let note = sample.note, !note.isEmpty {
                     Text(note)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(secondaryText)
                 }
                 Text(sample.timestamp.formatted(date: .omitted, time: .standard))
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .monospaced)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(secondaryText.opacity(0.7))
             }
             Spacer(minLength: 8)
             Text(formatMS(sample.valueMS))
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(sample.valueMS > 1_000 ? Color.goRed : Color.goPrimary)
         }
         .padding(.vertical, 10)

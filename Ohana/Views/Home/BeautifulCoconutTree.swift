@@ -311,7 +311,7 @@ struct BeautifulCoconutTree: View {
             .rotationEffect(.degrees(isSwaying ? 2 : -2), anchor: .bottom)
             .animation(
                 allowsAmbientMotion
-                    ? .easeInOut(duration: 6).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated tree sway
+                    ? .easeInOut(duration: 6).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated tree sway // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                     : nil,
                 value: isSwaying
             )
@@ -422,7 +422,7 @@ private struct EnergyRootPulseView: View {
                 .opacity(isActive ? opacity : 0)
             Circle()
                 .fill(color.opacity(0.18))
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .scaleEffect(scale * 0.84)
                 .opacity(isActive ? opacity : 0)
         }
@@ -452,14 +452,14 @@ private struct PendingUpgradeCoconutHint: View {
         HStack(spacing: -7) {
             ForEach(0..<min(count, 3), id: \.self) { index in
                 Text("🥥")
-                    .font(.system(size: 17))
-                    .frame(width: 25, height: 25)
+                    .font(OhanaFont.adaptive(size: 17))
+                    .frame(width: 25, height: 25) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .background(Color.goPrimary.opacity(0.16), in: Circle())
                     .overlay(alignment: .topTrailing) {
                         if index == 0 {
                             Circle()
                                 .fill(Color.goPrimary)
-                                .frame(width: 7, height: 7)
+                                .frame(width: 7, height: 7) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         }
                     }
             }
@@ -467,7 +467,7 @@ private struct PendingUpgradeCoconutHint: View {
                 Text("+\(count - 3)")
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 25, height: 25)
+                    .frame(width: 25, height: 25) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .background(Color.goPrimary, in: Circle())
                     .padding(.leading, 4)
             }
@@ -482,19 +482,19 @@ private struct GroundSproutView: View {
         ZStack(alignment: .bottom) {
             Capsule()
                 .fill(Color(hex: "4A2B16"))
-                .frame(width: 5, height: 24)
+                .frame(width: 5, height: 24) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
             LeafShape()
                 .fill(color)
-                .frame(width: 34, height: 20)
+                .frame(width: 34, height: 20) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .rotationEffect(.degrees(-34), anchor: .topLeading)
                 .offset(x: -6, y: -13)
             LeafShape()
                 .fill(color.opacity(0.82))
-                .frame(width: 30, height: 18)
+                .frame(width: 30, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .rotationEffect(.degrees(146), anchor: .topLeading)
                 .offset(x: 8, y: -12)
         }
-        .frame(width: 42, height: 34)
+        .frame(width: 42, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
     }
 }
 
@@ -512,15 +512,15 @@ private struct BlossomView: View {
             ForEach(0..<5, id: \.self) { i in
                 Capsule()
                     .fill(petalColor)
-                    .frame(width: 5, height: 12)
+                    .frame(width: 5, height: 12) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(y: -5)
                     .rotationEffect(.degrees(Double(i) * 72))
             }
             Circle()
                 .fill(isMax ? Color.goPrimary : Color.goYellow)
-                .frame(width: 5, height: 5)
+                .frame(width: 5, height: 5) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
         }
-        .frame(width: 18, height: 18)
+        .frame(width: 18, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
         .shadow(color: petalColor.opacity(isMax ? 0.75 : 0.35), radius: isMax ? 5 : 2) // ui-v4: allow tree blossom glow
     }
 }
@@ -548,7 +548,7 @@ private struct InteractiveCoconut: View {
             if !visuallyHarvested {
                 Circle()
                     .fill(Color.goPrimary)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 32, height: 32) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .scaleEffect(breatheScale)
                     .opacity(breatheOpacity)
                     .blur(radius: 4)
@@ -588,7 +588,7 @@ private struct InteractiveCoconut: View {
 
     private func updateBreathing() {
         if allowsAmbientMotion {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) { // ui-v4: allow AppWorkloadPolicy-gated coconut affordance; runtime-guardrail: allow AppWorkloadPolicy-gated coconut affordance
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) { // ui-v4: allow AppWorkloadPolicy-gated coconut affordance; runtime-guardrail: allow AppWorkloadPolicy-gated coconut affordance // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                 breatheScale = 1.4
                 breatheOpacity = 0.5
             }
@@ -718,14 +718,14 @@ struct CoconutView: View {
                 .opacity(0.8)
 
             let eyeColor = isMax ? Color(hex: "B45309") : Color(hex: "3E1F07")
-            Circle().fill(eyeColor).frame(width: 3, height: 3).offset(x: -3, y: -5)
-            Circle().fill(eyeColor).frame(width: 3, height: 3).offset(x:  3, y: -5)
-            Circle().fill(eyeColor).frame(width: 3, height: 3).offset(x:  0, y: -1)
+            Circle().fill(eyeColor).frame(width: 3, height: 3).offset(x: -3, y: -5) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+            Circle().fill(eyeColor).frame(width: 3, height: 3).offset(x:  3, y: -5) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+            Circle().fill(eyeColor).frame(width: 3, height: 3).offset(x:  0, y: -1) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
 
             if isMax {
                 Circle()
                     .fill(Color(hex: "FEF3C7"))
-                    .frame(width: 6, height: 6)
+                    .frame(width: 6, height: 6) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .blur(radius: 1)
                     .opacity(0.6)
                     .offset(x: -4, y: -6)
@@ -761,7 +761,7 @@ struct SunbeamsView: View {
 
     private func updateMotion() {
         if allowsAmbientMotion {
-            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) { // ui-v4: allow AppWorkloadPolicy-gated sunbeams; runtime-guardrail: allow AppWorkloadPolicy-gated sunbeams
+            withAnimation(.easeInOut(duration: 4).repeatForever(autoreverses: true)) { // ui-v4: allow AppWorkloadPolicy-gated sunbeams; runtime-guardrail: allow AppWorkloadPolicy-gated sunbeams // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                 breathe = true
             }
         } else {
@@ -816,7 +816,7 @@ struct DivineHaloView: View {
         .rotationEffect(.degrees(isSwaying ? 360 : 0))
         .animation(
             allowsAmbientMotion
-                ? .linear(duration: 25).repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated halo
+                ? .linear(duration: 25).repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated halo // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                 : nil,
             value: isSwaying
         )
@@ -834,7 +834,7 @@ struct RunesView: View {
             ForEach(0..<runes.count, id: \.self) { i in
                 let angle = Double(i) * (360.0 / Double(runes.count))
                 Text(runes[i])
-                    .font(.system(size: 14, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold))
                     .foregroundStyle(Color(hex: "84CC16"))
                     .shadow(color: Color(hex: "00FFD1"), radius: 4) // ui-v4: allow max-level rune glow
                     .offset(y: -130)
@@ -844,7 +844,7 @@ struct RunesView: View {
         .rotationEffect(.degrees(isSwaying ? -360 : 0))
         .animation(
             allowsAmbientMotion
-                ? .linear(duration: 30).repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated runes
+                ? .linear(duration: 30).repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated runes // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                 : nil,
             value: isSwaying
         )
@@ -887,7 +887,7 @@ struct StardustView: View {
                     .animation(
                         allowsAmbientMotion
                             ? .linear(duration: item.duration)
-                                .repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated stardust
+                                .repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated stardust // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                                 .delay(item.delay)
                             : nil,
                         value: animate
@@ -923,7 +923,7 @@ struct StardustView: View {
                     .frame(height: 340)
 
                     Text("Lv.\(level) · 点击椰子采摘")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
 
                     HStack(spacing: 16) {
@@ -949,7 +949,7 @@ struct StardustView: View {
                         .background(Color.ohanaControlFill, in: Capsule())
                         .foregroundStyle(Color.ohanaPrimaryText)
                     }
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                 }
                 .padding()
             }

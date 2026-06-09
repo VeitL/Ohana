@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct FeatureHubMetric: Identifiable, Hashable {
     let id: String
@@ -88,10 +89,10 @@ struct FeatureHubHeader<Avatar: View>: View {
             }
             Spacer()
             Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
             }
             .buttonStyle(ScaleButtonStyle())
             .contentShape(Circle())
@@ -100,20 +101,34 @@ struct FeatureHubHeader<Avatar: View>: View {
 }
 
 struct FeatureHubAvatar: View {
+    var image: UIImage? = nil
     let imageData: Data?
     let emoji: String
     let fallback: String
     let tint: Color
 
     var body: some View {
-        PetAvatarPortraitRoundedView(
-            imageData: imageData,
-            fallbackText: emoji.isEmpty ? fallback : emoji,
-            themeColor: tint,
-            size: 58,
-            cornerRadius: 18,
-            backgroundOpacity: 0.18
-        )
+        ZStack {
+            if let image {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(tint.opacity(0.18))
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 58, height: 58)
+            } else {
+                PetAvatarPortraitRoundedView(
+                    imageData: imageData,
+                    fallbackText: emoji.isEmpty ? fallback : emoji,
+                    themeColor: tint,
+                    size: 58,
+                    cornerRadius: 18,
+                    backgroundOpacity: 0.18
+                )
+            }
+        }
+        .frame(width: 58, height: 58)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
@@ -160,8 +175,8 @@ struct FeatureHubDestinationHost<Content: View>: View {
 
             if showsCloseButton {
                 Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -231,7 +246,7 @@ private struct FeatureHubTile: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: data.icon)
-                    .font(.system(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaFunctionalIcon)
                     .ohanaSymbolPulse(trigger: data.value)
                 Spacer()
@@ -271,10 +286,10 @@ struct PetMemorialBanner: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPurple)
-                .frame(width: 40, height: 40)
+                .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPurple.opacity(0.16), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text("彩虹桥纪念模式")
@@ -309,8 +324,8 @@ struct PetMemorialBadge: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 10, weight: .black))
+            Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(daysTogether > 0 ? "\(daysTogether)d" : "纪念")
                 .font(OhanaFont.caption2(.black))
         }

@@ -7,7 +7,6 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
 SKIP_BUILD=0
-SOFT_UI_ALL=0
 
 usage() {
   cat <<'USAGE'
@@ -19,7 +18,7 @@ Purpose:
 
 Options:
   --skip-build   Run checks that do not require CoreSimulator.
-  --ui-all-soft  Deprecated compatibility option; full-scope ratchet now runs by default.
+  --ui-all-soft  Deprecated compatibility no-op; UI/accessibility/smoothness are strict --all gates.
 USAGE
 }
 
@@ -30,7 +29,6 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --ui-all-soft)
-      SOFT_UI_ALL=1
       shift
       ;;
     -h|--help)
@@ -59,7 +57,6 @@ bash -n scripts/audit-ui-v4.sh
 bash -n scripts/audit-accessibility.sh
 bash -n scripts/audit-localization-coverage.sh
 bash -n scripts/audit-smoothness-risk.sh
-bash -n scripts/audit-full-scope-ratchet.sh
 bash -n scripts/audit-release-data-safety.sh
 bash -n scripts/audit-governance-manifests.sh
 bash -n scripts/audit-resource-integrity.sh
@@ -84,22 +81,14 @@ scripts/audit-governance-manifests.sh
 section "Resource integrity"
 scripts/audit-resource-integrity.sh
 
-section "UI V4 changed files"
-scripts/audit-ui-v4.sh --changed
+section "UI V4 whole repo"
+scripts/audit-ui-v4.sh --all
 
-section "Accessibility changed files"
-scripts/audit-accessibility.sh --changed
+section "Accessibility whole repo"
+scripts/audit-accessibility.sh --all
 
-section "Smoothness changed files"
-scripts/audit-smoothness-risk.sh --changed
-
-section "Full-scope UI/accessibility/smoothness ratchet"
-scripts/audit-full-scope-ratchet.sh
-
-if [[ "${SOFT_UI_ALL}" == "1" ]]; then
-  section "UI V4 all files soft report"
-  scripts/audit-ui-v4.sh --all --soft
-fi
+section "Smoothness whole repo"
+scripts/audit-smoothness-risk.sh --all
 
 section "Git size"
 scripts/audit-git-size.sh

@@ -356,8 +356,8 @@ struct PetWeightDashboardContent: View {
 
     private var addButton: some View {
         Button(action: onAdd) {
-            Image(systemName: "plus")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "plus").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 56, height: 56)
                 .background(Color.goPrimary, in: Circle())
@@ -379,10 +379,10 @@ struct PetWeightDashboardContent: View {
 
     private func weightRow(_ log: PetWeightLog) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "scalemass.fill")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "scalemass.fill").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.date.formatted(date: .abbreviated, time: .omitted))
                     .font(OhanaFont.callout(.black))
@@ -406,10 +406,10 @@ struct PetWeightDashboardContent: View {
                     )
                 }
             } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 13, weight: .bold))
+                Image(systemName: "trash").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
             .buttonStyle(ScaleButtonStyle())
         }
@@ -426,7 +426,7 @@ struct PetWeightDashboardContent: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .black))
                 .foregroundStyle(Color.goPrimary)
             Text(text)
                 .font(OhanaFont.callout(.black))
@@ -548,10 +548,10 @@ struct HumanWeightDashboardContent: View {
                 LazyVStack(spacing: 10) {
                     ForEach(logs.prefix(20)) { log in
                         HStack(spacing: 12) {
-                            Image(systemName: "scalemass.fill")
-                                .font(.system(size: 14, weight: .black))
+                            Image(systemName: "scalemass.fill").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 14, weight: .black))
                                 .foregroundStyle(Color.goPrimary)
-                                .frame(width: 34, height: 34)
+                                .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(log.date.formatted(date: .abbreviated, time: .omitted))
                                     .font(OhanaFont.callout(.black))
@@ -579,10 +579,10 @@ struct HumanWeightDashboardContent: View {
                                     )
                                 }
                             } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 13, weight: .bold))
+                                Image(systemName: "trash").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
                                     .foregroundStyle(Color.ohanaSecondaryText)
-                                    .frame(width: 34, height: 34)
+                                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             }
                             .buttonStyle(ScaleButtonStyle())
                         }
@@ -596,8 +596,8 @@ struct HumanWeightDashboardContent: View {
 
     private var addButton: some View {
         Button(action: onAdd) {
-            Image(systemName: "plus")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "plus").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 56, height: 56)
                 .background(Color.goPrimary, in: Circle())
@@ -619,7 +619,7 @@ struct HumanWeightDashboardContent: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .black))
                 .foregroundStyle(Color.goPrimary)
             Text(text)
                 .font(OhanaFont.callout(.black))
@@ -749,8 +749,8 @@ struct PetExpenseDashboardContent: View {
 
     private var addButton: some View {
         Button(action: onAdd) {
-            Image(systemName: "plus")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "plus").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 56, height: 56)
                 .background(Color.goPrimary, in: Circle())
@@ -770,7 +770,7 @@ struct PetExpenseDashboardContent: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                 Text(title)
                     .font(OhanaFont.caption(.black))
             }
@@ -785,9 +785,9 @@ struct PetExpenseDashboardContent: View {
     private func expenseRow(_ log: PetExpenseLog) -> some View {
         HStack(spacing: 12) {
             Image(systemName: log.expenseCategory.systemIconName)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.note.isEmpty ? l.expenseCategoryTitle(log.expenseCategory) : log.note)
                     .font(OhanaFont.callout(.black))
@@ -813,10 +813,10 @@ struct PetExpenseDashboardContent: View {
                     )
                 }
             } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 13, weight: .bold))
+                Image(systemName: "trash").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
             .buttonStyle(ScaleButtonStyle())
         }
@@ -834,7 +834,7 @@ struct PetExpenseDashboardContent: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .black))
                 .foregroundStyle(Color.goPrimary)
             Text(text)
                 .font(OhanaFont.callout(.black))
@@ -972,9 +972,9 @@ struct HumanExpenseDashboardContent: View {
                     ForEach(filteredLogs.prefix(30)) { log in
                         HStack(spacing: 12) {
                             Image(systemName: log.expenseCategory.systemIconName)
-                                .font(.system(size: 14, weight: .black))
+                                .font(OhanaFont.adaptive(size: 14, weight: .black))
                                 .foregroundStyle(Color.goPrimary)
-                                .frame(width: 34, height: 34)
+                                .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(log.note.isEmpty ? l.expenseCategoryTitle(log.expenseCategory) : log.note)
                                     .font(OhanaFont.callout(.black))
@@ -1003,10 +1003,10 @@ struct HumanExpenseDashboardContent: View {
                                     )
                                 }
                             } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 13, weight: .bold))
+                                Image(systemName: "trash").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
                                     .foregroundStyle(Color.ohanaSecondaryText)
-                                    .frame(width: 34, height: 34)
+                                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             }
                             .buttonStyle(ScaleButtonStyle())
                         }
@@ -1020,8 +1020,8 @@ struct HumanExpenseDashboardContent: View {
 
     private var addButton: some View {
         Button(action: onAdd) {
-            Image(systemName: "plus")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "plus").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 56, height: 56)
                 .background(Color.goPrimary, in: Circle())
@@ -1041,7 +1041,7 @@ struct HumanExpenseDashboardContent: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                 Text(title)
                     .font(OhanaFont.caption(.black))
             }
@@ -1056,7 +1056,7 @@ struct HumanExpenseDashboardContent: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .black))
                 .foregroundStyle(Color.goPrimary)
             Text(text)
                 .font(OhanaFont.callout(.black))

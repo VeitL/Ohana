@@ -10,8 +10,13 @@ import UIKit
 
 struct TreatCelebrationOverlay: View {
     let tint: Color
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
     @State private var isVisible = false
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+
+    private static let hasCelebrationImage = UIImage(named: "feed_treat_celebration") != nil
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var shouldRunCelebrationMotion: Bool {
         workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
@@ -20,7 +25,7 @@ struct TreatCelebrationOverlay: View {
     var body: some View {
         ZStack {
             if shouldRunCelebrationMotion {
-                TimelineView(.animation) { timeline in
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { timeline in // smoothness: allow visible-only treat celebration capped at 30fps and disabled by AppWorkloadPolicy.
                     celebrationContent(at: timeline.date.timeIntervalSinceReferenceDate)
                 }
             } else {
@@ -50,21 +55,23 @@ struct TreatCelebrationOverlay: View {
                             )
                             .opacity(0.9)
                     }
-                    if UIImage(named: "feed_treat_celebration") != nil {
+                    if Self.hasCelebrationImage {
                         Image("feed_treat_celebration")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 138, height: 138)
                             .scaleEffect(1 + sin(t * 4.0) * 0.035)
+                            .accessibilityHidden(true)
                     } else {
-                        Image(systemName: "birthday.cake.fill")
-                            .font(.system(size: 72, weight: .black))
+                        Image(systemName: "birthday.cake.fill") // a11y: allow decorative fallback celebration art hidden from VoiceOver.
+                            .font(OhanaFont.adaptive(size: 72, weight: .black)) // a11y: allow fixed-size decorative celebration art.
                             .foregroundStyle(tint)
                             .scaleEffect(1 + sin(t * 4.0) * 0.035)
+                            .accessibilityHidden(true)
                     }
                 }
-                Text("零食已记录")
-                    .font(.system(size: 20, weight: .black, design: .rounded))
+                Text(l.tr(zh: "零食已记录", en: "Treat logged", de: "Snack erfasst"))
+                    .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .padding(24)
@@ -235,7 +242,7 @@ extension View {
 
     func feedingTextFieldStyle(tint: Color) -> some View {
         self
-            .font(.system(size: 16, weight: .bold, design: .rounded))
+            .font(OhanaFont.headline(.bold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .padding(14)
             .feedFlatBlockSurface(cornerRadius: 16)

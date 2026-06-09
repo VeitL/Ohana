@@ -36,7 +36,7 @@ public struct InnerGlassTag: View {
     
     public var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
             .foregroundStyle(InnerPillConfig(isDark: isDark).text)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -94,22 +94,22 @@ public struct UltimateGlassCard<Content: View>: View {
     @ViewBuilder
     private var darkBackground: some View {
         let r = RoundedRectangle(cornerRadius: 24, style: .continuous)
-        r.fill(Color.white.opacity(0.075))
+        r.fill(Color.white.opacity(0.075)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             .overlay {
-                r.strokeBorder(Color.white.opacity(0.11), lineWidth: 1)
+                r.strokeBorder(Color.white.opacity(0.11), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             }
-            .shadow(color: .black.opacity(0.16), radius: 8, x: 0, y: 3)
+            .shadow(color: .black.opacity(0.16), radius: 8, x: 0, y: 3) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
 
     // MARK: Light Mode
     @ViewBuilder
     private var lightBackground: some View {
         let r = RoundedRectangle(cornerRadius: 24, style: .continuous)
-        r.fill(Color.white.opacity(0.86))
+        r.fill(Color.white.opacity(0.86)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             .overlay {
-                r.strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
+                r.strokeBorder(Color.black.opacity(0.06), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             }
-            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3)
+            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
 
 }

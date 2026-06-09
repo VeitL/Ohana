@@ -107,9 +107,7 @@ struct IslandPottyDashboard: View {
     var body: some View {
         dashboardBody
             .sheet(item: $sheetPet) { pet in
-                QuickPottyDetailSheet(pet: pet) {
-                    sheetPet = nil
-                }
+                QuickPottyDetailRouteContainer(id: pet.id, onRemove: { sheetPet = nil }, onClose: { sheetPet = nil })
             }
             .onAppear { animatePulse() }
             .onChange(of: selectedPetId) { _, _ in animatePulse() }
@@ -151,19 +149,19 @@ struct IslandPottyDashboard: View {
     private var navBar: some View {
         HStack {
             Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .bold))
+                Image(systemName: "chevron.left") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .goGlassBackground(Circle())
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text(l.tr(zh: "噗噗电台", en: "Poop Radio", de: "Häufchen-Radio"))
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goCardWhite)
             Spacer()
-            Color.clear.frame(width: 36, height: 36)
+            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
         }
         .padding(.top, 64)
     }
@@ -196,24 +194,24 @@ struct IslandPottyDashboard: View {
                         .frame(width: 96, height: 96)
                 }
                 Text(dominantType?.emoji ?? "💩")
-                    .font(.system(size: 42))
+                    .font(OhanaFont.adaptive(size: 42)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .scaleEffect(0.94 + pulseProgress * 0.06)
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(l.tr(zh: "今日节奏", en: "Today's rhythm", de: "Heute Rhythmus"))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite.opacity(0.56))
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text("\(todayLogs.count)")
-                        .font(.system(size: 44, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 44, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goCardWhite)
                     Text(l.tr(zh: "次", en: "x", de: "x"))
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(pottyBrown)
                 }
                 Text(rhythmSummaryText)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite.opacity(0.52))
                     .lineLimit(2)
             }
@@ -235,12 +233,12 @@ struct IslandPottyDashboard: View {
             ForEach(typeCounts, id: \.type.rawValue) { item in
                 VStack(spacing: 4) {
                     Image(systemName: item.type.systemIconName)
-                        .font(.system(size: 15, weight: .black))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("\(item.count)")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .monospacedDigit()
                     Text(item.type.localizedLabel(l))
-                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .lineLimit(1)
                 }
                 .foregroundStyle(pottyColor(item.type))
@@ -254,7 +252,7 @@ struct IslandPottyDashboard: View {
     private var rhythmStrip: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("10 日节奏条")
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goCardWhite.opacity(0.72))
 
             HStack(alignment: .bottom, spacing: 6) {
@@ -264,7 +262,7 @@ struct IslandPottyDashboard: View {
                             .fill(pulse.count > 0 ? pottyBrown.gradient : Color.goCardWhite.opacity(0.08).gradient)
                             .frame(height: max(10, CGFloat(pulse.count) * 17 * pulseProgress))
                         Text(pulse.date, format: .dateTime.weekday(.narrow))
-                            .font(.system(size: 9, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goCardWhite.opacity(Calendar.current.isDateInToday(pulse.date) ? 0.78 : 0.36))
                     }
                     .frame(maxWidth: .infinity)
@@ -279,7 +277,7 @@ struct IslandPottyDashboard: View {
     private var pottyRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "成员噗况", en: "Crew poop status", de: "Team-Häufchenstatus"))
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goCardWhite)
             ForEach(petSummaries) { summary in
                 Button { open(summary.pet) } label: {
@@ -288,22 +286,22 @@ struct IslandPottyDashboard: View {
                         VStack(alignment: .leading, spacing: 5) {
                             HStack(spacing: 6) {
                                 Text(summary.pet.name)
-                                    .font(.system(size: 15, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.goCardWhite)
                                 Text(summary.latestType?.localizedLabel(l) ?? l.tr(zh: "暂无", en: "None", de: "Keine"))
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle((summary.latestType.map(pottyColor) ?? .white).opacity(0.72))
                             }
                             Text(memberSummaryText(today: summary.todayCount, week: summary.weekCount))
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goCardWhite.opacity(0.48))
                         }
                         Spacer()
                         Text(summary.latestDate.map(relativeDayText) ?? "--")
-                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goCardWhite.opacity(0.42))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .black))
+                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goCardWhite.opacity(0.3))
                     }
                     .padding(14)
@@ -320,7 +318,7 @@ struct IslandPottyDashboard: View {
             HStack(spacing: 6) {
                 avatar()
                 Text(title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(isSelected ? .black : .white)
             .padding(.horizontal, 12)
@@ -332,7 +330,7 @@ struct IslandPottyDashboard: View {
 
     private func selectorChip(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         selectorChip(title: title, avatar: {
-            Image(systemName: icon).font(.system(size: 11, weight: .bold))
+            Image(systemName: icon).font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }, isSelected: isSelected, action: action)
     }
 

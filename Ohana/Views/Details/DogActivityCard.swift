@@ -55,33 +55,33 @@ struct DogActivityCard: View {
             VStack(alignment: .leading, spacing: 10) {
             // ── 标题行
             HStack(spacing: 6) {
-                Text("🐾").font(.system(size: 14))
+                Text("🐾").font(OhanaFont.adaptive(size: 14))
                 Text("遛狗 & 陪玩")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(primaryText)
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .foregroundStyle(tertiaryText)
             }
 
             // ── 遛狗快捷行
             HStack(spacing: 10) {
-                Image(systemName: "figure.walk")
-                    .font(.system(size: 13, weight: .bold))
+                Image(systemName: "figure.walk").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
                     .foregroundStyle(colorScheme == .dark ? Color.goPrimary : Color.goTeal)
                 Text("遛狗")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(primaryText)
                 Text("今日 \(walkCountToday) 次")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(tertiaryText)
                 Spacer()
                 // 本周进度胶囊（设置了目标才显示）
                 if weeklyGoalSet {
                     let capsuleColor = weeklyGoalReached ? Color.goPrimary : Color.goTeal.opacity(0.8)
                     Text(String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm))
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(weeklyGoalReached ? Color.arkInk : Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(capsuleColor, in: Capsule())
@@ -90,21 +90,21 @@ struct DogActivityCard: View {
 
             // ── 陪玩快捷行
             HStack(spacing: 10) {
-                Image(systemName: "tennisball.fill")
-                    .font(.system(size: 13, weight: .bold))
+                Image(systemName: "tennisball.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
                     .foregroundStyle(Color(hex: "FF6B6B"))
                 Text("陪玩")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(primaryText)
                 Text("今日 \(playCountToday) 次")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(tertiaryText)
                 Spacer()
                 Button {
                     recordPlay()
                 } label: {
                     Text("+ 打卡")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color(hex: "FF6B6B"), in: Capsule())

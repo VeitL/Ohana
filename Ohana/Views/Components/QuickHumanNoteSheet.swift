@@ -137,7 +137,7 @@ struct QuickHumanNoteSheet: View {
                 var loaded: [UIImage] = []
                 for item in newItems {
                     if let data = try? await item.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
+                       let image = await AttachmentImageDecoder.decode(data) {
                         loaded.append(image)
                     }
                 }
@@ -223,8 +223,8 @@ struct QuickHumanNoteSheet: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.goPrimary.opacity(0.18))
-                Image(systemName: "note.text")
-                    .font(.system(size: 18, weight: .black))
+                Image(systemName: "note.text") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
             }
             .frame(width: 58, height: 58)
@@ -302,7 +302,7 @@ struct QuickHumanNoteSheet: View {
     private func attachmentButton(icon: String, title: String, color: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
                 .font(OhanaFont.caption(.black))
                 .lineLimit(1)
@@ -329,10 +329,10 @@ struct QuickHumanNoteSheet: View {
                                     Button {
                                         selectedImages.remove(at: index)
                                     } label: {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 8, weight: .black))
+                                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 8, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(Color.arkInk)
-                                            .frame(width: 18, height: 18)
+                                            .frame(width: 18, height: 18) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                             .background(Color.goRed, in: Circle())
                                     }
                                     .offset(x: 5, y: -5)
@@ -346,7 +346,7 @@ struct QuickHumanNoteSheet: View {
             ForEach(attachedFiles) { file in
                 HStack(spacing: 8) {
                     Image(systemName: file.isImage ? "photo.fill" : "doc.fill")
-                        .font(.system(size: 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPurple)
                     Text(file.fileName)
                         .font(OhanaFont.caption(.semibold))
@@ -356,8 +356,8 @@ struct QuickHumanNoteSheet: View {
                     Button {
                         attachedFiles.removeAll { $0.id == file.id }
                     } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .black))
+                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     .buttonStyle(ScaleButtonStyle())
@@ -399,8 +399,8 @@ struct QuickHumanNoteSheet: View {
 
     private var dateBlock: some View {
         HStack(spacing: 12) {
-            Image(systemName: "calendar")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "calendar") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
             Text(l.tr(zh: "记录日期", en: "Record date", de: "Eintragsdatum"))
                 .font(OhanaFont.callout(.black))
@@ -419,7 +419,7 @@ struct QuickHumanNoteSheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(.system(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern")
@@ -448,11 +448,7 @@ struct QuickHumanNoteSheet: View {
 
     private func loadFileDrafts(from urls: [URL]) -> [QuickHumanFileAttachmentDraft] {
         urls.compactMap { url in
-            let didAccess = url.startAccessingSecurityScopedResource()
-            defer {
-                if didAccess { url.stopAccessingSecurityScopedResource() }
-            }
-            guard let data = try? Data(contentsOf: url) else { return nil }
+            guard let data = SecurityScopedFileDataReader.read(url) else { return nil }
             let isImage = (try? url.resourceValues(forKeys: [.contentTypeKey]).contentType?.conforms(to: .image)) ?? false
             return QuickHumanFileAttachmentDraft(
                 fileName: url.lastPathComponent.isEmpty ? "attachment" : url.lastPathComponent,

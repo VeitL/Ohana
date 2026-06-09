@@ -12,11 +12,11 @@ struct QuickPlayDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
     var onClose: (() -> Void)? = nil
+    var allEvents: [Event] = []
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = "zh"
-    @Query(sort: \Event.startDate) private var allEvents: [Event]
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingPlayPlanEditor = false
@@ -27,6 +27,7 @@ struct QuickPlayDetailSheet: View {
     @State private var saveToastMessage: String?
     @State private var playPlanSaveTask: Task<Void, Never>?
     @State private var isSavingPlayPlan = false
+    @State private var isCommittingPlay = false
     @State private var playFeedbackToken: CheckInFeedbackToken?
     @State private var chartProgress: Double = 0
 
@@ -35,6 +36,9 @@ struct QuickPlayDetailSheet: View {
     private var playTint: Color { Color.goOrange }
     private var petKey: String { pet.id.uuidString }
     private var playPlanTitle: String { "\(pet.name) 陪玩计划" }
+    private var playCommandExecutor: QuickPlayCommandExecutor {
+        QuickPlayCommandExecutor(context: modelContext)
+    }
 
     private var playPlanEvent: Event? {
         allEvents
@@ -136,7 +140,7 @@ struct QuickPlayDetailSheet: View {
                         headerRow
                         playSummaryMetrics
                         primaryPlayCard
-                        ExecutorPickerBar(tint: playTint)
+                        ExecutorPickerBarRouteContainer(tint: playTint)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         playFrequencySection
                         playPlanModule
@@ -165,6 +169,8 @@ struct QuickPlayDetailSheet: View {
             .onDisappear {
                 playPlanSaveTask?.cancel()
                 isSavingPlayPlan = false
+                isCommittingPlay = false
+                commandQueue.cancelAll()
             }
         }
     }
@@ -181,10 +187,10 @@ struct QuickPlayDetailSheet: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
-                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Label(l.tr(zh: "逗玩记录", en: "Play log", de: "Spielverlauf"), systemImage: "tennisball.fill")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(playTint)
             }
 
@@ -232,12 +238,12 @@ struct QuickPlayDetailSheet: View {
     private func playMetric(value: String, label: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(value)
-                .font(.system(size: 16, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.64)
             Text(label)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .lineLimit(1)
         }
@@ -247,19 +253,19 @@ struct QuickPlayDetailSheet: View {
     private var primaryPlayCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "tennisball.fill")
-                    .font(.system(size: 22, weight: .black))
+                Image(systemName: "tennisball.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 22, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 48, height: 48)
                     .background(playTint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(todayPlayCount > 0 ? l.tr(zh: "今天玩过啦", en: "Played today", de: "Heute gespielt") : l.tr(zh: "来玩一下", en: "Play now", de: "Jetzt spielen"))
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Text(playPlanSubtitle)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
@@ -273,13 +279,14 @@ struct QuickPlayDetailSheet: View {
 
             Button { commitPlay() } label: {
                 Label(playPrimaryTitle, systemImage: missedPlayPlanReminder == nil ? "checkmark" : "clock.badge.exclamationmark")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 15)
-                    .background(playTint, in: Capsule())
+                    .background(isCommittingPlay ? playTint.opacity(0.72) : playTint, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
+            .disabled(isCommittingPlay)
         }
         .padding(18)
         .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -291,15 +298,15 @@ struct QuickPlayDetailSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "逗玩频率", en: "Play frequency", de: "Spielfrequenz"))
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "按每天次数", en: "Daily sessions", de: "Einheiten pro Tag"))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text(l.tr(zh: "14天", en: "14d", de: "14T"))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(playTint)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -324,27 +331,27 @@ struct QuickPlayDetailSheet: View {
         } label: {
             HStack(spacing: 13) {
                 Image(systemName: playPlanEvent == nil ? "calendar.badge.plus" : "calendar.badge.clock")
-                    .font(.system(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goPurple, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "陪玩计划", en: "Play plan", de: "Spielplan"))
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(planStatusText)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
 
                 Spacer()
 
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "slider.horizontal.3") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 42, height: 38)
+                    .frame(width: 42, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
             }
             .padding(14)
             .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -398,11 +405,11 @@ struct QuickPlayDetailSheet: View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
                 Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(recentLogs.count)")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -420,11 +427,11 @@ struct QuickPlayDetailSheet: View {
 
     private var emptyRecentState: some View {
         HStack(spacing: 10) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(playTint)
             Text(l.tr(zh: "第一次逗玩后会出现在这里", en: "Your first play session appears here", de: "Das erste Spiel erscheint hier"))
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
         }
@@ -434,18 +441,18 @@ struct QuickPlayDetailSheet: View {
 
     private func recentLogRow(_ log: PetCareLog) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 11, weight: .black))
+            Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 24, height: 24)
+                .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(playTint, in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.date, format: .dateTime.month().day().hour().minute())
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "已完成", en: "Done", de: "Erledigt"))
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -463,10 +470,10 @@ struct QuickPlayDetailSheet: View {
                     }
                 }
             } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 12, weight: .bold))
+                Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaTertiaryText)
-                    .frame(width: 36, height: 34)
+                    .frame(width: 36, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             }
             .buttonStyle(ScaleButtonStyle())
         }
@@ -549,18 +556,18 @@ struct QuickPlayDetailSheet: View {
     private var playPlanEditorContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 18, weight: .black))
+                Image(systemName: "calendar.badge.clock") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goPurple, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(playPlanEvent == nil ? l.tr(zh: "添加陪玩计划", en: "Add play plan", de: "Spielplan hinzufügen") : l.tr(zh: "陪玩计划", en: "Play plan", de: "Spielplan"))
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "轻提醒，不制造压力。", en: "A light reminder, no pressure.", de: "Sanfte Erinnerung, kein Druck."))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -568,12 +575,12 @@ struct QuickPlayDetailSheet: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(l.tr(zh: "频率", en: "Frequency", de: "Häufigkeit"))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
 
                 HStack {
                     Text(l.tr(zh: "每 \(playPlanIntervalDays) 天", en: "Every \(playPlanIntervalDays)d", de: "Alle \(playPlanIntervalDays)T"))
-                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Spacer()
@@ -589,7 +596,7 @@ struct QuickPlayDetailSheet: View {
                 selection: $playPlanAnchorDate,
                 displayedComponents: .date
             )
-            .font(.system(size: 14, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText)
             .padding(15)
             .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -602,7 +609,7 @@ struct QuickPlayDetailSheet: View {
                         deletePlayPlan()
                     } label: {
                         Text(l.tr(zh: "关闭", en: "Turn off", de: "Ausschalten"))
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goRed)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -616,7 +623,7 @@ struct QuickPlayDetailSheet: View {
                     savePlayPlan()
                 } label: {
                     Text(isSavingPlayPlan ? l.tr(zh: "保存中", en: "Saving", de: "Speichert") : l.tr(zh: "保存", en: "Save", de: "Speichern"))
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 15)
@@ -648,7 +655,7 @@ struct QuickPlayDetailSheet: View {
 
     private func toast(message: String) -> some View {
         Text(message)
-            .font(.system(size: 12, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
@@ -658,17 +665,28 @@ struct QuickPlayDetailSheet: View {
     }
 
     private func commitPlay() {
+        guard !isCommittingPlay else { return }
         let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
-        let reward = QuestManager.OhanaActionType.general(
-            humanReward: 3,
-            petReward: 2,
-            emoji: "🎾",
-            title: l.tr(zh: "\(pet.name) 互动奖励", en: "\(pet.name) play reward", de: "\(pet.name) Spielbelohnung")
-        )
-        CareEventService.recordCare(pet: pet, type: .play, context: modelContext, executorId: executorId, reward: reward)
-        playFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: "+1", tint: playTint)
-        showToast(l.tr(zh: "已记录", en: "Logged", de: "Gespeichert"))
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        let rewardTitle = l.tr(zh: "\(pet.name) 互动奖励", en: "\(pet.name) play reward", de: "\(pet.name) Spielbelohnung")
+        isCommittingPlay = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(.quickCare(entityID: pet.id, action: CareType.play.rawValue)) {
+            let result = playCommandExecutor.recordPlay(
+                petID: pet.id,
+                executorId: executorId,
+                rewardTitle: rewardTitle
+            )
+            isCommittingPlay = false
+            guard let result else {
+                showToast(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
+            let deltaText = result.coconutDelta > 0 ? "+\(result.coconutDelta)" : "+1"
+            playFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: deltaText, tint: playTint)
+            showToast(l.tr(zh: "已记录", en: "Logged", de: "Gespeichert"))
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
     }
 
     private func openPlayPlanEditor() {

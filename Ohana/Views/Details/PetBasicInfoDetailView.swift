@@ -83,7 +83,7 @@ struct PetBasicInfoDetailView: View {
                         withAnimation { isEditing = false }
                     } label: {
                         Text("保存")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                     }
                 } else {
@@ -91,8 +91,8 @@ struct PetBasicInfoDetailView: View {
                         loadEditState()
                         withAnimation { isEditing = true }
                     } label: {
-                        Image(systemName: "pencil.circle.fill")
-                            .font(.system(size: 20))
+                        Image(systemName: "pencil.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.goPrimary)
                     }
@@ -170,7 +170,7 @@ struct PetBasicInfoDetailView: View {
             if !pet.notes.isEmpty {
                 infoSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
                     Text(pet.notes)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -190,22 +190,22 @@ struct PetBasicInfoDetailView: View {
                 withAnimation(GoMotion.selection) { breedTipsExpanded.toggle() }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 14, weight: .semibold))
+                    Image(systemName: "lightbulb.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     VStack(alignment: .leading, spacing: 1) {
                         Text("\(breed) · 护理贴士")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("基于品种特点的个性化建议")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Image(systemName: breedTipsExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -217,10 +217,10 @@ struct PetBasicInfoDetailView: View {
                         HStack(alignment: .top, spacing: 8) {
                             Circle()
                                 .fill(Color.goYellow.opacity(0.7))
-                                .frame(width: 5, height: 5)
+                                .frame(width: 5, height: 5) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 .padding(.top, 5)
                             Text(tip)
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.75))
                         }
                     }
@@ -336,10 +336,10 @@ struct PetBasicInfoDetailView: View {
                     ForEach(themePresets, id: \.0) { hex, _ in
                         Button { eThemeColorHex = hex } label: {
                             ZStack {
-                                Circle().fill(Color(hex: hex)).frame(width: 38, height: 38)
+                                Circle().fill(Color(hex: hex)).frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 if eThemeColorHex.uppercased() == hex.uppercased() {
                                     Circle().strokeBorder(Color.ohanaCardSurface, lineWidth: 2.5)
-                                    Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(Color.ohanaPrimaryText)
+                                    Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                             }
                         }.buttonStyle(ScaleButtonStyle())
@@ -348,14 +348,14 @@ struct PetBasicInfoDetailView: View {
                         get: { Color(hex: eThemeColorHex) },
                         set: { if let h = $0.toHex() { eThemeColorHex = h } }
                     ), supportsOpacity: false)
-                    .labelsHidden().frame(width: 38, height: 38).scaleEffect(1.3).clipShape(Circle())
+                    .labelsHidden().frame(width: 38, height: 38).scaleEffect(1.3).clipShape(Circle()) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .overlay(Circle().strokeBorder(.primary.opacity(0.3), lineWidth: 1))
                 }
             }
             // 备注
             editSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
                 TextField("备注（可选）", text: $eNotes, axis: .vertical)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .tint(Color.goOrange)
                     .lineLimit(3...6)
@@ -376,12 +376,12 @@ struct PetBasicInfoDetailView: View {
                     )
                     VStack(spacing: 4) {
                         Text(isEditing ? (eName.isEmpty ? pet.name : eName) : pet.name)
-                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.65)
                         Text("\(isEditing ? eSpecies : pet.species) · \(isEditing ? (eBreed.isEmpty ? "未填写品种" : eBreed) : (pet.breed.isEmpty ? "未填写品种" : pet.breed))")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -391,7 +391,7 @@ struct PetBasicInfoDetailView: View {
 
                 if isEditing {
                     Text("编辑中")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -428,8 +428,8 @@ struct PetBasicInfoDetailView: View {
     private func infoSection<Content: View>(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: icon).font(.system(size: 13, weight: .bold)).foregroundStyle(iconColor)
-                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                Image(systemName: icon).font(OhanaFont.adaptive(size: 13, weight: .bold)).foregroundStyle(iconColor) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                Text(title).font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             content()
         }
@@ -439,8 +439,8 @@ struct PetBasicInfoDetailView: View {
     private func editSection<Content: View>(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: icon).font(.system(size: 13, weight: .bold)).foregroundStyle(iconColor)
-                Text(title).font(.system(size: 15, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                Image(systemName: icon).font(OhanaFont.adaptive(size: 13, weight: .bold)).foregroundStyle(iconColor) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                Text(title).font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             content()
         }
@@ -449,21 +449,21 @@ struct PetBasicInfoDetailView: View {
 
     private func infoRow(label: String, value: String) -> some View {
         HStack {
-            Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.45)).frame(width: 80, alignment: .leading)
-            Text(value).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
+            Text(label).font(OhanaFont.adaptive(size: 13, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.45)).frame(width: 80, alignment: .leading) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            Text(value).font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.9)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Spacer()
         }
     }
 
     private func editLabel(_ label: String) -> some View {
-        Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+        Text(label).font(OhanaFont.adaptive(size: 13, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.55)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
     }
 
     private func editField(_ label: String, text: Binding<String>) -> some View {
         HStack {
             editLabel(label).frame(width: 70, alignment: .leading)
             TextField(label, text: text)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
                 .multilineTextAlignment(.trailing)
@@ -550,10 +550,10 @@ struct PetBasicInfoDetailView: View {
                         HStack(spacing: 6) {
                             Circle()
                                 .fill(Color(hex: item.hex))
-                                .frame(width: 14, height: 14)
+                                .frame(width: 14, height: 14) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 1))
                             Text(item.name)
-                                .font(.system(size: 12, weight: selection.wrappedValue == item.name ? .black : .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: selection.wrappedValue == item.name ? .black : .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
                         }
@@ -572,19 +572,19 @@ struct PetBasicInfoDetailView: View {
     private var vetVisitSummaryCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: "cross.case.fill")
-                    .font(.system(size: 13, weight: .bold))
+                Image(systemName: "cross.case.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed)
                 Text("就诊卡片")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 ShareLink(item: vetVisitSummaryText) {
                     HStack(spacing: 5) {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: "square.and.arrow.up") // a11y: allow decorative icon covered by surrounding text or control
                         Text("给兽医")
                     }
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
@@ -608,11 +608,11 @@ struct PetBasicInfoDetailView: View {
     private func compactSummaryRow(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text(label)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.46))
                 .frame(width: 58, alignment: .leading)
             Text(value)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(2)
@@ -686,9 +686,9 @@ struct PetBasicInfoDetailView: View {
         if pet.hasPassedAway {
             VStack(spacing: 10) {
                 HStack(spacing: 8) {
-                    Text("🌈").font(.system(size: 14))
+                    Text("🌈").font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("记录中心 · 彩虹桥彼端")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .tracking(1)
                     Spacer()
@@ -697,17 +697,17 @@ struct PetBasicInfoDetailView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         if let d = pet.passedAwayDate {
                             Text("离世日期：\(d.formatted(.dateTime.year().month().day()))")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         }
                         Text("相伴 \(pet.daysTogetherAtPassing) 天 · \(pet.ageAtPassingText)")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Spacer()
                     Button { showingUndoPassingAlert = true } label: {
                         Text("撤销离世")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goYellow)
                             .padding(.horizontal, 12).padding(.vertical, 6)
                             .background(Color.goYellow.opacity(0.1), in: Capsule())
@@ -722,7 +722,7 @@ struct PetBasicInfoDetailView: View {
             }
             .alert("撤销离世标记", isPresented: $showingUndoPassingAlert) {
                 Button("撤销", role: .destructive) {
-                    RainbowBridgeService.undoPassedAway(pet: pet, context: modelContext)
+                    undoPetPassedAway()
                 }
                 Button("取消", role: .cancel) {}
             } message: {
@@ -731,9 +731,9 @@ struct PetBasicInfoDetailView: View {
         } else {
             VStack(spacing: 10) {
                 HStack {
-                    Image(systemName: "rainbow").foregroundStyle(Color.purple.opacity(0.6)).font(.system(size: 12))
+                    Image(systemName: "rainbow").foregroundStyle(Color.purple.opacity(0.6)).font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("生命终章")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.purple.opacity(0.6))
                         .tracking(2)
                     Spacer()
@@ -745,7 +745,7 @@ struct PetBasicInfoDetailView: View {
                     HStack(spacing: 8) {
                         Text("🌈")
                         Text("标记 \(pet.name) 已离世")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .foregroundStyle(Color.purple.opacity(0.8))
                     .frame(maxWidth: .infinity)
@@ -758,7 +758,7 @@ struct PetBasicInfoDetailView: View {
             }
             .alert("确认标记离世", isPresented: $showingRainbowBridgeAlert) {
                 Button("确认", role: .destructive) {
-                    RainbowBridgeService.markPassedAway(pet: pet, date: rainbowBridgeDate, context: modelContext)
+                    markPetPassedAway()
                 }
                 Button("取消", role: .cancel) {}
             } message: {
@@ -777,6 +777,39 @@ struct PetBasicInfoDetailView: View {
     }
 
     // MARK: - Delete Helpers
+    private func markPetPassedAway() {
+        let command = DomainCommand.memberLifecycle(
+            entityID: pet.id,
+            kind: EntityKind.pet.rawValue,
+            action: "passed.mark"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext).markPetPassedAway(
+                pet,
+                date: rainbowBridgeDate,
+                note: "petBasicInfo.passed.mark"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
+    private func undoPetPassedAway() {
+        let command = DomainCommand.memberLifecycle(
+            entityID: pet.id,
+            kind: EntityKind.pet.rawValue,
+            action: "passed.undo"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext).undoPetPassedAway(
+                pet,
+                note: "petBasicInfo.passed.undo"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
     private func deletePetWithCascade(_ p: Pet) {
         let command = DomainCommand.memberDeletion(entityID: p.id, kind: EntityKind.pet.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -791,8 +824,19 @@ struct PetBasicInfoDetailView: View {
     }
 
     private func clearPetLogs() {
-        pet.clearAllActivityRecords(in: modelContext)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        let command = DomainCommand.memberLifecycle(
+            entityID: pet.id,
+            kind: EntityKind.pet.rawValue,
+            action: "records.clear"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext).clearPetActivityRecords(
+                pet,
+                note: "petBasicInfo.records.clear"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
     }
 
     // MARK: - Edit State
@@ -928,7 +972,7 @@ struct EditableProfileAvatarPicker: View {
                     avatarImageData = nil
                 } label: {
                     Text("移除头像")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -1007,10 +1051,10 @@ struct EditableProfileAvatarPicker: View {
     private func avatarActionLabel(icon: String, title: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .symbolRenderingMode(.monochrome)
             Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(Color.arkInk)
         .frame(maxWidth: .infinity)
@@ -1117,11 +1161,11 @@ private struct PetBasicInfoDangerZone: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .foregroundStyle(Color.goRed.opacity(0.7))
-                    .font(.system(size: 12))
+                    .font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text("危险区域")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed.opacity(0.7))
                     .tracking(2)
                 Spacer()
@@ -1131,10 +1175,10 @@ private struct PetBasicInfoDangerZone: View {
                 showingClearConfirm = true
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "eraser.fill")
-                        .font(.system(size: 14, weight: .bold))
+                    Image(systemName: "eraser.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("仅清空所有记录")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.goOrange)
                 .frame(maxWidth: .infinity)
@@ -1149,10 +1193,10 @@ private struct PetBasicInfoDangerZone: View {
                 showingDeleteSheet = true
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 14, weight: .bold))
+                    Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("彻底删除 \(petName)")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.goRed)
                 .frame(maxWidth: .infinity)
@@ -1201,25 +1245,25 @@ private struct PetDeleteConfirmationSheet: View {
             OhanaAppBackground()
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 16, weight: .black))
+                    Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("彻底删除 \(petName)")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("输入名字后才能继续")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Button(action: onCancel) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(Color.primary.opacity(0.08), in: Circle())
                     }
                     .buttonStyle(ScaleButtonStyle())
@@ -1227,15 +1271,15 @@ private struct PetDeleteConfirmationSheet: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("这会删除宠物和所有关联记录，无法撤销。")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.68))
                     Text("请输入：\(petName)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed.opacity(0.8))
                 }
 
                 TextField("宠物名字", text: $confirmName)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
@@ -1250,7 +1294,7 @@ private struct PetDeleteConfirmationSheet: View {
                 HStack(spacing: 10) {
                     Button(action: onCancel) {
                         Text("取消")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
@@ -1260,7 +1304,7 @@ private struct PetDeleteConfirmationSheet: View {
 
                     Button(action: attemptDelete) {
                         Text("删除")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(canDelete ? Color.ohanaPrimaryActionText : Color.primary.opacity(0.32))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)

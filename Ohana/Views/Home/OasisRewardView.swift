@@ -120,6 +120,7 @@ struct OasisRewardView: View {
     var isEmbeddedPrepared: Bool = true
     var isEmbeddedVisible: Bool = true
     var isEmbeddedActive: Bool = true
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -257,7 +258,7 @@ struct OasisRewardView: View {
     }
 
     private var canInjectTreeEnergy: Bool {
-        actionSnapshot.canInjectCoconuts ?? (activeHumanCoconutBalance >= 10)
+        actionSnapshot.canInjectCoconuts ?? (activeHumanCoconutBalance >= 80)
     }
 
     private var contentTopInset: CGFloat {
@@ -405,7 +406,8 @@ struct OasisRewardView: View {
                     OasisRewardPresentationModifier(
                         sheetRoute: $activeSheetRoute,
                         fullScreenRoute: $activeFullScreenRoute,
-                        pets: pets
+                        pets: pets,
+                        onPresentCoconutLog: onPresentCoconutLog
                     )
                 )
         )
@@ -795,7 +797,7 @@ struct OasisRewardView: View {
             showsDeltaAnimation: true,
             deltaAnimationContext: "oasis-\(currentActiveHumanId.isEmpty ? "global" : currentActiveHumanId)"
         ) {
-            openFullScreen(.coconutLog)
+            presentCoconutLog()
         }
         .accessibilityLabel(l.tr(
             zh: "椰子资产 \(activeHumanCoconutBalance)",
@@ -803,6 +805,10 @@ struct OasisRewardView: View {
             de: "Kokosnuss-Guthaben \(activeHumanCoconutBalance)"
         ))
         .accessibilityHint(l.tr(zh: "打开椰子历史", en: "Open coconut history", de: "Kokosnuss-Verlauf öffnen"))
+    }
+
+    private func presentCoconutLog() {
+        onPresentCoconutLog?(nil)
     }
 
     // MARK: - Life Tree Stage
@@ -1121,9 +1127,14 @@ struct OasisRewardView: View {
                         closeCritterNest()
                     }
 
-                OasisCritterCodexView(mode: .nest, isPopup: true) {
-                    closeCritterNest()
-                }
+                OasisCritterCodexRouteContainer(
+                    mode: .nest,
+                    isPopup: true,
+                    onClose: {
+                        closeCritterNest()
+                    },
+                    onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
+                )
                 .frame(
                     width: min(proxy.size.width - 20, 430),
                     height: min(proxy.size.height - 86, 760)
@@ -1270,9 +1281,9 @@ struct OasisRewardView: View {
                 Image(systemName: "bolt.fill") // a11y: allow decorative action icon paired with label
                     .font(OhanaFont.subheadline(.black))
                     .accessibilityHidden(true)
-                Text(l.tr(zh: "注入 +10", en: "Infuse +10", de: "+10 einspeisen"))
+                Text(l.tr(zh: "注入 +20XP", en: "Infuse +20XP", de: "+20XP einspeisen"))
                     .font(OhanaFont.callout(.black))
-                Text("-10🥥")
+                Text("-80🥥")
                     .font(OhanaFont.caption(.black))
                     .opacity(0.66)
             }
@@ -1384,7 +1395,7 @@ struct OasisRewardView: View {
         withAnimation(GoMotion.feedback) {
             coconutBalanceVisualOverride = targetBalance
             actionSnapshot.activeCoconutBalance = targetBalance
-            actionSnapshot.canInjectCoconuts = targetBalance >= 10
+            actionSnapshot.canInjectCoconuts = targetBalance >= 80
             bentoSnapshot.shopMetric = "\(targetBalance)"
         }
     }
@@ -1428,8 +1439,8 @@ struct OasisRewardView: View {
         let thawDelay: UInt64 = motionBudget.usesFullMotion ? 120 : 48
         let beforeLevel = treeVisualLevel
         let beforeBalance = activeHumanCoconutBalance
-        let targetBalance = max(0, beforeBalance - 10)
-        let targetEnergy = treeMgr.totalEnergy + 10
+        let targetBalance = max(0, beforeBalance - 80)
+        let targetEnergy = treeMgr.totalEnergy + 20
         let targetLevel = OasisTreeManager.treeLevel(forTotalEnergy: targetEnergy)
         let isLevelUp = targetLevel.rawValue > beforeLevel.rawValue
         let pulseBoost: CGFloat = motionBudget.usesFullMotion ? (isLevelUp ? 0.045 : 0.026) : 0.01
@@ -1439,7 +1450,7 @@ struct OasisRewardView: View {
         withAnimation(visualAnimation) {
             coconutBalanceVisualOverride = targetBalance
             actionSnapshot.activeCoconutBalance = targetBalance
-            actionSnapshot.canInjectCoconuts = targetBalance >= 10
+            actionSnapshot.canInjectCoconuts = targetBalance >= 80
             bentoSnapshot.shopMetric = "\(targetBalance)"
             treeVisualEnergyOverride = targetEnergy
             isInjecting = true
@@ -2280,7 +2291,7 @@ struct OasisRewardView: View {
                 Text(l.tr(zh: "注入能量", en: "Inject energy", de: "Energie geben"))
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                Text("(-10🥥)")
+                Text("(-80🥥)")
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.55))
             }

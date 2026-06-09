@@ -43,7 +43,7 @@ struct AddHeatCycleSheet: View {
                         DatePicker("结束时间", selection: $endDate, displayedComponents: .date)
                     }
                 } header: {
-                    Text("生理期状态").font(.system(size: 12, weight: .medium, design: .rounded))
+                    Text("生理期状态").font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 }
 
                 if status == .estrus || status == .pregnant {
@@ -54,7 +54,7 @@ struct AddHeatCycleSheet: View {
                                 .tint(.pink)
                         }
                     } header: {
-                        Text("繁育记录").font(.system(size: 12, weight: .medium, design: .rounded))
+                        Text("繁育记录").font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     }
                 }
 
@@ -62,7 +62,7 @@ struct AddHeatCycleSheet: View {
                     TextEditor(text: $note)
                         .frame(minHeight: 80)
                 } header: {
-                    Text("备注说明 (可选)").font(.system(size: 12, weight: .medium, design: .rounded))
+                    Text("备注说明 (可选)").font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 }
 
                 Section {
@@ -70,7 +70,7 @@ struct AddHeatCycleSheet: View {
                         save()
                     } label: {
                         Text(isSaving ? "保存中…" : "保存记录")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)

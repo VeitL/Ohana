@@ -99,7 +99,7 @@ struct PetHygieneDetailView: View {
         let maxH: CGFloat = 22
         VStack(alignment: .leading, spacing: 6) {
             Text("近 28 天")
-                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 2) {
                 ForEach(pts) { pt in
@@ -205,20 +205,20 @@ struct PetHygieneDetailView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text("护理")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer()
 
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 40, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -243,10 +243,10 @@ struct PetHygieneDetailView: View {
                         .rotationEffect(.degrees(-90))
                     VStack(spacing: 1) {
                         Text("\(completedTodayCount)/\(totalTypes)")
-                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("今日")
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
@@ -254,10 +254,10 @@ struct PetHygieneDetailView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(headline)
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(overdueTypes.isEmpty ? "继续保持，下一次护理会自动提醒。" : overdueTypes.map(\.rawValue).joined(separator: "、"))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(overdueTypes.isEmpty ? .secondary : Color.goRed.opacity(0.9))
                         .lineLimit(2)
                 }
@@ -276,15 +276,15 @@ struct PetHygieneDetailView: View {
     private func overviewMetric(icon: String, value: String, label: String, tint: Color) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
                 .foregroundStyle(tint)
-                .frame(width: 18, height: 18)
+                .frame(width: 18, height: 18) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(label)
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -317,21 +317,21 @@ struct PetHygieneDetailView: View {
             // 标题行：名称 + 状态 + 计划 + 打卡（主题色仅用于图标/按钮）
             HStack(spacing: 6) {
                 Image(systemName: type.systemIconName)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(themeColor)
                 Text(type.rawValue)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 4)
                 if let d = days {
                     Text(d == 0 ? "✓ 今天" : "\(d)天前")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(d == 0 ? themeColor : color)
                         .padding(.horizontal, 7).padding(.vertical, 3)
                         .background((d == 0 ? themeColor : color).opacity(0.14), in: Capsule())
                 } else {
                     Text("未记录")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium))
                         .foregroundStyle(themeColor.opacity(0.55))
                         .padding(.horizontal, 7).padding(.vertical, 3)
                         .background(themeColor.opacity(0.1), in: Capsule())
@@ -341,10 +341,10 @@ struct PetHygieneDetailView: View {
                     groomingPlanTarget = type
                 } label: {
                     HStack(spacing: 3) {
-                        Image(systemName: "bell.badge.plus")
-                            .font(.system(size: 10, weight: .bold))
+                        Image(systemName: "bell.badge.plus").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold))
                         Text("计划")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(themeColor)
                     .padding(.horizontal, 9).padding(.vertical, 5)
@@ -356,14 +356,14 @@ struct PetHygieneDetailView: View {
                     recordHygiene(type, doneToday: doneToday)
                 } label: {
                     if doneToday {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 11, weight: .bold))
+                        Image(systemName: "checkmark").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold))
                             .foregroundStyle(themeColor.opacity(0.55))
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(themeColor.opacity(0.1), in: Capsule())
                     } else {
                         Text("打卡")
-                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goCardWhite)
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(themeColor, in: Capsule())
@@ -376,26 +376,26 @@ struct PetHygieneDetailView: View {
             if !plans.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 4) {
-                        Image(systemName: "bell.fill")
-                            .font(.system(size: 10, weight: .bold))
+                        Image(systemName: "bell.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold))
                         Text("已设计划")
-                            .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .heavy, design: .rounded))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
 
                     ForEach(plans, id: \.id) { rem in
                         HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 11, weight: .semibold))
+                            Image(systemName: "calendar").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                                 .foregroundStyle(themeColor)
                                 .frame(width: 16, alignment: .center)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(rem.scheduledAt, format: .dateTime.month().day())
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 if let ev = rem.event, ev.recurrenceDays > 0 {
                                     Text("重复 · \(recurrenceLabel(ev.recurrenceDays))")
-                                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                                         .foregroundStyle(Color.ohanaSecondaryText)
                                 }
                             }
@@ -421,11 +421,11 @@ struct PetHygieneDetailView: View {
             HStack(spacing: 6) {
                 let effectiveDays = type.effectiveCycleDays(for: pet.id)
                 let isCustom = HygieneType.customCycleDays(for: type, petId: pet.id) != nil
-                Image(systemName: "repeat")
-                    .font(.system(size: 9, weight: .semibold))
+                Image(systemName: "repeat").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                     .foregroundStyle(themeColor.opacity(0.6))
                 Text("每\(effectiveDays)天\(isCustom ? " · 已自定义" : "")")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                 Spacer()
             }
@@ -436,11 +436,11 @@ struct PetHygieneDetailView: View {
                     ForEach(logs.prefix(3)) { log in
                         HStack {
                             Text(log.date, format: .dateTime.month().day().hour().minute())
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                             Spacer()
                             Button { deleteHygieneLog(log) } label: {
-                                Image(systemName: "trash").font(.system(size: 10))
+                                Image(systemName: "trash").accessibilityHidden(true).font(OhanaFont.adaptive(size: 10))
                                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
                         }

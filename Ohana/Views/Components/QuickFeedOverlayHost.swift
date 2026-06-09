@@ -31,10 +31,10 @@ struct QuickFeedOverlayHost: View {
         VStack {
             Spacer()
             HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 14, weight: .bold))
+                Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold))
                 Text(message)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
             }
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 18)

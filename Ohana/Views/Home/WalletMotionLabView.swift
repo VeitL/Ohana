@@ -75,10 +75,10 @@ struct WalletMotionLabView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "Apple Wallet 动效实验室", en: "Apple Wallet Motion Lab", de: "Apple-Wallet-Bewegungslabor"))
-                    .font(.system(size: 21, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 21, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "纯 fixture 卡片，先把空间连续感调对", en: "Fixture cards only, tuned for spatial continuity", de: "Nur Testkarten, für räumliche Kontinuität"))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -90,7 +90,7 @@ struct WalletMotionLabView: View {
                 }
             } label: {
                 Image(systemName: showDebug ? "scope" : "scope")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 44, height: 44)
                     .background(showDebug ? Color.goPrimary : Color.ohanaCardSurface, in: Circle())
@@ -101,8 +101,8 @@ struct WalletMotionLabView: View {
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .background(Color.ohanaCardSurface, in: Circle())
@@ -128,7 +128,7 @@ struct WalletMotionLabView: View {
                         }
                     } label: {
                         Text(item.title(l))
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                             .foregroundStyle(mode == item ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 36)
@@ -140,7 +140,7 @@ struct WalletMotionLabView: View {
 
             Toggle(isOn: $reduceMotionPreview.animation(GoMotion.selection)) {
                 Label(l.tr(zh: "Reduce Motion 预览", en: "Reduce Motion preview", de: "Reduce-Motion-Vorschau"), systemImage: "figure.walk.motion")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .toggleStyle(OhanaPillToggleStyle())
@@ -154,11 +154,11 @@ struct WalletMotionLabView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("progress")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Text(String(format: "%.2f", progress))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                     .contentTransition(.numericText())
             }
@@ -438,7 +438,7 @@ private struct WalletMotionLabScene: View {
             Text("direction \(heroDirection)")
             Text("reveal \(String(format: "%.2f", WalletHeroTimeline.quickReveal(progress: progress)))")
         }
-        .font(.system(size: 11, weight: .black, design: .rounded))
+        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
         .foregroundStyle(Color.ohanaPrimaryActionText)
         .padding(10)
         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -514,10 +514,10 @@ private struct WalletMotionCardView: View {
     private func metric(_ title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
         }
@@ -565,12 +565,12 @@ private struct WalletMotionQuickActions: View {
             ForEach(actions, id: \.0) { action in
                 VStack(spacing: 5) {
                     Image(systemName: action.0)
-                        .font(.system(size: 17, weight: .black))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(width: 46, height: 46)
                         .background(Color.goPrimary, in: Circle())
                     Text(action.1)
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 .frame(maxWidth: .infinity)

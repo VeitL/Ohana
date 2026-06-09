@@ -144,7 +144,7 @@ struct AddPetMedicationSheet: View {
                     Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                         GoKeyboard.dismiss()
                     }
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(chromeAccent)
                 }
             }
@@ -157,18 +157,18 @@ struct AddPetMedicationSheet: View {
                 .padding(.top, 8)
 
             HStack(spacing: 12) {
-                Image(systemName: "pill.fill")
-                    .font(.system(size: 20, weight: .black))
+                Image(systemName: "pill.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 20, weight: .black))
                     .foregroundStyle(chromeAccent)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(existing == nil ? l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen") : l.tr(zh: "编辑药物", en: "Edit medication", de: "Medikament bearbeiten"))
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "名称、剂量、频次", en: "Name, dose, schedule", de: "Name, Dosis, Rhythmus"))
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
@@ -209,7 +209,7 @@ struct AddPetMedicationSheet: View {
                     capitalization: .words,
                     autoFocusDelay: isInlinePopup ? nil : 0.25
                 )
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -220,7 +220,7 @@ struct AddPetMedicationSheet: View {
                                 }
                             } label: {
                                 Text(option)
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                     .foregroundStyle(name == option ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
@@ -270,7 +270,7 @@ struct AddPetMedicationSheet: View {
                             }
                         } label: {
                             Text(label)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(frequency == freq ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -301,7 +301,7 @@ struct AddPetMedicationSheet: View {
                     DatePicker("开始日期", selection: $startDate, displayedComponents: .date)
                         .tint(chromeAccent)
                     Text("疗程天数")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     HStack(alignment: .top, spacing: 8) {
                         HStack(spacing: 8) {
@@ -319,7 +319,7 @@ struct AddPetMedicationSheet: View {
                     }
                 } else {
                     Text("长期用药：不设置结束日期")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -333,7 +333,7 @@ struct AddPetMedicationSheet: View {
                             administrationTag = administrationTag == opt ? nil : opt
                         } label: {
                             Text(opt)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(administrationTag == opt ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -367,7 +367,7 @@ struct AddPetMedicationSheet: View {
                     )
                 }
                 Text("填写后可在详情页查看余量与预估天数")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(.tertiary)
             }
         }
@@ -380,7 +380,7 @@ struct AddPetMedicationSheet: View {
                     } label: {
                         Circle()
                             .fill(Color(hex: hex))
-                            .frame(width: 28, height: 28)
+                            .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             .overlay {
                                 Circle().strokeBorder(Color.ohanaPrimaryText.opacity(0.9), lineWidth: colorHex == hex ? 2 : 0)
                             }
@@ -396,7 +396,7 @@ struct AddPetMedicationSheet: View {
                 text: $notes,
                 axis: .vertical
             )
-            .font(.system(size: 14, weight: .medium, design: .rounded))
+            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
             .lineLimit(3...6)
         }
     }
@@ -406,7 +406,7 @@ struct AddPetMedicationSheet: View {
             saveAfterKeyboardDismiss()
         } label: {
             Text(isSaving ? "保存中…" : (existing == nil ? "开始记录这个疗程" : "保存修改"))
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -419,7 +419,7 @@ struct AddPetMedicationSheet: View {
     private func labeledField(_ title: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             content()
                 .padding(14)
@@ -433,7 +433,7 @@ struct AddPetMedicationSheet: View {
             doseUnit = u
         } label: {
             Text(u)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(doseUnit == u ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 .background(doseUnit == u ? chromeAccent : Color.ohanaControlFill, in: Capsule())
@@ -447,7 +447,7 @@ struct AddPetMedicationSheet: View {
             setCourseDays(days, preset: days)
         } label: {
             Text("\(days)\(l.tr(zh: "天", en: "d", de: "T"))")
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
@@ -470,12 +470,12 @@ struct AddPetMedicationSheet: View {
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
                         Text("\(resolvedCourseDays)")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .monospacedDigit()
                             .contentTransition(.numericText())
                         Text(l.tr(zh: "天", en: "d", de: "T"))
-                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                             .foregroundStyle(chromeAccent)
                     }
                     .frame(maxWidth: .infinity)
@@ -512,9 +512,9 @@ struct AddPetMedicationSheet: View {
             setCourseDays(resolvedCourseDays + delta, preset: nil)
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(chromeAccent, in: Circle())
         }
         .buttonStyle(ScaleButtonStyle())
@@ -567,12 +567,12 @@ struct AddPetMedicationSheet: View {
 
         return HStack(spacing: 12) {
             Text("\(index + 1)")
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(chromeAccent, in: Circle())
             Text(index == 0 ? "第一次" : "第\(index + 1)次")
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             DatePicker("", selection: timeBinding, displayedComponents: .hourAndMinute)

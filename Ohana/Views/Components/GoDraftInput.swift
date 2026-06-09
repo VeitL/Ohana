@@ -218,7 +218,7 @@ extension View {
                 Button(title) {
                     GoKeyboard.dismiss()
                 }
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.goPrimary)
             }
         }

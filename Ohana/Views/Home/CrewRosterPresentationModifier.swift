@@ -18,11 +18,17 @@ struct CrewRosterPresentationModifier: ViewModifier {
     let onAddEntityComplete: () -> Void
     let onPetSaved: (Pet) -> Void
     let onHumanSaved: (Human) -> Void
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
+
+    @State private var lastFullScreenRoute: CrewRosterFullScreenRoute?
 
     func body(content: Content) -> some View {
         content
             .fullScreenCover(item: $fullScreenRoute, onDismiss: onFullScreenDismissed) { route in
                 fullScreenDestination(for: route)
+                    .onAppear {
+                        lastFullScreenRoute = route
+                    }
             }
             .sheet(item: $sheetRoute) { route in
                 sheetDestination(for: route)
@@ -33,7 +39,11 @@ struct CrewRosterPresentationModifier: ViewModifier {
     private func fullScreenDestination(for route: CrewRosterFullScreenRoute) -> some View {
         switch route {
         case .coconutLog:
-            CoconutLogView()
+            Color.clear
+                .onAppear {
+                    onPresentCoconutLog(nil)
+                    fullScreenRoute = nil
+                }
         case let .addEntity(type):
             AddEntityDestinationView(
                 type: type,
@@ -73,7 +83,7 @@ struct CrewRosterPresentationModifier: ViewModifier {
     private func familyActivitySheet(_ pet: Pet) -> some View {
         NavigationStack {
             ScrollView {
-                FamilyActivityStripView(pet: pet, style: .full)
+                FamilyActivityStripRouteContainer(pet: pet, style: .full)
                     .padding(.vertical, 20)
             }
             .navigationTitle(
@@ -105,7 +115,10 @@ struct CrewRosterPresentationModifier: ViewModifier {
     }
 
     private func onFullScreenDismissed() {
-        onAddEntityDismissed()
+        defer { lastFullScreenRoute = nil }
+        if case .addEntity = lastFullScreenRoute {
+            onAddEntityDismissed()
+        }
     }
 }
 
@@ -118,7 +131,8 @@ extension View {
         onAddEntityDismissed: @escaping () -> Void,
         onAddEntityComplete: @escaping () -> Void,
         onPetSaved: @escaping (Pet) -> Void,
-        onHumanSaved: @escaping (Human) -> Void
+        onHumanSaved: @escaping (Human) -> Void,
+        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in }
     ) -> some View {
         modifier(
             CrewRosterPresentationModifier(
@@ -129,7 +143,8 @@ extension View {
                 onAddEntityDismissed: onAddEntityDismissed,
                 onAddEntityComplete: onAddEntityComplete,
                 onPetSaved: onPetSaved,
-                onHumanSaved: onHumanSaved
+                onHumanSaved: onHumanSaved,
+                onPresentCoconutLog: onPresentCoconutLog
             )
         )
     }

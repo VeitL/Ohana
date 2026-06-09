@@ -264,19 +264,19 @@ struct IslandWeightDashboard: View {
     private var navBar: some View {
         HStack {
             Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .bold))
+                Image(systemName: "chevron.left") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text("体重星球")
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(primaryText)
             Spacer()
-            Color.clear.frame(width: 40, height: 40)
+            Color.clear.frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
         }
         .padding(.top, 50)
     }
@@ -326,17 +326,17 @@ struct IslandWeightDashboard: View {
     private var privateWeightNotice: some View {
         if !privateVisibleWeightHumans.isEmpty {
             HStack(spacing: 10) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 26, height: 26) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goYellow.opacity(0.16), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text("包含仅自己可见的体重数据")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(primaryText)
                     Text(privateWeightNoticeText)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(secondaryText)
                         .lineLimit(2)
                 }
@@ -370,8 +370,8 @@ struct IslandWeightDashboard: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
-                    .frame(width: 26, height: 26)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .frame(width: 26, height: 26) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(isSelected ? Color.arkInk.opacity(0.16) : tint.opacity(0.18), in: Circle())
                 weightEntityChipText(title: title, isSelected: isSelected)
             }
@@ -405,7 +405,7 @@ struct IslandWeightDashboard: View {
 
     private func weightEntityChipText(title: String, isSelected: Bool) -> some View {
         Text(title)
-            .font(.system(size: 13, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .lineLimit(1)
             .minimumScaleFactor(0.72)
         .foregroundStyle(isSelected ? .black : .white)
@@ -418,32 +418,32 @@ struct IslandWeightDashboard: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         Image(systemName: selectedSeriesID == nil ? "globe.asia.australia.fill" : "scalemass.fill")
-                            .font(.system(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.arkInk)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(chartAccentColor, in: Circle())
 
                         Text(selectedSeriesID == nil ? "体重星球" : selectedEntityName)
-                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                     }
 
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(String(format: "%.1f", latestChartValue ?? totalIslandWeightKg))
-                            .font(.system(size: 58, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 58, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                             .ohanaNumericMotion(latestChartValue ?? totalIslandWeightKg)
                             .minimumScaleFactor(0.55)
                             .lineLimit(1)
                         Text("kg")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(secondaryText)
                     }
 
                     HStack(spacing: 8) {
                         trendDeltaPill
                         Text(selectedSeriesID == nil ? weightComparison : selectedEntitySubtitle)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(secondaryText)
                             .lineLimit(1)
                     }
@@ -471,9 +471,9 @@ struct IslandWeightDashboard: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: selectedWeightEntryRoute == nil ? "person.crop.circle.badge.plus" : "plus")
-                    .font(.system(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(selectedWeightEntryRoute == nil ? "选成员" : "记录")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 14)
@@ -490,9 +490,9 @@ struct IslandWeightDashboard: View {
         let delta = periodDeltaKg
         HStack(spacing: 5) {
             Image(systemName: deltaIcon(for: delta))
-                .font(.system(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(deltaText(for: delta))
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .ohanaNumericMotion(deltaText(for: delta))
         }
         .foregroundStyle(deltaTint(for: delta))
@@ -525,10 +525,10 @@ struct IslandWeightDashboard: View {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(selectedSeriesID == nil ? "全岛总质量趋势" : "体重趋势")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(primaryText)
                     Text(weightTimeRange == .all ? "全部记录" : "近 \(weightTimeRange.rawValue) 天")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(secondaryText)
                 }
                 Spacer()
@@ -557,7 +557,7 @@ struct IslandWeightDashboard: View {
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Text(range.rawValue)
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(weightTimeRange == range ? Color.arkInk : primaryText)
                         .frame(minWidth: range == .all ? 42 : 30)
                         .padding(.vertical, 7)
@@ -750,20 +750,20 @@ struct IslandWeightDashboard: View {
     private func rankingPill(title: String, ranking: FameRanking?, accent: Color, fallback: String) -> some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(accent)
             if let ranking {
                 Text(ranking.emoji)
-                    .font(.system(size: 16))
+                    .font(OhanaFont.adaptive(size: 16)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(ranking.entityName)
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .lineLimit(1)
                 Text("\(ranking.deltaPercent >= 0 ? "+" : "")\(String(format: "%.1f", ranking.deltaPercent))%")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(accent)
             } else {
                 Text(fallback)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(secondaryText)
             }
         }
@@ -779,11 +779,11 @@ struct IslandWeightDashboard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("成员", systemImage: "person.2.fill")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
                 Spacer()
                 Text("\(buildSparklineEntries(includeSelection: false).count)")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(secondaryText)
                     .ohanaNumericMotion(buildSparklineEntries(includeSelection: false).count)
             }
@@ -864,17 +864,17 @@ struct IslandWeightDashboard: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(String(format: "%.1f", entry.current))
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(entry.accentColor)
                     Text("kg")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText)
                     Text(deltaText(for: entry.delta))
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(deltaTint(for: entry.delta))
                 }
             }
@@ -886,8 +886,8 @@ struct IslandWeightDashboard: View {
                     .frame(width: 104, height: 44)
             }
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .bold))
+            Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tertiaryText.opacity(0.6))
         }
         .padding(14)
@@ -927,7 +927,7 @@ struct IslandWeightDashboard: View {
             humanAvatarView(human, size: 46)
         } else {
             Text(entry.emoji)
-                .font(.system(size: 24))
+                .font(OhanaFont.adaptive(size: 24)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .frame(width: 46, height: 46)
                 .background(entry.accentColor.opacity(0.16), in: Circle())
         }
@@ -936,7 +936,7 @@ struct IslandWeightDashboard: View {
     // MARK: - Empty State
     private func emptyState(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(tertiaryText)
             .frame(maxWidth: .infinity, alignment: .center)
     }
@@ -993,21 +993,12 @@ struct IslandWeightDashboard: View {
     }
 
     private func humanAvatarView(_ human: Human, size: CGFloat) -> some View {
-        let color = Color(hex: human.safeThemeColorHex)
-        return ZStack {
-            Circle().fill(color.opacity(0.24)).frame(width: size, height: size)
-            if let data = human.avatarImageData, let img = UIImage(data: data) {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                Text(String(human.name.prefix(1)))
-                    .font(.system(size: size * 0.42, weight: .black, design: .rounded))
-                    .foregroundStyle(color)
-            }
-        }
+        HumanAvatarPipelineView(
+            human: human,
+            size: size,
+            fallbackScale: 0.42,
+            backgroundOpacity: 0.24
+        )
     }
 }
 

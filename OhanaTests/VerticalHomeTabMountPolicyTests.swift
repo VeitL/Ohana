@@ -198,4 +198,34 @@ struct VerticalHomeTabMountPolicyTests {
             reduceMotion: true
         ))
     }
+
+    @Test func bottomNavigationKeepsLabelsThroughFourTabs() {
+        let metrics = HomeBottomNavigationLayoutPolicy.metrics(tabCount: 4)
+
+        #expect(metrics.showsTabLabels)
+        #expect(metrics.actionHitSize >= 56)
+        #expect(metrics.barHeight >= metrics.actionHitSize)
+    }
+
+    @Test func bottomNavigationSwitchesFiveTabsToIconOnlyDensity() {
+        let metrics = HomeBottomNavigationLayoutPolicy.metrics(tabCount: 5)
+
+        #expect(!metrics.showsTabLabels)
+        #expect(metrics.actionHitSize >= 56)
+        #expect(metrics.tabSpacing <= 2)
+    }
+
+    @Test func bottomNavigationReservesRoomForPrimaryAction() {
+        let threeTabWidth = HomeBottomNavigationLayoutPolicy.estimatedTabSlotWidth(
+            containerWidth: 390,
+            tabCount: 3
+        )
+        let fiveTabWidth = HomeBottomNavigationLayoutPolicy.estimatedTabSlotWidth(
+            containerWidth: 390,
+            tabCount: 5
+        )
+
+        #expect(threeTabWidth > 70)
+        #expect(fiveTabWidth >= 44)
+    }
 }

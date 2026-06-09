@@ -16,7 +16,7 @@ struct FoodPrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                 .foregroundStyle(Color.arkInk)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 44)

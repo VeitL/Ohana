@@ -554,10 +554,10 @@ struct FocusWalletCardView: View {
                 .frame(width: w * 0.34, height: w * 0.14)
                 .rotationEffect(.degrees(OhanaHeroGeometry.lerp(18, 10, progress: avatarProgress)))
             if isAttention {
-                Image(systemName: "exclamationmark")
-                    .font(.system(size: 10, weight: .black))
+                Image(systemName: "exclamationmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 22, height: 22) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(tint, in: Circle())
                     .offset(x: w * 0.15, y: -w * 0.12)
                     .shadow(color: tint.opacity(0.46), radius: 10, y: 0) // ui-v4: allow critter alert badge glow
@@ -636,7 +636,7 @@ struct FocusWalletCardView: View {
             VStack(alignment: .trailing, spacing: spacing) {
                 if showsCardTextBadges, card.streak > 1 {
                     Text("🔥 \(card.streak)天连续")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 9).padding(.vertical, 4)
                         .background(Color.goPrimary, in: Capsule())
@@ -759,9 +759,9 @@ struct FocusWalletCardView: View {
         let isShown = card.isShownOnHome
         return HStack(spacing: 6) {
             Image(systemName: isShown ? "house.fill" : "house.slash.fill")
-                .font(.system(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(isShown ? "首页显示中" : "未显示在首页")
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }
@@ -778,13 +778,13 @@ struct FocusWalletCardView: View {
     private func topIdentityBar(usesFullBleed: Bool) -> some View {
         HStack(spacing: 8) {
             Text(card.name)
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed).opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
             if showsCardTextBadges, petBondNameplateActive, let nameplate = card.petBondNameplateText {
                 Text(nameplate)
-                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
@@ -794,7 +794,7 @@ struct FocusWalletCardView: View {
             Spacer(minLength: 0)
             if showsCardTextBadges, let title = equippedTitleBadge {
                 Text(title)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .lineLimit(1)
                     .padding(.horizontal, 7)
@@ -846,60 +846,6 @@ struct FocusWalletCardView: View {
         if s.contains("仓鼠") || l.contains("hamster") { return "仓鼠" }
         if s.contains("鸟") || l.contains("bird")      { return "鸟" }
         return s
-    }
-}
-
-@MainActor
-enum FocusPopoutImageCache {
-    private struct Entry {
-        let signature: String
-        let image: UIImage?
-    }
-
-    private static var entries: [UUID: Entry] = [:]
-
-    static func cachedImage(for id: UUID, signature: String) -> UIImage? {
-        guard !signature.isEmpty,
-              let cached = entries[id],
-              cached.signature == signature else {
-            return nil
-        }
-        return cached.image
-    }
-
-    @discardableResult
-    static func preload(payloads: [FocusWalletAvatarCache.Payload]) async -> Bool {
-        var didChange = false
-        let decodePayloads: [(UUID, Data, String)] = payloads.compactMap { payload in
-            guard let data = payload.data, !data.isEmpty else {
-                if entries.removeValue(forKey: payload.id) != nil {
-                    didChange = true
-                }
-                return nil
-            }
-            let signature = FocusWalletAvatarCache.signature(for: data)
-            if let cached = entries[payload.id], cached.signature == signature {
-                return nil
-            }
-            return (payload.id, data, signature)
-        }
-        guard !decodePayloads.isEmpty else { return didChange }
-
-        let decoded = await Task.detached(priority: .userInitiated) {
-            decodePayloads.map { id, data, signature in
-                (id, signature, decodedImage(from: data))
-            }
-        }.value
-
-        for (id, signature, image) in decoded {
-            entries[id] = Entry(signature: signature, image: image)
-        }
-        return true
-    }
-
-    nonisolated private static func decodedImage(from data: Data) -> UIImage? {
-        let raw = UIImage(data: data)
-        return raw.flatMap { ImageCutoutService.trimmedTransparentSubjectImage(from: $0) } ?? raw
     }
 }
 

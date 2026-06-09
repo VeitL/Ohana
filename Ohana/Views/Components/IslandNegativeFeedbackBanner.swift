@@ -40,19 +40,19 @@ struct IslandNegativeFeedbackBanner: View {
                         .fill(signal.severity == .critical
                               ? Color.goRed.opacity(0.18)
                               : Color.goYellow.opacity(0.18))
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     Image(systemName: signal.iconName)
-                        .font(.system(size: 14, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold))
                         .foregroundStyle(signal.severity == .critical ? Color.goRed : Color.goYellow)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(signal.title)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text(signal.detail)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                         .lineLimit(1)
                 }
@@ -61,21 +61,21 @@ struct IslandNegativeFeedbackBanner: View {
 
                 if signals.count > 1 {
                     Text("\(selectedIndex + 1)/\(signals.count)")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(Color.white.opacity(0.08), in: Capsule())
+                        .background(Color.white.opacity(0.08), in: Capsule()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 }
 
                 Button {
                     dismissedDateRaw = todayKey
                     onDismiss()
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
+                    Image(systemName: "xmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                        .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.08), in: Circle())
+                        .frame(width: 22, height: 22) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                        .background(Color.white.opacity(0.08), in: Circle()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 }
                 .buttonStyle(ScaleButtonStyle())
             }

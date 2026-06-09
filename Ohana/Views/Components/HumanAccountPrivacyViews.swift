@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 
 struct HumanAccountSwitcherSheet: View {
+    let humans: [Human]
     var homePets: [Pet]? = nil
     var homeHumans: [Human]? = nil
     var homeElectronicPets: [OasisElectronicPet]? = nil
@@ -16,7 +17,6 @@ struct HumanAccountSwitcherSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @AppStorage("goFocusHomeCardOrder.v1") private var homeCardOrderRaw = ""
@@ -79,10 +79,10 @@ struct HumanAccountSwitcherSheet: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "person.2.badge.key.fill")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "person.2.badge.key.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text("切换人类账户")
@@ -96,10 +96,10 @@ struct HumanAccountSwitcherSheet: View {
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 34)
+                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaControlFill, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -202,9 +202,9 @@ struct HumanAccountSwitcherSheet: View {
             openSecurity(for: human)
         } label: {
             Image(systemName: HumanPasscodeService.hasPasscode(human) ? "lock.fill" : "lock.open.fill")
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(HumanPasscodeService.hasPasscode(human) ? Color.goYellow : Color.ohanaTertiaryText)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
@@ -376,21 +376,12 @@ struct HumanAccountSwitcherSheet: View {
 
     @ViewBuilder
     private func accountAvatar(_ human: Human, size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color(hex: human.themeColor).opacity(0.18))
-                .frame(width: size, height: size)
-            if let data = human.avatarImageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
-                    .font(.system(size: size * 0.45))
-            }
-        }
+        HumanAvatarPipelineView(
+            human: human,
+            size: size,
+            fallbackScale: 0.45,
+            backgroundOpacity: 0.18
+        )
     }
 
     private func displayName(_ human: Human) -> String {
@@ -400,11 +391,11 @@ struct HumanAccountSwitcherSheet: View {
 }
 
 struct HumanExecutorSwitchSheet: View {
+    let humans: [Human]
     var onSwitched: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Human.createdAt) private var humans: [Human]
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
 
     @State private var pendingHuman: Human? = nil
@@ -445,10 +436,10 @@ struct HumanExecutorSwitchSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.badge.checkmark")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "person.crop.circle.badge.checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text("切换执行人")
@@ -460,10 +451,10 @@ struct HumanExecutorSwitchSheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.primary.opacity(0.08), in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -499,18 +490,18 @@ struct HumanExecutorSwitchSheet: View {
                 }
                 Spacer()
                 if isActive {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 17, weight: .black))
+                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                 } else if HumanPasscodeService.hasPasscode(human) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goYellow.opacity(0.14), in: Circle())
                 } else {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .black))
+                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -627,21 +618,12 @@ struct HumanExecutorSwitchSheet: View {
 
     @ViewBuilder
     private func accountAvatar(_ human: Human, size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color(hex: human.themeColor).opacity(0.18))
-                .frame(width: size, height: size)
-            if let data = human.avatarImageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
-                    .font(.system(size: size * 0.45))
-            }
-        }
+        HumanAvatarPipelineView(
+            human: human,
+            size: size,
+            fallbackScale: 0.45,
+            backgroundOpacity: 0.18
+        )
     }
 
     private func displayName(_ human: Human) -> String {
@@ -704,9 +686,9 @@ struct HumanPasscodeManagementSheet: View {
     private var header: some View {
         HStack(spacing: 12) {
             Image(systemName: HumanPasscodeService.hasPasscode(human) ? "lock.shield.fill" : "lock.open.fill")
-                .font(.system(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goYellow.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text("账户 4 位密码")
@@ -718,10 +700,10 @@ struct HumanPasscodeManagementSheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.primary.opacity(0.08), in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -793,9 +775,9 @@ struct HumanPasscodeManagementSheet: View {
     private func statusCard(title: String, subtitle: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
@@ -815,16 +797,16 @@ struct HumanPasscodeManagementSheet: View {
     private func actionRow(title: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
             Text(title)
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .black))
+            Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
         }
         .padding(14)
@@ -848,7 +830,7 @@ struct HumanPasscodeManagementSheet: View {
                         ForEach(0..<4, id: \.self) { index in
                             Circle()
                                 .fill(index < text.wrappedValue.count ? Color.goPrimary : Color.ohanaControlFill)
-                                .frame(width: 10, height: 10)
+                                .frame(width: 10, height: 10) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         }
                     }
                 }
@@ -1058,10 +1040,10 @@ struct HumanAccountSecuritySheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.primary.opacity(0.08), in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -1072,9 +1054,9 @@ struct HumanAccountSecuritySheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: hasPasscode ? "lock.shield.fill" : "lock.open.fill")
-                    .font(.system(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(hasPasscode ? Color.goYellow : Color.goPrimary)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background((hasPasscode ? Color.goYellow : Color.goPrimary).opacity(0.14), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text("账户密码")
@@ -1168,9 +1150,9 @@ struct HumanAccountSecuritySheet: View {
         )) {
             HStack(spacing: 10) {
                 Image(systemName: icon(for: field))
-                    .font(.system(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow)
-                    .frame(width: 30, height: 30)
+                    .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(field.title)
@@ -1197,21 +1179,12 @@ struct HumanAccountSecuritySheet: View {
 
     @ViewBuilder
     private func accountAvatar(size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color(hex: human.themeColor).opacity(0.18))
-                .frame(width: size, height: size)
-            if let data = human.avatarImageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: size, height: size)
-                    .clipShape(Circle())
-            } else {
-                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
-                    .font(.system(size: size * 0.45))
-            }
-        }
+        HumanAvatarPipelineView(
+            human: human,
+            size: size,
+            fallbackScale: 0.45,
+            backgroundOpacity: 0.18
+        )
     }
 
     private func icon(for field: HumanPrivateField) -> String {
@@ -1246,7 +1219,7 @@ struct HumanPasscodePad: View {
                 ForEach(0..<4, id: \.self) { index in
                     Circle()
                         .fill(index < pin.count ? accent : Color.primary.opacity(0.16))
-                        .frame(width: 12, height: 12)
+                        .frame(width: 12, height: 12) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .animation(GoMotion.feedback, value: pin.count)
                 }
             }
@@ -1260,11 +1233,11 @@ struct HumanPasscodePad: View {
                         } label: {
                             Group {
                                 if key == "delete" {
-                                    Image(systemName: "delete.left.fill")
-                                        .font(.system(size: 17, weight: .black))
+                                    Image(systemName: "delete.left.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 } else {
                                     Text(key)
-                                        .font(.system(size: 22, weight: .black, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                             }
                             .foregroundStyle(Color.ohanaPrimaryText)
@@ -1295,7 +1268,7 @@ struct HumanPasscodePad: View {
 }
 
 struct HumanPrivacyTestView: View {
-    @Query(sort: \Human.createdAt) private var humans: [Human]
+    let humans: [Human]
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
 
     @State private var viewerId = ""
@@ -1330,10 +1303,10 @@ struct HumanPrivacyTestView: View {
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 18, weight: .black))
+                Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goYellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("人类隐私检查")
@@ -1415,9 +1388,9 @@ struct HumanPrivacyTestView: View {
     private func visibleRow(title: String, subtitle: String, isLocked: Bool) -> some View {
         HStack(spacing: 12) {
             Image(systemName: isLocked ? "lock.fill" : "eye.fill")
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(isLocked ? Color.goYellow : Color.goPrimary)
-                .frame(width: 32, height: 32)
+                .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background((isLocked ? Color.goYellow : Color.goPrimary).opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

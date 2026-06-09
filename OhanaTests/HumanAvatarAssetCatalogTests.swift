@@ -5,13 +5,13 @@ import Testing
 struct HumanAvatarAssetCatalogTests {
     private let calendar = Calendar(identifier: .gregorian)
 
-    @Test func avatarFilenameUsesGenderAndAgeGroup() throws {
-        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 5, day: 8)))
+    @Test func avatarFilenameUsesGenderAndAgeGroup() {
+        let now = date(year: 2026, month: 5, day: 8)
 
         #expect(
             HumanAvatarAssetCatalog.avatarFilename(
                 gender: "男",
-                birthday: try #require(calendar.date(from: DateComponents(year: 2011, month: 5, day: 8))),
+                birthday: date(year: 2011, month: 5, day: 8),
                 now: now
             ) == "human_male_teen.png"
         )
@@ -19,7 +19,7 @@ struct HumanAvatarAssetCatalogTests {
         #expect(
             HumanAvatarAssetCatalog.avatarFilename(
                 gender: "女",
-                birthday: try #require(calendar.date(from: DateComponents(year: 1996, month: 5, day: 8))),
+                birthday: date(year: 1996, month: 5, day: 8),
                 now: now
             ) == "human_female_young_adult.png"
         )
@@ -27,7 +27,7 @@ struct HumanAvatarAssetCatalogTests {
         #expect(
             HumanAvatarAssetCatalog.avatarFilename(
                 gender: "非二元",
-                birthday: try #require(calendar.date(from: DateComponents(year: 1986, month: 5, day: 8))),
+                birthday: date(year: 1986, month: 5, day: 8),
                 now: now
             ) == "human_nonbinary_mid_adult.png"
         )
@@ -35,7 +35,7 @@ struct HumanAvatarAssetCatalogTests {
         #expect(
             HumanAvatarAssetCatalog.avatarFilename(
                 gender: "nonbinary",
-                birthday: try #require(calendar.date(from: DateComponents(year: 1966, month: 5, day: 8))),
+                birthday: date(year: 1966, month: 5, day: 8),
                 now: now
             ) == "human_nonbinary_late_adult.png"
         )
@@ -43,7 +43,7 @@ struct HumanAvatarAssetCatalogTests {
         #expect(
             HumanAvatarAssetCatalog.avatarFilename(
                 gender: "male",
-                birthday: try #require(calendar.date(from: DateComponents(year: 1956, month: 5, day: 8))),
+                birthday: date(year: 1956, month: 5, day: 8),
                 now: now
             ) == "human_male_senior.png"
         )
@@ -65,5 +65,9 @@ struct HumanAvatarAssetCatalogTests {
                 birthday: nil
             ) == nil
         )
+    }
+
+    private func date(year: Int, month: Int, day: Int) -> Date {
+        calendar.date(from: DateComponents(year: year, month: month, day: day))!
     }
 }

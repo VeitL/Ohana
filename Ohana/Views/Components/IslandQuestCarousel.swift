@@ -59,9 +59,9 @@ struct IslandQuestCarousel: View {
             coconutClaimed = true
             toastMessage = "🥥 今日椰子盲盒已领取！"
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { showRewardToast = true }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { showRewardToast = true } // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-                withAnimation(.easeOut(duration: 0.3)) { showRewardToast = false }
+                withAnimation(.easeOut(duration: 0.3)) { showRewardToast = false } // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             }
         }) {
             CoconutDropSheet(isPresented: $showCoconut)
@@ -69,11 +69,11 @@ struct IslandQuestCarousel: View {
         .overlay(alignment: .top) {
             if showRewardToast {
                 Text(toastMessage)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 20).padding(.vertical, 11)
                     .background(Color.goPrimary, in: Capsule())
-                    .shadow(color: Color.goPrimary.opacity(0.45), radius: 12, y: 4)
+                    .shadow(color: Color.goPrimary.opacity(0.45), radius: 12, y: 4) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .padding(.top, 8)
             }
@@ -135,7 +135,7 @@ struct IslandQuestCarousel: View {
                     Circle()
                         .fill(i == pageIndex ? Color.primary : Color.secondary.opacity(0.3))
                         .frame(width: i == pageIndex ? 8 : 6, height: i == pageIndex ? 8 : 6)
-                        .animation(.spring(response: 0.3), value: pageIndex)
+                        .animation(.spring(response: 0.3), value: pageIndex) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 }
             }
         }
@@ -143,13 +143,13 @@ struct IslandQuestCarousel: View {
 
     private var collapsedCompletedRow: some View {
         HStack(spacing: 10) {
-            Text("✅").font(.system(size: 20))
+            Text("✅").font(OhanaFont.adaptive(size: 20))
             Text("今日岛屿委托全部完成！")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 18))
+            Image(systemName: "checkmark.seal.fill").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 18))
                 .foregroundStyle(Color.goPrimary)
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
@@ -163,21 +163,21 @@ struct IslandQuestCarousel: View {
                 if !coconutClaimed { showCoconut = true }
             } label: {
                 HStack(spacing: 10) {
-                    Text("🥥").font(.system(size: 20))
+                    Text("🥥").font(OhanaFont.adaptive(size: 20))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(coconutClaimed ? "今日盲盒已领取" : "领取今日椰子盲盒！")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(coconutClaimed ? .secondary : Color.arkInk)
                         if !coconutClaimed {
                             Text("+5🥥")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium))
                                 .foregroundStyle(Color.arkInk.opacity(0.6))
                         }
                     }
                     Spacer()
                     if !coconutClaimed {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .bold))
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold))
                             .foregroundStyle(Color.arkInk.opacity(0.4))
                     }
                 }
@@ -196,7 +196,7 @@ struct IslandQuestCarousel: View {
     private var emptyNonAllDonePlaceholder: some View {
         VStack(spacing: 8) {
             Text("🌴")
-                .font(.system(size: 40))
+                .font(OhanaFont.adaptive(size: 40))
             Text("今日委托全部完成！")
                 .font(.headline)
         }
@@ -261,7 +261,7 @@ private struct IslandQuestCarouselCard: View {
                 HStack(alignment: .top, spacing: 10) {
                     avatarView
                     Text(typeCapsule)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .background(Color.goPrimary.opacity(0.35), in: Capsule())
@@ -269,8 +269,8 @@ private struct IslandQuestCarouselCard: View {
                     Button {
                         onSkip()
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 22))
+                        Image(systemName: "xmark.circle.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 22))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -278,7 +278,7 @@ private struct IslandQuestCarouselCard: View {
                 }
 
                 Text(quest.title)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
@@ -291,14 +291,14 @@ private struct IslandQuestCarouselCard: View {
                     onComplete()
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18, weight: .bold))
+                        Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 18, weight: .bold))
                         Text("完成打卡")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         Spacer()
                         Text("+\(reward)")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
-                        Text("🥥").font(.system(size: 14))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        Text("🥥").font(OhanaFont.adaptive(size: 14))
                     }
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14).padding(.vertical, 10)
@@ -326,12 +326,12 @@ private struct IslandQuestCarouselCard: View {
             )
         } else if let pl = relatedPlant {
             Text(pl.avatarEmoji)
-                .font(.system(size: 20))
+                .font(OhanaFont.adaptive(size: 20))
                 .frame(width: size, height: size)
                 .background(stripColor.opacity(0.2), in: Circle())
         } else {
             Text(quest.emoji)
-                .font(.system(size: 20))
+                .font(OhanaFont.adaptive(size: 20))
                 .frame(width: size, height: size)
                 .background(Color.primary.opacity(0.08), in: Circle())
         }

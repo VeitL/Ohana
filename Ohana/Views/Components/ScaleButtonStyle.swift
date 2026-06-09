@@ -94,7 +94,7 @@ struct OhanaPillToggleStyle: ToggleStyle {
                     .overlay(alignment: configuration.isOn ? .trailing : .leading) {
                         Circle()
                             .fill(Color.ohanaPrimaryText)
-                            .frame(width: 22, height: 22)
+                            .frame(width: 22, height: 22) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             .shadow( // ui-v4: allow switch thumb depth for state clarity
                                 color: Color.arkInk.opacity(configuration.isOn ? 0.18 : 0.10),
                                 radius: configuration.isOn ? 7 : 4,

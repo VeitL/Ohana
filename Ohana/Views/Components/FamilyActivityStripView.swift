@@ -18,10 +18,10 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct FamilyActivityStripView: View {
     let pet: Pet
+    let humans: [Human]
     /// 展示样式
     /// - `.full`：原有大条带（头像 + 徽章 + 姓名，约 80pt）
     /// - `.compact`：小胶囊模式（约 30pt），点击展开完整 Sheet
@@ -30,7 +30,6 @@ struct FamilyActivityStripView: View {
 
     enum Style { case full, compact }
 
-    @Query(sort: \Human.createdAt) private var humans: [Human]
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     private var l: L10n { L10n(appLanguage) }
@@ -149,14 +148,14 @@ struct FamilyActivityStripView: View {
 
                 // 描述文本
                 Text(compactDescription(uniqueCount: uniqueHumans.count, actionCount: entries.count))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                     .lineLimit(1)
 
                 Spacer(minLength: 4)
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             }
             .padding(.horizontal, 10)
@@ -198,15 +197,8 @@ struct FamilyActivityStripView: View {
     private func avatarCircleCompact(for h: Human) -> some View {
         let ring = Color(hex: h.themeColor)
         ZStack {
-            Circle().fill(ring.opacity(0.2)).frame(width: 20, height: 20)
-            if let data = h.avatarImageData, let img = UIImage(data: data) {
-                Image(uiImage: img)
-                    .resizable().scaledToFill()
-                    .frame(width: 20, height: 20)
-                    .clipShape(Circle())
-            } else {
-                Text(h.avatarEmoji).font(.system(size: 11))
-            }
+            Circle().fill(ring.opacity(0.2)).frame(width: 20, height: 20) // a11y: allow decorative non-interactive frame; hit area handled by parent
+            FamilyActivityHumanAvatar(human: h, size: 20, fallbackSize: 11)
         }
         .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
     }
@@ -215,10 +207,10 @@ struct FamilyActivityStripView: View {
 
     private var headerLabel: some View {
         HStack(spacing: 6) {
-            Image(systemName: "person.2.fill")
-                .font(.system(size: 10, weight: .bold))
+            Image(systemName: "person.2.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 10, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(l.tr(zh: "今日 · 谁在照顾 \(pet.name)", en: "Today · Who cared for \(pet.name)", de: "Heute · Wer versorgt \(pet.name)"))
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .tracking(0.4)
             Spacer(minLength: 0)
         }
@@ -239,7 +231,7 @@ struct FamilyActivityStripView: View {
                     .offset(x: 4, y: 4)
             }
             Text(display)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.65))
                 .lineLimit(1)
                 .frame(maxWidth: 44)
@@ -252,21 +244,12 @@ struct FamilyActivityStripView: View {
         ZStack {
             Circle()
                 .fill(ring.opacity(0.18))
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             if let h {
-                if let data = h.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 34, height: 34)
-                        .clipShape(Circle())
-                } else {
-                    Text(h.avatarEmoji)
-                        .font(.system(size: 17))
-                }
+                FamilyActivityHumanAvatar(human: h, size: 34, fallbackSize: 17)
             } else {
-                Image(systemName: "person.fill.questionmark")
-                    .font(.system(size: 13, weight: .semibold))
+                Image(systemName: "person.fill.questionmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
@@ -281,17 +264,32 @@ struct FamilyActivityStripView: View {
         ZStack {
             Circle()
                 .fill(accent)
-                .frame(width: 16, height: 16)
+                .frame(width: 16, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .overlay(
                     Circle()
                         .strokeBorder(
-                            colorScheme == .dark ? Color.black.opacity(0.9) : Color.white,
+                            Color.ohanaCardSurface,
                             lineWidth: 1.6
                         )
                 )
             Image(systemName: icon)
-                .font(.system(size: 8, weight: .heavy))
-                .foregroundStyle(Color.black.opacity(0.85))
+                .font(OhanaFont.adaptive(size: 8, weight: .heavy)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .foregroundStyle(Color.arkInk.opacity(0.85))
         }
+    }
+}
+
+private struct FamilyActivityHumanAvatar: View {
+    let human: Human
+    let size: CGFloat
+    let fallbackSize: CGFloat
+
+    var body: some View {
+        HumanAvatarPipelineView(
+            human: human,
+            size: size,
+            fallbackScale: fallbackSize / max(size, 1),
+            showsBackground: false
+        )
     }
 }

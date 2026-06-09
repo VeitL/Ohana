@@ -111,22 +111,22 @@ struct PetVetSummaryPDFView: View {
             )
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(Color(hex: "1A1A2E"))
                 Text("\(pet.species) · \(pet.breed.isEmpty ? "未知品种" : pet.breed) · \(pet.genderSymbol)")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.gray.opacity(0.7))
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 Text("兽医档案")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(themeColor)
                 Text(Date().formatted(.dateTime.year().month().day()))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium))
                     .foregroundStyle(.gray.opacity(0.6))
                 Text("Ohana App")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                     .foregroundStyle(.gray.opacity(0.4))
             }
         }
@@ -144,14 +144,14 @@ struct PetVetSummaryPDFView: View {
         ]
         return VStack(alignment: .leading, spacing: 6) {
             Text("基础信息")
-                .font(.system(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
+                .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 6) {
                 ForEach(cols, id: \.0) { label, value in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(label)
-                            .font(.system(size: 9, weight: .semibold)).foregroundStyle(.gray.opacity(0.6))
+                            .font(OhanaFont.adaptive(size: 9, weight: .semibold)).foregroundStyle(.gray.opacity(0.6))
                         Text(value)
-                            .font(.system(size: 11, weight: .bold)).foregroundStyle(Color(hex: "1A1A2E"))
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold)).foregroundStyle(Color(hex: "1A1A2E"))
                             .lineLimit(1).minimumScaleFactor(0.7)
                     }
                     .padding(8)
@@ -165,7 +165,7 @@ struct PetVetSummaryPDFView: View {
     private var pdfAllergyNotes: some View {
         return VStack(alignment: .leading, spacing: 6) {
             Text("就诊速览")
-                .font(.system(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
+                .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 6) {
                 pdfSummaryCell("过敏史", pet.allergies.isEmpty ? "无记录" : pet.allergies)
                 pdfSummaryCell("用药中", medicationSummaryText)
@@ -180,10 +180,10 @@ struct PetVetSummaryPDFView: View {
     private func pdfSummaryCell(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 8, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 8, weight: .semibold))
                 .foregroundStyle(.gray.opacity(0.65))
             Text(value)
-                .font(.system(size: 9.5, weight: .medium))
+                .font(OhanaFont.adaptive(size: 9.5, weight: .medium))
                 .foregroundStyle(Color(hex: "1A1A2E").opacity(0.78))
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
@@ -231,11 +231,11 @@ struct PetVetSummaryPDFView: View {
     private var pdfHealthLogsTable: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("近期健康记录（最近8条）")
-                .font(.system(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
+                .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
 
             if recentHealthLogs.isEmpty {
                 Text("暂无健康记录")
-                    .font(.system(size: 11)).foregroundStyle(.gray.opacity(0.5))
+                    .font(OhanaFont.adaptive(size: 11)).foregroundStyle(.gray.opacity(0.5))
                     .padding(.vertical, 8)
             } else {
                 VStack(spacing: 0) {
@@ -246,7 +246,7 @@ struct PetVetSummaryPDFView: View {
                         Text("备注").frame(maxWidth: .infinity, alignment: .leading)
                         Text("有效期").frame(width: 90, alignment: .trailing)
                     }
-                    .font(.system(size: 9, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 9, weight: .bold))
                     .foregroundStyle(.gray.opacity(0.6))
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(Color.gray.opacity(0.06))
@@ -267,7 +267,7 @@ struct PetVetSummaryPDFView: View {
                                 Text("—").frame(width: 90, alignment: .trailing)
                             }
                         }
-                        .font(.system(size: 10, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium))
                         .foregroundStyle(Color(hex: "1A1A2E").opacity(0.8))
                         .padding(.horizontal, 8).padding(.vertical, 5)
                         .background(recentHealthLogs.firstIndex(where: { $0.id == log.id })?.isMultiple(of: 2) == true
@@ -287,7 +287,7 @@ struct PetVetSummaryPDFView: View {
     private var pdfWeightChart: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("近3个月体重趋势")
-                .font(.system(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
+                .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
 
             OhanaMinimalTrendChart(
                 points: weightLogs3Mo.map {
@@ -308,11 +308,11 @@ struct PetVetSummaryPDFView: View {
     private var pdfFooter: some View {
         HStack {
             Text("由 Ohana App 生成 · 仅供参考，非正式医疗文件")
-                .font(.system(size: 8, weight: .medium))
+                .font(OhanaFont.adaptive(size: 8, weight: .medium))
                 .foregroundStyle(.gray.opacity(0.4))
             Spacer()
             Text("ohana.app")
-                .font(.system(size: 8, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 8, weight: .semibold))
                 .foregroundStyle(themeColor.opacity(0.5))
         }
     }
@@ -336,14 +336,14 @@ struct PetVetPDFShareSheet: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 200)
                         VStack(spacing: 8) {
-                            Image(systemName: "doc.richtext.fill")
-                                .font(.system(size: 48))
+                            Image(systemName: "doc.richtext.fill").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 48))
                                 .foregroundStyle(pet.themeColor.color.opacity(0.8))
                             Text("\(pet.name)_兽医档案.pdf")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                             Text("A4 · 兽医健康档案")
-                                .font(.system(size: 11))
+                                .font(OhanaFont.adaptive(size: 11))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                         }
                     }
@@ -353,10 +353,10 @@ struct PetVetPDFShareSheet: View {
                     ShareLink(item: pdfURL, subject: Text("\(pet.name) 兽医档案"),
                               message: Text("由 Ohana App 生成的宠物健康档案")) {
                         HStack(spacing: 8) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 15, weight: .bold))
+                            Image(systemName: "square.and.arrow.up").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 15, weight: .bold))
                             Text("分享 / 保存 PDF")
-                                .font(.system(size: 16, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                         }
                         .foregroundStyle(.black) // ui-v4: allow ink on PDF action preview
                         .frame(maxWidth: .infinity)

@@ -77,7 +77,7 @@ struct HumanHealthReportView: View {
             if !isPrivacyLocked {
                 Button { showAddSheet = true } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "plus")
+                        Image(systemName: "plus").accessibilityHidden(true)
                             .font(OhanaFont.headline(.black))
                         Text("添加报告")
                             .font(OhanaFont.headline(.black))
@@ -104,7 +104,7 @@ struct HumanHealthReportView: View {
 
     private var privacyLockedView: some View {
         VStack(spacing: 14) {
-            Image(systemName: "lock.shield.fill")
+            Image(systemName: "lock.shield.fill").accessibilityHidden(true)
                 .font(OhanaFont.metric(size: 44))
                 .foregroundStyle(Color.goYellow)
             Text("身体数据仅本人可见")
@@ -139,7 +139,7 @@ struct HumanHealthReportView: View {
     }
 
     private var divider: some View {
-        Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40)
+        Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
     }
 
     private func bentoStat(icon: String, label: String, value: String, color: Color) -> some View {
@@ -198,7 +198,7 @@ struct HumanHealthReportView: View {
 
                         if let days = report.daysUntilNextCheck {
                             HStack(spacing: 4) {
-                                Image(systemName: "calendar.badge.clock")
+                                Image(systemName: "calendar.badge.clock").accessibilityHidden(true)
                                     .font(OhanaFont.caption2())
                                     .foregroundStyle(Color.ohanaTertiaryText)
                                 Text(days > 0 ? "距复查还有 \(days) 天" : days == 0 ? "今天复查" : "已逾期 \(-days) 天")
@@ -210,7 +210,7 @@ struct HumanHealthReportView: View {
 
                     Spacer()
 
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
@@ -227,7 +227,7 @@ struct HumanHealthReportView: View {
             VStack(spacing: 16) {
                 ZStack {
                     Circle().fill(Color.goTeal.opacity(0.12)).frame(width: 72, height: 72)
-                    Image(systemName: "stethoscope").font(.system(size: 32)).foregroundStyle(Color.goTeal)
+                    Image(systemName: "stethoscope").accessibilityHidden(true).font(OhanaFont.adaptive(size: 32)).foregroundStyle(Color.goTeal)
                 }
                 Text("还没有检测报告").font(OhanaFont.title3(.bold)).foregroundStyle(Color.ohanaPrimaryText)
                 Text("点击下方按钮添加第一条身体检测报告").font(OhanaFont.callout()).foregroundStyle(Color.ohanaSecondaryText)
@@ -291,8 +291,8 @@ struct AddHumanHealthReportSheet: View {
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Button { dismiss() } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .black))
+                            Image(systemName: "xmark").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 15, weight: .black))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
@@ -344,7 +344,7 @@ struct AddHumanHealthReportSheet: View {
                                     } label: {
                                         VStack(spacing: 4) {
                                             Text(c.emoji)
-                                                .font(.system(size: 20))
+                                                .font(OhanaFont.adaptive(size: 20))
                                             Text(c.rawValue)
                                                 .font(OhanaFont.caption2(.bold))
                                         }
@@ -483,7 +483,7 @@ struct AddHumanHealthReportSheet: View {
     private func cardHeader(icon: String, color: Color, title: String) -> some View {
         HStack(spacing: 10) {
             ZStack {
-                Circle().fill(color.opacity(0.2)).frame(width: 36, height: 36)
+                Circle().fill(color.opacity(0.2)).frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 Image(systemName: icon).font(OhanaFont.callout(.bold)).foregroundStyle(color)
             }
             Text(title).font(OhanaFont.headline(.bold)).foregroundStyle(Color.ohanaPrimaryText)

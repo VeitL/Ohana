@@ -133,7 +133,7 @@ struct RainbowPoopPin: View {
             return
         }
         rotation = 0
-        withAnimation(.linear(duration: 1.45).repeatForever(autoreverses: false)) { // ui-v4: allow route cosmetic loop; runtime-guardrail: allow gated by AppWorkloadPolicy and only used for visible equipped map pins.
+        withAnimation(.linear(duration: 1.45).repeatForever(autoreverses: false)) { // ui-v4: allow route cosmetic loop; runtime-guardrail: allow gated by AppWorkloadPolicy and only used for visible equipped map pins; smoothness: allow visible map-pin loop behind AppWorkloadPolicy.
             rotation = 360
         }
     }

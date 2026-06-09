@@ -272,7 +272,7 @@ struct CoconutGachaRevealView: View {
         } else if phase.showsPrize {
             VStack(spacing: 6) {
                 Text(prizeSymbol ?? "?")
-                    .font(.system(size: 58))
+                    .font(OhanaFont.adaptive(size: 58))
                     .frame(width: 94, height: 94)
                     .background(accent.opacity(0.18), in: Circle())
                     .overlay(
@@ -420,8 +420,8 @@ private struct GachaCoconutGrandBundlePrizeView: View {
 
             VStack(spacing: 8) {
                 ZStack {
-                    Image(systemName: "shippingbox.fill")
-                        .font(.system(size: 64, weight: .black))
+                    Image(systemName: "shippingbox.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 64, weight: .black))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(Color.goYellow)
                         .frame(width: 104, height: 104)
@@ -433,7 +433,7 @@ private struct GachaCoconutGrandBundlePrizeView: View {
                         .shadow(color: Color.goYellow.opacity(shouldAnimate ? 0.48 : 0.18), radius: 24, x: 0, y: 12) // ui-v4: allow one-shot jackpot bundle depth
 
                     Text("🥥")
-                        .font(.system(size: 34))
+                        .font(OhanaFont.adaptive(size: 34))
                         .offset(x: 30, y: 26)
                         .shadow(color: Color.arkInk.opacity(0.22), radius: 5, y: 2) // ui-v4: allow jackpot coconut readability
                 }
@@ -446,7 +446,7 @@ private struct GachaCoconutGrandBundlePrizeView: View {
 
                 VStack(spacing: 2) {
                     Text("+\(coconutDelta)🥥")
-                        .font(.system(size: 30, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 30, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goYellow)
                         .contentTransition(.numericText())
                         .shadow(color: Color.goYellow.opacity(0.30), radius: 12, x: 0, y: 5) // ui-v4: allow jackpot numeric glow
@@ -535,8 +535,8 @@ struct GachaCollectibleThumbnailView: View {
                 .saturation(isOwned ? 1 : 0.2)
                 .opacity(isOwned ? 1 : 0.68)
             if !isOwned && item.isHidden {
-                Image(systemName: "questionmark")
-                    .font(.system(size: 16, weight: .black))
+                Image(systemName: "questionmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 16, weight: .black))
                     .foregroundStyle(Color.goYellow)
                     .shadow(color: Color.arkInk.opacity(0.28), radius: 4, y: 1) // ui-v4: allow mystery placeholder readability
             }
@@ -881,10 +881,10 @@ private struct GachaCollectibleRevealCardView: View {
         ZStack(alignment: .bottomTrailing) {
             Circle()
                 .strokeBorder(Color.goCardWhite.opacity(0.9), lineWidth: 4)
-                .frame(width: 24, height: 24)
+                .frame(width: 24, height: 24) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             Circle()
                 .fill(Color.goPrimary)
-                .frame(width: 8, height: 8)
+                .frame(width: 8, height: 8) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .offset(x: 1, y: 1)
         }
         .padding(5)
@@ -1008,10 +1008,10 @@ private struct GachaCollectibleRevealCardView: View {
     @ViewBuilder
     private var tapCue: some View {
         if isCardTapReady {
-            Image(systemName: "hand.tap.fill")
-                .font(.system(size: 13, weight: .black))
+            Image(systemName: "hand.tap.fill").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(item.isHidden ? Color.arkInk : accent)
-                .frame(width: 30, height: 30)
+                .frame(width: 30, height: 30) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .background(item.isHidden ? Color.goYellow.opacity(0.92) : Color.ohanaCardSurface.opacity(0.88), in: Circle())
                 .overlay {
                     Circle()
@@ -1091,7 +1091,7 @@ private struct GachaAssetImage: View {
     var body: some View {
         if assetName.isEmpty {
             Text(fallbackSymbol)
-                .font(.system(size: 42))
+                .font(OhanaFont.adaptive(size: 42))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Image(assetName)
@@ -1129,7 +1129,7 @@ private struct ClosedCoconut: View {
             ForEach(0..<12, id: \.self) { index in
                 Capsule()
                     .fill(Color(hex: "E6C29A").opacity(0.42)) // ui-v4: allow coconut fiber color
-                    .frame(width: 3, height: 23)
+                    .frame(width: 3, height: 23) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .rotationEffect(.degrees(Double(index) * 30))
                     .offset(y: -68)
             }

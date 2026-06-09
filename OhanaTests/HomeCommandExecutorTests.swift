@@ -183,6 +183,138 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func quickPlayCommandExecutorWritesPlayFactAndPublishesRevision() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "狗")
+        context.insert(pet)
+        try context.save()
+
+        let questManager = QuestManager.shared
+        let oldCoconutCount = questManager.coconutCount
+        let oldCoconutLogs = questManager.coconutLogs
+        defer {
+            questManager.coconutCount = oldCoconutCount
+            questManager.coconutLogs = oldCoconutLogs
+            questManager.flushToDefaults()
+        }
+        questManager.coconutCount = 0
+        questManager.coconutLogs = []
+
+        let beforeRevision = ReadModelRevisionCenter.shared.homeRevision.value
+        let date = makeDate(year: 2026, month: 6, day: 8, hour: 18, minute: 0)
+        let result = QuickPlayCommandExecutor(context: context).recordPlay(
+            petID: pet.id,
+            executorId: "human-1",
+            rewardTitle: "Momo play reward",
+            date: date
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(result?.petID == pet.id)
+        #expect(result?.logID == logs.first?.id)
+        #expect(logs.count == 1)
+        #expect(logs.first?.careType == .play)
+        #expect(logs.first?.date == date)
+        #expect(logs.first?.executorId == "human-1")
+        #expect(ledgerEvents.count == 1)
+        #expect(ledgerEvents.first?.actionType == CareType.play.rawValue)
+        #expect(ReadModelRevisionCenter.shared.homeRevision.value != beforeRevision)
+        #expect(ReadModelRevisionCenter.shared.lastMutation?.command == .quickCare(entityID: pet.id, action: CareType.play.rawValue))
+    }
+
+    @MainActor
+    @Test func quickPottyCommandExecutorWritesPottyFactAndPublishesRevision() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "狗")
+        context.insert(pet)
+        try context.save()
+
+        let questManager = QuestManager.shared
+        let oldCoconutCount = questManager.coconutCount
+        let oldCoconutLogs = questManager.coconutLogs
+        defer {
+            questManager.coconutCount = oldCoconutCount
+            questManager.coconutLogs = oldCoconutLogs
+            questManager.flushToDefaults()
+        }
+        questManager.coconutCount = 0
+        questManager.coconutLogs = []
+
+        let beforeRevision = ReadModelRevisionCenter.shared.homeRevision.value
+        let date = makeDate(year: 2026, month: 6, day: 8, hour: 19, minute: 10)
+        let result = QuickPottyCommandExecutor(context: context).record(
+            petID: pet.id,
+            selectedType: .softPoop,
+            isLitter: false,
+            executorId: "human-1",
+            date: date
+        )
+
+        let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(result?.petID == pet.id)
+        #expect(result?.pottyLogID == pottyLogs.first?.id)
+        #expect(result?.careLogID == nil)
+        #expect(pottyLogs.count == 1)
+        #expect(pottyLogs.first?.pottyType == .softPoop)
+        #expect(pottyLogs.first?.executorId == "human-1")
+        #expect(careLogs.isEmpty)
+        #expect(ledgerEvents.count == 1)
+        #expect(ledgerEvents.first?.actionType == PottyType.softPoop.rawValue)
+        #expect(ReadModelRevisionCenter.shared.homeRevision.value != beforeRevision)
+        #expect(ReadModelRevisionCenter.shared.lastMutation?.command == .quickCare(entityID: pet.id, action: PottyType.softPoop.rawValue))
+    }
+
+    @MainActor
+    @Test func quickPottyCommandExecutorWritesLitterCareFactAndPublishesRevision() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(pet)
+        try context.save()
+
+        let questManager = QuestManager.shared
+        let oldCoconutCount = questManager.coconutCount
+        let oldCoconutLogs = questManager.coconutLogs
+        defer {
+            questManager.coconutCount = oldCoconutCount
+            questManager.coconutLogs = oldCoconutLogs
+            questManager.flushToDefaults()
+        }
+        questManager.coconutCount = 0
+        questManager.coconutLogs = []
+
+        let beforeRevision = ReadModelRevisionCenter.shared.homeRevision.value
+        let date = makeDate(year: 2026, month: 6, day: 8, hour: 20, minute: 15)
+        let result = QuickPottyCommandExecutor(context: context).record(
+            petID: pet.id,
+            selectedType: .perfectPoop,
+            isLitter: true,
+            executorId: "human-1",
+            date: date
+        )
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let pottyLogs = try context.fetch(FetchDescriptor<PetPottyLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(result?.petID == pet.id)
+        #expect(result?.careLogID == careLogs.first?.id)
+        #expect(result?.pottyLogID == nil)
+        #expect(careLogs.count == 1)
+        #expect(careLogs.first?.careType == .litter)
+        #expect(careLogs.first?.executorId == "human-1")
+        #expect(pottyLogs.isEmpty)
+        #expect(ledgerEvents.count == 1)
+        #expect(ledgerEvents.first?.actionType == CareType.litter.rawValue)
+        #expect(ReadModelRevisionCenter.shared.homeRevision.value != beforeRevision)
+        #expect(ReadModelRevisionCenter.shared.lastMutation?.command == .quickCare(entityID: pet.id, action: CareType.litter.rawValue))
+    }
+
+    @MainActor
     @Test func petCareTrackingCommandServiceRecordsAndDeletesLitterFact() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -4504,14 +4636,26 @@ struct HomeCommandExecutorTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
         let questManager = QuestManager.shared
         let previousCoconutCount = questManager.coconutCount
         let previousLogs = questManager.coconutLogs
         defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
             questManager.coconutCount = previousCoconutCount
             questManager.coconutLogs = previousLogs
             questManager.flushToDefaults()
         }
+        defaults.removeObject(forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(),
+            memberKey: "system"
+        )
         questManager.coconutCount = 0
         questManager.coconutLogs = []
         context.insert(pet)
@@ -5118,6 +5262,10 @@ struct HomeCommandExecutorTests {
         }
         defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
         defaults.removeObject(forKey: "shop_boostDoubleActive")
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(),
+            memberKey: human.id.uuidString
+        )
         questManager.coconutCount = 0
         questManager.coconutLogs = []
         context.insert(human)

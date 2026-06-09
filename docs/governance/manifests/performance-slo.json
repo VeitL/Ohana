@@ -67,7 +67,7 @@
         "flow.quick_care.command"
       ],
       "paths": [
-        "Ohana/Views/Home/HomeCommandExecutor.swift",
+        "Ohana/Models/HomeCommandExecutor.swift",
         "Ohana/Models/CareEventService.swift",
         "Ohana/Models/CareLedgerService.swift",
         "OhanaTests/HomeCommandExecutorTests.swift"
@@ -105,7 +105,7 @@
         "Maintenance work is deferred and cancelled when the embedded calendar is inactive."
       ],
       "measurement": "Stable AppPerformanceMonitor probes for calendar open shell, first frame, and list data readiness.",
-      "evidence": "flow.calendar.open plus CalendarView changed-file smoothness audit.",
+      "evidence": "flow.calendar.open plus whole-repo smoothness audit.",
       "probeNames": [
         "flow.calendar.open",
         "flow.calendar.mode_switch",

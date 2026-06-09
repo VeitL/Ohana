@@ -19,9 +19,15 @@ struct CoconutLogEntry: Codable, Identifiable {
     let date: Date
     var actorId:   String?  // N10: Human.id.uuidString 或 Pet.id.uuidString
     var actorName: String?  // N10: 显示名
+    var growthXP: Int?
+    var economyReason: String?
+    var budgetStage: String?
+    var feedbackMessage: String?
 
     init(emoji: String, title: String, amount: Int, date: Date = Date(),
-         actorId: String? = nil, actorName: String? = nil) {
+         actorId: String? = nil, actorName: String? = nil,
+         growthXP: Int? = nil, economyReason: String? = nil,
+         budgetStage: String? = nil, feedbackMessage: String? = nil) {
         self.id = UUID()
         self.emoji = emoji
         self.title = title
@@ -29,6 +35,10 @@ struct CoconutLogEntry: Codable, Identifiable {
         self.date = date
         self.actorId = actorId
         self.actorName = actorName
+        self.growthXP = growthXP
+        self.economyReason = economyReason
+        self.budgetStage = budgetStage
+        self.feedbackMessage = feedbackMessage
     }
 
     var timeAgoString: String {
@@ -87,6 +97,7 @@ final class QuestManager {
 
     // 椰子收支明细（最近 200 条）
     var coconutLogs: [CoconutLogEntry] = []
+    var lastEconomyRewardResult: EconomyRewardResult?
 
     var isPetWizardCompleted: Bool = false
     var isFirstMealRecorded: Bool = false
@@ -134,6 +145,7 @@ final class QuestManager {
         case .expense:           return nil
         case .weight:            return nil
         case .milestone:         return nil
+        case .dailyFocusCompletion: return nil
         case .general:           return 2 * 3600
         }
     }
@@ -152,6 +164,7 @@ final class QuestManager {
         case .expense:           aKey = "expense"
         case .weight:            aKey = "weight"
         case .milestone:         aKey = "milestone"
+        case .dailyFocusCompletion: aKey = "dailyFocusCompletion"
         case .general(_, _, _, let t): aKey = "general_\(t.prefix(10))"
         }
         return "\(pid)_\(aKey)"
@@ -201,6 +214,23 @@ final class QuestManager {
         Self.defaults.set(Self.defaults.integer(forKey: key) + amount, forKey: key)
     }
 
+    private func economyBudgetKeys(for human: Human?, context: ModelContext) -> (household: String, member: String) {
+        (
+            CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+            human?.id.uuidString ?? CoconutEconomyPolicyV2.currentUserKey()
+        )
+    }
+
+    private func careObjectKeys(for pets: [Pet]) -> [String] {
+        pets
+            .filter { !$0.hasPassedAway }
+            .map { "pet.\($0.id.uuidString)" }
+    }
+
+    private func careObjectKeys(for pet: Pet?) -> [String] {
+        pet.map { careObjectKeys(for: [$0]) } ?? []
+    }
+
     /// 清空某宠物的任务冷却 key，并从椰子流水中移除该 `actorId` 的条目（与 `Pet.clearAllActivityRecords` 配套）。
     func clearPerPetAuxiliaryState(forPetId petId: UUID) {
         let pid = petId.uuidString
@@ -247,37 +277,40 @@ final class QuestManager {
         case expense
         case milestone
         case weight
+        case dailyFocusCompletion
         case general(humanReward: Int, petReward: Int, emoji: String, title: String)
 
-        /// 基础奖励（未暴击时）
+        /// V2 基础椰子奖励预估（真实发放由 CoconutEconomyPolicyV2 统一计算）。
         var baseRewards: (human: Int, pet: Int) {
             switch self {
             case .walk(let d):
-                let human = min(20, max(1, Int(d / 300)))
-                let pet = min(10, max(1, Int(d / 600)))
-                return (human, pet)
+                let total = min(14, max(5, Int(d / 350)))
+                let pet = max(1, total / 3)
+                return (total - pet, pet)
             case .potty(let isLitter):
-                return isLitter ? (4, 1) : (1, 1)
+                return isLitter ? (2, 1) : (1, 1)
             case .feed:
                 return (2, 1)
             case .water:
                 return (2, 1)
             case .care(let t):
                 switch t {
-                case .bath:     return (12, 2)
-                case .teeth:    return (6, 2)
-                case .nails:    return (6, 2)
-                case .brushing: return (5, 2)
-                case .ears:     return (6, 2)
+                case .bath:     return (6, 2)
+                case .teeth:    return (4, 2)
+                case .nails:    return (4, 2)
+                case .brushing: return (3, 2)
+                case .ears:     return (4, 2)
                 }
             case .health:
-                return (20, 3)
+                return (8, 2)
             case .expense:
-                return (3, 0)
+                return (2, 0)
             case .weight:
-                return (5, 1)
+                return (3, 1)
             case .milestone:
-                return (50, 10)
+                return (2, 1)
+            case .dailyFocusCompletion:
+                return (8, 0)
             case .general(let h, let p, _, _):
                 return (h, p)
             }
@@ -301,6 +334,7 @@ final class QuestManager {
             case .expense: return "💰"
             case .weight:  return "⚖️"
             case .milestone: return "🏆"
+            case .dailyFocusCompletion: return "🎯"
             case .general(_, _, let e, _): return e
             }
         }
@@ -329,6 +363,7 @@ final class QuestManager {
             case .expense: return "记账奖励"
             case .weight:  return "\(n) 体重记录奖励"
             case .milestone: return "\(n) 里程碑达成"
+            case .dailyFocusCompletion: return "Today Focus 全完成"
             case .general(_, _, _, let t): return t
             }
         }
@@ -349,38 +384,38 @@ final class QuestManager {
         }
     }
 
-    // MARK: - 质量加成（精准模式、拍照、备注等越完整，椰子奖励越高）
-    /// 调用方按照用户提交的信息丰富度传入相应 bonus，默认 .none
+    // MARK: - 质量加成（精准模式、拍照、备注等越完整，成长 XP 越高）
+    /// V2 中质量主要增加成长 XP；椰子最多额外 +1，避免用照片/备注放大软货币通胀。
     enum QualityBonus {
-        case none                  // ×1.0 佛系/默认
-        case precise               // ×1.2 精准录入（如准确克数、GPS、重量）
-        case withNote              // ×1.2 填写了备注
-        case withPhoto             // ×1.3 附带照片
-        case preciseAndNote        // ×1.35
-        case preciseAndPhoto       // ×1.4
-        case preciseNotePhoto      // ×1.5 三项全齐
+        case none                  // XP ×1.0
+        case precise               // XP ×1.1 精准录入（如准确克数、GPS、重量）
+        case withNote              // XP ×1.1 填写了备注
+        case withPhoto             // XP ×1.1 附带照片
+        case preciseAndNote        // XP ×1.2
+        case preciseAndPhoto       // XP ×1.2
+        case preciseNotePhoto      // XP ×1.3 三项全齐
 
         var multiplier: Double {
             switch self {
             case .none:              return 1.0
-            case .precise:           return 1.2
-            case .withNote:          return 1.2
-            case .withPhoto:         return 1.3
-            case .preciseAndNote:    return 1.35
-            case .preciseAndPhoto:   return 1.4
-            case .preciseNotePhoto:  return 1.5
+            case .precise:           return 1.1
+            case .withNote:          return 1.1
+            case .withPhoto:         return 1.1
+            case .preciseAndNote:    return 1.2
+            case .preciseAndPhoto:   return 1.2
+            case .preciseNotePhoto:  return 1.3
             }
         }
 
         var badgeLabel: String? {
             switch self {
             case .none:              return nil
-            case .precise:           return "🎯 精准+20%"
-            case .withNote:          return "📝 备注+20%"
-            case .withPhoto:         return "📷 照片+30%"
-            case .preciseAndNote:    return "🎯📝 加成+35%"
-            case .preciseAndPhoto:   return "🎯📷 加成+40%"
-            case .preciseNotePhoto:  return "✨ 完美记录+50%"
+            case .precise:           return "🎯 精准XP+10%"
+            case .withNote:          return "📝 备注XP+10%"
+            case .withPhoto:         return "📷 照片XP+10%"
+            case .preciseAndNote:    return "🎯📝 XP+20%"
+            case .preciseAndPhoto:   return "🎯📷 XP+20%"
+            case .preciseNotePhoto:  return "✨ 完整记录XP+30%"
             }
         }
 
@@ -398,30 +433,6 @@ final class QuestManager {
         }
     }
 
-    // MARK: - 暴击引擎（内部）
-    private struct CritResult {
-        let multiplier: Int   // 1 / 2 / 5
-        let isCrit: Bool
-        let title: String
-    }
-
-    private func rollCrit() -> CritResult {
-        let roll = Int.random(in: 1...100)
-        switch roll {
-        case 99...100:
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-            }
-            return CritResult(multiplier: 5, isCrit: true, title: "👑 奇迹发生！主子赏的大红包！")
-        case 90...98:
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            return CritResult(multiplier: 2, isCrit: true, title: "🎉 触发幸运暴击！")
-        default:
-            return CritResult(multiplier: 1, isCrit: false, title: "")
-        }
-    }
-
     // MARK: - 核心分发方法（新版，接受 OhanaActionType）
     /// - Parameters:
     ///   - type: OhanaActionType，携带奖励规则
@@ -435,36 +446,8 @@ final class QuestManager {
         quality: QualityBonus = .none
     ) -> (humanGot: Int, petGot: Int) {
         if pet?.hasPassedAway == true {
+            lastEconomyRewardResult = .empty
             return (0, 0)
-        }
-
-        // ── 冷却检查：冷却期内返回 (0,0)，数据层已在上层写入
-        if isOnCooldown(petId: pet?.id, type: type) {
-            return (0, 0)
-        }
-
-        let base = type.baseRewards
-        let crit = rollCrit()
-
-        var finalHuman = base.human * crit.multiplier
-        var finalPet   = base.pet   * crit.multiplier
-
-        // 质量加成：信息越丰富，奖励越高（上限 ×1.5）
-        let qMul = quality.multiplier
-        if qMul > 1.0 {
-            finalHuman = Int(ceil(Double(finalHuman) * qMul))
-            finalPet   = Int(ceil(Double(finalPet)   * qMul))
-        }
-
-        // title_chef: CEO/Chef bonus
-        if case .feed = type, UserDefaults.standard.string(forKey: "shop_equipped_title") == "title_chef" {
-            finalHuman += 1
-        }
-
-        if UserDefaults.standard.bool(forKey: "shop_boostDoubleActive") {
-            finalHuman *= 2
-            finalPet *= 2
-            UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
         }
 
         // ── 1. 人类账户（从 context fetch，安全降级）
@@ -478,9 +461,27 @@ final class QuestManager {
             }
         }
 
-        if case .walk = type, let humanId = human?.id.uuidString {
-            finalHuman = min(finalHuman, remainingWalkRewardToday(for: humanId))
-        }
+        let consumesBoost = UserDefaults.standard.bool(forKey: "shop_boostDoubleActive")
+        let isCoolingDown = isOnCooldown(petId: pet?.id, type: type)
+        let budgetKeys = economyBudgetKeys(for: human, context: context)
+        let objectKeys = careObjectKeys(for: pet)
+        let result = CoconutEconomyPolicyV2.reward(
+            for: type,
+            quality: quality,
+            isOnCooldown: isCoolingDown,
+            userKey: budgetKeys.household,
+            memberKey: budgetKeys.member,
+            careObjectKeys: objectKeys,
+            careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
+            hasHumanAccount: human != nil,
+            hasPetAccount: pet != nil,
+            forcedLuck: consumesBoost ? .golden : nil
+        )
+        lastEconomyRewardResult = result
+
+        let finalHuman = result.humanCoconuts
+        let finalPet = result.petCoconuts
+        let islandDelta = result.totalCoconuts
 
         // ── 2. 宠物账户
         if finalPet > 0 { pet?.coconutBalance += finalPet }
@@ -488,57 +489,64 @@ final class QuestManager {
         // ── 3. 人类账户
         if finalHuman > 0 { human?.coconutBalance += finalHuman }
 
-        // ── 4. 全岛总库 = pet 到账 + human 到账（严格一致）
-        let islandDelta = (finalPet > 0 && pet != nil ? finalPet : 0)
-                        + (finalHuman > 0 && human != nil ? finalHuman : 0)
         if islandDelta > 0 { coconutCount += islandDelta }
 
         // ── 5. 日志（拆分：宠物和人类各生成独立条目）
-        let logEmoji = crit.isCrit && crit.multiplier == 5 ? "🎁" : type.emoji
-        var baseTitle = crit.isCrit ? crit.title : type.title(pet: pet)
-        // 非暴击时，将质量加成 badge 附到标题末尾
-        if !crit.isCrit, let badge = quality.badgeLabel {
+        let logEmoji = result.luck == .golden ? "🎁" : type.emoji
+        var baseTitle = type.title(pet: pet)
+        if let badge = quality.badgeLabel {
             baseTitle += " · \(badge)"
         }
+        if result.luck != .none {
+            baseTitle += result.luck == .golden ? " · 金色幸运" : " · 小幸运"
+        }
 
+        var insertedLogCount = 0
         if let p = pet, finalPet > 0 {
             appendLog(CoconutLogEntry(
                 emoji: logEmoji,
                 title: baseTitle,
                 amount: finalPet,
                 actorId: p.id.uuidString,
-                actorName: p.name
-            ))
+                actorName: p.name,
+                growthXP: result.growthXP,
+                economyReason: result.reason,
+                budgetStage: result.budgetStage.rawValue,
+                feedbackMessage: result.feedbackMessage
+            ), postsRewardFeedback: false)
+            insertedLogCount += 1
         }
         if let h = human, finalHuman > 0 {
             appendLog(CoconutLogEntry(
                 emoji: "🥥",
-                title: crit.isCrit ? crit.title : "协助奖励",
+                title: result.luck == .golden ? "金色幸运协助奖励" : "协助奖励",
                 amount: finalHuman,
                 actorId: h.id.uuidString,
-                actorName: h.name
-            ))
-        }
-        // 无实体的全局奖励（如仅 expense 且无 pet）写入 system 桶
-        if pet == nil && human == nil && (finalPet + finalHuman) > 0 {
-            appendLog(CoconutLogEntry(
-                emoji: logEmoji,
-                title: baseTitle,
-                amount: finalPet + finalHuman,
-                actorId: "system",
-                actorName: "岛屿奖励"
-            ))
+                actorName: h.name,
+                growthXP: result.growthXP,
+                economyReason: result.reason,
+                budgetStage: result.budgetStage.rawValue,
+                feedbackMessage: result.feedbackMessage
+            ), postsRewardFeedback: false)
+            insertedLogCount += 1
         }
 
         // ── 6. 持久化（先存 SwiftData，成功后再 flush UserDefaults）
         do {
             try context.save()
+            if consumesBoost {
+                UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
+            }
+            EconomyDailyBudgetStore.commit(result, householdKey: budgetKeys.household, memberKey: budgetKeys.member, careObjectKeys: objectKeys)
             flushToDefaults()
+            postEconomyFeedback(result, type: type, title: baseTitle, actorId: pet?.id.uuidString ?? human?.id.uuidString, actorName: pet?.name ?? human?.name)
             if case .walk = type, let humanId = human?.id.uuidString {
                 recordWalkRewardToday(finalHuman, humanId: humanId)
             }
-            // 记录冷却时间戳（持久化成功后才记录）
-            recordCooldown(petId: pet?.id, type: type)
+            // 记录冷却时间戳（持久化成功后才记录；冷却内补记不延长窗口）
+            if !isCoolingDown {
+                recordCooldown(petId: pet?.id, type: type)
+            }
             // TASK C: 检查 Streak 里程碑奖励
             if let pet { StreakRewardManager.shared.checkAndAward(pet: pet) }
         } catch {
@@ -547,7 +555,9 @@ final class QuestManager {
             if finalHuman > 0 { human?.coconutBalance -= finalHuman }
             coconutCount -= islandDelta
             // 移除刚插入的日志
-            if !coconutLogs.isEmpty { coconutLogs.removeFirst() }
+            if insertedLogCount > 0, coconutLogs.count >= insertedLogCount {
+                coconutLogs.removeFirst(insertedLogCount)
+            }
             #if DEBUG
             print("❌ [QuestManager] SwiftData save 失败，已回滚: \(error.localizedDescription)")
             #endif
@@ -565,29 +575,8 @@ final class QuestManager {
         quality: QualityBonus = .none,
         title: String? = nil
     ) -> (humanGot: Int, petGot: Int) {
-        let livePets = pets.filter { !$0.hasPassedAway && !isOnCooldown(petId: $0.id, type: type) }
+        let livePets = pets.filter { !$0.hasPassedAway }
         guard !livePets.isEmpty else { return (0, 0) }
-
-        let base = type.baseRewards
-        let crit = rollCrit()
-        var finalHuman = base.human * crit.multiplier
-        var finalPetEach = base.pet * crit.multiplier
-
-        let qMul = quality.multiplier
-        if qMul > 1.0 {
-            finalHuman = Int(ceil(Double(finalHuman) * qMul))
-            finalPetEach = Int(ceil(Double(finalPetEach) * qMul))
-        }
-
-        if case .feed = type, UserDefaults.standard.string(forKey: "shop_equipped_title") == "title_chef" {
-            finalHuman += 1
-        }
-
-        if UserDefaults.standard.bool(forKey: "shop_boostDoubleActive") {
-            finalHuman *= 2
-            finalPetEach *= 2
-            UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
-        }
 
         var human: Human?
         let humanIdStr = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
@@ -595,61 +584,106 @@ final class QuestManager {
             human = (try? context.fetch(FetchDescriptor<Human>()))?.first { $0.id.uuidString == hid }
         }
 
-        for pet in livePets where finalPetEach > 0 {
-            pet.coconutBalance += finalPetEach
+        let consumesBoost = UserDefaults.standard.bool(forKey: "shop_boostDoubleActive")
+        let isCoolingDown = livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) }
+        let budgetKeys = economyBudgetKeys(for: human, context: context)
+        let objectKeys = careObjectKeys(for: livePets)
+        let result = CoconutEconomyPolicyV2.sharedReward(
+            for: type,
+            targetCount: livePets.count,
+            quality: quality,
+            isOnCooldown: isCoolingDown,
+            userKey: budgetKeys.household,
+            memberKey: budgetKeys.member,
+            careObjectKeys: objectKeys,
+            careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
+            hasHumanAccount: human != nil,
+            forcedLuck: consumesBoost ? .golden : nil
+        )
+        lastEconomyRewardResult = result
+
+        let petAwards = Self.distribute(result.petCoconuts, count: livePets.count)
+        for (index, pet) in livePets.enumerated() where petAwards[index] > 0 {
+            pet.coconutBalance += petAwards[index]
         }
-        if finalHuman > 0 {
-            human?.coconutBalance += finalHuman
+        if result.humanCoconuts > 0 {
+            human?.coconutBalance += result.humanCoconuts
         }
 
-        let petTotal = finalPetEach * livePets.count
-        let humanTotal = human == nil ? 0 : finalHuman
-        let islandDelta = petTotal + humanTotal
+        let petTotal = petAwards.reduce(0, +)
+        let humanTotal = human == nil ? 0 : result.humanCoconuts
+        let islandDelta = result.totalCoconuts
         if islandDelta > 0 {
             coconutCount += islandDelta
         }
 
-        let logEmoji = crit.isCrit && crit.multiplier == 5 ? "🎁" : type.emoji
+        let logEmoji = result.luck == .golden ? "🎁" : type.emoji
         let petNames = livePets.prefix(3).map(\.name).joined(separator: "、") + (livePets.count > 3 ? " 等\(livePets.count)只" : "")
-        let sharedTitle = title ?? (crit.isCrit ? crit.title : "共同照护 · \(petNames)")
+        var sharedTitle = title ?? "共同照护 · \(petNames)"
+        if result.luck != .none {
+            sharedTitle += result.luck == .golden ? " · 金色幸运" : " · 小幸运"
+        }
 
-        for pet in livePets where finalPetEach > 0 {
+        var insertedLogCount = 0
+        for (index, pet) in livePets.enumerated() where petAwards[index] > 0 {
             appendLog(CoconutLogEntry(
                 emoji: logEmoji,
                 title: sharedTitle,
-                amount: finalPetEach,
+                amount: petAwards[index],
                 actorId: pet.id.uuidString,
-                actorName: pet.name
-            ))
+                actorName: pet.name,
+                growthXP: result.growthXP,
+                economyReason: result.reason,
+                budgetStage: result.budgetStage.rawValue,
+                feedbackMessage: result.feedbackMessage
+            ), postsRewardFeedback: false)
+            insertedLogCount += 1
         }
-        if let human, finalHuman > 0 {
+        if let human, humanTotal > 0 {
             appendLog(CoconutLogEntry(
                 emoji: "🥥",
-                title: crit.isCrit ? crit.title : "共同照护奖励",
-                amount: finalHuman,
+                title: result.luck == .golden ? "金色幸运共同照护奖励" : "共同照护奖励",
+                amount: humanTotal,
                 actorId: human.id.uuidString,
-                actorName: human.name
-            ))
+                actorName: human.name,
+                growthXP: result.growthXP,
+                economyReason: result.reason,
+                budgetStage: result.budgetStage.rawValue,
+                feedbackMessage: result.feedbackMessage
+            ), postsRewardFeedback: false)
+            insertedLogCount += 1
         }
 
         do {
             try context.save()
+            if consumesBoost {
+                UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
+            }
+            EconomyDailyBudgetStore.commit(result, householdKey: budgetKeys.household, memberKey: budgetKeys.member, careObjectKeys: objectKeys)
             flushToDefaults()
+            postEconomyFeedback(
+                result,
+                type: type,
+                title: sharedTitle,
+                actorId: human?.id.uuidString ?? livePets.first?.id.uuidString,
+                actorName: human?.name ?? livePets.first?.name
+            )
             livePets.forEach { pet in
-                recordCooldown(petId: pet.id, type: type)
+                if !isOnCooldown(petId: pet.id, type: type) {
+                    recordCooldown(petId: pet.id, type: type)
+                }
                 StreakRewardManager.shared.checkAndAward(pet: pet)
             }
         } catch {
-            for pet in livePets where finalPetEach > 0 {
-                pet.coconutBalance -= finalPetEach
+            for (index, pet) in livePets.enumerated() where petAwards[index] > 0 {
+                pet.coconutBalance -= petAwards[index]
             }
-            if finalHuman > 0 {
-                human?.coconutBalance -= finalHuman
+            if humanTotal > 0 {
+                human?.coconutBalance -= humanTotal
             }
             coconutCount -= islandDelta
-            let logCount = (finalPetEach > 0 ? livePets.count : 0) + (human != nil && finalHuman > 0 ? 1 : 0)
-            if logCount > 0, coconutLogs.count >= logCount {
-                coconutLogs.removeFirst(logCount)
+            if insertedLogCount > 0, coconutLogs.count >= insertedLogCount {
+                coconutLogs.removeFirst(insertedLogCount)
             }
             #if DEBUG
             print("❌ [QuestManager] shared care save failed: \(error.localizedDescription)")
@@ -665,6 +699,7 @@ final class QuestManager {
     /// 仅更新全岛总库（用于无实体关联的全局奖励）
     func addCoconuts(_ amount: Int, emoji: String = "🥥", title: String = "打卡奖励", reason: String? = nil,
                       actorId: String? = nil, actorName: String? = nil) {
+        lastEconomyRewardResult = nil
         guard amount > 0 else {
             coconutCount += amount
             appendLog(CoconutLogEntry(emoji: emoji, title: reason ?? title, amount: amount,
@@ -672,17 +707,9 @@ final class QuestManager {
             flushToDefaults()
             return
         }
-        let crit = rollCrit()
-        var finalAmount = amount * crit.multiplier
-        var finalTitle  = crit.isCrit ? crit.title : (reason ?? title)
-        var finalEmoji  = crit.isCrit && crit.multiplier == 5 ? "🎁" : emoji
-        // boost_double: 双倍椰子券激活时额外 ×2，消耗一次
-        if UserDefaults.standard.bool(forKey: "shop_boostDoubleActive") {
-            finalAmount *= 2
-            finalTitle   = "⚡️双倍券激活！" + finalTitle
-            finalEmoji   = "⚡️"
-            UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
-        }
+        let finalAmount = amount
+        let finalTitle = reason ?? title
+        let finalEmoji = emoji
         coconutCount += finalAmount
         appendLog(CoconutLogEntry(emoji: finalEmoji, title: finalTitle, amount: finalAmount,
                                   actorId: actorId, actorName: actorName))
@@ -779,21 +806,31 @@ final class QuestManager {
         let livePets = pets.filter { !$0.hasPassedAway }
         guard !livePets.isEmpty else { return (0, 0) }
 
-        let base = type.baseRewards
-        let crit = rollCrit()
-        var finalHuman = base.human * crit.multiplier   // 人只发一次
-        var finalPetEach = base.pet * crit.multiplier   // 每只宠物各发一次
-
-        // title_chef: CEO/Chef bonus
-        if case .feed = type, UserDefaults.standard.string(forKey: "shop_equipped_title") == "title_chef" {
-            finalHuman += 1
+        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+            .flatMap { $0.isEmpty ? nil : $0 }
+        var human: Human? = nil
+        if let executorId {
+            human = (try? context.fetch(FetchDescriptor<Human>()))?.first(where: { $0.id.uuidString == executorId })
         }
-
-        if UserDefaults.standard.bool(forKey: "shop_boostDoubleActive") {
-            finalHuman *= 2
-            finalPetEach *= 2
-            UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
-        }
+        let consumesBoost = UserDefaults.standard.bool(forKey: "shop_boostDoubleActive")
+        let isCoolingDown = livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) }
+        let budgetKeys = economyBudgetKeys(for: human, context: context)
+        let objectKeys = careObjectKeys(for: livePets)
+        let result = CoconutEconomyPolicyV2.sharedReward(
+            for: type,
+            targetCount: livePets.count,
+            quality: .none,
+            isOnCooldown: isCoolingDown,
+            userKey: budgetKeys.household,
+            memberKey: budgetKeys.member,
+            careObjectKeys: objectKeys,
+            careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
+            hasHumanAccount: human != nil,
+            forcedLuck: consumesBoost ? .golden : nil
+        )
+        lastEconomyRewardResult = result
+        let petAwards = Self.distribute(result.petCoconuts, count: livePets.count)
+        let humanTotal = human == nil ? 0 : result.humanCoconuts
 
         // ── 1. 写 PetCareLog（每只宠物独立一条）
         let careTypeEnum: CareType?
@@ -807,10 +844,7 @@ final class QuestManager {
         default:      careTypeEnum = nil
         }
 
-        let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-            .flatMap { $0.isEmpty ? nil : $0 }
-
-        for pet in livePets {
+        for (index, pet) in livePets.enumerated() {
             if let ct = careTypeEnum {
                 let log = PetCareLog(type: ct, pet: pet, executorId: executorId)
                 context.insert(log)
@@ -819,46 +853,68 @@ final class QuestManager {
                 context.insert(log)
             }
             // 更新宠物椰子账户
-            pet.coconutBalance += finalPetEach
+            pet.coconutBalance += petAwards[index]
         }
 
         // ── 2. 人类账户（只发一次，不乘以宠物数量）
-        var human: Human? = nil
-        let humanIdStr = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-            .flatMap { $0.isEmpty ? nil : $0 }
-        if let hid = humanIdStr {
-            human = (try? context.fetch(FetchDescriptor<Human>()))?.first(where: { $0.id.uuidString == hid })
-        }
-        if finalHuman > 0 { human?.coconutBalance += finalHuman }
+        if humanTotal > 0 { human?.coconutBalance += humanTotal }
 
         // ── 3. 全岛总库
-        let petTotal = finalPetEach * livePets.count
-        let islandDelta = petTotal + (human != nil ? finalHuman : 0)
+        let petTotal = petAwards.reduce(0, +)
+        let islandDelta = result.totalCoconuts
         if islandDelta > 0 { coconutCount += islandDelta }
 
         // ── 4. 一条合并日志
-        let logEmoji = crit.isCrit && crit.multiplier == 5 ? "🎁" : type.emoji
+        let logEmoji = result.luck == .golden ? "🎁" : type.emoji
         let petNames = livePets.prefix(3).map(\.name).joined(separator: "、")
             + (livePets.count > 3 ? " 等\(livePets.count)只" : "")
-        let baseTitle = crit.isCrit ? crit.title : "一键全家\(type.emoji) · \(petNames)"
-        appendLog(CoconutLogEntry(
-            emoji: logEmoji,
-            title: baseTitle,
-            amount: islandDelta,
-            actorId: human?.id.uuidString ?? "batch",
-            actorName: human?.name ?? "全家打卡"
-        ))
+        var baseTitle = "一键全家\(type.emoji) · \(petNames)"
+        if result.luck != .none {
+            baseTitle += result.luck == .golden ? " · 金色幸运" : " · 小幸运"
+        }
+        if islandDelta > 0 {
+            appendLog(CoconutLogEntry(
+                emoji: logEmoji,
+                title: baseTitle,
+                amount: islandDelta,
+                actorId: human?.id.uuidString ?? "batch",
+                actorName: human?.name ?? "全家打卡",
+                growthXP: result.growthXP,
+                economyReason: result.reason,
+                budgetStage: result.budgetStage.rawValue,
+                feedbackMessage: result.feedbackMessage
+            ), postsRewardFeedback: false)
+        }
 
         // ── 5. 持久化
         do {
             try context.save()
+            if consumesBoost {
+                UserDefaults.standard.removeObject(forKey: "shop_boostDoubleActive")
+            }
+            EconomyDailyBudgetStore.commit(result, householdKey: budgetKeys.household, memberKey: budgetKeys.member, careObjectKeys: objectKeys)
+            livePets.forEach { pet in
+                if !isOnCooldown(petId: pet.id, type: type) {
+                    recordCooldown(petId: pet.id, type: type)
+                }
+                StreakRewardManager.shared.checkAndAward(pet: pet)
+            }
             flushToDefaults()
+            postEconomyFeedback(
+                result,
+                type: type,
+                title: baseTitle,
+                actorId: human?.id.uuidString ?? "batch",
+                actorName: human?.name ?? "全家打卡"
+            )
         } catch {
             // 回滚
-            livePets.forEach { $0.coconutBalance -= finalPetEach }
-            human?.coconutBalance -= finalHuman
+            for (index, pet) in livePets.enumerated() {
+                pet.coconutBalance -= petAwards[index]
+            }
+            human?.coconutBalance -= humanTotal
             coconutCount -= islandDelta
-            if !coconutLogs.isEmpty { coconutLogs.removeFirst() }
+            if islandDelta > 0, !coconutLogs.isEmpty { coconutLogs.removeFirst() }
             #if DEBUG
             print("❌ [batchAward] save 失败: \(error)")
             #endif
@@ -866,13 +922,38 @@ final class QuestManager {
 
         // 震动反馈
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        return (finalHuman, petTotal)
+        return (humanTotal, petTotal)
+    }
+
+    private func postEconomyFeedback(
+        _ result: EconomyRewardResult,
+        type: OhanaActionType,
+        title: String,
+        actorId: String?,
+        actorName: String?
+    ) {
+        guard result.growthXP > 0 || result.totalCoconuts > 0 else { return }
+        let entry = CoconutLogEntry(
+            emoji: result.luck == .golden ? "🎁" : type.emoji,
+            title: result.feedbackMessage.isEmpty ? title : result.feedbackMessage,
+            amount: result.totalCoconuts,
+            actorId: actorId,
+            actorName: actorName,
+            growthXP: result.growthXP,
+            economyReason: result.reason,
+            budgetStage: result.budgetStage.rawValue,
+            feedbackMessage: result.feedbackMessage
+        )
+        NotificationCenter.default.post(
+            name: .ohanaCoconutRewardEvent,
+            object: OhanaCoconutRewardEvent(entry: entry)
+        )
     }
 
     private func appendLog(_ entry: CoconutLogEntry, postsRewardFeedback: Bool = true) {
         coconutLogs.insert(entry, at: 0)
         if coconutLogs.count > 200 { coconutLogs = Array(coconutLogs.prefix(200)) }
-        if entry.amount > 0, postsRewardFeedback {
+        if (entry.amount > 0 || (entry.growthXP ?? 0) > 0), postsRewardFeedback {
             NotificationCenter.default.post(
                 name: .ohanaCoconutRewardEvent,
                 object: OhanaCoconutRewardEvent(entry: entry)
@@ -880,6 +961,15 @@ final class QuestManager {
         }
         NotificationCenter.default.post(name: NSNotification.Name("coconutCountChanged"), object: nil)
         // 日志写入延迟到 flushToDefaults() 中一并执行
+    }
+
+    private static func distribute(_ total: Int, count: Int) -> [Int] {
+        guard total > 0, count > 0 else { return Array(repeating: 0, count: max(0, count)) }
+        let base = total / count
+        let remainder = total % count
+        return (0..<count).map { index in
+            base + (index < remainder ? 1 : 0)
+        }
     }
 
     func makeLedgerAudit(pets: [Pet], humans: [Human]) -> CoconutLedgerAudit {

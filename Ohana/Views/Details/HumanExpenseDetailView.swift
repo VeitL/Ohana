@@ -18,6 +18,18 @@ struct HumanExpenseDetailView: View {
 
     @State private var showingQuickExpense = false
 
+    init(human: Human) {
+        self.human = human
+        let humanKey = human.id.uuidString
+        _allExpenses = Query(
+            filter: #Predicate<PetExpenseLog> { log in
+                log.executorId == humanKey
+            },
+            sort: \.date,
+            order: .reverse
+        )
+    }
+
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
@@ -25,7 +37,7 @@ struct HumanExpenseDetailView: View {
         PrivacyService.isLocked(.expense, for: human, viewedBy: activeHumanId)
     }
     private var myExpenses: [PetExpenseLog] {
-        allExpenses.filter { $0.executorId == human.id.uuidString }
+        allExpenses
     }
     private var monthExpenses: [PetExpenseLog] {
         myExpenses.filter { Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) }
@@ -112,9 +124,10 @@ struct HumanExpenseDetailView: View {
 
     private var emptyState: some View {
         VStack(spacing: 10) {
-            Image(systemName: AppCurrency.systemIconName)
-                .font(.system(size: 34, weight: .black))
+            Image(systemName: AppCurrency.systemIconName) // a11y: allow decorative empty-state icon hidden below
+                .font(OhanaFont.largeTitle(.black))
                 .foregroundStyle(Color.goPrimary)
+                .accessibilityHidden(true)
             Text(l.tr(zh: "还没有花费记录", en: "No expenses yet", de: "Noch keine Kosten"))
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -133,10 +146,11 @@ struct HumanExpenseDetailView: View {
 
     private func expenseRow(_ log: PetExpenseLog) -> some View {
         HStack(spacing: 13) {
-            Image(systemName: log.expenseCategory.systemIconName)
-                .font(.system(size: 15, weight: .black))
+            Image(systemName: log.expenseCategory.systemIconName) // a11y: allow decorative category icon hidden below
+                .font(OhanaFont.body(.black))
                 .foregroundStyle(Color(hex: "F59E0B"))
-                .frame(width: 34, height: 34)
+                .frame(width: 44, height: 44)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.note.isEmpty ? l.tr(zh: "花费记录", en: "Expense", de: "Kosten") : log.note)

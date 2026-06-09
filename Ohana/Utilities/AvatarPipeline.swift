@@ -29,6 +29,10 @@ final class AvatarPipeline: ObservableObject {
         FocusWalletAvatarCache.cachedEntry(for: id, signature: signature)?.image
     }
 
+    func cachedEntry(for id: UUID, signature: String) -> FocusWalletAvatarCache.Entry? {
+        FocusWalletAvatarCache.cachedEntry(for: id, signature: signature)
+    }
+
     func preload(
         payloads: [FocusWalletAvatarCache.Payload],
         popoutPayloads: [FocusWalletAvatarCache.Payload] = [],

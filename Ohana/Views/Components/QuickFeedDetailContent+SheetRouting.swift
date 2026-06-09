@@ -43,12 +43,12 @@ extension QuickFeedDetailContent {
     func sheetHero(icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             Text(title)
-                .font(.system(size: 20, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
         }
@@ -69,11 +69,11 @@ extension QuickFeedDetailContent {
         let chrome = feedSheetChrome(for: sheet)
         return HStack(spacing: 10) {
             Image(systemName: chrome.icon)
-                .font(.system(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(chrome.tint)
-                .frame(width: 30, height: 34)
+                .frame(width: 30, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
             Text(chrome.title)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)

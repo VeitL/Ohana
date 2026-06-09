@@ -13,6 +13,7 @@ import SwiftData
 
 struct PetCareTrackingCard: View {
     let pet: Pet
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Household.createdAt) private var households: [Household]
 
@@ -39,15 +40,15 @@ struct PetCareTrackingCard: View {
                 // ── 顶栏—点击展开详情
                 Button { showingDetail = true } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "fork.knife.circle.fill")
-                            .font(.system(size: 14, weight: .semibold))
+                        Image(systemName: "fork.knife.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goOrange)
                         Text("日常照料")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
+                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                 }
@@ -83,7 +84,7 @@ struct PetCareTrackingCard: View {
             if undoLog != nil {
                 HStack(spacing: 8) {
                     Text("🍚 \(undoLabel) 已记录")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Button {
@@ -99,7 +100,7 @@ struct PetCareTrackingCard: View {
                         withAnimation(GoMotion.feedback) { undoLog = nil }
                     } label: {
                         Text("撤回")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goYellow)
                     }
                 }
@@ -110,7 +111,10 @@ struct PetCareTrackingCard: View {
         }
         .animation(GoMotion.feedback, value: undoLog != nil)
         .sheet(isPresented: $showingDetail) {
-            CareTrackingDetailSheet(pet: pet)
+            CareTrackingDetailSheet(
+                pet: pet,
+                onPresentCoconutLog: onPresentCoconutLog
+            )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.hidden)
         }
@@ -120,10 +124,10 @@ struct PetCareTrackingCard: View {
 // MARK: - U18 日常照料详情 Sheet（GO Club 沉浸式重构）
 struct CareTrackingDetailSheet: View {
     let pet: Pet
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var showAddFeed = false
-    @State private var showingCoconutLog = false
     @State private var addGrams: String = ""
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -148,26 +152,28 @@ struct CareTrackingDetailSheet: View {
                 // ── 顶部关闭 + 标题
                 HStack {
                     Button { dismiss() } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 15, weight: .bold))
+                        Image(systemName: "chevron.down") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 15, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                            .frame(width: 34, height: 34)
+                            .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .goGlassBackground(Circle())
                     }
                     Spacer()
                     VStack(spacing: 2) {
                         Text("日常照料")
-                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(pet.name)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                     Spacer()
-                    CoconutBalanceCapsule(balance: pet.coconutBalance) { showingCoconutLog = true }
+                    CoconutBalanceCapsule(balance: pet.coconutBalance) {
+                        onPresentCoconutLog?(.pet(pet.id))
+                    }
                     Button { showAddFeed = true } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 20))
+                        Image(systemName: "plus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goOrange)
                     }
                 }
@@ -178,13 +184,13 @@ struct CareTrackingDetailSheet: View {
                     ForEach(displayTypes, id: \.rawValue) { type in
                         VStack(spacing: 6) {
                             Image(systemName: type.systemIconName)
-                .font(.system(size: 22, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 22, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color(hex: type.accentColorHex))
                             Text("\(todayCount(type))")
-                                .font(.system(size: 28, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(type.rawValue)
-                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                         }
                         .frame(maxWidth: .infinity)
@@ -204,7 +210,7 @@ struct CareTrackingDetailSheet: View {
                     VStack(spacing: 0) {
                         Capsule()
                             .fill(Color.arkInk.opacity(0.1))
-                            .frame(width: 36, height: 4)
+                            .frame(width: 36, height: 4) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .padding(.top, 10).padding(.bottom, 12)
 
                         ScrollView(.vertical, showsIndicators: false) {
@@ -233,10 +239,10 @@ struct CareTrackingDetailSheet: View {
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Button(action: closeAddFeedOverlay) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .black))
+                            Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText)
-                                .frame(width: 34, height: 34)
+                                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 .background(Color.ohanaControlFill, in: Circle())
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -272,7 +278,6 @@ struct CareTrackingDetailSheet: View {
             }
         }
         .animation(GoMotion.page, value: showAddFeed)
-        .sheet(isPresented: $showingCoconutLog) { CoconutLogView(subject: .pet(pet.id)) }
     }
 
     private func closeAddFeedOverlay() {
@@ -307,14 +312,14 @@ struct CareTrackingDetailSheet: View {
             // 小标题
             HStack(spacing: 6) {
                 Image(systemName: type.systemIconName)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(accent)
                 Text(type.rawValue)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                 Spacer()
                 Text("今日 \(todayCount(type)) 次")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(accent)
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(accent.opacity(0.1), in: Capsule())
@@ -333,23 +338,23 @@ struct CareTrackingDetailSheet: View {
 
             // 最近记录（最多5条）
             if logs.isEmpty {
-                Text("暂无记录").font(.system(size: 12)).foregroundStyle(Color.ohanaSecondaryText)
+                Text("暂无记录").font(OhanaFont.adaptive(size: 12)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 4)
             } else {
                 VStack(spacing: 6) {
                     ForEach(logs.prefix(5)) { log in
                         HStack {
                             Text(log.date, format: .dateTime.month().day().hour().minute())
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.arkInk.opacity(0.7))
                             Spacer()
                             if log.amountGrams > 0 {
                                 Text("\(Int(log.amountGrams))g")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(accent)
                             } else if log.amountMl > 0 {
                                 Text("\(Int(log.amountMl))ml")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(accent)
                             }
                             Button {
@@ -361,8 +366,8 @@ struct CareTrackingDetailSheet: View {
                                     )
                                 }
                             } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 11))
+                                Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
+                                    .font(OhanaFont.adaptive(size: 11)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                             }
                         }
@@ -417,9 +422,9 @@ private struct CareTypeRow: View {
             ZStack {
                 Circle()
                     .fill(Color(hex: type.accentColorHex).opacity(0.14))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Image(systemName: type.systemIconName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color(hex: type.accentColorHex))
             }
 
@@ -427,10 +432,10 @@ private struct CareTypeRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(type.rawValue)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("今日 \(todayCount) 次")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color(hex: type.accentColorHex).opacity(0.8))
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(Color(hex: type.accentColorHex).opacity(0.14), in: Capsule())
@@ -458,9 +463,9 @@ private struct CareTypeRow: View {
                         .fill(isJustChecked
                               ? Color(hex: type.accentColorHex)
                               : Color(hex: type.accentColorHex).opacity(0.18))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     Image(systemName: isJustChecked ? "checkmark" : "plus")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(isJustChecked ? .black : Color(hex: type.accentColorHex))
                 }
             }

@@ -46,8 +46,10 @@ Baseline:
 - `scripts/release-hardening-check.sh`
 - `scripts/audit-release-data-safety.sh`
 - `scripts/build-debug-fast.sh`
-- `scripts/audit-runtime-guardrails.sh --all --soft`
-- `scripts/audit-ui-v4.sh --changed`
+- `scripts/audit-runtime-guardrails.sh --all`
+- `scripts/audit-ui-v4.sh --all`
+- `scripts/audit-accessibility.sh --all`
+- `scripts/audit-smoothness-risk.sh --all`
 
 When CoreSimulator is unavailable in a sandbox, use:
 

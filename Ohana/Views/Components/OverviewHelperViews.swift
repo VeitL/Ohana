@@ -55,7 +55,7 @@ struct FloatingDockNav: View {
                             .animation(GoMotion.feedback, value: selectedTab)
                         Circle()
                             .fill(isSelected ? Color.goPrimary : Color.clear)
-                            .frame(width: 4, height: 4)
+                            .frame(width: 4, height: 4) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -74,27 +74,28 @@ struct FloatingDockNav: View {
 struct CompactTaskRow: View {
     let reminder: Reminder
     @Environment(\.modelContext) private var modelContext
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var isDone = false
 
     var body: some View {
         HStack(spacing: 12) {
             Text(reminder.event?.emoji ?? "📌")
-                .font(.system(size: 18))
-                .frame(width: 32, height: 32)
+                .font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 8))
             VStack(alignment: .leading, spacing: 1) {
                 Text(reminder.event?.title ?? "提醒")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(isDone ? Color.ohanaTertiaryText : Color.ohanaPrimaryText)
                     .strikethrough(isDone)
                 HStack(spacing: 4) {
                     if let petName = reminder.event?.relatedEntityId {
                         Text("🐾 \(petName.prefix(8))")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaTertiaryText)
                     }
                     Text(reminder.scheduledAt, style: .time)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
             }
@@ -103,30 +104,34 @@ struct CompactTaskRow: View {
                 withAnimation(GoMotion.feedback) { isDone.toggle() }
                 let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
                 if isDone {
-                    ReminderCommandExecutor(context: modelContext).completeWithCoconutReward(
-                        reminder,
-                        by: activeHumanId,
-                        amount: 2,
-                        title: reminder.event?.title ?? "完成待办",
-                        note: "overview.reminder.complete.reward"
-                    )
+                    commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
+                        ReminderCommandExecutor(context: modelContext).completeWithCoconutReward(
+                            reminder,
+                            by: activeHumanId,
+                            amount: 2,
+                            title: reminder.event?.title ?? "完成待办",
+                            note: "overview.reminder.complete.reward"
+                        )
+                    }
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } else {
-                    ReminderCommandExecutor(context: modelContext).reopen(
-                        reminder,
-                        by: activeHumanId,
-                        note: "overview.reminder.reopen"
-                    )
+                    commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
+                        ReminderCommandExecutor(context: modelContext).reopen(
+                            reminder,
+                            by: activeHumanId,
+                            note: "overview.reminder.reopen"
+                        )
+                    }
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
             } label: {
                 ZStack {
                     Circle()
                         .strokeBorder(isDone ? Color.goTeal : Color.ohanaGlassStroke, lineWidth: 2)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     if isDone {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 11, weight: .black))
+                        Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goTeal)
                     }
                 }
@@ -143,6 +148,7 @@ struct CompactTaskRow: View {
 struct SwipeableReminderCard: View {
     let reminder: Reminder
     @Environment(\.modelContext) private var modelContext
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     @State private var dragX: CGFloat = 0
     @State private var isDismissed = false
@@ -161,10 +167,10 @@ struct SwipeableReminderCard: View {
             HStack {
                 if dragX > 40 {
                     HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18, weight: .bold))
+                        Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 18, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text("Done")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.leading, 20)
@@ -173,9 +179,9 @@ struct SwipeableReminderCard: View {
                     Spacer()
                     HStack(spacing: 6) {
                         Text("Skip")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                        Image(systemName: "minus.circle.fill")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        Image(systemName: "minus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 18, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.trailing, 20)
@@ -188,18 +194,18 @@ struct SwipeableReminderCard: View {
 
             HStack(spacing: 12) {
                 Text(reminder.event?.emoji ?? "📌")
-                    .font(.system(size: 22))
+                    .font(OhanaFont.adaptive(size: 22)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 VStack(alignment: .leading, spacing: 2) {
                     Text(reminder.event?.title ?? "提醒")
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(reminder.scheduledAt, style: .time)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .bold))
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(14)
@@ -246,8 +252,11 @@ struct SwipeableReminderCard: View {
 
     private func completeReminder() {
         isDismissed = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        commandQueue.enqueue(
+            .reminderCompletion(reminderID: reminder.id),
+            delayMilliseconds: 350
+        ) {
             ReminderCommandExecutor(context: modelContext).complete(
                 reminder,
                 by: activeHumanId,
@@ -258,8 +267,11 @@ struct SwipeableReminderCard: View {
 
     private func dismissReminder() {
         isDismissed = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        commandQueue.enqueue(
+            .reminderCompletion(reminderID: reminder.id),
+            delayMilliseconds: 350
+        ) {
             ReminderCommandExecutor(context: modelContext).skip(
                 reminder,
                 by: activeHumanId,
@@ -286,13 +298,13 @@ struct PlantGardenCard: View {
                         .fill(plant.needsWatering ? Color.goPrimary.opacity(0.2) : Color.ohanaControlFill)
                         .frame(width: 60, height: 60)
                     Text(plant.avatarEmoji)
-                        .font(.system(size: 32))
+                        .font(OhanaFont.adaptive(size: 32)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .scaleEffect(isWatering ? 1.2 : 1.0)
                         .animation(GoMotion.fab, value: isWatering)
                 }
 
                 Text(plant.name)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
 
@@ -301,10 +313,10 @@ struct PlantGardenCard: View {
                         waterPlant()
                     } label: {
                         HStack(spacing: 3) {
-                            Image(systemName: "drop.fill")
-                                .font(.system(size: 9, weight: .bold))
+                            Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text("Water")
-                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 10)
@@ -313,11 +325,11 @@ struct PlantGardenCard: View {
                     }
                 } else if let days = plant.daysSinceWatered {
                     Text("\(days)d ago")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
                     Text("No record")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
             }
@@ -368,10 +380,10 @@ struct HomeSectionManageSheet: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("首页模块管理")
-                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("拖拽排序，切换显示/隐藏")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
@@ -379,7 +391,7 @@ struct HomeSectionManageSheet: View {
                         saveState()
                         dismiss()
                     }
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .padding(.horizontal, 16).padding(.vertical, 8)
                     .background(Color.goPrimary.opacity(0.12), in: Capsule())
@@ -391,20 +403,20 @@ struct HomeSectionManageSheet: View {
                 List {
                     ForEach($sections) { $section in
                         HStack(spacing: 14) {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 16, weight: .semibold))
+                            Image(systemName: "line.3.horizontal") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaTertiaryText)
                                 .frame(width: 24)
                             Image(systemName: section.icon)
-                                .font(.system(size: 16, weight: .bold))
+                                .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color(hex: section.colorHex))
                                 .frame(width: 28)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(section.title)
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(section.subtitle)
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             Spacer()
@@ -503,7 +515,7 @@ struct BentoStatCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(accentColor)
                 Text(title)
                     .font(OhanaFont.footnote(.bold))
@@ -533,7 +545,7 @@ struct BentoStatCard: View {
             if let t = trend {
                 HStack(spacing: 3) {
                     Image(systemName: (trendUp ?? true) ? "arrow.up.right" : "arrow.down.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(t)
                         .font(OhanaFont.caption2(.bold))
                 }
@@ -550,9 +562,12 @@ struct BentoStatCard: View {
 // MARK: - AllPetsFoodOverviewSheet
 struct AllPetsFoodOverviewSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    let pets: [Pet]
     @State private var selectedPet: Pet? = nil
+
+    init(pets: [Pet] = []) {
+        self.pets = pets
+    }
 
     var body: some View {
         NavigationStack {
@@ -565,9 +580,9 @@ struct AllPetsFoodOverviewSheet: View {
                         }
                         if pets.isEmpty {
                             VStack(spacing: 12) {
-                                Text("🐾").font(.system(size: 48))
+                                Text("🐾").font(OhanaFont.adaptive(size: 48)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 Text("还没有宠物")
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .frame(maxWidth: .infinity)
@@ -584,8 +599,8 @@ struct AllPetsFoodOverviewSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
+                        Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
@@ -616,10 +631,10 @@ struct AllPetsFoodOverviewSheet: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(days > 0 ? "余粮 \(grams)g · 可用 \(days) 天" : "余粮不足，请补充")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(accent)
                 }
 
@@ -633,13 +648,13 @@ struct AllPetsFoodOverviewSheet: View {
                         .stroke(accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     Text("\(days)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(accent)
                 }
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)

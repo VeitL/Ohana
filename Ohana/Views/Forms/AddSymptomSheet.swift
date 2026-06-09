@@ -80,8 +80,8 @@ struct AddSymptomSheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -101,7 +101,7 @@ struct AddSymptomSheet: View {
                         } label: {
                             HStack(spacing: 7) {
                                 Image(systemName: categoryIcon(item))
-                                    .font(.system(size: 12, weight: .black))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                                 Text(categoryTitle(item))
                                     .font(OhanaFont.caption(.black))
                                     .lineLimit(1)
@@ -197,7 +197,7 @@ struct AddSymptomSheet: View {
     private func sectionLabel(_ title: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(tint)
             Text(title)
                 .font(OhanaFont.subheadline(.black))

@@ -90,7 +90,7 @@ extension MetricKitObserver: MXMetricManagerSubscriber {
 
 // MARK: - Summarizers
 
-private enum MetricKitSummarizer {
+nonisolated private enum MetricKitSummarizer {
     struct MetricSummary {
         let hangTimeMS: Double
         let note: String
@@ -194,7 +194,7 @@ private enum MetricKitSummarizer {
 }
 
 /// Average of bucket midpoints weighted by sample count, converted to ms.
-private func averageDurationMS(_ histogram: MXHistogram<UnitDuration>) -> Double {
+nonisolated private func averageDurationMS(_ histogram: MXHistogram<UnitDuration>) -> Double {
     let enumerator = histogram.bucketEnumerator
     var totalCount = 0
     var weightedSum = 0.0

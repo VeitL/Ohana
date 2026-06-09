@@ -72,7 +72,7 @@ private struct ConfettiPiece: View {
                     .fill(particle.color)
                     .frame(width: particle.size, height: particle.size)
             default:
-                Image(systemName: "star.fill")
+                Image(systemName: "star.fill") // a11y: allow decorative confetti particle hidden by the effect container.
                     .resizable()
                     .foregroundStyle(particle.color)
                     .frame(width: particle.size, height: particle.size)

@@ -10,15 +10,31 @@ import SwiftUI
 
 struct AppRouteDestination: View {
     let route: AppRoute
+    let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+
+    init(
+        route: AppRoute,
+        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    ) {
+        self.route = route
+        self.onPresentCoconutLog = onPresentCoconutLog
+    }
 
     var body: some View {
         switch route {
         case let .petProfile(id, initialTab):
             AppPetRouteContainer(id: id, initialTab: initialTab)
         case let .humanProfile(id):
-            AppHumanRouteContainer(id: id)
+            AppHumanRouteContainer(
+                id: id,
+                onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
+            )
         case let .plantProfile(id):
-            AppPlantRouteContainer(id: id)
+            if AppFeatureRouteGuard.allowsAppRoute(route) {
+                AppPlantRouteContainer(id: id)
+            } else {
+                HiddenRouteInterceptView(note: route.id)
+            }
         }
     }
 }
@@ -37,35 +53,58 @@ struct AppRoutePresentationHost: ViewModifier {
     func body(content: Content) -> some View {
         content
             .fullScreenCover(item: $coordinator.fullScreen) { route in
-                AppFullScreenRouteDestination(
-                    route: route,
-                    onRequiredHumanSaved: onRequiredHumanSaved,
-                    onDismiss: { coordinator.dismissFullScreen(route) }
-                )
+                AppDeferredRouteContent(
+                    routeID: route.id,
+                    policy: AppPresentationPolicyProvider.policy(for: route)
+                ) {
+                    AppFullScreenRouteDestination(
+                        route: route,
+                        onRequiredHumanSaved: onRequiredHumanSaved,
+                        onDismiss: { coordinator.dismissFullScreen(route) },
+                        onPresentCoconutLog: { subject in
+                            coordinator.presentCoconutLog(subject)
+                        }
+                    )
+                }
             }
             .sheet(item: $coordinator.sheet, onDismiss: handleSheetDismissed) { route in
-                AppSheetRouteDestination(
-                    route: route,
-                    coordinator: coordinator,
-                    onDismiss: { coordinator.dismissSheet(route) },
-                    onPetSavedFromAddEntity: onPetSavedFromAddEntity,
-                    onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
-                    onCalendarEventDestination: handleCalendarEventDestination,
-                    onHumanDoseTaken: onHumanDoseTaken
-                )
+                AppDeferredRouteContent(
+                    routeID: route.id,
+                    policy: AppPresentationPolicyProvider.policy(for: route)
+                ) {
+                    AppSheetRouteDestination(
+                        route: route,
+                        coordinator: coordinator,
+                        onDismiss: { coordinator.dismissSheet(route) },
+                        onPetSavedFromAddEntity: onPetSavedFromAddEntity,
+                        onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
+                        onCalendarEventDestination: handleCalendarEventDestination,
+                        onHumanDoseTaken: onHumanDoseTaken
+                    )
+                }
+                .appRouteSheetPresentation(for: route)
                 .onAppear {
                     lastSheetRoute = route
                 }
             }
             .overlay {
                 if let route = coordinator.overlay {
-                    AppOverlayRouteDestination(
-                        route: route,
-                        onDismiss: { coordinator.dismissOverlay(route) },
-                        onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
-                        onOpenPet: { id, tab in coordinator.openPet(id, initialTab: tab) },
-                        onOpenHuman: { id in coordinator.openHuman(id) }
-                    )
+                    AppDeferredRouteContent(
+                        routeID: route.id,
+                        policy: AppPresentationPolicyProvider.policy(for: route)
+                    ) {
+                        AppOverlayRouteDestination(
+                            route: route,
+                            onDismiss: { coordinator.dismissOverlay(route) },
+                            onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
+                            onOpenPet: { id, tab in coordinator.openPet(id, initialTab: tab) },
+                            onOpenHuman: { id in coordinator.openHuman(id) },
+                            onPresentCoconutLog: { subject in
+                                coordinator.presentCoconutLog(subject)
+                            }
+                        )
+                    }
+                    .ignoresSafeArea()
                     .zIndex(140)
                 }
             }
@@ -98,7 +137,8 @@ struct AppRoutePresentationHost: ViewModifier {
         case let .humanDetail(human):
             coordinator.openHuman(human.id)
         case .plant:
-            coordinator.presentFunctionMenu(destination: .plantsDashboard)
+            AppFeatureRouteGuard.recordIntercept("calendarPlant")
+            coordinator.presentFunctionMenu(destination: .growthRoadmap)
         case let .functionMenu(destination):
             coordinator.presentFunctionMenu(destination: destination)
         case let .calendar(entityID, humanID):
@@ -214,11 +254,12 @@ private struct AppFullScreenRouteDestination: View {
     let route: AppFullScreenRoute
     let onRequiredHumanSaved: (Human) -> Void
     let onDismiss: () -> Void
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
 
     var body: some View {
         switch route {
         case .oasisReward:
-            OasisRewardView()
+            OasisRewardView(onPresentCoconutLog: onPresentCoconutLog)
         case .requiredHumanProfile:
             RequiredHumanProfileView { human in
                 onRequiredHumanSaved(human)
@@ -254,12 +295,18 @@ private struct AppSheetRouteDestination: View {
             )
             .ohanaSheetPagePresentation()
         case let .calendar(entityID, humanID):
-            CalendarView(
+            CalendarRouteContainer(
                 preselectedPetId: entityID,
                 preselectedHumanId: humanID,
-                onOpenEventDestination: onCalendarEventDestination
+                onOpenEventDestination: onCalendarEventDestination,
+                onPresentCoconutLog: { subject in
+                    coordinator.presentCoconutLog(subject)
+                }
             )
             .ohanaSheetPagePresentation()
+        case let .coconutShop(category):
+            CoconutShopRouteContainer(initialCategory: category)
+                .ohanaSheetPagePresentation()
         case let .functionMenu(destination):
             FunctionMenuSheet(initialDestination: destination)
                 .ohanaSheetPagePresentation()
@@ -385,7 +432,10 @@ private struct AppSheetRouteDestination: View {
             AppPetDetailSheetRouteContainer(
                 id: id,
                 destination: .achievements,
-                onMissing: onDismiss
+                onMissing: onDismiss,
+                onPresentCoconutLog: { subject in
+                    coordinator.presentCoconutLog(subject)
+                }
             )
             .ohanaSheetPagePresentation()
         case let .petRetention(id):
@@ -403,11 +453,10 @@ private struct AppSheetRouteDestination: View {
             )
             .ohanaSheetPagePresentation()
         case let .humanAllFeatures(id):
-            AppHumanDetailSheetRouteContainer(
+            HumanAllFeaturesRouteContainer(
                 id: id,
-                destination: .allFeatures,
                 onMissing: onDismiss,
-                onOpenFeatureDestination: openHumanAllFeatureDestination
+                onOpenDestination: openHumanAllFeatureDestination
             )
             .ohanaSheetPagePresentation()
         case let .humanBasicInfo(id):
@@ -485,67 +534,75 @@ private struct AppSheetRouteDestination: View {
             AppAccountSwitcherRouteContainer(onSwitched: onDismiss)
                 .interactiveDismissDisabled(true)
         case .streakDetail:
-            AppStreakDetailRouteContainer(onClose: onDismiss)
+            AppStreakDetailRouteContainer(
+                onClose: onDismiss,
+                onPresentCoconutLog: { subject in
+                    coordinator.presentCoconutLog(subject)
+                },
+                onPresentCoconutShop: { category in
+                    coordinator.presentCoconutShop(category: category)
+                }
+            )
                 .ohanaSheetPagePresentation()
         }
     }
 
-    private func openPetAllFeatureDestination(_ pet: Pet, destination: PetAllFeatureDestination) {
+    private func openPetAllFeatureDestination(_ petID: UUID, destination: PetAllFeatureDestination) {
         let route: AppSheetRoute
         switch destination {
         case .health:
-            route = .petHealth(pet.id, initialSection: nil)
+            route = .petHealth(petID, initialSection: nil)
         case .medications:
-            route = .petMedication(pet.id)
+            route = .petMedication(petID)
         case .food:
-            route = .petFood(pet.id)
+            route = .petFood(petID)
         case .hygiene:
-            route = .petHygiene(pet.id)
+            route = .petHygiene(petID)
         case .walks:
-            route = .petWalkSummary(pet.id)
+            route = .petWalkSummary(petID)
         case .potty:
-            route = .petPotty(pet.id)
+            route = .petPotty(petID)
         case .basicInfo:
-            route = .petBasicInfo(pet.id)
+            route = .petBasicInfo(petID)
         case .documents:
-            route = .petDocuments(pet.id)
+            route = .petDocuments(petID)
         case .moments, .timeline:
-            route = .petMomentHistory(pet.id)
+            route = .petMomentHistory(petID)
         case .achievements:
-            route = .petAchievements(pet.id)
+            route = .petAchievements(petID)
         case .retention:
-            route = .petRetention(pet.id)
+            route = .petRetention(petID)
         case .weight:
-            route = .petWeight(pet.id)
+            route = .petWeight(petID)
         case .expense:
-            route = .petExpense(pet.id)
+            route = .petExpense(petID)
         case .bondVault:
-            route = .petBondVault(pet.id)
+            route = .petBondVault(petID)
         }
         presentFeatureRouteAfterTap(route)
     }
 
-    private func openHumanAllFeatureDestination(_ human: Human, destination: HumanAllFeatureDestination) {
+    private func openHumanAllFeatureDestination(_ humanID: UUID, destination: HumanAllFeatureDestination) {
         let route: AppSheetRoute
         switch destination {
         case .basicInfo:
-            route = .humanBasicInfo(human.id)
+            route = .humanBasicInfo(humanID)
         case .weight:
-            route = .humanWeight(human.id)
+            route = .humanWeight(humanID)
         case .workout:
-            route = .humanWorkoutDashboard(human.id)
+            route = .humanWorkoutDashboard(humanID)
         case .metrics:
-            route = .humanMetrics(human.id)
+            route = .humanMetrics(humanID)
         case .medication:
-            route = .humanMedication(human.id)
+            route = .humanMedication(humanID)
         case .report:
-            route = .humanReport(human.id)
+            route = .humanReport(humanID)
         case .expense:
-            route = .humanExpense(human.id)
+            route = .humanExpense(humanID)
         case .wishlist:
-            route = .humanWishlist(human.id)
+            route = .humanWishlist(humanID)
         case .notes:
-            route = .humanNote(human.id)
+            route = .humanNote(humanID)
         }
         presentFeatureRouteAfterTap(route)
     }
@@ -584,14 +641,16 @@ private struct AppPetDetailSheetRouteContainer: View {
     let destination: AppPetDetailSheetDestination
     let onMissing: () -> Void
     let onDismiss: () -> Void
-    let onOpenFeatureDestination: ((Pet, PetAllFeatureDestination) -> Void)?
+    let onOpenFeatureDestination: ((UUID, PetAllFeatureDestination) -> Void)?
+    let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     init(
         id: UUID,
         destination: AppPetDetailSheetDestination,
         onMissing: @escaping () -> Void,
         onDismiss: @escaping () -> Void = {},
-        onOpenFeatureDestination: ((Pet, PetAllFeatureDestination) -> Void)? = nil
+        onOpenFeatureDestination: ((UUID, PetAllFeatureDestination) -> Void)? = nil,
+        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
     ) {
         _pets = Query(filter: #Predicate<Pet> { pet in
             pet.id == id
@@ -600,6 +659,7 @@ private struct AppPetDetailSheetRouteContainer: View {
         self.onMissing = onMissing
         self.onDismiss = onDismiss
         self.onOpenFeatureDestination = onOpenFeatureDestination
+        self.onPresentCoconutLog = onPresentCoconutLog
     }
 
     var body: some View {
@@ -618,7 +678,7 @@ private struct AppPetDetailSheetRouteContainer: View {
             PetAllFeaturesSheet(
                 pet: pet,
                 onOpenDestination: { destination in
-                    onOpenFeatureDestination?(pet, destination)
+                    onOpenFeatureDestination?(pet.id, destination)
                 }
             )
         case .basicInfo:
@@ -630,20 +690,20 @@ private struct AppPetDetailSheetRouteContainer: View {
         case .expense:
             NavigationStack { ExpenseHistoryView(pet: pet) }
         case let .feed(opensManualSheet):
-            QuickFeedDetailSheet(
-                pet: pet,
+            QuickFeedDetailRouteContainer(
+                id: pet.id,
                 onRemove: onDismiss,
                 onClose: onDismiss,
                 opensManualSheetOnAppear: opensManualSheet
             )
         case .water:
-            QuickWaterDetailSheet(pet: pet, onRemove: onDismiss, onClose: onDismiss)
+            QuickWaterDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
         case .potty:
-            QuickPottyDetailSheet(pet: pet, onRemove: onDismiss, onClose: onDismiss)
+            QuickPottyDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
         case .litter:
-            QuickLitterDetailSheet(pet: pet, onRemove: onDismiss, onClose: onDismiss)
+            QuickPottyDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
         case .play:
-            QuickPlayDetailSheet(pet: pet, onRemove: onDismiss, onClose: onDismiss)
+            QuickPlayDetailRouteContainer(id: pet.id, onRemove: onDismiss, onClose: onDismiss)
         case .hygiene:
             NavigationStack { PetHygieneDetailView(pet: pet) }
         case .walkSummary:
@@ -663,7 +723,12 @@ private struct AppPetDetailSheetRouteContainer: View {
         case .documents:
             DocumentsListView(pet: pet, showsCloseButton: true)
         case .achievements:
-            NavigationStack { AchievementWallView(pet: pet) }
+            NavigationStack {
+                AchievementWallView(
+                    pet: pet,
+                    onPresentCoconutLog: onPresentCoconutLog
+                )
+            }
         case .retention:
             PetRetentionHubView(pet: pet, showsCloseButton: true)
         case .bondVault:
@@ -673,7 +738,6 @@ private struct AppPetDetailSheetRouteContainer: View {
 }
 
 private enum AppHumanDetailSheetDestination: Hashable {
-    case allFeatures
     case basicInfo
     case medication
     case weight
@@ -686,19 +750,201 @@ private enum AppHumanDetailSheetDestination: Hashable {
     case note
 }
 
+struct HumanAllFeaturesRouteContainer: View {
+    @Query private var humans: [Human]
+    @Query private var allMeds: [HumanMedication]
+    @Query private var allReports: [HumanHealthReport]
+    @Query private var allExpenses: [PetExpenseLog]
+
+    let onMissing: () -> Void
+    let onOpenDestination: (UUID, HumanAllFeatureDestination) -> Void
+
+    init(
+        id: UUID,
+        onMissing: @escaping () -> Void,
+        onOpenDestination: @escaping (UUID, HumanAllFeatureDestination) -> Void
+    ) {
+        let humanKey = id.uuidString
+        _humans = Query(filter: #Predicate<Human> { human in
+            human.id == id
+        })
+        _allMeds = Query(
+            filter: #Predicate<HumanMedication> { med in
+                med.humanId == humanKey
+            },
+            sort: \.createdAt
+        )
+        _allReports = Query(
+            filter: #Predicate<HumanHealthReport> { report in
+                report.humanId == humanKey
+            },
+            sort: \.reportDate,
+            order: .reverse
+        )
+        _allExpenses = Query(
+            filter: #Predicate<PetExpenseLog> { expense in
+                expense.executorId == humanKey
+            },
+            sort: \.date,
+            order: .reverse
+        )
+        self.onMissing = onMissing
+        self.onOpenDestination = onOpenDestination
+    }
+
+    var body: some View {
+        if let human = humans.first {
+            HumanAllFeaturesSheet(
+                human: human,
+                allMeds: allMeds,
+                allReports: allReports,
+                allExpenses: allExpenses,
+                onOpenDestination: { destination in
+                    onOpenDestination(human.id, destination)
+                }
+            )
+        } else {
+            MissingRouteEntityView(kind: "human")
+                .onAppear(perform: onMissing)
+        }
+    }
+}
+
+struct OasisCritterCodexRouteContainer: View {
+    let mode: OasisCritterViewMode
+    let initialCatalogId: String?
+    let isPopup: Bool
+    let onClose: (() -> Void)?
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
+
+    @Query(sort: \Human.createdAt) private var humans: [Human]
+    @Query(sort: \OasisElectronicPet.obtainedAt) private var electronicPets: [OasisElectronicPet]
+    @Query(sort: \OasisCritterFragmentBalance.updatedAt) private var fragments: [OasisCritterFragmentBalance]
+
+    init(
+        mode: OasisCritterViewMode = .codex,
+        initialCatalogId: String? = nil,
+        isPopup: Bool = false,
+        onClose: (() -> Void)? = nil,
+        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in }
+    ) {
+        self.mode = mode
+        self.initialCatalogId = initialCatalogId
+        self.isPopup = isPopup
+        self.onClose = onClose
+        self.onPresentCoconutLog = onPresentCoconutLog
+    }
+
+    var body: some View {
+        OasisCritterCodexView(
+            mode: mode,
+            initialCatalogId: initialCatalogId,
+            isPopup: isPopup,
+            onClose: onClose,
+            humans: humans,
+            electronicPets: electronicPets,
+            fragments: fragments,
+            onPresentCoconutLog: onPresentCoconutLog
+        )
+    }
+}
+
+struct CrewRosterOverlayRouteContainer: View {
+    let initialMode: CrewRosterMode
+    let onSelectPet: (Pet) -> Void
+    let onSelectHuman: (Human) -> Void
+    var onAddEntity: ((EntityType) -> Void)? = nil
+    var onClose: (() -> Void)? = nil
+    var hideToolbar: Bool = false
+    var searchTrigger: Bool = false
+    var addMemberTrigger: Bool = false
+    var safeTopInset: CGFloat = 0
+    var safeBottomInset: CGFloat = 0
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+
+    @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    @Query(sort: \Human.createdAt) private var humans: [Human]
+    @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
+           sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
+    @Query(sort: \FamilyCollaborationTask.updatedAt, order: .reverse) private var familyTasks: [FamilyCollaborationTask]
+
+    var body: some View {
+        CrewRosterOverlay(
+            initialMode: initialMode,
+            pets: pets,
+            humans: humans,
+            plants: [],
+            pendingReminders: pendingReminders,
+            familyTasks: familyTasks,
+            onSelectPet: onSelectPet,
+            onSelectHuman: onSelectHuman,
+            onAddEntity: onAddEntity,
+            onClose: onClose,
+            hideToolbar: hideToolbar,
+            searchTrigger: searchTrigger,
+            addMemberTrigger: addMemberTrigger,
+            safeTopInset: safeTopInset,
+            safeBottomInset: safeBottomInset,
+            onPresentCoconutLog: onPresentCoconutLog
+        )
+    }
+}
+
+struct CalendarRouteContainer: View {
+    var preselectedPetId: String? = nil
+    var preselectedHumanId: String? = nil
+    var hideToolbar: Bool = false
+    var showsEmbeddedControls: Bool = false
+    var addEventTrigger: Int = 0
+    var isEmbeddedPrepared: Bool = true
+    var isEmbeddedVisible: Bool = true
+    var isEmbeddedActive: Bool = true
+    var onRequestAddEvent: (() -> Void)? = nil
+    var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+
+    @Query(sort: \Event.startDate, order: .reverse) private var events: [Event]
+    @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    @Query(sort: \Human.createdAt) private var humans: [Human]
+    @Query(sort: \PetInsurance.createdAt) private var insurances: [PetInsurance]
+    @Query(sort: \PetMedication.createdAt) private var petMedications: [PetMedication]
+    @Query(sort: \HumanMedication.createdAt) private var humanMedications: [HumanMedication]
+
+    var body: some View {
+        CalendarView(
+            preselectedPetId: preselectedPetId,
+            preselectedHumanId: preselectedHumanId,
+            hideToolbar: hideToolbar,
+            showsEmbeddedControls: showsEmbeddedControls,
+            addEventTrigger: addEventTrigger,
+            isEmbeddedPrepared: isEmbeddedPrepared,
+            isEmbeddedVisible: isEmbeddedVisible,
+            isEmbeddedActive: isEmbeddedActive,
+            onRequestAddEvent: onRequestAddEvent,
+            onOpenEventDestination: onOpenEventDestination,
+            onPresentCoconutLog: onPresentCoconutLog,
+            events: events,
+            pets: pets,
+            humans: humans,
+            plants: [],
+            insurances: insurances,
+            petMedications: petMedications,
+            humanMedications: humanMedications
+        )
+    }
+}
+
 private struct AppHumanDetailSheetRouteContainer: View {
     @Query private var humans: [Human]
     let destination: AppHumanDetailSheetDestination
     let onMissing: () -> Void
     let onHumanDoseTaken: (UUID) -> Void
-    let onOpenFeatureDestination: ((Human, HumanAllFeatureDestination) -> Void)?
 
     init(
         id: UUID,
         destination: AppHumanDetailSheetDestination,
         onMissing: @escaping () -> Void,
-        onHumanDoseTaken: @escaping (UUID) -> Void = { _ in },
-        onOpenFeatureDestination: ((Human, HumanAllFeatureDestination) -> Void)? = nil
+        onHumanDoseTaken: @escaping (UUID) -> Void = { _ in }
     ) {
         _humans = Query(filter: #Predicate<Human> { human in
             human.id == id
@@ -706,7 +952,6 @@ private struct AppHumanDetailSheetRouteContainer: View {
         self.destination = destination
         self.onMissing = onMissing
         self.onHumanDoseTaken = onHumanDoseTaken
-        self.onOpenFeatureDestination = onOpenFeatureDestination
     }
 
     var body: some View {
@@ -721,13 +966,6 @@ private struct AppHumanDetailSheetRouteContainer: View {
     @ViewBuilder
     private func humanDestination(for human: Human) -> some View {
         switch destination {
-        case .allFeatures:
-            HumanAllFeaturesSheet(
-                human: human,
-                onOpenDestination: { destination in
-                    onOpenFeatureDestination?(human, destination)
-                }
-            )
         case .basicInfo:
             NavigationStack { HumanBasicInfoDetailView(human: human) }
         case .medication:
@@ -766,6 +1004,7 @@ private struct AppOverlayRouteDestination: View {
     let onFirstSuccessMomentCompleted: (Pet) -> Void
     let onOpenPet: (UUID, PetDetailTab) -> Void
     let onOpenHuman: (UUID) -> Void
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
 
     var body: some View {
         switch route {
@@ -786,6 +1025,10 @@ private struct AppOverlayRouteDestination: View {
                 onSelectHuman: { human in
                     onDismiss()
                     onOpenHuman(human.id)
+                },
+                onPresentCoconutLog: { subject in
+                    onDismiss()
+                    onPresentCoconutLog(subject)
                 }
             )
             .ignoresSafeArea()
@@ -846,6 +1089,7 @@ private struct AppAccountSwitcherRouteContainer: View {
 
     var body: some View {
         HumanAccountSwitcherSheet(
+            humans: humans,
             homePets: pets,
             homeHumans: humans,
             homeElectronicPets: electronicPets,
@@ -855,12 +1099,58 @@ private struct AppAccountSwitcherRouteContainer: View {
 }
 
 private struct AppStreakDetailRouteContainer: View {
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-
     let onClose: () -> Void
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
+    let onPresentCoconutShop: (ShopItem.ShopCategory) -> Void
 
     var body: some View {
-        DailyStreakDetailView(pets: pets, onClose: onClose)
+        DailyStreakDetailRouteContainer(
+            onClose: onClose,
+            onPresentCoconutLog: onPresentCoconutLog,
+            onPresentCoconutShop: onPresentCoconutShop
+        )
+    }
+}
+
+struct DailyStreakDetailRouteContainer: View {
+    @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    @Query(sort: \Human.createdAt) private var humans: [Human]
+    @Query private var ledgerEvents: [CareLedgerEvent]
+
+    var onClose: (() -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onPresentCoconutShop: ((ShopItem.ShopCategory) -> Void)? = nil
+
+    init(
+        onClose: (() -> Void)? = nil,
+        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil,
+        onPresentCoconutShop: ((ShopItem.ShopCategory) -> Void)? = nil
+    ) {
+        let calendar = Calendar.current
+        let weekStart = calendar.dateInterval(of: .weekOfYear, for: Date())?.start
+            ?? calendar.date(byAdding: .day, value: -7, to: Date())
+            ?? Date()
+        _ledgerEvents = Query(
+            filter: #Predicate<CareLedgerEvent> { event in
+                event.occurredAt >= weekStart
+            },
+            sort: \.occurredAt,
+            order: .reverse
+        )
+        self.onClose = onClose
+        self.onPresentCoconutLog = onPresentCoconutLog
+        self.onPresentCoconutShop = onPresentCoconutShop
+    }
+
+    var body: some View {
+        DailyStreakDetailView(
+            pets: pets,
+            humans: humans,
+            ledgerEvents: ledgerEvents,
+            onClose: onClose,
+            onPresentCoconutLog: onPresentCoconutLog,
+            onPresentCoconutShop: onPresentCoconutShop
+        )
     }
 }
 
@@ -931,16 +1221,59 @@ private struct AppPetRouteContainer: View {
 
 private struct AppHumanRouteContainer: View {
     @Query private var humans: [Human]
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+    @Query(sort: \Human.createdAt) private var allHumans: [Human]
+    @Query private var allPendingReminders: [Reminder]
+    @Query private var allMeds: [HumanMedication]
+    @Query private var allReports: [HumanHealthReport]
 
-    init(id: UUID) {
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
+
+    init(
+        id: UUID,
+        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in }
+    ) {
+        let humanKey = id.uuidString
+        let humanType = "Human"
+        let pendingStatus = "pending"
         _humans = Query(filter: #Predicate<Human> { human in
             human.id == id
         })
+        _allPendingReminders = Query(
+            filter: #Predicate<Reminder> { reminder in
+                reminder.status == pendingStatus &&
+                    reminder.event?.relatedEntityType == humanType &&
+                    reminder.event?.relatedEntityId == humanKey
+            },
+            sort: \.scheduledAt
+        )
+        _allMeds = Query(
+            filter: #Predicate<HumanMedication> { med in
+                med.humanId == humanKey
+            },
+            sort: \.createdAt
+        )
+        _allReports = Query(
+            filter: #Predicate<HumanHealthReport> { report in
+                report.humanId == humanKey
+            },
+            sort: \.reportDate,
+            order: .reverse
+        )
+        self.onPresentCoconutLog = onPresentCoconutLog
     }
 
     var body: some View {
         if let human = humans.first {
-            HumanDetailView(human: human)
+            HumanDetailView(
+                human: human,
+                allPets: allPets,
+                allHumans: allHumans,
+                allPendingReminders: allPendingReminders,
+                allMeds: allMeds,
+                allReports: allReports,
+                onPresentCoconutLog: onPresentCoconutLog
+            )
         } else {
             MissingRouteEntityView(kind: "human")
         }
@@ -962,6 +1295,317 @@ private struct AppPlantRouteContainer: View {
         } else {
             MissingRouteEntityView(kind: "plant")
         }
+    }
+}
+
+struct FunctionMenuDestinationRouteContainer: View {
+    let destination: FMDest
+    @Binding var parentPath: NavigationPath
+
+    @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    @Query(sort: \Human.name) private var humans: [Human]
+
+    var body: some View {
+        FunctionMenuDestinationRouter(
+            destination: destination,
+            parentPath: $parentPath,
+            pets: pets,
+            humans: humans,
+            plants: []
+        )
+    }
+}
+
+struct FunctionMenuRootRouteContainer: View {
+    let appLanguage: String
+    let onSelect: (FMDest) -> Void
+    let onClose: () -> Void
+
+    @Query(sort: \Pet.createdAt) private var pets: [Pet]
+    @Query(sort: \Human.name) private var humans: [Human]
+
+    var body: some View {
+        FunctionMenuRootView(
+            appLanguage: appLanguage,
+            onSelect: onSelect,
+            onClose: onClose,
+            pets: pets,
+            humans: humans
+        )
+    }
+}
+
+private struct HiddenRouteInterceptView: View {
+    let note: String
+
+    var body: some View {
+        Color.clear
+            .onAppear {
+                AppFeatureRouteGuard.recordIntercept(note)
+            }
+    }
+}
+
+struct ExecutorPickerBarRouteContainer: View {
+    var tint: Color = .goPrimary
+    var compact: Bool = false
+
+    @Query(sort: \Human.createdAt) private var humans: [Human]
+
+    var body: some View {
+        ExecutorPickerBar(
+            humans: humans,
+            tint: tint,
+            compact: compact
+        )
+    }
+}
+
+struct QuickPlayDetailRouteContainer: View {
+    @Query private var pets: [Pet]
+    @Query private var allEvents: [Event]
+
+    let onRemove: () -> Void
+    let onClose: (() -> Void)?
+
+    init(
+        id: UUID,
+        onRemove: @escaping () -> Void,
+        onClose: (() -> Void)? = nil
+    ) {
+        let petKey = id.uuidString
+        _pets = Query(filter: #Predicate<Pet> { pet in
+            pet.id == id
+        })
+        _allEvents = Query(
+            filter: #Predicate<Event> { event in
+                event.relatedEntityId == petKey
+            },
+            sort: \.startDate
+        )
+        self.onRemove = onRemove
+        self.onClose = onClose
+    }
+
+    var body: some View {
+        if let pet = pets.first {
+            QuickPlayDetailSheet(
+                pet: pet,
+                onRemove: onRemove,
+                onClose: onClose,
+                allEvents: allEvents
+            )
+        } else {
+            MissingRouteEntityView(kind: "pet")
+                .onAppear(perform: onRemove)
+        }
+    }
+}
+
+struct QuickFeedDetailRouteContainer: View {
+    @Query private var pets: [Pet]
+    @Query private var allEvents: [Event]
+    @Query(sort: \Human.createdAt) private var allHumans: [Human]
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+    @Query private var allCareLogs: [PetCareLog]
+    @Query private var allFoodRecords: [PetFoodRecord]
+
+    let onRemove: () -> Void
+    let onClose: (() -> Void)?
+    let showsRemoveQuickActionFooter: Bool
+    let showsCloseButton: Bool
+    let opensManualSheetOnAppear: Bool
+
+    init(
+        id: UUID,
+        onRemove: @escaping () -> Void,
+        onClose: (() -> Void)? = nil,
+        showsRemoveQuickActionFooter: Bool = true,
+        showsCloseButton: Bool = true,
+        opensManualSheetOnAppear: Bool = false
+    ) {
+        let petKey = id.uuidString
+        let dryStockKey = "\(petKey):\(FeedFoodKind.dry.rawValue)"
+        let wetStockKey = "\(petKey):\(FeedFoodKind.wet.rawValue)"
+        let feedingType = CareType.feeding.rawValue
+        let homeLogStartDate = Calendar.current.date(
+            byAdding: .day,
+            value: -6,
+            to: Calendar.current.startOfDay(for: Date())
+        ) ?? Date().addingTimeInterval(-6 * 86_400)
+
+        _pets = Query(filter: #Predicate<Pet> { pet in
+            pet.id == id
+        })
+        _allEvents = Query(
+            filter: #Predicate<Event> { event in
+                event.relatedEntityId == petKey ||
+                    event.relatedEntityId == dryStockKey ||
+                    event.relatedEntityId == wetStockKey
+            },
+            sort: \.startDate
+        )
+        _allCareLogs = Query(
+            filter: #Predicate<PetCareLog> { log in
+                log.type == feedingType &&
+                    log.pet?.id == id &&
+                    log.date >= homeLogStartDate
+            },
+            sort: \.date,
+            order: .reverse
+        )
+        _allFoodRecords = Query(
+            filter: #Predicate<PetFoodRecord> { record in
+                record.pet?.id == id
+            },
+            sort: \.startDate,
+            order: .reverse
+        )
+        self.onRemove = onRemove
+        self.onClose = onClose
+        self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
+        self.showsCloseButton = showsCloseButton
+        self.opensManualSheetOnAppear = opensManualSheetOnAppear
+    }
+
+    var body: some View {
+        if let pet = pets.first {
+            QuickFeedDetailSheet(
+                pet: pet,
+                onRemove: onRemove,
+                onClose: onClose,
+                showsRemoveQuickActionFooter: showsRemoveQuickActionFooter,
+                showsCloseButton: showsCloseButton,
+                opensManualSheetOnAppear: opensManualSheetOnAppear,
+                allEvents: allEvents,
+                allHumans: allHumans,
+                allPets: allPets,
+                allCareLogs: allCareLogs,
+                allFoodRecords: allFoodRecords
+            )
+        } else {
+            MissingRouteEntityView(kind: "pet")
+                .onAppear(perform: onRemove)
+        }
+    }
+}
+
+struct QuickWaterDetailRouteContainer: View {
+    @Query private var pets: [Pet]
+    @Query private var allEvents: [Event]
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+    @Query private var waterCareLogs: [PetCareLog]
+
+    let onRemove: () -> Void
+    let onClose: (() -> Void)?
+
+    init(
+        id: UUID,
+        onRemove: @escaping () -> Void,
+        onClose: (() -> Void)? = nil
+    ) {
+        let petKey = id.uuidString
+        let wateringType = CareType.watering.rawValue
+        let waterChangeType = CareType.waterChange.rawValue
+        let filterCleanType = CareType.filterClean.rawValue
+
+        _pets = Query(filter: #Predicate<Pet> { pet in
+            pet.id == id
+        })
+        _allEvents = Query(
+            filter: #Predicate<Event> { event in
+                event.relatedEntityId == petKey
+            },
+            sort: \.startDate
+        )
+        _waterCareLogs = Query(
+            filter: #Predicate<PetCareLog> { log in
+                (log.type == wateringType ||
+                 log.type == waterChangeType ||
+                 log.type == filterCleanType) &&
+                    log.pet?.id == id
+            },
+            sort: \.date,
+            order: .reverse
+        )
+        self.onRemove = onRemove
+        self.onClose = onClose
+    }
+
+    var body: some View {
+        if let pet = pets.first {
+            QuickWaterDetailSheet(
+                pet: pet,
+                onRemove: onRemove,
+                onClose: onClose,
+                allEvents: allEvents,
+                allPets: allPets,
+                waterCareLogs: waterCareLogs
+            )
+        } else {
+            MissingRouteEntityView(kind: "pet")
+                .onAppear(perform: onRemove)
+        }
+    }
+}
+
+struct QuickPottyDetailRouteContainer: View {
+    @Query private var pets: [Pet]
+    @Query private var allEvents: [Event]
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
+
+    let onRemove: () -> Void
+    let onClose: (() -> Void)?
+
+    init(
+        id: UUID,
+        onRemove: @escaping () -> Void,
+        onClose: (() -> Void)? = nil
+    ) {
+        let petKey = id.uuidString
+        _pets = Query(filter: #Predicate<Pet> { pet in
+            pet.id == id
+        })
+        _allEvents = Query(
+            filter: #Predicate<Event> { event in
+                event.relatedEntityId == petKey
+            },
+            sort: \.startDate
+        )
+        self.onRemove = onRemove
+        self.onClose = onClose
+    }
+
+    var body: some View {
+        if let pet = pets.first {
+            QuickPottyDetailSheet(
+                pet: pet,
+                onRemove: onRemove,
+                onClose: onClose,
+                allEvents: allEvents,
+                allPets: allPets
+            )
+        } else {
+            MissingRouteEntityView(kind: "pet")
+                .onAppear(perform: onRemove)
+        }
+    }
+}
+
+struct FamilyActivityStripRouteContainer: View {
+    let pet: Pet
+    var style: FamilyActivityStripView.Style = .full
+    var onExpand: () -> Void = {}
+
+    @Query(sort: \Human.createdAt) private var humans: [Human]
+
+    var body: some View {
+        FamilyActivityStripView(
+            pet: pet,
+            humans: humans,
+            style: style,
+            onExpand: onExpand
+        )
     }
 }
 
@@ -1005,17 +1649,18 @@ private struct RequiredHumanProfileView: View {
                     Circle()
                         .fill(Color.goLime.opacity(0.16))
                         .frame(width: 72, height: 72)
-                    Image(systemName: "person.crop.circle.badge.exclamationmark.fill")
-                        .font(.system(size: 34, weight: .bold))
+                    Image(systemName: "person.crop.circle.badge.exclamationmark.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.title(.bold))
                         .foregroundStyle(Color.goLime)
+                        .accessibilityHidden(true)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("先建立你的本人档案")
-                        .font(.system(size: 30, weight: .black, design: .rounded))
+                        .font(OhanaFont.title(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("当前没有人类成员。Ohana 需要至少一个人类成员，用来记录谁完成了喂食、喂水、护理、健康记录和花费。")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineSpacing(3)
                 }
@@ -1032,7 +1677,7 @@ private struct RequiredHumanProfileView: View {
                     }
                 } label: {
                     Text("建立我的档案")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
@@ -1052,11 +1697,12 @@ private struct RequiredHumanProfileView: View {
     private func requirementRow(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .bold))
+                .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.goLime)
                 .frame(width: 22)
+                .accessibilityHidden(true)
             Text(text)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
         }
@@ -1068,14 +1714,15 @@ private struct MissingRouteEntityView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "exclamationmark.magnifyingglass")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+            Image(systemName: "exclamationmark.magnifyingglass") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.title(.bold))
                 .foregroundStyle(Color.goPrimary)
+                .accessibilityHidden(true)
             Text("内容已不可用")
-                .font(.system(size: 20, weight: .black, design: .rounded))
+                .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(kind)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

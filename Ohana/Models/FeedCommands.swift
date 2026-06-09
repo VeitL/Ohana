@@ -119,6 +119,82 @@ enum ManualFeedCommand {
     }
 }
 
+struct OverviewQuickCareCommandResult: Equatable {
+    let petID: UUID
+    let action: String
+    let coconutDelta: Int
+}
+
+@MainActor
+struct OverviewQuickCareCommandExecutor {
+    private let context: ModelContext
+    private let revisionCenter: ReadModelRevisionCenter
+
+    init(context: ModelContext) {
+        self.init(context: context, revisionCenter: .shared)
+    }
+
+    init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
+        self.context = context
+        self.revisionCenter = revisionCenter
+    }
+
+    @discardableResult
+    func record(
+        pet: Pet,
+        actionType: String,
+        amount: Double,
+        saveAsDefault: Bool,
+        executorId: String?
+    ) -> OverviewQuickCareCommandResult {
+        if actionType == "water" {
+            let waterAmount = amount > 0 ? amount : 200
+            let result = QuickWaterCommandExecutor(context: context).recordWater(
+                pet: pet,
+                targets: [pet],
+                amountMl: waterAmount,
+                executorId: executorId
+            )
+            publish(petID: pet.id, action: "water", note: "overview.quick.water")
+            return OverviewQuickCareCommandResult(
+                petID: pet.id,
+                action: "water",
+                coconutDelta: result.coconutDelta
+            )
+        }
+
+        let grams = amount
+        _ = ManualFeedCommand.recordManual(
+            pet: pet,
+            targets: [pet],
+            grams: grams,
+            foodKind: pet.mainFoodKind,
+            saveAsDefault: saveAsDefault,
+            foodRecords: [],
+            allEvents: [],
+            context: context,
+            executorId: executorId
+        )
+        publish(petID: pet.id, action: "feed", note: "overview.quick.feed")
+        return OverviewQuickCareCommandResult(
+            petID: pet.id,
+            action: "feed",
+            coconutDelta: 0
+        )
+    }
+
+    private func publish(petID: UUID, action: String, note: String) {
+        revisionCenter.publish(
+            DomainMutationResult(
+                command: .quickCare(entityID: petID, action: action),
+                affectedEntityIDs: [petID],
+                wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+}
+
 struct TreatFeedCommandResult {
     let grams: Double
 }

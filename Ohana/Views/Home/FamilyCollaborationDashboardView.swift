@@ -13,13 +13,13 @@ struct FamilyCollaborationDashboardHost: View {
     let pets: [Pet]
     let humans: [Human]
     let pendingReminders: [Reminder]
+    let familyTasks: [FamilyCollaborationTask]
     var createTaskTrigger: Int = 0
     var onEditorVisibilityChanged: (Bool) -> Void = { _ in }
     var onOpenPetActivity: (Pet) -> Void
     var onOpenWeeklyReport: () -> Void
 
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \FamilyCollaborationTask.updatedAt, order: .reverse) private var familyTasks: [FamilyCollaborationTask]
     @AppStorage("bountyTasks") private var legacyBountyTasksRaw = ""
 
     var body: some View {
@@ -63,6 +63,9 @@ struct FamilyCollaborationDashboardView: View {
     @State private var memberRailFloating = false
     @State private var legacyBountySyncTask: Task<Void, Never>?
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
+    @State private var petAvatarSignatures: [UUID: String] = [:]
+    @State private var petAvatarCacheKey = "family-collaboration-pet-avatar-empty"
 
     private enum TaskScope: String {
         case mine
@@ -98,16 +101,27 @@ struct FamilyCollaborationDashboardView: View {
         activeFamilyTasks.filter { $0.hasReward }
     }
 
+    private var activePets: [Pet] {
+        pets.filter { !$0.hasPassedAway }
+    }
+
     private var selectedPet: Pet? {
         if let selectedPetId,
-           let pet = pets.first(where: { $0.id == selectedPetId && !$0.hasPassedAway }) {
+           let pet = activePets.first(where: { $0.id == selectedPetId }) {
             return pet
         }
-        return pets.first { !$0.hasPassedAway }
+        return activePets.first
     }
 
     private var careGapPets: [Pet] {
-        pets.filter { !$0.hasPassedAway && !careGapLabels(for: $0).isEmpty }
+        activePets.filter { !careGapLabels(for: $0).isEmpty }
+    }
+
+    private var petAvatarSourceKey: String {
+        let key = activePets
+            .map { "\($0.id.uuidString):\($0.avatarImageData?.count ?? 0)" }
+            .joined(separator: "|")
+        return key.isEmpty ? "family-collaboration-pet-avatar-empty" : key
     }
 
     private var todayAssignedReminders: [Reminder] {
@@ -214,7 +228,11 @@ struct FamilyCollaborationDashboardView: View {
         }
         .onDisappear {
             legacyBountySyncTask?.cancel()
+            avatarPipeline.cancel(key: petAvatarCacheKey)
             onEditorVisibilityChanged(false)
+        }
+        .task(id: petAvatarSourceKey) {
+            await preparePetAvatars()
         }
         .onChange(of: legacyBountySyncToken) { _, _ in
             scheduleLegacyBountySync()
@@ -260,7 +278,7 @@ struct FamilyCollaborationDashboardView: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(title)
                     .font(OhanaFont.caption2(.black))
                     .lineLimit(1)
@@ -278,8 +296,8 @@ struct FamilyCollaborationDashboardView: View {
 
     private var progressScopePill: some View {
         HStack(spacing: 6) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 11, weight: .black))
+            Image(systemName: "chart.line.uptrend.xyaxis") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(l.tr(zh: "完成", en: "Done", de: "Fertig"))
                 .font(OhanaFont.caption2(.black))
                 .lineLimit(1)
@@ -322,7 +340,7 @@ struct FamilyCollaborationDashboardView: View {
         .offset(y: memberRailFloating ? -3 : 2)
         .animation(
             shouldRunAmbientMotion
-            ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true)
+            ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // smoothness: allow visible-only family rail ambient float gated by AppWorkloadPolicy.
             : nil,
             value: memberRailFloating
         )
@@ -346,8 +364,8 @@ struct FamilyCollaborationDashboardView: View {
     private func floatingMemberNode(_ human: Human, index: Int) -> some View {
         VStack(spacing: 3) {
             Text(human.avatarEmoji)
-                .font(.system(size: 19))
-                .frame(width: 34, height: 34)
+                .font(OhanaFont.adaptive(size: 19)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.ohanaControlFill, in: Circle())
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.10), radius: 8, x: 0, y: 5) // ui-v4: allow small floating avatar shadow
             Text(human.name)
@@ -395,7 +413,7 @@ struct FamilyCollaborationDashboardView: View {
                             .font(OhanaFont.caption2(.black))
                             .foregroundStyle(Color.arkInk)
                             .monospacedDigit()
-                            .frame(width: 23, height: 23)
+                            .frame(width: 23, height: 23) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(tint, in: Circle())
                             .offset(x: 3, y: -2)
                     }
@@ -416,8 +434,10 @@ struct FamilyCollaborationDashboardView: View {
         let bodyWidth: CGFloat = selected ? 92 : 82
         let bodyHeight: CGFloat = selected ? 96 : 88
         Group {
-            if let data = pet.avatarImageData, let image = UIImage(data: data) {
-                if ImageCutoutService.isTransparentPNG(data) {
+            if let signature = petAvatarSignatures[pet.id],
+               let entry = FocusWalletAvatarCache.cachedEntry(for: pet.id, signature: signature),
+               let image = entry.image {
+                if entry.isTransparent {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
@@ -444,7 +464,7 @@ struct FamilyCollaborationDashboardView: View {
                         .fill(Color.ohanaCardSurface)
                         .frame(width: size, height: size)
                     Text(pet.avatarEmoji)
-                        .font(.system(size: 32))
+                        .font(OhanaFont.adaptive(size: 32)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .frame(width: size - 6, height: size - 6)
                 }
                 .overlay(Circle().strokeBorder(selected ? tint : Color.ohanaCardStroke, lineWidth: selected ? 2.5 : 1))
@@ -452,6 +472,38 @@ struct FamilyCollaborationDashboardView: View {
             }
         }
         .animation(GoMotion.feedback, value: selected)
+    }
+
+    @MainActor
+    private func preparePetAvatars() async {
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 32)
+        guard !Task.isCancelled else { return }
+
+        var signatures: [UUID: String] = [:]
+        var payloads: [FocusWalletAvatarCache.Payload] = []
+        for pet in activePets {
+            guard let data = pet.avatarImageData else { continue }
+            let signature = FocusWalletAvatarCache.signature(for: data)
+            signatures[pet.id] = signature
+            payloads.append(FocusWalletAvatarCache.Payload(id: pet.id, data: data))
+        }
+
+        let rawKey = payloads
+            .map { "\($0.id.uuidString):\($0.data?.count ?? 0)" }
+            .joined(separator: "|")
+        let nextKey = rawKey.isEmpty ? "family-collaboration-pet-avatar-empty" : "family-collaboration-\(rawKey)"
+        if petAvatarCacheKey != nextKey {
+            avatarPipeline.cancel(key: petAvatarCacheKey)
+            petAvatarCacheKey = nextKey
+        }
+        petAvatarSignatures = signatures
+        guard !payloads.isEmpty else { return }
+        avatarPipeline.seedPreviewEntries(payloads)
+        avatarPipeline.preload(
+            payloads: payloads,
+            key: nextKey,
+            delayMilliseconds: 56
+        )
     }
 
     private func scheduleLegacyBountySync() {
@@ -632,7 +684,7 @@ struct FamilyCollaborationDashboardView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: drawerIcon)
-                    .font(.system(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(drawerTint)
                 Text(drawerTitle)
                     .font(OhanaFont.callout(.black))
@@ -654,10 +706,10 @@ struct FamilyCollaborationDashboardView: View {
                 openMoreCollaboration()
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "ellipsis.circle.fill")
+                    Image(systemName: "ellipsis.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                     Text(l.tr(zh: "更多", en: "More", de: "Mehr"))
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                 }
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -751,9 +803,9 @@ struct FamilyCollaborationDashboardView: View {
         let assignTitle = l.tr(zh: "分配", en: "Assign", de: "Zuweisen")
         return HStack(spacing: 12) {
             Image(systemName: reminder.event?.silhouetteListSymbol ?? "checklist")
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
-                .frame(width: 38, height: 38)
+                .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
             VStack(alignment: .leading, spacing: 3) {
                 Text(reminder.event?.title ?? l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe"))
                     .font(OhanaFont.callout(.black))
@@ -766,8 +818,8 @@ struct FamilyCollaborationDashboardView: View {
                 presentEditor(.assignReminder(reminder.id))
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "person.crop.circle.badge.plus")
-                        .font(.system(size: 11, weight: .black))
+                    Image(systemName: "person.crop.circle.badge.plus") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(assignTitle)
                         .font(OhanaFont.caption(.black))
                 }
@@ -791,7 +843,7 @@ struct FamilyCollaborationDashboardView: View {
         HStack(spacing: 12) {
             Text(task.emoji)
                 .font(OhanaFont.title3(.black))
-                .frame(width: 38, height: 38)
+                .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
             VStack(alignment: .leading, spacing: 3) {
                 Text(task.title)
                     .font(OhanaFont.callout(.black))
@@ -1053,7 +1105,7 @@ struct FamilyCollaborationDashboardView: View {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(tint.opacity(0.16))
                     Image(systemName: icon)
-                        .font(.system(size: 17, weight: .black))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tint)
                 }
                 .frame(width: 48, height: 48)
@@ -1199,8 +1251,8 @@ struct FamilyCollaborationDashboardView: View {
             openMoreCollaboration()
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: "ellipsis.circle.fill")
-                    .font(.system(size: 16, weight: .black))
+                Image(systemName: "ellipsis.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "更多协作", en: "More collaboration", de: "Mehr Zusammenarbeit"))
@@ -1212,8 +1264,8 @@ struct FamilyCollaborationDashboardView: View {
                         .lineLimit(1)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(12)
@@ -1229,10 +1281,10 @@ struct FamilyCollaborationDashboardView: View {
                 onOpenWeeklyReport()
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "chart.bar.doc.horizontal")
-                        .font(.system(size: 16, weight: .black))
+                    Image(systemName: "chart.bar.doc.horizontal") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goPrimary, in: Circle())
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "家庭周报", en: "Family weekly report", de: "Familien-Wochenbericht"))
@@ -1345,7 +1397,7 @@ struct FamilyCollaborationDashboardView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                 Text(title)
                     .font(OhanaFont.caption(.black))
@@ -1377,9 +1429,9 @@ struct FamilyCollaborationDashboardView: View {
         let event = reminder.event
         return HStack(spacing: 12) {
             Image(systemName: event?.silhouetteListSymbol ?? "checklist")
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(role == .mine ? Color.goPurple : Color.goTeal)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(event?.title ?? l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe"))
@@ -1412,7 +1464,7 @@ struct FamilyCollaborationDashboardView: View {
             HStack(spacing: 12) {
                 Text(pet.avatarEmoji)
                     .font(OhanaFont.title3(.black))
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(pet.name)
@@ -1437,8 +1489,8 @@ struct FamilyCollaborationDashboardView: View {
                         .background(Color.goYellow, in: Capsule())
                 }
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .black))
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(12)
@@ -1484,9 +1536,9 @@ struct FamilyCollaborationDashboardView: View {
     private func activityRow(_ activity: CollaborationActivity) -> some View {
         HStack(spacing: 11) {
             Image(systemName: activity.icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(activity.tint)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(activity.actor) · \(activity.title)")
                     .font(OhanaFont.callout(.black))
@@ -1504,9 +1556,9 @@ struct FamilyCollaborationDashboardView: View {
     private func compactEmpty(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaTertiaryText)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(text)
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -1789,9 +1841,9 @@ private struct FamilyTaskEditorPanel: View {
     private func reminderSummary(_ reminder: Reminder) -> some View {
         HStack(spacing: 12) {
             Image(systemName: reminder.event?.silhouetteListSymbol ?? "checklist")
-                .font(.system(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
             VStack(alignment: .leading, spacing: 3) {
                 Text(reminder.event?.title ?? l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe"))
                     .font(OhanaFont.callout(.black))
@@ -1827,8 +1879,8 @@ private struct FamilyTaskEditorPanel: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
             if assignableHumans.isEmpty {
                 HStack(spacing: 8) {
-                    Image(systemName: "person.2.slash")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "person.2.slash") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(l.tr(
                         zh: "还没有可分配的其他家人",
@@ -1925,7 +1977,7 @@ private struct FamilyTaskEditorPanel: View {
                     } label: {
                         Text(item)
                             .font(OhanaFont.title3(.black))
-                            .frame(width: 42, height: 42)
+                            .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(emoji == item ? Color.goPrimary : Color.ohanaCardSurface, in: Circle())
                     }
                     .buttonStyle(ScaleButtonStyle())

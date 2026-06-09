@@ -136,10 +136,10 @@ struct VaccinePassportView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(pet.name)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "疫苗本", en: "Vaccine passport", de: "Impfpass"))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -148,10 +148,10 @@ struct VaccinePassportView: View {
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 40, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -184,15 +184,15 @@ struct VaccinePassportView: View {
     private func passportMetric(title: String, value: String, detail: String, tint: Color = Color.ohanaPrimaryText) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
             Text(detail)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
         }
@@ -204,23 +204,23 @@ struct VaccinePassportView: View {
             showingAdd = true
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: "syringe.fill")
-                    .font(.system(size: 20, weight: .black))
+                Image(systemName: "syringe.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 20, weight: .black))
                     .foregroundStyle(Color.ohanaFunctionalIcon)
                     .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "添加第一针疫苗", en: "Add first vaccine", de: "Erste Impfung hinzufügen"))
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "记录名称、日期和有效期", en: "Name, date, validity", de: "Name, Datum, Gültigkeit"))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "plus").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goPrimary, in: Circle())
             }
             .padding(16)
@@ -233,8 +233,8 @@ struct VaccinePassportView: View {
         Button {
             showingAdd = true
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 20, weight: .black))
+            Image(systemName: "plus").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 58, height: 58)
                 .background(Color.goPrimary, in: Circle())
@@ -316,10 +316,10 @@ private struct VaccineRow: View {
         HStack(alignment: .top, spacing: 14) {
             VStack(spacing: 3) {
                 Text(log.date.formatted(.dateTime.month().day()))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaFunctionalIcon)
                 Text(log.date.formatted(.dateTime.year()))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .frame(width: 42)
@@ -330,7 +330,7 @@ private struct VaccineRow: View {
 
             VStack(alignment: .leading, spacing: 9) {
                 Text(log.note.isEmpty ? l.tr(zh: "疫苗接种", en: "Vaccine", de: "Impfung") : log.note)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
 
@@ -352,7 +352,7 @@ private struct VaccineRow: View {
             Spacer()
 
             Text(statusLabel)
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(statusColor)
                 .padding(.horizontal, 9)
                 .frame(height: 28)
@@ -370,10 +370,10 @@ private struct VaccineRow: View {
     private func rowInfoPill(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 9, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -386,10 +386,10 @@ private struct VaccineRow: View {
     private func rowInlineMeta(icon: String, text: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .black))
                 .foregroundStyle(Color.ohanaFunctionalIcon)
             Text(text)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
         }
@@ -495,8 +495,8 @@ struct AddVaccineSheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -528,8 +528,8 @@ struct AddVaccineSheet: View {
                 }
 
                 HStack(spacing: 10) {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "pencil").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(Color.goPrimary)
                         .frame(width: 24)
                     TextField(l.tr(zh: "自定义疫苗名称", en: "Custom vaccine name", de: "Eigener Impfstoffname"), text: $vaccineName)
@@ -598,7 +598,7 @@ struct AddVaccineSheet: View {
                         withAnimation(GoMotion.feedback) { enableReminder.toggle() }
                     } label: {
                         Image(systemName: enableReminder ? "bell.fill" : "bell.slash.fill")
-                            .font(.system(size: 13, weight: .black))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
                             .foregroundStyle(enableReminder ? Color.arkInk : Color.ohanaSecondaryText)
                             .frame(width: 44, height: 32)
                             .background(enableReminder ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
@@ -684,7 +684,7 @@ struct AddVaccineSheet: View {
     private func sectionLabel(_ title: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(tint)
             Text(title)
                 .font(OhanaFont.subheadline(.black))

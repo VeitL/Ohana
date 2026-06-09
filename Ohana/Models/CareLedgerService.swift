@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum CareLedgerService {
+nonisolated enum CareLedgerService {
     /// Isolation-agnostic: only performs ModelContext writes, so it is safe to
     /// call from the main actor or from a background @ModelActor (e.g. backfill).
     @discardableResult
@@ -198,8 +198,14 @@ enum CareLedgerService {
         return max(0, reward.humanGot) + max(0, reward.petGot)
     }
 
+    @MainActor
     static func rewardMetadata(_ reward: (humanGot: Int, petGot: Int)?) -> String {
         guard let reward else { return "" }
+        if let result = QuestManager.shared.lastEconomyRewardResult,
+           result.humanCoconuts == max(0, reward.humanGot),
+           result.petCoconuts == max(0, reward.petGot) {
+            return result.metadataJSON
+        }
         return """
         {"humanCoconuts":\(max(0, reward.humanGot)),"petCoconuts":\(max(0, reward.petGot)),"economy":"humanWallet_petBond"}
         """

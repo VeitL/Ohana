@@ -73,7 +73,7 @@ struct MotionPreviewLabView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(l.tr(zh: "Motion System 预览", en: "Motion System Preview", de: "Motion-System-Vorschau"))
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 Text(l.tr(
@@ -81,7 +81,7 @@ struct MotionPreviewLabView: View {
                     en: "Three complete systems. Each defines numbers, progress, charts, switching, sheet opening, and sheet content loading.",
                     de: "Drei komplette Systeme fuer Zahlen, Fortschritt, Charts, Wechsel, Sheet-Oeffnung und Sheet-Inhaltsladen."
                 ))
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -91,8 +91,8 @@ struct MotionPreviewLabView: View {
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .background(Color.ohanaCardSurface, in: Circle())
@@ -119,25 +119,25 @@ struct MotionPreviewLabView: View {
                     } label: {
                         HStack(spacing: 12) {
                             Image(systemName: system.icon)
-                                .font(.system(size: 15, weight: .black))
+                                .font(OhanaFont.adaptive(size: 15, weight: .black))
                                 .foregroundStyle(selectedSystem == system ? Color.ohanaPrimaryActionText : Color.ohanaFunctionalIcon)
-                                .frame(width: 34, height: 34)
+                                .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                                 .background(selectedSystem == system ? accent : Color.ohanaControlFill, in: Circle())
 
                             VStack(alignment: .leading, spacing: 3) {
                                 HStack(spacing: 6) {
                                     Text(system.title(l))
-                                        .font(.system(size: 14, weight: .black, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                     Text(system.badge(l))
-                                        .font(.system(size: 9, weight: .black, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                                         .foregroundStyle(selectedSystem == system ? Color.ohanaPrimaryActionText : accent)
                                         .padding(.horizontal, 7)
                                         .frame(height: 20)
                                         .background(selectedSystem == system ? accent : accent.opacity(0.13), in: Capsule())
                                 }
                                 Text(system.summary(l))
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color.ohanaSecondaryText)
                                     .lineLimit(2)
                             }
@@ -145,7 +145,7 @@ struct MotionPreviewLabView: View {
                             Spacer()
 
                             Image(systemName: selectedSystem == system ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(OhanaFont.adaptive(size: 18, weight: .bold))
                                 .foregroundStyle(selectedSystem == system ? accent : Color.ohanaTertiaryText)
                         }
                         .padding(10)
@@ -186,7 +186,7 @@ struct MotionPreviewLabView: View {
                                 .shadow(color: item.color.opacity(selectedAccent == item ? 0.32 : 0.10), radius: selectedAccent == item ? 12 : 5, x: 0, y: 5) // ui-v4: allow palette preview glow
 
                             Text(item.title(l))
-                                .font(.system(size: 9, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                                 .foregroundStyle(selectedAccent == item ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.75)
@@ -226,9 +226,9 @@ struct MotionPreviewLabView: View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black))
                 Text(title)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
@@ -252,24 +252,24 @@ struct MotionPreviewLabView: View {
                     let spec = categorySystem.spec(for: category, l)
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: category.icon)
-                            .font(.system(size: 14, weight: .black))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black))
                             .foregroundStyle(accent)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 30, height: 30) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                             .background(accent.opacity(0.12), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 5) {
                                 Text(category.title(l))
-                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(categorySystem.shortName(l))
-                                    .font(.system(size: 8, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryActionText)
                                     .padding(.horizontal, 5)
                                     .frame(height: 16)
                                     .background(accent, in: Capsule())
                             }
                             Text(spec)
-                                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -293,14 +293,14 @@ struct MotionPreviewLabView: View {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(l.tr(zh: "椰子数", en: "Coconut balance", de: "Kokos-Konto"))
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
 
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Image(systemName: "circle.hexagongrid.fill")
-                            .font(.system(size: 15, weight: .black))
+                        Image(systemName: "circle.hexagongrid.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                            .font(OhanaFont.adaptive(size: 15, weight: .black))
                         Text("\(counter)")
-                            .font(.system(size: 34, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
                             .monospacedDigit()
                             .contentTransition(.numericText())
                             .ohanaNumericMotion(counter)
@@ -313,7 +313,7 @@ struct MotionPreviewLabView: View {
                     .overlay(alignment: .topTrailing) {
                         if let floatingDelta {
                             Text("+\(floatingDelta)")
-                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                                 .monospacedDigit()
                                 .foregroundStyle(accent)
                                 .padding(.horizontal, 8)
@@ -331,10 +331,10 @@ struct MotionPreviewLabView: View {
 
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(l.tr(zh: "Today Focus", en: "Today Focus", de: "Today Focus"))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text("\(secondaryCounter)")
-                        .font(.system(size: 42, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 42, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .monospacedDigit()
                         .contentTransition(.numericText())
@@ -356,11 +356,11 @@ struct MotionPreviewLabView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(l.tr(zh: "能量注入", en: "Energy injection", de: "Energie"))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text("\(Int(progress * 100))%")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(accent)
                         .monospacedDigit()
                         .contentTransition(.numericText())
@@ -378,7 +378,7 @@ struct MotionPreviewLabView: View {
                             .overlay(alignment: .trailing) {
                                 Circle()
                                     .fill(Color.ohanaPrimaryActionText.opacity(selectedSystem.progressCapOpacity))
-                                    .frame(width: 9, height: 9)
+                                    .frame(width: 9, height: 9) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                                     .padding(.trailing, 4)
                                     .scaleEffect(progressPulse ? selectedSystem.progressCapScale : 1)
                             }
@@ -410,11 +410,11 @@ struct MotionPreviewLabView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(l.tr(zh: "周趋势", en: "Weekly trend", de: "Wochentrend"))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text(chartSystem.chartLabel(l))
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(accent)
                         .padding(.horizontal, 9)
                         .frame(height: 24)
@@ -470,7 +470,7 @@ struct MotionPreviewLabView: View {
                             OhanaFeedback.selection()
                         } label: {
                             Text(item.name)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                                 .foregroundStyle(selectedContext == index ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                 .padding(.horizontal, 12)
                                 .frame(height: 36)
@@ -485,15 +485,15 @@ struct MotionPreviewLabView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(l.tr(zh: "日历快照", en: "Calendar snapshot", de: "Kalender-Snapshot"))
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                             Text(context.name)
-                                .font(.system(size: 22, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                         }
                         Spacer()
                         Text("\(context.items.count)")
-                            .font(.system(size: 31, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 31, weight: .black, design: .rounded))
                             .foregroundStyle(accent)
                             .contentTransition(.numericText())
                             .ohanaNumericMotion(context.items.count)
@@ -503,13 +503,13 @@ struct MotionPreviewLabView: View {
                         HStack(spacing: 10) {
                             Circle()
                                 .fill(index == 0 ? accent : context.tint)
-                                .frame(width: 8, height: 8)
+                                .frame(width: 8, height: 8) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                             Text(context.items[index].text(l))
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Spacer()
                             Text(index == 0 ? l.tr(zh: "优先", en: "First", de: "Zuerst") : l.tr(zh: "已排程", en: "Ready", de: "Bereit"))
-                                .font(.system(size: 10, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                                 .foregroundStyle(index == 0 ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                                 .padding(.horizontal, 8)
                                 .frame(height: 24)
@@ -544,7 +544,7 @@ struct MotionPreviewLabView: View {
                         en: "This isolates sheet shell open/close: offset, scale, opacity, and scrim rhythm.",
                         de: "Isoliert die Sheet-Huelle: Versatz, Skalierung, Deckkraft und Scrim-Rhythmus."
                     ))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -552,7 +552,7 @@ struct MotionPreviewLabView: View {
                         toggleSheet()
                     } label: {
                         Label(sheetVisible ? l.tr(zh: "关闭 Sheet", en: "Close Sheet", de: "Sheet schliessen") : l.tr(zh: "打开 Sheet", en: "Open Sheet", de: "Sheet oeffnen"), systemImage: "rectangle.bottomthird.inset.filled")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 44)
@@ -593,11 +593,11 @@ struct MotionPreviewLabView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(l.tr(zh: "内容加载节奏", en: "Content loading rhythm", de: "Inhalts-Laderhythmus"))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text(selectedSystem.contentLabel(l))
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(accent)
                         .padding(.horizontal, 9)
                         .frame(height: 24)
@@ -1193,10 +1193,10 @@ private struct MotionPreviewPanel<Content: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1242,7 +1242,7 @@ private struct MotionScenarioPanel<Content: View>: View {
 
                 Button(action: action) {
                     Label(localization.tr(zh: "重新预览", en: "Replay", de: "Erneut zeigen"), systemImage: "arrow.clockwise")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
@@ -1301,7 +1301,7 @@ private struct MotionPreviewChartDot: View {
         GeometryReader { geo in
             Circle()
                 .fill(accent)
-                .frame(width: 8, height: 8)
+                .frame(width: 8, height: 8) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .position(
                     x: CGFloat(index) * geo.size.width / CGFloat(max(count - 1, 1)),
                     y: geo.size.height * (1 - point)
@@ -1329,28 +1329,28 @@ private struct MotionPreviewSheetShell: View {
                 .frame(width: 44, height: 5)
 
             HStack(spacing: 12) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 22, weight: .bold))
+                Image(systemName: "checkmark.seal.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    .font(OhanaFont.adaptive(size: 22, weight: .bold))
                     .foregroundStyle(accent)
                     .frame(width: 46, height: 46)
                     .background(accent.opacity(0.12), in: Circle())
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(localization.tr(zh: "短 Sheet", en: "Short Sheet", de: "Kurzes Sheet"))
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(system.title(localization))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
                 Spacer()
 
                 Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         .contentShape(Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -1371,7 +1371,7 @@ private struct MotionPreviewSheetShell: View {
 
             Button(action: onConfirm) {
                 Text(localization.tr(zh: "确认 +12", en: "Confirm +12", de: "Bestaetigen +12"))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 40)
@@ -1402,17 +1402,17 @@ private struct MotionPreviewContentLoadingRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: row.icon)
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
                 .foregroundStyle(visible ? Color.ohanaPrimaryActionText : accent)
-                .frame(width: 30, height: 30)
+                .frame(width: 30, height: 30) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(visible ? accent : accent.opacity(0.12), in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title.text(localization))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(row.subtitle.text(localization))
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -1420,7 +1420,7 @@ private struct MotionPreviewContentLoadingRow: View {
             Spacer()
 
             Text(row.value)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(accent)
                 .monospacedDigit()
                 .contentTransition(.numericText())

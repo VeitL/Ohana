@@ -10,6 +10,13 @@ import SwiftData
 
 struct HumanDetailView: View {
     let human: Human
+    let allPets: [Pet]
+    let allHumans: [Human]
+    let allPendingReminders: [Reminder]
+    let allMeds: [HumanMedication]
+    let allReports: [HumanHealthReport]
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
+
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -17,13 +24,31 @@ struct HumanDetailView: View {
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
+    init(
+        human: Human,
+        allPets: [Pet] = [],
+        allHumans: [Human] = [],
+        allPendingReminders: [Reminder] = [],
+        allMeds: [HumanMedication] = [],
+        allReports: [HumanHealthReport] = [],
+        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in }
+    ) {
+        self.human = human
+        self.allPets = allPets
+        self.allHumans = allHumans
+        self.allPendingReminders = allPendingReminders
+        self.allMeds = allMeds
+        self.allReports = allReports
+        self.onPresentCoconutLog = onPresentCoconutLog
+    }
+
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirm = false
     @State private var showWeightHistory = false
-    @State private var showingCoconutLog = false
     @State private var showingWishlist = false
     @State private var showingCoHealth = false
     @State private var showingExpenses = false
@@ -32,13 +57,8 @@ struct HumanDetailView: View {
     @State private var showingHealthMetrics = false
     @State private var showingHomeStackFullAlert = false
     @State private var homeVisibilityOverride: Bool?
-
-    @Query private var allPets: [Pet]
-    @Query private var allHumans: [Human]
-    @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
-           sort: \Reminder.scheduledAt) private var allPendingReminders: [Reminder]
-    @Query private var allMeds: [HumanMedication]
-    @Query private var allReports: [HumanHealthReport]
+    @State private var avatarSignature = ""
+    @State private var avatarCacheKey = "human-detail-avatar-empty"
 
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isAllPrivateForViewer: Bool {
@@ -56,13 +76,13 @@ struct HumanDetailView: View {
 
     private var myMeds: [HumanMedication] {
         guard !human.isPrivate(.medication, viewedBy: activeHumanId) else { return [] }
-        return allMeds.filter { $0.humanId == human.id.uuidString && $0.isActive && $0.isActiveToday }
+        return allMeds.filter { $0.isActive && $0.isActiveToday }
     }
 
     private var myReports: [HumanHealthReport] {
         guard !isAllPrivateForViewer,
               !human.isPrivate(.weight, viewedBy: activeHumanId) else { return [] }
-        return allReports.filter { $0.humanId == human.id.uuidString }
+        return allReports
     }
 
     private var myHealthMetricLogs: [HumanHealthMetricLog] {
@@ -179,11 +199,13 @@ struct HumanDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 12) {
                     if !human.isPrivate(.wishlist, viewedBy: activeHumanId) {
-                        CoconutBalanceCapsule(balance: human.coconutBalance) { showingCoconutLog = true }
+                        CoconutBalanceCapsule(balance: human.coconutBalance) {
+                            presentCoconutLog()
+                        }
                     }
                     if isViewingOwnProfile {
                         Button { showingEditSheet = true } label: {
-                            Image(systemName: "pencil.circle")
+                            Image(systemName: "pencil.circle") // a11y: allow decorative icon covered by surrounding text or control
                                 .foregroundStyle(Color.ohanaPrimaryText)
                         }
                     }
@@ -191,7 +213,6 @@ struct HumanDetailView: View {
             }
         }
         .sheet(isPresented: $showingEditSheet) { EditHumanSheet(human: human) }
-        .sheet(isPresented: $showingCoconutLog) { CoconutLogView(subject: .human(human.id)) }
         .sheet(isPresented: $showWeightHistory) {
             NavigationStack { HumanWeightHistoryView(human: human) }
                 .ohanaSheetPagePresentation() // ui-v4: allow long weight history uses large sheet
@@ -218,6 +239,12 @@ struct HumanDetailView: View {
         } message: {
             Text("首页最多显示 \(HomeCardVisibility.maxVisibleCards) 张卡片。请先从首页移除一张宠物或人类卡片，再添加 \(human.name)。")
         }
+        .task(id: avatarSourceKey) {
+            await prepareAvatar()
+        }
+        .onDisappear {
+            avatarPipeline.cancel(key: avatarCacheKey)
+        }
     }
 
     // MARK: - Hero Card（GO 首页同款白底卡片，弱化大色块背景）
@@ -235,21 +262,7 @@ struct HumanDetailView: View {
                 .frame(maxWidth: .infinity)
 
             ZStack {
-                if let imageData = human.avatarImageData, let uiImage = UIImage(data: imageData) {
-                    Image(uiImage: uiImage)
-                        .resizable().scaledToFill()
-                        .frame(width: 100, height: 100)
-                        .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(themeColor.opacity(0.35), lineWidth: 2.5))
-                } else {
-                    ZStack {
-                        Circle()
-                            .fill(Color(hex: "EEF2FF"))
-                            .frame(width: 100, height: 100)
-                            .overlay(Circle().strokeBorder(themeColor.opacity(0.2), lineWidth: 1.5))
-                        Text(human.avatarEmoji).font(OhanaFont.metric(size: 50))
-                    }
-                }
+                humanAvatar(size: 100)
             }
 
             VStack(spacing: 10) {
@@ -274,6 +287,64 @@ struct HumanDetailView: View {
         .padding(.horizontal, 16)
         .goIslandModuleCard(cornerRadius: 28)
         .padding(.horizontal, 16)
+    }
+
+    @ViewBuilder
+    private func humanAvatar(size: CGFloat) -> some View {
+        ZStack {
+            Circle()
+                .fill(Color(hex: "EEF2FF"))
+                .frame(width: size, height: size)
+                .overlay(Circle().strokeBorder(themeColor.opacity(0.2), lineWidth: 1.5))
+
+            if !avatarSignature.isEmpty,
+               let image = avatarPipeline.cachedImage(for: human.id, signature: avatarSignature) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Text(human.avatarEmoji.isEmpty ? "👤" : human.avatarEmoji)
+                    .font(OhanaFont.metric(size: size * 0.5))
+                    .minimumScaleFactor(0.55)
+            }
+        }
+        .overlay(Circle().strokeBorder(themeColor.opacity(0.35), lineWidth: 2.5))
+    }
+
+    private var avatarSourceKey: String {
+        "\(human.id.uuidString):\(human.avatarImageData?.count ?? 0)"
+    }
+
+    private func prepareAvatar() async {
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
+        guard !Task.isCancelled else { return }
+        guard let data = human.avatarImageData else {
+            avatarPipeline.cancel(key: avatarCacheKey)
+            avatarSignature = ""
+            avatarCacheKey = "human-detail-avatar-empty"
+            return
+        }
+
+        let signature = FocusWalletAvatarCache.signature(for: data)
+        let nextKey = "human-detail-avatar-\(human.id.uuidString)-\(data.count)"
+        if avatarCacheKey != nextKey {
+            avatarPipeline.cancel(key: avatarCacheKey)
+            avatarCacheKey = nextKey
+        }
+        avatarSignature = signature
+        let payload = FocusWalletAvatarCache.Payload(id: human.id, data: data)
+        avatarPipeline.seedPreviewEntries([payload])
+        avatarPipeline.preload(
+            payloads: [payload],
+            key: nextKey,
+            delayMilliseconds: 48
+        )
+    }
+
+    private func presentCoconutLog() {
+        onPresentCoconutLog(.human(human.id))
     }
 
     // MARK: - Stats Bento（与 GO「岛屿统计」小卡同款：白底 + 轻阴影）
@@ -319,9 +390,9 @@ struct HumanDetailView: View {
     private func bentoStatMini(icon: String, value: String, unit: String, label: String, color: Color) -> some View {
         VStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(color)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(color.opacity(0.15), in: Circle())
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
@@ -357,7 +428,7 @@ struct HumanDetailView: View {
             if !badges.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 8) {
-                        Image(systemName: "trophy.fill")
+                        Image(systemName: "trophy.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.callout(.bold))
                             .foregroundStyle(Color.goYellow)
                         Text("动态称号")
@@ -393,7 +464,7 @@ struct HumanDetailView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle().fill(Color.goRed.opacity(0.18)).frame(width: 48, height: 48)
-                    Image(systemName: "pills.fill")
+                    Image(systemName: "pills.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.title3(.bold))
                         .foregroundStyle(Color.goRed)
                 }
@@ -412,7 +483,7 @@ struct HumanDetailView: View {
                                     HStack(spacing: 4) {
                                         Circle()
                                             .fill(Color(hex: med.colorHex))
-                                            .frame(width: 6, height: 6)
+                                            .frame(width: 6, height: 6) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                         Text(med.name)
                                             .font(OhanaFont.caption(.semibold))
                                             .foregroundStyle(Color(hex: "475569"))
@@ -432,13 +503,13 @@ struct HumanDetailView: View {
                 Spacer()
                 if !myMeds.isEmpty {
                     ZStack {
-                        Circle().fill(Color.goRed).frame(width: 24, height: 24)
+                        Circle().fill(Color.goRed).frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         Text("\(myMeds.count)")
                             .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(Color.arkInk)
                     }
                 }
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
@@ -455,7 +526,7 @@ struct HumanDetailView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle().fill(Color.goTeal.opacity(0.18)).frame(width: 48, height: 48)
-                    Image(systemName: "stethoscope")
+                    Image(systemName: "stethoscope") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.title3(.bold))
                         .foregroundStyle(Color.goTeal)
                 }
@@ -484,13 +555,13 @@ struct HumanDetailView: View {
                 Spacer()
                 if !myReports.isEmpty {
                     ZStack {
-                        Circle().fill(Color.goTeal).frame(width: 24, height: 24)
+                        Circle().fill(Color.goTeal).frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         Text("\(myReports.count)")
                             .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(Color.arkInk)
                     }
                 }
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
@@ -512,7 +583,7 @@ struct HumanDetailView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle().fill(Color.goTeal.opacity(0.18)).frame(width: 48, height: 48)
-                    Image(systemName: "waveform.path.ecg.rectangle.fill")
+                    Image(systemName: "waveform.path.ecg.rectangle.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.title3(.bold))
                         .foregroundStyle(Color.goTeal)
                 }
@@ -547,7 +618,7 @@ struct HumanDetailView: View {
                         }
                     }
                 }
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
@@ -564,7 +635,7 @@ struct HumanDetailView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle().fill(Color.goPrimary.opacity(0.18)).frame(width: 48, height: 48)
-                    Image(systemName: "scalemass.fill")
+                    Image(systemName: "scalemass.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.title3(.bold))
                         .foregroundStyle(Color.goPrimary)
                 }
@@ -593,7 +664,7 @@ struct HumanDetailView: View {
                             .foregroundStyle(Color.goPrimary.opacity(0.7))
                     }
                 }
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
@@ -609,7 +680,7 @@ struct HumanDetailView: View {
         HStack(spacing: 14) {
             ZStack {
                 Circle().fill(Color.goPrimary.opacity(0.2)).frame(width: 48, height: 48)
-                Image(systemName: "rectangle.stack.fill")
+                Image(systemName: "rectangle.stack.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.title3(.bold))
                     .foregroundStyle(Color.goPrimary)
             }
@@ -678,7 +749,7 @@ struct HumanDetailView: View {
                     }
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
@@ -695,7 +766,7 @@ struct HumanDetailView: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle().fill(Color.goCardCyan.opacity(0.18)).frame(width: 48, height: 48)
-                    Image(systemName: "yensign")
+                    Image(systemName: "yensign") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.title3(.bold))
                         .foregroundStyle(Color.goCardCyan)
                 }
@@ -708,7 +779,7 @@ struct HumanDetailView: View {
                         .foregroundStyle(Color(hex: "6B82C4"))
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
@@ -732,7 +803,7 @@ struct HumanDetailView: View {
     // MARK: - Privacy Placeholder
     private func privacyPlaceholderCard(label: String) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "lock.fill")
+            Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.headline())
                 .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             Text("🔒 \(label) · 仅本人可见")
@@ -747,7 +818,7 @@ struct HumanDetailView: View {
 
     private var fullPrivacyPlaceholder: some View {
         VStack(spacing: 12) {
-            Image(systemName: "lock.shield.fill")
+            Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.metric(size: 34))
                 .foregroundStyle(Color.goYellow)
             Text("此成员资料仅本人可见")
@@ -770,7 +841,7 @@ struct HumanDetailView: View {
     private var remindersSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
-                Image(systemName: "bell.badge.fill")
+                Image(systemName: "bell.badge.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.callout(.bold))
                     .foregroundStyle(Color.goOrange)
                 Text("待办提醒")
@@ -790,7 +861,7 @@ struct HumanDetailView: View {
                 HStack {
                     Spacer()
                     VStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle").font(OhanaFont.metric(size: 28)).foregroundStyle(Color(hex: "6B82C4").opacity(0.35))
+                        Image(systemName: "checkmark.circle").font(OhanaFont.metric(size: 28)).foregroundStyle(Color(hex: "6B82C4").opacity(0.35)) // a11y: allow decorative icon covered by surrounding text or control
                         Text("暂无待办提醒").font(OhanaFont.callout()).foregroundStyle(Color(hex: "6B82C4"))
                     }
                     .padding(.vertical, 12)
@@ -828,12 +899,12 @@ struct HumanDetailView: View {
                 NudgeButton(targetHuman: assignee)
             }
             Button { completeReminder(reminder) } label: {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.title3(.bold))
                     .foregroundStyle(Color.goPrimary)
             }
             Button { skipReminder(reminder) } label: {
-                Image(systemName: "forward.circle.fill")
+                Image(systemName: "forward.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.title3(.bold))
                     .foregroundStyle(Color.goYellow)
             }
@@ -851,7 +922,7 @@ struct HumanDetailView: View {
 
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 8) {
-                            Image(systemName: "note.text")
+                            Image(systemName: "note.text") // a11y: allow decorative icon covered by surrounding text or control
                                 .font(OhanaFont.callout(.bold))
                                 .foregroundStyle(Color.goPrimary)
                             Text("备注")
@@ -900,7 +971,7 @@ struct HumanDetailView: View {
         HStack(spacing: 8) {
             RoundedRectangle(cornerRadius: 2)
                 .fill(Color.goPrimary)
-                .frame(width: 3, height: 16)
+                .frame(width: 3, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(text)
                 .font(OhanaFont.footnote(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -916,20 +987,24 @@ struct HumanDetailView: View {
     // MARK: - Actions
     private func completeReminder(_ reminder: Reminder) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        ReminderCommandExecutor(context: modelContext).complete(
-            reminder,
-            by: human.id.uuidString,
-            note: "human.detail.reminder.complete"
-        )
+        commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
+            ReminderCommandExecutor(context: modelContext).complete(
+                reminder,
+                by: human.id.uuidString,
+                note: "human.detail.reminder.complete"
+            )
+        }
     }
 
     private func skipReminder(_ reminder: Reminder) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        ReminderCommandExecutor(context: modelContext).skip(
-            reminder,
-            by: human.id.uuidString,
-            note: "human.detail.reminder.skip"
-        )
+        commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
+            ReminderCommandExecutor(context: modelContext).skip(
+                reminder,
+                by: human.id.uuidString,
+                note: "human.detail.reminder.skip"
+            )
+        }
     }
 
     private func deleteHumanAndReturnHome() {

@@ -180,7 +180,7 @@ struct QuickHumanWorkoutSheet: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(accent.opacity(0.18))
                 Image(systemName: selectedType.icon)
-                    .font(.system(size: 19, weight: .black))
+                    .font(OhanaFont.adaptive(size: 19, weight: .black))
                     .foregroundStyle(accent)
             }
             .frame(width: 58, height: 58)
@@ -212,7 +212,7 @@ struct QuickHumanWorkoutSheet: View {
                 } label: {
                     VStack(spacing: 5) {
                         Image(systemName: type.icon)
-                            .font(.system(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black))
                         Text(type.rawValue)
                             .font(OhanaFont.caption2(.black))
                             .lineLimit(1)
@@ -275,7 +275,7 @@ struct QuickHumanWorkoutSheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(.system(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black))
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存运动", en: "Save Workout", de: "Training speichern")

@@ -202,7 +202,7 @@ private struct OhanaMarchingBorderModifier: ViewModifier {
                         .onAppear {
                             guard !reduceMotion else { return }
                             dashPhase = 42
-                            withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) { // ui-v4: allow continuous dashPhase attention border
+                            withAnimation(.linear(duration: 1.35).repeatForever(autoreverses: false)) { // ui-v4: allow continuous dashPhase attention border; smoothness: allow visible-only stroke phase loop gated by Reduce Motion.
                                 dashPhase = -42
                             }
                         }

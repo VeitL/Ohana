@@ -64,7 +64,7 @@ extension QuickFeedDetailContent {
 
     var mainFoodKindLabel: some View {
         Text(l.tr(zh: "当前主粮", en: "Current food", de: "Aktuelles Futter"))
-            .font(.system(size: 12, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
             .foregroundStyle(Color.ohanaSecondaryText)
             .lineLimit(1)
             .minimumScaleFactor(0.82)
@@ -79,7 +79,7 @@ extension QuickFeedDetailContent {
                     }
                 } label: {
                     Text(foodKind.title(l))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(pet.mainFoodKind == foodKind ? Color.arkInk : foodKindTint(foodKind))
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
@@ -139,7 +139,7 @@ extension QuickFeedDetailContent {
                             setSelection(foodKind)
                         } label: {
                             Text(foodKind.title(l))
-                                .font(.system(size: 14, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                                 .foregroundStyle(selection == foodKind ? Color.arkInk : foodKindTint(foodKind))
                                 .contentTransition(.opacity)
                                 .frame(width: segmentWidth, height: 46)
@@ -163,7 +163,7 @@ extension QuickFeedDetailContent {
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Label(treatKind.title(l), systemImage: treatKind.systemIconName)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(selection.wrappedValue == treatKind ? Color.arkInk : treatTint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -188,7 +188,7 @@ extension QuickFeedDetailContent {
                         UISelectionFeedbackGenerator().selectionChanged()
                     } label: {
                         Text(brand)
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                             .foregroundStyle(stockTint)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
@@ -245,7 +245,7 @@ extension QuickFeedDetailContent {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 10) {
                 gramStepButton(systemName: "minus", tint: tint) {
@@ -256,11 +256,11 @@ extension QuickFeedDetailContent {
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(text.wrappedValue.isEmpty ? "50" : text.wrappedValue)
-                            .font(.system(size: 32, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 32, weight: .black, design: .rounded))
                             .foregroundStyle(text.wrappedValue.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                             .monospacedDigit()
                         Text("g")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                             .foregroundStyle(tint)
                     }
                     .frame(maxWidth: .infinity)
@@ -286,9 +286,9 @@ extension QuickFeedDetailContent {
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: Circle())
         }
         .buttonStyle(ScaleButtonStyle())
@@ -308,11 +308,11 @@ extension QuickFeedDetailContent {
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(text.wrappedValue.isEmpty ? "50" : text.wrappedValue)
-                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                             .foregroundStyle(text.wrappedValue.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                             .monospacedDigit()
                         Text("g")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(tint)
                     }
                     .frame(maxWidth: .infinity)
@@ -342,7 +342,7 @@ extension QuickFeedDetailContent {
     var manualDefaultToggle: some View {
         Toggle(isOn: $draftStore.saveManualAsDefault) {
             Text(l.tr(zh: "保存为默认克数", en: "Save as default", de: "Als Standard speichern"))
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .tint(mainFoodTint)
@@ -358,21 +358,21 @@ extension QuickFeedDetailContent {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 5) {
                 Button {
                     openFeedNumberPad(field)
                 } label: {
                     Text(text.wrappedValue.isEmpty ? "50" : text.wrappedValue)
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(text.wrappedValue.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                         .monospacedDigit()
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 Text("g")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
             }
             .padding(12)
@@ -434,7 +434,7 @@ extension QuickFeedDetailContent {
                         UISelectionFeedbackGenerator().selectionChanged()
                     } label: {
                         Text(formattedFoodWeight(value))
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                             .foregroundStyle(tint)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
@@ -454,11 +454,11 @@ extension QuickFeedDetailContent {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack {
                 Text(value)
-                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
                 Spacer()
                 control()
@@ -472,11 +472,11 @@ extension QuickFeedDetailContent {
     func compactNotice(icon: String, text: String, tint: Color) -> some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(tint)
                 .frame(width: 18)
             Text(text)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -487,7 +487,7 @@ extension QuickFeedDetailContent {
 
     func errorText(_ text: String) -> some View {
         Label(text, systemImage: "exclamationmark.triangle.fill")
-            .font(.system(size: 12, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
             .foregroundStyle(Color.goRed)
             .padding(12)
             .feedFlatBlockSurface(cornerRadius: 14)

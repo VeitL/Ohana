@@ -47,12 +47,12 @@ extension QuickFeedDetailContent {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(l.tr(zh: "每餐", en: "Meals", de: "Mahlzeiten"))
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     ForEach(Array(draftStore.planMeals.indices), id: \.self) { index in
                         VStack(alignment: .leading, spacing: 10) {
                             Label(FeedRuleMetadata.mealName(for: draftStore.planMeals[index].time), systemImage: "clock.fill")
-                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                                 .foregroundStyle(tint)
                             DatePicker(
                                 "",
@@ -126,7 +126,7 @@ extension QuickFeedDetailContent {
                     deletePlan(kind)
                 } label: {
                     Label(l.tr(zh: "删除当前计划", en: "Delete current plan", de: "Aktuellen Plan löschen"), systemImage: "trash")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)

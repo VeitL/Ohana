@@ -8,19 +8,19 @@ extension QuickFeedDetailContent {
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label(foodKind.title(l), systemImage: "shippingbox.fill")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
                 Spacer()
                 Text(snapshot.totalGrams > 0 ? "\(snapshot.remainingDays) \(l.tr(zh: "天", en: "days", de: "Tage"))" : l.tr(zh: "未添加", en: "Not set", de: "Nicht gesetzt"))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(snapshot.totalGrams > 0 && snapshot.remainingDays <= 3 ? Color.goRed : Color.ohanaSecondaryText)
             }
             HStack(alignment: .lastTextBaseline, spacing: 8) {
                 Text(snapshot.totalGrams > 0 ? formattedStockWeight(snapshot.remainingGrams) : "--")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
                 Text(snapshot.totalGrams > 0 ? "/ \(formattedStockWeight(snapshot.totalGrams))" : "")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
             }
@@ -49,15 +49,15 @@ extension QuickFeedDetailContent {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .lastTextBaseline, spacing: 8) {
                 Text(days.map { "\($0)d" } ?? "--")
-                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
                     .foregroundStyle(stockOverviewStatusTint(dry: dry, wet: wet))
                     .contentTransition(.numericText())
                 Text(l.tr(zh: "预计可用", en: "estimated", de: "geschätzt"))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Text(stockOverviewStatusText(dry: dry, wet: wet))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(stockOverviewStatusTint(dry: dry, wet: wet))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -89,15 +89,15 @@ extension QuickFeedDetailContent {
     func stockOverviewMetric(title: String, value: String, icon: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
                 .foregroundStyle(stockTint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(title)
-                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -112,7 +112,7 @@ extension QuickFeedDetailContent {
                 overviewSectionHeader(l.tr(zh: "补粮记录", en: "Restocks", de: "Nachfüllungen"))
                 Spacer()
                 Text("\(stockOverviewRecords.count)")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(stockTint)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
@@ -154,10 +154,10 @@ extension QuickFeedDetailContent {
             HStack(spacing: 12) {
                 VStack(spacing: 4) {
                     Image(systemName: record.foodKind.systemIconName)
-                        .font(.system(size: 15, weight: .black))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black))
                         .foregroundStyle(Color.arkInk)
                     Text(record.foodKind == .dry ? "DRY" : "WET")
-                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk.opacity(0.72))
                 }
                 .frame(width: 44, height: 48)
@@ -166,18 +166,18 @@ extension QuickFeedDetailContent {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {
                         Text(record.brand.isEmpty ? l.tr(zh: "未命名主粮", en: "Food", de: "Futter") : record.brand)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(statusText)
-                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                             .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 4)
                             .background(statusTint, in: Capsule())
                     }
                     Text(stockRecordDateSummary(record))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
@@ -186,10 +186,10 @@ extension QuickFeedDetailContent {
 
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(total > 0 ? formattedStockWeight(total) : "--")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(foodKindTint(record.foodKind))
-                    Image(systemName: "pencil")
-                        .font(.system(size: 11, weight: .black))
+                    Image(systemName: "pencil").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .black))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -203,21 +203,21 @@ extension QuickFeedDetailContent {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: FeedRuleKind.autoFeeder.iconName)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(Color.goTeal, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "自动猫粮机", en: "Auto feeder", de: "Futterautomat"))
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(autoFeederStatusText)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text("\(autoFeederEvents.count)x")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goTeal)
             }
 

@@ -125,8 +125,8 @@ struct GlobalWalkBanner: View {
                 .shadow(color: Color.goPrimary.opacity(0.35), radius: 12) // ui-v4: allow active walk floating control glow
             VStack(spacing: 1) {
                 walkElapsedLabel(fontSize: 10)
-                Image(systemName: "figure.walk")
-                    .font(.system(size: 18, weight: .bold))
+                Image(systemName: "figure.walk").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 18, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
         }
@@ -163,27 +163,27 @@ struct GlobalWalkBanner: View {
                         HStack(spacing: 5) {
                             if case .paused = mgr.phase {
                                 Text("已暂停")
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.goYellow)
                                     .padding(.horizontal, 7).padding(.vertical, 2)
                                     .background(Color.goYellow.opacity(0.15), in: Capsule())
                             } else {
-                                Circle().fill(Color.goPrimary).frame(width: 7, height: 7)
+                                Circle().fill(Color.goPrimary).frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                     .shadow(color: Color.goPrimary.opacity(0.8), radius: 4) // ui-v4: allow live walk status glow
                                 Text("巡岛中")
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.goPrimary)
                             }
                         }
                         Text(pet.name)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
                 Spacer()
                 Button { withAnimation { isMinimized = true } } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 22))
+                    Image(systemName: "minus.circle.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 22))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
             }
@@ -196,22 +196,22 @@ struct GlobalWalkBanner: View {
                 walkStatCell(label: "时长", accent: .goPrimary) {
                     walkElapsedLabel(fontSize: 26)
                 }
-                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 walkStatCell(label: "距离", accent: .goTeal) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(String(format: "%.2f", LocationManager.shared.totalDistance / 1000))
-                            .font(.system(size: 26, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("km").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.goTeal)
+                        Text("km").font(OhanaFont.adaptive(size: 12, weight: .bold)).foregroundStyle(Color.goTeal)
                     }
                 }
-                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 walkStatCell(label: "便便", accent: .goYellow) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text("\(mgr.poopCount)")
-                            .font(.system(size: 26, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                        Text("💩").font(.system(size: 14))
+                        Text("💩").font(OhanaFont.adaptive(size: 14))
                     }
                 }
             }
@@ -230,7 +230,7 @@ struct GlobalWalkBanner: View {
                         mgr.phase == .running ? "暂停" : "继续",
                         systemImage: mgr.phase == .running ? "pause.fill" : "play.fill"
                     )
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                     .background(mgr.phase == .running ? Color.goYellow : Color.goTeal,
@@ -240,7 +240,7 @@ struct GlobalWalkBanner: View {
                     mgr.addPoop()
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 } label: {
-                    Text("💩").font(.system(size: 20))
+                    Text("💩").font(OhanaFont.adaptive(size: 20))
                         .frame(width: 48, height: 48)
                         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
@@ -253,7 +253,7 @@ struct GlobalWalkBanner: View {
                     showSummaryCard = true
                 } label: {
                     Label("结束", systemImage: "stop.fill")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
                         .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
@@ -356,10 +356,10 @@ struct GlobalWalkBanner: View {
                     petAvatar(pet: pet, size: 36)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("巡岛完成 🎉")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goPrimary)
                         Text(pet.name)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
@@ -372,8 +372,8 @@ struct GlobalWalkBanner: View {
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { mgr.reset() }
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 28))
+                    Image(systemName: "xmark.circle.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 28))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 }
                 .frame(width: 52, height: 52)
@@ -396,9 +396,9 @@ struct GlobalWalkBanner: View {
                             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .overlay(
                                 HStack(spacing: 4) {
-                                    Image(systemName: "map.fill").font(.system(size: 11, weight: .bold))
+                                    Image(systemName: "map.fill").accessibilityHidden(true).font(OhanaFont.adaptive(size: 11, weight: .bold))
                                     Text("在地图中查看")
-                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                 }
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .padding(.horizontal, 10).padding(.vertical, 5)
@@ -421,8 +421,8 @@ struct GlobalWalkBanner: View {
                         .frame(maxWidth: .infinity).frame(height: 108)
                         .overlay(
                             HStack(spacing: 6) {
-                                Image(systemName: "map").font(.system(size: 20)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
-                                Text("地图生成中…").font(.system(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                                Image(systemName: "map").accessibilityHidden(true).font(OhanaFont.adaptive(size: 20)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
+                                Text("地图生成中…").font(OhanaFont.adaptive(size: 12)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
                         )
                 }
@@ -433,11 +433,11 @@ struct GlobalWalkBanner: View {
 
             HStack(spacing: 0) {
                 summaryStatCell(label: "时长", value: formatElapsed(elapsed), accent: .goPrimary)
-                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 36)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 summaryStatCell(label: "距离", value: distance >= 1000
                     ? String(format: "%.2f km", distance / 1000)
                     : String(format: "%.0f m", distance), accent: .goTeal)
-                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 36)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 summaryStatCell(label: "便便", value: "\(poop) 💩", accent: .goYellow)
             }
             .padding(.horizontal, 4)
@@ -489,7 +489,7 @@ struct GlobalWalkBanner: View {
         VStack(spacing: 3) {
             value()
             Text(label)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
         .frame(maxWidth: .infinity)
@@ -499,12 +499,12 @@ struct GlobalWalkBanner: View {
     private func summaryStatCell(label: String, value: String, accent: Color) -> some View {
         VStack(spacing: 3) {
             Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
         .frame(maxWidth: .infinity)

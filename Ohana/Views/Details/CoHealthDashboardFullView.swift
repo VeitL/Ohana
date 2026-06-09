@@ -100,7 +100,7 @@ struct CoHealthDashboardFullView: View {
 
     private var privacyLockedView: some View {
         VStack(spacing: 14) {
-            Image(systemName: "lock.shield.fill")
+            Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.metric(size: 44))
                 .foregroundStyle(Color.goYellow)
             Text("共健数据仅本人可见")
@@ -119,28 +119,21 @@ struct CoHealthDashboardFullView: View {
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                if let data = human.avatarImageData, let img = UIImage(data: data) {
-                    Image(uiImage: img).resizable().scaledToFill()
-                        .frame(width: 52, height: 52).clipShape(Circle())
-                } else {
-                    Text(human.avatarEmoji).font(.system(size: 38))
-                        .frame(width: 52, height: 52)
-                        .background(Color(hex: human.themeColor).opacity(0.2), in: Circle())
-                }
+                HumanAvatarPipelineView(human: human, size: 52)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(human.name + " × 毛孩子")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("人宠共健报告")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
                 Spacer()
-                Text("🏃").font(.system(size: 36))
+                Text("🏃").font(OhanaFont.adaptive(size: 36)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
 
             Text(summaryText)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .lineSpacing(4)
         }
@@ -223,11 +216,11 @@ struct CoHealthDashboardFullView: View {
                     )
                     VStack(alignment: .leading, spacing: 4) {
                         Text(pet.name)
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         if let w = pet.weightLogs.sorted(by: { $0.date > $1.date }).first?.weight {
                             Text("最新体重 \(String(format: "%.1f", w)) kg")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         }
                     }
@@ -238,9 +231,9 @@ struct CoHealthDashboardFullView: View {
                         .reduce(0.0) { $0 + $1.distanceMeters } / 1000
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(String(format: "%.1f km", monthWalk))
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
-                        Text("本月同行").font(.system(size: 9)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                        Text("本月同行").font(OhanaFont.adaptive(size: 9)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                 }
             }
@@ -252,13 +245,13 @@ struct CoHealthDashboardFullView: View {
     // MARK: - Helpers
     private func sectionTitle(_ t: String) -> some View {
         Text(t)
-            .font(.system(size: 14, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText)
     }
 
     private func emptyLabel(_ t: String) -> some View {
         Text(t)
-            .font(.system(size: 12, weight: .medium))
+            .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 24)

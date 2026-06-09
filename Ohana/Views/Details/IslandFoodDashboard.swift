@@ -104,20 +104,20 @@ struct IslandFoodDashboard: View {
     private var navBar: some View {
         HStack {
             Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .bold))
+                Image(systemName: "chevron.left").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .goGlassBackground(Circle())
             }
             .buttonStyle(ScaleButtonStyle())
 
             Spacer()
             Text("饮食总览")
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
-            Color.clear.frame(width: 36, height: 36)
+            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
         }
         .padding(.top, 64)
     }
@@ -142,9 +142,9 @@ struct IslandFoodDashboard: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold))
                 Text(title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .lineLimit(1)
             }
             .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
@@ -165,7 +165,7 @@ struct IslandFoodDashboard: View {
             HStack(spacing: 6) {
                 avatar()
                 Text(title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .lineLimit(1)
             }
             .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
@@ -189,28 +189,28 @@ struct IslandFoodDashboard: View {
     private var foodBowlHero: some View {
         HStack(spacing: 16) {
             ZStack(alignment: .bottom) {
-                Image(systemName: "takeoutbag.and.cup.and.straw.fill")
-                    .font(.system(size: 82, weight: .black))
+                Image(systemName: "takeoutbag.and.cup.and.straw.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 82, weight: .black))
                     .foregroundStyle(Color.foodDry.opacity(0.22))
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.foodDry.gradient)
                     .frame(width: 82, height: max(10, 68 * CGFloat(min(1, snapshot.weekGrams / max(1, Double(selectedPets.count) * 700))) * chartRevealProgress))
                     .mask {
-                        Image(systemName: "takeoutbag.and.cup.and.straw.fill")
-                            .font(.system(size: 82, weight: .black))
+                        Image(systemName: "takeoutbag.and.cup.and.straw.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 82, weight: .black))
                     }
             }
             .frame(width: 104, height: 104)
 
             VStack(alignment: .leading, spacing: 7) {
                 Text("喂食节奏")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(snapshot.todayFeedCount == 0 ? "今天还没开饭" : "今天 \(snapshot.todayFeedCount) 次")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text("7 天 \(snapshot.weekFeedCount) 次 · \(compactFoodWeight(snapshot.weekGrams))")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
@@ -222,15 +222,15 @@ struct IslandFoodDashboard: View {
     private var trendSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Image(systemName: "chart.bar.xaxis")
-                    .font(.system(size: 12, weight: .bold))
+                Image(systemName: "chart.bar.xaxis").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold))
                     .foregroundStyle(Color.goPrimary)
                 Text("近 7 天喂食")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Text("克数")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
 
@@ -255,7 +255,7 @@ struct IslandFoodDashboard: View {
     private var foodRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("成员饮食状态")
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 2)
 
@@ -286,20 +286,20 @@ struct IslandFoodDashboard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(pet.name)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(pet.species.isEmpty ? "成员" : pet.species)
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaTertiaryText)
                             .lineLimit(1)
                     }
                     Text(foodStatusText(for: pet))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(accent)
                         .lineLimit(1)
                     Text("今日 \(summary.todayCount) 次 · \(compactFoodWeight(summary.todayGrams)) / 7天 \(summary.weekCount) 次")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .lineLimit(1)
                 }
@@ -313,11 +313,11 @@ struct IslandFoodDashboard: View {
                         .trim(from: 0, to: foodProgress(for: pet))
                         .stroke(accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                         .rotationEffect(.degrees(-90))
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .black))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 10, weight: .black))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
-                .frame(width: 38, height: 38)
+                .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
             .padding(14)
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -329,22 +329,22 @@ struct IslandFoodDashboard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
                     .foregroundStyle(accent)
                 Spacer()
             }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
-                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text(unit)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             Text(title)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(14)
@@ -354,11 +354,11 @@ struct IslandFoodDashboard: View {
 
     private func emptyState(_ text: String) -> some View {
         VStack(spacing: 8) {
-            Image(systemName: "fork.knife.circle")
-                .font(.system(size: 26, weight: .semibold))
+            Image(systemName: "fork.knife.circle").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 26, weight: .semibold))
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text(text)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color.ohanaSecondaryText)
         }

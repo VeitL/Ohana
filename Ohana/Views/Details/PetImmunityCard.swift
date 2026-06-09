@@ -13,17 +13,17 @@ struct PetImmunityCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Image(systemName: "shield.checkered")
-                    .font(.system(size: 14, weight: .semibold))
+                Image(systemName: "shield.checkered").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.goCardCyan)
                 Text("免疫健康")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 let urgentCount = upcomingCount
                 if urgentCount > 0 {
                     Text("\(urgentCount) 项到期")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold))
                         .foregroundStyle(Color.goRed)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.goRed.opacity(0.15), in: Capsule())
@@ -97,18 +97,18 @@ struct PetImmunityCard: View {
         let isUrgent  = !isOverdue && (daysUntilDue ?? 999) <= 30
 
         return HStack(spacing: 12) {
-            Text(row.icon).font(.system(size: 22))
+            Text(row.icon).font(OhanaFont.adaptive(size: 22))
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if let last = row.lastDate {
                     Text("上次: \(last, style: .date)")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 } else {
                     Text("尚未记录")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 }
             }
@@ -116,19 +116,19 @@ struct PetImmunityCard: View {
             if let days = daysUntilDue {
                 if isOverdue {
                     Text("已逾期")
-                        .font(.system(size: 11, weight: .black))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black))
                         .foregroundStyle(Color.goRed)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.goRed.opacity(0.15), in: Capsule())
                 } else if isUrgent {
                     Text("\(days)天后")
-                        .font(.system(size: 11, weight: .black))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black))
                         .foregroundStyle(Color.goYellow)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.goYellow.opacity(0.15), in: Capsule())
                 } else if let due = row.nextDueDate {
                     Text(due, style: .date)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 }
             }

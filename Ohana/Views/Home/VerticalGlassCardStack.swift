@@ -258,24 +258,24 @@ struct GlassReminderCard: View {
                     .fill(card.tint.opacity(0.16))
                     .frame(width: 72, height: 72)
                 Image(systemName: card.symbolName)
-                    .font(.system(size: 32, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 32, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(card.tint)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(card.title)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(card.value)
-                    .font(.system(size: 42, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 42, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                     .contentTransition(.numericText())
                 Text(card.subtitle)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }

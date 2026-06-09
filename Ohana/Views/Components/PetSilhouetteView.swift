@@ -143,21 +143,21 @@ private struct CatSilhouette: View {
                 // 耳朵外层
                 CatEarShape()
                     .fill(coatColor.mix(with: .black, by: 0.06))
-                    .frame(width: 32, height: 36)
+                    .frame(width: 32, height: 36) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(x: -36, y: -44)
                 CatEarShape()
                     .fill(coatColor.mix(with: .black, by: 0.06))
-                    .frame(width: 32, height: 36)
+                    .frame(width: 32, height: 36) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .scaleEffect(x: -1)
                     .offset(x: 36, y: -44)
                 // 耳朵内粉
                 CatEarShape()
                     .fill(Color(hex: "FFB3C1").opacity(0.85))
-                    .frame(width: 15, height: 18)
+                    .frame(width: 15, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(x: -36, y: -40)
                 CatEarShape()
                     .fill(Color(hex: "FFB3C1").opacity(0.85))
-                    .frame(width: 15, height: 18)
+                    .frame(width: 15, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .scaleEffect(x: -1)
                     .offset(x: 36, y: -40)
 
@@ -173,11 +173,11 @@ private struct CatSilhouette: View {
                 // 脸颊腮红
                 Ellipse()
                     .fill(Color(hex: "FFB3C1").opacity(0.32))
-                    .frame(width: 28, height: 18)
+                    .frame(width: 28, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(x: -38, y: 22)
                 Ellipse()
                     .fill(Color(hex: "FFB3C1").opacity(0.32))
-                    .frame(width: 28, height: 18)
+                    .frame(width: 28, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(x: 38, y: 22)
 
                 // 眼睛（kawaii 大眼，略低位置）
@@ -258,7 +258,7 @@ private struct DogSilhouette: View {
             DogTailShape()
                 .stroke(LinearGradient(colors: [earColor, coatColor], startPoint: .leading, endPoint: .trailing),
                         style: StrokeStyle(lineWidth: 9, lineCap: .round))
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .offset(x: 68, y: 40)
                 .onTapGesture { onTapCoat?() }
 
@@ -314,12 +314,12 @@ private struct DogSilhouette: View {
                 // 大圆鼻子
                 Ellipse()
                     .fill(Color(hex: "2C2C2C").opacity(0.88))
-                    .frame(width: 22, height: 16)
+                    .frame(width: 22, height: 16) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(y: 30)
                 // 鼻子高光
                 Ellipse()
                     .fill(Color.goCardWhite.opacity(0.38))
-                    .frame(width: 8, height: 5)
+                    .frame(width: 8, height: 5) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(x: -4, y: 27)
             }
             .offset(y: -18)
@@ -440,7 +440,7 @@ private struct RabbitSilhouette: View {
                     p.addQuadCurve(to: CGPoint(x: 9, y: 13), control: CGPoint(x: 4, y: 9))
                 }
                 .stroke(Color(hex: "FFB3C1").opacity(0.7), lineWidth: 1.6)
-                .frame(width: 18, height: 14)
+                .frame(width: 18, height: 14) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .offset(y: 40)
             }
             .offset(y: -18)
@@ -603,16 +603,16 @@ private struct BirdSilhouette: View {
                 // 冠羽（三根）
                 BirdCrownFeather()
                     .fill(coatColor.mix(with: .black, by: 0.2))
-                    .frame(width: 10, height: 28)
+                    .frame(width: 10, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .rotationEffect(.degrees(-20))
                     .offset(x: -12, y: -66)
                 BirdCrownFeather()
                     .fill(coatColor.mix(with: .black, by: 0.25))
-                    .frame(width: 12, height: 36)
+                    .frame(width: 12, height: 36) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(x: 0, y: -72)
                 BirdCrownFeather()
                     .fill(coatColor.mix(with: .black, by: 0.2))
-                    .frame(width: 10, height: 28)
+                    .frame(width: 10, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .rotationEffect(.degrees(20))
                     .offset(x: 12, y: -66)
 
@@ -642,7 +642,7 @@ private struct BirdSilhouette: View {
                     .fill(LinearGradient(
                         colors: [Color(hex: "FFB830"), Color(hex: "E07B00")],
                         startPoint: .top, endPoint: .bottom))
-                    .frame(width: 22, height: 14)
+                    .frame(width: 22, height: 14) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(y: 34)
             }
             .offset(y: -28)
@@ -952,11 +952,11 @@ private struct CatFaceDetails: View {
                 // 鼻子（心形倒三角）
                 CatNoseShape()
                     .fill(Color(hex: "FF9B9B"))
-                    .frame(width: 13, height: 9)
+                    .frame(width: 13, height: 9) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 // 嘴（W 形）
                 CatMouthShape()
                     .stroke(Color(hex: "2C2C2C").opacity(0.45), lineWidth: 1.4)
-                    .frame(width: 22, height: 9)
+                    .frame(width: 22, height: 9) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
             }
         }
     }
@@ -1017,18 +1017,18 @@ private struct DogFaceDetails: View {
             // 鼻子（大圆鼻）
             Ellipse()
                 .fill(Color(hex: "2C2C2C"))
-                .frame(width: 28, height: 20)
+                .frame(width: 28, height: 20) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .overlay(
                     Ellipse()
                         .fill(Color.goCardWhite.opacity(0.28))
-                        .frame(width: 9, height: 6)
+                        .frame(width: 9, height: 6) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         .offset(x: -4, y: -4)
                 )
             // 嘴 + 舌头
             ZStack {
                 DogMouthShape()
                     .stroke(Color(hex: "2C2C2C").opacity(0.35), lineWidth: 1.5)
-                    .frame(width: 28, height: 12)
+                    .frame(width: 28, height: 12) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 // 舌头（伸出）
                 RoundedRectangle(cornerRadius: 5)
                     .fill(

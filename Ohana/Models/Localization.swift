@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct L10n {
+nonisolated struct L10n {
     let lang: String
 
     init(_ lang: String = UserDefaults.standard.string(forKey: "appLanguage") ?? "zh") {

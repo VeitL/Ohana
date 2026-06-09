@@ -8,24 +8,71 @@
 import SwiftUI
 import SwiftData
 
+private struct DailyStreakAvatarIndex {
+    let signatures: [UUID: String]
+    let payloads: [FocusWalletAvatarCache.Payload]
+    let cacheKey: String
+
+    static let empty = DailyStreakAvatarIndex(
+        signatures: [:],
+        payloads: [],
+        cacheKey: "daily-streak-empty"
+    )
+
+    static func make(humans: [Human]) -> DailyStreakAvatarIndex {
+        var signatures: [UUID: String] = [:]
+        var payloads: [FocusWalletAvatarCache.Payload] = []
+
+        for human in humans {
+            guard let data = human.avatarImageData else { continue }
+            let signature = FocusWalletAvatarCache.signature(for: data)
+            signatures[human.id] = signature
+            payloads.append(FocusWalletAvatarCache.Payload(id: human.id, data: data))
+        }
+
+        let cacheKey = payloads
+            .map { payload in
+                "\(payload.id.uuidString):\(payload.data?.count ?? 0)"
+            }
+            .joined(separator: "|")
+
+        return DailyStreakAvatarIndex(
+            signatures: signatures,
+            payloads: payloads,
+            cacheKey: cacheKey.isEmpty ? "daily-streak-empty" : "daily-streak-\(cacheKey)"
+        )
+    }
+}
+
+private struct DailyStreakLeaderboardEntry: Identifiable {
+    let human: Human
+    let count: Int
+    let coconuts: Int
+
+    var id: UUID { human.id }
+}
+
 struct DailyStreakDetailView: View {
     let pets: [Pet]
+    let humans: [Human]
+    let ledgerEvents: [CareLedgerEvent]
     var onClose: (() -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onPresentCoconutShop: ((ShopItem.ShopCategory) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-    @Query(sort: \CareLedgerEvent.occurredAt, order: .reverse) private var ledgerEvents: [CareLedgerEvent]
+    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @State private var selectedMonth = Date()
     @State private var checkedInDates: Set<String> = []
     @State private var makeupDates: Set<String> = []
     @State private var makeupPackCount = 0
     @State private var showMakeupConfirm: String? = nil
-    @State private var showCoconutShop = false
-    @State private var showingCoconutLog = false
     @State private var lastClaimedMilestone = 0
     @State private var monthSlideDirection = 1
     @State private var checkInCommandTask: Task<Void, Never>?
+    @State private var avatarIndex = DailyStreakAvatarIndex.empty
+    @State private var familyLeaderboardSnapshot: [DailyStreakLeaderboardEntry] = []
 
     private let cal = Calendar.current
     private var commandExecutor: OasisRewardCommandExecutor { OasisRewardCommandExecutor(context: modelContext) }
@@ -42,15 +89,15 @@ struct DailyStreakDetailView: View {
             subtitle: activeHuman?.name ?? "Ohana",
             onClose: closePage,
             leading: {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 18, weight: .black))
+                Image(systemName: "flame.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaControlFill, in: Circle())
             },
             trailing: {
                 CoconutBalanceCapsule(balance: activeHuman?.coconutBalance ?? 0) {
-                    showingCoconutLog = true
+                    presentCoconutLog()
                 }
             },
             content: {
@@ -72,6 +119,12 @@ struct DailyStreakDetailView: View {
             loadCheckInData()
             scheduleTodayCheckIn()
         }
+        .task(id: avatarSourceKey) {
+            await prepareHumanAvatars()
+        }
+        .task(id: familyLeaderboardSourceKey) {
+            await refreshFamilyLeaderboardSnapshot()
+        }
         .onChange(of: currentActiveHumanId) { _, _ in
             selectedMonth = Date()
             loadCheckInData()
@@ -91,19 +144,10 @@ struct DailyStreakDetailView: View {
         } message: {
             Text("补签 \(showMakeupConfirm ?? "")，将消耗1个补签包")
         }
-        .sheet(isPresented: $showCoconutShop) {
-            CoconutShopView(initialCategory: .boost)
-                .ohanaSheetPagePresentation() // ui-v4: allow long shop overview
-        }
-        .sheet(isPresented: $showingCoconutLog) {
-            CoconutLogView()
-        }
-        .onChange(of: showCoconutShop) { _, isShowing in
-            if !isShowing { loadCheckInData() }
-        }
         .onDisappear {
             checkInCommandTask?.cancel()
             checkInCommandTask = nil
+            avatarPipeline.cancel(key: avatarIndex.cacheKey)
         }
     }
 
@@ -112,45 +156,52 @@ struct DailyStreakDetailView: View {
         dismiss()
     }
 
+    private func presentCoconutLog() {
+        onPresentCoconutLog?(nil)
+    }
+
+    private func presentCoconutShop(_ category: ShopItem.ShopCategory) {
+        onPresentCoconutShop?(category)
+    }
+
     // MARK: - 我的连击卡片
     private var myStreakCard: some View {
         return VStack(spacing: 16) {
             HStack(spacing: 14) {
                 ZStack {
-                    Circle()
-                        .fill(Color(hex: activeHuman?.safeThemeColorHex ?? OhanaThemeColorPolicy.humanFallbackHex).opacity(0.25))
-                        .frame(width: 52, height: 52)
-                    if let data = activeHuman?.avatarImageData, let img = UIImage(data: data) {
-                        Image(uiImage: img)
-                            .resizable().scaledToFill()
-                            .frame(width: 52, height: 52)
-                            .clipShape(Circle())
+                    if let activeHuman {
+                        humanAvatar(activeHuman, size: 52)
                     } else {
-                        Text(activeHuman?.avatarEmoji ?? "🧑")
-                            .font(.system(size: 26))
+                        Text("🧑")
+                            .font(OhanaFont.adaptive(size: 26)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .frame(width: 52, height: 52)
+                            .background(
+                                Color(hex: OhanaThemeColorPolicy.humanFallbackHex).opacity(0.18),
+                                in: Circle()
+                            )
                     }
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(activeHuman?.name ?? "我")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("每天打开 App 即打卡")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
                         Text("\(currentStreak)")
-                            .font(.system(size: 44, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 44, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(currentStreak > 0 ? Color.goOrange : Color.ohanaPrimaryText.opacity(0.25))
                             .contentTransition(.numericText())
                         Text("天")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Text(currentStreak >= 30 ? "🔥 传奇！" : currentStreak >= 7 ? "🔥 火热！" : "继续保持")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goOrange)
                 }
             }
@@ -163,11 +214,11 @@ struct DailyStreakDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("距离 \(next) 天里程碑")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         Spacer()
                         Text("还差 \(next - currentStreak) 天")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goOrange.opacity(0.8))
                     }
                     GeometryReader { geo in
@@ -193,20 +244,20 @@ struct DailyStreakDetailView: View {
     }
 
     private var familyCompetitionSection: some View {
-        let leaderboard = familyLeaderboard
+        let leaderboard = familyLeaderboardSnapshot
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("家庭连击")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("本周照护贡献，谁最稳一眼就知道")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 18, weight: .black))
+                Image(systemName: "flame.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goOrange)
             }
 
@@ -220,16 +271,16 @@ struct DailyStreakDetailView: View {
                         humanAvatar(entry.human, size: 32)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(entry.human.name)
-                                .font(.system(size: 14, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(1)
                             Text(entry.count == 0 ? "本周还没有记录" : "\(entry.count) 次照护 · +\(entry.coconuts)🥥")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
                         Text("\(entry.count)")
-                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(index == 0 ? Color.goPrimary : Color.ohanaPrimaryText)
                             .monospacedDigit()
                     }
@@ -251,18 +302,18 @@ struct DailyStreakDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 HStack(spacing: 6) {
-                    Image(systemName: "calendar.badge.checkmark")
-                        .font(.system(size: 16, weight: .bold))
+                    Image(systemName: "calendar.badge.checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                     Text("打卡日历")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
                 HStack(spacing: 4) {
                     Text("🔥")
                     Text("\(currentStreak) 天连胜")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goOrange)
                 }
                 .padding(.horizontal, 10)
@@ -278,17 +329,17 @@ struct DailyStreakDetailView: View {
                 Button {
                     shiftCheckInMonth(by: -1)
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .bold))
+                    Image(systemName: "chevron.left") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.ohanaControlFill, in: Circle())
                 }
 
                 Spacer()
 
                 Text(monthYearString(selectedMonth))
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 Spacer()
@@ -296,14 +347,14 @@ struct DailyStreakDetailView: View {
                 Button {
                     shiftCheckInMonth(by: 1)
                 } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .bold))
+                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(
                             cal.isDate(selectedMonth, equalTo: Date(), toGranularity: .month)
                             ? Color.ohanaPrimaryText.opacity(0.15)
                             : Color.ohanaPrimaryText.opacity(0.5)
                         )
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .disabled(cal.isDate(selectedMonth, equalTo: Date(), toGranularity: .month))
@@ -312,7 +363,7 @@ struct DailyStreakDetailView: View {
             HStack(spacing: 0) {
                 ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
                     Text(d)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         .frame(maxWidth: .infinity)
                 }
@@ -334,23 +385,23 @@ struct DailyStreakDetailView: View {
 
             HStack(spacing: 12) {
                 HStack(spacing: 4) {
-                    Text("📦").font(.system(size: 14))
+                    Text("📦").font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("补签包")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     Text("×\(makeupPackCount)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(makeupPackCount > 0 ? Color.goPrimary : Color.ohanaPrimaryText.opacity(0.3))
                 }
                 Spacer()
                 if makeupPackCount > 0 {
                     Text("点击灰色日期补签")
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary.opacity(0.7))
                 } else {
-                    Button { showCoconutShop = true } label: {
+                    Button { presentCoconutShop(.boost) } label: {
                         Text("去商店购买 →")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goYellow.opacity(0.85))
                     }
                     .buttonStyle(ScaleButtonStyle())
@@ -383,13 +434,13 @@ struct DailyStreakDetailView: View {
     private func checkInStatCell(value: String, label: String, icon: String, color: Color) -> some View {
         VStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(color)
             Text(value)
-                .font(.system(size: 16, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(label)
-                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
         }
         .frame(maxWidth: .infinity)
@@ -411,7 +462,7 @@ struct DailyStreakDetailView: View {
                 HStack(spacing: 6) {
                     Text(nextMilestone.emoji)
                     Text("再连续 \(nextMilestone.days - currentStreak) 天即可领取 +\(nextMilestone.reward)🥥")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary.opacity(0.75))
                     Spacer()
                 }
@@ -424,13 +475,13 @@ struct DailyStreakDetailView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Text(milestone.emoji)
-                            .font(.system(size: 16))
+                            .font(OhanaFont.adaptive(size: 16)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text("\(milestone.days) 天连胜达成！")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                         Spacer()
                         Text("+\(milestone.reward)🥥 领取")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                     }
                     .padding(.horizontal, 14)
@@ -520,7 +571,7 @@ struct DailyStreakDetailView: View {
                 ZStack {
                     Circle()
                         .fill(cellFillColor(cell))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .overlay(
                             Circle().strokeBorder(
                                 cell.isToday ? Color.goPrimary : .clear,
@@ -529,17 +580,17 @@ struct DailyStreakDetailView: View {
                         )
                     if cell.isChecked {
                         if cell.isMakeup {
-                            Image(systemName: "arrow.uturn.backward")
-                                .font(.system(size: 9, weight: .black))
+                            Image(systemName: "arrow.uturn.backward") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 9, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                         } else {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 10, weight: .black))
+                            Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryActionText)
                         }
                     } else {
                         Text("\(cell.day)")
-                            .font(.system(size: 13, weight: cell.isToday ? .black : .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: cell.isToday ? .black : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(
                                 cell.isFuture ? Color.ohanaPrimaryText.opacity(0.2) :
                                 cell.isToday ? Color.goPrimary :
@@ -568,7 +619,9 @@ struct DailyStreakDetailView: View {
 
     @ViewBuilder
     private func humanAvatar(_ human: Human, size: CGFloat) -> some View {
-        if let data = human.avatarImageData, let image = UIImage(data: data) {
+        let signature = avatarIndex.signatures[human.id] ?? ""
+        if !signature.isEmpty,
+           let image = avatarPipeline.cachedImage(for: human.id, signature: signature) {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
@@ -582,7 +635,48 @@ struct DailyStreakDetailView: View {
         }
     }
 
-    private var familyLeaderboard: [(human: Human, count: Int, coconuts: Int)] {
+    private var avatarSourceKey: String {
+        humans.map { human in
+            "\(human.id.uuidString):\(human.avatarImageData?.count ?? 0)"
+        }
+        .joined(separator: "|")
+    }
+
+    private func prepareHumanAvatars() async {
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
+        guard !Task.isCancelled else { return }
+        let previousKey = avatarIndex.cacheKey
+        let nextIndex = DailyStreakAvatarIndex.make(humans: humans)
+        if previousKey != nextIndex.cacheKey {
+            avatarPipeline.cancel(key: previousKey)
+        }
+        avatarIndex = nextIndex
+        guard !nextIndex.payloads.isEmpty else { return }
+        avatarPipeline.seedPreviewEntries(nextIndex.payloads)
+        avatarPipeline.preload(
+            payloads: nextIndex.payloads,
+            key: nextIndex.cacheKey,
+            delayMilliseconds: 48
+        )
+    }
+
+    private var familyLeaderboardSourceKey: String {
+        let latestLedgerTimestamp = ledgerEvents.first?.occurredAt.timeIntervalSince1970 ?? 0
+        return [
+            "humans:\(humans.count)",
+            "pets:\(pets.count)",
+            "ledger:\(ledgerEvents.count)",
+            "latest:\(Int(latestLedgerTimestamp))"
+        ].joined(separator: "|")
+    }
+
+    private func refreshFamilyLeaderboardSnapshot() async {
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 32)
+        guard !Task.isCancelled else { return }
+        familyLeaderboardSnapshot = makeFamilyLeaderboardSnapshot()
+    }
+
+    private func makeFamilyLeaderboardSnapshot() -> [DailyStreakLeaderboardEntry] {
         let start = cal.dateInterval(of: .weekOfYear, for: Date())?.start
             ?? cal.date(byAdding: .day, value: -7, to: Date())
             ?? Date()
@@ -598,7 +692,11 @@ struct DailyStreakDetailView: View {
             .map { human in
                 let id = human.id.uuidString
                 let mine = entries.filter { $0.actorId == id }
-                return (human, mine.count, mine.reduce(0) { $0 + $1.coconuts })
+                return DailyStreakLeaderboardEntry(
+                    human: human,
+                    count: mine.count,
+                    coconuts: mine.reduce(0) { $0 + $1.coconuts }
+                )
             }
             .sorted {
                 if $0.count != $1.count { return $0.count > $1.count }

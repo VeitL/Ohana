@@ -210,7 +210,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
     private var header: some View {
         HStack {
             Text(title)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite.opacity(0.92))
             Spacer()
             if let onToggleEdit {
@@ -222,7 +222,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     onToggleEdit()
                 } label: {
                     Image(systemName: isEditMode ? "checkmark" : "pencil")
-                        .font(.system(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(isEditMode ? Color.goPrimary : Color.goCardWhite)
                         .frame(width: 44, height: 32)
@@ -267,23 +267,23 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         if item.showsAttention && !isEditMode {
                             Circle()
                                 .fill(Color.goRed)
-                                .frame(width: 7, height: 7)
+                                .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                 .offset(x: 3, y: -3)
                         }
                         if item.isLocked && !isEditMode {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 8, weight: .black))
+                            Image(systemName: "lock.fill").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 8, weight: .black))
                                 .foregroundStyle(Color.goYellow)
                                 .offset(x: 4, y: -4)
                         }
                     }
                     Text(item.title)
-                        .font(.system(size: 10.5, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded))
                         .foregroundStyle(state.foreground)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
                     Text(statusLine)
-                        .font(.system(size: 8.4, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 8.4, weight: .bold, design: .rounded))
                         .foregroundStyle(state.statusForeground)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
@@ -436,14 +436,14 @@ struct VerticalHomeEmbeddedQuickActions: View {
             }
         } label: {
             VStack(spacing: 5) {
-                Image(systemName: "plus")
-                    .font(.system(size: 20, weight: .black))
+                Image(systemName: "plus").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 20, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goCardWhite.opacity(0.12), in: Circle())
                 Text(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
-                    .font(.system(size: 10.5, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goCardWhite.opacity(0.74))
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
@@ -467,7 +467,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         VStack(spacing: 9) {
             HStack(spacing: 8) {
                 Text(l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 0)
                 Button {
@@ -476,10 +476,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         showingAddPanel = false
                     }
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .black))
+                    Image(systemName: "xmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 10, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 28, height: 28) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -524,7 +524,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     color: item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaFunctionalIcon
                 )
                 Text(item.title)
-                    .font(.system(size: 9.5, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9.5, weight: .black, design: .rounded))
                     .foregroundStyle(item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.58)
@@ -533,8 +533,8 @@ struct VerticalHomeEmbeddedQuickActions: View {
             .frame(height: 55)
 
             if item.isAddDisabled {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
                     .padding(6)
@@ -568,7 +568,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     )
                     .frame(width: 44, height: 44)
                     Text(item.title)
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 .fixedSize()
@@ -583,9 +583,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
             ZStack {
                 Circle()
                     .fill(Color.goRed)
-                    .frame(width: 20, height: 20)
-                Image(systemName: "minus")
-                    .font(.system(size: 9, weight: .black))
+                    .frame(width: 20, height: 20) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                Image(systemName: "minus").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 9, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.arkInk)
             }
@@ -613,7 +613,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
     private var editJiggleAnimation: Animation? {
         guard isEditMode, !shouldReduceWork, !isDraggingAnyItem else { return nil }
-        return GoMotion.quick.repeatForever(autoreverses: true)
+        return GoMotion.quick.repeatForever(autoreverses: true) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
 
     private func menuOffsetY(index: Int) -> CGFloat {

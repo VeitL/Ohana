@@ -30,16 +30,33 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(item: modalSheetRouteBinding, onDismiss: handleModalDismissed) { route in
-                homeModalDestination(for: route)
-                    .onAppear {
-                        lastModalRoute = route
-                    }
+                AppDeferredRouteContent(
+                    routeID: route.id,
+                    policy: AppPresentationPolicyProvider.policy(for: route)
+                ) {
+                    homeModalDestination(for: route)
+                }
+                .appPresentationSheet(AppPresentationPolicyProvider.policy(for: route))
+                .onAppear {
+                    lastModalRoute = route
+                }
             }
             .sheet(item: systemSheetRouteBinding) { route in
-                homeSheetDestination(for: route)
+                AppDeferredRouteContent(
+                    routeID: route.id,
+                    policy: AppPresentationPolicyProvider.policy(for: route)
+                ) {
+                    homeSheetDestination(for: route)
+                }
+                .appPresentationSheet(AppPresentationPolicyProvider.policy(for: route))
             }
             .fullScreenCover(item: fullScreenRouteBinding) { route in
-                homeFullScreenDestination(for: route)
+                AppDeferredRouteContent(
+                    routeID: route.id,
+                    policy: AppPresentationPolicyProvider.policy(for: route)
+                ) {
+                    homeFullScreenDestination(for: route)
+                }
             }
             .overlay {
                 ZStack {
@@ -141,7 +158,12 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             FunctionMenuSheet(initialDestination: destination)
                 .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
         case .streakDetail:
-            DailyStreakDetailView(pets: pets, onClose: { routes.dismissModal() })
+            DailyStreakDetailRouteContainer(
+                onClose: { routes.dismissModal() },
+                onPresentCoconutLog: { subject in
+                    routes.openCoconutLog(subject)
+                }
+            )
                 .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
         case let .addEntity(type):
             AddEntityDestinationView(
@@ -156,7 +178,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .ohanaSheetPagePresentation() // ui-v4: allow role creation flow as long sheet
         case let .crewRoster(mode):
             NavigationStack {
-                CrewRosterOverlay(
+                CrewRosterOverlayRouteContainer(
                     initialMode: mode,
                     onSelectPet: { pet in
                         routes.dismissModal()
@@ -166,12 +188,15 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                         routes.dismissModal()
                         onCrewHumanSelected(human)
                     },
-                    onClose: { routes.dismissModal() }
+                    onClose: { routes.dismissModal() },
+                    onPresentCoconutLog: { subject in
+                        routes.openCoconutLog(subject)
+                    }
                 )
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button { routes.dismissModal() } label: {
-                            Image(systemName: "xmark.circle.fill")
+                            Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
@@ -180,16 +205,20 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .ohanaSheetPagePresentation() // ui-v4: allow family collaboration/member hub
         case .accountSwitcher:
             HumanAccountSwitcherSheet(
+                humans: humans,
                 homePets: pets,
                 homeHumans: humans,
                 homeElectronicPets: electronicPets
             )
                 .ohanaCompactSheetPresentation(detents: [.medium, .large])
         case let .calendar(entityID, humanID):
-            CalendarView(
+            CalendarRouteContainer(
                 preselectedPetId: entityID,
                 preselectedHumanId: humanID,
-                onOpenEventDestination: openCalendarEventDestination
+                onOpenEventDestination: openCalendarEventDestination,
+                onPresentCoconutLog: { subject in
+                    routes.openCoconutLog(subject)
+                }
             )
             .ohanaSheetPagePresentation() // ui-v4: allow calendar as long sheet
         }
@@ -215,7 +244,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .humanDetail(human):
             routes.openSheet(.humanBasicInfo(human.id))
         case .plant:
-            routes.openFunctionMenu(destination: .plantsDashboard)
+            AppFeatureRouteGuard.recordIntercept("sheetReminderPlant")
+            routes.openFunctionMenu(destination: .growthRoadmap)
         case let .functionMenu(destination):
             routes.openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId):
@@ -317,16 +347,21 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     @ViewBuilder
     private func inlineSettingsLayer() -> some View {
         if settingsRouteIsActive {
-            HomeSettingsInlineHost(
-                homePets: pets,
-                homeHumans: humans,
-                homeElectronicPets: electronicPets,
-                onClose: {
-                    if routes.settingsPresented {
-                        routes.dismissSettings()
+            AppDeferredRouteContent(
+                routeID: "home-settings",
+                policy: AppPresentationPolicyProvider.policyForHomeSettings()
+            ) {
+                HomeSettingsInlineHost(
+                    homePets: pets,
+                    homeHumans: humans,
+                    homeElectronicPets: electronicPets,
+                    onClose: {
+                        if routes.settingsPresented {
+                            routes.dismissSettings()
+                        }
                     }
-                }
-            )
+                )
+            }
             .ignoresSafeArea()
             .zIndex(120)
         }
@@ -342,12 +377,17 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     @ViewBuilder
     private func inlineCoconutLogDestination() -> some View {
         if case let .coconutLog(subject) = routes.fullScreen {
-            HomeCoconutLogInlineHost(
-                subject: subject,
-                onClose: {
-                    routes.dismissFullScreen()
-                }
-            )
+            AppDeferredRouteContent(
+                routeID: "home-coconut-log-\(subject?.id ?? "all")",
+                policy: AppPresentationPolicyProvider.policyForHomeCoconutLog()
+            ) {
+                HomeCoconutLogInlineHost(
+                    subject: subject,
+                    onClose: {
+                        routes.dismissFullScreen()
+                    }
+                )
+            }
             .ignoresSafeArea()
             .zIndex(130)
         }
@@ -356,20 +396,29 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     @ViewBuilder
     private func crewRosterOverlayDestination() -> some View {
         if case let .some(.crewRoster(mode)) = routes.modal {
-            HomeCrewRosterInlineHost(
-                initialMode: mode,
-                onClose: {
-                    routes.dismissModal()
-                },
-                onSelectPet: { pet in
-                    routes.dismissModal()
-                    onCrewPetSelected(pet)
-                },
-                onSelectHuman: { human in
-                    routes.dismissModal()
-                    onCrewHumanSelected(human)
-                }
-            )
+            AppDeferredRouteContent(
+                routeID: "home-crew-roster-\(mode.rawValue)",
+                policy: AppPresentationPolicyProvider.policyForHomeCrewRoster()
+            ) {
+                HomeCrewRosterInlineHost(
+                    initialMode: mode,
+                    onClose: {
+                        routes.dismissModal()
+                    },
+                    onSelectPet: { pet in
+                        routes.dismissModal()
+                        onCrewPetSelected(pet)
+                    },
+                    onSelectHuman: { human in
+                        routes.dismissModal()
+                        onCrewHumanSelected(human)
+                    },
+                    onPresentCoconutLog: { subject in
+                        routes.dismissModal()
+                        routes.openCoconutLog(subject)
+                    }
+                )
+            }
             .ignoresSafeArea()
             .zIndex(140)
         }
@@ -378,28 +427,33 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     @ViewBuilder
     private func homeOverlayDestination() -> some View {
         if let route = routes.overlay {
-            switch route {
-            case let .quickMoment(routeID, petID):
-                if let pet = pet(petID) {
-                    QuickMomentSheet(
-                        pet: pet,
-                        onRemove: nil,
-                        onSaved: {
-                            onFirstSuccessMomentCompleted(pet)
-                        },
-                        onClose: {
-                            routes.dismissOverlay(routeID: routeID)
-                        }
-                    )
-                    .ignoresSafeArea()
-                    .zIndex(100)
-                } else {
-                    Color.clear
-                        .onAppear {
-                            routes.dismissOverlay(routeID: routeID)
-                        }
+            AppDeferredRouteContent(
+                routeID: route.id.uuidString,
+                policy: AppPresentationPolicyProvider.policy(for: route)
+            ) {
+                switch route {
+                case let .quickMoment(routeID, petID):
+                    if let pet = pet(petID) {
+                        QuickMomentSheet(
+                            pet: pet,
+                            onRemove: nil,
+                            onSaved: {
+                                onFirstSuccessMomentCompleted(pet)
+                            },
+                            onClose: {
+                                routes.dismissOverlay(routeID: routeID)
+                            }
+                        )
+                    } else {
+                        Color.clear
+                            .onAppear {
+                                routes.dismissOverlay(routeID: routeID)
+                            }
+                    }
                 }
             }
+            .ignoresSafeArea()
+            .zIndex(100)
         }
     }
 
@@ -526,17 +580,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 missingRouteDismissView()
             }
         case let .humanAllFeatures(id):
-            if let human = human(id) {
-                HumanAllFeaturesSheet(
-                    human: human,
-                    onOpenDestination: { destination in
-                        routes.openSheet(homeHumanFeatureRoute(humanID: human.id, destination: destination))
-                    }
-                )
-                    .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
-            } else {
-                missingRouteDismissView()
-            }
+            HumanAllFeaturesRouteContainer(
+                id: id,
+                onMissing: { routes.dismissSheet() },
+                onOpenDestination: { humanID, destination in
+                    routes.openSheet(homeHumanFeatureRoute(humanID: humanID, destination: destination))
+                }
+            )
+            .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
         case let .petBasicInfo(id):
             if let pet = pet(id) {
                 NavigationStack { PetBasicInfoDetailView(pet: pet) }
@@ -574,8 +625,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             }
         case let .petFeed(id, opensManualSheet):
             if let pet = pet(id) {
-                QuickFeedDetailSheet(
-                    pet: pet,
+                QuickFeedDetailRouteContainer(
+                    id: pet.id,
                     onRemove: { routes.dismissSheet() },
                     onClose: { routes.dismissSheet() },
                     opensManualSheetOnAppear: opensManualSheet
@@ -586,34 +637,28 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             }
         case let .petWater(id):
             if let pet = pet(id) {
-                QuickWaterDetailSheet(pet: pet) {
-                    routes.dismissSheet()
-                }
+                QuickWaterDetailRouteContainer(id: pet.id, onRemove: { routes.dismissSheet() }, onClose: { routes.dismissSheet() })
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()
             }
         case let .petPotty(id):
             if let pet = pet(id) {
-                QuickPottyDetailSheet(pet: pet) { routes.dismissSheet() }
+                QuickPottyDetailRouteContainer(id: pet.id, onRemove: { routes.dismissSheet() }, onClose: { routes.dismissSheet() })
                     .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()
             }
         case let .petLitter(id):
             if let pet = pet(id) {
-                QuickLitterDetailSheet(pet: pet) { routes.dismissSheet() }
+                QuickPottyDetailRouteContainer(id: pet.id, onRemove: { routes.dismissSheet() }, onClose: { routes.dismissSheet() })
                     .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()
             }
         case let .petPlay(id):
-            if let pet = pet(id) {
-                QuickPlayDetailSheet(pet: pet) { routes.dismissSheet() }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-            } else {
-                missingRouteDismissView()
-            }
+            QuickPlayDetailRouteContainer(id: id, onRemove: { routes.dismissSheet() })
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petHygiene(id):
             if let pet = pet(id) {
                 NavigationStack { PetHygieneDetailView(pet: pet) }
@@ -664,7 +709,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             }
         case let .petAchievements(id):
             if let pet = pet(id) {
-                NavigationStack { AchievementWallView(pet: pet) }
+                NavigationStack {
+                    AchievementWallView(
+                        pet: pet,
+                        onPresentCoconutLog: { subject in
+                            routes.openCoconutLog(subject)
+                        }
+                    )
+                }
                     .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()
@@ -948,6 +1000,7 @@ struct HomeCrewRosterInlineHost: View {
     let onClose: () -> Void
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
+    var onPresentCoconutLog: (CoconutLogSubject?) -> Void = { _ in }
 
     @StateObject private var safeAreaController = FocusHomeSafeAreaController()
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
@@ -977,13 +1030,18 @@ struct HomeCrewRosterInlineHost: View {
                         .opacity(isContentMounted ? 0 : 1)
 
                         if isContentMounted {
-                            CrewRosterOverlay(
+                            CrewRosterOverlayRouteContainer(
                                 initialMode: initialMode,
                                 onSelectPet: selectPet,
                                 onSelectHuman: selectHuman,
                                 onClose: requestClose,
                                 safeTopInset: safeTop,
-                                safeBottomInset: safeBottom
+                                safeBottomInset: safeBottom,
+                                onPresentCoconutLog: { subject in
+                                    closeThen {
+                                        onPresentCoconutLog(subject)
+                                    }
+                                }
                             )
                             .opacity(isContentVisible ? 1 : 0)
                         }
@@ -1105,9 +1163,9 @@ private struct HomeCrewRosterOpeningShell: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Image(systemName: isCollaboration ? "hands.sparkles.fill" : "person.2.crop.square.stack.fill")
-                    .font(.system(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -1126,10 +1184,10 @@ private struct HomeCrewRosterOpeningShell: View {
                 Spacer()
 
                 Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -1146,7 +1204,7 @@ private struct HomeCrewRosterOpeningShell: View {
 }
 
 struct HomeCoconutLogInlineHost: View {
-    let subject: CoconutLogSubject
+    let subject: CoconutLogSubject?
     let onClose: () -> Void
 
     @StateObject private var safeAreaController = FocusHomeSafeAreaController()
@@ -1195,7 +1253,7 @@ struct HomeCoconutLogInlineHost: View {
                 safeAreaController.stabilize(from: proxy)
             }
         }
-        .task(id: subject.id) {
+        .task(id: subject?.id ?? "all") {
             await playEntrance()
         }
         .onDisappear {
@@ -1287,10 +1345,10 @@ private struct HomeCoconutLogOpeningShell: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "circle.hexagongrid.fill")
-                    .font(.system(size: 18, weight: .black))
+                Image(systemName: "circle.hexagongrid.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -1305,10 +1363,10 @@ private struct HomeCoconutLogOpeningShell: View {
                 Spacer()
 
                 Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -1321,6 +1379,174 @@ private struct HomeCoconutLogOpeningShell: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private extension AppPresentationPolicyProvider {
+    static func policy(for route: HomeModalRoute) -> AppPresentationPolicy {
+        switch route {
+        case .accountSwitcher:
+            return AppPresentationPolicy(
+                surface: .compactSheet,
+                loading: .shellFirst(delayMS: 64),
+                instrumentationName: "home.accountSwitcher",
+                detents: [.medium, .large],
+                cornerRadius: 32
+            )
+        case .functionMenu:
+            return homeSheetPagePolicy("home.functionMenu")
+        case .streakDetail:
+            return homeSheetPagePolicy("home.streakDetail")
+        case .addEntity:
+            return homeSheetPagePolicy("home.addEntity")
+        case .crewRoster:
+            return homeSheetPagePolicy("home.crewRoster")
+        case .calendar:
+            return homeSheetPagePolicy("home.calendar")
+        }
+    }
+
+    static func policy(for route: HomeSheetRoute) -> AppPresentationPolicy {
+        homeSheetPagePolicy("home.\(route.presentationName)")
+    }
+
+    static func policy(for route: HomeFullScreenRoute) -> AppPresentationPolicy {
+        AppPresentationPolicy(
+            surface: .fullScreen,
+            loading: .shellFirst(delayMS: 64),
+            instrumentationName: "home.\(route.presentationName)"
+        )
+    }
+
+    static func policy(for route: HomeOverlayRoute) -> AppPresentationPolicy {
+        AppPresentationPolicy(
+            surface: .inlineOverlay,
+            loading: .shellFirst(delayMS: 64),
+            instrumentationName: "home.\(route.presentationName)"
+        )
+    }
+
+    static func policyForHomeCoconutLog() -> AppPresentationPolicy {
+        AppPresentationPolicy(
+            surface: .inlineOverlay,
+            loading: .shellFirst(delayMS: 64),
+            instrumentationName: "home.coconutLog"
+        )
+    }
+
+    static func policyForHomeCrewRoster() -> AppPresentationPolicy {
+        AppPresentationPolicy(
+            surface: .inlineOverlay,
+            loading: .shellFirst(delayMS: 64),
+            instrumentationName: "home.crewRoster"
+        )
+    }
+
+    static func policyForHomeSettings() -> AppPresentationPolicy {
+        AppPresentationPolicy(
+            surface: .inlineOverlay,
+            loading: .shellFirst(delayMS: 64),
+            instrumentationName: "home.settings"
+        )
+    }
+
+    private static func homeSheetPagePolicy(_ name: String) -> AppPresentationPolicy {
+        AppPresentationPolicy(
+            surface: .sheetPage,
+            loading: .shellFirst(delayMS: 80),
+            instrumentationName: name,
+            detents: [.large],
+            cornerRadius: 36
+        )
+    }
+}
+
+private extension HomeSheetRoute {
+    var presentationName: String {
+        switch self {
+        case .petAllFeatures:
+            return "petAllFeatures"
+        case .humanAllFeatures:
+            return "humanAllFeatures"
+        case .petBasicInfo:
+            return "petBasicInfo"
+        case .humanBasicInfo:
+            return "humanBasicInfo"
+        case .petFood:
+            return "petFood"
+        case .petWeight:
+            return "petWeight"
+        case .petExpense:
+            return "petExpense"
+        case .petFeed:
+            return "petFeed"
+        case .petWater:
+            return "petWater"
+        case .petPotty:
+            return "petPotty"
+        case .petLitter:
+            return "petLitter"
+        case .petPlay:
+            return "petPlay"
+        case .petHygiene:
+            return "petHygiene"
+        case .petWalkSummary:
+            return "petWalkSummary"
+        case .petHealth:
+            return "petHealth"
+        case .petMedication:
+            return "petMedication"
+        case .petMomentHistory:
+            return "petMomentHistory"
+        case .petDocuments:
+            return "petDocuments"
+        case .petAchievements:
+            return "petAchievements"
+        case .petRetention:
+            return "petRetention"
+        case .petBondVault:
+            return "petBondVault"
+        case .humanMedication:
+            return "humanMedication"
+        case .humanWeight:
+            return "humanWeight"
+        case .humanWorkout:
+            return "humanWorkout"
+        case .humanWorkoutDashboard:
+            return "humanWorkoutDashboard"
+        case .humanMetrics:
+            return "humanMetrics"
+        case .humanReport:
+            return "humanReport"
+        case .humanExpense:
+            return "humanExpense"
+        case .humanWishlist:
+            return "humanWishlist"
+        case .humanNote:
+            return "humanNote"
+        }
+    }
+}
+
+private extension HomeFullScreenRoute {
+    var presentationName: String {
+        switch self {
+        case .walk:
+            return "walk"
+        case .oasisReward:
+            return "oasisReward"
+        case .coconutLog:
+            return "coconutLog"
+        }
+    }
+}
+
+private extension HomeOverlayRoute {
+    var presentationName: String {
+        switch self {
+        case .quickMoment:
+            return "quickMoment"
+        }
     }
 }
 

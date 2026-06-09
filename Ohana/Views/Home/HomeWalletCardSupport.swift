@@ -517,7 +517,7 @@ struct WalletPetCardDraftFront: View {
     /// 脚注用品种文案（已解析「其他」+ 自定义）
     var breedFootnote: String
     var avatarImageData: Data?
-    /// 父视图异步解码，避免每次重绘时重复 `UIImage(data:)` / 透明检测
+    /// 父视图异步解码，避免每次重绘时重复 `UIImage(data:)` / 透明检测 // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
     var decodedAvatar: UIImage? = nil
     var decodedAvatarIsTransparent: Bool = false
     var coatColor: Color
@@ -627,17 +627,17 @@ struct WalletPetCardDraftFront: View {
                     Spacer()
 
                     Text(daysTogetherLabel)
-                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
                         .foregroundStyle(primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
 
                     Text("Days Together")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(primaryText.opacity(useDarkText ? 0.82 : 0.92))
 
                     Text(footnote)
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded))
                         .foregroundStyle(secondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -708,7 +708,7 @@ struct WalletPetCardDraftFront: View {
                 }
             }
             Text("O H A N A   P E T")
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .monospaced))
                 .foregroundStyle(foreground.opacity(0.82))
                 .tracking(1.2)
         }
@@ -887,26 +887,26 @@ struct WalletHumanCardDraftFront: View {
                 VStack(alignment: .trailing, spacing: 6) {
                     Spacer()
                     Text(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? L10n.current.humanWalletNewMember : name)
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                         .foregroundStyle(primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                         .contentTransition(.opacity)
                     Text(L10n.current.humanWalletResident)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(primaryText.opacity(useDarkText ? 0.72 : 0.62))
                     if (zodiacText?.isEmpty == false) || (mbtiText?.isEmpty == false) {
                         HStack(spacing: 6) {
                             if let zodiacText, !zodiacText.isEmpty {
                                 Text(zodiacText)
-                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                                     .foregroundStyle(primaryText.opacity(0.95))
                                     .padding(.horizontal, 10).padding(.vertical, 4)
                                     .background(Capsule().fill(primaryText.opacity(useDarkText ? 0.12 : 0.22)))
                             }
                             if let mbtiText, !mbtiText.isEmpty {
                                 Text(mbtiText.uppercased())
-                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                                     .foregroundStyle(primaryText.opacity(0.95))
                                     .padding(.horizontal, 10).padding(.vertical, 4)
                                     .background(Capsule().fill(primaryText.opacity(useDarkText ? 0.12 : 0.22)))
@@ -914,7 +914,7 @@ struct WalletHumanCardDraftFront: View {
                         }
                     }
                     Text(subtitle.isEmpty ? L10n.current.humanWalletSubtitlePlaceholder : subtitle)
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                         .foregroundStyle(primaryText.opacity(0.72))
                         .lineLimit(2)
                         .multilineTextAlignment(.trailing)

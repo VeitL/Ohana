@@ -42,17 +42,17 @@ struct QuickWeightSheet: View {
                         )
                         VStack(alignment: .leading, spacing: 2) {
                             Text(pet.name)
-                                .font(.system(size: 16, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text("记录体重")
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                     }
                     Spacer()
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .semibold))
+                        Image(systemName: "xmark").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
@@ -80,10 +80,10 @@ struct QuickWeightSheet: View {
                 // ── 上次体重提示
                 if let last = pet.weightLogs.sorted(by: { $0.date > $1.date }).first {
                     HStack(spacing: 6) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 11, weight: .semibold))
+                        Image(systemName: "clock.arrow.circlepath").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         Text("上次记录：\(last.weight, specifier: "%.1f") kg")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .padding(.top, 10)
@@ -93,11 +93,11 @@ struct QuickWeightSheet: View {
 
                 // ── 日期选择
                 HStack(spacing: 10) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 13, weight: .semibold))
+                    Image(systemName: "calendar").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     Text("记录日期")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     Spacer()
                     DatePicker("", selection: $recordDate, in: ...Date(), displayedComponents: [.date])
@@ -113,9 +113,9 @@ struct QuickWeightSheet: View {
                 Button { saveWeight() } label: {
                     HStack(spacing: 8) {
                         Image(systemName: didSave ? "checkmark.circle.fill" : "scalemass.fill")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 16, weight: .bold))
                         Text(didSave ? "已保存 ✓" : "保存记录")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)

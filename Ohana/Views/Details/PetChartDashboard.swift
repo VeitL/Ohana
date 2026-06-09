@@ -107,14 +107,14 @@ struct PetChartDashboard: View {
         return VStack(alignment: .leading, spacing: 10) {
             cardHeader(icon: "scalemass", title: "体重", accent: .goTeal) {
                 Button { showingAddWeight.toggle() } label: {
-                    Image(systemName: "plus.circle.fill").font(.system(size: 16)).foregroundStyle(Color.goPrimary)
+                    Image(systemName: "plus.circle.fill").accessibilityHidden(true).font(OhanaFont.adaptive(size: 16)).foregroundStyle(Color.goPrimary)
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(latest.map { String(format: "%.1f", $0.weight) } ?? "--")
-                    .font(.system(size: 34, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
-                Text("kg").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.goTeal)
+                    .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                Text("kg").font(OhanaFont.adaptive(size: 14, weight: .bold)).foregroundStyle(Color.goTeal)
             }
             if showingAddWeight {
                 VStack(spacing: 6) {
@@ -151,7 +151,7 @@ struct PetChartDashboard: View {
                         }
                         quickWeightInput = ""; showingAddWeight = false
                     } label: {
-                        Text("存").font(.system(size: 12, weight: .black)).foregroundStyle(Color.arkInk)
+                        Text("存").font(OhanaFont.adaptive(size: 12, weight: .black)).foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 10).padding(.vertical, 5).background(Color.goPrimary, in: Capsule())
                     }
                 }
@@ -175,24 +175,24 @@ struct PetChartDashboard: View {
             cardHeader(icon: "figure.walk", title: "巡岛", accent: .goPrimary) {
                 if isWalking {
                     HStack(spacing: 3) {
-                        Circle().fill(Color.goPrimary).frame(width: 6, height: 6)
+                        Circle().fill(Color.goPrimary).frame(width: 6, height: 6) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         Text("进行中")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.goPrimary)
                     }
                 } else {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                 }
             }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text("\(weekCounts.reduce(0, +))")
-                    .font(.system(size: 34, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
-                Text("次").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.goPrimary)
+                    .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                Text("次").font(OhanaFont.adaptive(size: 14, weight: .bold)).foregroundStyle(Color.goPrimary)
             }
             Text(lastWalk.map { "上次 \($0.distanceText)" } ?? "暂无记录")
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
+                .font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             Spacer(minLength: 0)
             MiniBarChart(values: weekCounts.map { Double($0) }, labels: [], accentColor: .goPrimary).frame(height: 60)
         }
@@ -204,15 +204,15 @@ struct PetChartDashboard: View {
         let week = last7DaysPotty()
         return VStack(alignment: .leading, spacing: 10) {
             cardHeader(icon: "drop.fill", title: "噗噗", accent: .goOrange) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
             }
             HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text("\(todayCount)").font(.system(size: 34, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
-                Text("次").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.goOrange)
+                Text("\(todayCount)").font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                Text("次").font(OhanaFont.adaptive(size: 14, weight: .bold)).foregroundStyle(Color.goOrange)
             }
-            Text("今日").font(.system(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
+            Text("今日").font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             Spacer(minLength: 0)
             MiniBarChart(values: week.map { Double($0) }, labels: [], accentColor: .goOrange).frame(height: 60)
         }
@@ -226,16 +226,16 @@ struct PetChartDashboard: View {
         let monthly = last6MonthExpense()
         return VStack(alignment: .leading, spacing: 10) {
             cardHeader(icon: AppCurrency.systemIconName, title: "花费", accent: .goYellow) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
             }
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(AppCurrency.format(monthTotal, fractionDigits: 0))
-                    .font(.system(size: 34, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                    .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
                     .minimumScaleFactor(0.6).lineLimit(1)
             }
-            Text("本月").font(.system(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
+            Text("本月").font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             Spacer(minLength: 0)
             MiniBarChart(values: monthly, labels: [], accentColor: .goYellow).frame(height: 60)
         }
@@ -246,27 +246,27 @@ struct PetChartDashboard: View {
         let accent: Color = pet.remainingFoodDays <= 7 ? .goRed : .goTeal
         return VStack(alignment: .leading, spacing: 10) {
             cardHeader(icon: "fork.knife", title: "余粮", accent: accent) {
-                Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                Image(systemName: "chevron.right").accessibilityHidden(true).font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
             }
             if pet.remainingFoodDays > 0 {
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text("\(pet.remainingFoodDays)")
-                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
                         .foregroundStyle(pet.remainingFoodDays <= 7 ? Color.goRed : .white)
-                    Text("天").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+                    Text("天").font(OhanaFont.adaptive(size: 14, weight: .bold)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
                 Text("\(Int(pet.remainingFoodGrams))g 剩余")
-                    .font(.system(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 Spacer(minLength: 0)
                 ProgressView(value: pet.remainingFoodPercent).tint(accent).scaleEffect(y: 1.2)
                 Text("点击管理粮食")
-                    .font(.system(size: 10, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.22))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.22))
             } else {
-                Text("未设置").font(.system(size: 14)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                Text("未设置").font(OhanaFont.adaptive(size: 14)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 Spacer(minLength: 0)
                 Text("点击添加余粮信息")
-                    .font(.system(size: 11, weight: .medium)).foregroundStyle(Color.goPrimary.opacity(0.7))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium)).foregroundStyle(Color.goPrimary.opacity(0.7))
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background(Color.goPrimary.opacity(0.1), in: Capsule())
             }
@@ -277,15 +277,15 @@ struct PetChartDashboard: View {
     @ViewBuilder
     private func cardHeader<T: View>(icon: String, title: String, accent: Color, @ViewBuilder trailing: () -> T = { EmptyView() }) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: icon).font(.system(size: 12, weight: .bold)).foregroundStyle(accent)
-            Text(title).font(.system(size: 12, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+            Image(systemName: icon).font(OhanaFont.adaptive(size: 12, weight: .bold)).foregroundStyle(accent)
+            Text(title).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
             Spacer()
             trailing()
         }
     }
 
     private var emptyHint: some View {
-        Text("暂无数据").font(.system(size: 10)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
+        Text("暂无数据").font(OhanaFont.adaptive(size: 10)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
             .frame(maxWidth: .infinity, alignment: .center).padding(.vertical, 8)
     }
 

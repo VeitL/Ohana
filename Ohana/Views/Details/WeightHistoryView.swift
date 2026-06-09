@@ -93,15 +93,15 @@ struct WeightHistoryView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("体重趋势")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     if let latest = sortedLogs.first {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text(displayWeightValue(latest))
-                                .font(.system(size: 44, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 44, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(displayWeightUnit(latest))
-                                .font(.system(size: 18, weight: .bold))
+                                .font(OhanaFont.adaptive(size: 18, weight: .bold))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         }
                     }
@@ -127,9 +127,9 @@ struct WeightHistoryView: View {
                 let delta = last - first
                 HStack(spacing: 6) {
                     Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold))
                     Text(displayWeightDelta(delta))
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 }
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(.horizontal, 10).padding(.vertical, 4)
@@ -152,13 +152,13 @@ struct WeightHistoryView: View {
                         Spacer()
                         Text(l.date, format: .dateTime.month(.abbreviated).day())
                     }
-                    .font(.system(size: 10, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .padding(.horizontal, 24)
                 }
             } else {
                 Text("记录 2 条以上体重后可显示趋势图")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 13, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 40)
@@ -171,27 +171,27 @@ struct WeightHistoryView: View {
     // MARK: - Feeding Insight Banner
     private func feedingInsightBanner(avg: Double) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "fork.knife")
-                .font(.system(size: 15, weight: .semibold))
+            Image(systemName: "fork.knife").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                 .foregroundStyle(Color.goOrange)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .background(Color.goOrange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("饮食 · 体重关联")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                 HStack(spacing: 4) {
                     Text(String(format: "近期日均摄入 %.0fg", avg))
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     if let latest = sortedLogs.first, let prev = sortedLogs.dropFirst().first {
                         let delta = latest.weightInKg - prev.weightInKg
                         Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold))
                             .foregroundStyle(delta >= 0 ? Color.goOrange : Color.goTeal)
                         Text(displayWeightDelta(delta))
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(delta >= 0 ? Color.goOrange : Color.goTeal)
                     }
                 }
@@ -225,17 +225,17 @@ struct WeightHistoryView: View {
             VStack(spacing: 0) {
                 Capsule()
                     .fill(.primary.opacity(0.15))
-                    .frame(width: 40, height: 4)
+                    .frame(width: 40, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .padding(.top, 12)
                     .padding(.bottom, 8)
 
                 HStack {
                     Text("历史记录")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20)
@@ -255,7 +255,7 @@ struct WeightHistoryView: View {
                         }
                         if sortedLogs.isEmpty {
                             Text("还没有体重记录\n点击右上角 + 在这里记录")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 14, weight: .medium))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
@@ -271,10 +271,10 @@ struct WeightHistoryView: View {
     private var inlineWeightComposer: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                Image(systemName: "scalemass.fill")
-                    .font(.system(size: 17, weight: .black))
+                Image(systemName: "scalemass.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 17, weight: .black))
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("记录体重")
@@ -290,10 +290,10 @@ struct WeightHistoryView: View {
                         isInlineWeightComposerVisible = false
                     }
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .black))
+                    Image(systemName: "xmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -301,7 +301,7 @@ struct WeightHistoryView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(newWeightText.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 1, countryCode: appCountry) : newWeightText)
-                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 36, weight: .black, design: .rounded))
                         .foregroundStyle(newWeightText.isEmpty ? Color.ohanaSecondaryText.opacity(0.55) : Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Spacer()
@@ -346,8 +346,8 @@ struct WeightHistoryView: View {
             }
 
             HStack(spacing: 10) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "calendar").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 24)
                 Text("日期")
@@ -364,7 +364,7 @@ struct WeightHistoryView: View {
 
             Button(action: saveInlineWeight) {
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
                     Text("保存体重")
                 }
                 .font(OhanaFont.body(.black))
@@ -409,14 +409,14 @@ struct WeightHistoryView: View {
         HStack(spacing: 14) {
             Circle()
                 .fill(.primary.opacity(0.6))
-                .frame(width: 8, height: 8)
+                .frame(width: 8, height: 8) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.date, format: .dateTime.year().month().day())
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 Text(log.date, format: .dateTime.weekday(.wide))
-                    .font(.system(size: 11, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -425,15 +425,15 @@ struct WeightHistoryView: View {
             VStack(alignment: .trailing, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(displayWeightValue(log))
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(displayWeightUnit(log))
-                        .font(.system(size: 12, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 }
                 if log.bcsScore > 0 {
                     Text("BCS \(log.bcsScore)")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(bcsColor(log.bcsScore), in: Capsule())
@@ -454,8 +454,8 @@ struct WeightHistoryView: View {
                     )
                 }
             } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 13, weight: .semibold))
+                Image(systemName: "trash").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
             }
         }

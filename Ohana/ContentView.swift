@@ -14,6 +14,8 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var appRoutes = AppRouteCoordinator()
     @State private var createdEntitySignal: HomeCreatedEntitySignal?
+    @State private var onboardingJourneyEvaluationTask: Task<Void, Never>?
+    @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
     @AppStorage("ohana_has_onboarded") private var hasOnboarded: Bool = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @Namespace private var heroNS
@@ -28,8 +30,18 @@ struct ContentView: View {
             NavigationStack(path: $appRoutes.path) {
                 selectedHomeView
                 .navigationDestination(for: AppRoute.self) { route in
-                    AppRouteDestination(route: route)
-                        .navigationTransition(.zoom(sourceID: route.sourceID, in: heroNS))
+                    AppDeferredRouteContent(
+                        routeID: route.id,
+                        policy: AppPresentationPolicyProvider.policy(for: route)
+                    ) {
+                        AppRouteDestination(
+                            route: route,
+                            onPresentCoconutLog: { subject in
+                                appRoutes.presentCoconutLog(subject)
+                            }
+                        )
+                    }
+                    .navigationTransition(.zoom(sourceID: route.sourceID, in: heroNS))
                 }
                 .toolbar {
                     ToolbarItemGroup(placement: .keyboard) {
@@ -38,7 +50,7 @@ struct ContentView: View {
                             dismissKeyboard()
                         } label: {
                             Label("隐藏键盘", systemImage: "keyboard.chevron.compact.down")
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.callout(.semibold))
                         }
                     }
                 }
@@ -57,9 +69,11 @@ struct ContentView: View {
         .onAppear {
             AppLifecycleCoordinator.shared.handle(.rootAppeared(scenePhase: scenePhase))
             reconcileHumanProfileRequirement()
+            scheduleOnboardingJourneyEvaluation()
         }
         .onChange(of: hasOnboarded) { _, _ in
             reconcileHumanProfileRequirement()
+            scheduleOnboardingJourneyEvaluation()
         }
         .onReceive(NotificationCenter.default.publisher(for: .ohanaReturnHomeAfterHumanDeletion)) { notification in
             let outcome = appRoutes.handleNotificationEvent(
@@ -80,16 +94,27 @@ struct ContentView: View {
             onRequiredHumanSaved: { activateRequiredHuman($0) },
             onPetSavedFromAddEntity: { pet in
                 createdEntitySignal = HomeCreatedEntitySignal(entityID: pet.id)
+                scheduleOnboardingJourneyEvaluation()
             },
             onHumanSavedFromAddEntity: { human in
                 currentActiveHumanId = human.id.uuidString
                 createdEntitySignal = HomeCreatedEntitySignal(entityID: human.id)
+                scheduleOnboardingJourneyEvaluation()
+            },
+            onFirstSuccessMomentCompleted: { _ in
+                OnboardingJourneyCoordinator.markFirstCareCompleted()
+                scheduleOnboardingJourneyEvaluation()
+            },
+            onHumanDoseTaken: { _ in
+                OnboardingJourneyCoordinator.markFirstCareCompleted()
+                scheduleOnboardingJourneyEvaluation()
             }
         )
         .onChange(of: currentActiveHumanId) { _, newValue in
             if !newValue.isEmpty {
                 appRoutes.dismissSheet(.requiredAccountSwitch)
                 reconcileHumanProfileRequirement()
+                scheduleOnboardingJourneyEvaluation()
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -175,6 +200,20 @@ struct ContentView: View {
 
     private func activateRequiredHuman(_ human: Human) {
         currentActiveHumanId = human.id.uuidString
+        scheduleOnboardingJourneyEvaluation()
+    }
+
+    private func scheduleOnboardingJourneyEvaluation() {
+        onboardingJourneyEvaluationTask?.cancel()
+        onboardingJourneyEvaluationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 480) {
+            let evaluation = OnboardingJourneyCoordinator.evaluate(
+                hasOnboarded: hasOnboarded,
+                activeHumanID: currentActiveHumanId.isEmpty ? nil : currentActiveHumanId,
+                context: modelContext
+            )
+            onboardingJourneyPhase = evaluation.phase
+            onboardingJourneyEvaluationTask = nil
+        }
     }
 
     private func handleRouteNotificationOutcome(_ outcome: AppRouteNotificationOutcome) {

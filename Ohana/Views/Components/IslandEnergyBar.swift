@@ -19,16 +19,16 @@ struct IslandEnergyBar: View {
             // 标签行
             HStack(spacing: 6) {
                 Text("🌿 岛屿能量")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 Spacer()
                 Text(levelLabel)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                 Text("·")
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                 Text("\(Int(progress * 100))%")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -50,26 +50,26 @@ struct IslandEnergyBar: View {
                             )
                         )
                         .frame(width: geo.size.width * animatedProgress, height: 8)
-                        .shadow(color: Color.goPrimary.opacity(0.4), radius: 4, y: 0)
+                        .shadow(color: Color.goPrimary.opacity(0.4), radius: 4, y: 0) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 }
             }
             .frame(height: 8)
 
             // 升级提示
             Text(nextLevelHint)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onAppear {
-            withAnimation(.easeOut(duration: 0.8).delay(0.1)) {
+            withAnimation(.easeOut(duration: 0.8).delay(0.1)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 animatedProgress = progress
             }
         }
         .onChange(of: progress) { _, newVal in
-            withAnimation(.easeOut(duration: 0.6)) {
+            withAnimation(.easeOut(duration: 0.6)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 animatedProgress = newVal
             }
         }

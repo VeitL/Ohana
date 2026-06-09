@@ -11,6 +11,7 @@ import SwiftUI
 struct OasisHomeTabHost: View {
     let lifecycle: VerticalSolidHomePageLifecycle
     let injectEnergyTrigger: Int
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
 
     @State private var showsLiveContent = false
     @State private var forwardedInjectEnergyTrigger = 0
@@ -46,7 +47,8 @@ struct OasisHomeTabHost: View {
                     injectEnergyTrigger: forwardedInjectEnergyTrigger,
                     isEmbeddedPrepared: lifecycle.isPrepared,
                     isEmbeddedVisible: lifecycle.isVisible,
-                    isEmbeddedActive: lifecycle.isLive
+                    isEmbeddedActive: lifecycle.isLive,
+                    onPresentCoconutLog: onPresentCoconutLog
                 )
                 .allowsHitTesting(lifecycle.isLive)
             }

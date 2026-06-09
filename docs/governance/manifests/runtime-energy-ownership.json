@@ -72,7 +72,7 @@
       "lowPowerGate": "Ambient loops must ask AppWorkloadPolicy or SurfaceActivityGate and fall back to static/reduced visuals.",
       "reduceMotionGate": "Reduce Motion disables decorative loops and keeps interaction feedback lightweight.",
       "backgroundGate": "Hidden/off-tab home surfaces are unmounted or rendered as static shells.",
-      "policyGate": "scripts/audit-smoothness-risk.sh --changed and scripts/audit-runtime-guardrails.sh --all block new unowned loops.",
+      "policyGate": "scripts/audit-smoothness-risk.sh --all and scripts/audit-runtime-guardrails.sh --all block new unowned loops.",
       "evidence": "Round 3 Oasis host/live snapshot repair; Today Focus and streak particles are policy gated.",
       "paths": [
         "Ohana/Views/Home/OasisHomeTabHost.swift",
@@ -142,7 +142,7 @@
       "lowPowerGate": "Preview canvases must expose reduced-work paths when used in app surfaces.",
       "reduceMotionGate": "Preview canvases consume AppWorkloadPolicy or explicit reduced-work parameters.",
       "backgroundGate": "Preview/lab surfaces are route scoped and should not continue when dismissed.",
-      "policyGate": "Runtime guardrails and changed-file smoothness audit catch new TimelineView(.animation) usage.",
+      "policyGate": "Runtime guardrails and whole-repo smoothness audit catch new TimelineView(.animation) usage.",
       "evidence": "Design preview files are isolated under design/spec and lab views, not startup.",
       "paths": [
         "Ohana/Views/Details/DesignSpecPreviewCanvasV4.swift",

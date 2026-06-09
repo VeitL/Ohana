@@ -7,7 +7,7 @@ extension QuickFeedDetailContent {
             sheetHero(icon: "slider.horizontal.3", title: l.tr(zh: "管理", en: "Manage", de: "Verwalten"), tint: Color.goPrimary)
             VStack(alignment: .leading, spacing: 10) {
                 Text(l.tr(zh: "模式", en: "Mode", de: "Modus"))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 feedModeSelector
             }
@@ -168,7 +168,7 @@ extension QuickFeedDetailContent {
                     quickValues: quickMainGramOptions
                 )
                 DatePicker(l.tr(zh: "时间", en: "Time", de: "Zeit"), selection: $draftStore.editFeedLogDate)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .padding(12)
                     .feedFlatBlockSurface(cornerRadius: 16)
                 if let inputError = draftStore.inputError {

@@ -204,8 +204,8 @@ struct PetMedicationView: View {
         Button {
             openAddMedicationPopup()
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 22, weight: .black))
+            Image(systemName: "plus").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 22, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 60, height: 60)
                 .background(chromeAccent, in: Circle())
@@ -241,10 +241,10 @@ struct PetMedicationView: View {
             Button {
                 dismiss()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
@@ -287,7 +287,7 @@ struct PetMedicationView: View {
                 Label {
                     Text(l.tr(zh: "用药节奏", en: "Medication rhythm", de: "Medikamentenrhythmus"))
                 } icon: {
-                    Image(systemName: "calendar.badge.checkmark")
+                    Image(systemName: "calendar.badge.checkmark").accessibilityHidden(true)
                 }
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -323,7 +323,7 @@ struct PetMedicationView: View {
             ZStack(alignment: .bottom) {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(Color.ohanaControlFill)
-                    .frame(width: 14, height: 34)
+                    .frame(width: 14, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(tint)
                     .frame(width: 14, height: max(stats.required == 0 ? 4 : 6, 34 * progress))
@@ -378,9 +378,9 @@ struct PetMedicationView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: todayDone >= todayRequired && todayRequired > 0 ? "checkmark.circle.fill" : "pills.fill")
-                    .font(.system(size: 22, weight: .black))
+                    .font(OhanaFont.adaptive(size: 22, weight: .black))
                     .foregroundStyle(todayDone >= todayRequired && todayRequired > 0 ? Color.goTeal : chromeAccent)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background((todayDone >= todayRequired && todayRequired > 0 ? Color.goTeal : chromeAccent).opacity(0.14), in: Circle())
 
                 VStack(alignment: .leading, spacing: 5) {
@@ -404,7 +404,7 @@ struct PetMedicationView: View {
                     recordDose(for: pendingMedication)
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
                         Text(l.tr(zh: "直接打卡", en: "Check in", de: "Abhaken"))
                         Spacer()
                         Text(pendingMedication.dosage.isEmpty ? l.tr(zh: "按医嘱", en: "As directed", de: "Nach Anweisung") : pendingMedication.dosage)
@@ -464,10 +464,10 @@ struct PetMedicationView: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Image(systemName: "pills.fill")
-                    .font(.system(size: 18, weight: .black))
+                Image(systemName: "pills.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 18, weight: .black))
                     .foregroundStyle(tint)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(tint.opacity(0.14), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -545,8 +545,8 @@ struct PetMedicationView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Image(systemName: "pills.fill")
-                .font(.system(size: 30, weight: .black))
+            Image(systemName: "pills.fill").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 30, weight: .black))
                 .foregroundStyle(chromeAccent)
                 .frame(width: 58, height: 58)
                 .background(chromeAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 20, style: .continuous))

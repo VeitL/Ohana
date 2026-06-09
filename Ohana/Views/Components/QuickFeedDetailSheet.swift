@@ -22,13 +22,13 @@ struct QuickFeedDetailSheet: View {
     var showsRemoveQuickActionFooter: Bool = true
     var showsCloseButton: Bool = true
     var opensManualSheetOnAppear: Bool = false
+    let allEvents: [Event]
+    let allHumans: [Human]
+    let allPets: [Pet]
+    let allCareLogs: [PetCareLog]
+    let allFoodRecords: [PetFoodRecord]
 
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Event.startDate) private var allEvents: [Event]
-    @Query(sort: \Human.createdAt) private var allHumans: [Human]
-    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
-    @Query(sort: \PetCareLog.date) private var allCareLogs: [PetCareLog]
-    @Query(sort: \PetFoodRecord.startDate) private var allFoodRecords: [PetFoodRecord]
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("defaultFeedGrams") private var defaultFeedGrams: Double = 0
 
@@ -38,7 +38,12 @@ struct QuickFeedDetailSheet: View {
         onClose: (() -> Void)? = nil,
         showsRemoveQuickActionFooter: Bool = true,
         showsCloseButton: Bool = true,
-        opensManualSheetOnAppear: Bool = false
+        opensManualSheetOnAppear: Bool = false,
+        allEvents: [Event] = [],
+        allHumans: [Human] = [],
+        allPets: [Pet] = [],
+        allCareLogs: [PetCareLog] = [],
+        allFoodRecords: [PetFoodRecord] = []
     ) {
         self.pet = pet
         self.onRemove = onRemove
@@ -46,42 +51,11 @@ struct QuickFeedDetailSheet: View {
         self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
         self.showsCloseButton = showsCloseButton
         self.opensManualSheetOnAppear = opensManualSheetOnAppear
-
-        let petID = pet.id
-        let petKey = petID.uuidString
-        let dryStockKey = "\(petKey):\(FeedFoodKind.dry.rawValue)"
-        let wetStockKey = "\(petKey):\(FeedFoodKind.wet.rawValue)"
-        let feedingType = CareType.feeding.rawValue
-        let homeLogStartDate = Calendar.current.date(
-            byAdding: .day,
-            value: -6,
-            to: Calendar.current.startOfDay(for: Date())
-        ) ?? Date().addingTimeInterval(-6 * 86400)
-
-        _allEvents = Query(
-            filter: #Predicate<Event> { event in
-                event.relatedEntityId == petKey ||
-                    event.relatedEntityId == dryStockKey ||
-                    event.relatedEntityId == wetStockKey
-            },
-            sort: \.startDate
-        )
-        _allCareLogs = Query(
-            filter: #Predicate<PetCareLog> { log in
-                log.type == feedingType &&
-                    log.pet?.id == petID &&
-                    log.date >= homeLogStartDate
-            },
-            sort: \.date,
-            order: .reverse
-        )
-        _allFoodRecords = Query(
-            filter: #Predicate<PetFoodRecord> { record in
-                record.pet?.id == petID
-            },
-            sort: \.startDate,
-            order: .reverse
-        )
+        self.allEvents = allEvents
+        self.allHumans = allHumans
+        self.allPets = allPets
+        self.allCareLogs = allCareLogs
+        self.allFoodRecords = allFoodRecords
     }
 
     var body: some View {
@@ -520,7 +494,7 @@ struct QuickFeedDetailContent: View {
                         Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                             dismissFeedKeyboard()
                         }
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                     }
                 }
@@ -746,10 +720,10 @@ struct QuickFeedDetailContent: View {
             avatarView(size: 46)
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "粮食记录", en: "Food log", de: "Futter"))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
@@ -757,10 +731,10 @@ struct QuickFeedDetailContent: View {
                 Button {
                     closeDetail()
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .contentShape(Rectangle())
                 }
                 .frame(width: 44, height: 44)

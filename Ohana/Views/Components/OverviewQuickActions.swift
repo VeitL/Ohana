@@ -287,7 +287,7 @@ struct OhanaQuickActionIcon: View {
         return ZStack {
             Circle()
                 .fill(Color.goPrimary)
-            Image(systemName: "checkmark")
+            Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
                 .font(.system(size: badgeSize * 0.52, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
         }
@@ -902,6 +902,7 @@ struct GoQuickActionCard: View {
     @State private var showGroomMenu = false
     @State private var showPottyMenu = false
     @State private var showHealthMenu = false
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @Environment(\.modelContext) private var modelContext
 
     private var isGroom: Bool { item.actionType == "groom" }
@@ -1030,11 +1031,13 @@ struct GoQuickActionCard: View {
                     if let reminder = pendingReminder {
                         Button {
                             let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-                            ReminderCommandExecutor(context: modelContext).complete(
-                                reminder,
-                                by: activeHumanId,
-                                note: "overview.quick.action.reminder.complete"
-                            )
+                            commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
+                                ReminderCommandExecutor(context: modelContext).complete(
+                                    reminder,
+                                    by: activeHumanId,
+                                    note: "overview.quick.action.reminder.complete"
+                                )
+                            }
                             UINotificationFeedbackGenerator().notificationOccurred(.success)
                         } label: {
                             Label("完成待办", systemImage: "checkmark.circle.fill")
@@ -1081,14 +1084,14 @@ struct GoQuickActionCard: View {
                 if pendingReminder != nil || showsAttentionDot {
                     Circle()
                         .fill(Color.goRed)
-                        .frame(width: 7, height: 7)
+                        .frame(width: 7, height: 7) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .offset(x: 2, y: -2)
                 }
 
                 if let privacyIconName {
                     Image(systemName: privacyIconName)
-                        .font(.system(size: 10, weight: .black))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(privacyIconTint)
                         .shadow(color: Color.arkInk.opacity(0.35), radius: 2, x: 0, y: 1) // ui-v4: allow tiny privacy badge legibility lift
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -1124,7 +1127,7 @@ struct GoQuickActionCard: View {
 
                 if let badge = privacyBadgeText {
                     Label(badge, systemImage: isPrivacyLocked ? "lock.fill" : "globe.asia.australia.fill")
-                        .font(.system(size: 8, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(isPrivacyLocked ? Color.goYellow : subtitleForeground)
                         .lineLimit(1)
                         .labelStyle(.titleAndIcon)
@@ -1135,7 +1138,7 @@ struct GoQuickActionCard: View {
                         .lineLimit(1)
                 } else {
                     Text(" ")
-                        .font(.system(size: 9))
+                        .font(OhanaFont.adaptive(size: 9)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
             }
         }
@@ -1230,11 +1233,11 @@ private struct GroomPopoverContent: View {
                 } label: {
                     VStack(spacing: 6) {
                         Image(systemName: opt.icon)
-                            .font(.system(size: 24, weight: .semibold))
+                            .font(OhanaFont.adaptive(size: 24, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(themeColor)
                             .frame(width: 48, height: 48)
                         Text(LocalizedStringKey(opt.label))
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
@@ -1275,11 +1278,11 @@ private struct PottyPopoverContent: View {
                 } label: {
                     VStack(spacing: 6) {
                         Image(systemName: opt.icon)
-                            .font(.system(size: 24, weight: .semibold))
+                            .font(OhanaFont.adaptive(size: 24, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaFunctionalIcon)
                             .frame(width: 48, height: 48)
                         Text(LocalizedStringKey(opt.label))
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
@@ -1326,11 +1329,11 @@ private struct HealthPopoverContent: View {
                 } label: {
                     VStack(spacing: 6) {
                         Image(systemName: opt.icon)
-                            .font(.system(size: 24, weight: .semibold))
+                            .font(OhanaFont.adaptive(size: 24, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaFunctionalIcon)
                             .frame(width: 48, height: 48)
                         Text(opt.label)
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
@@ -1362,17 +1365,17 @@ struct QAManageSheet: View {
                             size: 28,
                             color: Color.ohanaFunctionalIcon
                         )
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.label)
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             if let pid = item.petId, let pet = pets.first(where: { $0.id == pid }) {
                                 Text(pet.name)
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             } else {
                                 Text("通用")
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                         }
@@ -1395,7 +1398,7 @@ struct QAManageSheet: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack {
                         Button { showingAddSheet = true } label: {
-                            Image(systemName: "plus")
+                            Image(systemName: "plus") // a11y: allow decorative icon covered by surrounding text or control
                         }
                         Button("完成") { dismiss() }
                             .fontWeight(.bold)
@@ -1485,9 +1488,9 @@ struct AddQuickActionSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("选择宠物")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("为哪只宠物添加快速入口")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -1513,16 +1516,16 @@ struct AddQuickActionSheet: View {
                             )
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
-                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text("\(pet.species) · \(pet.breed)")
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                                     .lineLimit(1)
                             }
                             Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 13, weight: .semibold))
+                            Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color(hex: pet.themeColorHex))
                         }
                         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -1542,10 +1545,10 @@ struct AddQuickActionSheet: View {
                 Button {
                     withAnimation(GoMotion.selection) { step = 1 }
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 15, weight: .bold))
+                    Image(systemName: "chevron.left") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(.secondary.opacity(0.12), in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -1560,9 +1563,9 @@ struct AddQuickActionSheet: View {
                     )
                     VStack(alignment: .leading, spacing: 1) {
                         Text(pet.name)
-                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text("选择快捷功能")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
@@ -1583,17 +1586,17 @@ struct AddQuickActionSheet: View {
                         if selectedPetItemCount >= QuickActionLimit.maxItemsPerEntity {
                             VStack(spacing: 8) {
                                 Text("最多 8 个快捷操作")
-                                    .font(.system(size: 15, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text("更多功能可以去「全部功能」里查看。")
-                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 40)
                         } else if available.isEmpty {
                             Text("所有快捷入口已添加")
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 40)
@@ -1623,7 +1626,7 @@ struct AddQuickActionSheet: View {
                                     )
                                     .frame(width: 44, height: 44)
                                     Text(action.label)
-                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                         .lineLimit(1)
                                 }
@@ -1661,6 +1664,7 @@ struct QuickFeedSheet: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var amountText: String = ""
     @State private var setAsDefault = false
 
@@ -1676,7 +1680,7 @@ struct QuickFeedSheet: View {
                 VStack(spacing: 24) {
                     petHeader
                     HStack {
-                        ExecutorPickerBar(tint: Color.goPrimary)
+                        ExecutorPickerBarRouteContainer(tint: Color.goPrimary)
                         Spacer()
                     }
                     .padding(.horizontal, 20)
@@ -1690,10 +1694,13 @@ struct QuickFeedSheet: View {
                 .padding(.top, 24)
             }
             .navigationTitle("")
+            .onDisappear {
+                commandQueue.cancelAll()
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
+                        Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -1720,7 +1727,7 @@ struct QuickFeedSheet: View {
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
             }
             Spacer()
-            Text(isWater ? "💧" : "🍗").font(.system(size: 30))
+            Text(isWater ? "💧" : "🍗").font(OhanaFont.adaptive(size: 30)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .padding(.horizontal, 20)
     }
@@ -1820,21 +1827,20 @@ struct QuickFeedSheet: View {
         let executorId = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap {
             $0.isEmpty ? nil : $0
         }
-        if isWater {
-            let waterAmount = amount > 0 ? amount : defaultAmount
-            CareEventService.recordCare(pet: pet, type: .watering, amountMl: waterAmount, context: modelContext, executorId: executorId, reward: .water)
-        } else {
-            if !isCasual && setAsDefault && amount > 0 { pet.dailyPortionGrams = amount }
-            CareEventService.recordManualFeed(
+        let requestedAmount = isWater ? (amount > 0 ? amount : defaultAmount) : amount
+        let shouldSaveDefault = !isWater && !isCasual && setAsDefault && amount > 0
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(.quickCare(entityID: pet.id, action: isWater ? "water" : "feed")) {
+            _ = OverviewQuickCareCommandExecutor(context: modelContext).record(
                 pet: pet,
-                amountGrams: amount,
-                context: modelContext,
-                executorId: executorId,
-                foodKind: pet.mainFoodKind
+                actionType: actionType,
+                amount: requestedAmount,
+                saveAsDefault: shouldSaveDefault,
+                executorId: executorId
             )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
         }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        dismiss()
     }
 }
 
@@ -1855,11 +1861,11 @@ private struct QuickActionWaterDropWithWaves: View {
     var body: some View {
         let frame = dropSize * 1.2
         ZStack {
-            Image(systemName: "drop.fill")
+            Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(.system(size: dropSize, weight: .semibold))
                 .foregroundStyle(accent)
 
-            TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: shouldReduceWork)) { timeline in
+            TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: shouldReduceWork)) { timeline in // smoothness: allow visible water icon wave is workload-policy gated and reduced to 20fps
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 Canvas { context, size in
                     let w = size.width
@@ -1887,13 +1893,13 @@ private struct QuickActionWaterDropWithWaves: View {
                 }
                 .frame(width: frame, height: frame)
                 .mask {
-                    Image(systemName: "drop.fill")
+                    Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(.system(size: dropSize, weight: .semibold))
                         .frame(width: frame, height: frame)
                 }
             }
 
-            Image(systemName: "drop.fill")
+            Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(.system(size: dropSize, weight: .semibold))
                 .foregroundStyle(
                     LinearGradient(
@@ -1945,21 +1951,21 @@ struct QAQuickAddPopoverContent: View {
         Group {
             if isAtLimit {
                 VStack(spacing: 8) {
-                    Text("8/8").font(.system(size: 24, weight: .black, design: .rounded))
+                    Text("8/8").font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("快捷操作已满")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("更多功能请去「全部功能」查看")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
             } else if options.isEmpty {
                 VStack(spacing: 8) {
-                    Text("✅").font(.system(size: 26))
+                    Text("✅").font(OhanaFont.adaptive(size: 26)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("已全部添加")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20)

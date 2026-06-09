@@ -100,15 +100,15 @@ struct AddWizardStageProgress: View {
             ZStack {
                 Circle()
                     .fill(isCurrent ? accent : Color.ohanaCardSurfaceElevated)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 Image(systemName: stage.systemImage)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(isCurrent ? Color.arkInk : Color.ohanaSecondaryText)
             }
             if isCurrent {
                 Text(stage.title)
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .leading)))
@@ -159,25 +159,25 @@ struct AddWizardThemeMatrixCell<Fill: ShapeStyle>: View {
             Rectangle()
                 .strokeBorder(Color.ohanaCardStroke.opacity(0.24), lineWidth: 0.35)
             if showsPaletteIcon && !isSelected {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .black))
+                Image(systemName: "plus").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 16, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             if isDisabled {
                 Rectangle()
                     .fill(Color.ohanaCardSurface.opacity(0.58))
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             if isSelected {
                 Circle()
                     .fill(Color.goCardWhite.opacity(0.94))
-                    .frame(width: 23, height: 23)
-                Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .black))
+                    .frame(width: 23, height: 23) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                Image(systemName: "checkmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.arkInk)
                 Rectangle()
@@ -397,7 +397,7 @@ struct AddWizardStatusBadge: View {
 
     var body: some View {
         Label(title, systemImage: systemImage)
-            .font(.system(size: 11, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .foregroundStyle(Color.arkInk)
@@ -413,11 +413,11 @@ struct AddWizardCardCloseButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 14, weight: .black, design: .rounded))
+            Image(systemName: "xmark").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .background(
                     Circle()
                         .fill(Color.goCardWhite.opacity(0.76))
@@ -450,17 +450,17 @@ struct AddWizardJoinCelebrationOverlay: View {
                         .fill(accent)
                         .frame(width: 72, height: 72)
                     Image(systemName: systemImage)
-                        .font(.system(size: 30, weight: .black))
+                        .font(OhanaFont.adaptive(size: 30, weight: .black))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.arkInk)
                 }
                 VStack(spacing: 5) {
                     Text(title)
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .multilineTextAlignment(.center)
                     Text(subtitle)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .multilineTextAlignment(.center)
                 }

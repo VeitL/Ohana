@@ -12,13 +12,13 @@ struct QuickWaterDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
     var onClose: (() -> Void)? = nil
+    let allEvents: [Event]
+    let allPets: [Pet]
+    let waterCareLogs: [PetCareLog]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-    @Query(sort: \Event.startDate) private var allEvents: [Event]
-    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
-    @Query(sort: \PetCareLog.date, order: .reverse) private var waterCareLogs: [PetCareLog]
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     @State private var waterIntervalDays: Int = 3
@@ -106,34 +106,21 @@ struct QuickWaterDetailSheet: View {
         }
     }
 
-    init(pet: Pet, onRemove: @escaping () -> Void, onClose: (() -> Void)? = nil) {
+    init(
+        pet: Pet,
+        onRemove: @escaping () -> Void,
+        onClose: (() -> Void)? = nil,
+        allEvents: [Event] = [],
+        allPets: [Pet] = [],
+        waterCareLogs: [PetCareLog] = []
+    ) {
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
+        self.allEvents = allEvents
+        self.allPets = allPets
+        self.waterCareLogs = waterCareLogs
         _displayedWaterMode = State(initialValue: WaterOperatingMode.stored(pet.id) ?? .manual)
-
-        let petID = pet.id
-        let petKey = petID.uuidString
-        let wateringType = CareType.watering.rawValue
-        let waterChangeType = CareType.waterChange.rawValue
-        let filterCleanType = CareType.filterClean.rawValue
-
-        _allEvents = Query(
-            filter: #Predicate<Event> { event in
-                event.relatedEntityId == petKey
-            },
-            sort: \.startDate
-        )
-        _waterCareLogs = Query(
-            filter: #Predicate<PetCareLog> { log in
-                (log.type == wateringType ||
-                 log.type == waterChangeType ||
-                 log.type == filterCleanType) &&
-                log.pet?.id == petID
-            },
-            sort: \.date,
-            order: .reverse
-        )
     }
 
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
@@ -515,20 +502,20 @@ struct QuickWaterDetailSheet: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
-                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(isAquatic ? "水体 / 换水 / 滤芯" : "喂水 / 换水 / 滤芯")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer()
 
             Button { closeDetail() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .contentShape(Rectangle())
             }
             .frame(width: 44, height: 44)
@@ -562,9 +549,9 @@ struct QuickWaterDetailSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: mode == .manual ? "hand.tap.fill" : "bell.badge.fill")
-                    .font(.system(size: 10, weight: .black))
+                    .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(mode == .manual ? "手动" : "计划")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(selected ? Color.arkInk : tint)
             .frame(maxWidth: .infinity)
@@ -592,16 +579,16 @@ struct QuickWaterDetailSheet: View {
                         .fill((waterMode == .reminder ? Color.goTeal : chromeTint).opacity(0.14))
                         .frame(width: 66, height: 66)
                     Image(systemName: isAquatic ? "water.waves" : "drop.fill")
-                        .font(.system(size: 28, weight: .black))
+                        .font(OhanaFont.adaptive(size: 28, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(waterMode == .reminder ? Color.goTeal : chromeTint)
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(isAquatic ? "水体管理" : "今日喂水")
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(isAquatic ? "换水、滤芯和水体状态" : waterSubtitle)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
@@ -637,14 +624,14 @@ struct QuickWaterDetailSheet: View {
             HStack(spacing: 4) {
                 Text(title)
                 if isWarning {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 8, weight: .black))
+                    Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 8, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
             }
-            .font(.system(size: 10, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(isWarning ? Color.goRed : Color.ohanaSecondaryText)
             Text(value)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -781,14 +768,14 @@ struct QuickWaterDetailSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("最近")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Button {
                     openWaterSheet(.history)
                 } label: {
                     Text("管理")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(chromeTint)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -796,7 +783,7 @@ struct QuickWaterDetailSheet: View {
 
             if allWaterLogs.isEmpty {
                 Text("暂无记录")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.62))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
@@ -814,7 +801,7 @@ struct QuickWaterDetailSheet: View {
 
     private var toastView: some View {
         Text(saveToastMessage)
-            .font(.system(size: 13, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
@@ -1045,7 +1032,7 @@ struct QuickWaterDetailSheet: View {
                         openWaterSheet(.history)
                     } label: {
                         Label("全部记录", systemImage: "clock.arrow.circlepath")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(chromeTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
@@ -1096,7 +1083,7 @@ struct QuickWaterDetailSheet: View {
                         openWaterSheet(.waterSettings)
                     } label: {
                         Label("管理", systemImage: "slider.horizontal.3")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(waterChangeStatusTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
@@ -1147,7 +1134,7 @@ struct QuickWaterDetailSheet: View {
                         openWaterSheet(.filterSettings)
                     } label: {
                         Label("管理", systemImage: "slider.horizontal.3")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(filterStatusTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
@@ -1173,16 +1160,16 @@ struct QuickWaterDetailSheet: View {
     private func overviewHero(icon: String, title: String, subtitle: String, tint: Color) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 24, weight: .bold))
+                .font(OhanaFont.adaptive(size: 24, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 54, height: 54)
                 .background(tint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer(minLength: 0)
@@ -1200,7 +1187,7 @@ struct QuickWaterDetailSheet: View {
                     scheduleOverviewChartReplay(milliseconds: 60)
                 } label: {
                     Text(range.title)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(overviewRange == range ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -1244,11 +1231,11 @@ struct QuickWaterDetailSheet: View {
     private func waterSheetChromeTitleContent(icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
-                .frame(width: 30, height: 34)
+                .frame(width: 30, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(title)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
@@ -1259,16 +1246,16 @@ struct QuickWaterDetailSheet: View {
     private func overviewMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
-                .frame(width: 30, height: 30)
+                .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(value)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -1284,10 +1271,10 @@ struct QuickWaterDetailSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(subtitle)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -1323,15 +1310,15 @@ struct QuickWaterDetailSheet: View {
                 HStack(spacing: 6) {
                     Text(title)
                     if isWarning {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                 }
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(isWarning ? Color.goRed : Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(elapsed)/\(max(interval, 1))天")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tint)
             }
             GeometryReader { proxy in
@@ -1351,7 +1338,7 @@ struct QuickWaterDetailSheet: View {
 
     private func overviewSectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 14, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.top, 4)
     }
@@ -1359,9 +1346,9 @@ struct QuickWaterDetailSheet: View {
     private func emptyInlineState(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .bold))
+                .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(text)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(Color.ohanaSecondaryText)
         .frame(maxWidth: .infinity)

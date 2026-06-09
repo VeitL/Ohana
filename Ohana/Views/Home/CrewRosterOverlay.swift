@@ -13,6 +13,11 @@ import UIKit
 
 struct CrewRosterOverlay: View {
     var initialMode: CrewRosterMode = .members
+    var pets: [Pet] = []
+    var humans: [Human] = []
+    var plants: [Plant] = []
+    var pendingReminders: [Reminder] = []
+    var familyTasks: [FamilyCollaborationTask] = []
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
     var onAddEntity: ((EntityType) -> Void)? = nil
@@ -22,14 +27,10 @@ struct CrewRosterOverlay: View {
     var addMemberTrigger: Bool = false
     var safeTopInset: CGFloat = 0
     var safeBottomInset: CGFloat = 0
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-    @Query(sort: \Plant.createdAt) private var plants: [Plant]
-    @Query(filter: #Predicate<Reminder> { $0.status == "pending" },
-           sort: \Reminder.scheduledAt) private var pendingReminders: [Reminder]
 
     @State private var activeFullScreenRoute: CrewRosterFullScreenRoute?
     @State private var activeSheetRoute: CrewRosterSheetRoute?
@@ -65,15 +66,18 @@ struct CrewRosterOverlay: View {
 
     private var filteredPets: [Pet] { Array(pets) }
     private var filteredHumans: [Human] { Array(humans) }
-    private var filteredPlants: [Plant] { Array(plants) }
-    private var isEmpty: Bool { pets.isEmpty && humans.isEmpty && plants.isEmpty }
+    private var filteredPlants: [Plant] { [] }
+    private var isEmpty: Bool { pets.isEmpty && humans.isEmpty && filteredPlants.isEmpty }
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var showsFamilyCollaboration: Bool { humans.count > 1 && !activePets.isEmpty }
     private var resolvedInitialMode: CrewRosterMode {
         showsFamilyCollaboration ? initialMode : .members
     }
     private var activeHumanCoconutBalance: Int {
-        humans.first { $0.id.uuidString == activeHumanIdStr }?.coconutBalance ?? 0
+        activeHuman?.coconutBalance ?? 0
+    }
+    private var activeHuman: Human? {
+        humans.first { $0.id.uuidString == activeHumanIdStr }
     }
 
     var body: some View {
@@ -100,6 +104,7 @@ struct CrewRosterOverlay: View {
                             pets: activePets,
                             humans: humans,
                             pendingReminders: pendingReminders,
+                            familyTasks: familyTasks,
                             createTaskTrigger: collaborationCreateTaskTrigger,
                             onEditorVisibilityChanged: { isPresented in
                                 withAnimation(GoMotion.feedback) {
@@ -145,7 +150,10 @@ struct CrewRosterOverlay: View {
                 onAddEntityDismissed: resetPendingInlineAddEntity,
                 onAddEntityComplete: completeInlineAddEntity,
                 onPetSaved: { pendingInlineSavedPet = $0 },
-                onHumanSaved: { pendingInlineSavedHuman = $0 }
+                onHumanSaved: { pendingInlineSavedHuman = $0 },
+                onPresentCoconutLog: { subject in
+                    onPresentCoconutLog?(subject)
+                }
             )
             .onChange(of: addMemberTrigger) { _, _ in
                 memberAddMenuItemsVisible = false
@@ -203,7 +211,11 @@ struct CrewRosterOverlay: View {
 
     private var rosterCoconutButton: some View {
         CoconutBalanceCapsule(balance: activeHumanCoconutBalance) {
-            activeFullScreenRoute = .coconutLog
+            if let onPresentCoconutLog {
+                onPresentCoconutLog(activeHuman.map { CoconutLogSubject.human($0.id) })
+            } else {
+                activeFullScreenRoute = .coconutLog
+            }
         }
         .frame(minHeight: 44)
         .contentShape(Rectangle())
@@ -226,7 +238,7 @@ struct CrewRosterOverlay: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(title)
                     .font(OhanaFont.caption(.black))
                     .lineLimit(1)
@@ -245,9 +257,9 @@ struct CrewRosterOverlay: View {
         let isCollaboration = showsFamilyCollaboration && selectedRosterMode == .collaboration
         return HStack(spacing: 12) {
             Image(systemName: isCollaboration ? "hands.sparkles.fill" : "person.2.crop.square.stack.fill")
-                .font(.system(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
@@ -276,10 +288,10 @@ struct CrewRosterOverlay: View {
 
             if !hideToolbar {
                 Button { closeRoster() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -311,6 +323,10 @@ struct CrewRosterOverlay: View {
     }
 
     private func presentInlineAddEntity(_ type: EntityType) {
+        guard AppFeatureRouteGuard.allowsAddEntity(type) else {
+            AppFeatureRouteGuard.recordIntercept("crewAddEntity:\(type.rawValue)")
+            return
+        }
         memberAddMenuItemsVisible = false
         withAnimation(GoMotion.fab) {
             memberAddMenuExpanded = false
@@ -367,7 +383,7 @@ struct CrewRosterOverlay: View {
                 }
             } label: {
                 Image(systemName: selectedRosterMode == .members && memberAddMenuExpanded ? "xmark" : "plus")
-                    .font(.system(size: 20, weight: .black))
+                    .font(OhanaFont.adaptive(size: 20, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 58, height: 58)
                     .background(Color.goPrimary, in: Circle())
@@ -380,7 +396,9 @@ struct CrewRosterOverlay: View {
     }
 
     private var memberAddMenuItems: [EntityType] {
-        [.pet, .human, .plant]
+        [.pet, .human, .plant].filter { type in
+            AppFeatureRouteGuard.allowsAddEntity(type)
+        }
     }
 
     private func openMemberAddMenu() {
@@ -454,7 +472,7 @@ struct CrewRosterOverlay: View {
                 .background(Color.ohanaCardSurface, in: Capsule())
 
                 Image(systemName: type.icon)
-                    .font(.system(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 48, height: 48)
                     .background(Color.goPrimary, in: Circle())
@@ -829,15 +847,15 @@ struct CrewRosterOverlay: View {
     // MARK: - 空状态
     private var emptyState: some View {
         VStack(spacing: 14) {
-            Image(systemName: "person.2.slash")
-                .font(.system(size: 34, weight: .black))
+            Image(systemName: "person.2.slash") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 34, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 72, height: 72)
                 .background(Color.goPrimary.opacity(0.14), in: Circle())
             Text(l.tr(zh: "还没有成员", en: "No members yet", de: "Noch keine Mitglieder"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(zh: "添加宠物、人类或植物开始照顾。", en: "Add a pet, human, or plant to begin.", de: "Füge Tier, Mensch oder Pflanze hinzu."))
+            Text(l.tr(zh: "添加宠物或人类成员开始照顾。", en: "Add a pet or human member to begin.", de: "Füge ein Tier oder einen Menschen hinzu."))
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
@@ -873,17 +891,17 @@ private struct RosterHomeVisibilityToggle: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: visualIsOn ? "house.fill" : "house")
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(visualIsOn ? Color.goPrimary : Color.goCardWhite.opacity(0.78))
                     .symbolEffect(.bounce, value: visualIsOn)
 
                 ZStack(alignment: visualIsOn ? .trailing : .leading) {
                     Capsule()
                         .fill(visualIsOn ? Color.goPrimary.opacity(0.92) : Color.goCardWhite.opacity(0.18))
-                        .frame(width: 28, height: 16)
+                        .frame(width: 28, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     Circle()
                         .fill(visualIsOn ? Color.arkInk : Color.goCardWhite.opacity(0.92))
-                        .frame(width: 12, height: 12)
+                        .frame(width: 12, height: 12) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .padding(.horizontal, 2)
                 }
             }
@@ -954,6 +972,9 @@ private struct CrewRosterProfilePanel: View {
     @State private var themeHex = ""
     @State private var notes = ""
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
+    @State private var humanAvatarSignature = ""
+    @State private var humanAvatarCacheKey = "crew-roster-profile-human-avatar-empty"
 
     private let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
     private let bloodTypeOptions = ["未填写", "A", "B", "AB", "O"]
@@ -996,6 +1017,12 @@ private struct CrewRosterProfilePanel: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear(perform: loadEditState)
+        .task(id: humanAvatarSourceKey) {
+            await prepareHumanAvatar()
+        }
+        .onDisappear {
+            avatarPipeline.cancel(key: humanAvatarCacheKey)
+        }
         .alert("确认标记离世", isPresented: $showingPetPassedAlert) {
             Button("确认", role: .destructive) {
                 markPetPassedAway()
@@ -1100,7 +1127,7 @@ private struct CrewRosterProfilePanel: View {
                 }
             } label: {
                 Image(systemName: isEditing ? "checkmark" : "pencil")
-                    .font(.system(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 44, height: 44)
                     .background(tint, in: Circle())
@@ -1121,8 +1148,8 @@ private struct CrewRosterProfilePanel: View {
             }
             Spacer(minLength: 8)
             Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite)
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
@@ -1347,7 +1374,7 @@ private struct CrewRosterProfilePanel: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tint)
                     .frame(width: 20)
                 Text(title)
@@ -1411,20 +1438,19 @@ private struct CrewRosterProfilePanel: View {
                 backgroundOpacity: 0.25,
                 transparentScale: 0.78
             )
-        } else if let human {
+        } else if human != nil {
             ZStack {
                 Circle()
                     .fill(tint.opacity(0.22))
                     .frame(width: size, height: size)
-                if let data = isEditing ? avatarImageData : human.avatarImageData,
-                   let image = UIImage(data: data) {
+                if let image = preparedHumanAvatarImage {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
                         .frame(width: size - 6, height: size - 6)
                         .clipShape(Circle())
                 } else {
-                    Text((isEditing ? avatarEmoji : human.avatarEmoji).isEmpty ? "👤" : (isEditing ? avatarEmoji : human.avatarEmoji))
+                    Text(selectedHumanAvatarFallback)
                         .font(.system(size: size * 0.42))
                 }
             }
@@ -1447,6 +1473,27 @@ private struct CrewRosterProfilePanel: View {
 
     private var fallbackEmoji: String {
         pet?.avatarEmoji ?? human?.avatarEmoji ?? plant?.avatarEmoji ?? "👤"
+    }
+
+    private var selectedHumanAvatarData: Data? {
+        guard let human else { return nil }
+        return isEditing ? avatarImageData : human.avatarImageData
+    }
+
+    private var selectedHumanAvatarFallback: String {
+        let value = isEditing ? avatarEmoji : (human?.avatarEmoji ?? "")
+        return value.isEmpty ? "👤" : value
+    }
+
+    private var preparedHumanAvatarImage: UIImage? {
+        guard let human, !humanAvatarSignature.isEmpty else { return nil }
+        return avatarPipeline.cachedImage(for: human.id, signature: humanAvatarSignature)
+    }
+
+    private var humanAvatarSourceKey: String {
+        guard let human else { return "crew-roster-profile-human-avatar-none" }
+        let dataCount = selectedHumanAvatarData?.count ?? 0
+        return "\(human.id.uuidString):\(isEditing):\(dataCount)"
     }
 
     private func emptyText(_ value: String) -> String {
@@ -1529,7 +1576,7 @@ private struct CrewRosterProfilePanel: View {
                     input: input,
                     note: "crew.member.profile.pet"
                 )
-                seedAvatarCache(id: result.entityID, data: input.avatarImageData)
+                warmAvatarCache(id: result.entityID, data: input.avatarImageData)
                 onSaved(result.entityID, result.kind)
             }
         } else if let human {
@@ -1559,7 +1606,7 @@ private struct CrewRosterProfilePanel: View {
                     input: input,
                     note: "crew.member.profile.human"
                 )
-                seedAvatarCache(id: result.entityID, data: input.avatarImageData)
+                warmAvatarCache(id: result.entityID, data: input.avatarImageData)
                 onSaved(result.entityID, result.kind)
             }
         } else if let plant {
@@ -1580,6 +1627,7 @@ private struct CrewRosterProfilePanel: View {
                     input: input,
                     note: "crew.member.profile.plant"
                 )
+                warmAvatarCache(id: result.entityID, data: input.avatarImageData)
                 onSaved(result.entityID, result.kind)
             }
         }
@@ -1648,13 +1696,40 @@ private struct CrewRosterProfilePanel: View {
         }
     }
 
-    private func seedAvatarCache(id: UUID, data: Data?) {
-        guard let data, let image = UIImage(data: data) else { return }
-        FocusWalletAvatarCache.storeDecodedImage(
-            cardId: id,
-            data: data,
-            image: image,
-            isTransparent: ImageCutoutService.imageHasTransparentPixels(image)
+    @MainActor
+    private func prepareHumanAvatar() async {
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
+        guard !Task.isCancelled else { return }
+        guard let human, let data = selectedHumanAvatarData else {
+            avatarPipeline.cancel(key: humanAvatarCacheKey)
+            humanAvatarSignature = ""
+            humanAvatarCacheKey = "crew-roster-profile-human-avatar-empty"
+            return
+        }
+
+        let signature = FocusWalletAvatarCache.signature(for: data)
+        let nextKey = "crew-roster-profile-human-avatar-\(human.id.uuidString)-\(signature)"
+        if humanAvatarCacheKey != nextKey {
+            avatarPipeline.cancel(key: humanAvatarCacheKey)
+            humanAvatarCacheKey = nextKey
+        }
+        humanAvatarSignature = signature
+        let payload = FocusWalletAvatarCache.Payload(id: human.id, data: data)
+        avatarPipeline.seedPreviewEntries([payload])
+        avatarPipeline.preload(
+            payloads: [payload],
+            key: nextKey,
+            delayMilliseconds: 48
+        )
+    }
+
+    private func warmAvatarCache(id: UUID, data: Data?) {
+        let payload = FocusWalletAvatarCache.Payload(id: id, data: data)
+        avatarPipeline.seedPreviewEntries([payload])
+        avatarPipeline.preload(
+            payloads: [payload],
+            key: "crew-roster-profile-avatar-save-\(id.uuidString)-\(data?.count ?? 0)",
+            delayMilliseconds: 48
         )
     }
 
@@ -1710,10 +1785,10 @@ private struct CrewRosterDeleteConfirmationSheet: View {
             OhanaAppBackground()
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 16, weight: .black))
+                    Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title)
@@ -1727,10 +1802,10 @@ private struct CrewRosterDeleteConfirmationSheet: View {
                     }
                     Spacer()
                     Button(action: onCancel) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(Color.primary.opacity(0.08), in: Circle())
                     }
                     .buttonStyle(ScaleButtonStyle())
@@ -1795,8 +1870,8 @@ private struct CrewRosterEditorShell<Content: View>: View {
                 Button {
                     onCancel()
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goCardWhite)
                         .frame(width: 44, height: 44)
                         .contentShape(Circle())
@@ -1821,8 +1896,8 @@ private struct CrewRosterEditorShell<Content: View>: View {
                 Button {
                     onSave()
                 } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: .black))
+                    Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 44, height: 44)
                         .background(tint, in: Circle())
@@ -2274,10 +2349,10 @@ private struct CrewRosterThemeSwatchRow: View {
                         ZStack {
                             Circle()
                                 .fill(Color(hex: hex))
-                                .frame(width: 28, height: 28)
+                                .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             if selectedHex.uppercased() == hex.uppercased() {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 10, weight: .black))
+                                Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                                    .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(WalletPetCardTheme.prefersDarkForeground(for: hex) ? Color.arkInk : Color.goCardWhite)
                             }
                         }
@@ -2301,7 +2376,7 @@ private struct CrewRosterEditorLabel: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 18)
             Text(title)

@@ -39,20 +39,20 @@ struct PetPickerSheet: View {
         VStack(spacing: 0) {
             Capsule()
                 .fill(Color.primary.opacity(0.12))
-                .frame(width: 40, height: 4)
+                .frame(width: 40, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .padding(.top, 12)
                 .padding(.bottom, 20)
 
             VStack(spacing: 20) {
                 HStack(spacing: 12) {
                     Text(actionEmoji)
-                        .font(.system(size: 36))
+                        .font(OhanaFont.adaptive(size: 36))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(actionTitle)
-                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("选择一只宠物继续")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 14, weight: .medium))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
@@ -77,18 +77,18 @@ struct PetPickerSheet: View {
 
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(pet.name)
-                                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded))
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                     Text("\(pet.species) · \(pet.breed)")
-                                        .font(.system(size: 13, weight: .medium))
+                                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
                                         .foregroundStyle(Color.ohanaSecondaryText)
                                         .lineLimit(1)
                                 }
 
                                 Spacer()
 
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14, weight: .semibold))
+                                Image(systemName: "chevron.right").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .padding(.horizontal, 16)

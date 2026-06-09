@@ -184,7 +184,7 @@ struct QuickHumanExpenseSheet: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.goPrimary.opacity(0.18))
                 Image(systemName: AppCurrency.systemIconName)
-                    .font(.system(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black))
                     .foregroundStyle(Color.goPrimary)
             }
             .frame(width: 58, height: 58)
@@ -254,8 +254,8 @@ struct QuickHumanExpenseSheet: View {
 
     private var dateBlock: some View {
         HStack(spacing: 12) {
-            Image(systemName: "calendar")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "calendar").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.goPrimary)
             Text(l.tr(zh: "日期", en: "Date", de: "Datum"))
                 .font(OhanaFont.callout(.black))
@@ -278,7 +278,7 @@ struct QuickHumanExpenseSheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(.system(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black))
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存花费", en: "Save Expense", de: "Ausgabe speichern")

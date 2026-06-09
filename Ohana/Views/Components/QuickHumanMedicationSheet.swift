@@ -239,8 +239,8 @@ struct QuickHumanMedicationSheet: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.goPrimary.opacity(0.18))
-                Image(systemName: "pill.fill")
-                    .font(.system(size: 19, weight: .black))
+                Image(systemName: "pill.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 19, weight: .black))
                     .foregroundStyle(Color.goPrimary)
             }
             .frame(width: 58, height: 58)
@@ -308,7 +308,7 @@ struct QuickHumanMedicationSheet: View {
                     } label: {
                         VStack(spacing: 5) {
                             Image(systemName: item.icon)
-                                .font(.system(size: 14, weight: .black))
+                                .font(OhanaFont.adaptive(size: 14, weight: .black))
                             Text(item.title(l))
                                 .font(OhanaFont.caption2(.black))
                                 .lineLimit(1)
@@ -425,7 +425,7 @@ struct QuickHumanMedicationSheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(.system(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black))
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存药物", en: "Save Medication", de: "Medikament speichern")

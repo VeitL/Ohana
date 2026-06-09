@@ -42,23 +42,23 @@ struct ProTipSection: View {
                 ZStack {
                     Circle()
                         .fill(highlightColor.opacity(colorScheme == .light ? 0.14 : 0.28))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 16, weight: .bold))
+                    Image(systemName: "sparkles").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(highlightColor)
                 }
                 
                 Text(l.petProTipTitle)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(titleColor)
                 
                 Spacer()
                 
                 // 新功能标签
                 Text("NEW")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -115,7 +115,7 @@ private struct StepRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .font(OhanaFont.adaptive(size: 20))
                 .foregroundStyle(highlightColor)
                 .frame(width: 24)
             
@@ -128,7 +128,7 @@ private struct StepRow: View {
                 Text(suffix)
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
             }
-            .font(.system(size: 14, weight: .medium))
+            .font(OhanaFont.adaptive(size: 14, weight: .medium))
             
             Spacer()
         }

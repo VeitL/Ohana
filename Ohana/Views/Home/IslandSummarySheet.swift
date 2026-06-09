@@ -59,7 +59,7 @@ struct IslandSummarySheet: View {
                     // 负反馈列表
                     if !signals.isEmpty {
                         Text("需要关心")
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                             .tracking(1.5)
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .padding(.top, 4)
@@ -82,8 +82,8 @@ struct IslandSummarySheet: View {
                     Button {
                         dismiss()
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 22, weight: .semibold))
+                        Image(systemName: "xmark.circle.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 22, weight: .semibold))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                 }
@@ -94,10 +94,10 @@ struct IslandSummarySheet: View {
     private var moodCard: some View {
         HStack(spacing: 14) {
             Text(moodEmoji)
-                .font(.system(size: 44))
+                .font(OhanaFont.adaptive(size: 44))
             VStack(alignment: .leading, spacing: 4) {
                 Text(moodText)
-                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             Spacer(minLength: 0)
@@ -114,14 +114,14 @@ struct IslandSummarySheet: View {
             ZStack {
                 Circle()
                     .fill(checkInStreak >= 7 ? Color.orange.opacity(0.2) : Color.goPrimary.opacity(0.16))
-                    .frame(width: 40, height: 40)
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 18, weight: .bold))
+                    .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                Image(systemName: "flame.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 18, weight: .bold))
                     .foregroundStyle(checkInStreak >= 7 ? Color.orange : Color.goPrimary)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text("连续打卡 \(checkInStreak) 天")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             Spacer()
@@ -138,22 +138,22 @@ struct IslandSummarySheet: View {
             ZStack {
                 Circle()
                     .fill(s.severity == .critical ? Color.goRed.opacity(0.18) : Color.goYellow.opacity(0.18))
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 Image(systemName: s.iconName)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold))
                     .foregroundStyle(s.severity == .critical ? Color.goRed : Color.goYellow)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(s.title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(s.detail)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .bold))
+            Image(systemName: "chevron.right").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 11, weight: .bold))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
@@ -172,10 +172,10 @@ struct IslandSummarySheet: View {
 
     private var allGoodCard: some View {
         HStack(spacing: 12) {
-            Text("🎉").font(.system(size: 32))
+            Text("🎉").font(OhanaFont.adaptive(size: 32))
             VStack(alignment: .leading, spacing: 2) {
                 Text("一切安好")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             Spacer()

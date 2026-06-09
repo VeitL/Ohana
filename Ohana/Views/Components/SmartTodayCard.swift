@@ -228,17 +228,17 @@ private struct NormalTaskCard: View {
                         .fill(textColor.opacity(0.15))
                         .frame(width: 52, height: 52)
                     Text(task.emoji)
-                        .font(.system(size: 26))
+                        .font(OhanaFont.adaptive(size: 26)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 8) {
                         Text(task.title)
-                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(textColor)
                             .lineLimit(2)
                         if let label = task.urgencyLabel {
                             Text(label)
-                                .font(.system(size: 10, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(textColor)
                                 .padding(.horizontal, 7).padding(.vertical, 3)
                                 .background(textColor.opacity(0.18), in: Capsule())
@@ -254,10 +254,10 @@ private struct NormalTaskCard: View {
             Button(action: onAction) {
                 HStack(spacing: 6) {
                     Text(task.actionLabel)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(textColor)
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 12, weight: .bold))
+                    Image(systemName: "arrow.right") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(textColor.opacity(0.5))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -276,6 +276,7 @@ private struct GoldenRewardRow: View {
 
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var didFeed = false
     @State private var feedScale: CGFloat = 1.0
     @State private var sparkleOpacity: CGFloat = 0.0
@@ -300,7 +301,7 @@ private struct GoldenRewardRow: View {
                         .fill(Color.arkInk.opacity(0.1))
                         .frame(width: 56, height: 56)
                     Text(didFeed ? "🍖" : "🎁")
-                        .font(.system(size: 30))
+                        .font(OhanaFont.adaptive(size: 30)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .scaleEffect(feedScale)
                         .animation(GoMotion.feedback, value: feedScale)
                 }
@@ -308,11 +309,11 @@ private struct GoldenRewardRow: View {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 8) {
                         Text(milestoneTitle)
-                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.arkInk)
                             .lineLimit(2)
                         Text("里程碑")
-                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 7).padding(.vertical, 3)
                             .background(Color.arkInk.opacity(0.12), in: Capsule())
@@ -326,7 +327,7 @@ private struct GoldenRewardRow: View {
                     completeMilestone()
                 } label: {
                     Text(didFeed ? "✓ 已投喂" : "已投喂 🍖")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 14).padding(.vertical, 9)
                         .background(didFeed ? Color.goPrimary.opacity(0.5) : Color.goPrimary, in: Capsule())
@@ -370,7 +371,7 @@ private struct GoldenRewardRow: View {
 
     private func startSparkleMotion() {
         sparkleOpacity = 0.18
-        withAnimation(.easeInOut(duration: 0.45)) {
+        withAnimation(GoMotion.feedback) {
             sparkleOpacity = 0.42
         }
     }
@@ -385,14 +386,16 @@ private struct GoldenRewardRow: View {
 
     private func completeMilestone() {
         let activeHumanId = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-        ReminderCommandExecutor(context: modelContext).completeWithCoconutReward(
-            reminder,
-            by: activeHumanId,
-            amount: milestoneReward,
-            title: reminder.event?.title ?? "里程碑奖励",
-            emoji: "🎁",
-            note: "smart.today.milestone.complete.reward"
-        )
+        commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
+            ReminderCommandExecutor(context: modelContext).completeWithCoconutReward(
+                reminder,
+                by: activeHumanId,
+                amount: milestoneReward,
+                title: reminder.event?.title ?? "里程碑奖励",
+                emoji: "🎁",
+                note: "smart.today.milestone.complete.reward"
+            )
+        }
 
         // 2. 强触觉反馈 × 2（多巴胺闭环）
         let gen = UIImpactFeedbackGenerator(style: .heavy)

@@ -48,14 +48,14 @@ struct HumanPrivacyToggleButton: View {
 
                 Circle()
                     .fill(knobFill)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 26, height: 26) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .overlay {
                         Circle()
                             .strokeBorder(Color.ohanaCardStroke.opacity(displayIsPrivate ? 0.25 : 0.9), lineWidth: 1)
                     }
                     .overlay {
                         Image(systemName: displayIsPrivate ? "lock.fill" : "lock.open.fill")
-                            .font(.system(size: 10, weight: .black))
+                            .font(OhanaFont.adaptive(size: 10, weight: .black))
                             .foregroundStyle(knobIconColor)
                     }
                     .offset(x: displayIsPrivate ? 17 : -17)
@@ -129,10 +129,10 @@ struct HumanPrivateDataNotice: View {
     var body: some View {
         if isOwner && isFieldPrivate {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "lock.shield.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
                     .foregroundStyle(Color.goYellow)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 28, height: 28) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goYellow.opacity(0.16), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {

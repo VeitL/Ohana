@@ -2,34 +2,30 @@
 
 > Date: 2026-06-08
 >
-> Status: active. This policy upgrades UI/accessibility/smoothness governance
-> from changed-file-only ratchets to a whole-repo baseline ratchet.
+> Status: promoted on 2026-06-09. UI/accessibility/smoothness governance now
+> uses direct whole-repo strict gates because the full-scope baseline is zero.
 
 ## Active Gate
 
-CI runs both layers:
+CI runs direct whole-repo strict audits:
 
-1. Changed-file strict audits keep new or modified SwiftUI files clean.
-2. `scripts/audit-full-scope-ratchet.sh` runs UI V4, accessibility, and
-   smoothness audits across all `Ohana/Views` and `Ohana/Utilities` Swift files.
+1. `scripts/audit-ui-v4.sh --all`
+2. `scripts/audit-accessibility.sh --all`
+3. `scripts/audit-smoothness-risk.sh --all`
 
-The full-scope baseline lives at
-`docs/governance/manifests/full-scope-audit-baseline.json`.
+The historical zero baseline lives at
+`docs/governance/manifests/full-scope-audit-baseline.json`. It is retained as
+promotion evidence, not as an allowance for future warnings.
 
-## Ratchet Rules
+## Strict Rules
 
-- Any file/rule warning count above the baseline fails CI.
-- Cleanup that reduces counts passes.
-- After cleanup, run `scripts/audit-full-scope-ratchet.sh --update-baseline` to
-  lock in the lower count.
-- Do not increase the baseline to hide newly introduced debt.
-- When all three totals reach zero, replace this ratchet with direct strict
-  full-scope commands:
-  - `scripts/audit-ui-v4.sh --all`
-  - `scripts/audit-accessibility.sh --all`
-  - `scripts/audit-smoothness-risk.sh --all`
+- Any UI V4, accessibility, or smoothness warning fails CI.
+- Do not reintroduce changed-file-only gates for these audit families.
+- Do not increase the zero baseline to hide newly introduced debt.
+- Use inline allow comments only for deliberate, documented exceptions that the
+  strict audit scripts already recognize.
 
-## Initial Baseline
+## Baseline History
 
 Measured on 2026-06-08:
 
@@ -43,10 +39,18 @@ The high accessibility count is mostly historical fixed-font and unlabeled SF
 Symbol debt. The smoothness count includes broad `@Query`, sync image decoding,
 and runtime loops that should be retired feature-by-feature.
 
+Promoted on 2026-06-09:
+
+| Audit | Current warnings | Active command |
+|---|---:|---|
+| UI V4 | 0 | `scripts/audit-ui-v4.sh --all` |
+| Accessibility | 0 | `scripts/audit-accessibility.sh --all` |
+| Smoothness | 0 | `scripts/audit-smoothness-risk.sh --all` |
+
 ## Validation
 
-Passed on 2026-06-08:
+Passed on 2026-06-09:
 
-- `scripts/audit-full-scope-ratchet.sh`
-- `scripts/audit-governance-manifests.sh`
-- `scripts/release-hardening-check.sh --skip-build`
+- `scripts/audit-ui-v4.sh --all`
+- `scripts/audit-accessibility.sh --all`
+- `scripts/audit-smoothness-risk.sh --all`

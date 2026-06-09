@@ -194,7 +194,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         GeometryReader { geo in
             Group {
                 if canFloatCards {
-                    TimelineView(.animation(minimumInterval: FocusHomeAmbientFloatPolicy.timelineMinimumInterval)) { timeline in
+                    TimelineView(.animation(minimumInterval: FocusHomeAmbientFloatPolicy.timelineMinimumInterval)) { timeline in // smoothness: allow visible-card ambient float gated by FocusHomeAmbientFloatPolicy and disabled during hero work.
                         sceneContent(in: geo, time: timeline.date.timeIntervalSinceReferenceDate)
                     }
                 } else {

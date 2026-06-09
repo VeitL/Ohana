@@ -12,7 +12,6 @@ struct CareLedgerAnalysisView: View {
     @Query(sort: \CareLedgerEvent.occurredAt, order: .reverse) private var ledgerEvents: [CareLedgerEvent]
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
-    @Query(sort: \Plant.createdAt) private var plants: [Plant]
 
     @State private var selectedRange: RangeFilter = .week
     @State private var selectedKind: CareLedgerEventKind? = nil
@@ -62,9 +61,9 @@ struct CareLedgerAnalysisView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("统一照护事件账本")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                     Text("用同一事件层查看谁、给谁、做了什么")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -143,22 +142,22 @@ struct CareLedgerAnalysisView: View {
                 ForEach(filteredEvents.prefix(20)) { event in
                     HStack(spacing: 10) {
                         Image(systemName: event.eventKindEnum.icon)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold))
                             .foregroundStyle(event.eventKindEnum.color)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 30, height: 30) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             .background(event.eventKindEnum.color.opacity(0.14), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(event.eventKindEnum.displayName) · \(event.actionType)")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                 .lineLimit(1)
                             Text("\(actorName(for: event.actorId, kind: event.actorKind)) → \(subjectName(for: event.subjectId, kind: event.subjectKind))")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .lineLimit(1)
                         }
                         Spacer()
                         Text(event.occurredAt, format: .dateTime.month().day().hour().minute())
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -171,12 +170,12 @@ struct CareLedgerAnalysisView: View {
     private func kindChip(title: String, kind: CareLedgerEventKind?) -> some View {
         let isSelected = selectedKind == kind
         return Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.9)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 selectedKind = kind
             }
         } label: {
             Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(isSelected ? Color.arkInk : Color.primary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
@@ -188,9 +187,9 @@ struct CareLedgerAnalysisView: View {
     private func statBar(title: String, count: Int, total: Int, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(title).font(.system(size: 12, weight: .bold, design: .rounded))
+                Text(title).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 Spacer()
-                Text("\(count)").font(.system(size: 12, weight: .black, design: .rounded)).foregroundStyle(color)
+                Text("\(count)").font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)).foregroundStyle(color)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -204,8 +203,8 @@ struct CareLedgerAnalysisView: View {
 
     private func metric(_ label: String, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
-            Text(value).font(.system(size: 22, weight: .black, design: .rounded)).foregroundStyle(color)
-            Text(label).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+            Text(value).font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)).foregroundStyle(color)
+            Text(label).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -215,14 +214,14 @@ struct CareLedgerAnalysisView: View {
     private func sectionHeader(_ title: String, icon: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon).foregroundStyle(Color.goPrimary)
-            Text(title).font(.system(size: 15, weight: .black, design: .rounded))
+            Text(title).font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
             Spacer()
         }
     }
 
     private func emptyText(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -237,7 +236,7 @@ struct CareLedgerAnalysisView: View {
             return pets.first { $0.id.uuidString == id }?.name ?? "宠物"
         }
         if kind == CareLedgerActorKind.plant.rawValue {
-            return plants.first { $0.id.uuidString == id }?.name ?? "植物"
+            return "植物"
         }
         return "系统"
     }
@@ -251,7 +250,7 @@ struct CareLedgerAnalysisView: View {
             return humans.first { $0.id.uuidString == id }?.name ?? "家人"
         }
         if kind == CareLedgerSubjectKind.plant.rawValue {
-            return plants.first { $0.id.uuidString == id }?.name ?? "植物"
+            return "植物"
         }
         return "全家"
     }

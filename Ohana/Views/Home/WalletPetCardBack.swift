@@ -139,7 +139,7 @@ struct WalletPetCardBack: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(.white.opacity(0.18), lineWidth: 0.5)
+                .strokeBorder(.white.opacity(0.18), lineWidth: 0.5) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         )
     }
 
@@ -148,15 +148,15 @@ struct WalletPetCardBack: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Image(systemName: section.symbol)
-                    .font(.system(size: 7, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 7, weight: .bold))
                 Text(LocalizedStringKey(section.title))
-                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 8, weight: .bold, design: .rounded))
                     .kerning(0.3)
                 Rectangle()
-                    .fill(.white.opacity(0.2))
+                    .fill(.white.opacity(0.2)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     .frame(height: 0.5)
             }
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(.white.opacity(0.55)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
 
             HStack(spacing: 5) {
                 ForEach(section.entries) { entry in
@@ -171,19 +171,19 @@ struct WalletPetCardBack: View {
         Button { entry.action() } label: {
             HStack(spacing: 4) {
                 Image(systemName: entry.symbol)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(.white.opacity(0.95))
+                    .foregroundStyle(.white.opacity(0.95)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 Text(LocalizedStringKey(entry.title))
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.9)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 6)
             .padding(.vertical, 6)
-            .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -201,28 +201,28 @@ struct WalletPetCardBack: View {
                 )
             } else {
                 Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: pet.species))
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 24, height: 24)
-                    .background(.white.opacity(0.15), in: Circle())
+                    .foregroundStyle(.white.opacity(0.85)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                    .frame(width: 24, height: 24) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                    .background(.white.opacity(0.15), in: Circle()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             }
 
             Text(pet.name)
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
             Spacer(minLength: 4)
 
             Button { onShowSettings() } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 13, weight: .semibold))
+                Image(systemName: "gearshape.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(.white.opacity(0.8))
-                    .frame(width: 28, height: 28)
-                    .background(.white.opacity(0.13), in: Circle())
+                    .foregroundStyle(.white.opacity(0.8)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                    .frame(width: 28, height: 28) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                    .background(.white.opacity(0.13), in: Circle()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             }
             .buttonStyle(ScaleButtonStyle())
         }

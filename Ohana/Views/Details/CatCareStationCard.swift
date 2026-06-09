@@ -58,12 +58,12 @@ struct CatCareStationCard: View {
             Button { showHistory = true } label: {
                 HStack {
                     Text("🐱")
-                        .font(.system(size: 18))
+                        .font(OhanaFont.adaptive(size: 18))
                     Text("猫咪护理站")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     Spacer()
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 14))
+                    Image(systemName: "clock.arrow.circlepath").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 14))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -80,14 +80,14 @@ struct CatCareStationCard: View {
             if let recentAction {
                 HStack {
                     Text("\(recentAction.emoji) 已打卡")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium))
                         .foregroundStyle(.green)
                     Spacer()
                     Button {
                         undoAction()
                     } label: {
                         Text("撤回")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium))
                             .foregroundStyle(.orange)
                     }
                 }
@@ -115,9 +115,9 @@ struct CatCareStationCard: View {
         } label: {
             VStack(spacing: 6) {
                 Text(action.emoji)
-                    .font(.system(size: 24))
+                    .font(OhanaFont.adaptive(size: 24))
                 Text(action.rawValue)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .frame(maxWidth: .infinity)
@@ -137,9 +137,9 @@ struct CatCareStationCard: View {
                 let count = todayCount(for: action)
                 HStack(spacing: 4) {
                     Text(action.emoji)
-                        .font(.system(size: 12))
+                        .font(OhanaFont.adaptive(size: 12))
                     Text("×\(count)")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(count > 0 ? .primary : .secondary)
                 }
             }
@@ -244,9 +244,9 @@ struct CatCareHistorySheet: View {
             if catCareEvents.isEmpty {
                 VStack(spacing: 12) {
                     Text("🐱")
-                        .font(.system(size: 48))
+                        .font(OhanaFont.adaptive(size: 48))
                     Text("暂无护理记录")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 16, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.top, 40)
@@ -258,16 +258,16 @@ struct CatCareHistorySheet: View {
                 ForEach(grouped, id: \.key) { date, events in
                     VStack(alignment: .leading, spacing: 8) {
                         Text(date, style: .date)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                         
                         ForEach(events) { event in
                             HStack {
                                 Text(event.title)
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(OhanaFont.adaptive(size: 14, weight: .medium))
                                 Spacer()
                                 Text(event.startDate, style: .time)
-                                    .font(.system(size: 12))
+                                    .font(OhanaFont.adaptive(size: 12))
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .padding(10)

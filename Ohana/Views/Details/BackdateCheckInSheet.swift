@@ -29,14 +29,6 @@ struct BackdateCheckInSheet: View {
         case potty = "便便 💩"
         case walk  = "散步 🦮"
 
-        var questType: QuestManager.OhanaActionType {
-            switch self {
-            case .feed:  return .feed
-            case .water: return .water
-            case .potty: return .potty(isLitter: false)
-            case .walk:  return .walk(distanceMeters: 300)
-            }
-        }
         var commandKey: String {
             switch self {
             case .feed: return "feed"
@@ -120,9 +112,9 @@ struct BackdateCheckInSheet: View {
                         } label: {
                             VStack(spacing: 4) {
                                 Text(days == 1 ? "昨天" : "\(days)天前")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                 Text(date, format: .dateTime.month().day())
-                                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                             }
                             .foregroundStyle(selectedDaysAgo == days ? Color.arkInk : Color.ohanaSecondaryText)
@@ -142,7 +134,7 @@ struct BackdateCheckInSheet: View {
                     HStack(spacing: 8) {
                         Text("📅")
                         Text("确认补打卡")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(selectedPet != nil ? Color.arkInk : Color.ohanaTertiaryText)
                     .frame(maxWidth: .infinity)
@@ -167,27 +159,27 @@ struct BackdateCheckInSheet: View {
         VStack(spacing: 24) {
             Spacer()
             Text("✅")
-                .font(.system(size: 72))
+                .font(OhanaFont.adaptive(size: 72))
             Text("补打卡成功！")
-                .font(.system(size: 28, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if earnedCoconuts > 0 {
                 HStack(spacing: 6) {
                     Text("🥥 +\(earnedCoconuts)")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goYellow)
                 }
                 .padding(.horizontal, 20).padding(.vertical, 10)
                 .background(Color.goYellow.opacity(0.15), in: Capsule())
             } else {
                 Text("奖励已发放（或今日已超出冷却限制）")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
             Button("关闭") { dismiss() }
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.arkInk)
                 .padding(.horizontal, 40).padding(.vertical, 14)
                 .background(Color.goPrimary, in: Capsule())
@@ -200,7 +192,7 @@ struct BackdateCheckInSheet: View {
     // MARK: - 子组件
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             .padding(.horizontal, 24)
     }
@@ -208,13 +200,13 @@ struct BackdateCheckInSheet: View {
     private var infoCard: some View {
         HStack(spacing: 12) {
             Text("📅")
-                .font(.system(size: 28))
+                .font(OhanaFont.adaptive(size: 28))
             VStack(alignment: .leading, spacing: 3) {
                 Text("补打卡券")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text("可补录 \(backdateDays) 天内任意一次打卡，正常发放椰子奖励")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
         }
@@ -229,9 +221,9 @@ struct BackdateCheckInSheet: View {
         Button { selectedPet = pet } label: {
             HStack(spacing: 6) {
                 Text(pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji)
-                    .font(.system(size: 18))
+                    .font(OhanaFont.adaptive(size: 18))
                 Text(pet.name)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(selectedPet?.id == pet.id ? Color.arkInk : Color.ohanaSecondaryText)
             }
             .padding(.horizontal, 14).padding(.vertical, 8)
@@ -246,7 +238,7 @@ struct BackdateCheckInSheet: View {
     private func actionChip(_ action: CheckInActionType) -> some View {
         Button { selectedAction = action } label: {
             Text(action.rawValue)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                 .foregroundStyle(selectedAction == action ? Color.arkInk : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -264,7 +256,6 @@ struct BackdateCheckInSheet: View {
         let action = selectedAction
         commandQueue.enqueue(.backdateCheckIn(petID: pet.id, action: action.commandKey)) {
             let result = RewardEconomyCommandExecutor(context: modelContext).awardBackdateCheckIn(
-                action: action.questType,
                 actionKey: action.commandKey,
                 pet: pet,
                 note: "backdateCheckIn.award"

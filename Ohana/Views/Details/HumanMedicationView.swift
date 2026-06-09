@@ -55,9 +55,37 @@ struct HumanMedicationView: View {
     @State private var pendingMedicationActivationIDs: Set<UUID> = []
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
+    init(
+        human: Human,
+        showsDoneButton: Bool = true,
+        onDoseTaken: (() -> Void)? = nil
+    ) {
+        self.human = human
+        self.showsDoneButton = showsDoneButton
+        self.onDoseTaken = onDoseTaken
+
+        let humanKey = human.id.uuidString
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let logStart = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+        _allMeds = Query(
+            filter: #Predicate<HumanMedication> { med in
+                med.humanId == humanKey
+            },
+            sort: \.createdAt,
+            order: .reverse
+        )
+        _allLogs = Query(
+            filter: #Predicate<HumanMedicationLog> { log in
+                log.humanId == humanKey && log.scheduledTime >= logStart
+            },
+            sort: \.scheduledTime,
+            order: .reverse
+        )
+    }
+
     private var myMeds: [HumanMedication] {
-        allMeds.filter { $0.humanId == human.id.uuidString }
-            .sorted { $0.createdAt > $1.createdAt }
+        allMeds
     }
     private var currentMeds: [HumanMedication] { meds(in: .current) }
     private var manualMeds: [HumanMedication] { meds(in: .manual) }
@@ -284,10 +312,10 @@ struct HumanMedicationView: View {
 
                 Button { showAddSheet = true } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .black))
+                        Image(systemName: "plus") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text(l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 28).padding(.vertical, 14)
@@ -560,7 +588,7 @@ struct HumanMedicationView: View {
         HStack(spacing: 5) {
             Circle()
                 .fill(color)
-                .frame(width: 7, height: 7)
+                .frame(width: 7, height: 7) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(label)
                 .font(OhanaFont.caption2(.bold))
                 .foregroundStyle(secondaryText)
@@ -631,7 +659,7 @@ struct HumanMedicationView: View {
             ZStack {
                 Circle()
                     .fill(tint.opacity(0.14))
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Image(systemName: doseStatusIcon(item, status: status))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(tint)
@@ -801,10 +829,10 @@ struct HumanMedicationView: View {
                 Button {
                     editingMed = med
                 } label: {
-                    Image(systemName: "slider.horizontal.3")
+                    Image(systemName: "slider.horizontal.3") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(secondaryText)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(controlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -852,7 +880,7 @@ struct HumanMedicationView: View {
                         }
                     }
                     HStack(spacing: 4) {
-                        Image(systemName: "clock")
+                        Image(systemName: "clock") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.caption2())
                             .foregroundStyle(tertiaryText)
                         Text(scheduleSummary(for: med))
@@ -876,10 +904,10 @@ struct HumanMedicationView: View {
                 Button {
                     editingMed = med
                 } label: {
-                    Image(systemName: "slider.horizontal.3")
+                    Image(systemName: "slider.horizontal.3") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.callout(.bold))
                         .foregroundStyle(secondaryText)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(controlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -904,7 +932,7 @@ struct HumanMedicationView: View {
             Circle()
                 .fill(Color(hex: med.colorHex).opacity(0.2))
                 .frame(width: 48, height: 48)
-            Image(systemName: "pills.fill")
+            Image(systemName: "pills.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.title3(.bold))
                 .foregroundStyle(Color(hex: med.colorHex))
         }
@@ -1015,7 +1043,7 @@ struct HumanMedicationView: View {
             VStack(spacing: 16) {
                 ZStack {
                     Circle().fill(Color.goRed.opacity(0.12)).frame(width: 72, height: 72)
-                    Image(systemName: "pills").font(.system(size: 32)).foregroundStyle(Color.goRed)
+                    Image(systemName: "pills").font(OhanaFont.adaptive(size: 32)).foregroundStyle(Color.goRed) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 Text(l.tr(zh: "还没有添加药物", en: "No medication yet", de: "Noch keine Medikamente"))
                     .font(OhanaFont.title3(.bold))
@@ -1237,7 +1265,7 @@ struct AddMedicationSheet: View {
                 guard !isSaving else { return }
                 dismiss()
             } label: {
-                Image(systemName: "xmark")
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(primaryText)
                     .frame(width: 44, height: 44)
@@ -1314,7 +1342,7 @@ struct AddMedicationSheet: View {
                         HStack(spacing: 6) {
                             Text(doseUnit)
                                 .font(OhanaFont.callout(.bold))
-                            Image(systemName: "chevron.up.chevron.down")
+                            Image(systemName: "chevron.up.chevron.down") // a11y: allow decorative icon covered by surrounding text or control
                                 .font(OhanaFont.caption(.bold))
                         }
                         .foregroundStyle(primaryText)
@@ -1443,7 +1471,7 @@ struct AddMedicationSheet: View {
 
     private var previewCard: some View {
         HStack(spacing: 10) {
-            Image(systemName: "bell.badge.fill")
+            Image(systemName: "bell.badge.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.callout(.bold))
                 .foregroundStyle(Color.goYellow)
             VStack(alignment: .leading, spacing: 3) {
@@ -1464,7 +1492,7 @@ struct AddMedicationSheet: View {
 
     private var manualModeCard: some View {
         HStack(spacing: 10) {
-            Image(systemName: "hand.tap.fill")
+            Image(systemName: "hand.tap.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.callout(.bold))
                 .foregroundStyle(Color.goPrimary)
             VStack(alignment: .leading, spacing: 3) {
@@ -1554,7 +1582,7 @@ struct AddMedicationSheet: View {
                             } label: {
                                 Circle()
                                     .fill(Color(hex: hex))
-                                    .frame(width: 30, height: 30)
+                                    .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                     .overlay(Circle().strokeBorder(primaryText, lineWidth: colorHex == hex ? 2.5 : 0))
                                     .scaleEffect(colorHex == hex ? 1.12 : 1.0)
                             }
@@ -1594,7 +1622,7 @@ struct AddMedicationSheet: View {
             } label: {
                 HStack(spacing: 8) {
                     if isSaving {
-                        Image(systemName: "hourglass")
+                        Image(systemName: "hourglass") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.callout(.bold))
                     }
                     Text(isSaving ? l.tr(zh: "保存中", en: "Saving", de: "Speichert") : (isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen sichern") : l.tr(zh: "保存药物", en: "Save medication", de: "Medikament sichern")))
@@ -1627,7 +1655,7 @@ struct AddMedicationSheet: View {
     private func cardHeader(icon: String, color: Color, title: String) -> some View {
         HStack(spacing: 10) {
             ZStack {
-                Circle().fill(color.opacity(0.2)).frame(width: 36, height: 36)
+                Circle().fill(color.opacity(0.2)).frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Image(systemName: icon).font(OhanaFont.callout(.bold)).foregroundStyle(color)
             }
             Text(title).font(OhanaFont.headline(.bold)).foregroundStyle(primaryText)

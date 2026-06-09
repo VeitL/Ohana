@@ -27,7 +27,7 @@ final class OasisRewardLiveDataStore: ObservableObject {
         OasisRewardLiveDataSnapshot(
             pets: fetchPets(context: context),
             humans: fetchHumans(context: context),
-            plants: fetchPlants(context: context),
+            plants: AppFeatureRouteGuard.shouldLoadPlantData ? fetchPlants(context: context) : [],
             upgradeCoconuts: fetchUpgradeCoconuts(context: context),
             electronicPets: fetchElectronicPets(context: context),
             critterFragments: fetchCritterFragments(context: context)

@@ -14,15 +14,15 @@ struct PetHealthLogCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "heart.text.clipboard")
-                    .font(.system(size: 14, weight: .semibold))
+                Image(systemName: "heart.text.clipboard").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.goRed)
                 Text("健康日志")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(pet.healthLogs.count) 条")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
 
@@ -32,11 +32,11 @@ struct PetHealthLogCard: View {
                     Text(log.healthLogType.emoji)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(log.type)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         if !log.note.isEmpty {
                             Text(log.note)
-                                .font(.system(size: 12))
+                                .font(OhanaFont.adaptive(size: 12))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 .lineLimit(1)
                         }
@@ -48,9 +48,9 @@ struct PetHealthLogCard: View {
                             
                             HStack(spacing: 4) {
                                 Image(systemName: isExpired ? "exclamationmark.triangle.fill" : "calendar")
-                                    .font(.system(size: 10))
+                                    .font(OhanaFont.adaptive(size: 10))
                                 Text(isExpired ? "已过期" : (isUrgent ? "剩余\(daysUntil)天" : "有效期至\(expirationDate.formatted(.dateTime.month().day()))"))
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(OhanaFont.adaptive(size: 10, weight: .medium))
                             }
                             .foregroundStyle(isExpired ? Color.goRed : (isUrgent ? Color.goYellow : .primary.opacity(0.5)))
                             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -64,10 +64,10 @@ struct PetHealthLogCard: View {
                             let isSoon = daysUntil <= 30 && daysUntil > 0
                             
                             HStack(spacing: 4) {
-                                Image(systemName: "bell.circle")
-                                    .font(.system(size: 10))
+                                Image(systemName: "bell.circle").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 10))
                                 Text(isOverdue ? "体检已过期" : (isSoon ? "体检剩余\(daysUntil)天" : "下次体检\(nextCheckupDate.formatted(.dateTime.month().day()))"))
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(OhanaFont.adaptive(size: 10, weight: .medium))
                             }
                             .foregroundStyle(isOverdue ? Color.goRed : (isSoon ? Color.goYellow : Color.goTeal))
                             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -77,11 +77,11 @@ struct PetHealthLogCard: View {
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(log.date, style: .date)
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         if log.cost > 0 {
                             Text(AppCurrency.format(log.cost, fractionDigits: 0))
-                                .font(.system(size: 11, weight: .bold))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold))
                                 .foregroundStyle(Color.goYellow)
                         }
                     }
@@ -90,7 +90,7 @@ struct PetHealthLogCard: View {
 
             if pet.healthLogs.isEmpty {
                 Text("暂无健康日志")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 13, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
@@ -100,10 +100,10 @@ struct PetHealthLogCard: View {
                 Button { showingAllLogs = true } label: {
                     HStack(spacing: 4) {
                         Text("查看全部 \(pet.healthLogs.count) 条")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.goPrimary)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .bold))
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold))
                             .foregroundStyle(Color.goPrimary)
                     }
                     .frame(maxWidth: .infinity, alignment: .trailing)
@@ -144,7 +144,7 @@ struct HealthLogListView: View {
                     }
                     if filteredLogs.isEmpty {
                         Text("暂无记录")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 14, weight: .medium))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .padding(.top, 40)
                     }
@@ -176,7 +176,7 @@ struct HealthLogListView: View {
     private func filterChip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(isSelected ? Color.arkInk : .primary.opacity(0.7))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
@@ -191,17 +191,17 @@ struct HealthLogListView: View {
             ZStack {
                 Circle()
                     .fill(Color.goRed.opacity(0.12))
-                    .frame(width: 40, height: 40)
+                    .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 Text(log.healthLogType.emoji)
-                    .font(.system(size: 20))
+                    .font(OhanaFont.adaptive(size: 20))
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.type)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if !log.note.isEmpty {
                     Text(log.note)
-                        .font(.system(size: 12))
+                        .font(OhanaFont.adaptive(size: 12))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .lineLimit(2)
                 }
@@ -209,11 +209,11 @@ struct HealthLogListView: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 Text(log.date, style: .date)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 if log.cost > 0 {
                     Text(AppCurrency.format(log.cost, fractionDigits: 0))
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.goYellow)
                 }
             }

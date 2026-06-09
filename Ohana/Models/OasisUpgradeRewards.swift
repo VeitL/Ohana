@@ -1147,7 +1147,7 @@ enum OasisUpgradeRewardService {
             return (0, 1, 0, 1)
         case .milestone:
             return (3, 5, 4, 6)
-        case .general:
+        case .dailyFocusCompletion, .general:
             return (1, 2, 1, 2)
         }
     }

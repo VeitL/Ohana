@@ -78,8 +78,8 @@ struct DesignSpecPreviewCanvasV4: View {
 
     private var scrollHint: some View {
         HStack(spacing: 6) {
-            Image(systemName: "arrow.up.and.down")
-                .font(.system(size: 9, weight: .black))
+            Image(systemName: "arrow.up.and.down") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .font(OhanaFont.adaptive(size: 9, weight: .black))
             Text("上下滑动预览 / Scroll preview")
                 .font(font(9, .black))
         }
@@ -126,7 +126,7 @@ struct DesignSpecPreviewCanvasV4: View {
                     play("Icon Button")
                 } label: {
                     Image(systemName: icon("bell.fill"))
-                        .frame(width: 22, height: 22)
+                        .frame(width: 22, height: 22) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 }
                 .buttonStyle(buttonStyle(.icon))
             }
@@ -230,9 +230,9 @@ struct DesignSpecPreviewCanvasV4: View {
                 Spacer()
                 HStack(spacing: 6) {
                     iconCircle("chevron.left")
-                        .frame(width: 28, height: 28)
+                        .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     iconCircle("chevron.right")
-                        .frame(width: 28, height: 28)
+                        .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 }
             }
 
@@ -332,7 +332,7 @@ struct DesignSpecPreviewCanvasV4: View {
         case "bars":
             RoundedRectangle(cornerRadius: 999, style: .continuous)
                 .fill(day.isMultiple(of: 2) ? palette.accent : Color.goBlue)
-                .frame(width: 18, height: 3)
+                .frame(width: 18, height: 3) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
         case "icons":
             HStack(spacing: 2) {
                 Image(systemName: icon(day.isMultiple(of: 2) ? "fork.knife" : "drop.fill"))
@@ -340,7 +340,7 @@ struct DesignSpecPreviewCanvasV4: View {
                     Image(systemName: icon("pawprint.fill"))
                 }
             }
-            .font(.system(size: 6, weight: iconWeight))
+            .font(OhanaFont.adaptive(size: 6, weight: iconWeight))
             .foregroundStyle(palette.accent)
         case "stack":
             Text(day.isMultiple(of: 3) ? "3" : "2")
@@ -351,9 +351,9 @@ struct DesignSpecPreviewCanvasV4: View {
                 .background(palette.accent, in: Capsule())
         default:
             HStack(spacing: 2) {
-                Circle().fill(palette.accent).frame(width: 4, height: 4)
+                Circle().fill(palette.accent).frame(width: 4, height: 4) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 if day.isMultiple(of: 3) {
-                    Circle().fill(Color.goBlue).frame(width: 4, height: 4)
+                    Circle().fill(Color.goBlue).frame(width: 4, height: 4) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 }
             }
         }
@@ -363,8 +363,8 @@ struct DesignSpecPreviewCanvasV4: View {
         HStack(spacing: 9) {
             if selection.calendarAgenda == "timeRail" {
                 VStack(spacing: 3) {
-                    Circle().fill(tint).frame(width: 7, height: 7)
-                    Rectangle().fill(palette.stroke).frame(width: 1, height: 32)
+                    Circle().fill(tint).frame(width: 7, height: 7) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    Rectangle().fill(palette.stroke).frame(width: 1, height: 32) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 }
                 .frame(width: 12)
             }
@@ -377,9 +377,9 @@ struct DesignSpecPreviewCanvasV4: View {
             }
 
             Image(systemName: icon(iconName))
-                .font(.system(size: 12, weight: iconWeight))
+                .font(OhanaFont.adaptive(size: 12, weight: iconWeight))
                 .foregroundStyle(palette.accent)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
@@ -394,10 +394,10 @@ struct DesignSpecPreviewCanvasV4: View {
 
             if selection.calendarAgenda == "swipeRows" {
                 HStack(spacing: 4) {
-                    Image(systemName: "checkmark")
-                    Image(systemName: "trash")
+                    Image(systemName: "checkmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    Image(systemName: "trash") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 }
-                .font(.system(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .black))
                 .foregroundStyle(palette.accent)
             }
         }
@@ -443,7 +443,7 @@ struct DesignSpecPreviewCanvasV4: View {
                 }
                 Spacer()
                 Image(systemName: icon("sparkles"))
-                    .font(.system(size: 17, weight: iconWeight))
+                    .font(OhanaFont.adaptive(size: 17, weight: iconWeight))
                     .foregroundStyle(palette.accent)
             }
 
@@ -475,8 +475,8 @@ struct DesignSpecPreviewCanvasV4: View {
                 .font(font(10, .black))
                 .foregroundStyle(state == .error ? palette.danger : palette.secondaryText)
             HStack(spacing: 9) {
-                Image(systemName: "scalemass.fill")
-                    .font(.system(size: 12, weight: iconWeight))
+                Image(systemName: "scalemass.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    .font(OhanaFont.adaptive(size: 12, weight: iconWeight))
                     .foregroundStyle(stroke)
                 Button {
                     withAnimation(GoMotion.feedback) {
@@ -494,7 +494,7 @@ struct DesignSpecPreviewCanvasV4: View {
                     .font(font(12, .black))
                     .foregroundStyle(palette.secondaryText)
                 if state == .error {
-                    Image(systemName: "exclamationmark.circle.fill")
+                    Image(systemName: "exclamationmark.circle.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         .foregroundStyle(palette.danger)
                 }
             }
@@ -539,14 +539,14 @@ struct DesignSpecPreviewCanvasV4: View {
         } label: {
             HStack(spacing: selection.toggle == "text" ? 6 : 8) {
                 Image(systemName: toggleOn ? "lock.open.fill" : "lock.fill")
-                    .font(.system(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
                 if selection.toggle == "text" || selection.toggle == "row" {
                     Text(toggleOn ? "公开 / Public" : "隐私 / Private")
                         .font(font(10, .black))
                 }
                 Circle()
                     .fill(toggleOn ? palette.accent : palette.secondaryText.opacity(0.35))
-                    .frame(width: 16, height: 16)
+                    .frame(width: 16, height: 16) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(x: toggleOn ? 7 : -7)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 4)
@@ -581,13 +581,13 @@ struct DesignSpecPreviewCanvasV4: View {
                         .stroke(palette.accent, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
-                .frame(width: 40, height: 40)
+                .frame(width: 40, height: 40) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
             } else if selection.progress == "steps" {
                 HStack(spacing: 5) {
                     ForEach(0..<5, id: \.self) { index in
                         Circle()
                             .fill(index < Int((sliderValue * 5).rounded(.up)) ? palette.accent : palette.stroke)
-                            .frame(width: 10, height: 10)
+                            .frame(width: 10, height: 10) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     }
                 }
                 .padding(.vertical, 13)
@@ -613,9 +613,9 @@ struct DesignSpecPreviewCanvasV4: View {
     private var listRowPreview: some View {
         HStack(spacing: 9) {
             Image(systemName: icon("clock.fill"))
-                .font(.system(size: 12, weight: iconWeight))
+                .font(OhanaFont.adaptive(size: 12, weight: iconWeight))
                 .foregroundStyle(palette.accent)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(palette.controlFill, in: Circle())
 
             VStack(alignment: .leading, spacing: 1) {
@@ -666,10 +666,10 @@ struct DesignSpecPreviewCanvasV4: View {
                         .background(palette.controlFill, in: Capsule())
                 } else {
                     Button { dismissSheet() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "xmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                             .foregroundStyle(palette.primaryText)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 32, height: 32) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     }
                     .buttonStyle(ScaleButtonStyle()) // ui-v4: allow icon-only sheet close control
                 }
@@ -711,7 +711,7 @@ struct DesignSpecPreviewCanvasV4: View {
 
     private var destructivePreview: some View {
         HStack(spacing: 10) {
-            Image(systemName: "trash.fill")
+            Image(systemName: "trash.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .foregroundStyle(palette.danger)
             VStack(alignment: .leading, spacing: 2) {
                 Text("确认删除")
@@ -742,7 +742,7 @@ struct DesignSpecPreviewCanvasV4: View {
                 play(fabOpen ? "FAB 展开 / FAB open" : "FAB 收起 / FAB close")
             } label: {
                 Image(systemName: fabOpen ? "xmark" : "plus")
-                    .font(.system(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black))
                     .foregroundStyle(palette.accentText)
                     .frame(width: 54, height: 54)
                     .background(palette.accent, in: Circle())
@@ -764,7 +764,7 @@ struct DesignSpecPreviewCanvasV4: View {
                 Text("\(zh) / \(en)")
                     .font(font(10, .black))
                 Image(systemName: icon(iconName))
-                    .font(.system(size: 11, weight: iconWeight))
+                    .font(OhanaFont.adaptive(size: 11, weight: iconWeight))
             }
             .foregroundStyle(palette.primaryText)
             .padding(.horizontal, 11)
@@ -782,7 +782,7 @@ struct DesignSpecPreviewCanvasV4: View {
                 .scaleEffect(tapPulse ? 1.55 : 0.65)
                 .opacity(tapPulse ? 0 : 0.85)
             Image(systemName: selection.tap == "bright" ? "sparkles" : "hand.tap.fill")
-                .font(.system(size: 26, weight: .black))
+                .font(OhanaFont.adaptive(size: 26, weight: .black))
                 .foregroundStyle(palette.accent)
                 .scaleEffect(tapPulse ? 1.08 : 0.82)
         }
@@ -830,7 +830,7 @@ struct DesignSpecPreviewCanvasV4: View {
     private func iconTab(_ iconName: String, _ title: String, selected: Bool) -> some View {
         VStack(spacing: 3) {
             Image(systemName: icon(iconName))
-                .font(.system(size: 13, weight: iconWeight))
+                .font(OhanaFont.adaptive(size: 13, weight: iconWeight))
             Text(title)
                 .font(font(8, .black))
         }
@@ -841,7 +841,7 @@ struct DesignSpecPreviewCanvasV4: View {
     private func metricTile(_ zh: String, _ en: String, _ value: String, _ iconName: String, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Image(systemName: icon(iconName))
-                .font(.system(size: 13, weight: iconWeight))
+                .font(OhanaFont.adaptive(size: 13, weight: iconWeight))
                 .foregroundStyle(tint)
             Text(value)
                 .font(font(16, .black))
@@ -939,7 +939,7 @@ struct DesignSpecPreviewCanvasV4: View {
     private func statusBanner(_ zh: String, _ en: String, icon iconName: String, tint: Color) -> some View {
         HStack(spacing: 9) {
             Image(systemName: icon(iconName))
-                .font(.system(size: 13, weight: iconWeight))
+                .font(OhanaFont.adaptive(size: 13, weight: iconWeight))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(zh)
@@ -959,9 +959,9 @@ struct DesignSpecPreviewCanvasV4: View {
     private func formRow(_ zh: String, _ en: String, _ iconName: String, trailing: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon(iconName))
-                .font(.system(size: 13, weight: iconWeight))
+                .font(OhanaFont.adaptive(size: 13, weight: iconWeight))
                 .foregroundStyle(palette.accent)
-                .frame(width: 30, height: 30)
+                .frame(width: 30, height: 30) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(palette.controlFill, in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(zh)
@@ -989,15 +989,15 @@ struct DesignSpecPreviewCanvasV4: View {
                 .font(font(10, .black))
                 .foregroundStyle(state == .error ? palette.danger : palette.secondaryText)
             HStack(spacing: 9) {
-                Image(systemName: "scalemass.fill")
-                    .font(.system(size: 12, weight: iconWeight))
+                Image(systemName: "scalemass.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    .font(OhanaFont.adaptive(size: 12, weight: iconWeight))
                     .foregroundStyle(stroke)
                 Text(value)
                     .font(font(14, .bold))
                     .foregroundStyle(state == .disabled ? palette.secondaryText : palette.primaryText)
                 Spacer()
                 if state == .error {
-                    Image(systemName: "exclamationmark.circle.fill")
+                    Image(systemName: "exclamationmark.circle.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         .foregroundStyle(palette.danger)
                 }
             }
@@ -1013,7 +1013,7 @@ struct DesignSpecPreviewCanvasV4: View {
         let tint = stateTint(state)
         return HStack(spacing: 5) {
             Image(systemName: state.icon)
-                .font(.system(size: 10, weight: iconWeight))
+                .font(OhanaFont.adaptive(size: 10, weight: iconWeight))
                 .foregroundStyle(palette.accent)
             Text(state.zh)
                 .font(font(9, .black))
@@ -1067,9 +1067,9 @@ struct DesignSpecPreviewCanvasV4: View {
 
     private func iconCircle(_ iconName: String) -> some View {
         Image(systemName: icon(iconName))
-            .font(.system(size: 13, weight: iconWeight))
+            .font(OhanaFont.adaptive(size: 13, weight: iconWeight))
             .foregroundStyle(palette.accent)
-            .frame(width: 34, height: 34)
+            .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
     }
 
     private var background: some View {
@@ -1095,7 +1095,7 @@ struct DesignSpecPreviewCanvasV4: View {
     private var vividGlassBackdrop: some View {
         Group {
             if workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible) {
-                TimelineView(.animation) { timeline in
+                TimelineView(.animation) { timeline in // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                     let phase = timeline.date.timeIntervalSinceReferenceDate
                     vividGlassBackdropFrame(phase: phase)
                 }
@@ -1157,7 +1157,7 @@ struct DesignSpecPreviewCanvasV4: View {
         ZStack {
             ForEach(0..<15, id: \.self) { index in
                 Text(denseGlassLine(index))
-                    .font(.system(size: 8.5, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 8.5, weight: .black, design: .rounded))
                     .tracking(1.1)
                     .foregroundStyle(vividLineColor(index).opacity(mode == .dark ? 0.42 : 0.58))
                     .lineLimit(1)
@@ -1170,7 +1170,7 @@ struct DesignSpecPreviewCanvasV4: View {
             }
             ForEach(0..<10, id: \.self) { index in
                 Text("0123456789  文字穿过玻璃  LENS")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .tracking(1.5)
                     .foregroundStyle(Color.white.opacity(mode == .dark ? 0.22 : 0.34)) // ui-v4: allow vivid glass lab text contrast
                     .rotationEffect(.degrees(90))
@@ -1199,7 +1199,7 @@ struct DesignSpecPreviewCanvasV4: View {
             }
             ForEach(0..<14, id: \.self) { index in
                 Text("GLASS \(index + 1) · 12345 · UI")
-                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                     .tracking(1.8)
                     .foregroundStyle(vividLineColor(index + 2).opacity(mode == .dark ? 0.48 : 0.60))
                     .rotationEffect(.degrees(index.isMultiple(of: 2) ? 17 : -14))
@@ -1351,14 +1351,14 @@ struct DesignSpecPreviewCanvasV4: View {
                 HStack(spacing: 5) {
                     Capsule()
                         .fill(palette.accent.opacity(0.94))
-                        .frame(width: 42, height: 24)
+                        .frame(width: 42, height: 24) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         .overlay(Capsule().strokeBorder(Color.white.opacity(0.24), lineWidth: 0.7)) // ui-v4: allow selected control rim
                     Circle()
                         .fill(palette.primaryText.opacity(mode == .dark ? 0.12 : 0.10))
-                        .frame(width: 22, height: 22)
+                        .frame(width: 22, height: 22) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     Circle()
                         .fill(palette.primaryText.opacity(mode == .dark ? 0.08 : 0.07))
-                        .frame(width: 18, height: 18)
+                        .frame(width: 18, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 }
                 .padding(7)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)

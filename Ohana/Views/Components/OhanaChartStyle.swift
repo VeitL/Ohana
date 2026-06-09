@@ -271,7 +271,7 @@ struct OhanaMinimalTrendChart: View {
                 } else if let point = chartPoints.first {
                     Circle()
                         .fill(tint)
-                        .frame(width: 9, height: 9)
+                        .frame(width: 9, height: 9) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .position(point)
                         .scaleEffect(0.72 + 0.28 * effectiveProgress)
                         .opacity(effectiveProgress)
@@ -280,7 +280,7 @@ struct OhanaMinimalTrendChart: View {
                 if showsLatestPoint, let latest = chartPoints.last {
                     Circle()
                         .fill(tint)
-                        .frame(width: 9, height: 9)
+                        .frame(width: 9, height: 9) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .overlay(Circle().stroke(Color.ohanaCardSurface, lineWidth: 2))
                         .position(latest)
                         .scaleEffect(0.72 + 0.28 * effectiveProgress)
@@ -419,7 +419,7 @@ struct OhanaMinimalMultiTrendChart: View {
                     if showsLatestPoint, effectiveDrawProgress > 0.82, let latest = chartPoints.last {
                         Circle()
                             .fill(item.tint)
-                            .frame(width: 8, height: 8)
+                            .frame(width: 8, height: 8) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             .overlay(Circle().stroke(Color.ohanaCardSurface, lineWidth: 2))
                             .position(latest)
                             .scaleEffect(max(0.72, min(1, effectiveDrawProgress)))
@@ -522,7 +522,7 @@ struct OhanaMinimalBarChart: View {
                             .scaleEffect(x: 1, y: 0.98 + 0.02 * effectiveProgress, anchor: .bottom)
                         if showsLabels, points.count <= 10 {
                             Text(point.label ?? point.date.formatted(.dateTime.weekday(.narrow)))
-                                .font(.system(size: 9, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                                 .foregroundStyle(Calendar.current.isDateInToday(point.date) ? tint : Color.ohanaTertiaryText)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)

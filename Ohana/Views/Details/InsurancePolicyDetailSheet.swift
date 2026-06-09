@@ -104,8 +104,8 @@ struct InsurancePolicyDetailSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Image(systemName: "shield.lefthalf.filled")
-                .font(.system(size: 20, weight: .black))
+            Image(systemName: "shield.lefthalf.filled").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(Color.goPurple)
                 .frame(width: 48, height: 48)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -121,8 +121,8 @@ struct InsurancePolicyDetailSheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -198,10 +198,10 @@ struct InsurancePolicyDetailSheet: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button { withAnimation(GoMotion.page) { showAddClaim = true } } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "plus").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(Color.arkInk)
-                        .frame(width: 38, height: 34)
+                        .frame(width: 38, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -230,7 +230,7 @@ struct InsurancePolicyDetailSheet: View {
         HStack(spacing: 12) {
             Circle()
                 .fill(Color(hex: claim.claimStatus.colorHex))
-                .frame(width: 10, height: 10)
+                .frame(width: 10, height: 10) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(claim.incidentDate.formatted(.dateTime.year().month().day()))
@@ -290,7 +290,7 @@ struct InsurancePolicyDetailSheet: View {
                 setPolicyActive(!insurance.isActive)
             } label: {
                 Image(systemName: insurance.isActive ? "pause.fill" : "play.fill")
-                    .font(.system(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 52, height: 48)
                     .background(Color.ohanaCardSurface, in: Capsule())
@@ -298,8 +298,8 @@ struct InsurancePolicyDetailSheet: View {
             .buttonStyle(ScaleButtonStyle())
 
             Button(role: .destructive) { showDeleteConfirm = true } label: {
-                Image(systemName: "trash.fill")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "trash.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.goRed)
                     .frame(width: 52, height: 48)
                     .background(Color.ohanaCardSurface, in: Capsule())
@@ -444,8 +444,8 @@ private struct InsuranceClaimPopup: View {
                         .gesture(handleDrag)
 
                     HStack(spacing: 12) {
-                        Image(systemName: "arrow.down.doc.fill")
-                            .font(.system(size: 18, weight: .black))
+                        Image(systemName: "arrow.down.doc.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 18, weight: .black))
                             .foregroundStyle(Color.arkInk)
                             .frame(width: 48, height: 48)
                             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -581,7 +581,7 @@ private struct InsuranceClaimPopup: View {
                         HStack(spacing: 6) {
                             Circle()
                                 .fill(Color(hex: status.colorHex))
-                                .frame(width: 7, height: 7)
+                                .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             Text(status.rawValue)
                                 .font(OhanaFont.caption(.black))
                                 .lineLimit(1)

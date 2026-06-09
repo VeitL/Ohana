@@ -7,14 +7,12 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct FeatureGroupDashboardView: View {
     let group: FeatureGroup
     @Binding var parentPath: NavigationPath
-
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-    @Query(sort: \Human.name)    private var humans: [Human]
+    let pets: [Pet]
+    let humans: [Human]
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var selectedItemID: String?
@@ -36,13 +34,23 @@ struct FeatureGroupDashboardView: View {
 
     private var items: [FeatureGroupItem] {
         FeatureGroupItem.items(for: group, hasDogs: hasDogs, hasMultipleHumans: hasMultipleHumans)
+            .filter {
+                AppFeatureRouteGuard.isVisibleFunctionDestination(
+                    $0.destination,
+                    currentLevel: currentTreeLevel
+                )
+            }
     }
 
-    private var selectedItem: FeatureGroupItem {
+    private var selectedItem: FeatureGroupItem? {
         if let selectedItemID, let item = items.first(where: { $0.id == selectedItemID }) {
             return item
         }
-        return items.first ?? FeatureGroupItem.fallback
+        return items.first
+    }
+
+    private var effectiveSelectedItemID: String {
+        selectedItem?.id ?? ""
     }
 
     var body: some View {
@@ -52,9 +60,13 @@ struct FeatureGroupDashboardView: View {
 
             VStack(spacing: 0) {
                 pageHeader
-                segmentBar
-                Rectangle().fill(Color.ohanaDivider).frame(height: 1)
-                pager
+                if items.isEmpty {
+                    unavailableGroupFallback
+                } else {
+                    segmentBar
+                    Rectangle().fill(Color.ohanaDivider).frame(height: 1)
+                    pager
+                }
             }
         }
         .onAppear(perform: ensureSelectedItem)
@@ -64,9 +76,9 @@ struct FeatureGroupDashboardView: View {
     private var pageHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: group.icon)
-                .font(.system(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(group.color)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(LocalizedStringKey(group.title))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -82,7 +94,6 @@ struct FeatureGroupDashboardView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(items) { item in
-                    let unlock = GrowthUnlockPolicy.status(for: item.destination, currentLevel: currentTreeLevel)
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         withAnimation(GoMotion.feedback) {
@@ -90,27 +101,16 @@ struct FeatureGroupDashboardView: View {
                         }
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: unlock.isUnlocked ? item.icon : "lock.fill")
-                                .font(.system(size: 11, weight: .bold))
+                            Image(systemName: item.icon)
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text(LocalizedStringKey(item.title))
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .lineLimit(1)
                         }
-                        .foregroundStyle(selectedItem.id == item.id ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
+                        .foregroundStyle(effectiveSelectedItemID == item.id ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .padding(.horizontal, 13)
                         .padding(.vertical, 8)
-                        .background(selectedItem.id == item.id ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-                        .overlay(alignment: .topTrailing) {
-                            if !unlock.isUnlocked {
-                                Text("Lv.\(unlock.step.requiredLevel)")
-                                    .font(.system(size: 7, weight: .black, design: .rounded))
-                                    .foregroundStyle(Color.arkInk)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 2)
-                                    .background(Color(hex: unlock.step.tintHex), in: Capsule())
-                                    .offset(x: 4, y: -6)
-                            }
-                        }
+                        .background(effectiveSelectedItemID == item.id ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -122,7 +122,7 @@ struct FeatureGroupDashboardView: View {
 
     private var pager: some View {
         TabView(selection: Binding(
-            get: { selectedItem.id },
+            get: { effectiveSelectedItemID },
             set: { selectedItemID = $0 }
         )) {
             ForEach(items) { item in
@@ -131,39 +131,72 @@ struct FeatureGroupDashboardView: View {
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
-        .animation(GoMotion.page, value: selectedItem.id)
+        .animation(GoMotion.page, value: effectiveSelectedItemID)
     }
 
     @ViewBuilder
     private func content(for item: FeatureGroupItem) -> some View {
-        let unlock = GrowthUnlockPolicy.status(for: item.destination, currentLevel: currentTreeLevel)
-        if !unlock.isUnlocked {
-            GrowthLockedFeatureView(
-                status: unlock,
-                appLanguage: appLanguage,
-                showsFullRoadmap: false
-            )
-        } else {
-            switch item.destination {
-            case .featureAggregate(let feature):
-                FeatureAggregateView(
-                    feature: feature,
-                    parentPath: $parentPath,
-                    showsNavigationChrome: false,
-                    showsEntityChips: false
-                )
-            case .careLedgerAnalysis:
-                CareLedgerAnalysisView()
-            case .reminderObservability:
-                ReminderObservabilityView()
-            case .bountyBoard:
-                BountyBoardView()
-            case .familyWeeklyReport:
-                FamilyWeeklyReportDashboardView()
-            default:
-                EmptyView()
-            }
+        switch AppFeatureRouteGuard.functionDestinationDecision(item.destination, currentLevel: currentTreeLevel) {
+        case .allow:
+            allowedContent(for: item)
+        case .rootMenu:
+            EmptyView()
+        case let .redirectToRoadmap(note):
+            lockedRouteFallback(note: note)
+        case let .suppress(note):
+            hiddenRouteFallback(note: note)
         }
+    }
+
+    @ViewBuilder
+    private func allowedContent(for item: FeatureGroupItem) -> some View {
+        switch item.destination {
+        case .featureAggregate(let feature):
+            FeatureAggregateView(
+                feature: feature,
+                parentPath: $parentPath,
+                pets: pets,
+                humans: humans,
+                showsNavigationChrome: false,
+                showsEntityChips: false
+            )
+        case .careLedgerAnalysis:
+            CareLedgerAnalysisView()
+        case .reminderObservability:
+            ReminderObservabilityView()
+        case .bountyBoard:
+            BountyBoardView()
+        case .familyWeeklyReport:
+            FamilyWeeklyReportDashboardView()
+        default:
+            EmptyView()
+        }
+    }
+
+    private var unavailableGroupFallback: some View {
+        GrowthUnlockRoadmapView(
+            currentLevel: currentTreeLevel,
+            progressToNextLevel: treeManager.progressToNextLevel,
+            appLanguage: appLanguage
+        )
+    }
+
+    private func lockedRouteFallback(note: String) -> some View {
+        GrowthUnlockRoadmapView(
+            currentLevel: currentTreeLevel,
+            progressToNextLevel: treeManager.progressToNextLevel,
+            appLanguage: appLanguage
+        )
+        .onAppear {
+            AppFeatureRouteGuard.recordIntercept(note)
+        }
+    }
+
+    private func hiddenRouteFallback(note: String) -> some View {
+        Color.clear
+            .onAppear {
+                AppFeatureRouteGuard.recordIntercept(note)
+            }
     }
 
     private func ensureSelectedItem() {
@@ -180,13 +213,6 @@ private struct FeatureGroupItem: Identifiable {
     let title: String
     let icon: String
     let destination: FMDest
-
-    static let fallback = FeatureGroupItem(
-        id: "fallback",
-        title: "功能",
-        icon: "square.grid.2x2.fill",
-        destination: .featureAggregate(.food)
-    )
 
     static func items(for group: FeatureGroup, hasDogs: Bool, hasMultipleHumans: Bool) -> [FeatureGroupItem] {
         switch group {

@@ -44,9 +44,9 @@ struct PetInsuranceView: View {
                         }
                         ToolbarItem(placement: .topBarTrailing) {
                             Button { showingAdd = true } label: {
-                                Image(systemName: "plus.circle.fill")
+                                Image(systemName: "plus.circle.fill").accessibilityHidden(true)
                                     .symbolRenderingMode(.hierarchical)
-                                    .foregroundStyle(Color.goPrimary).font(.system(size: 22))
+                                    .foregroundStyle(Color.goPrimary).font(OhanaFont.adaptive(size: 22))
                             }
                         }
                     }
@@ -72,12 +72,12 @@ struct PetInsuranceView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("保险")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button { showingAdd = true } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 20, weight: .bold))
+                    Image(systemName: "plus.circle.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 20, weight: .bold))
                         .foregroundStyle(Color.goPrimary)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -113,11 +113,11 @@ struct PetInsuranceView: View {
     private var embeddedEmpty: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("暂无保单，可记录续期与保额")
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Button { showingAdd = true } label: {
                 Text("添加保单")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 16).padding(.vertical, 8)
                     .background(Color.goPrimary, in: Capsule())
@@ -131,11 +131,11 @@ struct PetInsuranceView: View {
     // MARK: - Empty State
     private var emptyState: some View {
         VStack(spacing: 16) {
-            Text("🛡️").font(.system(size: 56))
-            Text("暂无保险记录").font(.system(size: 17, weight: .black, design: .rounded))
-            Text("记录宠物保险保单，轻松追踪续期日期").font(.system(size: 13, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).multilineTextAlignment(.center)
+            Text("🛡️").font(OhanaFont.adaptive(size: 56))
+            Text("暂无保险记录").font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+            Text("记录宠物保险保单，轻松追踪续期日期").font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).multilineTextAlignment(.center)
             Button { showingAdd = true } label: {
-                Text("添加保单").font(.system(size: 15, weight: .black, design: .rounded)).foregroundStyle(Color.arkInk)
+                Text("添加保单").font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)).foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(Color.goPrimary, in: Capsule())
             }.buttonStyle(ScaleButtonStyle())
@@ -151,23 +151,23 @@ struct PetInsuranceView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(spacing: 6) {
                                 Text(ins.productName.isEmpty ? "未命名保单" : ins.productName)
-                                    .font(.system(size: 16, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(ins.renewalStatusLabel)
-                                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.arkInk)
                                     .padding(.horizontal, 8).padding(.vertical, 3)
                                     .background(Color(hex: ins.renewalStatusColor), in: Capsule())
                             }
                             if !ins.companyName.isEmpty {
                                 Text(ins.companyName)
-                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                         }
                         Spacer(minLength: 36)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                             .foregroundStyle(.tertiary)
                     }
 
@@ -189,7 +189,7 @@ struct PetInsuranceView: View {
 
                     if !ins.notes.isEmpty {
                         Text(ins.notes)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                             .lineLimit(1)
                     }
@@ -213,8 +213,8 @@ struct PetInsuranceView: View {
                     Label("删除", systemImage: "trash")
                 }
             } label: {
-                Image(systemName: "ellipsis.circle.fill")
-                    .font(.system(size: 20))
+                Image(systemName: "ellipsis.circle.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 20))
                     .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .padding(10)
@@ -240,8 +240,8 @@ struct PetInsuranceView: View {
 
     private func statCell(label: String, value: String) -> some View {
         VStack(spacing: 3) {
-            Text(value).font(.system(size: 14, weight: .black, design: .rounded))
-            Text(label).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+            Text(value).font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+            Text(label).font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
         }.frame(maxWidth: .infinity)
     }
 }
@@ -336,7 +336,7 @@ struct AddPetInsuranceSheet: View {
                             }
                             DatePicker("续期日期", selection: $renewalDate, in: startDate..., displayedComponents: .date)
                         }
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
                         .tint(Color.goPrimary)
                         .padding(14)
                         .goTranslucentCard(cornerRadius: 14)
@@ -352,7 +352,7 @@ struct AddPetInsuranceSheet: View {
                         // 保存按钮
                         Button { save() } label: {
                             Text(isEdit ? "保存修改" : "添加保单")
-                                .font(.system(size: 16, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.arkInk)
                                 .frame(maxWidth: .infinity).padding(.vertical, 16)
                                 .background(productName.isEmpty ? Color.primary.opacity(0.15) : Color.goPrimary,
@@ -381,7 +381,7 @@ struct AddPetInsuranceSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $enablePolicyNumber) {
                 Text("填写保单号")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
             }
             .tint(Color.goPrimary)
             if enablePolicyNumber {
@@ -390,7 +390,7 @@ struct AddPetInsuranceSheet: View {
 
             Toggle(isOn: $enableCoverage) {
                 Text("填写保额")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
             }
             .tint(Color.goPrimary)
             if enableCoverage {
@@ -415,7 +415,7 @@ struct AddPetInsuranceSheet: View {
             // 金额输入行
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(AppCurrency.symbol)
-                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                 InlineNumericInput(
                     text: $premiumInput,
@@ -430,7 +430,7 @@ struct AddPetInsuranceSheet: View {
                     verticalPadding: 8
                 )
                 Text(premiumMode == .annual ? "/ 年" : "/ 月")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(.vertical, 4)
@@ -442,16 +442,16 @@ struct AddPetInsuranceSheet: View {
                 VStack(alignment: .leading, spacing: 3) {
                     if premiumMode == .monthly {
                         Text("年总保费：\(AppCurrency.format(annualPremiumDouble, fractionDigits: 2))")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     HStack(spacing: 4) {
                         Text("每期缴纳：\(AppCurrency.format(basePerPeriod + other, fractionDigits: 2))")
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.goPrimary)
                         if other > 0 {
                             Text("（含其他费用 \(AppCurrency.format(other, fractionDigits: 2))）")
-                                .font(.system(size: 11, weight: .regular, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .regular, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
@@ -464,10 +464,10 @@ struct AddPetInsuranceSheet: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: showOtherFee ? "minus.circle" : "plus.circle")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(showOtherFee ? "收起其他费用" : "添加其他费用（服务费等）")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -477,7 +477,7 @@ struct AddPetInsuranceSheet: View {
                 HStack(spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
                         Text(AppCurrency.symbol)
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                         InlineNumericInput(
                             text: $otherFeeInput,
@@ -497,7 +497,7 @@ struct AddPetInsuranceSheet: View {
                     .frame(maxWidth: 100)
 
                     TextField("费用说明（如：服务费）", text: $otherFeeNote)
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
                         .padding(10)
                         .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
                 }
@@ -511,7 +511,7 @@ struct AddPetInsuranceSheet: View {
     private func modeTab(_ title: String, mode: PremiumInputMode) -> some View {
         Button { premiumMode = mode } label: {
             Text(title)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(premiumMode == mode ? Color.arkInk : .primary.opacity(0.5))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 7)
@@ -540,11 +540,11 @@ struct AddPetInsuranceSheet: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("付款日")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                         Text(paymentFrequency == .monthly
                              ? "每月 \(paymentDay) 日扣款"
                              : "每季度 \(paymentDay) 日扣款")
-                            .font(.system(size: 11, weight: .regular, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .regular, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
@@ -552,18 +552,18 @@ struct AddPetInsuranceSheet: View {
                         Button {
                             if paymentDay > 1 { paymentDay -= 1 }
                         } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .font(.system(size: 22))
+                            Image(systemName: "minus.circle.fill").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 22))
                                 .foregroundStyle(Color.goPrimary)
                         }
                         Text("\(paymentDay)")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                             .frame(minWidth: 28)
                         Button {
                             if paymentDay < 28 { paymentDay += 1 }
                         } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 22))
+                            Image(systemName: "plus.circle.fill").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 22))
                                 .foregroundStyle(Color.goPrimary)
                         }
                     }
@@ -583,12 +583,12 @@ struct AddPetInsuranceSheet: View {
                         in: Date.distantPast...Date.distantFuture,
                         displayedComponents: .date
                     )
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
                     .tint(Color.goPrimary)
                     Text(paymentFrequency == .once
                          ? "一次性：仅按该日生成一笔保费记录。"
                          : "按年：每年与此日同月同日生成扣款，直至续期日前。")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -603,7 +603,7 @@ struct AddPetInsuranceSheet: View {
             withAnimation(GoMotion.feedback) { paymentFrequency = freq }
         } label: {
             Text(freq.rawValue)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.85)
@@ -626,11 +626,11 @@ struct AddPetInsuranceSheet: View {
             Toggle(isOn: $autoGenExpenses) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("自动生成全部付款记录")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                     let other = CountryDecimalInput.parse(otherFeeInput, countryCode: AppCountry.code) ?? 0
                     let perPeriod = paymentFrequency.periodAmount(fromAnnual: annualPremiumDouble) + other
                     Text("每期 \(AppCurrency.format(perPeriod, fractionDigits: 2)) · 按\(paymentFrequency.rawValue)写入花费")
-                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .regular, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -643,9 +643,9 @@ struct AddPetInsuranceSheet: View {
             Toggle(isOn: $showInCalendar) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("在日历中显示缴费提醒")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                     Text("为每期付款日创建日历事件")
-                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .regular, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -659,14 +659,14 @@ struct AddPetInsuranceSheet: View {
 
     private func sectionLabel(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
     }
 
     @ViewBuilder
     private func field(_ placeholder: String, text: Binding<String>, axis: Axis = .horizontal) -> some View {
         TextField(placeholder, text: text, axis: axis)
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
             .lineLimit(axis == .vertical ? 3 : 1)
             .padding(14)
             .goTranslucentCard(cornerRadius: 14)

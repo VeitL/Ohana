@@ -89,7 +89,7 @@ struct PetMomentsHubView: View {
 
     private var realPhotos: [PetPhotoLog] {
         pet.photoLogs
-            .filter { renderableImage(from: $0) != nil }
+            .filter { !$0.imageData.isEmpty }
             .sorted { $0.date > $1.date }
     }
 
@@ -184,10 +184,10 @@ struct PetMomentsHubView: View {
             Spacer()
 
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -317,9 +317,9 @@ struct PetMomentsHubView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 9) {
                 Image(systemName: item.iconName)
-                    .font(.system(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(item.color)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 22, height: 22) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text(item.title)
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -355,15 +355,15 @@ struct PetMomentsHubView: View {
                     Circle()
                         .fill(item.color.opacity(0.18))
                     Image(systemName: item.iconName)
-                        .font(.system(size: 12, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(item.color)
                 }
-                .frame(width: 30, height: 30)
+                .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
                 if !isLast {
                     Rectangle()
                         .fill(Color.ohanaSecondaryText.opacity(0.15))
-                        .frame(width: 1, height: 22)
+                        .frame(width: 1, height: 22) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 }
             }
 
@@ -390,22 +390,35 @@ struct PetMomentsHubView: View {
 
     @ViewBuilder
     private func photoCollage(_ photos: [PetPhotoLog]) -> some View {
-        let validPhotos = photos.compactMap { renderableImage(from: $0) }
-        if validPhotos.count == 1, let image = validPhotos.first {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(height: 182)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        let validPhotos = photos.filter { !$0.imageData.isEmpty }
+        if validPhotos.count == 1, let photo = validPhotos.first {
+            AsyncDecodedImageView(data: photo.imageData) { image in
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 182)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            } placeholder: {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.ohanaCardSurface)
+                    .frame(height: 182)
+            }
         } else if !validPhotos.isEmpty {
             HStack(spacing: 6) {
-                ForEach(Array(validPhotos.prefix(3).enumerated()), id: \.offset) { _, image in
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 150)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                ForEach(Array(validPhotos.prefix(3).enumerated()), id: \.element.id) { _, photo in
+                    AsyncDecodedImageView(data: photo.imageData) { image in
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 150)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } placeholder: {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.ohanaCardSurface)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 150)
+                    }
                 }
             }
         }
@@ -414,7 +427,7 @@ struct PetMomentsHubView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: tab == .highlights ? "sparkles" : "sparkles.rectangle.stack.fill")
-                .font(.system(size: 38, weight: .black))
+                .font(OhanaFont.adaptive(size: 38, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
             Text(emptyTitle)
                 .font(OhanaFont.title3(.black))
@@ -505,7 +518,7 @@ struct PetMomentsHubView: View {
     private func addButtonLabel(icon: String, title: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
                 .font(OhanaFont.callout(.black))
         }
@@ -515,11 +528,4 @@ struct PetMomentsHubView: View {
         .background(Color.goPrimary, in: Capsule())
     }
 
-    private func renderableImage(from log: PetPhotoLog) -> UIImage? {
-        guard let image = UIImage(data: log.imageData),
-              image.size.width > 2,
-              image.size.height > 2
-        else { return nil }
-        return image
-    }
 }

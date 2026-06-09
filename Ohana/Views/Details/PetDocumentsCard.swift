@@ -21,19 +21,19 @@ struct PetDocumentsCard: View {
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 14, weight: .semibold))
+                    Image(systemName: "doc.text").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                         .foregroundStyle(Color.goCardCyan)
                     Text("证件与保障")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     HStack(spacing: 6) {
                         Text("\(pet.documents.count) 份")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     }
                 }
@@ -45,11 +45,11 @@ struct PetDocumentsCard: View {
                             HStack(spacing: 8) {
                                 Text(doc.documentCategory.emoji)
                                 Text(doc.title.isEmpty ? doc.category : doc.title)
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Spacer()
                                 Text(doc.isExpired ? "已过期" : "即将到期")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(OhanaFont.adaptive(size: 10, weight: .bold))
                                     .foregroundStyle(doc.isExpired ? Color.goRed : Color.goYellow)
                                     .padding(.horizontal, 7).padding(.vertical, 3)
                                     .background((doc.isExpired ? Color.goRed : Color.goYellow).opacity(0.15), in: Capsule())
@@ -58,7 +58,7 @@ struct PetDocumentsCard: View {
                     }
                 } else if pet.documents.isEmpty {
                     Text("暂无证件，点击添加")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 4)
@@ -67,13 +67,13 @@ struct PetDocumentsCard: View {
                     HStack(spacing: 8) {
                         ForEach(pet.documents.prefix(5)) { doc in
                             Text(doc.documentCategory.emoji)
-                                .font(.system(size: 20))
-                                .frame(width: 36, height: 36)
+                                .font(OhanaFont.adaptive(size: 20))
+                                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                                 .goGlassBackground(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
                         if pet.documents.count > 5 {
                             Text("+\(pet.documents.count - 5)")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                     }

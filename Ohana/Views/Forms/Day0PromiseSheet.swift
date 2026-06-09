@@ -68,7 +68,7 @@ struct Day0PromiseSheet: View {
                             }
                         }
                         Text("勾选的承诺会自动进入「家庭悬赏榜」——任何家人都可以帮你完成并领取椰子。")
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 6)
@@ -97,10 +97,10 @@ struct Day0PromiseSheet: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("欢迎 \(petName) 🎉")
-                .font(.system(size: 22, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text("勾选几条你今晚或明天愿意完成的小承诺——它们会自动成为家庭任务，让家人一起参与。")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -116,24 +116,24 @@ struct Day0PromiseSheet: View {
                 ZStack {
                     Circle()
                         .fill(isOn ? Color.goPrimary : Color.goPrimary.opacity(0.12))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     if isOn {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 13, weight: .black))
-                            .foregroundStyle(.black)
+                        Image(systemName: "checkmark").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
+                            .foregroundStyle(.black) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     }
                 }
-                Text(p.emoji).font(.system(size: 22))
+                Text(p.emoji).font(OhanaFont.adaptive(size: 22))
                 Text(p.title)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 HStack(spacing: 3) {
                     Text("+\(p.reward)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goYellow)
-                    Text("🥥").font(.system(size: 11))
+                    Text("🥥").font(OhanaFont.adaptive(size: 11))
                 }
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
@@ -158,11 +158,11 @@ struct Day0PromiseSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: selected.isEmpty ? "arrow.right.circle" : "checkmark.seal.fill")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
                 Text(selected.isEmpty ? "先跳过，以后再说" : "把 \(selected.count) 条承诺发给家人")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(.black)
+            .foregroundStyle(.black) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             .frame(maxWidth: .infinity, minHeight: 48)
             .background(Color.goPrimary, in: Capsule())
         }

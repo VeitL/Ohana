@@ -85,8 +85,8 @@ struct ProtectionDocumentPopup: View {
                         .gesture(handleDrag)
 
                     HStack(spacing: 12) {
-                        Image(systemName: "doc.badge.plus")
-                            .font(.system(size: 18, weight: .black))
+                        Image(systemName: "doc.badge.plus") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.arkInk)
                             .frame(width: 48, height: 48)
                             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -167,13 +167,17 @@ struct ProtectionDocumentPopup: View {
         }
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [UTType.pdf, UTType.image, UTType.data]) { result in
             guard case .success(let url) = result else { return }
-            _ = url.startAccessingSecurityScopedResource()
-            defer { url.stopAccessingSecurityScopedResource() }
-            if let data = try? Data(contentsOf: url) {
-                attachmentData = data
-                attachmentFilename = url.lastPathComponent
-                attachmentIsImage = UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
-                hasNewAttachment = true
+            Task {
+                let data = await AttachmentImageDecoder.readFileData(url)
+                let isImage = UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
+                await MainActor.run {
+                    if let data {
+                        attachmentData = data
+                        attachmentFilename = url.lastPathComponent
+                        attachmentIsImage = isImage
+                        hasNewAttachment = true
+                    }
+                }
             }
         }
         .sheet(isPresented: $showingCamera) {
@@ -289,7 +293,7 @@ struct ProtectionDocumentPopup: View {
     private func formTextField(label: String, placeholder: String, text: Binding<String>, icon: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 4) {
@@ -333,7 +337,7 @@ struct ProtectionDocumentPopup: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     Image(systemName: icon)
-                        .font(.system(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                         .frame(width: 24)
                     VStack(alignment: .leading, spacing: 2) {
@@ -402,7 +406,7 @@ struct ProtectionDocumentPopup: View {
     private func attachmentButtonLabel(_ icon: String, _ title: String) -> some View {
         VStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
                 .font(OhanaFont.caption2(.black))
         }

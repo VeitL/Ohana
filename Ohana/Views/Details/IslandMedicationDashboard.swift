@@ -117,19 +117,19 @@ struct IslandMedicationDashboard: View {
     private var navBar: some View {
         HStack {
             Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .bold))
+                Image(systemName: "chevron.left").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
                     .foregroundStyle(Color.goCardWhite)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .goGlassBackground(Circle())
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text("今日药盒")
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
             Spacer()
-            Color.clear.frame(width: 36, height: 36)
+            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
         }
         .padding(.top, 64)
     }
@@ -162,23 +162,23 @@ struct IslandMedicationDashboard: View {
                     .frame(width: 104, height: 104)
                 VStack(spacing: 1) {
                     Text("\(takenDoses)")
-                        .font(.system(size: 31, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 31, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goCardWhite)
                     Text("/ \(dueDoses)")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goCardWhite.opacity(0.48))
                 }
             }
 
             VStack(alignment: .leading, spacing: 7) {
                 Text("今日服药进度")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goCardWhite.opacity(0.56))
                 Text(dueDoses == 0 ? "没有固定剂量" : completion >= 1 ? "今日完成" : "还有 \(max(0, dueDoses - takenDoses)) 次")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goCardWhite)
                 Text("\(activeMeds.count) 个当前用药 · \(endingSoonCount) 个 7 天内结束")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.goCardWhite.opacity(0.52))
             }
             Spacer()
@@ -197,7 +197,7 @@ struct IslandMedicationDashboard: View {
     private var todayMedicationStrip: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("药盒格")
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite.opacity(0.72))
 
             if activeMeds.isEmpty {
@@ -237,11 +237,11 @@ struct IslandMedicationDashboard: View {
                     }
             }
             Text(med.name.isEmpty ? "未命名" : med.name)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
             Text(pet?.name ?? med.frequency.rawValue)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.goCardWhite.opacity(0.42))
                 .lineLimit(1)
         }
@@ -253,7 +253,7 @@ struct IslandMedicationDashboard: View {
     private var medicationRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("成员药盒")
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goCardWhite)
             ForEach(summaries) { summary in
                 Button { open(summary.pet) } label: {
@@ -261,18 +261,18 @@ struct IslandMedicationDashboard: View {
                         FMPetAvatar(pet: summary.pet, size: 42)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(summary.pet.name)
-                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.goCardWhite)
                             Text(summary.activeMeds.isEmpty ? "暂无当前用药" : "\(summary.activeMeds.count) 个当前用药")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.goCardWhite.opacity(0.48))
                         }
                         Spacer()
                         Text(summary.dueDoses == 0 ? "--" : "\(summary.takenDoses)/\(summary.dueDoses)")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                             .foregroundStyle(summary.dueDoses > 0 && summary.takenDoses >= summary.dueDoses ? Color.goLime : medAccent)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .black))
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 11, weight: .black))
                             .foregroundStyle(Color.goCardWhite.opacity(0.3))
                     }
                     .padding(14)
@@ -289,7 +289,7 @@ struct IslandMedicationDashboard: View {
             HStack(spacing: 6) {
                 avatar()
                 Text(title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
             }
             .foregroundStyle(isSelected ? Color.arkInk : Color.goCardWhite)
             .padding(.horizontal, 12)
@@ -301,13 +301,13 @@ struct IslandMedicationDashboard: View {
 
     private func selectorChip(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         selectorChip(title: title, avatar: {
-            Image(systemName: icon).font(.system(size: 11, weight: .bold))
+            Image(systemName: icon).font(OhanaFont.adaptive(size: 11, weight: .bold))
         }, isSelected: isSelected, action: action)
     }
 
     private func emptyState(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.goCardWhite.opacity(0.42))
             .frame(maxWidth: .infinity, minHeight: 100)

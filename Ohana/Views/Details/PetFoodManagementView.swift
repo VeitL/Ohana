@@ -11,8 +11,8 @@ struct PetFoodManagementView: View {
     let pet: Pet
 
     var body: some View {
-        QuickFeedDetailSheet(
-            pet: pet,
+        QuickFeedDetailRouteContainer(
+            id: pet.id,
             onRemove: {},
             showsRemoveQuickActionFooter: false,
             showsCloseButton: false

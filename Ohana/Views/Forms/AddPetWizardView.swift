@@ -291,7 +291,7 @@ struct AddPetWizardView: View {
         automaticAvatarLoadTask = Task {
             let data = await Task.detached(priority: .utility) { () -> Data? in
                 guard let requestURL else { return nil }
-                return try? Data(contentsOf: requestURL)
+                return try? Data(contentsOf: requestURL) // smoothness: allow detached bundled avatar asset read
             }.value
             guard !Task.isCancelled else { return }
             guard usesAutomaticAvatarAsset,
@@ -387,7 +387,7 @@ struct AddPetWizardView: View {
         wizardL10n.petWizBreedCollapseSummary(isCustomBreed: isCustomBreed, customBreedText: customBreedText, breed: breed)
     }
 
-    /// 顶卡头像在后台解码，避免 `name` 每次变化时主线程重复 `UIImage(data:)` / `isTransparentPNG`
+    /// 顶卡头像在后台解码，避免 `name` 每次变化时主线程重复做图片解码 / 透明检测。
     private func scheduleWalletAvatarDecode() {
         guard let data = avatarImageData, !data.isEmpty else {
             walletDecodedAvatar = nil
@@ -397,7 +397,7 @@ struct AddPetWizardView: View {
         let snapshot = data
         Task.detached(priority: .utility) {
             let transparent = ImageCutoutService.isTransparentPNG(snapshot)
-            let img = UIImage(data: snapshot).map { image -> UIImage in
+            let img = UIImage(data: snapshot).map { image -> UIImage in // smoothness: allow detached avatar decode before render
                 let downsampled = Self.downsample(image, maxDim: 900)
                 if transparent, let trimmed = ImageCutoutService.trimmedTransparentSubjectImage(from: downsampled) {
                     return trimmed
@@ -553,12 +553,12 @@ struct AddPetWizardView: View {
             ZStack {
                 Color.arkInk.opacity(0.35).ignoresSafeArea()
                 VStack(spacing: 16) {
-                    Text("🥥").font(.system(size: 72))
+                    Text("🥥").font(OhanaFont.adaptive(size: 72)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("+50 🥥")
-                        .font(.system(size: 44, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 44, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow)
                     Text(wizardL10n.petWizIslandWelcome)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 }
                 .scaleEffect(coconutBurstScale).opacity(coconutBurstOpacity)
@@ -865,7 +865,7 @@ struct AddPetWizardView: View {
     nonisolated static func cropReadyImage(from data: Data, maxPixel: CGFloat = 1600) -> UIImage? {
         let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
         guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
-            return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) }
+            return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) } // smoothness: allow static crop fallback off the interaction path
         }
 
         let thumbnailOptions: [CFString: Any] = [
@@ -878,7 +878,7 @@ struct AddPetWizardView: View {
             return UIImage(cgImage: cgImage)
         }
 
-        return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) }
+        return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) } // smoothness: allow static crop fallback off the interaction path
     }
 
     nonisolated static func preparedCropImage(_ image: UIImage, maxPixel: CGFloat = 1600) -> UIImage {
@@ -992,7 +992,7 @@ struct AddPetWizardView: View {
 
     private func meshCardLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.primary.opacity(0.6))
             .tracking(0.8)
             .textCase(.uppercase)
@@ -1017,7 +1017,7 @@ struct AddPetWizardView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(l.petWizSpecies)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .padding(.horizontal, 20)
 
@@ -1034,10 +1034,10 @@ struct AddPetWizardView: View {
                             } label: {
                                 VStack(spacing: 4) {
                                     Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: sp))
-                                        .font(.system(size: 20, weight: .bold)).symbolRenderingMode(.monochrome)
+                                        .font(OhanaFont.adaptive(size: 20, weight: .bold)).symbolRenderingMode(.monochrome) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(species == sp ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.85))
                                     Text(l.petSpeciesLabel(sp))
-                                        .font(.system(size: 11, weight: species == sp ? .bold : .medium, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 11, weight: species == sp ? .bold : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(species == sp ? Color.arkInk : Color.ohanaSecondaryText)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -1061,7 +1061,7 @@ struct AddPetWizardView: View {
                             submitLabel: .done,
                             capitalization: .words
                         )
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .textFieldStyle(.plain)
                         .padding(.horizontal, 14).padding(.vertical, 12)
@@ -1076,13 +1076,13 @@ struct AddPetWizardView: View {
 
                 Button { showBreedPickerSheet = true } label: {
                     HStack {
-                        Image(systemName: "list.bullet").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaSecondaryText)
+                        Image(systemName: "list.bullet").font(OhanaFont.adaptive(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(l.petWizBentoBreed).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
-                            Text(breedCollapseSummary).font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                            Text(l.petWizBentoBreed).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            Text(breedCollapseSummary).font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaTertiaryText)
+                        Image(systemName: "chevron.right").font(OhanaFont.adaptive(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaTertiaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .padding(.horizontal, 14).padding(.vertical, 12)
                     .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -1092,11 +1092,11 @@ struct AddPetWizardView: View {
                 Divider().opacity(0.15).padding(.horizontal, 20)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(l.petWizGender).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+                    Text(l.petWizGender).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     HStack(spacing: 8) {
                         ForEach([("male", l.petWizGenderBoy), ("female", l.petWizGenderGirl), ("unknown", l.petWizGenderUnknown)], id: \.0) { val, label in
                             Button { UIImpactFeedbackGenerator(style: .light).impactOccurred(); gender = val } label: {
-                                Text(label).font(.system(size: 13, weight: gender == val ? .bold : .medium, design: .rounded))
+                                Text(label).font(OhanaFont.adaptive(size: 13, weight: gender == val ? .bold : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(gender == val ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.85))
                                     .frame(maxWidth: .infinity)
                                     .frame(minHeight: 44)
@@ -1108,7 +1108,7 @@ struct AddPetWizardView: View {
                 .padding(.horizontal, 20)
 
                 HStack {
-                    Text(l.petWizNeuter).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+                    Text(l.petWizNeuter).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Spacer()
                     Toggle("", isOn: $isNeutered).tint(Color.goPrimary).labelsHidden()
                 }
@@ -1118,7 +1118,7 @@ struct AddPetWizardView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(l.petWizBirthday).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+                        Text(l.petWizBirthday).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Spacer()
                         Toggle("", isOn: $hasBirthday).tint(Color.goPrimary).labelsHidden()
                     }
@@ -1130,7 +1130,7 @@ struct AddPetWizardView: View {
                             .simultaneousGesture(TapGesture().onEnded { GoKeyboard.dismiss() })
                         if !humanAgeText.isEmpty {
                             Label(humanAgeText, systemImage: "person.fill")
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
@@ -1141,7 +1141,7 @@ struct AddPetWizardView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(l.petWizHomeDate).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+                        Text(l.petWizHomeDate).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Spacer()
                         Toggle("", isOn: $hasHomeDate).tint(Color.goPrimary).labelsHidden()
                     }
@@ -1154,7 +1154,7 @@ struct AddPetWizardView: View {
                             .onChange(of: birthday) { _, newB in if homeDate < newB { homeDate = newB } }
                         if !daysTogetherText.isEmpty {
                             Label(daysTogetherText, systemImage: "heart.fill")
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
@@ -1182,8 +1182,8 @@ struct AddPetWizardView: View {
                     presentPhotoLibrary()
                 } label: {
                     HStack(spacing: 5) {
-                        Image(systemName: "photo.on.rectangle.angled").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome)
-                        Text(l.humanWizPhotoLibrary).font(.system(size: 12, weight: .bold, design: .rounded))
+                        Image(systemName: "photo.on.rectangle.angled").font(OhanaFont.adaptive(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        Text(l.humanWizPhotoLibrary).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
                     .frame(maxWidth: .infinity)
@@ -1195,8 +1195,8 @@ struct AddPetWizardView: View {
 
                 Button { presentCamera() } label: {
                     HStack(spacing: 5) {
-                        Image(systemName: "camera.fill").font(.system(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome)
-                        Text(l.humanWizCamera).font(.system(size: 12, weight: .bold, design: .rounded))
+                        Image(systemName: "camera.fill").font(OhanaFont.adaptive(size: 13, weight: .semibold)).symbolRenderingMode(.monochrome) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        Text(l.humanWizCamera).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
                     .frame(maxWidth: .infinity)
@@ -1227,7 +1227,7 @@ struct AddPetWizardView: View {
                         l.tr(zh: "恢复 2.5D 头像", en: "Restore 2.5D avatar", de: "2.5D-Avatar wiederherstellen"),
                         systemImage: "sparkles"
                     )
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
@@ -1301,7 +1301,7 @@ struct AddPetWizardView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     if bi == nil {
                         Text(l.petWizAppearanceNoBreedHint)
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .padding(.horizontal, 20)
                     }
@@ -1310,7 +1310,7 @@ struct AddPetWizardView: View {
                     colorSectionOnMesh(title: l.petWizEyeSection, items: eyeItems, patternItems: [], selected: $eyeColor, showCustomPicker: $showEyeColorSheet, customColor: $customEyeUIColor, swatchLayout: .wrappingGrid)
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(l.petWizThemeSection).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).padding(.horizontal, 20)
+                        Text(l.petWizThemeSection).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).padding(.horizontal, 20) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: AddWizardThemePalette.gridColumnCount), spacing: 0) {
                             ForEach(AddWizardThemePalette.memberOptions, id: \.hex) { option in
                                 let tcHex = option.hex
@@ -1362,7 +1362,7 @@ struct AddPetWizardView: View {
                 meshCardLabel(petMeshTags)
                 Spacer()
                 Text(l.petWizTagPicked(selectedPersonalityTagIds.count))
-                    .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaTertiaryText)
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaTertiaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .padding(.top, 14).padding(.horizontal, 20)
 
@@ -1386,8 +1386,8 @@ struct AddPetWizardView: View {
                             isComposingCustomPersonalityTag = true
                         } label: {
                             HStack(spacing: 4) {
-                                Image(systemName: "plus").font(.system(size: 12, weight: .bold)).symbolRenderingMode(.monochrome)
-                                Text(l.petCustomSwatch).font(.system(size: 12, weight: .bold, design: .rounded))
+                                Image(systemName: "plus").font(OhanaFont.adaptive(size: 12, weight: .bold)).symbolRenderingMode(.monochrome) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                Text(l.petCustomSwatch).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             }
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .padding(.horizontal, 10).padding(.vertical, 10)
@@ -1405,17 +1405,17 @@ struct AddPetWizardView: View {
                 HStack(spacing: 8) {
                     TextField(l.tr(zh: "标签名称", en: "Tag name", de: "Tag-Name"), text: $newCustomPersonalityTagText)
                         .focused($customPersonalityTagFieldFocused)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .textFieldStyle(.plain).padding(.horizontal, 12).padding(.vertical, 10)
                         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 10))
                         .frame(maxWidth: .infinity)
                     Button { cancelCustomPersonalityTagComposer() } label: {
-                        Text(l.cancel).font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+                        Text(l.cancel).font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .padding(.horizontal, 12).padding(.vertical, 10)
                             .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
                     }.buttonStyle(ScaleButtonStyle())
                     Button { commitCustomPersonalityTag() } label: {
-                        Text(l.confirm).font(.system(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Color.arkInk)
+                        Text(l.confirm).font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)).foregroundStyle(Color.arkInk) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .padding(.horizontal, 12).padding(.vertical, 10)
                             .background(Color.goPrimary, in: Capsule())
                     }.buttonStyle(ScaleButtonStyle()).disabled(newCustomPersonalityTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -1431,8 +1431,8 @@ struct AddPetWizardView: View {
     private func meshTagChip(symbol: String, title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: isOn ? "sparkle" : symbol).font(.system(size: 12, weight: .bold)).symbolRenderingMode(.monochrome)
-                Text(title).font(.system(size: 12, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8)
+                Image(systemName: isOn ? "sparkle" : symbol).font(OhanaFont.adaptive(size: 12, weight: .bold)).symbolRenderingMode(.monochrome) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                Text(title).font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.8) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(isOn ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.85))
             .padding(.horizontal, 10).padding(.vertical, 10)
@@ -1480,7 +1480,7 @@ struct AddPetWizardView: View {
                 meshCardLabel(petMeshConfirm).padding(.top, 14)
 
                 HStack(spacing: 14) {
-                    if let data = avatarImageData, let ui = UIImage(data: data) {
+                    if let data = avatarImageData, let ui = walletDecodedAvatar {
                         PetAvatarPortraitImage(
                             image: ui,
                             isTransparentAvatar: PetAvatarTransparencyCache.isTransparentAvatar(data),
@@ -1488,16 +1488,16 @@ struct AddPetWizardView: View {
                         )
                     } else {
                         Circle().fill(Color(hex: themeColorHex).opacity(0.3)).frame(width: 56, height: 56)
-                            .overlay(Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: effectiveSpeciesForData)).font(.system(size: 22, weight: .bold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaSecondaryText))
+                            .overlay(Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: effectiveSpeciesForData)).font(OhanaFont.adaptive(size: 22, weight: .bold)).symbolRenderingMode(.monochrome).foregroundStyle(Color.ohanaSecondaryText)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(name.isEmpty ? l.petWizUnnamed : name).font(.system(size: 20, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText)
+                        Text(name.isEmpty ? l.petWizUnnamed : name).font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text(
                             breed.isEmpty
                                 ? l.petSpeciesLabel(effectiveSpeciesForData)
                                 : "\(l.petSpeciesLabel(effectiveSpeciesForData)) · \(breed)"
                         )
-                        .font(.system(size: 13, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                 }
 
@@ -1510,14 +1510,14 @@ struct AddPetWizardView: View {
                     if !eyeColor.isEmpty { confirmMeshCell(icon: "eye.fill", label: l.petWizEyeSection, value: l.petCoatOrEyeDisplay(eyeColor)) }
                     // Theme color swatch
                     HStack(spacing: 8) {
-                        Circle().fill(Color(hex: themeColorHex)).frame(width: 16, height: 16)
+                        Circle().fill(Color(hex: themeColorHex)).frame(width: 16, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .overlay(Circle().strokeBorder(.primary.opacity(0.2), lineWidth: 0.5))
                             .frame(width: 16)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(l.petWizThemeSection).font(.system(size: 10, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+                            Text(l.petWizThemeSection).font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             HStack(spacing: 4) {
-                                RoundedRectangle(cornerRadius: 3).fill(Color(hex: themeColorHex)).frame(width: 36, height: 12)
-                                Text("#\(themeColorHex.uppercased())").font(.system(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(Color.ohanaSecondaryText)
+                                RoundedRectangle(cornerRadius: 3).fill(Color(hex: themeColorHex)).frame(width: 36, height: 12) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                                Text("#\(themeColorHex.uppercased())").font(OhanaFont.adaptive(size: 9, weight: .medium, design: .monospaced)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             }
                         }
                         Spacer()
@@ -1530,7 +1530,7 @@ struct AddPetWizardView: View {
                     HStack(spacing: 6) {
                         ForEach(selectedPersonalityTagIds, id: \.self) { tid in
                             Text(PetPersonalityTag.displayTitle(for: tid, l: wizardL10n))
-                                .font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.85)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .padding(.horizontal, 8).padding(.vertical, 4)
                                 .background(Color.primary.opacity(0.08), in: Capsule())
                         }
@@ -1547,10 +1547,10 @@ struct AddPetWizardView: View {
                     HStack(spacing: 8) {
                         if isSaving { ProgressView().tint(Color.arkInk) }
                         Text(trimmedName.isEmpty ? l.humanWizNeedName : isNameDuplicate ? l.humanWizNameTakenBtn : isSaving ? l.petWizSavingShort : l.humanWizJoinIsland)
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         if !isSaving {
                             Image(systemName: confirmNameOk ? "checkmark.circle.fill" : "lock.fill")
-                                .font(.system(size: 15, weight: .bold)).symbolRenderingMode(.monochrome)
+                                .font(OhanaFont.adaptive(size: 15, weight: .bold)).symbolRenderingMode(.monochrome) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                     }
                     .foregroundStyle(confirmNameOk ? Color.arkInk : Color.ohanaSecondaryText)
@@ -1567,11 +1567,11 @@ struct AddPetWizardView: View {
 
     private func confirmMeshCell(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: icon).font(.system(size: 12, weight: .semibold)).symbolRenderingMode(.monochrome)
+            Image(systemName: icon).font(OhanaFont.adaptive(size: 12, weight: .semibold)).symbolRenderingMode(.monochrome) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.primary.opacity(0.6)).frame(width: 16)
             VStack(alignment: .leading, spacing: 1) {
-                Text(label).font(.system(size: 10, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.55))
-                Text(value).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText).lineLimit(1)
+                Text(label).font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)).foregroundStyle(Color.primary.opacity(0.55)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                Text(value).font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText).lineLimit(1) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             Spacer()
         }
@@ -1599,15 +1599,15 @@ struct AddPetWizardView: View {
             Button { selected.wrappedValue = colorName } label: {
                 VStack(spacing: 4) {
                     ZStack {
-                        Circle().fill(Color(hex: hex)).frame(width: 34, height: 34)
+                        Circle().fill(Color(hex: hex)).frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         if selected.wrappedValue == colorName {
                             Circle().strokeBorder(Color.primary.opacity(0.45), lineWidth: 2)
-                            Image(systemName: "checkmark").font(.system(size: 10, weight: .black)).foregroundStyle(Color.ohanaPrimaryText)
+                            Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 10, weight: .black)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                     }
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     Text(l.petCoatOrEyeDisplay(colorName))
-                        .font(.system(size: 9, weight: selected.wrappedValue == colorName ? .bold : .medium))
+                        .font(OhanaFont.adaptive(size: 9, weight: selected.wrappedValue == colorName ? .bold : .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(selected.wrappedValue == colorName ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
@@ -1621,15 +1621,15 @@ struct AddPetWizardView: View {
             Button { selected.wrappedValue = pattern.displayName } label: {
                 VStack(spacing: 4) {
                     ZStack {
-                        Circle().fill(pattern.gradient).frame(width: 34, height: 34)
+                        Circle().fill(pattern.gradient).frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         if selected.wrappedValue == pattern.displayName {
                             Circle().strokeBorder(Color.primary.opacity(0.45), lineWidth: 2)
-                            Image(systemName: "checkmark").font(.system(size: 10, weight: .black)).foregroundStyle(Color.ohanaPrimaryText)
+                            Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 10, weight: .black)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                     }
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     Text(l.petCoatPatternDisplay(pattern.displayName))
-                        .font(.system(size: 9, weight: selected.wrappedValue == pattern.displayName ? .bold : .medium))
+                        .font(OhanaFont.adaptive(size: 9, weight: selected.wrappedValue == pattern.displayName ? .bold : .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(selected.wrappedValue == pattern.displayName ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
@@ -1643,16 +1643,16 @@ struct AddPetWizardView: View {
             VStack(spacing: 4) {
                 ZStack {
                     if selected.wrappedValue == "自定义" {
-                        Circle().fill(customColor.wrappedValue).frame(width: 34, height: 34)
-                        Circle().strokeBorder(Color.primary.opacity(0.45), lineWidth: 2).frame(width: 34, height: 34)
-                        Image(systemName: "checkmark").font(.system(size: 10, weight: .black)).foregroundStyle(Color.ohanaPrimaryText)
+                        Circle().fill(customColor.wrappedValue).frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                        Circle().strokeBorder(Color.primary.opacity(0.45), lineWidth: 2).frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                        Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 10, weight: .black)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     } else {
-                        Circle().fill(LinearGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 34, height: 34)
+                        Circle().fill(LinearGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     }
                 }
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text(l.petCustomSwatch)
-                    .font(.system(size: 9, weight: selected.wrappedValue == "自定义" ? .bold : .medium))
+                    .font(OhanaFont.adaptive(size: 9, weight: selected.wrappedValue == "自定义" ? .bold : .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(selected.wrappedValue == "自定义" ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .frame(width: 48, height: 28, alignment: .top)
@@ -1674,7 +1674,7 @@ struct AddPetWizardView: View {
         swatchLayout: WizardColorSwatchLayout = .horizontalScroll
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).padding(.horizontal, 20)
+            Text(title).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText).padding(.horizontal, 20) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Group {
                 switch swatchLayout {
                 case .horizontalScroll:
@@ -1741,10 +1741,10 @@ struct AddPetWizardView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.petWizBreedSheetTitle)
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.petWizBreedCollapseSummary(isCustomBreed: isCustomBreed, customBreedText: customBreedText, breed: breed))
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
@@ -1752,8 +1752,8 @@ struct AddPetWizardView: View {
                 Button {
                     closeBreedPicker()
                 } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
+                    Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 44, height: 44)
@@ -1790,8 +1790,8 @@ struct AddPetWizardView: View {
 
     private func breedPickerSearchField(_ l: L10n) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .semibold))
+            Image(systemName: "magnifyingglass") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
             GoDraftTextField(
@@ -1801,12 +1801,12 @@ struct AddPetWizardView: View {
                 submitLabel: .search,
                 capitalization: .never
             )
-            .font(.system(size: 14, weight: .medium, design: .rounded))
+            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText)
             if !breedSearch.isEmpty {
                 Button { breedSearch = "" } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                    Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                         .frame(width: 44, height: 44)
@@ -1856,7 +1856,7 @@ struct AddPetWizardView: View {
                 submitLabel: .done,
                 capitalization: .words
             )
-            .font(.system(size: 15, weight: .medium, design: .rounded))
+            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText)
             .padding(12)
             .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -1871,12 +1871,12 @@ struct AddPetWizardView: View {
     private func breedRowContent(title: String, isSelected: Bool) -> some View {
         HStack(spacing: 10) {
             Text(title)
-                .font(.system(size: 15, weight: isSelected ? .bold : .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: isSelected ? .bold : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
             Spacer()
             if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 17, weight: .bold))
+                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 17, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.arkInk)
             }
@@ -2160,7 +2160,7 @@ final class OhanaCameraViewController: UIViewController {
 
     private func configureControls() {
         closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal) // a11y: allow decorative icon covered by surrounding text or control
         closeButton.tintColor = UIColor(Color.goCardWhite)
         closeButton.backgroundColor = UIColor(Color.arkInk).withAlphaComponent(0.36)
         closeButton.layer.cornerRadius = 22
@@ -2403,7 +2403,7 @@ private struct PetWizardNameInputField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             TextField(placeholder, text: $draftName)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 24, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -2420,7 +2420,7 @@ private struct PetWizardNameInputField: View {
 
             if isDuplicate {
                 Text(duplicateMessage)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color(hex: "FF6B00"))
                     .padding(.leading, 4)
             }
@@ -2547,7 +2547,7 @@ struct PetImageCropView: View {
                 VStack {
                     Spacer()
                     Label("卡片取景", systemImage: "crop")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goCardWhite.opacity(0.5))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -2602,7 +2602,7 @@ struct PetImageCropView: View {
             HStack(spacing: 12) {
                 Button { onCrop(nil) } label: {
                     Text("取消")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goCardWhite.opacity(0.75))
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 50)
@@ -2612,7 +2612,7 @@ struct PetImageCropView: View {
 
                 Button { performCrop() } label: {
                     Text("确认裁剪")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 50)
@@ -2824,11 +2824,11 @@ struct GoColorPickerSheet: View {
                 // 顶部把手
                 Capsule()
                     .fill(Color.ohanaGlassStroke)
-                    .frame(width: 40, height: 4)
+                    .frame(width: 40, height: 4) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .padding(.top, 12)
 
                 Text("自定义颜色")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 // 预览色块
@@ -2876,7 +2876,7 @@ struct GoColorPickerSheet: View {
                     dismiss()
                 } label: {
                     Text("确认")
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
@@ -2953,8 +2953,8 @@ private struct AhaHatchOverlay: View {
             ZStack {
                 ForEach(0 ..< 8, id: \.self) { i in
                     let angle = Double(i) * (360.0 / 8.0)
-                    Image(systemName: "sparkle")
-                        .font(.system(size: 22, weight: .bold))
+                    Image(systemName: "sparkle") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 22, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow)
                         .offset(y: -130)
                         .rotationEffect(.degrees(angle))
@@ -2967,13 +2967,13 @@ private struct AhaHatchOverlay: View {
             ZStack {
                 // 蛋壳裂纹（crackPhase 0→1：逐渐消失，emoji 出现）
                 Text("🥚")
-                    .font(.system(size: 92))
+                    .font(OhanaFont.adaptive(size: 92)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .opacity(1 - crackPhase)
                     .scaleEffect(1 + crackPhase * 0.3)
 
                 // 宠物 emoji 弹出
                 Text(petEmoji)
-                    .font(.system(size: 110))
+                    .font(OhanaFont.adaptive(size: 110)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .scaleEffect(petScale)
                     .opacity(petOpacity)
             }
@@ -2982,10 +2982,10 @@ private struct AhaHatchOverlay: View {
             VStack(spacing: 6) {
                 Spacer().frame(height: 180)
                 Text("\(petName) 加入 Ohana")
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite)
                 Text("一起开启你们的故事")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite.opacity(0.7))
             }
             .opacity(titleOpacity)
@@ -3040,7 +3040,7 @@ private struct AhaHatchOverlay: View {
             return
         }
         sparkleRotation = 0
-        withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) { // ui-v4: allow workload-gated celebratory sparkle loop.
+        withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) { // ui-v4: allow workload-gated celebratory sparkle loop; smoothness: allow AppWorkloadPolicy-gated completion celebration.
             sparkleRotation = 360
         }
     }

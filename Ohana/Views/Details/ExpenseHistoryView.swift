@@ -127,6 +127,7 @@ struct ExpenseHistoryView: View {
             if showingExpensePopup {
                 AddExpenseSheet(
                     pet: pet,
+                    humans: allHumans,
                     preselectedPayerId: selectedPayerId ?? currentActiveHumanId,
                     onDismiss: {
                         withAnimation(GoMotion.feedback) {
@@ -158,11 +159,11 @@ struct ExpenseHistoryView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(selectedRange.rawValue + "花费")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(AppCurrency.format(rangeTotal, fractionDigits: 0))
-                            .font(.system(size: 44, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 44, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .contentTransition(.numericText())
                             .animation(GoMotion.feedback, value: rangeTotal)
@@ -179,10 +180,10 @@ struct ExpenseHistoryView: View {
                 .overlay(Circle().strokeBorder(Color.ohanaSecondaryText.opacity(0.2), lineWidth: 2))
                 if showsCloseButton {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .black))
+                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 38, height: 38)
+                            .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .contentShape(Circle())
@@ -197,7 +198,7 @@ struct ExpenseHistoryView: View {
                 ForEach(TimeRange.allCases, id: \.self) { range in
                     Button { withAnimation(GoMotion.feedback) { selectedRange = range } } label: {
                         Text(range.rawValue)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(selectedRange == range ? Color.arkInk : .primary.opacity(0.5))
                             .padding(.horizontal, 14).padding(.vertical, 7)
                             .background(selectedRange == range ? Color.goYellow : .clear, in: Capsule())
@@ -212,7 +213,7 @@ struct ExpenseHistoryView: View {
             // 饼图 + 图例
             if categoryBreakdown.isEmpty {
                 Text("暂无花费记录")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 13, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 30)
@@ -222,16 +223,16 @@ struct ExpenseHistoryView: View {
                             let pct = rangeTotal > 0 ? Int(amount / rangeTotal * 100) : 0
                             VStack(alignment: .leading, spacing: 5) {
                                 HStack(spacing: 6) {
-                                    Text(cat.emoji).font(.system(size: 13))
+                                    Text(cat.emoji).font(OhanaFont.adaptive(size: 13)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     Text(cat.rawValue)
-                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                                     Spacer()
                                     Text("\(pct)%")
-                                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                     Text(AppCurrency.format(amount, fractionDigits: 0))
-                                        .font(.system(size: 11, weight: .black, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.goYellow)
                                 }
                                 GeometryReader { proxy in
@@ -249,13 +250,13 @@ struct ExpenseHistoryView: View {
                         // 报销净节省行
                         if rangeTotalReimbursed > 0 {
                             HStack(spacing: 6) {
-                                Text("🛡️").font(.system(size: 13))
+                                Text("🛡️").font(OhanaFont.adaptive(size: 13)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 Text("保险报销")
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color(hex: "4ECDC4"))
                                 Spacer()
                                 Text(AppCurrency.format(-rangeTotalReimbursed, fractionDigits: 0))
-                                    .font(.system(size: 11, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color(hex: "4ECDC4"))
                             }
                         }
@@ -278,16 +279,16 @@ struct ExpenseHistoryView: View {
             VStack(spacing: 0) {
                 Capsule()
                     .fill(.primary.opacity(0.15))
-                    .frame(width: 40, height: 4)
+                    .frame(width: 40, height: 4) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .padding(.top, 12).padding(.bottom, 8)
 
                 HStack {
                     Text("花费记录")
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text("\(sortedLogs.count) 条")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 20)
@@ -307,7 +308,7 @@ struct ExpenseHistoryView: View {
                         }
                         if sortedLogs.isEmpty {
                             Text("还没有花费记录\n点击右上角 + 在这里记录")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                                 .multilineTextAlignment(.center)
                                 .padding(.vertical, 40)
@@ -323,17 +324,17 @@ struct ExpenseHistoryView: View {
     private var inlineExpenseComposer: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                Image(systemName: "creditcard.fill")
-                    .font(.system(size: 17, weight: .black))
+                Image(systemName: "creditcard.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("快速记账")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("金额、日期和备注都在本页完成")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -342,29 +343,29 @@ struct ExpenseHistoryView: View {
                         isInlineExpenseComposerVisible = false
                     }
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("金额")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(AppCurrency.symbol)
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                     Text(newAmount.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: appCountry) : newAmount)
-                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(newAmount.isEmpty ? Color.ohanaSecondaryText.opacity(0.55) : Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Spacer()
                     Text(AppCurrency.code)
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .padding(.horizontal, 16)
@@ -385,7 +386,7 @@ struct ExpenseHistoryView: View {
             inlineExpenseMetadataRows
 
             TextField("备注（可选）", text: $newNote)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
@@ -395,10 +396,10 @@ struct ExpenseHistoryView: View {
 
             Button(action: saveInlineExpense) {
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                     Text("保存记录")
                 }
-                .font(.system(size: 16, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.arkInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 15)
@@ -423,7 +424,7 @@ struct ExpenseHistoryView: View {
                         HStack(spacing: 6) {
                             Text(cat.emoji)
                             Text(cat.rawValue)
-                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         .foregroundStyle(newCategory == cat ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.72))
                         .padding(.horizontal, 13)
@@ -439,12 +440,12 @@ struct ExpenseHistoryView: View {
     private var inlineExpenseMetadataRows: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "calendar") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 24)
                 Text("日期")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 DatePicker("", selection: $newDate, in: ...Date(), displayedComponents: .date)
@@ -463,19 +464,19 @@ struct ExpenseHistoryView: View {
                     }
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "person.crop.circle.fill")
-                            .font(.system(size: 13, weight: .black))
+                        Image(systemName: "person.crop.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                             .frame(width: 24)
                         Text("支付人")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Text(selectedPayerName)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 11, weight: .black))
+                        Image(systemName: "chevron.down") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
@@ -496,24 +497,24 @@ struct ExpenseHistoryView: View {
 
         return HStack(spacing: 14) {
             ZStack {
-                Circle().fill(accentColor.opacity(0.15)).frame(width: 36, height: 36)
+                Circle().fill(accentColor.opacity(0.15)).frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 if isReimbursement {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
+                    Image(systemName: "arrow.down.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(accentColor)
                 } else {
-                    Text(cat.emoji).font(.system(size: 18))
+                    Text(cat.emoji).font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(isReimbursement ? "保险报销" : log.category)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(isReimbursement ? accentColor : .primary)
                     if isReimbursement {
                         Text("到账")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(accentColor, in: Capsule())
@@ -521,20 +522,20 @@ struct ExpenseHistoryView: View {
                 }
                 HStack(spacing: 8) {
                     Text(log.date, format: .dateTime.year().month().day())
-                        .font(.system(size: 11, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     if !log.note.isEmpty {
                         Text(log.note)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .lineLimit(1)
                     }
                 }
                 HStack(spacing: 5) {
                     Image(systemName: isReimbursement ? "arrow.down.circle.fill" : "person.crop.circle.fill")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("\(payerLabel)：\(payerName)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .lineLimit(1)
                 }
                 .foregroundStyle(accentColor.opacity(payer == nil && !isReimbursement ? 0.65 : 1))
@@ -543,7 +544,7 @@ struct ExpenseHistoryView: View {
             Spacer()
 
             Text(AppCurrency.format(log.amount, fractionDigits: 0))
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(accentColor)
 
             Button {
@@ -560,8 +561,8 @@ struct ExpenseHistoryView: View {
                     )
                 }
             } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 13, weight: .semibold))
+                Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             }
         }

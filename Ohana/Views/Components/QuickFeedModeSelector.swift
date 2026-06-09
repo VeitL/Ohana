@@ -34,9 +34,9 @@ struct QuickFeedModeSelector: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: mode.feedIconName)
-                    .font(.system(size: 10, weight: .black))
+                    .font(OhanaFont.adaptive(size: 10, weight: .black))
                 Text(mode.feedShortTitle(localization))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
             }

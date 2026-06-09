@@ -241,20 +241,20 @@ struct IslandExpenseDashboard: View {
     private var navBar: some View {
         HStack {
             Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .bold))
+                Image(systemName: "chevron.left").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
 
             Spacer()
             Text(l.tr(zh: "花费星球", en: "Expense Planet", de: "Ausgabenplanet"))
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
-            Color.clear.frame(width: 36, height: 36)
+            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
         }
         .padding(.top, 50)
     }
@@ -266,8 +266,8 @@ struct IslandExpenseDashboard: View {
                     Circle()
                         .fill(Color.goPrimary.opacity(0.16))
                         .frame(width: 56, height: 56)
-                    Image(systemName: "creditcard.fill")
-                        .font(.system(size: 24, weight: .black))
+                    Image(systemName: "creditcard.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 24, weight: .black))
                         .foregroundStyle(Color.goPrimary)
                 }
 
@@ -277,7 +277,7 @@ struct IslandExpenseDashboard: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                     HStack(alignment: .lastTextBaseline, spacing: 8) {
                         Text(AppCurrency.format(totalAmount, fractionDigits: 0))
-                            .font(.system(size: 38, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 38, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .ohanaNumericMotion(totalAmount)
                         if let periodDelta {
@@ -422,8 +422,8 @@ struct IslandExpenseDashboard: View {
 
     private var reimbursementStrip: some View {
         HStack(spacing: 10) {
-            Image(systemName: "arrow.uturn.backward.circle.fill")
-                .font(.system(size: 15, weight: .black))
+            Image(systemName: "arrow.uturn.backward.circle.fill").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 15, weight: .black))
                 .foregroundStyle(Color(hex: "06B6D4"))
             Text(l.tr(zh: "已记录报销", en: "Refunds logged", de: "Erstattungen erfasst"))
                 .font(OhanaFont.caption(.black))
@@ -460,8 +460,8 @@ struct IslandExpenseDashboard: View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
                 Text(avatar)
-                    .font(.system(size: 24))
-                    .frame(width: 42, height: 42)
+                    .font(OhanaFont.adaptive(size: 24))
+                    .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(tint.opacity(0.16), in: Circle())
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -513,11 +513,11 @@ struct IslandExpenseDashboard: View {
         let tint = isUp ? Color.goRed : Color.goTeal
         return HStack(spacing: 4) {
             Image(systemName: isUp ? "arrow.up.right" : "arrow.down.right")
-                .font(.system(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .black))
             Text(AppCurrency.format(abs(delta), fractionDigits: 0))
                 .ohanaNumericMotion(delta)
         }
-        .font(.system(size: 11, weight: .black, design: .rounded))
+        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
         .foregroundStyle(tint)
         .padding(.horizontal, 8)
         .frame(height: 24)
@@ -527,14 +527,14 @@ struct IslandExpenseDashboard: View {
     private func miniMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaTertiaryText)
                 Text(value)
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
@@ -545,15 +545,15 @@ struct IslandExpenseDashboard: View {
     private func statBadge(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion(value)
                 Text(title)
-                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
         }
@@ -563,7 +563,7 @@ struct IslandExpenseDashboard: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .black))
+                .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text(text)
                 .font(OhanaFont.caption(.semibold))

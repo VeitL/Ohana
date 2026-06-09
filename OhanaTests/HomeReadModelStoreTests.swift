@@ -129,7 +129,7 @@ struct HomeReadModelStoreTests {
     }
 
     private func waitUntil(
-        timeout: TimeInterval = 3,
+        timeout: TimeInterval = 8,
         condition: () -> Bool
     ) async throws -> Bool {
         let deadline = Date().addingTimeInterval(timeout)

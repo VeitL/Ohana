@@ -344,7 +344,7 @@ struct AddHumanWizardView: View {
 
     private func meshCardLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
             .foregroundStyle(Color.primary.opacity(0.6))
             .tracking(0.8)
             .textCase(.uppercase)
@@ -397,7 +397,7 @@ struct AddHumanWizardView: View {
                 submitLabel: .done,
                 capitalization: .words
             )
-            .font(.system(size: 27, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 27, weight: .black, design: .rounded))
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.ohanaPrimaryText)
             .padding(.vertical, 15).padding(.horizontal, 14)
@@ -415,7 +415,7 @@ struct AddHumanWizardView: View {
             .transaction { $0.animation = nil }
             if isNameDuplicate {
                 Text(l.humanWizDupNameInline)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(hex: "FF6B00"))
                     .padding(.leading, 4)
             }
@@ -445,10 +445,10 @@ struct AddHumanWizardView: View {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(birthday.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted)))
-                            .font(.system(size: 20, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(Human.westernZodiacDisplay(for: birthday, l: l))
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goPrimary)
                     }
                     Spacer()
@@ -481,7 +481,7 @@ struct AddHumanWizardView: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
                             Text(bt)
-                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                                 .foregroundStyle(bloodType == bt ? Color.arkInk : Color.ohanaPrimaryText)
                                 .frame(maxWidth: .infinity)
                                 .frame(minHeight: 44)
@@ -513,11 +513,11 @@ struct AddHumanWizardView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Text(mbti.isEmpty ? l.humanWizSkipChip : mbti)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10, weight: .black))
+                        Image(systemName: "chevron.down").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 10, weight: .black))
                     }
                     .foregroundStyle(mbti.isEmpty ? Color.ohanaSecondaryText : Color.arkInk)
                     .frame(maxWidth: .infinity)
@@ -574,7 +574,7 @@ struct AddHumanWizardView: View {
                                 l.tr(zh: "恢复 2.5D 头像", en: "Restore 2.5D avatar", de: "2.5D-Avatar wiederherstellen"),
                                 systemImage: "sparkles"
                             )
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 11)
@@ -617,7 +617,7 @@ struct AddHumanWizardView: View {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             } label: {
                                 Text(l.humanWizSkipChip)
-                                    .font(.system(size: 13, weight: nationalityCountry.isEmpty ? .bold : .medium, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: nationalityCountry.isEmpty ? .bold : .medium, design: .rounded))
                                     .foregroundStyle(nationalityCountry.isEmpty ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75))
                                     .padding(.horizontal, 12).padding(.vertical, 7)
                                     .frame(minHeight: 44)
@@ -633,7 +633,7 @@ struct AddHumanWizardView: View {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 } label: {
                                     Text(country)
-                                        .font(.system(size: 13, weight: nationalityCountry == country ? .bold : .medium, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 13, weight: nationalityCountry == country ? .bold : .medium, design: .rounded))
                                         .foregroundStyle(nationalityCountry == country ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75))
                                         .padding(.horizontal, 12).padding(.vertical, 7)
                                         .frame(minHeight: 44)
@@ -660,7 +660,7 @@ struct AddHumanWizardView: View {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             } label: {
                                 Text(l.humanWizSkipChip)
-                                    .font(.system(size: 13, weight: residenceCountry.isEmpty && residenceCity.isEmpty ? .bold : .medium, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: residenceCountry.isEmpty && residenceCity.isEmpty ? .bold : .medium, design: .rounded))
                                     .foregroundStyle(residenceCountry.isEmpty && residenceCity.isEmpty ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75))
                                     .padding(.horizontal, 12).padding(.vertical, 7)
                                     .frame(minHeight: 44)
@@ -684,7 +684,7 @@ struct AddHumanWizardView: View {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 } label: {
                                     Text(country)
-                                        .font(.system(size: 13, weight: residenceCountry == country ? .bold : .medium, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 13, weight: residenceCountry == country ? .bold : .medium, design: .rounded))
                                         .foregroundStyle(residenceCountry == country ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75))
                                         .padding(.horizontal, 12).padding(.vertical, 7)
                                         .frame(minHeight: 44)
@@ -712,7 +712,7 @@ struct AddHumanWizardView: View {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 } label: {
                                     Text(l.humanResidenceCityOther(city))
-                                        .font(.system(size: 13, weight: residenceCity == city && !isCustomResidenceCity ? .bold : .medium, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 13, weight: residenceCity == city && !isCustomResidenceCity ? .bold : .medium, design: .rounded))
                                         .foregroundStyle(
                                             (residenceCity == city && !isCustomResidenceCity) || (city == "其他" && isCustomResidenceCity)
                                                 ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.75)
@@ -736,7 +736,7 @@ struct AddHumanWizardView: View {
                                 submitLabel: .done,
                                 capitalization: .words
                             )
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .padding(12)
                             .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -749,8 +749,8 @@ struct AddHumanWizardView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     cardSectionLabel(l.humanWizNotesLabel)
                     HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "note.text")
-                            .font(.system(size: 16, weight: .semibold))
+                        Image(systemName: "note.text").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .padding(.top, 2)
                         GoDraftTextField(
@@ -760,7 +760,7 @@ struct AddHumanWizardView: View {
                             commitDelayNanoseconds: 220_000_000,
                             submitLabel: .done
                         )
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2 ... 3)
                         .transaction { $0.animation = nil }
@@ -886,9 +886,9 @@ struct AddHumanWizardView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Text(trimmedName.isEmpty ? l.humanWizNeedName : isNameDuplicate ? l.humanWizNameTakenBtn : !isGenderReady ? l.humanWizNeedGender : l.humanWizJoinIsland)
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                         Image(systemName: confirmOk ? "checkmark.circle.fill" : "lock.fill")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 15, weight: .bold))
                             .symbolRenderingMode(.monochrome)
                     }
                     .foregroundStyle(confirmOk ? Color.arkInk : Color.ohanaSecondaryText)
@@ -922,7 +922,7 @@ struct AddHumanWizardView: View {
                     .frame(maxWidth: .infinity)
                     .clipped()
                 Text(l.humanGenderDisplay(opt.key))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -960,9 +960,9 @@ struct AddHumanWizardView: View {
                 ZStack {
                     Circle()
                         .fill(wizardAccent)
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "person.text.rectangle.fill")
-                        .font(.system(size: 17, weight: .black))
+                        .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                    Image(systemName: "person.text.rectangle.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 17, weight: .black))
                         .foregroundStyle(Color.arkInk)
                         .symbolEffect(.bounce, value: wizardPageIndex)
                 }
@@ -972,7 +972,7 @@ struct AddHumanWizardView: View {
                         en: "Create your own profile first",
                         de: "Erstelle zuerst dein Profil"
                     ))
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.78)
@@ -981,7 +981,7 @@ struct AddHumanWizardView: View {
                         en: "This becomes the owner card for this device.",
                         de: "Das wird die Besitzerkarte dieses Geräts."
                     ))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
@@ -1010,7 +1010,7 @@ struct AddHumanWizardView: View {
 
     private func firstSelfProfileChip(icon: String, title: String) -> some View {
         Label(title, systemImage: icon)
-            .font(.system(size: 10, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
             .lineLimit(1)
             .minimumScaleFactor(0.75)
             .foregroundStyle(Color.ohanaPrimaryText)
@@ -1046,11 +1046,11 @@ struct AddHumanWizardView: View {
                         .frame(width: 52, height: 52)
                     Circle()
                         .fill(Color.goCardWhite.opacity(0.86))
-                        .frame(width: 15, height: 15)
+                        .frame(width: 15, height: 15) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .offset(x: 9, y: -9)
                     Circle()
                         .fill(Color.goCardWhite.opacity(0.32))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .offset(x: -7, y: 8)
                 }
                 .shadow(color: memberThemeColor.opacity(0.24), radius: 16, x: 0, y: 10) // ui-v4: allow selected member theme preview glow.
@@ -1058,7 +1058,7 @@ struct AddHumanWizardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     cardSectionLabel(l.humanWizThemeLabel)
                     Text(l.humanThemeSwatchLabel(selectedThemeOption.label))
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .contentTransition(.opacity)
                 }
@@ -1164,15 +1164,15 @@ struct AddHumanWizardView: View {
     ) -> some View {
         HStack(spacing: 9) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .bold))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold))
                 .foregroundStyle(iconColor)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(value)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -1181,8 +1181,8 @@ struct AddHumanWizardView: View {
             Menu {
                 menuContent()
             } label: {
-                Image(systemName: "chevron.down.circle.fill")
-                    .font(.system(size: 16, weight: .bold))
+                Image(systemName: "chevron.down.circle.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold))
                     .foregroundStyle(wizardAccent)
             }
         }
@@ -1195,17 +1195,17 @@ struct AddHumanWizardView: View {
     /// 卡内小节标题（与 `AddPetWizardView` 卡内 `Text(…).foregroundStyle(Color.ohanaSecondaryText)` 同级）
     private func cardSectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
             .foregroundStyle(Color.ohanaSecondaryText)
     }
 
     private func avatarActionButton(icon: String, label: String, accent: Color = Color.goPrimary) -> some View {
         VStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(accent)
             Text(label)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.65))
         }
         .frame(maxWidth: .infinity)
@@ -1272,20 +1272,20 @@ struct AddHumanWizardView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
                     .foregroundStyle(isActive ? Color.arkInk : iconColor)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(isActive ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
                     Text(text.wrappedValue.isEmpty ? placeholder : text.wrappedValue)
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(isActive ? Color.arkInk : text.wrappedValue.isEmpty ? Color.ohanaSecondaryText.opacity(0.45) : Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                 }
                 Text(unit)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(isActive ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
             }
             .padding(12)
@@ -1309,11 +1309,11 @@ struct AddHumanWizardView: View {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 7) {
                     Image(systemName: systemImage)
-                        .font(.system(size: 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(binding.wrappedValue ? Color.ohanaSecondaryText : Color.goPrimary)
                         .frame(width: 18)
                     Text(title)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.68)
@@ -1356,7 +1356,7 @@ struct AddHumanWizardView: View {
                     in: Capsule()
                 )
         }
-        .font(.system(size: 10, weight: .black, design: .rounded))
+        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
         .padding(3)
         .background(Color.ohanaCardSurface, in: Capsule())
         .overlay(
@@ -1368,9 +1368,9 @@ struct AddHumanWizardView: View {
 
     private func privacyRow(_ title: String, emoji: String, binding: Binding<Bool>) -> some View {
         HStack(spacing: 12) {
-            Text(emoji).font(.system(size: 20)).frame(width: 28)
+            Text(emoji).font(OhanaFont.adaptive(size: 20)).frame(width: 28)
             Text(title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Toggle("", isOn: binding)
@@ -1388,23 +1388,23 @@ struct AddHumanWizardView: View {
         return Button { role = normalizedKey; UIImpactFeedbackGenerator(style: .light).impactOccurred() } label: {
             HStack(spacing: 9) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(isSelected ? Color.arkInk : wizardAccent)
-                    .frame(width: 24, height: 24)
+                    .frame(width: 24, height: 24) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                     Text(desc)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle((isSelected ? Color.arkInk : Color.ohanaSecondaryText).opacity(0.72))
                         .lineLimit(1)
                         .minimumScaleFactor(0.68)
                 }
                 Spacer(minLength: 0)
                 if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .black))
+                    Image(systemName: "checkmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.arkInk)
                 }
             }
@@ -1593,7 +1593,7 @@ struct AddHumanWizardView: View {
         }
         let snap = data
         Task.detached(priority: .utility) {
-            let img = UIImage(data: snap).map { AddPetWizardView.downsample($0, maxDim: 900) }
+            let img = UIImage(data: snap).map { AddPetWizardView.downsample($0, maxDim: 900) } // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
             let transparent = ImageCutoutService.isTransparentPNG(snap)
             await MainActor.run {
                 guard avatarImageData == snap else { return }
@@ -1706,7 +1706,7 @@ private struct HumanGenderAvatarPreview: View {
             let requestedBirthday = birthday
             let decoded = await Task.detached(priority: .utility) {
                 HumanAvatarAssetCatalog.avatarData(gender: requestedGender, birthday: requestedBirthday)
-                    .flatMap { UIImage(data: $0) }
+                    .flatMap { UIImage(data: $0) } // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                     .map { AddPetWizardView.downsample($0, maxDim: 260) }
             }.value
             guard !Task.isCancelled else { return }
@@ -1726,14 +1726,14 @@ private struct FlowTagRow: View {
     var body: some View {
         if tags.isEmpty {
             Text(emptyHint)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(tags, id: \.self) { tag in
                         Text(tag)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(accent)
                             .padding(.horizontal, 12).padding(.vertical, 5)
                             .background(accent.opacity(0.15), in: Capsule())

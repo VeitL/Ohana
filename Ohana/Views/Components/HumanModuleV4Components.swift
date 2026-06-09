@@ -58,8 +58,8 @@ struct HumanModulePageHeader<Trailing: View>: View {
 
             if showsCloseButton {
                 Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .black))
+                    Image(systemName: "xmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 15, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -105,8 +105,8 @@ struct HumanModulePrivacyLockedView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 34, weight: .black))
+            Image(systemName: "lock.shield.fill").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 34, weight: .black))
                 .foregroundStyle(Color.goYellow)
             Text(title)
                 .font(OhanaFont.title3(.black))
@@ -137,7 +137,7 @@ struct HumanModuleFloatingActionButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                 Text(title)
                     .font(OhanaFont.callout(.black))
             }

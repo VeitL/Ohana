@@ -39,7 +39,6 @@ struct WalkRouteTracePreview: View {
                         Color.goPrimary,
                         style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
                     )
-                    .shadow(color: Color.goPrimary.opacity(0.28), radius: 6)
                 }
 
                 if let start = points.first {
@@ -52,10 +51,11 @@ struct WalkRouteTracePreview: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(alignment: .bottomTrailing) {
                 HStack(spacing: 4) {
-                    Image(systemName: "map.fill")
-                        .font(.system(size: 11, weight: .bold))
+                    Image(systemName: "map.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.caption2(.bold))
+                        .accessibilityHidden(true)
                     Text(title)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.caption2(.bold))
                 }
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(.horizontal, 10)

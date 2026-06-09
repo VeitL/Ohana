@@ -1,18 +1,13 @@
 import SwiftUI
-import SwiftData
 
 struct FunctionMenuRootView: View {
     let appLanguage: String
     let onSelect: (FMDest) -> Void
     let onClose: () -> Void
-
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-    @Query(sort: \Human.name) private var humans: [Human]
-    @Query(sort: \Plant.createdAt) private var plants: [Plant]
+    let pets: [Pet]
+    let humans: [Human]
 
     @State private var treeManager = OasisTreeManager.shared
-    @State private var lockedStatus: GrowthUnlockStatus?
-    @State private var ruleStatus: GrowthUnlockStatus?
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome } }
@@ -37,11 +32,6 @@ struct FunctionMenuRootView: View {
                         isCompact: true
                     )
 
-                    if let lockedStatus {
-                        lockedCallout(lockedStatus)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-
                     VStack(alignment: .leading, spacing: 10) {
                         sectionHeader(
                             icon: "square.grid.2x2.fill",
@@ -51,44 +41,36 @@ struct FunctionMenuRootView: View {
 
                         LazyVGrid(columns: columns, spacing: 10) {
                             ForEach(functionMenuGroups, id: \.self) { group in
-                                let unlock = GrowthUnlockPolicy.status(for: group, currentLevel: currentTreeLevel)
                                 menuTile(
                                     icon: group.icon,
                                     iconColor: group.color,
                                     title: group.title,
                                     status: compactSubtitle(for: subtitle(for: group)),
-                                    unlockStatus: unlock,
-                                    onInfo: {
-                                        presentUnlockRules(unlock)
-                                    }
                                 ) {
-                                    select(.featureGroup(group), unlock: unlock)
+                                    select(.featureGroup(group))
                                 }
                             }
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        sectionHeader(
-                            icon: "wrench.and.screwdriver.fill",
-                            title: l.tr(zh: "工具", en: "Tools", de: "Tools"),
-                            label: "TOOLS"
-                        )
+                    if !toolEntries.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            sectionHeader(
+                                icon: "wrench.and.screwdriver.fill",
+                                title: l.tr(zh: "工具", en: "Tools", de: "Tools"),
+                                label: "TOOLS"
+                            )
 
-                        LazyVGrid(columns: columns, spacing: 10) {
-                            ForEach(toolEntries) { entry in
-                                let unlock = GrowthUnlockPolicy.status(for: entry.destination, currentLevel: currentTreeLevel)
-                                menuTile(
-                                    icon: entry.icon,
-                                    iconColor: entry.color,
-                                    title: entry.title,
-                                    status: compactSubtitle(for: entry.subtitle),
-                                    unlockStatus: unlock,
-                                    onInfo: {
-                                        presentUnlockRules(unlock)
+                            LazyVGrid(columns: columns, spacing: 10) {
+                                ForEach(toolEntries) { entry in
+                                    menuTile(
+                                        icon: entry.icon,
+                                        iconColor: entry.color,
+                                        title: entry.title,
+                                        status: compactSubtitle(for: entry.subtitle),
+                                    ) {
+                                        select(entry.destination)
                                     }
-                                ) {
-                                    select(entry.destination, unlock: unlock)
                                 }
                             }
                         }
@@ -98,23 +80,14 @@ struct FunctionMenuRootView: View {
                 .padding(.bottom, 30)
             }
         }
-        .sheet(item: $ruleStatus) { status in
-            GrowthUnlockRulesSheet(
-                status: status,
-                appLanguage: appLanguage,
-                onClose: { ruleStatus = nil }
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
     }
 
     private var rootHeader: some View {
         HStack(spacing: 12) {
-            Image(systemName: "square.grid.2x2.fill")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
             Text(l.tr(zh: "更多功能", en: "More", de: "Mehr"))
                 .font(OhanaFont.title2(.black))
@@ -130,8 +103,8 @@ struct FunctionMenuRootView: View {
             Spacer()
 
             Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -142,7 +115,10 @@ struct FunctionMenuRootView: View {
     }
 
     private var functionMenuGroups: [FeatureGroup] {
-        [.dailyCare, .healthBody, .archiveMemory, .householdHub]
+        AppFeatureRouteGuard.visibleFeatureGroups(
+            from: [.dailyCare, .healthBody, .archiveMemory, .householdHub],
+            currentLevel: currentTreeLevel
+        )
     }
 
     private var columns: [GridItem] {
@@ -153,21 +129,46 @@ struct FunctionMenuRootView: View {
         [
             ToolEntry(
                 id: "wealth",
-                title: "总资产",
+                title: l.tr(zh: "Oasis 收益", en: "Oasis Income", de: "Oasis-Erträge"),
                 subtitle: wealthSubtitle,
                 icon: "creditcard.fill",
                 color: Color(hex: "EAB308"),
                 destination: .wealthDashboard
             ),
             ToolEntry(
-                id: "plants",
-                title: "植物",
-                subtitle: plantsSubtitle,
-                icon: "leaf.fill",
-                color: Color(hex: "22C55E"),
-                destination: .plantsDashboard
+                id: "shop",
+                title: l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokos-Shop"),
+                subtitle: l.tr(zh: "装饰 · 周报 · 奖励", en: "Cosmetics · Reports · Rewards", de: "Deko · Berichte · Belohnungen"),
+                icon: "bag.fill",
+                color: Color(hex: "EAB308"),
+                destination: .coconutShop
+            ),
+            ToolEntry(
+                id: "gacha",
+                title: l.tr(zh: "收藏玩法", en: "Collection Play", de: "Sammlungsspiel"),
+                subtitle: l.tr(zh: "扭蛋 · 电子宠物", en: "Draws · E-critter", de: "Ziehungen · E-Critter"),
+                icon: "circle.grid.cross.fill",
+                color: Color(hex: "F97316"),
+                destination: .gacha
+            ),
+            ToolEntry(
+                id: "insights",
+                title: l.tr(zh: "高级洞察", en: "Advanced Insights", de: "Erweiterte Einsichten"),
+                subtitle: l.tr(zh: "趋势 · 异常", en: "Trends · Signals", de: "Trends · Signale"),
+                icon: "chart.xyaxis.line",
+                color: Color(hex: "06B6D4"),
+                destination: .careLedgerAnalysis
+            ),
+            ToolEntry(
+                id: "report",
+                title: l.tr(zh: "成长回顾", en: "Growth Review", de: "Wachstumsrückblick"),
+                subtitle: l.tr(zh: "周报 · 归档", en: "Reports · Archive", de: "Berichte · Archiv"),
+                icon: "book.closed.fill",
+                color: Color(hex: "EC4899"),
+                destination: .familyWeeklyReport
             )
         ]
+        .filter { AppFeatureRouteGuard.isVisibleFunctionDestination($0.destination, currentLevel: currentTreeLevel) }
     }
 
     private func subtitle(for group: FeatureGroup) -> String {
@@ -185,19 +186,12 @@ struct FunctionMenuRootView: View {
         case .oasisRewards:
             return "\(wealthSubtitle) · 商店 · 扭蛋"
         case .plants:
-            return plantsSubtitle
+            return l.tr(zh: "当前版本暂不开放", en: "Hidden for this version", de: "In dieser Version verborgen")
         }
     }
 
     private var hasDogs: Bool {
         activePets.contains { $0.species.localizedCaseInsensitiveContains("狗") || $0.species.localizedCaseInsensitiveContains("dog") }
-    }
-
-    private var plantsSubtitle: String {
-        if plants.isEmpty { return "暂无植物 · 点击添加" }
-        let thirsty = plants.filter { $0.needsWatering }.count
-        if thirsty > 0 { return "\(plants.count)种 · \(thirsty)种需浇水" }
-        return "\(plants.count)种植物"
     }
 
     private var wealthSubtitle: String {
@@ -215,20 +209,20 @@ struct FunctionMenuRootView: View {
         return subtitle.components(separatedBy: " · ").first ?? subtitle
     }
 
-    private func select(_ destination: FMDest, unlock: GrowthUnlockStatus) {
-        guard unlock.isUnlocked else {
+    private func select(_ destination: FMDest) {
+        switch AppFeatureRouteGuard.functionDestinationDecision(destination, currentLevel: currentTreeLevel) {
+        case let .allow(destination):
+            onSelect(destination)
+        case let .redirectToRoadmap(note):
+            AppFeatureRouteGuard.recordIntercept(note)
+            onSelect(.growthRoadmap)
+        case let .suppress(note):
+            AppFeatureRouteGuard.recordIntercept(note)
             OhanaFeedback.light()
-            withAnimation(GoMotion.feedback) {
-                lockedStatus = unlock
-            }
+            return
+        case .rootMenu:
             return
         }
-        lockedStatus = nil
-        onSelect(destination)
-    }
-
-    private func presentUnlockRules(_ status: GrowthUnlockStatus) {
-        ruleStatus = status
     }
 
     private func menuTile(
@@ -236,116 +230,51 @@ struct FunctionMenuRootView: View {
         iconColor: Color,
         title: String,
         status: String,
-        unlockStatus: GrowthUnlockStatus,
-        onInfo: @escaping () -> Void,
         action: @escaping () -> Void
     ) -> some View {
-        ZStack(alignment: .topTrailing) {
-            Button(action: action) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: icon)
-                            .font(.system(size: 18, weight: .black))
-                            .foregroundStyle(unlockStatus.isUnlocked ? Color.ohanaFunctionalIcon : Color.ohanaTertiaryText)
-                        Spacer()
-                        Image(systemName: unlockStatus.isUnlocked ? "chevron.right" : "lock.fill")
-                            .font(.system(size: 10, weight: .black))
-                            .foregroundStyle(unlockStatus.isUnlocked ? Color.ohanaSecondaryText.opacity(0.6) : iconColor)
-                            .padding(.trailing, unlockStatus.isUnlocked ? 0 : 30)
-                    }
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(title)
-                            .font(OhanaFont.callout(.black))
-                            .foregroundStyle(unlockStatus.isUnlocked ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                        Text(unlockStatus.isUnlocked ? status : lockedSubtitle(unlockStatus))
-                            .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(iconColor)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: icon)
+                        .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaFunctionalIcon)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
                 }
-                .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
-                .padding(14)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            }
-            .buttonStyle(ScaleButtonStyle())
 
-            if !unlockStatus.isUnlocked {
-                GrowthUnlockRuleInfoButton(
-                    status: unlockStatus,
-                    appLanguage: appLanguage,
-                    onTap: onInfo
-                )
-                .padding(.top, 2)
-                .padding(.trailing, 2)
-                .zIndex(2)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    Text(status)
+                        .font(OhanaFont.caption2(.black))
+                        .foregroundStyle(iconColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
             }
+            .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+            .padding(14)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-    }
-
-    private func lockedCallout(_ status: GrowthUnlockStatus) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 13, weight: .black))
-                .foregroundStyle(Color(hex: status.step.tintHex))
-                .frame(width: 30, height: 30)
-                .background(Color.ohanaControlFill, in: Circle())
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(status.step.title(language: appLanguage))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-                Text(status.step.detail(language: appLanguage))
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Spacer(minLength: 6)
-
-            GrowthUnlockRuleInfoButton(
-                status: status,
-                appLanguage: appLanguage,
-                onTap: { presentUnlockRules(status) }
-            )
-
-            Text("Lv.\(status.step.requiredLevel)")
-                .font(OhanaFont.caption2(.black))
-                .foregroundStyle(Color.arkInk)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color.goPrimary, in: Capsule())
-        }
-        .frame(minHeight: 52)
-        .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private func lockedSubtitle(_ status: GrowthUnlockStatus) -> String {
-        l.tr(
-            zh: "Lv.\(status.step.requiredLevel) 解锁",
-            en: "Unlocks at Lv.\(status.step.requiredLevel)",
-            de: "Ab Lv.\(status.step.requiredLevel)"
-        )
+        .buttonStyle(ScaleButtonStyle())
     }
 
     private func sectionHeader(icon: String, title: String, label: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .bold))
+                .font(OhanaFont.adaptive(size: 10, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary.opacity(0.8))
             Text(title)
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(label)
-                .font(.system(size: 9, weight: .bold))
+                .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary.opacity(0.6))
                 .tracking(2)
         }

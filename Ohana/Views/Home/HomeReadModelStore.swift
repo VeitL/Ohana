@@ -170,7 +170,7 @@ final class HomeReadModelStore: ObservableObject {
         let humans = fetches.humans()
         guard await checkpoint(generation: generation, stage: "members", startedAt: startedAt) else { return }
 
-        let plants = fetches.plants()
+        let plants = AppFeatureRouteGuard.shouldLoadPlantData ? fetches.plants() : []
         let electronicPets = fetches.electronicPets()
         guard await checkpoint(generation: generation, stage: "livingSurfaces", startedAt: startedAt) else { return }
 

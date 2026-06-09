@@ -9,10 +9,10 @@ struct FunctionMenuSheet: View {
 
     let initialDestination: FMDest?
 
+    @State private var treeManager = OasisTreeManager.shared
     @State private var path = NavigationPath()
     @State private var didOpenInitialDestination = false
     @State private var directLandingIsReady = false
-    @State private var plantRouteStub: Plant?
 
     init(initialDestination: FMDest? = nil) {
         self.initialDestination = initialDestination
@@ -21,22 +21,29 @@ struct FunctionMenuSheet: View {
     /// FAB 直达这些目的地时跳过根列表，避免先显示菜单再 push 的视觉跳动。
     /// 带实体 id 的目的地继续通过 `path.append` 进入，保留系统返回链路。
     private var directLandingDestination: FMDest? {
-        guard let dest = initialDestination else { return nil }
+        guard let dest = initialRoutedDestination else { return nil }
         switch dest {
         case .featureGroup,
              .featureAggregate,
+             .growthRoadmap,
              .calendar,
              .familyWeeklyReport,
              .careLedgerAnalysis,
              .reminderObservability,
              .coconutShop,
              .gacha,
-             .wealthDashboard,
-             .plantsDashboard:
+             .wealthDashboard:
             return dest
         default:
             return nil
         }
+    }
+
+    private var initialRoutedDestination: FMDest? {
+        AppFeatureRouteGuard.visibleFunctionDestination(
+            initialDestination,
+            currentLevel: treeManager.treeLevel.rawValue
+        )
     }
 
     var body: some View {
@@ -47,7 +54,7 @@ struct FunctionMenuSheet: View {
                     navigationDestinationView(dest)
                 }
             } else {
-                FunctionMenuRootView(
+                FunctionMenuRootRouteContainer(
                     appLanguage: appLanguage,
                     onSelect: { path.append($0) },
                     onClose: { dismiss() }
@@ -97,7 +104,7 @@ struct FunctionMenuSheet: View {
 
     private func openInitialDestinationIfNeeded() {
         guard directLandingDestination == nil else { return }
-        guard !didOpenInitialDestination, let initialDestination else { return }
+        guard !didOpenInitialDestination, let initialDestination = initialRoutedDestination else { return }
         didOpenInitialDestination = true
         DispatchQueue.main.async {
             path.append(initialDestination)
@@ -128,7 +135,7 @@ struct FunctionMenuSheet: View {
             VStack(spacing: 14) {
                 Spacer(minLength: 0)
                 Image(systemName: destinationChrome(for: landing).icon)
-                    .font(.system(size: 26, weight: .black))
+                    .font(OhanaFont.adaptive(size: 26, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 58, height: 58)
@@ -167,10 +174,9 @@ struct FunctionMenuSheet: View {
 
     @ViewBuilder
     private func destinationRouter(_ destination: FMDest) -> some View {
-        FunctionMenuDestinationRouter(
+        FunctionMenuDestinationRouteContainer(
             destination: destination,
-            parentPath: $path,
-            selectedPlant: $plantRouteStub
+            parentPath: $path
         )
     }
 
@@ -178,11 +184,11 @@ struct FunctionMenuSheet: View {
         switch dest {
         case .featureGroup,
              .featureAggregate,
+             .growthRoadmap,
              .calendar,
              .familyWeeklyReport,
              .careLedgerAnalysis,
              .reminderObservability,
-             .plantsDashboard,
              .bountyBoard:
             return true
         default:
@@ -200,8 +206,8 @@ struct FunctionMenuSheet: View {
 
     private func pageCloseButton(action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .black))
+            Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
@@ -230,6 +236,8 @@ struct FunctionMenuSheet: View {
             return (L10n(appLanguage).tr(zh: "扭蛋机", en: "Gacha", de: "Gacha"), "circle.grid.cross.fill")
         case .wealthDashboard:
             return (L10n(appLanguage).tr(zh: "Ohana 财富", en: "Ohana Wealth", de: "Ohana Vermögen"), "chart.pie.fill")
+        case .growthRoadmap:
+            return (L10n(appLanguage).tr(zh: "椰子树路线", en: "Tree Roadmap", de: "Baum-Roadmap"), "tree.fill")
         case .plantsDashboard:
             return (L10n(appLanguage).tr(zh: "植物", en: "Plants", de: "Pflanzen"), "leaf.fill")
         default:

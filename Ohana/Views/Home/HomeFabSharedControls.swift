@@ -28,11 +28,11 @@ struct HomeFabActionRow: View {
         HStack(spacing: 10) {
             HStack(spacing: 6) {
                 Text(item.label)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                     .lineLimit(1)
                 if let badge = item.badge {
                     Text(badge)
-                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -71,7 +71,7 @@ struct HomeFabMainButton: View {
                     .fill(Color.goPrimary)
                     .frame(width: 56, height: 56)
                 Image(systemName: isExpanded ? "xmark" : "square.grid.2x2.fill")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 18, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     .animation(HeroAnim.buttonSpring, value: isExpanded)

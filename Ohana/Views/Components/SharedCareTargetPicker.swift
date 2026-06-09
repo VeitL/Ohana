@@ -18,11 +18,11 @@ struct SharedCareTargetPicker: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text(subtitle)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
                     .contentTransition(.numericText())
             }
@@ -62,12 +62,12 @@ struct SharedCareTargetPicker: View {
                     transparentYOffset: 0.04
                 )
                 Text(pet.name)
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaSecondaryText.opacity(0.65))
             }
             .padding(.leading, 6)

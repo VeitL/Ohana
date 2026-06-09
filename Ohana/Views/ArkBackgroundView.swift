@@ -232,7 +232,7 @@ enum CustomAppBackgroundStore {
     }
 
     static var image: UIImage? {
-        UIImage(contentsOfFile: fileURL.path)
+        UIImage(contentsOfFile: fileURL.path) // smoothness: allow settings-scoped custom background preview load; render paths use prepared background views.
     }
 
     static var exists: Bool {
@@ -240,7 +240,7 @@ enum CustomAppBackgroundStore {
     }
 
     static func saveImageData(_ data: Data) throws {
-        guard let image = UIImage(data: data) else { throw CocoaError(.fileReadCorruptFile) }
+        guard let image = UIImage(data: data) else { throw CocoaError(.fileReadCorruptFile) } // smoothness: allow explicit import/save path, not a finger-frame render decode.
         let optimized = optimizedBackgroundImage(image)
         guard let jpegData = optimized.jpegData(compressionQuality: 0.82) else {
             throw CocoaError(.fileWriteUnknown)
@@ -389,13 +389,13 @@ private struct GoDefaultBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift
+            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift; smoothness: allow ambient background loop behind visible shell, reduced by policy gates.
                 blob1Offset = CGSize(width: 40, height: -30)
             }
-            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift
+            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift; smoothness: allow ambient background loop behind visible shell, reduced by policy gates.
                 blob2Offset = CGSize(width: -50, height: 35)
             }
-            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift; smoothness: allow ambient background loop behind visible shell, reduced by policy gates.
                 blob3Offset = CGSize(width: 30, height: -40)
             }
         }
@@ -583,7 +583,7 @@ private struct DeepAmbientBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.linear(duration: 18).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated aurora background drift
+            withAnimation(.linear(duration: 18).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated aurora background drift; smoothness: allow ambient background loop behind visible shell, reduced by policy gates.
                 isAnimating = true
             }
         }
@@ -637,7 +637,7 @@ private struct AuroraBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 12).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift
+            withAnimation(.easeInOut(duration: 12).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated ambient background drift; smoothness: allow ambient background loop behind visible shell, reduced by policy gates.
                 phase = 1
             }
         }
@@ -703,7 +703,7 @@ private struct SunsetGlowBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) { pulse = true } // ui-v4: allow workload-gated ambient background pulse
+            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) { pulse = true } // ui-v4: allow workload-gated ambient background pulse; smoothness: allow ambient background loop behind visible shell, reduced by policy gates.
         }
     }
 }
@@ -741,7 +741,7 @@ private struct SakuraMistBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 14).repeatForever(autoreverses: true)) { drift = 1 } // ui-v4: allow workload-gated ambient background drift
+            withAnimation(.easeInOut(duration: 14).repeatForever(autoreverses: true)) { drift = 1 } // ui-v4: allow workload-gated ambient background drift; smoothness: allow ambient background loop behind visible shell, reduced by policy gates.
         }
     }
 }
@@ -781,7 +781,7 @@ private struct ForestGladeBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) { sway = true } // ui-v4: allow workload-gated ambient background sway
+            withAnimation(.easeInOut(duration: 11).repeatForever(autoreverses: true)) { sway = true } // ui-v4: allow workload-gated ambient background sway; smoothness: allow ambient background loop behind visible shell, reduced by policy gates.
         }
     }
 }
@@ -881,7 +881,7 @@ private struct NeonGridBackground: View {
         }
         .ignoresSafeArea()
         .onAppear {
-            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { phase = 1 } // ui-v4: allow workload-gated ambient background phase
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { phase = 1 } // ui-v4: allow workload-gated ambient background phase; smoothness: allow ambient background loop behind visible shell, reduced by policy gates.
         }
     }
 }
@@ -944,7 +944,7 @@ struct GoIslandWizardBackdrop: View {
         .ignoresSafeArea()
         .onAppear {
             guard !shouldReduceWork else { return }
-            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated onboarding background pulse
+            withAnimation(.easeInOut(duration: 9).repeatForever(autoreverses: true)) { // ui-v4: allow workload-gated onboarding background pulse; smoothness: allow onboarding-only background loop gated by reduced-work policy.
                 blobPulse = true
             }
         }

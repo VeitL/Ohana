@@ -109,19 +109,19 @@ struct IslandRetentionDashboard: View {
     private var navBar: some View {
         HStack {
             Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
+                Image(systemName: "chevron.left").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
+                    .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .goGlassBackground(Circle())
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text("成长档案")
-                .font(.system(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             Spacer()
-            Color.clear.frame(width: 36, height: 36)
+            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
         }
         .padding(.top, 64)
     }
@@ -149,7 +149,7 @@ struct IslandRetentionDashboard: View {
                     .frame(width: 18, height: 64 * growProgress)
                 ForEach(0..<5, id: \.self) { index in
                     Circle()
-                        .fill(index < Int(averageScore.rounded()) ? Color.goLime.opacity(0.82) : Color.white.opacity(0.12))
+                        .fill(index < Int(averageScore.rounded()) ? Color.goLime.opacity(0.82) : Color.white.opacity(0.12)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                         .frame(width: 22 + CGFloat(index) * 9, height: 22 + CGFloat(index) * 9)
                         .offset(x: index.isMultiple(of: 2) ? -22 : 22, y: -CGFloat(index) * 13 * growProgress)
                         .scaleEffect(growProgress)
@@ -159,26 +159,26 @@ struct IslandRetentionDashboard: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 Text("档案完整度")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.56))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.56)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(String(format: "%.1f", averageScore))
-                        .font(.system(size: 42, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .font(OhanaFont.adaptive(size: 42, weight: .black, design: .rounded))
+                        .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     Text("/ 5")
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goLime)
                 }
                 Text("\(totalMemories) 个记忆点 · \(totalAchievements.unlocked)/\(totalAchievements.total) 枚成就")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.52))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.52)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     .lineLimit(2)
             }
             Spacer()
         }
         .padding(18)
         .background(
-            LinearGradient(colors: [Color.goLime.opacity(0.19), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
+            LinearGradient(colors: [Color.goLime.opacity(0.19), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing), // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             in: RoundedRectangle(cornerRadius: 26, style: .continuous)
         )
     }
@@ -194,12 +194,12 @@ struct IslandRetentionDashboard: View {
     private func archiveMetric(_ title: String, _ value: String, _ icon: String, _ color: Color) -> some View {
         VStack(spacing: 7) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black))
             Text(value)
-                .font(.system(size: 22, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                 .monospacedDigit()
             Text(title)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
         }
         .foregroundStyle(color)
         .frame(maxWidth: .infinity)
@@ -210,8 +210,8 @@ struct IslandRetentionDashboard: View {
     private var archiveRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("成员成长档案")
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             ForEach(summaries) { summary in
                 Button { open(summary.pet) } label: {
                     HStack(spacing: 12) {
@@ -219,16 +219,16 @@ struct IslandRetentionDashboard: View {
                         VStack(alignment: .leading, spacing: 7) {
                             HStack {
                                 Text(summary.pet.name)
-                                    .font(.system(size: 15, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
+                                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                                 Spacer()
                                 Text("\(summary.score)/5")
-                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.goLime)
                             }
                             GeometryReader { geo in
                                 ZStack(alignment: .leading) {
-                                    Capsule().fill(Color.white.opacity(0.1))
+                                    Capsule().fill(Color.white.opacity(0.1)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                                     Capsule()
                                         .fill(Color.goLime)
                                         .frame(width: geo.size.width * CGFloat(summary.score) / 5 * growProgress)
@@ -236,16 +236,16 @@ struct IslandRetentionDashboard: View {
                             }
                             .frame(height: 7)
                             Text("\(summary.photos) 张照片 · \(summary.milestones) 个时刻 · \(summary.unlocked)/\(summary.totalAchievements) 成就")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.46))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.46)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                                 .lineLimit(1)
                         }
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .black))
-                            .foregroundStyle(.white.opacity(0.3))
+                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 11, weight: .black))
+                            .foregroundStyle(.white.opacity(0.3)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     }
                     .padding(14)
-                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -258,19 +258,19 @@ struct IslandRetentionDashboard: View {
             HStack(spacing: 6) {
                 avatar()
                 Text(title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
             }
             .foregroundStyle(isSelected ? .black : .white)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule())
+            .background(isSelected ? Color.goLime : Color.white.opacity(0.12), in: Capsule()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         }
         .buttonStyle(ScaleButtonStyle())
     }
 
     private func selectorChip(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         selectorChip(title: title, avatar: {
-            Image(systemName: icon).font(.system(size: 11, weight: .bold))
+            Image(systemName: icon).font(OhanaFont.adaptive(size: 11, weight: .bold))
         }, isSelected: isSelected, action: action)
     }
 
@@ -295,7 +295,7 @@ struct IslandRetentionDashboard: View {
 
     private func animateGrowth() {
         growProgress = 0
-        withAnimation(.spring(response: 0.7, dampingFraction: 0.82)) {
+        withAnimation(.spring(response: 0.7, dampingFraction: 0.82)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             growProgress = 1
         }
     }

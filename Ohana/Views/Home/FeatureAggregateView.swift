@@ -4,8 +4,8 @@
 // FeatureGroup segmented page. Embedded mode hides the extra entity chip row so
 // the page does not show pet names twice above the actual content.
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct FeatureAggregateNavigationChrome: ViewModifier {
     let title: String
@@ -25,12 +25,15 @@ private struct FeatureAggregateNavigationChrome: ViewModifier {
 struct FeatureAggregateView: View {
     let feature: PetFeature
     @Binding var parentPath: NavigationPath
+    let pets: [Pet]
+    let humans: [Human]
     var showsNavigationChrome: Bool = true
     var showsEntityChips: Bool = true
 
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-    @Query(sort: \Human.name)   private var humans: [Human]
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
+    @State private var humanAvatarSignatures: [UUID: String] = [:]
+    @State private var humanAvatarCacheKey = "feature-aggregate-human-avatar-empty"
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome } }
@@ -59,6 +62,13 @@ struct FeatureAggregateView: View {
         }
     }
 
+    private var humanAvatarSourceKey: String {
+        let key = humansForFeature
+            .map { "\($0.id.uuidString):\($0.avatarImageData?.count ?? 0)" }
+            .joined(separator: "|")
+        return key.isEmpty ? "feature-aggregate-human-avatar-empty" : key
+    }
+
     var body: some View {
         ZStack {
             OhanaAppBackground()
@@ -75,14 +85,20 @@ struct FeatureAggregateView: View {
                 featureContent
             }
         }
+        .task(id: humanAvatarSourceKey) {
+            await prepareHumanAvatars()
+        }
+        .onDisappear {
+            avatarPipeline.cancel(key: humanAvatarCacheKey)
+        }
     }
 
     private var pageHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: feature.icon)
-                .font(.system(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(LocalizedStringKey(feature.title))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -101,10 +117,10 @@ struct FeatureAggregateView: View {
             HStack(spacing: 8) {
                 // "全部" — selected state, no action
                 HStack(spacing: 5) {
-                    Image(systemName: "square.grid.2x2.fill")
-                        .font(.system(size: 11, weight: .bold))
+                    Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("全部")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 14).padding(.vertical, 8)
@@ -137,7 +153,7 @@ struct FeatureAggregateView: View {
         HStack(spacing: 6) {
             avatar()
             Text(name)
-                .font(.system(size: 13, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 12).padding(.vertical, 7)
@@ -148,16 +164,49 @@ struct FeatureAggregateView: View {
     private func humanAvatarView(_ human: Human) -> some View {
         let color = Color(hex: human.themeColorHex.isEmpty ? "4ECDC4" : human.themeColorHex)
         ZStack {
-            Circle().fill(color.opacity(0.3)).frame(width: 24, height: 24)
-            if let data = human.avatarImageData, let img = UIImage(data: data) {
+            Circle().fill(color.opacity(0.3)).frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
+            if let signature = humanAvatarSignatures[human.id],
+               let img = avatarPipeline.cachedImage(for: human.id, signature: signature) {
                 Image(uiImage: img).resizable().scaledToFill()
-                    .frame(width: 24, height: 24).clipShape(Circle())
+                    .frame(width: 24, height: 24).clipShape(Circle()) // a11y: allow decorative non-interactive frame; hit area handled by parent
             } else {
                 Text(String(human.name.prefix(1)))
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(color)
             }
         }
+    }
+
+    @MainActor
+    private func prepareHumanAvatars() async {
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 32)
+        guard !Task.isCancelled else { return }
+
+        var signatures: [UUID: String] = [:]
+        var payloads: [FocusWalletAvatarCache.Payload] = []
+        for human in humansForFeature {
+            guard let data = human.avatarImageData else { continue }
+            let signature = FocusWalletAvatarCache.signature(for: data)
+            signatures[human.id] = signature
+            payloads.append(FocusWalletAvatarCache.Payload(id: human.id, data: data))
+        }
+
+        let rawKey = payloads
+            .map { "\($0.id.uuidString):\($0.data?.count ?? 0)" }
+            .joined(separator: "|")
+        let nextKey = rawKey.isEmpty ? "feature-aggregate-human-avatar-empty" : "feature-aggregate-\(rawKey)"
+        if humanAvatarCacheKey != nextKey {
+            avatarPipeline.cancel(key: humanAvatarCacheKey)
+            humanAvatarCacheKey = nextKey
+        }
+        humanAvatarSignatures = signatures
+        guard !payloads.isEmpty else { return }
+        avatarPipeline.seedPreviewEntries(payloads)
+        avatarPipeline.preload(
+            payloads: payloads,
+            key: nextKey,
+            delayMilliseconds: 56
+        )
     }
 
     // MARK: - Feature Content
@@ -208,15 +257,15 @@ struct FeatureAggregateView: View {
                         FMPetAvatar(pet: pet)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(pet.name)
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(subtitle(for: pet))
-                                .font(.system(size: 12, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .semibold))
+                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaTertiaryText)
                     }
                     .padding(.vertical, 4)

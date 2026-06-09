@@ -37,7 +37,7 @@ struct VerticalSolidHomeDataContainer: View {
     let onPresentAccountSwitcher: () -> Void
     let onPresentAddEntity: (EntityType) -> Void
     let onPresentAppSheet: (AppSheetRoute) -> Void
-    let onPresentCoconutLog: (CoconutLogSubject) -> Void
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
     let onPresentCrewRoster: (CrewRosterMode) -> Void
     let onPresentFunctionMenu: (FMDest?) -> Void
     let onPresentOasisReward: () -> Void
@@ -65,7 +65,7 @@ struct VerticalSolidHomeDataContainer: View {
         onPresentAccountSwitcher: @escaping () -> Void,
         onPresentAddEntity: @escaping (EntityType) -> Void,
         onPresentAppSheet: @escaping (AppSheetRoute) -> Void,
-        onPresentCoconutLog: @escaping (CoconutLogSubject) -> Void,
+        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void,
         onPresentCrewRoster: @escaping (CrewRosterMode) -> Void,
         onPresentFunctionMenu: @escaping (FMDest?) -> Void,
         onPresentOasisReward: @escaping () -> Void,

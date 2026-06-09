@@ -214,19 +214,19 @@ struct IslandExplorationDashboard: View {
     private var navBar: some View {
         HStack {
             Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .bold))
+                Image(systemName: "chevron.left").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text("全岛探索")
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
-            Color.clear.frame(width: 36, height: 36)
+            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
         }
         .padding(.top, 64)
     }
@@ -250,20 +250,20 @@ struct IslandExplorationDashboard: View {
                     (totalMeters / 1000)
                         .formatted(.number.precision(.fractionLength(totalMeters >= 1000 ? 1 : 0)))
                 )
-                .font(.system(size: 46, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 46, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
                 .animation(GoMotion.feedback, value: totalMeters)
 
                 Text("km")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                     .padding(.bottom, 3)
 
                 Spacer()
 
                 Text(funSubtitle)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 140)
@@ -297,16 +297,16 @@ struct IslandExplorationDashboard: View {
             ) {
                 if let p = topPet {
                     VStack(spacing: 6) {
-                        Text(p.emoji).font(.system(size: 38))
+                        Text(p.emoji).font(OhanaFont.adaptive(size: 38))
                         Text(p.name)
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(
                             (p.totalMeters / 1000)
                                 .formatted(.number.precision(.fractionLength(1))) + " km"
                         )
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.goPrimary)
                     }
                 } else {
@@ -325,25 +325,25 @@ struct IslandExplorationDashboard: View {
                             Circle()
                                 .fill(Color.goPrimary.mix(with: .black, by: 0.3))
                                 .frame(width: 44, height: 44)
-                            Text(h.human.avatarEmoji).font(.system(size: 24))
+                            Text(h.human.avatarEmoji).font(OhanaFont.adaptive(size: 24))
                             
                             if h.human.id.uuidString == activeHumanId && equippedTitle == "title_pioneer" {
                                 Text("🚀")
-                                    .font(.system(size: 14))
+                                    .font(OhanaFont.adaptive(size: 14))
                                     .padding(4)
                                     .background(Color.ohanaControlFill, in: Circle())
                                     .offset(x: 16, y: -16)
                             }
                         }
                         Text(h.human.name)
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(
                             (h.totalMeters / 1000)
                                 .formatted(.number.precision(.fractionLength(1))) + " km"
                         )
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.goTeal)
                     }
                 } else {
@@ -361,7 +361,7 @@ struct IslandExplorationDashboard: View {
     ) -> some View {
         VStack(spacing: 10) {
             Text(title)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .tracking(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -381,7 +381,7 @@ struct IslandExplorationDashboard: View {
 
     private func emptyBentoLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .medium))
+            .font(OhanaFont.adaptive(size: 11, weight: .medium))
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
     }
 
@@ -390,14 +390,14 @@ struct IslandExplorationDashboard: View {
     private var stackedBarChartCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("探索趋势")
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 .tracking(1)
 
             let data = stackedPoints
             if data.isEmpty {
                 Text("暂无遛宠记录")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
             } else {
@@ -414,9 +414,9 @@ struct IslandExplorationDashboard: View {
                     HStack(spacing: 12) {
                         ForEach(petSummaries.prefix(5)) { s in
                             HStack(spacing: 4) {
-                                Circle().fill(s.color).frame(width: 7, height: 7)
+                                Circle().fill(s.color).frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                 Text(s.name)
-                                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                                     .lineLimit(1)
                             }
@@ -436,13 +436,13 @@ struct IslandExplorationDashboard: View {
     private var leaderboardCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("里程贡献榜")
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 .tracking(1)
 
             if petSummaries.isEmpty {
                 Text("暂无遛宠记录")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .frame(maxWidth: .infinity, minHeight: 60, alignment: .center)
             } else {
@@ -454,14 +454,14 @@ struct IslandExplorationDashboard: View {
                             ZStack {
                                 Circle()
                                     .fill(s.color.opacity(0.2))
-                                    .frame(width: 36, height: 36)
-                                Text(s.emoji).font(.system(size: 18))
+                                    .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                                Text(s.emoji).font(OhanaFont.adaptive(size: 18))
                             }
 
                             // 名字 + 进度条
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(s.name)
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1)
 
@@ -487,7 +487,7 @@ struct IslandExplorationDashboard: View {
                                 (s.totalMeters / 1000)
                                     .formatted(.number.precision(.fractionLength(1))) + " km"
                             )
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                             .foregroundStyle(s.color)
                             .frame(width: 52, alignment: .trailing)
                         }

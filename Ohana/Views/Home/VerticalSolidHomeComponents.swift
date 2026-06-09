@@ -65,7 +65,7 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                ForEach(VerticalSolidHomeTab.allCases) { tab in
+                ForEach(VerticalSolidHomeTab.visibleTabs) { tab in
                     page(for: tab)
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .offset(x: CGFloat(tab.index - selectedTab.index) * proxy.size.width)
@@ -1001,18 +1001,18 @@ struct VerticalSolidHomePlantsPage: View {
                                 VerticalSolidHomeAvatar(emoji: plant.emoji, color: Color(hex: plant.themeHex), size: 46)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(plant.name)
-                                        .font(.system(size: 16, weight: .black, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                         .lineLimit(1)
                                     Text(plant.subtitle.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.subtitle)
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                         .foregroundStyle(Color.ohanaSecondaryText)
                                         .lineLimit(1)
                                 }
                                 Spacer()
                                 if plant.needsCare {
-                                    Image(systemName: "drop.fill")
-                                        .font(.system(size: 15, weight: .black))
+                                    Image(systemName: "drop.fill").accessibilityHidden(true)
+                                        .font(OhanaFont.adaptive(size: 15, weight: .black))
                                         .foregroundStyle(Color.goTeal)
                                 }
                             }
@@ -1029,334 +1029,6 @@ struct VerticalSolidHomePlantsPage: View {
             .padding(.bottom, 18)
         }
         .scrollBounceBehavior(.basedOnSize)
-    }
-}
-
-struct VerticalSolidHomeBottomBar: View {
-    let selectedTab: VerticalSolidHomeTab
-    @Binding var isFabExpanded: Bool
-    @Binding var itemsVisible: Bool
-    let activeCard: FocusCard?
-    let homeShortcuts: [HomeFabFunctionShortcut]
-    let expandedShortcuts: [ExpandedCardFabShortcut]
-    let safeBottom: CGFloat
-    let canAnimate: Bool
-    let localization: L10n
-    let onSelect: (VerticalSolidHomeTab) -> Void
-    let onHomeShortcut: (HomeFabFunctionShortcut) -> Void
-    let onExpandedShortcut: (ExpandedCardFabShortcut, FocusCard) -> Void
-    let onCenter: () -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
-    private var l: L10n { localization }
-
-    var body: some View {
-        let barBottomInset = max(safeBottom - 2, 4)
-        let centerBottomInset = max(safeBottom + 4, 12)
-
-        ZStack(alignment: .bottom) {
-            menuRows
-                .padding(.bottom, safeBottom + 90)
-
-            HStack(spacing: 0) {
-                tabButton(.home)
-                tabButton(.calendar)
-                Spacer(minLength: 72)
-                tabButton(.oasis)
-                tabButton(.plants)
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 58)
-            .background(navBackground)
-            .padding(.horizontal, 16)
-            .padding(.bottom, barBottomInset)
-
-            Button {
-                OhanaFeedback.medium()
-                if usesFabMenu {
-                    toggleFab()
-                    return
-                }
-                onCenter()
-            } label: {
-                Image(systemName: centerIcon)
-                    .font(.system(size: 24, weight: .black))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 64, height: 64)
-                    .background(Color.goPrimary, in: Circle())
-                    .shadow(color: Color.goPrimary.opacity(0.26), radius: 16, x: 0, y: 8) // ui-v4: allow elevated primary nav action
-                    .rotationEffect(.degrees(isFabExpanded ? 90 : 0))
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .padding(.bottom, centerBottomInset)
-            .accessibilityLabel(centerButtonAccessibilityLabel)
-        }
-        .animation(canAnimate ? GoMotion.selection : GoMotion.reduced, value: selectedTab)
-        .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: isFabExpanded)
-        .animation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced, value: itemsVisible)
-    }
-
-    private var centerIcon: String {
-        if isFabExpanded {
-            return "xmark"
-        }
-        if usesFabMenu {
-            return "plus"
-        }
-        switch selectedTab {
-        case .home: return "plus"
-        case .calendar: return "calendar.badge.plus"
-        case .oasis: return "bolt.fill"
-        case .plants: return "leaf.fill"
-        }
-    }
-
-    private var centerButtonAccessibilityLabel: String {
-        if isFabExpanded {
-            return l.tr(zh: "收起菜单", en: "Close menu", de: "Menü schließen")
-        }
-        if activeCard != nil {
-            return l.tr(zh: "显示该成员剩余功能", en: "Show remaining member features", de: "Weitere Funktionen anzeigen")
-        }
-        if selectedTab == .home {
-            return l.tr(zh: "展开首页快捷菜单", en: "Show home shortcuts", de: "Home-Schnellzugriffe anzeigen")
-        }
-        switch selectedTab {
-        case .home:
-            return l.tr(zh: "更多功能", en: "More features", de: "Weitere Funktionen")
-        case .calendar:
-            return l.tr(zh: "添加事件", en: "Add event", de: "Ereignis hinzufügen")
-        case .oasis:
-            return l.tr(zh: "注入能量", en: "Inject energy", de: "Energie einspeisen")
-        case .plants:
-            return l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen")
-        }
-    }
-
-    private var navBackground: some View {
-        Capsule()
-            .fill(Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.42 : 0.72))
-            .overlay {
-                Capsule()
-                    .strokeBorder(Color.ohanaGlassStroke.opacity(0.22), lineWidth: 1)
-            }
-            .shadow(color: Color.arkInk.opacity(0.18), radius: 20, x: 0, y: 10) // ui-v4: allow home bottom navigation lift
-    }
-
-    @ViewBuilder
-    private var menuRows: some View {
-        if isFabExpanded, let activeCard {
-            HStack(spacing: 8) {
-                ForEach(Array(expandedShortcuts.enumerated()), id: \.element.id) { index, shortcut in
-                    VerticalSolidHomeFabShortcutButton(shortcut: shortcut) {
-                        guard shortcut.isAvailable else {
-                            OhanaFeedback.light()
-                            return
-                        }
-                        onExpandedShortcut(shortcut, activeCard)
-                    }
-                    .scaleEffect(canAnimate ? (itemsVisible ? 1 : 0.88) : 1, anchor: .bottom)
-                    .opacity(itemsVisible ? 1 : 0)
-                    .offset(y: canAnimate ? (itemsVisible ? 0 : 34) : 0)
-                    .animation(
-                        canAnimate ? HeroAnim.fabSpring.delay(GoMotion.staggerDelay(index, step: 0.035, maxDelay: 0.14)) : GoMotion.reduced,
-                        value: itemsVisible
-                    )
-                    .allowsHitTesting(itemsVisible)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 2)
-        } else if isFabExpanded, selectedTab == .home {
-            HStack(spacing: 8) {
-                ForEach(Array(homeShortcuts.enumerated()), id: \.element.id) { index, shortcut in
-                    VerticalSolidHomeHomeFabShortcutButton(shortcut: shortcut) {
-                        guard shortcut.isAvailable else {
-                            OhanaFeedback.light()
-                            return
-                        }
-                        onHomeShortcut(shortcut)
-                    }
-                    .scaleEffect(canAnimate ? (itemsVisible ? 1 : 0.88) : 1, anchor: .bottom)
-                    .opacity(itemsVisible ? 1 : 0)
-                    .offset(y: canAnimate ? (itemsVisible ? 0 : 34) : 0)
-                    .animation(
-                        canAnimate ? HeroAnim.fabSpring.delay(GoMotion.staggerDelay(index, step: 0.035, maxDelay: 0.14)) : GoMotion.reduced,
-                        value: itemsVisible
-                    )
-                    .allowsHitTesting(itemsVisible)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 2)
-        }
-    }
-
-    private var usesFabMenu: Bool {
-        activeCard != nil || selectedTab == .home
-    }
-
-    private func tabButton(_ tab: VerticalSolidHomeTab) -> some View {
-        Button {
-            onSelect(tab)
-        } label: {
-            VStack(spacing: 3) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 17, weight: .black))
-                    .symbolRenderingMode(.monochrome)
-                Text(tab.title(l))
-                    .font(.system(size: 10, weight: .black, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-            .foregroundStyle(selectedTab == tab ? Color.goPrimary : Color.ohanaSecondaryText)
-            .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-
-    private func toggleFab() {
-        if isFabExpanded {
-            withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
-                itemsVisible = false
-            }
-            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
-                guard !itemsVisible else { return }
-                withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
-                    isFabExpanded = false
-                }
-            }
-        } else {
-            itemsVisible = false
-            withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
-                isFabExpanded = true
-            }
-            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 16) {
-                withAnimation(canAnimate ? HeroAnim.fabSpring : GoMotion.reduced) {
-                    itemsVisible = true
-                }
-            }
-        }
-    }
-}
-
-private struct VerticalSolidHomeFabShortcutButton: View {
-    let shortcut: ExpandedCardFabShortcut
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 5) {
-                ZStack(alignment: .topTrailing) {
-                    Circle()
-                        .fill(Color.goPrimary.opacity(shortcut.isAvailable ? 1 : 0.36))
-                        .frame(width: 42, height: 42)
-                    OhanaQuickActionIcon(
-                        actionType: iconActionType,
-                        fallbackSystemName: shortcut.icon,
-                        size: 24,
-                        color: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54)
-                    )
-                    .frame(width: 42, height: 42)
-
-                    if let badge = shortcut.badge {
-                        Text(badge)
-                            .font(.system(size: 8, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.arkInk)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                            .padding(.horizontal, 5)
-                            .frame(height: 15)
-                            .background(Color.goYellow, in: Capsule())
-                            .offset(x: 5, y: -4)
-                    }
-                }
-
-                Text(shortcut.label)
-                    .font(.system(size: 9, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-                    .frame(width: 44)
-            }
-            .opacity(shortcut.isAvailable ? 1 : 0.55)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(shortcut.label)
-    }
-
-    private var iconActionType: String {
-        switch shortcut.action {
-        case .quick(let actionType), .humanQuick(let actionType):
-            return actionType
-        case .detail(let feature):
-            return feature.rawValue
-        case .allFeatures, .humanAllFeatures:
-            return shortcut.id
-        }
-    }
-}
-
-private struct VerticalSolidHomeHomeFabShortcutButton: View {
-    let shortcut: HomeFabFunctionShortcut
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 5) {
-                ZStack(alignment: .topTrailing) {
-                    Circle()
-                        .fill(Color.goPrimary.opacity(shortcut.isAvailable ? 1 : 0.36))
-                        .frame(width: 42, height: 42)
-                    OhanaQuickActionIcon(
-                        actionType: iconActionType,
-                        fallbackSystemName: shortcut.icon,
-                        size: 24,
-                        color: Color.ohanaPrimaryActionText.opacity(shortcut.isAvailable ? 1 : 0.54),
-                        animatesStateChanges: false
-                    )
-                        .frame(width: 42, height: 42)
-
-                    if let badge = shortcut.badge {
-                        Text(badge)
-                            .font(.system(size: 8, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.arkInk)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                            .padding(.horizontal, 5)
-                            .frame(height: 15)
-                            .background(Color.goYellow, in: Capsule())
-                            .offset(x: 5, y: -4)
-                    }
-                }
-
-                Text(shortcut.label)
-                    .font(.system(size: 9, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-                    .frame(width: 46)
-            }
-            .opacity(shortcut.isAvailable ? 1 : 0.55)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(shortcut.label)
-    }
-
-    private var iconActionType: String {
-        if case let .featureAggregate(feature)? = shortcut.destination {
-            return feature.rawValue
-        }
-        if case .calendar? = shortcut.destination {
-            return "calendar"
-        }
-        return shortcut.id
     }
 }
 
@@ -1392,11 +1064,11 @@ struct VerticalSolidHomeEmptyAction: View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .black))
+                    .font(OhanaFont.adaptive(size: 20, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
                 Text(title)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)

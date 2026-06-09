@@ -45,13 +45,13 @@ struct PetCardBackSettingsSheet: View {
             .sheet(isPresented: $showSitterCard) { SitterCardPreviewSheet(pet: pet) }
             .alert("确认标记离世", isPresented: $showRainbowAlert) {
                 Button("确认", role: .destructive) {
-                    RainbowBridgeService.markPassedAway(pet: pet, date: rainbowDate, context: modelContext)
+                    markPetPassedAway()
                 }
                 Button("取消", role: .cancel) {}
             } message: { Text("标记后将进入「彩虹桥」状态。") }
             .alert("撤销离世标记", isPresented: $showUndoPassingAlert) {
                 Button("撤销", role: .destructive) {
-                    RainbowBridgeService.undoPassedAway(pet: pet, context: modelContext)
+                    undoPetPassedAway()
                 }
                 Button("取消", role: .cancel) {}
             }
@@ -100,9 +100,9 @@ struct PetCardBackSettingsSheet: View {
 
     private var rainbowMemorialRow: some View {
         HStack {
-            Text("🌈").font(.system(size: 20))
+            Text("🌈").font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text("永远的家人")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Spacer()
         }
     }
@@ -119,8 +119,52 @@ struct PetCardBackSettingsSheet: View {
     }
 
     private func clearPetLogs() {
-        pet.clearAllActivityRecords(in: modelContext)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        let command = DomainCommand.memberLifecycle(
+            entityID: pet.id,
+            kind: EntityKind.pet.rawValue,
+            action: "records.clear"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext).clearPetActivityRecords(
+                pet,
+                note: "pet.cardBack.records.clear"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
+    private func markPetPassedAway() {
+        let command = DomainCommand.memberLifecycle(
+            entityID: pet.id,
+            kind: EntityKind.pet.rawValue,
+            action: "passed.mark"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext).markPetPassedAway(
+                pet,
+                date: rainbowDate,
+                note: "pet.cardBack.passed.mark"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
+    private func undoPetPassedAway() {
+        let command = DomainCommand.memberLifecycle(
+            entityID: pet.id,
+            kind: EntityKind.pet.rawValue,
+            action: "passed.undo"
+        )
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        commandQueue.enqueue(command) {
+            _ = MemberCommandExecutor(context: modelContext).undoPetPassedAway(
+                pet,
+                note: "pet.cardBack.passed.undo"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
     }
 
     private func deletePetIfConfirmed() {

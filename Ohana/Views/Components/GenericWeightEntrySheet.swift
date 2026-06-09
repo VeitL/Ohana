@@ -270,7 +270,7 @@ struct GenericWeightEntrySheet: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             avatarView
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(identityColor.opacity(0.16), in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
@@ -294,8 +294,8 @@ struct GenericWeightEntrySheet: View {
     private var weightEntryBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Image(systemName: "scalemass.fill")
-                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: "scalemass.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(l.tr(zh: "体重", en: "Weight", de: "Gewicht"))
                     .font(OhanaFont.caption(.bold))
                 Spacer()
@@ -412,8 +412,8 @@ struct GenericWeightEntrySheet: View {
         if case .pet = target {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 6) {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.system(size: 11, weight: .semibold))
+                    Image(systemName: "chart.bar.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("BCS")
                         .font(OhanaFont.caption(.bold))
                     Spacer()
@@ -462,7 +462,7 @@ struct GenericWeightEntrySheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存体重记录", en: "Save weight", de: "Gewicht speichern")
@@ -489,7 +489,7 @@ struct GenericWeightEntrySheet: View {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text(label)
                 .font(OhanaFont.callout(.semibold))
@@ -564,17 +564,12 @@ struct GenericWeightEntrySheet: View {
                 showsBackground: false
             )
         case .human(let human):
-            Group {
-                if let data = human.avatarImageData, let image = UIImage(data: data) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .clipShape(Circle())
-                } else {
-                    Text(human.avatarEmoji)
-                        .font(.system(size: 28))
-                }
-            }
+            HumanAvatarPipelineView(
+                human: human,
+                size: 42,
+                fallbackScale: 0.67,
+                showsBackground: false
+            )
         }
     }
 

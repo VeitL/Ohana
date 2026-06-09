@@ -115,7 +115,7 @@ enum HomeModalRoute: Identifiable {
 enum HomeFullScreenRoute: Identifiable {
     case walk(UUID)
     case oasisReward
-    case coconutLog(CoconutLogSubject)
+    case coconutLog(CoconutLogSubject?)
 
     var id: String {
         switch self {
@@ -124,7 +124,7 @@ enum HomeFullScreenRoute: Identifiable {
         case .oasisReward:
             return "oasis-reward"
         case let .coconutLog(subject):
-            return "coconut-log-\(subject.id)"
+            return "coconut-log-\(subject?.id ?? "all")"
         }
     }
 }
@@ -183,7 +183,7 @@ enum HomeAppFullScreenRoute: Equatable {
 }
 
 enum HomeAppOverlayRoute: Equatable {
-    case coconutLog(CoconutLogSubject)
+    case coconutLog(CoconutLogSubject?)
     case crewRoster(CrewRosterMode)
     case quickMoment(petID: UUID)
     case settings
@@ -229,12 +229,28 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openFunctionMenu(destination: FMDest?) {
+        let routedDestination: FMDest?
+        switch AppFeatureRouteGuard.functionDestinationDecision(
+            destination,
+            currentLevel: OasisTreeManager.shared.treeLevel.rawValue
+        ) {
+        case .rootMenu:
+            routedDestination = nil
+        case let .allow(destination):
+            routedDestination = destination
+        case let .redirectToRoadmap(note):
+            AppFeatureRouteGuard.recordIntercept(note)
+            routedDestination = .growthRoadmap
+        case let .suppress(note):
+            AppFeatureRouteGuard.recordIntercept(note)
+            routedDestination = nil
+        }
         if let appSheetRouteSink {
-            appSheetRouteSink(.functionMenu(destination: destination))
+            appSheetRouteSink(.functionMenu(destination: routedDestination))
             modal = nil
             return
         }
-        modal = .functionMenu(destination: destination)
+        modal = .functionMenu(destination: routedDestination)
     }
 
     func openStreakDetail() {
@@ -247,6 +263,15 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openAddEntity(_ type: EntityType) {
+        guard AppFeatureRouteGuard.allowsAddEntity(type) else {
+            AppFeatureRouteGuard.recordIntercept("homeAddEntity:\(type.rawValue)")
+            if let appSheetRouteSink {
+                appSheetRouteSink(.functionMenu(destination: .growthRoadmap))
+            } else {
+                modal = .functionMenu(destination: .growthRoadmap)
+            }
+            return
+        }
         if let appSheetRouteSink {
             appSheetRouteSink(.addEntity(type))
             modal = nil
@@ -317,7 +342,7 @@ final class HomeRouteCoordinator: ObservableObject {
         openFullScreen(.oasisReward)
     }
 
-    func openCoconutLog(_ subject: CoconutLogSubject) {
+    func openCoconutLog(_ subject: CoconutLogSubject?) {
         if let appOverlayRouteSink {
             appOverlayRouteSink(.coconutLog(subject))
             fullScreen = nil

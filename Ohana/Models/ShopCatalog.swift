@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-struct AppIconShopDescriptor: Identifiable, Equatable {
+nonisolated struct AppIconShopDescriptor: Identifiable, Equatable {
     let itemId: String
     let alternateIconName: String?
     let previewSymbol: String
@@ -68,7 +68,7 @@ struct ShopItem: Identifiable, Equatable {
     func description(_ l: L10n) -> String { l.text(descriptionText) }
 }
 
-enum AppIconCatalog {
+nonisolated enum AppIconCatalog {
     static let selectedIconKey = "shop_selected_app_icon"
     static let defaultItemId = "appicon_default"
 
@@ -220,14 +220,14 @@ enum ShopCatalog {
     private static let titleItems: [ShopItem] = [
         ShopItem(id: "title_guardian", emoji: "🛡️", nameText: .init(zh: "守护者", en: "Guardian", de: "Beschützer"), descriptionText: .init(zh: "称号 · 显示在首页头像旁。", en: "Title shown near your Home avatar.", de: "Titel neben deinem Startseiten-Avatar."), cost: 500, category: .title_),
         ShopItem(id: "title_pioneer", emoji: "🚀", nameText: .init(zh: "先行者", en: "Pioneer", de: "Pionier"), descriptionText: .init(zh: "称号 · 解锁岛屿探索徽章。", en: "Title for island exploration energy.", de: "Titel für Insel-Erkundung."), cost: 650, category: .title_),
-        ShopItem(id: "title_chef", emoji: "👨‍🍳", nameText: .init(zh: "首席厨师", en: "Head Chef", de: "Chefkoch"), descriptionText: .init(zh: "称号 · 喂食打卡额外 +1🥥。", en: "Title · feeding check-ins grant +1🥥.", de: "Titel · Fütterungs-Check-ins geben +1🥥."), cost: 900, category: .title_)
+        ShopItem(id: "title_chef", emoji: "👨‍🍳", nameText: .init(zh: "首席厨师", en: "Head Chef", de: "Chefkoch"), descriptionText: .init(zh: "称号 · 显示你的喂养担当身份。", en: "Title · shows your feeding lead role.", de: "Titel · zeigt deine Fütterungsrolle."), cost: 900, category: .title_)
     ]
 
     private static let boostItems: [ShopItem] = [
-        ShopItem(id: "boost_double", emoji: "⚡️", nameText: .init(zh: "双倍椰子券", en: "Double Coconut", de: "Doppelte Kokosnuss"), descriptionText: .init(zh: "下次普通照护奖励翻倍，兑换和悬赏不受影响。", en: "Doubles the next regular care reward. Exchanges and bounties are excluded.", de: "Verdoppelt die nächste normale Pflegebelohnung. Tausche und Kopfgelder sind ausgeschlossen."), cost: 350, category: .boost, isConsumable: true),
+        ShopItem(id: "boost_double", emoji: "⚡️", nameText: .init(zh: "金色幸运券", en: "Golden Luck", de: "Goldenes Glück"), descriptionText: .init(zh: "下次普通照护触发金色幸运，受每日预算控制。", en: "Turns the next regular care reward into Golden Luck, within the daily budget.", de: "Macht die nächste normale Pflege zu goldenem Glück, im Tagesbudget."), cost: 220, category: .boost, isConsumable: true),
         ShopItem(id: "boost_streak", emoji: "🛡️", nameText: .init(zh: "Streak 保护盾", en: "Streak Shield", de: "Streak-Schild"), descriptionText: .init(zh: "48 小时内漏签 1 天也不断连胜。", en: "Protects one missed day within 48 hours.", de: "Schützt einen verpassten Tag innerhalb von 48 Stunden."), cost: 260, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_tree", emoji: "🌱", nameText: .init(zh: "生命树能量 +30", en: "Tree Energy +30", de: "Baumenergie +30"), descriptionText: .init(zh: "立即为生命之树注入 30 点能量。", en: "Adds 30 energy to the life tree.", de: "Gibt dem Lebensbaum 30 Energie."), cost: 120, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_tree_large", emoji: "🌳", nameText: .init(zh: "生命树能量 +110", en: "Tree Energy +110", de: "Baumenergie +110"), descriptionText: .init(zh: "批量注入 110 点能量，比小包更划算。", en: "Adds 110 energy, better value.", de: "Gibt 110 Energie, günstiger im Paket."), cost: 320, category: .boost, isConsumable: true),
+        ShopItem(id: "boost_tree", emoji: "🌱", nameText: .init(zh: "每日树能量 +20XP", en: "Daily Tree XP +20", de: "Tägliche Baum-XP +20"), descriptionText: .init(zh: "每天 1 次，为生命之树轻度加速。", en: "Once per day, gently speeds up Life Tree growth.", de: "Einmal täglich, beschleunigt den Lebensbaum leicht."), cost: 80, category: .boost, isConsumable: true),
+        ShopItem(id: "boost_tree_large", emoji: "🌳", nameText: .init(zh: "周树能量 +60XP", en: "Weekly Tree XP +60", de: "Wöchentliche Baum-XP +60"), descriptionText: .init(zh: "Lv.5 后每周 1 次，不能买穿核心功能。", en: "Once per week after Lv.5; cannot skip the core progression.", de: "Ab Lv.5 einmal pro Woche; überspringt keine Kernprogression."), cost: 220, category: .boost, isConsumable: true),
         ShopItem(id: "boost_backdate_single", emoji: "📅", nameText: .init(zh: "补签券 ×1", en: "Backdate Pass ×1", de: "Nachtragspass ×1"), descriptionText: .init(zh: "获得 1 张昨日补签券，放入百宝箱。", en: "Adds one yesterday backdate pass.", de: "Fügt einen Nachtragspass für gestern hinzu."), cost: 150, category: .boost, isConsumable: true),
         ShopItem(id: "boost_backdate_pack", emoji: "🗓️", nameText: .init(zh: "补签券 ×3", en: "Backdate Pass ×3", de: "Nachtragspass ×3"), descriptionText: .init(zh: "获得 3 张昨日补签券，适合连续补签。", en: "Adds three backdate passes.", de: "Fügt drei Nachtragspässe hinzu."), cost: 350, category: .boost, isConsumable: true)
     ]

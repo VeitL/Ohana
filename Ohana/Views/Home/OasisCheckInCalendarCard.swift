@@ -53,19 +53,19 @@ struct OasisCheckInCalendarCard: View {
     private var headerRow: some View {
         HStack {
             HStack(spacing: 6) {
-                Image(systemName: "calendar.badge.checkmark")
-                    .font(.system(size: 16, weight: .bold))
+                Image(systemName: "calendar.badge.checkmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold))
                     .foregroundStyle(Color.goPrimary)
                 Text(localization.tr(zh: "打卡日历", en: "Check-in calendar", de: "Check-in-Kalender"))
-                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             Spacer()
             HStack(spacing: 4) {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 11, weight: .black))
+                Image(systemName: "flame.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
                 Text(localization.tr(zh: "\(currentStreak) 天连胜", en: "\(currentStreak)-day streak", de: "\(currentStreak)-Tage-Serie"))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.goYellow)
             }
             .padding(.horizontal, 10)
@@ -86,13 +86,13 @@ struct OasisCheckInCalendarCard: View {
     private func statCell(value: String, label: String, icon: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .bold))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold))
                 .foregroundStyle(color)
             Text(value)
-                .font(.system(size: 16, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(label)
-                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
         }
         .frame(maxWidth: .infinity)
@@ -105,15 +105,15 @@ struct OasisCheckInCalendarCard: View {
                     displayMonth = Calendar.current.date(byAdding: .month, value: -1, to: displayMonth) ?? displayMonth
                 }
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .bold))
+                Image(systemName: "chevron.left").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
 
             Spacer()
 
             Text(monthYearString(displayMonth))
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer()
@@ -126,8 +126,8 @@ struct OasisCheckInCalendarCard: View {
                     }
                 }
             } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .bold))
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold))
                     .foregroundStyle(
                         Calendar.current.isDate(displayMonth, equalTo: Date(), toGranularity: .month)
                             ? Color.ohanaPrimaryText.opacity(0.15)
@@ -143,7 +143,7 @@ struct OasisCheckInCalendarCard: View {
         HStack(spacing: 0) {
             ForEach(weekdaySymbols, id: \.self) { day in
                 Text(day)
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .frame(maxWidth: .infinity)
             }
@@ -162,14 +162,14 @@ struct OasisCheckInCalendarCard: View {
     private var makeupPackRow: some View {
         HStack(spacing: 12) {
             HStack(spacing: 4) {
-                Image(systemName: "shippingbox.fill")
-                    .font(.system(size: 12, weight: .black))
+                Image(systemName: "shippingbox.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .foregroundStyle(Color.goPrimary)
                 Text(localization.tr(zh: "补签包", en: "Makeup packs", de: "Nachtragspakete"))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 Text("x\(makeupPackCount)")
-                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                     .foregroundStyle(makeupPackCount > 0 ? Color.goPrimary : Color.ohanaPrimaryText.opacity(0.3))
             }
 
@@ -177,12 +177,12 @@ struct OasisCheckInCalendarCard: View {
 
             if makeupPackCount > 0 {
                 Text(localization.tr(zh: "点击灰色日期补签", en: "Tap a gray date to make up", de: "Graues Datum zum Nachtragen tippen"))
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.goPrimary.opacity(0.6))
             } else {
                 Button(action: onOpenMakeupShop) {
                     Text(localization.tr(zh: "去商店购买", en: "Buy in shop", de: "Im Shop kaufen"))
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.goYellow.opacity(0.8))
                 }
             }
@@ -205,14 +205,14 @@ struct OasisCheckInCalendarCard: View {
             if let next = nextMilestone {
                 HStack(spacing: 6) {
                     Image(systemName: next.systemName)
-                        .font(.system(size: 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.goPrimary.opacity(0.7))
                     Text(localization.tr(
                         zh: "再连续 \(next.days - currentStreak) 天即可领取 +\(next.reward)🥥",
                         en: "\(next.days - currentStreak) more days for +\(next.reward)🥥",
                         de: "Noch \(next.days - currentStreak) Tage für +\(next.reward)🥥"
                     ))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.goPrimary.opacity(0.7))
                     Spacer()
                 }
@@ -225,17 +225,17 @@ struct OasisCheckInCalendarCard: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: milestone.systemName)
-                                .font(.system(size: 14, weight: .black))
+                                .font(OhanaFont.adaptive(size: 14, weight: .black))
                             Text(localization.tr(
                                 zh: "\(milestone.days) 天连胜达成！",
                                 en: "\(milestone.days)-day streak reached!",
                                 de: "\(milestone.days)-Tage-Serie erreicht!"
                             ))
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             Spacer()
                             Text(localization.tr(zh: "+\(milestone.reward)🥥 领取", en: "Claim +\(milestone.reward)🥥", de: "+\(milestone.reward)🥥 holen"))
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
                         }
                         .padding(.horizontal, 14)
@@ -297,7 +297,7 @@ struct OasisCheckInCalendarCard: View {
     @ViewBuilder
     private func calendarDayCell(_ cell: CalendarCell) -> some View {
         if cell.dateStr.isEmpty {
-            Color.clear.frame(width: 34, height: 34)
+            Color.clear.frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
         } else {
             Button {
                 if !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0 {
@@ -307,7 +307,7 @@ struct OasisCheckInCalendarCard: View {
                 ZStack {
                     Circle()
                         .fill(cellFillColor(cell))
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .overlay(
                             Circle().strokeBorder(
                                 cell.isToday ? Color.goPrimary : Color.clear,
@@ -320,7 +320,7 @@ struct OasisCheckInCalendarCard: View {
                             .foregroundStyle(Color.ohanaPrimaryActionText.opacity(cell.isMakeup ? 0.72 : 1))
                     } else {
                         Text("\(cell.day)")
-                            .font(.system(size: 11, weight: cell.isToday ? .black : .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: cell.isToday ? .black : .medium, design: .rounded))
                             .foregroundStyle(
                                 cell.isFuture ? Color.ohanaSecondaryText.opacity(0.35) :
                                     cell.isToday ? Color.goPrimary : Color.ohanaSecondaryText

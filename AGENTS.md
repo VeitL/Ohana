@@ -54,10 +54,10 @@ Local command-line builds and tests must target the fixed simulator `platform=iO
 Rules in this file and `docs/` are enforced mechanically, not only by memory.
 `.github/workflows/ci.yml` runs on every push and pull request:
 
-- `audits`: repo audits (UI V4, accessibility, and smoothness changed-file
-  strict gates plus the full-repo baseline ratchet; full-repo runtime guardrails,
-  localization coverage, release data-safety, governance manifests, resource
-  integrity / xattr pre-sign checks, git size).
+- `audits`: repo audits (UI V4, accessibility, and smoothness whole-repo strict
+  gates; full-repo runtime guardrails, localization coverage, release
+  data-safety, governance manifests, resource integrity / xattr pre-sign checks,
+  git size).
 - `lint`: SwiftLint (`.swiftlint.yml`) and SwiftFormat (`.swiftformat`).
 - `build-test`: `xcodebuild test` on the fixed iPhone 17 simulator.
 
@@ -67,15 +67,12 @@ enforced automatically rather than as prose. The `build-test` job requires a
 runner whose Xcode ships the iOS 26 SDK and an iPhone 17 simulator; see
 `docs/os-support-matrix.md`.
 
-UI/accessibility/smoothness are no longer changed-file-only. CI runs changed-file
-strict gates and `scripts/audit-full-scope-ratchet.sh`, which scans the whole
-repo and fails if any file/rule warning count grows beyond
-`docs/governance/manifests/full-scope-audit-baseline.json`. That baseline may
-only shrink after cleanup. Once the full-scope baseline reaches zero, replace the
-ratchet with direct `scripts/audit-ui-v4.sh --all`,
-`scripts/audit-accessibility.sh --all`, and
-`scripts/audit-smoothness-risk.sh --all` strict gates. SwiftFormat remains the
-last report-only ratchet until its baseline is formatted and committed.
+UI/accessibility/smoothness are full-repo strict gates. CI runs
+`scripts/audit-ui-v4.sh --all`, `scripts/audit-accessibility.sh --all`, and
+`scripts/audit-smoothness-risk.sh --all`; these baselines are now zero and must
+stay zero. `docs/governance/manifests/full-scope-audit-baseline.json` is retained
+as historical promotion evidence, not as a debt allowance. SwiftFormat remains
+the last report-only ratchet until its baseline is formatted and committed.
 
 ## Parallel Agent & Build Isolation
 

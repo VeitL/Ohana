@@ -14,10 +14,15 @@ struct QuickPottySheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
 
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var selectedType: PottyType = .perfectPoop
     @State private var date = Date()
+    @State private var isSaving = false
 
     private var l: L10n { L10n(appLanguage) }
+    private var commandExecutor: QuickPottyCommandExecutor {
+        QuickPottyCommandExecutor(context: modelContext)
+    }
 
     var body: some View {
         ZStack {
@@ -30,8 +35,8 @@ struct QuickPottySheet: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
+                        Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -40,7 +45,7 @@ struct QuickPottySheet: View {
 
                 // 执行人胶囊
                 HStack {
-                    ExecutorPickerBar(tint: Color.goYellow)
+                    ExecutorPickerBarRouteContainer(tint: Color.goYellow)
                     Spacer()
                 }
                 .padding(.horizontal, 20)
@@ -50,7 +55,7 @@ struct QuickPottySheet: View {
                     ForEach(PottyType.allCases, id: \.rawValue) { type in
                         Button { selectedType = type } label: {
                             VStack(spacing: 8) {
-                                Text(type.emoji).font(.system(size: 32))
+                                Text(type.emoji).font(OhanaFont.adaptive(size: 32)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 Text(type.localizedLabel(l))
                                     .font(OhanaFont.caption(.bold))
                                     .foregroundStyle(selectedType == type ? Color.arkInk : .primary.opacity(0.4))
@@ -84,31 +89,49 @@ struct QuickPottySheet: View {
                 // 记录按钮
                 Button { savePotty() } label: {
                     HStack(spacing: 8) {
-                        Text(selectedType.emoji).font(.system(size: 16))
+                        Text(selectedType.emoji).font(OhanaFont.adaptive(size: 16)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text(l.tr(zh: "记录 \(selectedType.localizedLabel(l))", en: "Log \(selectedType.localizedLabel(l))", de: "\(selectedType.localizedLabel(l)) loggen"))
                             .font(OhanaFont.headline(.black))
                     }
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
-                    .background(Color.goYellow, in: Capsule())
+                    .background(isSaving ? Color.goYellow.opacity(0.72) : Color.goYellow, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .disabled(isSaving)
                 .padding(.horizontal, 20)
 
                 Spacer()
             }
         }
+        .onDisappear {
+            isSaving = false
+            commandQueue.cancelAll()
+        }
     }
 
     private func savePotty() {
+        guard !isSaving else { return }
         let eid = UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 }
         let isLitter = ["猫","兔子","仓鼠","龙猫","豚鼠"].contains(pet.species)
-        if isLitter {
-            CareEventService.recordCare(pet: pet, type: .litter, context: modelContext, executorId: eid, reward: .potty(isLitter: true), date: date)
-        } else {
-            CareEventService.recordPotty(pet: pet, type: selectedType, context: modelContext, executorId: eid, date: date)
+        let action = isLitter ? CareType.litter.rawValue : selectedType.rawValue
+        isSaving = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(.quickCare(entityID: pet.id, action: action)) {
+            let result = commandExecutor.record(
+                petID: pet.id,
+                selectedType: selectedType,
+                isLitter: isLitter,
+                executorId: eid,
+                date: date
+            )
+            isSaving = false
+            guard result != nil else {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
         }
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        dismiss()
     }
 }

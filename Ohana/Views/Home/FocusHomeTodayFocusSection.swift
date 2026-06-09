@@ -8,11 +8,7 @@
 import SwiftUI
 
 struct FocusHomeTodayFocusSection: View {
-    let activePets: [Pet]
-    let plants: [Plant]
-    let reminders: [Reminder]
-    let humans: [Human]
-    let events: [Event]
+    let snapshot: TodayFocusSnapshot
     let activePet: Pet?
     let showFirstSuccessCard: Bool
     let firstQuickCheckInCompleted: Bool
@@ -36,12 +32,7 @@ struct FocusHomeTodayFocusSection: View {
 
             TodayFocusCarousel(cardMargin: cardMargin, animation: animation) { cardWidth in
                 TodayFocusQuestCardHost(
-                    pets: activePets,
-                    plants: plants,
-                    reminders: reminders,
-                    humans: humans,
-                    events: events,
-                    activePet: activePet,
+                    snapshot: snapshot,
                     isLive: !isExpanded,
                     onOpenQuest: onOpenQuest,
                     onCompleteQuest: onCompleteQuest,

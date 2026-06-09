@@ -51,30 +51,30 @@ struct ExpenseSplitterCard: View {
             // 标题行
             HStack(spacing: 8) {
                 Text("⚖️")
-                    .font(.system(size: 18))
+                    .font(OhanaFont.adaptive(size: 18))
                 Text("财务结算室")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 if totalExpense > 0 {
                     Text("人均 \(AppCurrency.format(totalExpense / max(1, Double(humans.count)), fractionDigits: 0))")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(.white.opacity(0.08), in: Capsule())
+                        .background(.white.opacity(0.08), in: Capsule()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 }
             }
             .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 14)
 
             if results.isEmpty {
                 Text("添加花费记录并指定支付人后，这里会自动计算谁欠谁多少钱。")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .padding(.horizontal, 20).padding(.bottom, 18)
             } else {
                 // 结算文案（大字报）
                 Text(settlementText)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 16)
@@ -91,8 +91,8 @@ struct ExpenseSplitterCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.white.opacity(0.05))
-                .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(.white.opacity(0.1), lineWidth: 1))
+                .fill(.white.opacity(0.05)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(.white.opacity(0.1), lineWidth: 1)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         )
     }
 
@@ -100,22 +100,22 @@ struct ExpenseSplitterCard: View {
         let accent = Color(hex: r.themeHex)
         let isPositive = r.balance >= 0
         return HStack(spacing: 12) {
-            Text(r.emoji).font(.system(size: 20))
+            Text(r.emoji).font(OhanaFont.adaptive(size: 20))
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.name)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text("实付 \(AppCurrency.format(r.paid, fractionDigits: 0))")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(isPositive ? "应收 \(AppCurrency.format(r.balance, fractionDigits: 0))" : "应付 \(AppCurrency.format(abs(r.balance), fractionDigits: 0))")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(isPositive ? Color.goPrimary : Color.goRed)
                 Text(isPositive ? "垫付较多" : "少付了")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 9, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             }
         }

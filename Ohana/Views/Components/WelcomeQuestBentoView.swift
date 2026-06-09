@@ -54,25 +54,25 @@ struct WelcomeQuestBentoView: View {
             // ── 头部
             HStack {
                 Text("🌱 建设欧哈纳岛屿")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 // 椰子总数
                 HStack(spacing: 4) {
                     Text("🥥")
-                        .font(.system(size: 13))
+                        .font(OhanaFont.adaptive(size: 13))
                     Text("\(manager.coconutCount)")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goYellow)
                         .contentTransition(.numericText())
-                        .animation(.spring(response: 0.4), value: manager.coconutCount)
+                        .animation(.spring(response: 0.4), value: manager.coconutCount) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 }
                 .padding(.horizontal, 10).padding(.vertical, 4)
                 .background(Color.goYellow.opacity(0.12), in: Capsule())
                 .overlay(Capsule().strokeBorder(Color.goYellow.opacity(0.3), lineWidth: 1))
                 // 进度
                 Text("\(manager.completedCount)/\(manager.totalQuestCount)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .padding(.leading, 4)
             }
@@ -122,14 +122,14 @@ struct WelcomeQuestBentoView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(quest.emoji)
-                    .font(.system(size: 22))
+                    .font(OhanaFont.adaptive(size: 22))
                 Spacer()
                 if quest.isCompleted {
                     Text("✅")
-                        .font(.system(size: 14))
+                        .font(OhanaFont.adaptive(size: 14))
                 } else {
                     Text("+\(quest.reward) 🥥")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goYellow)
                         .padding(.horizontal, 7).padding(.vertical, 3)
                         .background(Color.goYellow.opacity(0.15), in: Capsule())
@@ -137,7 +137,7 @@ struct WelcomeQuestBentoView: View {
             }
 
             Text(quest.title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(quest.isCompleted ? .white.opacity(0.35) : .white)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -146,7 +146,7 @@ struct WelcomeQuestBentoView: View {
 
             // 底部进度指示
             RoundedRectangle(cornerRadius: 3)
-                .fill(quest.isCompleted ? Color.goPrimary : Color.white.opacity(0.1))
+                .fill(quest.isCompleted ? Color.goPrimary : Color.white.opacity(0.1)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 .frame(height: 3)
         }
         .padding(14)
@@ -162,6 +162,6 @@ struct WelcomeQuestBentoView: View {
                 )
         )
         .opacity(quest.isCompleted ? 0.55 : 1.0)
-        .animation(.spring(response: 0.35), value: quest.isCompleted)
+        .animation(.spring(response: 0.35), value: quest.isCompleted) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
 }

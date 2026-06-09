@@ -26,11 +26,11 @@ struct DesignSpecStepRailV4: View {
                             VStack(alignment: .leading, spacing: 0) {
                                 Text(item.zh)
                                 Text(item.en)
-                                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                                     .opacity(0.70)
                             }
                         }
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(step == item ? Color.arkInk : palette.primaryText)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
@@ -156,17 +156,17 @@ struct DesignSpecControlsPanelV4: View {
     private func optionChip(_ option: DesignSpecOptionV4, selected: Bool) -> some View {
         HStack(spacing: 6) {
             Image(systemName: option.icon)
-                .font(.system(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
                 .foregroundStyle(selected ? Color.arkInk : palette.accent)
             VStack(alignment: .leading, spacing: 0) {
                 Text(option.zh)
                 Text(option.en)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                     .opacity(0.68)
             }
             if option.recommended {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 7, weight: .black))
+                Image(systemName: "star.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    .font(OhanaFont.adaptive(size: 7, weight: .black))
             }
         }
         .font(DesignSpecUIV4.typeFont(11, weight: .black, selection: selection))
@@ -231,7 +231,7 @@ struct DesignSpecAuditPanelV4: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: result.icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                     .foregroundStyle(tint)
                 Spacer()
                 Text(result.status.rawValue.uppercased())

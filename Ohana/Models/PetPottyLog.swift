@@ -8,7 +8,7 @@
 import SwiftData
 import Foundation
 
-enum PottyType: String, Codable, CaseIterable {
+nonisolated enum PottyType: String, Codable, CaseIterable {
     case perfectPoop = "完美便便"
     case softPoop = "软便"
     case liquidPoop = "水便"

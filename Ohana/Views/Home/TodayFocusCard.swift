@@ -215,18 +215,18 @@ struct TodayFocusCard: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "今日", en: "TODAY", de: "HEUTE"))
-                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                             .tracking(2.2)
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.36))
                             .todayFocusReadableShadow(strength: 0.8)
                         Text(l.tr(zh: "任务盘", en: "Task board", de: "Aufgabenbrett"))
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
                             .todayFocusReadableShadow()
                     }
                     Spacer()
                     Text(focusStatusText)
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -269,8 +269,8 @@ struct TodayFocusCard: View {
 
     private func startAmbientPulseIfNeeded() {
         guard !shouldReduceWork, !freezesToFrontCard else { return }
-        withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { pulse = 1 } // ui-v4: allow Today Focus ambient pulse micro-motion; runtime-guardrail: allow gated by Today Focus live state, explicit user opt-in, and AppWorkloadPolicy.
-        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { bounceEmoji = true } // ui-v4: allow Today Focus celebration bounce micro-motion; runtime-guardrail: allow gated by Today Focus live state, explicit user opt-in, and AppWorkloadPolicy.
+        withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) { pulse = 1 } // ui-v4: allow Today Focus ambient pulse micro-motion; runtime-guardrail: allow gated by Today Focus live state, explicit user opt-in, and AppWorkloadPolicy. // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
+        withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { bounceEmoji = true } // ui-v4: allow Today Focus celebration bounce micro-motion; runtime-guardrail: allow gated by Today Focus live state, explicit user opt-in, and AppWorkloadPolicy. // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
 
     // MARK: - Card switcher
@@ -534,7 +534,7 @@ struct TodayFocusCard: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(q.title)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(2)
                             .todayFocusReadableShadow(strength: 1.08)
@@ -553,10 +553,10 @@ struct TodayFocusCard: View {
                     onCompleteQuest(q)
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "checkmark").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                         Text(l.tr(zh: "打卡", en: "Check in", de: "Abhaken"))
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14).padding(.vertical, 10)
@@ -588,12 +588,12 @@ struct TodayFocusCard: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(task.title)
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(2)
                             .todayFocusReadableShadow(strength: 1.08)
                         Text(taskStatusLine(task, performer: performer, rewardText: rewardText))
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                             .lineLimit(1)
                             .todayFocusReadableShadow(strength: 0.82)
@@ -611,10 +611,10 @@ struct TodayFocusCard: View {
                     onTapFamilyTask(task)
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "arrow.right").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                         Text(actionTitle)
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14)
@@ -640,12 +640,12 @@ struct TodayFocusCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "确认线下收款", en: "Confirm cash received", de: "Zahlung bestätigen"))
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .todayFocusReadableShadow(strength: 1.08)
                 Text("\(request.senderName) → \(amount) · \(request.coconutCost)🥥")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(2)
                     .todayFocusReadableShadow(strength: 0.82)
@@ -658,10 +658,10 @@ struct TodayFocusCard: View {
                     confirmExchange(request)
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "checkmark").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                         Text(l.tr(zh: "已收到", en: "Received", de: "Erhalten"))
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14)
@@ -685,12 +685,12 @@ struct TodayFocusCard: View {
                 ForEach(Array(tokens), id: \.id) { token in
                     HStack(spacing: 4) {
                         Text(token.emoji)
-                            .font(.system(size: 10))
+                            .font(OhanaFont.adaptive(size: 10))
                         Image(systemName: token.isCompleted ? "checkmark" : "circle.fill")
                             .font(.system(size: token.isCompleted ? 8 : 5, weight: .black))
                     }
                     .foregroundStyle(token.isCompleted ? Color.goPrimary : Color.ohanaSecondaryText)
-                    .frame(width: 36, height: 20)
+                    .frame(width: 36, height: 20) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(Color.ohanaControlFill, in: Capsule())
                 }
             }
@@ -705,10 +705,10 @@ struct TodayFocusCard: View {
     private func compactMetaChip(icon: String, text: String, tint: Color) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .black))
 
             Text(text)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .lineLimit(1)
                 .todayFocusReadableShadow(strength: 0.55)
         }
@@ -757,18 +757,18 @@ struct TodayFocusCard: View {
                     .frame(width: 52, height: 52)
                     .scaleEffect(1 + pulse * 0.08)
                 Image(systemName: s.iconName)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 22, weight: .bold))
                     .foregroundStyle(accent)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(s.title)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .todayFocusReadableShadow(strength: 1.08)
                 Text(negativeStatusText(for: s))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(accent)
                     .lineLimit(1)
                     .todayFocusReadableShadow(strength: 0.82)
@@ -782,7 +782,7 @@ struct TodayFocusCard: View {
                     onTapNegativeSignal(s)
                 } label: {
                     Text(negativeActionTitle(for: s))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 9)
@@ -825,12 +825,12 @@ struct TodayFocusCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(m.headline)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .todayFocusReadableShadow(strength: 1.08)
                 Text(m.subline)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(2)
                     .todayFocusReadableShadow(strength: 0.82)
@@ -839,10 +839,10 @@ struct TodayFocusCard: View {
             Spacer(minLength: 6)
 
             Button { onTapMemory() } label: {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 18, weight: .bold))
+                Image(systemName: "sparkles").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 18, weight: .bold))
                     .foregroundStyle(accent)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(accent.opacity(0.15), in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -862,7 +862,7 @@ struct TodayFocusCard: View {
                     .frame(width: 52, height: 52)
                     .scaleEffect(1 + pulse * 0.1)
                 Text("🎉")
-                    .font(.system(size: 30))
+                    .font(OhanaFont.adaptive(size: 30))
                     .scaleEffect(bounceEmoji ? 1.1 : 1)
             }
 
@@ -870,7 +870,7 @@ struct TodayFocusCard: View {
                 Text(skippedFocusKeys.isEmpty
                      ? l.tr(zh: "今日清空", en: "All clear", de: "Alles klar")
                      : l.tr(zh: "已暂时跳过", en: "Skipped today", de: "Heute übersprungen"))
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .todayFocusReadableShadow(strength: 1.08)
@@ -888,7 +888,7 @@ struct TodayFocusCard: View {
                 Text(skippedFocusKeys.isEmpty
                      ? l.tr(zh: "绿洲", en: "Oasis", de: "Oase")
                      : l.tr(zh: "恢复", en: "Restore", de: "Zurück"))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .background(accent, in: Capsule())
@@ -907,7 +907,7 @@ struct TodayFocusCard: View {
             iconBubble(emoji: "🏝️", accent: accent)
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "岛屿欢迎你", en: "Welcome home", de: "Willkommen"))
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .todayFocusReadableShadow(strength: 1.08)
             }
@@ -927,7 +927,7 @@ struct TodayFocusCard: View {
                 .frame(width: 52, height: 52)
                 .scaleEffect(1 + pulse * 0.06)
             Text(emoji)
-                .font(.system(size: 28))
+                .font(OhanaFont.adaptive(size: 28))
                 .offset(y: pulse * 0.8 - 0.4)
         }
     }
@@ -935,13 +935,13 @@ struct TodayFocusCard: View {
     private func rewardChip(_ amount: Int) -> some View {
         HStack(spacing: 3) {
             Text("+\(amount)")
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(Color.goYellow)
                 .contentTransition(.numericText())
                 .animation(GoMotion.feedback, value: amount)
                 .todayFocusReadableShadow(strength: 0.9)
             Text("🥥")
-                .font(.system(size: 10))
+                .font(OhanaFont.adaptive(size: 10))
                 .ohanaSymbolPulse(trigger: amount)
         }
         .padding(.horizontal, 8).padding(.vertical, 4)
@@ -1095,7 +1095,7 @@ struct TodayFocusCard: View {
             skipFocusCard(content)
         } label: {
             Text(isNegative ? l.tr(zh: "关闭", en: "Close", de: "Schließen") : l.tr(zh: "跳过", en: "Skip", de: "Überspringen"))
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.58))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)

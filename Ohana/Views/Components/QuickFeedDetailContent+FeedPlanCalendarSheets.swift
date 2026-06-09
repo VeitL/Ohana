@@ -5,16 +5,16 @@ extension QuickFeedDetailContent {
     var manualFeedSettingSummary: some View {
         HStack(spacing: 12) {
             Image(systemName: pet.mainFoodKind.systemIconName)
-                .font(.system(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "当前打卡设置", en: "Current log setting", de: "Aktuelle Einstellung"))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(manualFeedSettingSummaryText)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -23,10 +23,10 @@ extension QuickFeedDetailContent {
             Button {
                 openManualFeedSheet(settingsOnly: true)
             } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "slider.horizontal.3").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goPrimary, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -57,10 +57,10 @@ extension QuickFeedDetailContent {
                 Button {
                     shiftFeedPlanCalendarMonth(by: -1)
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "chevron.left").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .feedFlatBlockSurface(cornerRadius: 14)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -72,10 +72,10 @@ extension QuickFeedDetailContent {
                 } label: {
                     HStack(spacing: 6) {
                         Text(feedPlanCalendarMonthTitle)
-                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Image(systemName: draftStore.showFeedPlanMonthPicker ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .black))
+                            .font(OhanaFont.adaptive(size: 10, weight: .black))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     .padding(.horizontal, 4)
@@ -88,7 +88,7 @@ extension QuickFeedDetailContent {
                     setFeedPlanCalendarMonth(today, direction: direction)
                 } label: {
                     Text(l.tr(zh: "今天", en: "Today", de: "Heute"))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .padding(.horizontal, 12)
                         .frame(height: 36)
@@ -98,10 +98,10 @@ extension QuickFeedDetailContent {
                 Button {
                     shiftFeedPlanCalendarMonth(by: 1)
                 } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .feedFlatBlockSurface(cornerRadius: 14)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -149,26 +149,26 @@ extension QuickFeedDetailContent {
                 Button {
                     setFeedPlanCalendarYear(year - 1)
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 12, weight: .black))
+                    Image(systemName: "chevron.left").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 34)
+                        .frame(width: 36, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .feedFlatBlockSurface(cornerRadius: 13)
                 }
                 .buttonStyle(ScaleButtonStyle())
 
                 Text(feedPlanPlainYearText(year))
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity)
 
                 Button {
                     setFeedPlanCalendarYear(year + 1)
                 } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .black))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 34)
+                        .frame(width: 36, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .feedFlatBlockSurface(cornerRadius: 13)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -181,7 +181,7 @@ extension QuickFeedDetailContent {
                         selectFeedPlanCalendarMonth(year: year, month: month)
                     } label: {
                         Text(feedPlanMonthTitle(month, year: year))
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                             .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 34)
@@ -293,16 +293,16 @@ extension QuickFeedDetailContent {
         let actionTitle = feedPlanActionTitle(for: occurrence)
         return HStack(spacing: 10) {
             Image(systemName: status.icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(status.tint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(status.title)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text("\(occurrence.date.formatted(date: .omitted, time: .shortened)) · \(event.foodKind.title(l)) · \(grams)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
@@ -311,7 +311,7 @@ extension QuickFeedDetailContent {
                     completeSelectedPlanOccurrence(occurrence)
                 } label: {
                     Text(actionTitle)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)

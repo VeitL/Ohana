@@ -127,14 +127,14 @@ struct IslandWealthDashboardView: View {
     private var navBar: some View {
         HStack {
             Text("Ohana财富")
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
             .buttonStyle(ScaleButtonStyle())
         }
@@ -149,14 +149,14 @@ struct IslandWealthDashboardView: View {
     private var totalAssetsRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(wealthScopeTitle)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.goPrimary.opacity(0.7))
             Text("\(vm.displayedAssets)")
-                .font(.system(size: 52, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 52, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .ohanaNumericMotion(vm.displayedAssets)
             Text("🥥")
-                .font(.system(size: 30))
+                .font(OhanaFont.adaptive(size: 30))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
@@ -202,19 +202,19 @@ struct IslandWealthDashboardView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .foregroundStyle(valueColor.opacity(0.7))
                 Text(label)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             }
             Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(valueColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.58)
             Text("🥥")
-                .font(.system(size: 16))
+                .font(OhanaFont.adaptive(size: 16))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -247,15 +247,15 @@ struct IslandWealthDashboardView: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("收支趋势")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.62))
                     Text(selectedCoconutActorId == nil ? "全岛收入 / 花费" : "\(wealthScopeTitle) 收入 / 花费")
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.36))
                 }
                 Spacer()
                 Text(vm.periodNet >= 0 ? "+\(vm.periodNet)🥥" : "\(vm.periodNet)🥥")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(vm.periodNet >= 0 ? incomeTint : spendingTint)
                     .ohanaNumericMotion(vm.periodNet)
             }
@@ -279,15 +279,15 @@ struct IslandWealthDashboardView: View {
 
             HStack(spacing: 10) {
                 HStack(spacing: 5) {
-                    Circle().fill(incomeTint).frame(width: 7, height: 7)
+                    Circle().fill(incomeTint).frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     Text("+\(vm.periodIncome) 收入")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.58))
                 }
                 HStack(spacing: 5) {
-                    Circle().fill(spendingTint.opacity(0.86)).frame(width: 7, height: 7)
+                    Circle().fill(spendingTint.opacity(0.86)).frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     Text("-\(vm.periodSpending) 花费")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.58))
                 }
                 Spacer()
@@ -299,9 +299,9 @@ struct IslandWealthDashboardView: View {
     private var emptyChart: some View {
         VStack(spacing: 12) {
             Text("🥥")
-                .font(.system(size: 52))
+                .font(OhanaFont.adaptive(size: 52))
             Text("立刻去打卡赚取第一桶金吧！")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
         }
         .frame(maxWidth: .infinity)
@@ -315,11 +315,11 @@ struct IslandWealthDashboardView: View {
         VStack(spacing: 0) {
             if vm.leaderboard.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "trophy")
-                        .font(.system(size: 36))
+                    Image(systemName: "trophy").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 36))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     Text("完成打卡即可解锁财富榜 ✨")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 }
                 .frame(maxWidth: .infinity)
@@ -329,7 +329,7 @@ struct IslandWealthDashboardView: View {
                 VStack(spacing: 10) {
                     HStack {
                         Text("财富榜")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         Spacer()
                     }
@@ -363,9 +363,9 @@ struct IslandWealthDashboardView: View {
                               rank == 2 ? Color(hex: "FFF44F").opacity(0.55) :
                               rank == 3 ? Color.goTeal.opacity(0.5) :
                               Color.ohanaCardSurface.opacity(0.74))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     Text("\(rank)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(rank <= 3 ? Color.arkInk : Color.ohanaSecondaryText)
                 }
 
@@ -377,18 +377,18 @@ struct IslandWealthDashboardView: View {
                             .blur(radius: 6)
                         Circle()
                             .strokeBorder(Color.goPrimary, lineWidth: 2)
-                            .frame(width: 42, height: 42)
+                            .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     }
                     Text(row.emoji)
-                        .font(.system(size: 20))
-                        .frame(width: 38, height: 38)
+                        .font(OhanaFont.adaptive(size: 20))
+                        .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .background(accent.opacity(0.12), in: Circle())
                 }
                 .frame(width: 44, height: 44)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(row.name)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     GeometryReader { geo in
@@ -409,7 +409,7 @@ struct IslandWealthDashboardView: View {
                 Spacer(minLength: 8)
 
                 Text("\(row.amount)🥥")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .padding(.horizontal, 9).padding(.vertical, 4)
                     .background((isSelected ? Color.goPrimary : accent).opacity(isSelected ? 0.24 : 0.14), in: Capsule())
@@ -429,7 +429,7 @@ struct IslandWealthDashboardView: View {
 
     private func leaderStatPill(text: String, tint: Color) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
             .foregroundStyle(tint)
             .lineLimit(1)
             .minimumScaleFactor(0.7)

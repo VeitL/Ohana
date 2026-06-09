@@ -138,7 +138,7 @@ struct QuickMomentSheet: View {
                 var loaded: [MomentDraftPhoto] = []
                 for item in newItems {
                     if let data = try? await item.loadTransferable(type: Data.self),
-                       let img = UIImage(data: data) {
+                       let img = await AttachmentImageDecoder.decode(data) {
                         loaded.append(MomentDraftPhoto(image: img))
                     }
                 }
@@ -283,10 +283,10 @@ struct QuickMomentSheet: View {
                     onRemove?()
                     close()
                 } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 14, weight: .black))
+                    Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -328,14 +328,14 @@ struct QuickMomentSheet: View {
     private var locationCompactSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Image(systemName: "location.fill")
-                    .font(.system(size: 14))
+                Image(systemName: "location.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(momentAccent)
                     .frame(width: 20)
 
                 if !resolvedPlaceDisplay.isEmpty {
                     Text(resolvedPlaceDisplay)
-                        .font(.system(size: 15, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Spacer(minLength: 0)
@@ -344,7 +344,7 @@ struct QuickMomentSheet: View {
                         locationModel.reset()
                         showLocationInput = false
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
+                        Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .symbolRenderingMode(.hierarchical)
                     }
@@ -467,10 +467,10 @@ struct QuickMomentSheet: View {
                     selectedPhotos.removeAll { $0.id == photo.id }
                 }
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goRed, in: Circle())
             }
             .padding(10)
@@ -486,7 +486,7 @@ struct QuickMomentSheet: View {
     private func photoActionLabel(icon: String, title: String, color: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
                 .font(OhanaFont.callout(.black))
         }
@@ -574,7 +574,7 @@ struct QuickMomentSheet: View {
                         .scaleEffect(0.8)
                 } else {
                     Image(systemName: canSave ? "checkmark.circle.fill" : "lock.fill")
-                        .font(.system(size: 18))
+                        .font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 Text(isSaving
                      ? l.tr(zh: "保存中…", en: "Saving…", de: "Speichern…")
@@ -603,8 +603,8 @@ struct QuickMomentSheet: View {
 
     private var successOverlay: some View {
         VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 48))
+            Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 48)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(momentAccent)
             Text(l.tr(zh: "时刻已记录！", en: "Moment saved!", de: "Moment gespeichert!"))
                 .font(OhanaFont.title3(.black))

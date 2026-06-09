@@ -195,20 +195,20 @@ struct IslandHygieneDashboard: View {
     private var navBar: some View {
         HStack {
             Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 15, weight: .bold))
+                Image(systemName: "chevron.left").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
 
             Spacer()
             Text(l.tr(zh: "清洁星球", en: "Clean Planet", de: "Putzplanet"))
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
-            Color.clear.frame(width: 36, height: 36)
+            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
         }
         .padding(.top, 50)
     }
@@ -245,7 +245,7 @@ struct IslandHygieneDashboard: View {
                     .fill(heroTint.opacity(0.16))
                     .frame(width: 62, height: 62)
                 Image(systemName: overdueCount > 0 ? "exclamationmark.bubbles.fill" : "bubbles.and.sparkles.fill")
-                    .font(.system(size: 26, weight: .black))
+                    .font(OhanaFont.adaptive(size: 26, weight: .black))
                     .foregroundStyle(heroTint)
                     .scaleEffect(chartProgress > 0.5 ? 1 : 0.92)
             }
@@ -257,7 +257,7 @@ struct IslandHygieneDashboard: View {
 
                 HStack(alignment: .lastTextBaseline, spacing: 6) {
                     Text("\(overdueCount > 0 ? overdueCount : todayCount)")
-                        .font(.system(size: 40, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 40, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .ohanaNumericMotion(overdueCount > 0 ? overdueCount : todayCount)
                     Text(overdueCount > 0 ? l.tr(zh: "项", en: "due", de: "fällig") : l.tr(zh: "次", en: "done", de: "erledigt"))
@@ -390,8 +390,8 @@ struct IslandHygieneDashboard: View {
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .black))
+            Image(systemName: "chevron.right").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
                 .foregroundStyle(Color.ohanaTertiaryText)
         }
         .padding(.vertical, 13)
@@ -430,22 +430,22 @@ struct IslandHygieneDashboard: View {
     private func selectorChip(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         selectorChip(title: title, avatar: {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
         }, isSelected: isSelected, action: action)
     }
 
     private func statBadge(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion(value)
                 Text(title)
-                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
         }
@@ -456,11 +456,11 @@ struct IslandHygieneDashboard: View {
         HStack(spacing: 4) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 8, weight: .black))
+                    .font(OhanaFont.adaptive(size: 8, weight: .black))
             }
             Text(text)
         }
-        .font(.system(size: 10, weight: .black, design: .rounded))
+        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
         .foregroundStyle(color)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -470,7 +470,7 @@ struct IslandHygieneDashboard: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .black))
+                .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text(text)
                 .font(OhanaFont.caption(.semibold))

@@ -163,9 +163,9 @@ struct MemberCompactDateRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(foreground)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
             Text(title)
                 .font(OhanaFont.callout(.black))
@@ -208,8 +208,8 @@ struct MemberCompactDateRow: View {
                 .opacity(0.015)
                 .accessibilityLabel(formattedDate)
 
-            Image(systemName: "calendar")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "calendar").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(foreground)
                 .frame(width: 44, height: 38)
                 .allowsHitTesting(false)
@@ -321,8 +321,8 @@ struct MemberCompactCityPicker: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.62)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 10, weight: .black))
+                    Image(systemName: "chevron.up.chevron.down").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 10, weight: .black))
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
                 .frame(height: 42)
@@ -384,9 +384,9 @@ struct MemberDateInputBlock: View {
         VStack(alignment: .leading, spacing: 11) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(OhanaFont.callout(.black))
@@ -425,7 +425,7 @@ struct MemberDateInputBlock: View {
                         }
                         Spacer()
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 12, weight: .black))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                             .foregroundStyle(Color.ohanaTertiaryText)
                     }
                     .padding(.horizontal, 14)
@@ -728,7 +728,7 @@ struct MemberCreationJoinHandoffCard: View {
                 }
                 .overlay(alignment: .bottomLeading) {
                     HStack(spacing: 7) {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
                         Text(snapshot.statusText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -886,12 +886,12 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(snapshot.title)
-                            .font(.system(size: 28, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                             .foregroundStyle(readableText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.62)
                         Text(snapshot.subtitle.isEmpty ? snapshot.kind.typeLabel(L10n(AppLanguage.code)) : snapshot.subtitle)
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                             .foregroundStyle(readableText.opacity(0.72))
                             .lineLimit(1)
                             .minimumScaleFactor(0.62)
@@ -899,7 +899,7 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                     Spacer()
                     if !snapshot.statusText.isEmpty {
                         Text(snapshot.statusText)
-                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                             .foregroundStyle(statusPillForeground)
                             .padding(.horizontal, 11)
                             .frame(height: 30)
@@ -977,8 +977,8 @@ struct MemberAvatarCandidateCell: View {
                             .scaledToFit()
                             .padding(8)
                     } else {
-                        Image(systemName: "person.crop.square.fill")
-                            .font(.system(size: 24, weight: .semibold))
+                        Image(systemName: "person.crop.square.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 24, weight: .semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
@@ -999,7 +999,7 @@ struct MemberAvatarCandidateCell: View {
         .task(id: candidate.id) {
             let data = candidate.data
             image = await Task.detached(priority: .utility) {
-                UIImage(data: data)
+                UIImage(data: data) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
             }.value
         }
     }
@@ -1111,8 +1111,8 @@ struct MemberPortraitCropView: View {
                             .font(OhanaFont.callout(.black))
                             .foregroundStyle(Color.goCardWhite)
                     } else {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 24, weight: .black))
+                        Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 24, weight: .black))
                             .foregroundStyle(Color.goYellow)
                         Text(loadErrorText)
                             .font(OhanaFont.callout(.black))

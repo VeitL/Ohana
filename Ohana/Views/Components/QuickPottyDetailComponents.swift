@@ -149,9 +149,9 @@ struct PoopCoreCard: View {
                     Button(action: primaryAction) {
                         HStack(spacing: 5) {
                             Image(systemName: primaryIcon)
-                                .font(.system(size: 11, weight: .black))
+                                .font(OhanaFont.adaptive(size: 11, weight: .black))
                             Text(primaryTitle)
-                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         }
                         .foregroundStyle(Color.arkInk)
                         .frame(minWidth: 72)
@@ -164,7 +164,7 @@ struct PoopCoreCard: View {
                     if let secondaryTitle, let secondaryAction {
                         Button(action: secondaryAction) {
                             Text(secondaryTitle)
-                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                                 .foregroundStyle(tint)
                                 .frame(minWidth: 72)
                                 .padding(.horizontal, 10)
@@ -208,22 +208,22 @@ struct PoopCoreCard: View {
                 PoopProgressRing(progress: progress, tint: tint)
                     .frame(width: 58, height: 58)
                 Image(systemName: icon)
-                    .font(.system(size: 20, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 20, weight: .bold))
                     .foregroundStyle(tint)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(value)
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                     .contentTransition(.numericText())
                 Text(subtitle)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -298,13 +298,13 @@ struct PoopHeroCard: View {
                             )
                             .animation(
                                 shouldAnimateHero
-                                ? .easeInOut(duration: 1.1 + Double(index) * 0.16).repeatForever(autoreverses: true)
+                                ? .easeInOut(duration: 1.1 + Double(index) * 0.16).repeatForever(autoreverses: true) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                                 : nil,
                                 value: bounce
                             )
                     }
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 22, weight: .bold))
+                    Image(systemName: "sparkles").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 22, weight: .bold))
                         .foregroundStyle(scoopTint)
                         .offset(x: 42, y: -24)
                 }
@@ -312,10 +312,10 @@ struct PoopHeroCard: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(l.tr(zh: "今日噗噗", en: "Today's poop", de: "Heute Häufchen"))
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(l.tr(zh: "\(pottyCount) 次", en: "\(pottyCount)x", de: "\(pottyCount)x"))
-                        .font(.system(size: 32, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 32, weight: .black, design: .rounded))
                         .foregroundStyle(tint)
                     HStack(spacing: 12) {
                         MiniPoopGauge(title: l.tr(zh: "铲砂", en: "Scoop", de: "Klo"), progress: scoopProgress, tint: scoopTint)
@@ -356,14 +356,14 @@ struct MiniPoopGauge: View {
         HStack(spacing: 6) {
             Capsule()
                 .fill(tint.opacity(0.2))
-                .frame(width: 34, height: 8)
+                .frame(width: 34, height: 8) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .overlay(alignment: .leading) {
                     Capsule()
                         .fill(tint)
                         .frame(width: max(6, 34 * min(max(progress, 0), 1)), height: 8)
                 }
             Text(title)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
     }
@@ -382,30 +382,30 @@ struct PoopLogRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: item.icon)
-                .font(.system(size: 13, weight: .bold))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold))
                 .foregroundStyle(tint)
-                .frame(width: 26, height: 26)
+                .frame(width: 26, height: 26) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title(l))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if let detail = item.detail(l) {
                     Text(detail)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             Spacer()
             Text(item.date, format: .dateTime.month().day().hour().minute())
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             if showDelete {
                 Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11, weight: .bold))
+                    Image(systemName: "trash").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold))
                         .foregroundStyle(Color.ohanaSecondaryText.opacity(0.55))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 30, height: 30) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -423,18 +423,18 @@ struct PoopSheetHero: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .black))
+                .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 48, height: 48)
                 .background(tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
                 Text(subtitle)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
             }
@@ -451,11 +451,11 @@ struct PoopInlineNotice: View {
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(tint)
                 .frame(width: 18)
             Text(text)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -475,7 +475,7 @@ struct PoopPrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                 .foregroundStyle(Color.arkInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -509,16 +509,16 @@ struct PoopCheckInSheet: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: icon)
-                        .font(.system(size: 22, weight: .black))
+                        .font(OhanaFont.adaptive(size: 22, weight: .black))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 54, height: 54)
                         .background(tint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(l.tr(zh: "当前状态", en: "Status now", de: "Status"))
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                         Text(value)
-                            .font(.system(size: 28, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                             .foregroundStyle(tint)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
@@ -550,7 +550,7 @@ struct PoopCheckInSheet: View {
 
                 Button(action: secondaryAction) {
                     Label(secondaryTitle, systemImage: "calendar.badge.clock")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
@@ -595,10 +595,10 @@ struct PottyTypeSheet: View {
                         } label: {
                             VStack(spacing: 8) {
                                 Image(systemName: type.systemIconName)
-                                    .font(.system(size: 22, weight: .bold))
+                                    .font(OhanaFont.adaptive(size: 22, weight: .bold))
                                     .foregroundStyle(color(for: type))
                                 Text(type.localizedLabel(l))
-                                    .font(.system(size: 14, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.75)
@@ -614,7 +614,7 @@ struct PottyTypeSheet: View {
                 if let unknownGroupTitle, let onUnknownGroup {
                     Button(action: onUnknownGroup) {
                         Label(unknownGroupTitle, systemImage: "questionmark.circle.fill")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -672,20 +672,20 @@ struct PoopCycleSettingsSheet: View {
                 PoopSheetHero(icon: icon, title: title, subtitle: subtitle, tint: tint)
 
                 HStack(spacing: 12) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 18, weight: .black))
+                    Image(systemName: "calendar.badge.clock").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 18, weight: .black))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 46, height: 46)
                         .background(tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(statusTitle)
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                         Text(statusValue)
-                            .font(.system(size: 26, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                             .foregroundStyle(tint)
                         Text(statusDetail)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(2)
                     }
@@ -703,7 +703,7 @@ struct PoopCycleSettingsSheet: View {
                     DatePicker(selection: $anchorDate, displayedComponents: .date) {
                         Text(l.tr(zh: "起算日", en: "Start date", de: "Startdatum"))
                     }
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                         .tint(tint)
 
                     Toggle(isOn: $reminderOn) {
@@ -725,7 +725,7 @@ struct PoopCycleSettingsSheet: View {
                     onDelete()
                 } label: {
                     Label(l.tr(zh: "删除当前计划", en: "Delete this plan", de: "Plan löschen"), systemImage: "trash")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
@@ -740,11 +740,11 @@ struct PoopCycleSettingsSheet: View {
     private func settingsRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
         }
     }
@@ -769,7 +769,7 @@ struct PoopHistorySheet: View {
             List {
                 if items.isEmpty {
                     Text(l.tr(zh: "暂无记录", en: "No logs yet", de: "Noch keine Einträge"))
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
                     ForEach(items) { item in

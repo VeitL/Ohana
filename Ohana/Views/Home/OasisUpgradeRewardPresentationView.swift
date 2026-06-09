@@ -46,10 +46,10 @@ struct OasisStageOpenedRewardCard: View {
                 Spacer(minLength: 0)
 
                 Button(action: onClose) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "checkmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .background(Color.goPrimary, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -90,10 +90,10 @@ struct OasisOpenedUpgradeRewardDockCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(reward.title(localization))
-                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(reward.detail(localization))
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
             }
@@ -101,10 +101,10 @@ struct OasisOpenedUpgradeRewardDockCard: View {
             Spacer()
 
             Button(action: onClose) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "checkmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goPrimary, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -222,7 +222,7 @@ private struct OasisCritterUnlockRewardCard: View {
 
             Button(action: onClose) {
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark.seal.fill")
+                    Image(systemName: "checkmark.seal.fill").accessibilityHidden(true)
                     Text(confirmTitle)
                 }
                 .font(OhanaFont.callout(.black))

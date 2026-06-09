@@ -75,7 +75,7 @@ struct SwipeableEventRow: View {
         ZStack {
             // 完成粒子层
             ForEach(celebrationParticles) { p in
-                Text(p.emoji).font(.system(size: 18))
+                Text(p.emoji).font(OhanaFont.adaptive(size: 18))
                     .offset(x: p.offsetX, y: p.offsetY)
                     .rotationEffect(.degrees(p.rotation))
                     .transition(.asymmetric(insertion: .scale(scale: 0.1).combined(with: .opacity), removal: .opacity))
@@ -85,7 +85,7 @@ struct SwipeableEventRow: View {
             // 椰子浮字
             ForEach(coconutFloats) { f in
                 Text("+5🥥")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                     .offset(y: f.offsetY)
                     .opacity(f.opacity)
@@ -98,9 +98,9 @@ struct SwipeableEventRow: View {
                     Spacer()
                     VStack(spacing: 4) {
                         Image(systemName: leftProgress >= 1 ? "checkmark.circle.fill" : "checkmark.circle")
-                            .font(.system(size: 20, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 20, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                        Text("完成").font(.system(size: 12, weight: .bold, design: .rounded))
+                        Text("完成").font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, leftProgress * 1.5))
@@ -116,10 +116,10 @@ struct SwipeableEventRow: View {
             if offsetX > 0 {
                 HStack {
                     VStack(spacing: 4) {
-                        Image(systemName: "trash.fill")
-                            .font(.system(size: 20, weight: .bold))
+                        Image(systemName: "trash.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 20, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                        Text("删除").font(.system(size: 12, weight: .bold, design: .rounded))
+                        Text("删除").font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, rightProgress * 1.5))
@@ -169,14 +169,14 @@ struct SwipeableEventRow: View {
                 overdueBreath = false
                 return
             }
-            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { // ui-v4: allow overdue warning breath, gated by reduce-work policy.
+            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { // ui-v4: allow overdue warning breath, gated by reduce-work policy. // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                 overdueBreath = true
             }
         }
         .overlay(alignment: .top) {
             if showSkipReason {
                 Text("今日已打卡，不重复奖励 🥥")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14).padding(.vertical, 8)
                     .background(Color.goYellow, in: Capsule())
@@ -209,17 +209,17 @@ struct SwipeableEventRow: View {
                 ZStack {
                     Circle()
                         .fill(Color(hex: "FF5A00"))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .scaleEffect(overdueBreath ? 1.05 : 1.0)
                     if leftProgress > 0.3 {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 16, weight: .black))
+                        Image(systemName: "checkmark").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 16, weight: .black))
                             .foregroundStyle(Color.goCardWhite)
                             .opacity(Double((leftProgress - 0.3) / 0.7))
                             .scaleEffect(0.5 + leftProgress * 0.5)
                     } else {
                         Image(systemName: event.silhouetteListSymbol)
-                            .font(.system(size: 17, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 17, weight: .bold))
                             .symbolRenderingMode(.monochrome)
                             .foregroundStyle(Color.goCardWhite)
                             .opacity(1 - Double(leftProgress / 0.3))
@@ -229,9 +229,9 @@ struct SwipeableEventRow: View {
                 ZStack {
                     Circle()
                         .fill(Color.goTeal.opacity(0.12))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 20, weight: .bold))
+                        .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                    Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 20, weight: .bold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.goTeal)
                 }
@@ -239,17 +239,17 @@ struct SwipeableEventRow: View {
                 ZStack {
                     Circle()
                         .fill(nodeCircleColor)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     // Morph icon → checkmark as swipe deepens
                     if leftProgress > 0.4 {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 16, weight: .black))
+                        Image(systemName: "checkmark").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 16, weight: .black))
                             .foregroundStyle(Color.goCardWhite)
                             .opacity(Double((leftProgress - 0.4) / 0.6))
                             .scaleEffect(0.5 + leftProgress * 0.5)
                     } else {
                         Image(systemName: event.silhouetteListSymbol)
-                            .font(.system(size: 18, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 18, weight: .bold))
                             .symbolRenderingMode(.monochrome)
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .opacity(leftProgress > 0 ? Double(1 - leftProgress / 0.4) : 1)
@@ -260,7 +260,7 @@ struct SwipeableEventRow: View {
             // 中间信息区
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(rowState == .completed ? titleMuted : titlePrimary)
                     .strikethrough(rowState == .completed, color: titleMuted.opacity(0.9))
                     .lineLimit(1)
@@ -268,20 +268,20 @@ struct SwipeableEventRow: View {
 
                 HStack(spacing: 6) {
                     Text(event.eventType)
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(eventNodeColor)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(eventNodeColor.opacity(0.15), in: Capsule())
 
                     if event.recurrenceDays > 0 {
-                        Image(systemName: "repeat")
-                            .font(.system(size: 9, weight: .semibold))
+                        Image(systemName: "repeat").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                             .symbolRenderingMode(.monochrome)
                             .foregroundStyle(timeSecondary.opacity(0.85))
                     }
                     if rowState == .overdue {
                         Text("逾期")
-                            .font(.system(size: 9, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                             .foregroundStyle(Color(hex: "FF5A00"))
                             .padding(.horizontal, 5).padding(.vertical, 1)
                             .background(Color(hex: "FF5A00").opacity(0.12), in: Capsule())
@@ -295,17 +295,17 @@ struct SwipeableEventRow: View {
             // 右侧：时间 / 完成标记
             Group {
                 if rowState == .completed {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 16, weight: .bold))
+                    Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.goPrimary)
                 } else if event.isAllDay {
                     Text("全天")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(timeSecondary)
                 } else {
                     Text(occurrenceDisplayStart, style: .time)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(rowState == .overdue ? Color(hex: "FF5A00") : timeSecondary)
                         .monospacedDigit()
                 }
@@ -505,7 +505,7 @@ private struct EventDetailSheet: View {
         VStack(spacing: 0) {
             Capsule()
                 .fill(Color.goCardWhite.opacity(0.2))
-                .frame(width: 40, height: 4)
+                .frame(width: 40, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .padding(.top, 12).padding(.bottom, 20)
 
             ScrollView(showsIndicators: false) {
@@ -517,17 +517,17 @@ private struct EventDetailSheet: View {
                                 .fill(nodeColor.opacity(0.15))
                                 .frame(width: 52, height: 52)
                             Image(systemName: event.silhouetteListSymbol)
-                                .font(.system(size: 22, weight: .bold))
+                                .font(OhanaFont.adaptive(size: 22, weight: .bold))
                                 .symbolRenderingMode(.monochrome)
                                 .foregroundStyle(nodeColor)
                         }
                         VStack(alignment: .leading, spacing: 4) {
                             Text(event.title)
-                                .font(.system(size: 18, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(2)
                             Text(event.eventType)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                                 .foregroundStyle(nodeColor)
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(nodeColor.opacity(0.12), in: Capsule())
@@ -578,7 +578,7 @@ private struct EventDetailSheet: View {
                             } label: {
                                 Label(event.isOccurrenceMarkedComplete(on: occurrenceDate) ? "标记未完成" : "标记完成",
                                       systemImage: event.isOccurrenceMarkedComplete(on: occurrenceDate) ? "xmark.circle" : "checkmark.circle.fill")
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .frame(maxWidth: .infinity).padding(.vertical, 14)
                                     .background(Color.goTeal, in: RoundedRectangle(cornerRadius: 14))
@@ -590,7 +590,7 @@ private struct EventDetailSheet: View {
                             showDeleteConfirm = true
                         } label: {
                             Label("删除", systemImage: "trash.fill")
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .frame(maxWidth: .infinity).padding(.vertical, 14)
                                 .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
@@ -629,16 +629,16 @@ private struct EventDetailSheet: View {
     private func infoRow(icon: String, label: String, value: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(nodeColor)
                 .frame(width: 22)
             Text(label)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             Spacer()
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 24)

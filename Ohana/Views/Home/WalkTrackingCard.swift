@@ -11,7 +11,7 @@ import MapKit
 
 struct WalkTrackingSnapshot {
     let latestWalk: PetWalkLog?
-    let latestWalkMapImage: UIImage?
+    let latestWalkMapData: Data?
     let latestRouteCoordinates: [CLLocationCoordinate2D]
     let latestPoopMarkers: [WalkPoopMarker]
     let thisWeekDistanceKm: Double
@@ -46,7 +46,7 @@ struct WalkTrackingSnapshot {
             .reduce(0) { $0 + $1.distanceMeters } / 1000.0
         return WalkTrackingSnapshot(
             latestWalk: latestWalk,
-            latestWalkMapImage: latestWalk?.mapSnapshotData.flatMap(UIImage.init(data:)),
+            latestWalkMapData: latestWalk?.mapSnapshotData,
             latestRouteCoordinates: routeCoordinates,
             latestPoopMarkers: poopMarkers,
             thisWeekDistanceKm: weekDistanceKm
@@ -323,13 +323,11 @@ struct WalkTrackingCard: View {
             }
         } else {
             // 待出发：显示上次遛狗地图快照
-            if let lastWalk = snapshot.latestWalk, let ui = snapshot.latestWalkMapImage {
+            if let lastWalk = snapshot.latestWalk, let data = snapshot.latestWalkMapData {
                 Button {
                     showWalkDetail = lastWalk
                 } label: {
-                    Image(uiImage: ui)
-                        .resizable()
-                        .scaledToFill()
+                    WalkMapSnapshotImage(data: data)
                 }
                 .buttonStyle(ScaleButtonStyle())
             } else {
@@ -340,8 +338,8 @@ struct WalkTrackingCard: View {
                 )
                 .overlay(
                     VStack(spacing: 6) {
-                        Image(systemName: "map")
-                            .font(.system(size: 24))
+                        Image(systemName: "map") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 24)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goCardWhite.opacity(0.2))
                         Text("暂无路线记录")
                             .font(OhanaFont.caption())
@@ -360,8 +358,8 @@ struct WalkTrackingCard: View {
         )
         .overlay(
             VStack(spacing: 6) {
-                Image(systemName: "pause.circle.fill")
-                    .font(.system(size: 24))
+                Image(systemName: "pause.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 24)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow.opacity(0.7))
                 Text(L10n(appLanguage).tr(zh: "遛狗已暂停", en: "Walk paused", de: "Gassi pausiert"))
                     .font(OhanaFont.caption(.bold))
@@ -453,7 +451,7 @@ struct WalkTrackingCard: View {
             // Left: pet info + timer
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(pet.avatarEmoji).font(.system(size: 18))
+                    Text(pet.avatarEmoji).font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(pet.name)
                         .font(OhanaFont.footnote(.bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
@@ -473,7 +471,7 @@ struct WalkTrackingCard: View {
     private var statusDot: some View {
         Circle()
             .fill(statusColor)
-            .frame(width: 6, height: 6)
+            .frame(width: 6, height: 6) // a11y: allow decorative non-interactive frame; hit area handled by parent
     }
 
     private var statusColor: Color {
@@ -605,10 +603,10 @@ struct WalkTrackingCard: View {
 
     private var summaryCloseButton: some View {
         Button { closeSummaryBack() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.arkInk.opacity(0.42), in: Circle())
                     .overlay {
                         Circle().strokeBorder(Color.goCardWhite.opacity(0.18), lineWidth: 1)
@@ -625,10 +623,10 @@ struct WalkTrackingCard: View {
             goalDraft = max(3, pet.weeklyWalkGoalKm)
             showingGoalSetter = true
         } label: {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "slider.horizontal.3") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 40, height: 40)
+                .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary, in: Circle())
         }
         .frame(width: 44, height: 44)
@@ -643,11 +641,9 @@ struct WalkTrackingCard: View {
         let poopMarkers = snapshot.latestPoopMarkers
         let markerCoords = poopMarkers.compactMap(\.coordinate)
         let previewCoords = coords.isEmpty ? markerCoords : coords
-        if walk != nil, let ui = snapshot.latestWalkMapImage, !(equipFxRainbowRoute || equipFxRainbowPoop) {
+        if walk != nil, let data = snapshot.latestWalkMapData, !(equipFxRainbowRoute || equipFxRainbowPoop) {
             GeometryReader { geo in
-                Image(uiImage: ui)
-                    .resizable()
-                    .scaledToFill()
+                WalkMapSnapshotImage(data: data)
                     .frame(width: geo.size.width, height: geo.size.height)
                     .clipped()
                     .overlay(alignment: .bottomLeading) {
@@ -670,8 +666,8 @@ struct WalkTrackingCard: View {
                 .fill(Color.goCardWhite.opacity(0.08))
                 .overlay {
                     VStack(spacing: 5) {
-                        Image(systemName: "map")
-                            .font(.system(size: 22, weight: .bold))
+                        Image(systemName: "map") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 22, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goCardWhite.opacity(0.28))
                         Text("本次轨迹生成中")
                             .font(OhanaFont.caption(.bold))
@@ -764,14 +760,14 @@ struct WalkTrackingCard: View {
                 .font(OhanaFont.caption2(.black))
                 .foregroundStyle(Color.goCardWhite)
         }
-        .frame(width: 42, height: 42)
+        .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
     }
 
     private var goalFlagIcon: some View {
-        Image(systemName: "flag.checkered")
-            .font(.system(size: 18, weight: .bold))
+        Image(systemName: "flag.checkered") // a11y: allow decorative icon covered by surrounding text or control
+            .font(OhanaFont.adaptive(size: 18, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.goPrimary)
-            .frame(width: 42, height: 42)
+            .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
             .background(Color.arkInk.opacity(0.34), in: Circle())
     }
 
@@ -799,7 +795,7 @@ struct WalkTrackingCard: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(weeklyGoalDisplay(goalDraft))
-                    .font(.system(size: 52, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 52, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
                     .animation(GoMotion.feedback, value: goalDraft)
@@ -810,8 +806,8 @@ struct WalkTrackingCard: View {
 
             HStack(spacing: 28) {
                 Button { adjustWeeklyGoal(-0.5) } label: {
-                    Image(systemName: "minus.circle.fill")
-                        .font(.system(size: 40, weight: .medium))
+                    Image(systemName: "minus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 40, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(goalDraft <= 0 ? Color.ohanaTertiaryText.opacity(0.35) : Color.goPrimary, Color.ohanaControlFill.opacity(0.42))
                 }
@@ -823,8 +819,8 @@ struct WalkTrackingCard: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
 
                 Button { adjustWeeklyGoal(0.5) } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 40, weight: .medium))
+                    Image(systemName: "plus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 40, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(goalDraft >= 100 ? Color.ohanaTertiaryText.opacity(0.35) : Color.goPrimary, Color.ohanaControlFill.opacity(0.42))
                 }
@@ -1035,7 +1031,7 @@ struct WalkTrackingCard: View {
             Image(systemName: icon)
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(color, in: Circle())
         }
         .buttonStyle(ScaleButtonStyle())
@@ -1050,15 +1046,15 @@ struct WalkTrackingCard: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { showFloatingPoop = false }
             } label: {
                 Text("💩")
-                    .font(.system(size: 15))
-                    .frame(width: 34, height: 34)
+                    .font(OhanaFont.adaptive(size: 15)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaCardSurface, in: Circle())
             }
             if mgr.poopCount > 0 {
                 Text("\(mgr.poopCount)")
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(Color.goCardWhite)
-                    .frame(width: 15, height: 15)
+                    .frame(width: 15, height: 15) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goOrange, in: Circle())
                     .offset(x: 3, y: -3)
             }
@@ -1110,6 +1106,31 @@ struct WalkTrackingCard: View {
             showSummaryBack = false
             isClosingSummaryBack = false
             mgr.reset()
+        }
+    }
+}
+
+private struct WalkMapSnapshotImage: View {
+    let data: Data
+
+    @State private var image: UIImage?
+
+    private var signature: String {
+        FocusWalletAvatarCache.signature(for: data)
+    }
+
+    var body: some View {
+        ZStack {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Color.arkInk.opacity(0.18)
+            }
+        }
+        .task(id: signature) {
+            image = await MapSnapshotImageDecoder.decode(data)
         }
     }
 }

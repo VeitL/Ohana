@@ -68,18 +68,18 @@ struct OasisBentoGridView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: systemName)
-                    .font(.system(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(Color.ohanaControlFill, in: Circle())
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(metric)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                         .foregroundStyle(accent)
                         .monospacedDigit()
                         .lineLimit(1)
@@ -87,8 +87,8 @@ struct OasisBentoGridView: View {
 
                 Spacer(minLength: 0)
 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.ohanaSecondaryText)
             }

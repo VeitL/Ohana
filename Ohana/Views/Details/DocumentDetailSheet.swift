@@ -18,6 +18,7 @@ struct DocumentDetailSheet: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var previewImageData: Data?
+    @State private var previewImage: UIImage?
     @State private var showingDeleteAlert = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -56,6 +57,20 @@ struct DocumentDetailSheet: View {
         ExpenseReceiptMetadata.visibleNotes(from: doc.notes)
     }
 
+    private var previewImageKey: String {
+        guard let previewImageData else { return "none" }
+        return "\(previewImageData.count)-\(previewImageData.hashValue)"
+    }
+
+    @MainActor
+    private func decodePreviewImage() async {
+        guard let previewImageData else {
+            previewImage = nil
+            return
+        }
+        previewImage = await AttachmentImageDecoder.decode(previewImageData)
+    }
+
     var body: some View {
         ZStack {
             OhanaAppBackground().ignoresSafeArea()
@@ -73,10 +88,13 @@ struct DocumentDetailSheet: View {
                 .padding(.top, 18)
             }
 
-            if let previewImageData, let ui = UIImage(data: previewImageData) {
-                imagePreview(ui)
+            if let previewImage {
+                imagePreview(previewImage)
                     .zIndex(20)
             }
+        }
+        .task(id: previewImageKey) {
+            await decodePreviewImage()
         }
         .alert(l.tr(zh: "删除证件？", en: "Delete document?", de: "Dokument löschen?"), isPresented: $showingDeleteAlert) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
@@ -103,7 +121,7 @@ struct DocumentDetailSheet: View {
     private var header: some View {
         HStack(spacing: 12) {
             Text(doc.documentCategory.emoji)
-                .font(.system(size: 26))
+                .font(OhanaFont.adaptive(size: 26)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .frame(width: 48, height: 48)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
@@ -118,8 +136,8 @@ struct DocumentDetailSheet: View {
             }
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -171,7 +189,7 @@ struct DocumentDetailSheet: View {
     private func detailRow(icon: String, label: String, value: String, tint: Color = Color.ohanaPrimaryText) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 24)
             Text(label)
@@ -198,16 +216,8 @@ struct DocumentDetailSheet: View {
                 if !imageAttachments.isEmpty {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(Array(imageAttachments.enumerated()), id: \.offset) { _, data in
-                            if let ui = UIImage(data: data) {
-                                Button { previewImageData = data } label: {
-                                    Image(uiImage: ui)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(height: 128)
-                                        .frame(maxWidth: .infinity)
-                                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                                }
-                                .buttonStyle(ScaleButtonStyle())
+                            DocumentAttachmentThumbnailView(data: data) {
+                                previewImageData = data
                             }
                         }
                     }
@@ -215,8 +225,8 @@ struct DocumentDetailSheet: View {
 
                 ForEach(Array(fileAttachments.enumerated()), id: \.offset) { _, attachment in
                     HStack(spacing: 12) {
-                        Image(systemName: "doc.fill")
-                            .font(.system(size: 14, weight: .black))
+                        Image(systemName: "doc.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                         Text(attachment.name)
                             .font(OhanaFont.caption(.bold))
@@ -251,8 +261,8 @@ struct DocumentDetailSheet: View {
             Button(role: .destructive) {
                 showingDeleteAlert = true
             } label: {
-                Image(systemName: "trash.fill")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed)
                     .frame(width: 52, height: 48)
                     .background(Color.ohanaCardSurface, in: Capsule())
@@ -267,7 +277,7 @@ struct DocumentDetailSheet: View {
         ZStack {
             Color.arkInk.opacity(0.94)
                 .ignoresSafeArea()
-                .onTapGesture { withAnimation(GoMotion.page) { previewImageData = nil } }
+                .onTapGesture { dismissPreview() }
             Image(uiImage: ui)
                 .resizable()
                 .scaledToFit()
@@ -275,9 +285,9 @@ struct DocumentDetailSheet: View {
             VStack {
                 HStack {
                     Spacer()
-                    Button { withAnimation(GoMotion.page) { previewImageData = nil } } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .black))
+                    Button { dismissPreview() } label: {
+                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .frame(width: 44, height: 44)
                     }
@@ -285,6 +295,56 @@ struct DocumentDetailSheet: View {
                     .padding(16)
                 }
                 Spacer()
+            }
+        }
+    }
+
+    private func dismissPreview() {
+        withAnimation(GoMotion.page) {
+            previewImageData = nil
+            previewImage = nil
+        }
+    }
+}
+
+private struct DocumentAttachmentThumbnailView: View {
+    let data: Data
+    let onTap: () -> Void
+
+    @State private var image: UIImage?
+
+    private var imageKey: String {
+        "\(data.count)-\(data.hashValue)"
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.ohanaCardSurface)
+
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.title3(.bold))
+                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.45))
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(height: 128)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .task(id: imageKey) {
+            let decoded = await AttachmentImageDecoder.decode(data)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                image = decoded
             }
         }
     }

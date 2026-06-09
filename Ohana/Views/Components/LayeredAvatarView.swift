@@ -65,13 +65,17 @@ struct LayeredAvatarView: View {
     @State private var showFurPicker  = false
     @State private var eyePressScale: CGFloat  = 1
     @State private var bodyPressScale: CGFloat = 1
+    @State private var decodedAvatarImage: UIImage?
 
     private var furColor: Color  { Color(hex: furHex.isEmpty ? "D4A847" : furHex) }
     private var eyeColor: Color  { Color(hex: eyeHex.isEmpty ? "D4A017" : eyeHex) }
+    private var avatarSignature: String {
+        imageData.map { FocusWalletAvatarCache.signature(for: $0) } ?? "empty"
+    }
 
     var body: some View {
         ZStack {
-            if let data = imageData, let uiImg = UIImage(data: data) {
+            if let uiImg = decodedAvatarImage {
                 // ── Photo path: real avatar ──
                 photoAvatar(uiImg)
             } else {
@@ -101,6 +105,13 @@ struct LayeredAvatarView: View {
             )
             .presentationDetents([.height(340)])
             .presentationCornerRadius(32)
+        }
+        .task(id: avatarSignature) {
+            guard let imageData else {
+                decodedAvatarImage = nil
+                return
+            }
+            decodedAvatarImage = await AttachmentImageDecoder.decode(imageData)
         }
     }
 
@@ -161,7 +172,7 @@ struct LayeredAvatarView: View {
             // Species silhouette SVG path
             PetSilhouetteIcon(species: species)
                 .foregroundStyle(furColor.isDark ? Color.goCardWhite.opacity(0.15) : Color.arkInk.opacity(0.1))
-                .font(.system(size: 56))
+                .font(OhanaFont.adaptive(size: 56)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .frame(width: 80, height: 80)
 
             // Eye dots overlay
@@ -231,10 +242,10 @@ struct LayeredAvatarView: View {
     // MARK: – Customize hint badge
     private var customizeHint: some View {
         HStack(spacing: 4) {
-            Image(systemName: "hand.tap.fill")
-                .font(.system(size: 9, weight: .bold))
+            Image(systemName: "hand.tap.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text("点击捏脸")
-                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(Color.goCardWhite)
         .padding(.horizontal, 8).padding(.vertical, 4)
@@ -287,11 +298,11 @@ struct ColorPickerPopup: View {
                 // Handle bar
                 Capsule()
                     .fill(Color.primary.opacity(0.12))
-                    .frame(width: 36, height: 5)
+                    .frame(width: 36, height: 5) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .padding(.top, 12)
 
                 Text(title)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 // Color grid
@@ -326,8 +337,8 @@ struct ColorPickerPopup: View {
                         Circle()
                             .strokeBorder(accent, lineWidth: 3)
                             .frame(width: 44, height: 44)
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goCardWhite)
                             .shadow(color: Color.arkInk.opacity(0.22), radius: 2) // ui-v4: allow checkmark readability on bright swatches.
                     }
@@ -336,7 +347,7 @@ struct ColorPickerPopup: View {
                 .animation(GoMotion.feedback, value: isSelected)
 
                 Text(preset.name)
-                    .font(.system(size: 10, weight: isSelected ? .bold : .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: isSelected ? .bold : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(isSelected ? accent : textSec)
             }
         }

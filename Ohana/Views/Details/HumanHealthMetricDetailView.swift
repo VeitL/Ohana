@@ -123,9 +123,9 @@ struct HumanHealthMetricDetailView: View {
     private var pageHeader: some View {
         HStack(spacing: 12) {
             Image(systemName: metric.category.systemImage)
-                .font(.system(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
@@ -289,10 +289,10 @@ struct HumanHealthMetricDetailView: View {
             sectionTitle(l.tr(zh: "参考范围", en: "Reference Range", de: "Referenzbereich"))
 
             HStack(spacing: 12) {
-                Image(systemName: "target")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "target").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(tint)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(tint.opacity(0.15), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -335,8 +335,8 @@ struct HumanHealthMetricDetailView: View {
 
     private var emptyTrendState: some View {
         VStack(spacing: 10) {
-            Image(systemName: "chart.xyaxis.line")
-                .font(.system(size: 28, weight: .bold))
+            Image(systemName: "chart.xyaxis.line").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 28, weight: .bold))
                 .foregroundStyle(tint)
             Text(l.tr(zh: "记录后会显示趋势图", en: "A trend appears after logging.", de: "Nach dem Erfassen erscheint ein Verlauf."))
                 .font(OhanaFont.callout(.bold))
@@ -348,8 +348,8 @@ struct HumanHealthMetricDetailView: View {
 
     private var emptyHistoryState: some View {
         VStack(spacing: 10) {
-            Image(systemName: "tray")
-                .font(.system(size: 24, weight: .bold))
+            Image(systemName: "tray").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 24, weight: .bold))
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text(l.tr(zh: "当前单位还没有历史记录", en: "No history in the selected unit.", de: "Keine Historie in dieser Einheit."))
                 .font(OhanaFont.callout(.semibold))
@@ -367,8 +367,8 @@ struct HumanHealthMetricDetailView: View {
             }
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .black))
+                Image(systemName: "plus").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 16, weight: .black))
                 Text(l.tr(zh: "记录", en: "Record", de: "Erfassen"))
                     .font(OhanaFont.callout(.black))
             }
@@ -398,7 +398,7 @@ struct HumanHealthMetricDetailView: View {
     private func miniStat(icon: String, value: String, label: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
@@ -423,7 +423,7 @@ struct HumanHealthMetricDetailView: View {
         return HStack(spacing: 5) {
             Circle()
                 .fill(status.color)
-                .frame(width: 7, height: 7)
+                .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             Text(status.label(l))
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(status.color)
@@ -438,7 +438,7 @@ struct HumanHealthMetricDetailView: View {
         return HStack(spacing: 12) {
             Circle()
                 .fill(status.color)
-                .frame(width: 9, height: 9)
+                .frame(width: 9, height: 9) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.date, format: .dateTime.year().month().day())
@@ -484,10 +484,10 @@ struct HumanHealthMetricDetailView: View {
                     )
                 }
             } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 14, weight: .semibold))
+                Image(systemName: "trash").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())

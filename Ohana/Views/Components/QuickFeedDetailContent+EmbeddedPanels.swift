@@ -173,7 +173,7 @@ extension QuickFeedDetailContent {
             }
             VStack(alignment: .leading, spacing: 10) {
                 Text(l.tr(zh: "餐次", en: "Meals", de: "Mahlzeiten"))
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 ForEach(Array(draftStore.planMeals.indices), id: \.self) { index in
                     embeddedPlanMealEditor(index: index, tint: tint)
@@ -200,7 +200,7 @@ extension QuickFeedDetailContent {
                     deletePlan(kind)
                 } label: {
                     Label(l.tr(zh: "删除当前计划", en: "Delete current plan", de: "Aktuellen Plan löschen"), systemImage: "trash")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
@@ -218,7 +218,7 @@ extension QuickFeedDetailContent {
     func embeddedPlanMealEditor(index: Int, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(FeedRuleMetadata.mealName(for: draftStore.planMeals[index].time), systemImage: "clock.fill")
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
             DatePicker(
                 "",
@@ -276,7 +276,7 @@ extension QuickFeedDetailContent {
     var manualDefaultEnabledToggle: some View {
         Toggle(isOn: $draftStore.manualDefaultEnabled.animation(GoMotion.feedback)) {
             Text(l.tr(zh: "开启默认克数", en: "Enable default grams", de: "Standardgramm aktivieren"))
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .tint(mainFoodTint)
@@ -287,12 +287,12 @@ extension QuickFeedDetailContent {
     func embeddedPanelHeader(icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 40, height: 40)
+                .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             Text(title)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
@@ -300,8 +300,8 @@ extension QuickFeedDetailContent {
             Button {
                 collapseEmbeddedPanel()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())

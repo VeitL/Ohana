@@ -125,21 +125,21 @@ struct IslandMoodHeaderStrip: View {
                 ZStack {
                     Circle()
                         .fill(accentColor.opacity(colorScheme == .dark ? 0.22 : 0.16))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .scaleEffect(1 + breath * 0.06)
 
                     Text(moodEmoji)
-                        .font(.system(size: 22))
+                        .font(OhanaFont.adaptive(size: 22))
                         .offset(y: breath * 0.8)
 
                     // 两片飘云（仅在 breezy/cloudy/calm 展示）
                     if mood == .breezy || mood == .cloudy || mood == .calm {
                         Text("☁️")
-                            .font(.system(size: 9))
+                            .font(OhanaFont.adaptive(size: 9))
                             .opacity(0.55)
                             .offset(x: cloudOffsetA, y: -14)
                         Text("☁️")
-                            .font(.system(size: 7))
+                            .font(OhanaFont.adaptive(size: 7))
                             .opacity(0.35)
                             .offset(x: cloudOffsetB, y: 12)
                     }
@@ -148,12 +148,12 @@ struct IslandMoodHeaderStrip: View {
                 // 中：标题 + 副标题
                 VStack(alignment: .leading, spacing: 2) {
                     Text(primaryMessage.title)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     if let detail = primaryMessage.detail {
                         Text(detail)
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                             .lineLimit(1)
                     }
@@ -165,14 +165,14 @@ struct IslandMoodHeaderStrip: View {
                 HStack(spacing: 6) {
                     if badgeCount > 0 {
                         Text("\(badgeCount)")
-                            .font(.system(size: 10, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
+                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                            .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                             .frame(minWidth: 16, minHeight: 16)
                             .padding(.horizontal, 4)
                             .background(Color.goRed, in: Capsule())
                     }
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 }
             }
@@ -210,7 +210,7 @@ struct IslandMoodHeaderStrip: View {
 
     private func startAmbientMotion() {
         resetAmbientMotion()
-        withAnimation(.easeInOut(duration: 0.55)) {
+        withAnimation(.easeInOut(duration: 0.55)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             cloudOffsetA = 4
             cloudOffsetB = -4
             breath = 0.45

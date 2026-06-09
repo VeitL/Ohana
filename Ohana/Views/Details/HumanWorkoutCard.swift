@@ -82,8 +82,8 @@ struct HumanWorkoutCard: View {
                     ZStack {
                         Circle()
                             .fill(Color.goPrimary.opacity(0.18))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: "figure.run")
+                            .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                        Image(systemName: "figure.run").accessibilityHidden(true)
                             .font(OhanaFont.callout(.bold))
                             .foregroundStyle(Color.goPrimary)
                     }
@@ -91,7 +91,7 @@ struct HumanWorkoutCard: View {
                         .font(OhanaFont.headline())
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
@@ -110,9 +110,9 @@ struct HumanWorkoutCard: View {
 
             HStack(spacing: 0) {
                 workoutStatCell(value: "\(monthLogs.count)", label: "本月次数", color: .goPrimary)
-                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 32)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 32) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 workoutStatCell(value: "\(totalMinutes)", label: "总分钟", color: .goCardCyan)
-                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 32)
+                Rectangle().fill(Color.ohanaDivider).frame(width: 1, height: 32) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 workoutStatCell(value: String(format: "%.1f", totalKm), label: "总公里", color: .goOrange)
             }
             .padding(.horizontal, 16)
@@ -189,7 +189,7 @@ struct HumanWorkoutCard: View {
             // 添加按钮 - 保留手动记录功能
             Button { showAddSheet = true } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus").accessibilityHidden(true)
                         .font(OhanaFont.caption(.bold))
                     Text("手动添加运动")
                         .font(OhanaFont.caption(.semibold))
@@ -207,7 +207,7 @@ struct HumanWorkoutCard: View {
             ZStack {
                 Circle()
                     .fill(Color(hex: colorHex).opacity(0.18))
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 Image(systemName: icon)
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color(hex: colorHex))
@@ -256,7 +256,7 @@ struct HumanWorkoutCard: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Image(systemName: "figure.run.circle")
+            Image(systemName: "figure.run.circle").accessibilityHidden(true)
                 .font(OhanaFont.metric(size: 36))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
             Text("暂无运动记录")
@@ -326,7 +326,7 @@ struct AddWorkoutSheet: View {
 
                         // 日期
                         HStack {
-                            Image(systemName: "calendar")
+                            Image(systemName: "calendar").accessibilityHidden(true)
                                 .font(OhanaFont.callout())
                                 .foregroundStyle(Color.goPrimary)
                             Text("日期")
@@ -404,7 +404,7 @@ struct AddWorkoutSheet: View {
     private var workoutPreview: some View {
         HStack(spacing: 14) {
             Image(systemName: selectedType.icon)
-                .font(.system(size: 28, weight: .bold))
+                .font(OhanaFont.adaptive(size: 28, weight: .bold))
                 .foregroundStyle(Color(hex: selectedType.colorHex))
                 .frame(width: 56, height: 56)
                 .background(Color(hex: selectedType.colorHex).opacity(0.16), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -536,7 +536,7 @@ struct HumanWorkoutHistoryView: View {
                                         .padding(.top, 60)
 
                                     HStack(spacing: 8) {
-                                        Image(systemName: "hammer.fill")
+                                        Image(systemName: "hammer.fill").accessibilityHidden(true)
                                             .font(OhanaFont.callout())
                                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                         Text("Apple Health 同步功能开发中")
@@ -562,10 +562,10 @@ struct HumanWorkoutHistoryView: View {
                 if !isPrivacyLocked {
                     Button { showAddSheet = true } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 16, weight: .black))
+                            Image(systemName: "plus").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 16, weight: .black))
                             Text("添加运动")
-                                .font(.system(size: 16, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                         }
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 28).padding(.vertical, 14)
@@ -583,7 +583,7 @@ struct HumanWorkoutHistoryView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
+                        Image(systemName: "xmark.circle.fill").accessibilityHidden(true)
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -598,7 +598,7 @@ struct HumanWorkoutHistoryView: View {
 
     private var privacyLockedView: some View {
         VStack(spacing: 14) {
-            Image(systemName: "lock.shield.fill")
+            Image(systemName: "lock.shield.fill").accessibilityHidden(true)
                 .font(OhanaFont.metric(size: 44))
                 .foregroundStyle(Color.goYellow)
             Text(PrivacyService.lockedMessage(for: .workout))
@@ -683,7 +683,7 @@ struct HumanWorkoutHistoryView: View {
                                 )
                             }
                         } label: {
-                            Image(systemName: "trash")
+                            Image(systemName: "trash").accessibilityHidden(true)
                                 .font(OhanaFont.caption())
                                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
                         }

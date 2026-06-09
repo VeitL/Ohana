@@ -74,6 +74,10 @@ final class VerticalSolidHomeController: ObservableObject {
     }
 
     func select(_ tab: VerticalSolidHomeTab) {
+        guard AppFeatureRouteGuard.allowsHomeTab(tab) else {
+            AppFeatureRouteGuard.recordIntercept("homeTab:\(tab.rawValue)")
+            return
+        }
         guard selectedTab != tab else {
             deferredPrepareTask?.cancel()
             deferredPrepareTask = nil
@@ -97,10 +101,11 @@ final class VerticalSolidHomeController: ObservableObject {
     }
 
     func startWarmup() {
-        guard preparedTabs.count < VerticalSolidHomeTab.allCases.count else { return }
+        let visibleTabs = AppFeatureRouteGuard.visibleHomeTabs
+        guard preparedTabs.count < visibleTabs.count else { return }
         warmupTask?.cancel()
         warmupTask = Task { @MainActor in
-            for tab in [VerticalSolidHomeTab.calendar, .oasis, .plants] {
+            for tab in visibleTabs where tab != .home {
                 await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: warmupDelay(for: tab))
                 guard !Task.isCancelled else { return }
                 prepare(tab)

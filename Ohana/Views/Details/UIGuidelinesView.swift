@@ -37,10 +37,10 @@ struct UIGuidelinesView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button { dismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 15, weight: .black))
+                    Image(systemName: "chevron.left") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                        .font(OhanaFont.adaptive(size: 15, weight: .black))
                         .foregroundStyle(palette.primaryText)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 32, height: 32) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         .background(palette.controlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle()) // ui-v4: allow custom nav icon press in developer console
@@ -74,10 +74,10 @@ struct UIGuidelinesView: View {
                     GrowthUnlockFlowTestView()
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "tree.fill")
-                            .font(.system(size: 14, weight: .black))
+                        Image(systemName: "tree.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                            .font(OhanaFont.adaptive(size: 14, weight: .black))
                             .foregroundStyle(palette.accent)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 32, height: 32) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                             .background(palette.controlFill, in: Circle())
 
                         VStack(alignment: .leading, spacing: 2) {
@@ -91,8 +91,8 @@ struct UIGuidelinesView: View {
 
                         Spacer()
 
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .black))
+                        Image(systemName: "chevron.right") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                            .font(OhanaFont.adaptive(size: 11, weight: .black))
                             .foregroundStyle(palette.secondaryText)
                     }
                     .frame(minHeight: 44)
@@ -154,7 +154,7 @@ struct UIGuidelinesView: View {
                     withAnimation(DesignSpecUIV4.controlChangeAnimation(selection)) { previewMode = mode }
                 } label: {
                     Label(mode.zh, systemImage: mode.icon)
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(previewMode == mode ? Color.arkInk : palette.primaryText)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
@@ -175,14 +175,14 @@ struct UIGuidelinesView: View {
         } label: {
             HStack(spacing: 9) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
                     .foregroundStyle(palette.accent)
                 Text(title)
                     .font(DesignSpecUIV4.typeFont(13, weight: .black, selection: selection))
                     .foregroundStyle(palette.primaryText)
                 Spacer()
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .black))
+                Image(systemName: "chevron.down") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
                     .foregroundStyle(palette.secondaryText)
                     .rotationEffect(.degrees(isExpanded.wrappedValue ? 180 : 0))
             }
@@ -218,8 +218,8 @@ struct UIGuidelinesView: View {
                     }
                     toast = "已恢复默认"
                 } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .frame(width: 22, height: 22)
+                    Image(systemName: "arrow.counterclockwise") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                        .frame(width: 22, height: 22) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 }
                 .buttonStyle(buttonStyle(.icon))
             }
@@ -374,7 +374,7 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                             .buttonStyle(buttonStyle(.secondary))
                         Button { play("Icon Button") } label: {
                             Image(systemName: icon("gearshape.fill"))
-                                .frame(width: 18, height: 18)
+                                .frame(width: 18, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         }
                         .buttonStyle(buttonStyle(.icon))
                     }
@@ -592,8 +592,8 @@ private struct DesignSpecSafePreviewCanvasV4: View {
 
     private func sheetTokenCell(_ zh: String, _ en: String, _ value: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 12, weight: .black))
+            Image(systemName: "checkmark.circle.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
                 .foregroundStyle(palette.accent)
             VStack(alignment: .leading, spacing: 1) {
                 Text("\(zh) / \(en)")
@@ -617,10 +617,10 @@ private struct DesignSpecSafePreviewCanvasV4: View {
             }
             play("FAB / \(selection.fabMotion)")
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 13, weight: .black))
+            Image(systemName: "plus") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(palette.accentText)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(palette.accent, in: Circle())
                 .rotationEffect(.degrees(selection.fabMotion == "rotate" && fabOpen ? 45 : 0))
                 .scaleEffect(selection.fabMotion == "pop" && fabOpen ? 1.10 : 1)
@@ -646,8 +646,8 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                 }
                 play("FAB / \(selection.fabMotion)")
             } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .black))
+                Image(systemName: "plus") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    .font(OhanaFont.adaptive(size: 16, weight: .black))
                     .foregroundStyle(palette.accentText)
                     .frame(width: 44, height: 44)
                     .background(palette.accent, in: Circle())
@@ -658,7 +658,7 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                         if selection.fabMotion == "fan" && fabOpen {
                             Circle()
                                 .fill(Color.goBlue)
-                                .frame(width: 14, height: 14)
+                                .frame(width: 14, height: 14) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                                 .offset(x: 8, y: -8)
                         }
                     }
@@ -864,7 +864,7 @@ private struct DesignSpecSafePreviewCanvasV4: View {
             .foregroundStyle(state == "errorFirst" ? palette.danger : palette.secondaryText)
             HStack(spacing: 7) {
                 Image(systemName: icon("keyboard.fill"))
-                    .font(.system(size: 10, weight: .black))
+                    .font(OhanaFont.adaptive(size: 10, weight: .black))
                     .foregroundStyle(state == "errorFirst" ? palette.danger : palette.accent)
                 Text(value)
                     .font(font(12, .bold))
@@ -894,13 +894,13 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                             .stroke(palette.accent, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                             .rotationEffect(.degrees(-90))
                     }
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 case "steps":
                     HStack(spacing: 5) {
                         ForEach(0..<5, id: \.self) { index in
                             Circle()
                                 .fill(index < 4 ? palette.accent : palette.stroke.opacity(0.55))
-                                .frame(width: 10, height: 10)
+                                .frame(width: 10, height: 10) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         }
                     }
                     .frame(height: 42)
@@ -946,10 +946,10 @@ private struct DesignSpecSafePreviewCanvasV4: View {
     private func calendarMarker(_ day: Int) -> some View {
         switch selection.calendarEvent {
         case "bars":
-            Capsule().fill(palette.accent).frame(width: 18, height: 3)
+            Capsule().fill(palette.accent).frame(width: 18, height: 3) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
         case "icons":
                 Image(systemName: icon(day.isMultiple(of: 2) ? "fork.knife" : "drop.fill"))
-                .font(.system(size: 7, weight: .black))
+                .font(OhanaFont.adaptive(size: 7, weight: .black))
                 .foregroundStyle(palette.accent)
         case "stack":
             Text("2")
@@ -959,8 +959,8 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                 .background(palette.accent, in: Capsule())
         default:
             HStack(spacing: 2) {
-                Circle().fill(palette.accent).frame(width: 4, height: 4)
-                Circle().fill(Color.goBlue).frame(width: 4, height: 4)
+                Circle().fill(palette.accent).frame(width: 4, height: 4) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                Circle().fill(Color.goBlue).frame(width: 4, height: 4) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
             }
         }
     }
@@ -972,9 +972,9 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                 .foregroundStyle(palette.secondaryText)
                 .frame(width: 38, alignment: .leading)
             Image(systemName: self.icon(icon))
-                .font(.system(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .black))
                 .foregroundStyle(tint)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(tint.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
@@ -992,10 +992,10 @@ private struct DesignSpecSafePreviewCanvasV4: View {
         .overlay(alignment: .trailing) {
             if selection.calendarAgenda == "swipeRows" {
                 HStack(spacing: 4) {
-                    Image(systemName: "checkmark")
-                    Image(systemName: "trash")
+                    Image(systemName: "checkmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                    Image(systemName: "trash") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 }
-                .font(.system(size: 8, weight: .black))
+                .font(OhanaFont.adaptive(size: 8, weight: .black))
                 .foregroundStyle(palette.accent)
                 .padding(.trailing, 7)
             }
@@ -1223,9 +1223,9 @@ private struct DesignSpecSafePreviewCanvasV4: View {
 
     private func iconButton(_ name: String, selected: Bool) -> some View {
         Image(systemName: icon(name))
-            .font(.system(size: 12, weight: DesignSpecUIV4.iconWeight(selection)))
+            .font(OhanaFont.adaptive(size: 12, weight: DesignSpecUIV4.iconWeight(selection)))
             .foregroundStyle(selected ? palette.accent : palette.primaryText)
-            .frame(width: 30, height: 30)
+            .frame(width: 30, height: 30) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
             .background(palette.controlFill, in: Circle())
             .overlay(Circle().strokeBorder(selected ? palette.accent.opacity(0.35) : palette.stroke, lineWidth: 1))
     }
@@ -1234,19 +1234,19 @@ private struct DesignSpecSafePreviewCanvasV4: View {
     private var pageBackControl: some View {
         switch selection.pageBackButton {
         case "systemChevron":
-            Image(systemName: "chevron.left")
-                .font(.system(size: 15, weight: .black))
+            Image(systemName: "chevron.left") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .font(OhanaFont.adaptive(size: 15, weight: .black))
                 .foregroundStyle(palette.primaryText)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
         case "solidCircle":
-            Image(systemName: "chevron.left")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "chevron.left") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(palette.accentText)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(palette.accent, in: Circle())
         case "textPill":
             HStack(spacing: 4) {
-                Image(systemName: "chevron.left")
+                Image(systemName: "chevron.left") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 Text("返回")
             }
             .font(font(10, .black))
@@ -1255,10 +1255,10 @@ private struct DesignSpecSafePreviewCanvasV4: View {
             .frame(height: 34)
             .background(palette.controlFill, in: Capsule())
         default:
-            Image(systemName: "chevron.left")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "chevron.left") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(palette.primaryText)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(palette.controlFill, in: Circle())
                 .overlay(Circle().strokeBorder(palette.stroke, lineWidth: 1))
         }
@@ -1268,15 +1268,15 @@ private struct DesignSpecSafePreviewCanvasV4: View {
     private var pageCloseControl: some View {
         switch selection.pageCloseButton {
         case "circle":
-            Image(systemName: "xmark")
-                .font(.system(size: 12, weight: .black))
+            Image(systemName: "xmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
                 .foregroundStyle(palette.primaryText)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(palette.controlFill, in: Circle())
                 .overlay(Circle().strokeBorder(palette.stroke, lineWidth: 1))
         case "pill":
             HStack(spacing: 5) {
-                Image(systemName: "xmark")
+                Image(systemName: "xmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 Text("关闭")
             }
             .font(font(10, .black))
@@ -1290,10 +1290,10 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                 .foregroundStyle(palette.primaryText)
                 .frame(height: 34)
         default:
-            Image(systemName: "xmark")
-                .font(.system(size: 12, weight: .black))
+            Image(systemName: "xmark") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
                 .foregroundStyle(palette.primaryText)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
         }
     }
 
@@ -1311,8 +1311,8 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 8, weight: .black))
+            Image(systemName: "chevron.right") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .font(OhanaFont.adaptive(size: 8, weight: .black))
                 .foregroundStyle(palette.secondaryText.opacity(0.72))
         }
         .frame(maxWidth: .infinity)
@@ -1324,26 +1324,26 @@ private struct DesignSpecSafePreviewCanvasV4: View {
     @ViewBuilder
     private func settingIconPreview(_ iconName: String, tint: Color) -> some View {
         let glyph = Image(systemName: icon(iconName))
-            .font(.system(size: 12, weight: DesignSpecUIV4.iconWeight(selection)))
+            .font(OhanaFont.adaptive(size: 12, weight: DesignSpecUIV4.iconWeight(selection)))
         switch selection.settingIcon {
         case "plainGlyph":
             glyph
                 .foregroundStyle(tint)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
         case "circleDisc":
             glyph
                 .foregroundStyle(tint)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(tint.opacity(mode == .dark ? 0.16 : 0.10), in: Circle())
         case "flatBlock":
             glyph
                 .foregroundStyle(tint)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(palette.flatBlock, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         default:
             glyph
                 .foregroundStyle(tint)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(tint.opacity(mode == .dark ? 0.16 : 0.10), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
     }
@@ -1354,7 +1354,7 @@ private struct DesignSpecSafePreviewCanvasV4: View {
             Text(title)
                 .font(font(8, .black))
         }
-        .font(.system(size: 12, weight: DesignSpecUIV4.iconWeight(selection)))
+        .font(OhanaFont.adaptive(size: 12, weight: DesignSpecUIV4.iconWeight(selection)))
         .foregroundStyle(selected ? palette.accent : palette.secondaryText)
         .frame(maxWidth: .infinity)
     }
@@ -1362,9 +1362,9 @@ private struct DesignSpecSafePreviewCanvasV4: View {
     private var listRowPreview: some View {
         HStack(spacing: 9) {
             Image(systemName: icon("clock.fill"))
-                .font(.system(size: 11, weight: DesignSpecUIV4.iconWeight(selection)))
+                .font(OhanaFont.adaptive(size: 11, weight: DesignSpecUIV4.iconWeight(selection)))
                 .foregroundStyle(palette.accent)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .background(palette.controlFill, in: Circle())
             VStack(alignment: .leading, spacing: 1) {
                 Text("最近记录")
@@ -1453,9 +1453,9 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                 switch selection.toggle {
                 case "lock":
                     Image(systemName: toggleOn ? "lock.open.fill" : "lock.fill")
-                        .font(.system(size: 14, weight: .black))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black))
                         .foregroundStyle(toggleOn ? palette.accent : Color.goYellow)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                         .background(palette.controlFill, in: Circle())
                         .symbolEffect(.bounce, value: toggleOn)
                 case "text":
@@ -1564,14 +1564,14 @@ private struct DesignSpecSafePreviewCanvasV4: View {
                     .padding(.vertical, 7)
                     .background(palette.controlFill, in: Capsule())
             } else if selection.sheetChrome == "danger" {
-                Image(systemName: "trash.fill")
+                Image(systemName: "trash.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .foregroundStyle(palette.danger)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
             } else {
                 Image(systemName: icon("xmark"))
-                    .font(.system(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
                     .foregroundStyle(palette.primaryText)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
             }
         }
     }
@@ -1590,7 +1590,7 @@ private struct DesignSpecSafePreviewCanvasV4: View {
             miniChart(values: [0.45, 0.62, 0.40, 0.75, 0.68, 0.80, 0.58])
         case "confirm":
             HStack(spacing: 9) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .foregroundStyle(palette.danger)
                 Text("确认删除 / Confirm")
                     .font(font(12, .black))
@@ -1616,7 +1616,7 @@ private struct DesignSpecSafePreviewCanvasV4: View {
     private var feedbackToast: some View {
         HStack(spacing: 8) {
             if selection.toast == "icon" || selection.toast == "glass" {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .foregroundStyle(palette.accent)
             }
             Text(selection.toast == "silent" ? "Saved" : "已保存 / Saved")
@@ -1651,7 +1651,7 @@ private struct DesignSpecSafePreviewCanvasV4: View {
     private var rewardPreview: some View {
         HStack(spacing: 7) {
             Image(systemName: rewardIcon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(rewardOn ? palette.accent : palette.secondaryText)
                 .scaleEffect(rewardOn && selection.reward == "bouncy" ? 1.18 : 1)
                 .rotationEffect(.degrees(rewardOn && selection.reward == "confetti" ? 12 : 0))

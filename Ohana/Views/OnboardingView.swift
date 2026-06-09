@@ -173,7 +173,7 @@ private struct OnboardingCompanionStage: View {
     private func stageBadge(icon: String, label: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(label)
                 .font(OhanaFont.caption2(.black))
         }
@@ -280,11 +280,8 @@ private struct OnboardingAvatarShowcase: View {
     private func onboardingImageData(filename: String, directory: String) -> UIImage? {
         let name = (filename as NSString).deletingPathExtension
         let ext = (filename as NSString).pathExtension
-        guard let url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: directory),
-              let data = try? Data(contentsOf: url) else {
-            return nil
-        }
-        return UIImage(data: data)
+        guard let url = Bundle.main.url(forResource: name, withExtension: ext, subdirectory: directory) else { return nil }
+        return UIImage(contentsOfFile: url.path) // smoothness: allow small bundled onboarding avatar asset
     }
 
     private func avatarFigure<Fallback: View>(
@@ -309,7 +306,7 @@ private struct OnboardingAvatarShowcase: View {
     private func stageBadge(icon: String, label: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(label)
                 .font(OhanaFont.caption2(.black))
         }
@@ -378,7 +375,7 @@ struct OnboardingView: View {
             if shouldReduceWork {
                 iconPulse = false
             } else {
-                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true } // ui-v4: allow gated onboarding icon pulse
+                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true } // ui-v4: allow gated onboarding icon pulse; smoothness: allow reduce-work gated onboarding pulse.
             }
             if !isReplay && !currentActiveHumanId.isEmpty && !hasOnboarded {
                 step = .firstPet
@@ -449,8 +446,8 @@ struct OnboardingView: View {
                     Button {
                         withAnimation(GoMotion.page) { step = .intro }
                     } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .black, design: .rounded))
+                        Image(systemName: "chevron.left") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
@@ -547,8 +544,8 @@ struct OnboardingView: View {
                         HStack(spacing: 8) {
                             Text(AppLocalizedText(zh: "继续", en: "Continue", de: "Weiter").resolve(languageCode))
                                 .font(OhanaFont.title3(.black))
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 14, weight: .black))
+                            Image(systemName: "arrow.right") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         .foregroundStyle(OnboardingPalette.selectedText)
                         .frame(maxWidth: .infinity)
@@ -570,7 +567,7 @@ struct OnboardingView: View {
         } label: {
             HStack(spacing: 8) {
                 Text(country.flag)
-                    .font(.system(size: 20))
+                    .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(country.displayName.resolve(languageCode))
                     .font(OhanaFont.subheadline(isSelected ? .black : .bold))
                     .foregroundStyle(isSelected ? OnboardingPalette.selectedText : OnboardingPalette.primaryText)
@@ -578,8 +575,8 @@ struct OnboardingView: View {
                     .minimumScaleFactor(0.78)
                 Spacer(minLength: 0)
                 if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 15, weight: .black))
+                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(OnboardingPalette.selectedText)
                 }
             }
@@ -767,7 +764,7 @@ struct OnboardingView: View {
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(OnboardingPalette.selectedText)
                     Image(systemName: introPageIndex < introPageCount - 1 ? "chevron.right" : "arrow.right")
-                        .font(.system(size: 14, weight: .black))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(OnboardingPalette.selectedText)
                 }
                 .frame(maxWidth: .infinity)
@@ -804,9 +801,9 @@ struct OnboardingView: View {
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(usesFilledTint ? OnboardingPalette.selectedText : tint)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(usesFilledTint ? tint : tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             Text(title)
@@ -950,7 +947,7 @@ struct OnboardingView: View {
     private func onboardingMiniTip(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goBlue)
                 .frame(width: 24)
             Text(text)

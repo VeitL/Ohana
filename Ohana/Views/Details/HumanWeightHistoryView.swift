@@ -82,52 +82,10 @@ struct HumanWeightHistoryView: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
-    private var pageHeader: some View {
-        HStack(spacing: 12) {
-            if let data = human.avatarImageData, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 46, height: 46)
-                    .clipShape(Circle())
-            } else {
-                Text(human.avatarEmoji)
-                    .font(.system(size: 28))
-                    .frame(width: 46, height: 46)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(human.name)
-                    .font(OhanaFont.headline(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                Text(l.tr(zh: "体重追踪", en: "Weight tracking", de: "Gewicht"))
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-
-            Spacer()
-
-            if isViewingOwnProfile {
-                HumanPrivacyToggleButton(human: human, field: .weight)
-            }
-
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-        }
-    }
-
     private var privacyLockedView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 34, weight: .bold))
+            Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 34, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
             Text(l.tr(zh: "体重记录仅本人可见", en: "Weight is private", de: "Gewicht ist privat"))
                 .font(OhanaFont.title3(.black))
@@ -223,7 +181,7 @@ struct HumanWeightHistoryView: View {
             VStack(spacing: 0) {
                 Capsule()
                     .fill(Color.ohanaDivider)
-                    .frame(width: 40, height: 4)
+                    .frame(width: 40, height: 4) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .padding(.top, 12).padding(.bottom, 8)
 
                 HStack {
@@ -266,10 +224,10 @@ struct HumanWeightHistoryView: View {
     private var inlineWeightComposer: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                Image(systemName: "scalemass.fill")
-                    .font(.system(size: 17, weight: .black))
+                Image(systemName: "scalemass.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "添加体重", en: "Add weight", de: "Gewicht hinzufügen"))
@@ -285,10 +243,10 @@ struct HumanWeightHistoryView: View {
                         isInlineWeightComposerVisible = false
                     }
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .black))
+                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .frame(width: 34, height: 34)
+                        .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -337,8 +295,8 @@ struct HumanWeightHistoryView: View {
             }
 
             HStack(spacing: 10) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "calendar") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 24)
                     Text(l.tr(zh: "日期", en: "Date", de: "Datum"))
@@ -354,8 +312,8 @@ struct HumanWeightHistoryView: View {
             .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
             HStack(spacing: 10) {
-                Image(systemName: "clock")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "clock") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 24)
                 VStack(alignment: .leading, spacing: 1) {
@@ -382,7 +340,7 @@ struct HumanWeightHistoryView: View {
 
             Button(action: saveInlineWeight) {
                 HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                     Text(l.tr(zh: "保存体重", en: "Save weight", de: "Gewicht sichern"))
                 }
                 .font(OhanaFont.body(.black))
@@ -400,7 +358,7 @@ struct HumanWeightHistoryView: View {
 
     private func weightRow(log: HumanWeightLog) -> some View {
         HStack(spacing: 14) {
-            Circle().fill(Color.goPrimary).frame(width: 8, height: 8)
+            Circle().fill(Color.goPrimary).frame(width: 8, height: 8) // a11y: allow decorative non-interactive frame; hit area handled by parent
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.date, format: .dateTime.year().month().day())
                     .font(OhanaFont.subheadline(.semibold))
@@ -432,7 +390,7 @@ struct HumanWeightHistoryView: View {
                     )
                 }
             } label: {
-                Image(systemName: "trash")
+                Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.subheadline())
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
             }

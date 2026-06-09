@@ -24,6 +24,7 @@ struct EquipPopoutCardSheet: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var previewData: Data?
+    @State private var previewImage: UIImage?
     @State private var previewSource: PetPopoutCardSource?
     @State private var isProcessing = false
     @State private var toast: Toast?
@@ -37,7 +38,9 @@ struct EquipPopoutCardSheet: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var currentPreviewData: Data? { previewData ?? pet.cardPopoutImageData ?? pet.avatarImageData }
-    private var currentPreviewImage: UIImage? { currentPreviewData.flatMap(UIImage.init(data:)) }
+    private var currentPreviewSignature: String {
+        currentPreviewData.map { FocusWalletAvatarCache.signature(for: $0) } ?? "empty"
+    }
     private var isPopoutActive: Bool { pet.cardStyleRaw == "popout" }
 
     var body: some View {
@@ -48,7 +51,7 @@ struct EquipPopoutCardSheet: View {
             VStack(spacing: 0) {
                 Capsule()
                     .fill(Color.ohanaSecondaryText.opacity(0.28))
-                    .frame(width: 42, height: 5)
+                    .frame(width: 42, height: 5) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .padding(.top, 10)
                     .padding(.bottom, 18)
 
@@ -80,6 +83,13 @@ struct EquipPopoutCardSheet: View {
             guard let item else { return }
             processPhoto(item)
         }
+        .task(id: currentPreviewSignature) {
+            guard let data = currentPreviewData else {
+                previewImage = nil
+                return
+            }
+            previewImage = await AttachmentImageDecoder.decode(data)
+        }
     }
 
     private var header: some View {
@@ -96,8 +106,8 @@ struct EquipPopoutCardSheet: View {
             Spacer()
 
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -131,7 +141,7 @@ struct EquipPopoutCardSheet: View {
                         .padding(14)
                 }
 
-            if let image = currentPreviewImage {
+            if let image = previewImage {
                 ZStack(alignment: .bottomLeading) {
                     Ellipse()
                         .fill(Color.arkInk.opacity(0.32))
@@ -147,8 +157,8 @@ struct EquipPopoutCardSheet: View {
                         .shadow(color: Color.arkInk.opacity(0.34), radius: 20, x: 0, y: 14) // ui-v4: allow popout preview depth
                 }
             } else {
-                Image(systemName: "sparkles.rectangle.stack.fill")
-                    .font(.system(size: 52, weight: .black))
+                Image(systemName: "sparkles.rectangle.stack.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 52, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .offset(y: -16)
@@ -196,7 +206,7 @@ struct EquipPopoutCardSheet: View {
     private func sourceButton(icon: String, title: String, isSelected: Bool) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
                 .font(OhanaFont.caption(.black))
                 .lineLimit(1)
@@ -236,7 +246,7 @@ struct EquipPopoutCardSheet: View {
                 savePopout()
             } label: {
                 HStack {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                     Text(l.tr(zh: "启用破框卡片", en: "Enable popout card", de: "Popout-Karte aktivieren"))
                 }
                 .font(OhanaFont.callout(.black))
@@ -297,7 +307,7 @@ struct EquipPopoutCardSheet: View {
         Task {
             defer { Task { @MainActor in isProcessing = false } }
             guard let rawData = try? await item.loadTransferable(type: Data.self),
-                  let image = UIImage(data: rawData) else {
+                  let image = await AttachmentImageDecoder.decode(rawData) else {
                 showError(l.tr(zh: "无法读取这张图片。", en: "Could not read this photo.", de: "Dieses Foto konnte nicht gelesen werden."))
                 return
             }

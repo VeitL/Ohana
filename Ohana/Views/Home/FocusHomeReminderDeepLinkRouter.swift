@@ -126,9 +126,9 @@ enum FocusHomeReminderDeepLinkRouter {
             return .humanQuick("humanNote", human)
         }
 
-        if isPlantEntity(entityType),
-           let plant = plants.first(where: { $0.id.uuidString == event.relatedEntityId }) {
-            return .plant(plant)
+        if isPlantEntity(entityType) {
+            AppFeatureRouteGuard.recordIntercept("reminderPlant")
+            return .functionMenu(.growthRoadmap)
         }
 
         if let pet = pet(for: event, pets: pets) {
@@ -151,9 +151,9 @@ enum FocusHomeReminderDeepLinkRouter {
            let human = humans.first(where: { $0.id.uuidString == id }) {
             return .humanDetail(human)
         }
-        if isPlantEntity(entityType),
-           let plant = plants.first(where: { $0.id.uuidString == id }) {
-            return .plant(plant)
+        if isPlantEntity(entityType) {
+            AppFeatureRouteGuard.recordIntercept("reminderPlantFallback")
+            return .functionMenu(.growthRoadmap)
         }
         if isPetEntity(entityType),
            let pet = pets.first(where: { $0.id.uuidString == id }) {

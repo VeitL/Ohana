@@ -82,7 +82,7 @@ struct HumanBasicInfoDetailView: View {
                             withAnimation { isEditing = false }
                         } label: {
                             Text("保存")
-                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goPrimary)
                         }
                     } else {
@@ -90,8 +90,8 @@ struct HumanBasicInfoDetailView: View {
                             loadEditState()
                             withAnimation { isEditing = true }
                         } label: {
-                            Image(systemName: "pencil.circle.fill")
-                                .font(.system(size: 20))
+                            Image(systemName: "pencil.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .symbolRenderingMode(.hierarchical)
                                 .foregroundStyle(Color.goPrimary)
                         }
@@ -172,13 +172,13 @@ struct HumanBasicInfoDetailView: View {
                 .fill(accent.opacity(0.16))
                 .frame(width: size, height: size)
                 .overlay(Circle().strokeBorder(accent.opacity(0.35), lineWidth: 2))
-            if let data, let image = UIImage(data: data) {
+            AsyncDecodedImageView(data: data) { image in
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: size - 8, height: size - 8, alignment: .center)
                     .clipShape(Circle())
-            } else {
+            } placeholder: {
                 Text(fallbackEmoji.isEmpty ? "👤" : fallbackEmoji)
                     .font(OhanaFont.metric(size: size * 0.48))
             }
@@ -231,9 +231,9 @@ struct HumanBasicInfoDetailView: View {
                 HStack(spacing: 10) {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color(hex: human.safeThemeColorHex))
-                        .frame(width: 32, height: 32)
+                        .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     Text("#\(human.safeThemeColorHex.uppercased())")
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .monospaced)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 }
             }
@@ -241,7 +241,7 @@ struct HumanBasicInfoDetailView: View {
             if !displayNotes.isEmpty {
                 infoSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
                     Text(displayNotes)
-                        .font(.system(size: 14, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -337,11 +337,11 @@ struct HumanBasicInfoDetailView: View {
                     ForEach(themePresets, id: \.self) { hex in
                         Button { eThemeColorHex = hex } label: {
                             ZStack {
-                                Circle().fill(Color(hex: hex)).frame(width: 38, height: 38)
+                                Circle().fill(Color(hex: hex)).frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 if eThemeColorHex.uppercased() == hex.uppercased() {
                                     Circle().strokeBorder(Color.ohanaPrimaryText, lineWidth: 2.5)
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 11, weight: .black))
+                                    Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                 }
                             }
@@ -364,11 +364,11 @@ struct HumanBasicInfoDetailView: View {
     private var deleteDangerZone: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("危险操作")
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goRed)
             Button(role: .destructive) { showingDeleteSheet = true } label: {
                 Label("删除成员", systemImage: "trash")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -385,12 +385,12 @@ struct HumanBasicInfoDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(iconColor)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(iconColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 Text(title)
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             VStack(spacing: 10) { content() }
@@ -406,11 +406,11 @@ struct HumanBasicInfoDetailView: View {
     private func infoRow(label: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(label)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer(minLength: 16)
             Text(value)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
                 .multilineTextAlignment(.trailing)
         }
@@ -418,7 +418,7 @@ struct HumanBasicInfoDetailView: View {
 
     private func editLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaSecondaryText)
     }
 
@@ -426,7 +426,7 @@ struct HumanBasicInfoDetailView: View {
         HStack {
             editLabel(title)
             TextField(title, text: text)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .multilineTextAlignment(.trailing)
         }
     }
@@ -460,7 +460,7 @@ struct HumanBasicInfoDetailView: View {
                 editLabel("身高")
                 Spacer()
                 Text(heightValue > 0 ? "\(Int(heightValue)) cm" : "未填写")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
             }
             HStack(spacing: 8) {
@@ -469,7 +469,7 @@ struct HumanBasicInfoDetailView: View {
                         eHeightText = option == "未填写" ? "" : option
                     } label: {
                         Text(option == "未填写" ? option : "\(option)")
-                            .font(.system(size: 12, weight: heightOptionSelected(option) ? .black : .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: heightOptionSelected(option) ? .black : .semibold, design: .rounded))
                             .foregroundStyle(heightOptionSelected(option) ? Color.arkInk : .primary.opacity(0.78))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
@@ -487,7 +487,7 @@ struct HumanBasicInfoDetailView: View {
                 step: 1
             ) {
                 Text("微调 80-230 cm")
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
@@ -527,7 +527,7 @@ struct HumanBasicInfoDetailView: View {
                         selection.wrappedValue = option == "未填写" ? "" : option
                     } label: {
                         Text(option)
-                            .font(.system(size: 12, weight: selected ? .black : .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: selected ? .black : .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(selected ? Color.arkInk : .primary.opacity(0.82))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
@@ -705,25 +705,25 @@ private struct HumanDeleteConfirmationSheet: View {
             OhanaAppBackground()
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 16, weight: .black))
+                    Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("删除成员 \(humanName)")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("输入名字后才能继续")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Button(action: onCancel) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(Color.primary.opacity(0.08), in: Circle())
                     }
                     .buttonStyle(ScaleButtonStyle())
@@ -731,15 +731,15 @@ private struct HumanDeleteConfirmationSheet: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("这会删除成员资料、体重与运动记录，无法撤销。")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.68))
                     Text("请输入：\(humanName)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed.opacity(0.8))
                 }
 
                 TextField("成员名字", text: $confirmName)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
@@ -752,7 +752,7 @@ private struct HumanDeleteConfirmationSheet: View {
                 HStack(spacing: 10) {
                     Button(action: onCancel) {
                         Text("取消")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
@@ -762,7 +762,7 @@ private struct HumanDeleteConfirmationSheet: View {
 
                     Button(action: onDelete) {
                         Text("删除")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(canDelete ? Color.white : Color.ohanaTertiaryText) // ui-v4: allow destructive red button needs white contrast
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)

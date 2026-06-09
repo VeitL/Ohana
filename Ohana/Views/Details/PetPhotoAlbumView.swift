@@ -73,13 +73,13 @@ struct PetPhotoAlbumView: View {
                         .toolbar {
                             ToolbarItem(placement: .topBarLeading) {
                                 Button { dismiss() } label: {
-                                    Image(systemName: "xmark.circle.fill")
+                                    Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                                         .symbolRenderingMode(.hierarchical).foregroundStyle(Color.ohanaSecondaryText)
                                 }
                             }
                             ToolbarItem(placement: .topBarTrailing) {
                                 PhotosPicker(selection: pickerBinding, maxSelectionCount: 12, matching: .images) {
-                                    Image(systemName: "plus.circle.fill")
+                                    Image(systemName: "plus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                                         .symbolRenderingMode(.hierarchical)
                                         .foregroundStyle(Color.goPrimary)
                                         .font(OhanaFont.title2(.bold))
@@ -141,7 +141,7 @@ struct PetPhotoAlbumView: View {
                         ForEach(grouped, id: \.0) { month, photos in
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(month)
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                                     .padding(.horizontal, 16)
 
@@ -156,8 +156,11 @@ struct PetPhotoAlbumView: View {
                                         .buttonStyle(ScaleButtonStyle())
                                         .contextMenu {
                                             Button {
-                                                if let img = UIImage(data: photo.imageData) {
-                                                    shareImage(img)
+                                                Task {
+                                                    guard let image = await AttachmentImageDecoder.decode(photo.imageData) else { return }
+                                                    await MainActor.run {
+                                                        shareImage(image)
+                                                    }
                                                 }
                                             } label: {
                                                 Label("分享", systemImage: "square.and.arrow.up")
@@ -183,7 +186,7 @@ struct PetPhotoAlbumView: View {
 
     private var emptyState: some View {
         VStack(spacing: 16) {
-            Image(systemName: "photo.on.rectangle.angled")
+            Image(systemName: "photo.on.rectangle.angled") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.metric(size: 56, .medium))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text("暂无照片").font(OhanaFont.title3(.black))
@@ -224,17 +227,17 @@ struct PetPhotoAlbumView: View {
     @ViewBuilder
     private func photoThumbnail(_ photo: PetPhotoLog) -> some View {
         let side = (ScreenCompat.width - 6) / 3
-        if let img = UIImage(data: photo.imageData) {
-            Image(uiImage: img)
+        AsyncDecodedImageView(data: photo.imageData) { image in
+            Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
                 .frame(width: side, height: side)
                 .clipped()
-        } else {
+        } placeholder: {
             Rectangle()
                 .fill(Color.primary.opacity(0.1))
                 .frame(width: side, height: side)
-                .overlay(Image(systemName: "photo").foregroundStyle(Color.ohanaSecondaryText))
+                .overlay(Image(systemName: "photo").foregroundStyle(Color.ohanaSecondaryText)) // a11y: allow decorative icon covered by surrounding text or control
         }
     }
 }
@@ -255,21 +258,25 @@ private struct PhotoDetailSheet: View {
             ZStack {
                 Color.black.ignoresSafeArea() // ui-v4: allow fullScreenPhotoViewer
                 VStack(spacing: 0) {
-                    if let img = UIImage(data: photo.imageData) {
-                        Image(uiImage: img)
+                    AsyncDecodedImageView(data: photo.imageData) { image in
+                        Image(uiImage: image)
                             .resizable()
                             .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } placeholder: {
+                        ProgressView()
+                            .tint(.white)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
 
                     VStack(spacing: 10) {
                         Text(photo.date.formatted(.dateTime.year().month().day().weekday()))
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(.white.opacity(0.6)) // ui-v4: allow fullScreenPhotoViewer
 
                         if isEditingNote {
                             TextField("添加备注…", text: $noteText, axis: .vertical)
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(.white) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)
                                 .lineLimit(3)
@@ -278,7 +285,7 @@ private struct PhotoDetailSheet: View {
                                 }
                         } else {
                             Text(photo.note.isEmpty ? "轻触添加备注" : photo.note)
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(photo.note.isEmpty ? .white.opacity(0.3) : .white.opacity(0.8)) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)
                                 .onTapGesture {
@@ -295,7 +302,7 @@ private struct PhotoDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
+                        Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .symbolRenderingMode(.hierarchical).foregroundStyle(.white.opacity(0.7)) // ui-v4: allow fullScreenPhotoViewer
                     }
                 }

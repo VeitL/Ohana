@@ -64,9 +64,9 @@ struct CrewRosterExpandedMemberOverlay: View {
     private var header: some View {
         HStack(spacing: 12) {
             Image(systemName: pet == nil ? "person.fill" : "pawprint.fill")
-                .font(.system(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .black))
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(Color.ohanaControlFill, in: Circle())
 
             VStack(alignment: .leading, spacing: 1) {
@@ -85,10 +85,10 @@ struct CrewRosterExpandedMemberOverlay: View {
                 OhanaFeedback.light()
                 onClose()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 40, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.ohanaControlFill, in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -228,7 +228,7 @@ struct CrewRosterExpandedMemberOverlay: View {
             ForEach(metrics) { metric in
                 VStack(alignment: .leading, spacing: 5) {
                     Image(systemName: metric.icon)
-                        .font(.system(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(Color.goPrimary)
                     Text(metric.value)
                         .font(OhanaFont.title3(.black))
@@ -259,7 +259,7 @@ struct CrewRosterExpandedMemberOverlay: View {
                 ForEach(rows) { row in
                     HStack(spacing: 10) {
                         Image(systemName: row.icon)
-                            .font(.system(size: 13, weight: .black))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
                             .foregroundStyle(Color.goPrimary)
                             .frame(width: 22)
 
@@ -289,8 +289,8 @@ struct CrewRosterExpandedMemberOverlay: View {
             action()
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "arrow.up.right")
-                    .font(.system(size: 13, weight: .black))
+                Image(systemName: "arrow.up.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black))
                 Text(title)
                     .font(OhanaFont.caption(.black))
             }

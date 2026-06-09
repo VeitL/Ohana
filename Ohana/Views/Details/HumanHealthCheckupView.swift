@@ -152,10 +152,10 @@ struct HumanHealthCheckupView: View {
 
     private var trackedChartEmptyState: some View {
         HStack(spacing: 12) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "chart.line.uptrend.xyaxis").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(Color.goOrange)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .background(Color.goOrange.opacity(0.14), in: Circle())
 
             VStack(alignment: .leading, spacing: 3) {
@@ -192,9 +192,9 @@ struct HumanHealthCheckupView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Image(systemName: metric.category.systemImage)
-                        .font(.system(size: 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.arkInk)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .background(metric.category.color, in: Circle())
                     VStack(alignment: .leading, spacing: 1) {
                         Text(metric.displayName(l))
@@ -207,8 +207,8 @@ struct HumanHealthCheckupView: View {
                             .foregroundStyle(metric.category.color)
                     }
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .black))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .black))
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
 
@@ -304,9 +304,9 @@ struct HumanHealthCheckupView: View {
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 9) {
                 Image(systemName: category.systemImage)
-                    .font(.system(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.arkInk)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 32, height: 32) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(category.color, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(category.displayName(l))
@@ -399,10 +399,10 @@ struct HumanHealthCheckupView: View {
                 detailMetric = metric
                 UISelectionFeedbackGenerator().selectionChanged()
             } label: {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "chart.line.uptrend.xyaxis").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(metric.category.color)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(metric.category.color.opacity(0.14), in: Circle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -429,9 +429,9 @@ struct HumanHealthCheckupView: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: metric.category.systemImage)
-                        .font(.system(size: 14, weight: .black))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black))
                         .foregroundStyle(Color.arkInk)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .background(metric.category.color, in: Circle())
 
                     VStack(alignment: .leading, spacing: 3) {
@@ -442,7 +442,7 @@ struct HumanHealthCheckupView: View {
                         HStack(spacing: 5) {
                             Circle()
                                 .fill(status.color)
-                                .frame(width: 6, height: 6)
+                                .frame(width: 6, height: 6) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             Text(status.label(l))
                             Text("·")
                             Text(log.date, format: .dateTime.year().month().day())
@@ -459,8 +459,8 @@ struct HumanHealthCheckupView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.62)
 
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .black))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
                 .padding(.horizontal, 14)
@@ -474,8 +474,8 @@ struct HumanHealthCheckupView: View {
 
     private var emptyRecentState: some View {
         VStack(spacing: 10) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 28, weight: .bold))
+            Image(systemName: "chart.line.uptrend.xyaxis").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 28, weight: .bold))
                 .foregroundStyle(Color.goTeal)
             Text(l.tr(zh: "还没有体检指标记录", en: "No checkup metrics yet", de: "Noch keine Check-up-Werte"))
                 .font(OhanaFont.callout(.black))
@@ -500,7 +500,7 @@ struct HumanHealthCheckupView: View {
     private func summaryItem(icon: String, value: String, label: String, tint: Color) -> some View {
         VStack(spacing: 7) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .black))
                 .foregroundStyle(tint)
             Text(value)
                 .font(OhanaFont.metric(size: 24, .black))
@@ -549,6 +549,6 @@ struct HumanHealthCheckupView: View {
         }
         return Circle()
             .fill(color)
-            .frame(width: 9, height: 9)
+            .frame(width: 9, height: 9) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
     }
 }

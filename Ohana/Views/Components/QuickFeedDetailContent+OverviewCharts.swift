@@ -5,23 +5,23 @@ extension QuickFeedDetailContent {
     var feedingOverviewAggregateSummary: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Image(systemName: "fork.knife.circle.fill")
-                    .font(.system(size: 18, weight: .black))
+                Image(systemName: "fork.knife.circle.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 18, weight: .black))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 46, height: 46)
                     .background(mainFoodOverviewTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "全部喂食", en: "All feeding", de: "Alle Fütterungen"))
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "手动、计划、自动都会计入总览。", en: "Manual, plan, and auto logs are all included.", de: "Manuell, Plan und Auto sind enthalten."))
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Text(feedTaskState.todayMainFoodGrams > 0 ? formattedFoodWeight(feedTaskState.todayMainFoodGrams) : "--")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(mainFoodOverviewTint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
@@ -69,7 +69,7 @@ extension QuickFeedDetailContent {
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Text(range.title(l))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(draftStore.overviewRange == range ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
@@ -85,16 +85,16 @@ extension QuickFeedDetailContent {
     func overviewMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(value)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.68)
@@ -117,21 +117,21 @@ extension QuickFeedDetailContent {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(subtitle)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text(draftStore.overviewRange.title(l))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
             }
 
             if points.allSatisfy({ $0.value <= 0 }) {
                 Text(emptyText)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity, minHeight: 150)
             } else {
@@ -168,21 +168,21 @@ extension QuickFeedDetailContent {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(subtitle)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text(draftStore.overviewRange.title(l))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
             }
 
             if points.allSatisfy({ $0.value <= 0 }) {
                 Text(emptyText)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity, minHeight: 118)
             } else {
@@ -200,7 +200,7 @@ extension QuickFeedDetailContent {
                         de: "Ø \(String(format: "%.1f", average))/Tag"
                     ))
                 }
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
 
                 OhanaMinimalBarChart(
@@ -233,19 +233,19 @@ extension QuickFeedDetailContent {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(
                         zh: "按次数看节奏，没填克数也算",
                         en: "Frequency rhythm; no-gram logs count",
                         de: "Rhythmus nach Anzahl; ohne Gramm zählt"
                     ))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text(draftStore.overviewRange.title(l))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(tint)
             }
 
@@ -258,7 +258,7 @@ extension QuickFeedDetailContent {
                     en: "\(total)x · \(activeDays) snack days · peak \(maxCount)",
                     de: "\(total)x · \(activeDays) Snacktage · Spitze \(maxCount)"
                 ))
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .contentTransition(.numericText())
 
@@ -276,7 +276,7 @@ extension QuickFeedDetailContent {
                                     .opacity(point.value > 0 ? 0.95 : 0.42)
                                 if draftStore.overviewRange == .days7 {
                                     Text(point.date, format: .dateTime.weekday(.narrow))
-                                        .font(.system(size: 9, weight: .black, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                                         .foregroundStyle(Calendar.current.isDateInToday(point.date) ? tint : Color.ohanaTertiaryText)
                                 }
                             }

@@ -192,36 +192,25 @@ struct MemoryDropCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // 地图截图（如果有）
-            if let data = fragment.mapSnapshotData, let img = UIImage(data: data) {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 110)
-                    .clipped()
-                    .overlay(
-                        LinearGradient(
-                            colors: [.clear, fragment.accentColor.mix(with: .black, by: 0.4).opacity(0.85)],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                    )
+            if let data = fragment.mapSnapshotData {
+                MemoryDropMapSnapshotView(data: data, accentColor: fragment.accentColor)
             }
 
             VStack(alignment: .leading, spacing: 8) {
                 // 标签行
                 HStack(spacing: 6) {
                     Text("✨")
-                        .font(.system(size: 11))
+                        .font(OhanaFont.adaptive(size: 11)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("记忆碎片")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .tracking(1)
                     Spacer()
                     // 闪光扫光效果提示
                     Text("今日回忆")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(shimmer ? 0.7 : 0.25))
-                        .animation(shouldRunShimmer ? .easeInOut(duration: 2.0).repeatForever(autoreverses: true) : GoMotion.reduced, value: shimmer)
+                        .animation(shouldRunShimmer ? .easeInOut(duration: 2.0).repeatForever(autoreverses: true) : GoMotion.reduced, value: shimmer) // smoothness: allow AppWorkloadPolicy-gated visible-only memory label shimmer.
                         .onAppear {
                             isVisible = true
                             shimmer = shouldRunShimmer
@@ -238,9 +227,9 @@ struct MemoryDropCard: View {
                 // 主标题
                 HStack(alignment: .top, spacing: 10) {
                     Text(fragment.emoji)
-                        .font(.system(size: 28))
+                        .font(OhanaFont.adaptive(size: 28)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(fragment.headline)
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -248,7 +237,7 @@ struct MemoryDropCard: View {
 
                 // 副标题
                 Text(fragment.subline)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -258,16 +247,16 @@ struct MemoryDropCard: View {
                     HStack(spacing: 6) {
                         if let name = fragment.petName {
                             Text(name)
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }
                         Spacer()
                         HStack(spacing: 3) {
                             Text("+\(fragment.rewardCoconuts)")
-                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goPrimary)
                             Text("🥥")
-                                .font(.system(size: 12))
+                                .font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.goPrimary.opacity(0.15), in: Capsule())
@@ -292,5 +281,40 @@ struct MemoryDropCard: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(fragment.accentColor.opacity(0.3), lineWidth: 1)
         )
+    }
+}
+
+private struct MemoryDropMapSnapshotView: View {
+    let data: Data
+    let accentColor: Color
+
+    @State private var image: UIImage?
+
+    private var signature: String {
+        FocusWalletAvatarCache.signature(for: data)
+    }
+
+    var body: some View {
+        ZStack {
+            accentColor.opacity(0.14)
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 110)
+        .clipped()
+        .overlay(
+            LinearGradient(
+                colors: [.clear, accentColor.mix(with: Color.arkInk, by: 0.4).opacity(0.85)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .task(id: signature) {
+            image = await MapSnapshotImageDecoder.decode(data)
+        }
     }
 }

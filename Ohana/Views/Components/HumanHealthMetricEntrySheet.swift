@@ -243,9 +243,9 @@ struct HumanHealthMetricEntrySheet: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: metric.category.systemImage)
-                .font(.system(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
@@ -270,8 +270,8 @@ struct HumanHealthMetricEntrySheet: View {
     private var valueBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Image(systemName: "number")
-                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: "number").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 Text(metric.displayName(l))
                     .font(OhanaFont.caption(.bold))
                 Spacer()
@@ -368,8 +368,8 @@ struct HumanHealthMetricEntrySheet: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Image(systemName: "note.text")
-                        .font(.system(size: 13, weight: .semibold))
+                    Image(systemName: "note.text").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                     Text(l.tr(zh: "备注", en: "Notes", de: "Notizen"))
                         .font(OhanaFont.callout(.semibold))
@@ -391,10 +391,10 @@ struct HumanHealthMetricEntrySheet: View {
 
     private var referenceBlock: some View {
         HStack(spacing: 12) {
-            Image(systemName: "target")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "target").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(tint)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .background(tint.opacity(0.15), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "参考范围", en: "Reference range", de: "Referenzbereich"))
@@ -415,7 +415,7 @@ struct HumanHealthMetricEntrySheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold))
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存指标", en: "Save metric", de: "Wert speichern")
@@ -442,7 +442,7 @@ struct HumanHealthMetricEntrySheet: View {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text(label)
                 .font(OhanaFont.callout(.semibold))

@@ -4176,6 +4176,42 @@ struct RewardEconomyCommandExecutor {
     }
 
     @discardableResult
+    func awardBackdateCheckIn(
+        actionKey: String,
+        pet: Pet,
+        questManager: QuestManager? = nil,
+        note: String
+    ) -> BackdateCheckInCommandResult {
+        awardBackdateCheckIn(
+            action: backdateActionType(for: actionKey),
+            actionKey: actionKey,
+            pet: pet,
+            questManager: questManager,
+            note: note
+        )
+    }
+
+    private func backdateActionType(for actionKey: String) -> QuestManager.OhanaActionType {
+        switch actionKey {
+        case "feed":
+            return .feed
+        case "water":
+            return .water
+        case "potty":
+            return .potty(isLitter: false)
+        case "walk":
+            return .walk(distanceMeters: 300)
+        default:
+            return .general(
+                humanReward: 1,
+                petReward: 0,
+                emoji: "📅",
+                title: "Backdate check-in"
+            )
+        }
+    }
+
+    @discardableResult
     func unlockBondVaultItem(
         _ item: PetBondVaultItem,
         pet: Pet,

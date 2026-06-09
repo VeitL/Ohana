@@ -46,7 +46,7 @@ struct IslandMoodWeatherView: View {
             ZStack {
                 ForEach(particles) { particle in
                     Text(particle.emoji)
-                        .font(.system(size: 16))
+                        .font(OhanaFont.adaptive(size: 16))
                         .scaleEffect(particle.scale)
                         .opacity(particle.opacity)
                         .position(x: particle.x, y: particle.y)

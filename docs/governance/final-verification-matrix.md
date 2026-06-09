@@ -1,9 +1,10 @@
 # Final Verification Matrix
 
-> Date: 2026-06-08
+> Date: 2026-06-09
 >
-> Status: full-score hardening pass complete. Governance, release hardening,
-> resource, runtime, build, and fixed-simulator test gates are green.
+> Status: full-score hardening pass complete. Governance, UI/accessibility/
+> smoothness strict full-scope gates, runtime, build, and fixed-simulator test
+> gates are green.
 
 ## Passed Gates
 
@@ -11,17 +12,17 @@
 |---|---|---|
 | Root rule cleanup | Passed | `.cursor` and `.windsurf` are deleted; `AGENTS.md` is the root rule file. |
 | Governance manifests | Passed | `scripts/audit-governance-manifests.sh` passed. |
-| Runtime guardrails | Passed | `scripts/audit-runtime-guardrails.sh --all` passed on 435 Swift files. |
+| Runtime guardrails | Passed | `scripts/audit-runtime-guardrails.sh --all` passed on 444 Swift files. |
 | Resource integrity | Passed | `scripts/audit-resource-integrity.sh` passed with manifest-driven budgets. |
 | Release data safety | Passed | `scripts/audit-release-data-safety.sh` passed. |
 | Localization coverage | Passed | `scripts/audit-localization-coverage.sh` passed. |
-| UI V4 changed files | Passed | `scripts/audit-ui-v4.sh --changed` passed. |
-| Accessibility changed files | Passed | `scripts/audit-accessibility.sh --changed` passed. |
-| Smoothness changed files | Passed | `scripts/audit-smoothness-risk.sh --changed` passed. |
-| Full-scope UI/a11y/smoothness ratchet | Passed | `scripts/audit-full-scope-ratchet.sh` passed. Current locked baseline: UI V4 `128`, accessibility `4275`, smoothness `191`. Baseline blocks any file/rule warning count increase until the full-scope audits can be promoted to direct `--all` strict gates. |
-| Release hardening baseline | Passed | `scripts/release-hardening-check.sh --skip-build` passed with the full-scope ratchet enabled. |
-| Fixed simulator build | Passed | `DERIVED_DATA_PATH=/tmp/OhanaDD-fullscore-round4-runtime scripts/build-debug-fast.sh` passed on `platform=iOS Simulator,name=iPhone 17` with `-sdk iphonesimulator`. |
-| Fixed simulator tests | Passed | `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/OhanaDD-fullscore-round7-final -disableAutomaticPackageResolution -skipPackagePluginValidation` passed. Result bundle: `/tmp/OhanaDD-fullscore-round7-final/Logs/Test/Test-Ohana-2026.06.08_16-52-17-+0200.xcresult`. XCTest: 1 test passed. Swift Testing: 271 tests in 37 suites passed. |
+| UI V4 whole repo | Passed | `scripts/audit-ui-v4.sh --all` passed with 0 warnings. |
+| Accessibility whole repo | Passed | `scripts/audit-accessibility.sh --all` passed with 0 warnings. |
+| Smoothness whole repo | Passed | `scripts/audit-smoothness-risk.sh --all` passed with 0 warnings. |
+| Full-scope baseline promotion | Passed | `docs/governance/manifests/full-scope-audit-baseline.json` is locked at UI V4 `0`, accessibility `0`, smoothness `0`; CI now runs direct strict `--all` audits instead of the ratchet. |
+| Release hardening baseline | Passed | `scripts/release-hardening-check.sh --skip-build` passed with whole-repo strict UI/accessibility/smoothness audits enabled. |
+| Fixed simulator build | Passed | `scripts/build-debug-fast.sh` passed on `platform=iOS Simulator,name=iPhone 17` with `-sdk iphonesimulator`. |
+| Fixed simulator tests | Passed | `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO` passed. Result bundle: `/Users/guanchenli/Library/Developer/Xcode/DerivedData/Ohana-frxggpejbejurvbcwvgvtdandbfd/Logs/Test/Test-Ohana-2026.06.09_14-23-34-+0200.xcresult`. Swift Testing: 437 tests in 37 suites passed. XCTest UI: 3 tests passed. |
 
 ## Resolved Test Failure Clusters
 
@@ -35,8 +36,12 @@
 
 ## Non-Blocking Warnings Seen
 
-- `PetMilestoneListView.swift` uses deprecated iOS 26 `placemark`.
-- `OhanaDesignSystem.swift` uses deprecated iOS 26 `UIScreen.main`.
+- AppIntents metadata extraction reports no AppIntents framework dependency; this
+  is expected because this pass does not add App Intents.
+- Xcode UI tests emitted simulator debugger-version and duplicate WebKit
+  accessibility class noise; all UI tests passed.
+- Existing Swift Testing notes flag `#expect(true)` placeholders in historical
+  tests; they do not block this hardening pass.
 
 ## Completion Decision
 
@@ -45,7 +50,4 @@ product-maturity refinements rather than blockers for this pass:
 
 1. Capture dedicated Instruments energy/animation traces before App Store
    release.
-2. Retire the two iOS 26 deprecation warnings when the affected UI helpers are
-   next touched.
-3. Continue shrinking the full-scope UI/accessibility/smoothness baseline and
-   enforce SwiftFormat once the formatting baseline is committed.
+2. Enforce SwiftFormat once the formatting baseline is committed.

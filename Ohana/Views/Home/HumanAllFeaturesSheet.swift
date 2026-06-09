@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import SwiftData
+import UIKit
 
 enum HumanAllFeatureDestination: Hashable {
     case basicInfo
@@ -57,25 +57,31 @@ extension HumanAllFeatureDestination: Identifiable {
 
 struct HumanAllFeaturesSheet: View {
     let human: Human
+    let allMeds: [HumanMedication]
+    let allReports: [HumanHealthReport]
+    let allExpenses: [PetExpenseLog]
     let onOpenDestination: (HumanAllFeatureDestination) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
-    @Query(sort: \Pet.name) private var allPets: [Pet]
-    @Query(sort: \Human.createdAt) private var allHumans: [Human]
-    @Query private var allMeds: [HumanMedication]
-    @Query private var allReports: [HumanHealthReport]
-    @Query(sort: \PetExpenseLog.date, order: .reverse) private var allExpenses: [PetExpenseLog]
-
+    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
     @State private var lockedField: HumanPrivateField?
+    @State private var avatarSignature = ""
+    @State private var avatarCacheKey = "human-feature-avatar-empty"
 
     init(
         human: Human,
+        allMeds: [HumanMedication] = [],
+        allReports: [HumanHealthReport] = [],
+        allExpenses: [PetExpenseLog] = [],
         onOpenDestination: @escaping (HumanAllFeatureDestination) -> Void
     ) {
         self.human = human
+        self.allMeds = allMeds
+        self.allReports = allReports
+        self.allExpenses = allExpenses
         self.onOpenDestination = onOpenDestination
     }
 
@@ -83,6 +89,10 @@ struct HumanAllFeaturesSheet: View {
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var themeColor: Color { Color(hex: human.safeThemeColorHex) }
+    private var preparedAvatarImage: UIImage? {
+        guard !avatarSignature.isEmpty else { return nil }
+        return avatarPipeline.cachedImage(for: human.id, signature: avatarSignature)
+    }
 
     var body: some View {
         NavigationStack {
@@ -94,7 +104,8 @@ struct HumanAllFeaturesSheet: View {
                     onClose: { dismiss() },
                     avatar: {
                         FeatureHubAvatar(
-                            imageData: human.avatarImageData,
+                            image: preparedAvatarImage,
+                            imageData: nil,
                             emoji: human.avatarEmoji,
                             fallback: "👤",
                             tint: themeColor
@@ -121,6 +132,12 @@ struct HumanAllFeaturesSheet: View {
             .grayscale(human.hasPassedAway ? 0.86 : 0)
             .animation(GoMotion.page, value: human.hasPassedAway)
         }
+        .task(id: avatarSourceKey) {
+            await prepareAvatar()
+        }
+        .onDisappear {
+            avatarPipeline.cancel(key: avatarCacheKey)
+        }
         .alert(
             l.tr(zh: "仅本人可见", en: "Private to owner", de: "Nur selbst sichtbar"),
             isPresented: Binding(
@@ -134,6 +151,36 @@ struct HumanAllFeaturesSheet: View {
                 Text(PrivacyService.lockedMessage(for: lockedField))
             }
         }
+    }
+
+    private var avatarSourceKey: String {
+        "\(human.id.uuidString):\(human.avatarImageData?.count ?? 0)"
+    }
+
+    private func prepareAvatar() async {
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
+        guard !Task.isCancelled else { return }
+        guard let data = human.avatarImageData else {
+            avatarPipeline.cancel(key: avatarCacheKey)
+            avatarSignature = ""
+            avatarCacheKey = "human-feature-avatar-empty"
+            return
+        }
+
+        let signature = FocusWalletAvatarCache.signature(for: data)
+        let nextKey = "human-feature-avatar-\(human.id.uuidString)-\(data.count)"
+        if avatarCacheKey != nextKey {
+            avatarPipeline.cancel(key: avatarCacheKey)
+            avatarCacheKey = nextKey
+        }
+        avatarSignature = signature
+        let payload = FocusWalletAvatarCache.Payload(id: human.id, data: data)
+        avatarPipeline.seedPreviewEntries([payload])
+        avatarPipeline.preload(
+            payloads: [payload],
+            key: nextKey,
+            delayMilliseconds: 48
+        )
     }
 
     private func open(_ destination: HumanAllFeatureDestination) {
@@ -511,8 +558,8 @@ private struct HumanOwnerPrivacyHint: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 14, weight: .black))
+            Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
             Text(l.tr(zh: "已开启隐私的数据仅自己可见", en: "Private fields are visible only to you", de: "Private Felder sind nur für dich sichtbar"))
                 .font(OhanaFont.caption(.bold))
@@ -530,10 +577,10 @@ private struct HumanMemorialBanner: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 18, weight: .black))
+            Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPurple)
-                .frame(width: 40, height: 40)
+                .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPurple.opacity(0.16), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "纪念模式", en: "Memorial mode", de: "Gedenkmodus"))

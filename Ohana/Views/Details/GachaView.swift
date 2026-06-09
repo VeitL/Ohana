@@ -8,9 +8,34 @@
 import SwiftUI
 import SwiftData
 
+struct GachaRouteContainer: View {
+    @Query(sort: \Human.createdAt) private var humans: [Human]
+    @Query(sort: \GachaOwnedItem.latestObtainedAt, order: .reverse) private var ownedItems: [GachaOwnedItem]
+    @Query(sort: \GachaDrawLog.drawDate, order: .reverse) private var drawLogs: [GachaDrawLog]
+
+    var drawsBackground: Bool = true
+    var onClose: (() -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+
+    var body: some View {
+        GachaView(
+            drawsBackground: drawsBackground,
+            onClose: onClose,
+            onPresentCoconutLog: onPresentCoconutLog,
+            humans: humans,
+            ownedItems: ownedItems,
+            drawLogs: drawLogs
+        )
+    }
+}
+
 struct GachaView: View {
     var drawsBackground: Bool = true
     var onClose: (() -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    let humans: [Human]
+    let ownedItems: [GachaOwnedItem]
+    let drawLogs: [GachaDrawLog]
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -20,10 +45,6 @@ struct GachaView: View {
     @AppStorage("appLanguage") private var appLanguage: String = "zh"
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
     @AppStorage("gachaHistory") private var legacyHistoryRaw: String = ""
-
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-    @Query(sort: \GachaOwnedItem.latestObtainedAt, order: .reverse) private var ownedItems: [GachaOwnedItem]
-    @Query(sort: \GachaDrawLog.drawDate, order: .reverse) private var drawLogs: [GachaDrawLog]
 
     @State private var selectedSeriesId = GachaSeriesCatalog.defaultSeriesId
     @State private var isDrawing = false
@@ -39,9 +60,24 @@ struct GachaView: View {
     @State private var pendingCollectionCompletion = false
     @State private var collectionCompletionToken = 0
     @State private var isCollectionCompletionCelebrating = false
-    @State private var showingCoconutLog = false
     @State private var revealResetToken = 0
     @State private var selectedCollectionItemId: String?
+
+    init(
+        drawsBackground: Bool = true,
+        onClose: (() -> Void)? = nil,
+        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil,
+        humans: [Human] = [],
+        ownedItems: [GachaOwnedItem] = [],
+        drawLogs: [GachaDrawLog] = []
+    ) {
+        self.drawsBackground = drawsBackground
+        self.onClose = onClose
+        self.onPresentCoconutLog = onPresentCoconutLog
+        self.humans = humans
+        self.ownedItems = ownedItems
+        self.drawLogs = drawLogs
+    }
 
     private var l: L10n { L10n(appLanguage) }
     private var series: GachaSeriesEntry { GachaSeriesCatalog.series(id: selectedSeriesId) }
@@ -135,13 +171,6 @@ struct GachaView: View {
         }
         .ignoresSafeArea(.container, edges: .bottom)
         .statusBarHidden(false)
-        .sheet(isPresented: $showingCoconutLog) {
-            if let currentHuman {
-                CoconutLogView(subject: .human(currentHuman.id))
-            } else {
-                CoconutLogView()
-            }
-        }
     }
 
     private func popupPanel(maxHeight: CGFloat) -> some View {
@@ -228,8 +257,8 @@ struct GachaView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: isUnlocked ? seriesIconName(entry) : "lock.fill")
-                    .font(.system(size: 13, weight: .black))
-                    .frame(width: 24, height: 24)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .foregroundStyle(isSelected && isUnlocked ? Color.arkInk : Color.ohanaPrimaryText)
                     .background(
                         (isSelected && isUnlocked ? Color.goPrimary : Color.ohanaControlFill),
@@ -295,7 +324,7 @@ struct GachaView: View {
 
     private var balancePill: some View {
         CoconutBalanceCapsule(balance: currentCoconutBalance, showsDeltaAnimation: true) {
-            showingCoconutLog = true
+            presentCoconutLog()
             OhanaFeedback.light()
         }
         .frame(minHeight: 44)
@@ -303,6 +332,11 @@ struct GachaView: View {
         .disabled(currentHuman == nil)
         .opacity(currentHuman == nil ? 0.62 : 1)
         .accessibilityLabel(l.tr(zh: "当前椰子余额 \(currentCoconutBalance)，打开椰子历史", en: "Current coconut balance \(currentCoconutBalance), open coconut history", de: "Aktueller Kokosnussstand \(currentCoconutBalance), Kokosnuss-Historie öffnen"))
+    }
+
+    private func presentCoconutLog() {
+        let subject = currentHuman.map { CoconutLogSubject.human($0.id) }
+        onPresentCoconutLog?(subject)
     }
 
     private var gachaStage: some View {
@@ -345,7 +379,7 @@ struct GachaView: View {
                 )
             } else {
                 Text(outcome.displaySymbol)
-                    .font(.system(size: 34))
+                    .font(OhanaFont.adaptive(size: 34)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .frame(width: 54, height: 54)
                     .background(tint.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
@@ -633,7 +667,7 @@ struct GachaView: View {
     private func collectionDetailImage(_ item: GachaItemEntry) -> some View {
         if item.imageAssetName.isEmpty {
             Text(item.placeholderSymbol)
-                .font(.system(size: 86))
+                .font(OhanaFont.adaptive(size: 86)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Image(item.imageAssetName)
@@ -690,8 +724,8 @@ struct GachaView: View {
                     if let row = recentRowData(log) {
                         HStack(spacing: 10) {
                             Text(row.symbol)
-                                .font(.system(size: 22))
-                                .frame(width: 38, height: 38)
+                                .font(OhanaFont.adaptive(size: 22)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 .background(row.tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(row.title)

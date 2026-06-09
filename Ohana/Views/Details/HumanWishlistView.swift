@@ -177,7 +177,7 @@ struct HumanWishlistView: View {
                     .buttonStyle(ScaleButtonStyle())
 
                     Button { delete(item: item) } label: {
-                        Image(systemName: "trash")
+                        Image(systemName: "trash").accessibilityHidden(true)
                             .font(OhanaFont.footnote())
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     }
@@ -224,7 +224,7 @@ struct HumanWishlistView: View {
             VStack(spacing: 0) {
                 Capsule()
                     .fill(Color.ohanaDivider)
-                    .frame(width: 40, height: 4)
+                    .frame(width: 40, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .padding(.top, 12).padding(.bottom, 20)
 
                 Text("许一个愿 🌟")
@@ -236,7 +236,7 @@ struct HumanWishlistView: View {
                 VStack(spacing: 14) {
                     // 心愿标题
                     HStack {
-                        Image(systemName: "sparkles")
+                        Image(systemName: "sparkles").accessibilityHidden(true)
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         TextField("心愿内容（例如：新耳机）", text: $newTitle)
                             .font(OhanaFont.callout(.semibold))

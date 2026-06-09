@@ -43,7 +43,7 @@ extension QuickFeedDetailContent {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle(isOn: $draftStore.stockReminderEnabled) {
                         Text(l.tr(zh: "低余粮提醒", en: "Low stock reminder", de: "Vorrats-Erinnerung"))
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     }
                     .tint(stockTint)
 
@@ -94,7 +94,7 @@ extension QuickFeedDetailContent {
     var stockCalculationModePicker: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "粮仓计算", en: "Stock calculation", de: "Vorratsberechnung"))
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
 
             ViewThatFits(in: .horizontal) {
@@ -129,18 +129,18 @@ extension QuickFeedDetailContent {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: stockCalculationModeIcon(mode))
-                    .font(.system(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(isSelected ? Color.arkInk : tint)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(isSelected ? Color.arkInk.opacity(0.14) : tint.opacity(0.12), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(stockCalculationModeTitle(mode))
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
                     Text(stockCalculationModeSubtitle(mode))
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
@@ -220,7 +220,7 @@ extension QuickFeedDetailContent {
         VStack(alignment: .leading, spacing: 10) {
             Toggle(isOn: isOn.animation(GoMotion.feedback)) {
                 Text(title)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .tint(stockTint)
@@ -241,7 +241,7 @@ extension QuickFeedDetailContent {
         VStack(spacing: 10) {
             HStack {
                 Text(l.tr(zh: "支付人", en: "Payer", de: "Zahlende Person"))
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Menu {
@@ -256,9 +256,9 @@ extension QuickFeedDetailContent {
                 } label: {
                     HStack(spacing: 6) {
                         Text(stockExpensePayerName)
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10, weight: .black))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        Image(systemName: "chevron.down").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 10, weight: .black))
                     }
                     .foregroundStyle(stockTint)
                 }
@@ -274,11 +274,11 @@ extension QuickFeedDetailContent {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(l.tr(zh: "金额", en: "Amount", de: "Betrag"))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Text(l.tr(zh: "可选", en: "Optional", de: "Optional"))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(draftStore.stockExpenseAmountText.isEmpty ? Color.ohanaTertiaryText : stockTint)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
@@ -295,17 +295,17 @@ extension QuickFeedDetailContent {
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(AppCurrency.symbol)
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(stockTint)
                     Text(draftStore.stockExpenseAmountText.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: AppCountry.code) : draftStore.stockExpenseAmountText)
-                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                         .foregroundStyle(draftStore.stockExpenseAmountText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
                     Spacer(minLength: 8)
                     Image(systemName: draftStore.stockExpenseAmountKeypadVisible ? "keyboard.chevron.compact.down" : "number")
-                        .font(.system(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(stockTint)
                 }
                 .padding(.horizontal, 14)
@@ -391,21 +391,21 @@ extension QuickFeedDetailContent {
             activeAlert = .deleteFoodRecord(record)
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: "trash")
-                    .font(.system(size: 14, weight: .black))
+                Image(systemName: "trash").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.goRed)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "删除这袋粮", en: "Delete this bag", de: "Diesen Vorrat löschen"))
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed)
                     Text(l.tr(
                         zh: "只删除当前补粮/开袋记录，不删除喂食历史。",
                         en: "Removes only this stock record, not feeding history.",
                         de: "Entfernt nur diesen Vorratseintrag, nicht die Fütterungshistorie."
                     ))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -439,15 +439,15 @@ extension QuickFeedDetailContent {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(record.brand.isEmpty ? l.tr(zh: "当前余粮", en: "Current stock", de: "Aktueller Vorrat") : record.brand)
-                        .font(.system(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("\(draftStore.selectedStockFoodKind.title(l)) · \(formattedStockWeight(snapshot.remainingGrams))")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(stockStatusTint(snapshot))
                 }
                 Spacer()
                 Text(snapshot.remainingDays > 0 ? "\(snapshot.remainingDays)d" : "--")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                     .foregroundStyle(stockStatusTint(snapshot))
             }
 
@@ -465,7 +465,7 @@ extension QuickFeedDetailContent {
                     en: "Manually corrected to \(formattedStockWeight(grams)) · \(date.formatted(date: .numeric, time: .shortened))",
                     de: "Manuell korrigiert auf \(formattedStockWeight(grams)) · \(date.formatted(date: .numeric, time: .shortened))"
                 ))
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
@@ -483,11 +483,11 @@ extension QuickFeedDetailContent {
     func stockDateLine(title: String, date: Date) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
             Text(date.formatted(date: .numeric, time: .omitted))
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
     }
@@ -495,7 +495,7 @@ extension QuickFeedDetailContent {
     func stockCorrectionCard(record: PetFoodRecord) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "手动修正余量", en: "Correct remaining stock", de: "Restbestand korrigieren"))
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             VStack(alignment: .leading, spacing: 8) {
                 Button {
@@ -503,15 +503,15 @@ extension QuickFeedDetailContent {
                 } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(draftStore.stockCorrectionText.isEmpty ? "800" : draftStore.stockCorrectionText)
-                            .font(.system(size: 24, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                             .foregroundStyle(draftStore.stockCorrectionText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                             .monospacedDigit()
                         Text("g")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(stockTint)
                         Spacer()
-                        Image(systemName: "number")
-                            .font(.system(size: 12, weight: .black))
+                        Image(systemName: "number").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
                             .foregroundStyle(stockTint)
                     }
                 }
@@ -533,7 +533,7 @@ extension QuickFeedDetailContent {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $draftStore.stockReminderEnabled) {
                 Text(l.tr(zh: "低余粮提醒", en: "Low stock reminder", de: "Vorrats-Erinnerung"))
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .tint(stockTint)
@@ -551,7 +551,7 @@ extension QuickFeedDetailContent {
                 saveStockReminderSettings()
             } label: {
                 Label(l.tr(zh: "保存提醒", en: "Save reminder", de: "Erinnerung speichern"), systemImage: "bell.badge.fill")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(stockTint)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -604,7 +604,7 @@ extension QuickFeedDetailContent {
                         openFeedSheet(.stockManage)
                     } label: {
                         Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(stockTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)

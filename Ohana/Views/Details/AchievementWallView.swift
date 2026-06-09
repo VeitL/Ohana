@@ -12,6 +12,7 @@ import UIKit
 struct AchievementWallView: View {
     let pet: Pet
     var allPets: [Pet] = []
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -31,7 +32,6 @@ struct AchievementWallView: View {
     @State private var selectedFilter: AchievementFilter = .all
     @State private var selectedAchievement: Achievement?
     @State private var pendingClaimAchievement: Achievement?
-    @State private var showingCoconutLog = false
     @State private var showRewardAnimation = false
     @State private var rewardAnimationAmount = 0
     @State private var rewardAnimationLabel: String?
@@ -39,6 +39,10 @@ struct AchievementWallView: View {
     @State private var showingAchievementShareSheet = false
     @State private var isRenderingAchievementShareImage = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
+    @State private var humanAvatarSignatures: [UUID: String] = [:]
+    @State private var humanAvatarCacheKey = "achievement-wall-human-avatar-empty"
+    @State private var humanActivityIndex = AchievementHumanActivityIndex.empty
 
     private enum AchievementSubject: Hashable, Identifiable {
         case pet(UUID)
@@ -73,6 +77,48 @@ struct AchievementWallView: View {
         case claimed
         case unlocked
         case locked
+    }
+
+    private struct AchievementHumanActivityIndex {
+        var medicationsByHumanId: [String: [HumanMedication]]
+        var medicationLogsByHumanId: [String: [HumanMedicationLog]]
+        var expensesByHumanId: [String: [PetExpenseLog]]
+
+        static let empty = AchievementHumanActivityIndex(
+            medicationsByHumanId: [:],
+            medicationLogsByHumanId: [:],
+            expensesByHumanId: [:]
+        )
+
+        static func make(
+            medications: [HumanMedication],
+            medicationLogs: [HumanMedicationLog],
+            expenses: [PetExpenseLog]
+        ) -> AchievementHumanActivityIndex {
+            let groupedExpenses = Dictionary(
+                grouping: expenses.compactMap { expense in
+                    expense.executorId.map { ($0, expense) }
+                },
+                by: \.0
+            )
+            return AchievementHumanActivityIndex(
+                medicationsByHumanId: Dictionary(grouping: medications, by: \.humanId),
+                medicationLogsByHumanId: Dictionary(grouping: medicationLogs, by: \.humanId),
+                expensesByHumanId: groupedExpenses.mapValues { pairs in pairs.map(\.1) }
+            )
+        }
+
+        func medications(for human: Human) -> [HumanMedication] {
+            medicationsByHumanId[human.id.uuidString] ?? []
+        }
+
+        func medicationLogs(for human: Human) -> [HumanMedicationLog] {
+            medicationLogsByHumanId[human.id.uuidString] ?? []
+        }
+
+        func expenses(for human: Human) -> [PetExpenseLog] {
+            expensesByHumanId[human.id.uuidString] ?? []
+        }
     }
 
     private let rewardPerAchievement = 10
@@ -154,6 +200,21 @@ struct AchievementWallView: View {
 
     private var subjects: [AchievementSubject] {
         pets.map { .pet($0.id) } + humans.map { .human($0.id) }
+    }
+
+    private var humanAvatarSourceKey: String {
+        let key = humans
+            .map { "\($0.id.uuidString):\($0.avatarImageData?.count ?? 0)" }
+            .joined(separator: "|")
+        return key.isEmpty ? "achievement-wall-human-avatar-empty" : key
+    }
+
+    private var humanActivitySourceKey: String {
+        [
+            "med:\(humanMedications.count):\(Int(humanMedications.first?.createdAt.timeIntervalSince1970 ?? 0))",
+            "log:\(humanMedicationLogs.count):\(Int(humanMedicationLogs.first?.createdAt.timeIntervalSince1970 ?? 0))",
+            "expense:\(allExpenseLogs.count):\(Int(allExpenseLogs.first?.date.timeIntervalSince1970 ?? 0))"
+        ].joined(separator: "|")
     }
 
     private var activeSubject: AchievementSubject {
@@ -272,14 +333,20 @@ struct AchievementWallView: View {
         .onAppear {
             if selectedSubject == nil { selectedSubject = .pet(pet.id) }
         }
+        .task(id: humanAvatarSourceKey) {
+            await prepareHumanAvatars()
+        }
+        .task(id: humanActivitySourceKey) {
+            await prepareHumanActivityIndex()
+        }
+        .onDisappear {
+            avatarPipeline.cancel(key: humanAvatarCacheKey)
+        }
         .coconutRewardOverlay(
             trigger: $showRewardAnimation,
             amount: rewardAnimationAmount,
             label: rewardAnimationLabel
         )
-        .fullScreenCover(isPresented: $showingCoconutLog) {
-            CoconutLogView(subject: activeCoconutLogSubject)
-        }
         .sheet(isPresented: $showingAchievementShareSheet) {
             if let achievementShareImage {
                 ShareSheet(image: achievementShareImage)
@@ -305,13 +372,13 @@ struct AchievementWallView: View {
                 showsDeltaAnimation: true,
                 deltaAnimationContext: "achievementWall:\(activeSubject.id)"
             ) {
-                showingCoconutLog = true
+                onPresentCoconutLog?(activeCoconutLogSubject)
             }
             .accessibilityLabel(l.tr(zh: "椰子历史", en: "Coconut history", de: "Kokosnuss-Verlauf"))
 
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -391,7 +458,7 @@ struct AchievementWallView: View {
             if !claimable.isEmpty {
                 Button { claimAllRewards() } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "gift.fill")
+                        Image(systemName: "gift.fill") // a11y: allow decorative icon covered by surrounding text or control
                         Text(l.tr(
                             zh: "领取全部 +\(claimable.count * rewardPerAchievement)🥥",
                             en: "Claim all +\(claimable.count * rewardPerAchievement)🥥",
@@ -415,7 +482,7 @@ struct AchievementWallView: View {
         let info = progress(for: badge)
         return HStack(spacing: 12) {
             Text(badge.emoji)
-                .font(.system(size: 30))
+                .font(OhanaFont.adaptive(size: 30)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .frame(width: 52, height: 52)
                 .background(badge.color.opacity(0.16), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             VStack(alignment: .leading, spacing: 5) {
@@ -431,7 +498,7 @@ struct AchievementWallView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            Image(systemName: "chevron.right")
+            Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
@@ -441,7 +508,7 @@ struct AchievementWallView: View {
 
     private var completedRow: some View {
         HStack(spacing: 12) {
-            Text("🏆").font(.system(size: 30))
+            Text("🏆").font(OhanaFont.adaptive(size: 30)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "全部成就已解锁", en: "All badges unlocked", de: "Alle Abzeichen freigeschaltet"))
                     .font(OhanaFont.callout(.black))
@@ -543,17 +610,17 @@ struct AchievementWallView: View {
         let resolvedForeground = foreground ?? Color.ohanaPrimaryText
         switch state {
         case .claimable:
-            Image(systemName: "gift.fill")
+            Image(systemName: "gift.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .foregroundStyle(foreground ?? Color.arkInk)
         case .claimed:
-            Image(systemName: "checkmark.seal.fill")
+            Image(systemName: "checkmark.seal.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .foregroundStyle(resolvedForeground)
         case .unlocked:
-            Image(systemName: "seal.fill")
+            Image(systemName: "seal.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .foregroundStyle(resolvedForeground)
         case .locked:
-            Image(systemName: "lock.fill")
-                .font(.system(size: 11, weight: .black))
+            Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(foreground ?? Color.ohanaSecondaryText)
         }
     }
@@ -1095,7 +1162,7 @@ struct AchievementWallView: View {
     private func achievementPopupIconButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 44, height: 44)
                 .background(Color.goCardWhite.opacity(0.78), in: Circle())
@@ -1135,20 +1202,20 @@ struct AchievementWallView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(badge.title)
-                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite)
 
                 Text(statusTitle(for: state))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite.opacity(0.82))
 
                 Text(achievementMomentLine(for: badge))
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite.opacity(0.92))
                     .lineLimit(2)
 
                 Text(completionText)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite.opacity(0.78))
             }
             .padding(22)
@@ -1172,7 +1239,7 @@ struct AchievementWallView: View {
 
             VStack(spacing: 14) {
                 Text(badge.emoji)
-                    .font(.system(size: 44))
+                    .font(OhanaFont.adaptive(size: 44)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .frame(width: 70, height: 70)
                     .background(badge.color.opacity(0.18), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
 
@@ -1279,7 +1346,8 @@ struct AchievementWallView: View {
             RoundedRectangle(cornerRadius: size * 0.36, style: .continuous)
                 .fill(Color(hex: human.safeThemeColorHex).opacity(isSelected ? 0.24 : 0.14))
 
-            if let data = human.avatarImageData, let image = UIImage(data: data) {
+            if let signature = humanAvatarSignatures[human.id],
+               let image = avatarPipeline.cachedImage(for: human.id, signature: signature) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -1292,6 +1360,49 @@ struct AchievementWallView: View {
             }
         }
         .frame(width: size, height: size)
+    }
+
+    @MainActor
+    private func prepareHumanAvatars() async {
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 32)
+        guard !Task.isCancelled else { return }
+
+        var signatures: [UUID: String] = [:]
+        var payloads: [FocusWalletAvatarCache.Payload] = []
+        for human in humans {
+            guard let data = human.avatarImageData else { continue }
+            let signature = FocusWalletAvatarCache.signature(for: data)
+            signatures[human.id] = signature
+            payloads.append(FocusWalletAvatarCache.Payload(id: human.id, data: data))
+        }
+
+        let nextKey = payloads
+            .map { "\($0.id.uuidString):\($0.data?.count ?? 0)" }
+            .joined(separator: "|")
+        let cacheKey = nextKey.isEmpty ? "achievement-wall-human-avatar-empty" : "achievement-wall-\(nextKey)"
+        if humanAvatarCacheKey != cacheKey {
+            avatarPipeline.cancel(key: humanAvatarCacheKey)
+            humanAvatarCacheKey = cacheKey
+        }
+        humanAvatarSignatures = signatures
+        guard !payloads.isEmpty else { return }
+        avatarPipeline.seedPreviewEntries(payloads)
+        avatarPipeline.preload(
+            payloads: payloads,
+            key: cacheKey,
+            delayMilliseconds: 56
+        )
+    }
+
+    @MainActor
+    private func prepareHumanActivityIndex() async {
+        await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 32)
+        guard !Task.isCancelled else { return }
+        humanActivityIndex = AchievementHumanActivityIndex.make(
+            medications: humanMedications,
+            medicationLogs: humanMedicationLogs,
+            expenses: allExpenseLogs
+        )
     }
 
     private struct ProgressInfo {
@@ -1679,15 +1790,15 @@ struct AchievementWallView: View {
     }
 
     private func medications(for human: Human) -> [HumanMedication] {
-        humanMedications.filter { $0.humanId == human.id.uuidString }
+        humanActivityIndex.medications(for: human)
     }
 
     private func medicationLogs(for human: Human) -> [HumanMedicationLog] {
-        humanMedicationLogs.filter { $0.humanId == human.id.uuidString }
+        humanActivityIndex.medicationLogs(for: human)
     }
 
     private func expenses(for human: Human) -> [PetExpenseLog] {
-        allExpenseLogs.filter { $0.executorId == human.id.uuidString }
+        humanActivityIndex.expenses(for: human)
     }
 
     private func hasAnyHumanRecord(_ human: Human) -> Bool {

@@ -53,14 +53,14 @@ struct WeeklyReportCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "chart.bar.fill")
+                Image(systemName: "chart.bar.fill").accessibilityHidden(true)
                     .foregroundStyle(Color.goPrimary)
                 Text("本周小报")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(weekStart, format: .dateTime.month().day()) - \(weekEnd, format: .dateTime.month().day())")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 Button {
                     Task { await renderAndShare() }
@@ -69,16 +69,16 @@ struct WeeklyReportCard: View {
                         ProgressView().tint(Color.goPrimary).scaleEffect(0.75)
                     } else {
                         HStack(spacing: 4) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 11, weight: .bold))
+                            Image(systemName: "square.and.arrow.up").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold))
                             Text("分享")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         }
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .background(Color.goPrimary, in: Capsule())
                         .scaleEffect(shouldPulseShare && pulseShare ? 1.06 : 1.0)
-                        .animation(shouldPulseShare ? .easeInOut(duration: 1.4).repeatForever(autoreverses: true) : GoMotion.reduced, value: pulseShare)
+                        .animation(shouldPulseShare ? .easeInOut(duration: 1.4).repeatForever(autoreverses: true) : GoMotion.reduced, value: pulseShare) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                         .onAppear {
                             isVisible = true
                             pulseShare = shouldPulseShare
@@ -112,7 +112,7 @@ struct WeeklyReportCard: View {
             // 7天活跃热力图
             VStack(alignment: .leading, spacing: 6) {
                 Text("活跃天数")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 
                 HStack(spacing: 4) {
@@ -126,7 +126,7 @@ struct WeeklyReportCard: View {
                                 .frame(height: 24)
                             
                             Text(date, format: .dateTime.weekday(.narrow))
-                                .font(.system(size: 9, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 9, weight: .medium))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         .frame(maxWidth: .infinity)
@@ -146,14 +146,14 @@ struct WeeklyReportCard: View {
     private func statBubble(emoji: String, value: String, label: String) -> some View {
         VStack(spacing: 4) {
             Text(emoji)
-                .font(.system(size: 16))
+                .font(OhanaFont.adaptive(size: 16))
             Text(value)
-                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Text(label)
-                .font(.system(size: 10, weight: .medium))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
@@ -215,11 +215,11 @@ struct WeeklyReportCard: View {
             // 顶部品牌条
             HStack {
                 Text("🏝️ Ohana 周报")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goPrimary)
                 Spacer()
                 Text("\(weekStart, format: .dateTime.month().day()) — \(weekEnd, format: .dateTime.month().day())")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             .padding(.horizontal, 20)
@@ -238,10 +238,10 @@ struct WeeklyReportCard: View {
                 )
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("本周战绩")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
                 Spacer()
@@ -252,10 +252,10 @@ struct WeeklyReportCard: View {
                 }.count
                 VStack(spacing: 2) {
                     Text("\(activeDays)")
-                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 36, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goPrimary)
                     Text("活跃天")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
             }
@@ -283,7 +283,7 @@ struct WeeklyReportCard: View {
                             .fill(active ? Color.goPrimary.opacity(0.7) : Color.primary.opacity(0.08))
                             .frame(height: 20)
                         Text(d, format: .dateTime.weekday(.narrow))
-                            .font(.system(size: 8, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 8, weight: .medium))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                     .frame(maxWidth: .infinity)
@@ -296,7 +296,7 @@ struct WeeklyReportCard: View {
             HStack {
                 Spacer()
                 Text("Made with Ohana 🏝️")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.18))
             }
             .padding(.horizontal, 20)
@@ -318,13 +318,13 @@ struct WeeklyReportCard: View {
 
     private func posterStat(emoji: String, value: String, label: String) -> some View {
         VStack(spacing: 4) {
-            Text(emoji).font(.system(size: 18))
+            Text(emoji).font(OhanaFont.adaptive(size: 18))
             Text(value)
-                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1).minimumScaleFactor(0.7)
             Text(label)
-                .font(.system(size: 9, weight: .medium))
+                .font(OhanaFont.adaptive(size: 9, weight: .medium))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
         .frame(maxWidth: .infinity)

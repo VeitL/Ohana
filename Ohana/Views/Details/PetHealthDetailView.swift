@@ -969,10 +969,10 @@ struct PetHealthDetailView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "健康", en: "Health", de: "Gesundheit"))
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -983,10 +983,10 @@ struct PetHealthDetailView: View {
                 dismiss()
                 onFullDismiss?()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 40, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
@@ -1172,10 +1172,10 @@ struct PetHealthDetailView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(healthStatusTitle)
-                    .font(.system(size: 27, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 27, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(healthStatusSubtitle)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(healthStatusColor)
                     .lineLimit(1)
                 HStack(spacing: 6) {
@@ -1185,7 +1185,7 @@ struct PetHealthDetailView: View {
             }
             Spacer()
             Image(systemName: (healthAlerts.isEmpty && duePreventiveCount == 0) ? "checkmark.seal.fill" : "heart.text.square.fill")
-                .font(.system(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .black))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(healthStatusColor)
         }
@@ -1196,9 +1196,9 @@ struct PetHealthDetailView: View {
     private func statusPill(icon: String, value: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .black))
             Text(value)
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
         }
         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.78))
         .padding(.horizontal, 8)
@@ -1211,17 +1211,17 @@ struct PetHealthDetailView: View {
             ForEach(healthAlerts.prefix(2)) { alert in
                 HStack(spacing: 10) {
                     Image(systemName: alertIcon(for: alert.type))
-                        .font(.system(size: 15, weight: .black))
+                        .font(OhanaFont.adaptive(size: 15, weight: .black))
                         .foregroundStyle(alertColor(alert))
-                        .frame(width: 30, height: 30)
+                        .frame(width: 30, height: 30) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .background(alertColor(alert).opacity(0.16), in: Circle())
                     VStack(alignment: .leading, spacing: 2) {
                         Text(alert.title)
-                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(alert.detail)
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(1)
                     }
@@ -1299,21 +1299,21 @@ struct PetHealthDetailView: View {
                     .fill(tint.opacity(isDark ? 0.20 : 0.13))
                     .frame(width: 58, height: 58)
                 Image(systemName: icon)
-                    .font(.system(size: 22, weight: .black))
+                    .font(OhanaFont.adaptive(size: 22, weight: .black))
                     .foregroundStyle(tint)
             }
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(title)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(value)
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text(detail)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -1325,7 +1325,7 @@ struct PetHealthDetailView: View {
                     primaryAction()
                 } label: {
                     Text(primaryTitle)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(width: 64, height: 34)
                         .background(tint, in: Capsule())
@@ -1336,7 +1336,7 @@ struct PetHealthDetailView: View {
                     secondaryAction()
                 } label: {
                     Text(secondaryTitle)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 64, height: 34)
                         .background(Color.primary.opacity(isDark ? 0.10 : 0.07), in: Capsule())
@@ -1377,8 +1377,8 @@ struct PetHealthDetailView: View {
                     Button {
                         closeHealthOverview()
                     } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .black))
+                        Image(systemName: "xmark").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 14, weight: .black))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                 }
@@ -1564,16 +1564,16 @@ struct PetHealthDetailView: View {
     private func overviewTitle(icon: String, title: String, subtitle: String, tint: Color) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 22, weight: .black))
+                .font(OhanaFont.adaptive(size: 22, weight: .black))
                 .foregroundStyle(tint)
                 .frame(width: 48, height: 48)
                 .background(tint.opacity(isDark ? 0.18 : 0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
             }
@@ -1583,7 +1583,7 @@ struct PetHealthDetailView: View {
 
     private func overviewSectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 14, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
             .foregroundStyle(Color.ohanaPrimaryText)
             .padding(.top, 4)
     }
@@ -1591,10 +1591,10 @@ struct PetHealthDetailView: View {
     private func overviewMetric(title: String, value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(value)
-                .font(.system(size: 28, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(title)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1606,9 +1606,9 @@ struct PetHealthDetailView: View {
         Button(action: action) {
             HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                 Text(title)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
@@ -1642,20 +1642,20 @@ struct PetHealthDetailView: View {
 
         return HStack(spacing: 12) {
             Image(systemName: item.icon)
-                .font(.system(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .black))
                 .foregroundStyle(tint)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(item.latestLog?.date.formatted(.dateTime.year().month().day()) ?? l.tr(zh: "未记录", en: "Not logged", de: "Nicht erfasst"))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
             Text(status)
-                .font(.system(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
         }
         .padding(12)
@@ -1666,28 +1666,28 @@ struct PetHealthDetailView: View {
         let isPast = item.scheduledAt <= Date()
         return HStack(spacing: 12) {
             Image(systemName: item.isCompleted ? "checkmark.circle.fill" : (isPast ? "clock.badge.exclamationmark.fill" : "clock.fill"))
-                .font(.system(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .black))
                 .foregroundStyle(item.isCompleted ? Color.goTeal : (isPast ? Color.goOrange : medicationTint))
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.medication.name.isEmpty ? l.tr(zh: "未命名药物", en: "Unnamed medication", de: "Unbenanntes Medikament") : item.medication.name)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(relativeDoseTime(item.scheduledAt))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
             if item.isCompleted {
                 Text(l.tr(zh: "已服", en: "Taken", de: "Genommen"))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.goTeal)
             } else if Calendar.current.isDateInToday(item.scheduledAt) {
                 Button {
                     recordMedicationDose(item)
                 } label: {
                     Text(isPast ? l.tr(zh: "补记", en: "Catch up", de: "Nachtragen") : l.tr(zh: "提前", en: "Early", de: "Früh"))
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -1696,7 +1696,7 @@ struct PetHealthDetailView: View {
                 .buttonStyle(ScaleButtonStyle())
             } else {
                 Text(l.tr(zh: "待服", en: "Planned", de: "Geplant"))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
@@ -1707,16 +1707,16 @@ struct PetHealthDetailView: View {
     private func overviewHistoryRow(icon: String, title: String, detail: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .black))
                 .foregroundStyle(tint)
-                .frame(width: 34, height: 34)
+                .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint.opacity(isDark ? 0.16 : 0.10), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(detail)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
@@ -1727,11 +1727,11 @@ struct PetHealthDetailView: View {
 
     private func emptyOverviewRow(_ text: String) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "tray")
-                .font(.system(size: 16, weight: .bold))
+            Image(systemName: "tray").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 16, weight: .bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(text)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
         }
@@ -1747,7 +1747,7 @@ struct PetHealthDetailView: View {
                 let count = pet.symptomLogs.filter { $0.severity == severity }.count
                 HStack(spacing: 10) {
                     Text(severity.label)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .frame(width: 44, alignment: .leading)
                     GeometryReader { proxy in
@@ -1761,7 +1761,7 @@ struct PetHealthDetailView: View {
                     }
                     .frame(height: 9)
                     Text("\(count)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 24, alignment: .trailing)
                 }
@@ -1838,22 +1838,22 @@ struct PetHealthDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Image(systemName: icon)
-                        .font(.system(size: 19, weight: .black))
+                        .font(OhanaFont.adaptive(size: 19, weight: .black))
                         .foregroundStyle(tint)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 38, height: 38) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .black))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .black))
                         .foregroundStyle(.tertiary)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(value)
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                     Text(title)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -1868,17 +1868,17 @@ struct PetHealthDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("防护")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
                     OhanaFeedback.light()
                     showingPassport = true
                 } label: {
-                    Image(systemName: "syringe.fill")
-                        .font(.system(size: 13, weight: .black))
+                    Image(systemName: "syringe.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(chromeAccent)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 30, height: 30) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -1920,11 +1920,11 @@ struct PetHealthDetailView: View {
         } label: {
             VStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(tint)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 38, height: 38) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 Text(title)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.74))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -1940,7 +1940,7 @@ struct PetHealthDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
@@ -1948,7 +1948,7 @@ struct PetHealthDetailView: View {
                     showingHistory = true
                 } label: {
                     Text(l.tr(zh: "全部", en: "All", de: "Alle"))
-                        .font(.system(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                         .foregroundStyle(chromeAccent)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -1956,11 +1956,11 @@ struct PetHealthDetailView: View {
 
             if recentHealthActivities.isEmpty {
                 HStack(spacing: 12) {
-                    Image(systemName: "heart.text.square")
-                        .font(.system(size: 22, weight: .bold))
+                    Image(systemName: "heart.text.square").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 22, weight: .bold))
                         .foregroundStyle(chromeAccent)
                     Text(l.tr(zh: "还没有健康记录", en: "No health records yet", de: "Noch keine Gesundheitseinträge"))
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                 }
@@ -1969,23 +1969,23 @@ struct PetHealthDetailView: View {
                 ForEach(recentHealthActivities) { item in
                     HStack(spacing: 12) {
                         Image(systemName: item.icon)
-                            .font(.system(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black))
                             .foregroundStyle(item.tint)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             .background(item.tint.opacity(isDark ? 0.20 : 0.12), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.title)
-                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(1)
                             Text(item.detail)
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .lineLimit(1)
                         }
                         Spacer()
                         Text(item.date.formatted(.dateTime.month().day()))
-                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                             .foregroundStyle(.tertiary)
                     }
                     .padding(.vertical, 3)
@@ -2028,18 +2028,18 @@ struct PetHealthDetailView: View {
                                 .rotationEffect(.degrees(-90))
                         }
                         Image(systemName: icon)
-                            .font(.system(size: 16, weight: .black))
+                            .font(OhanaFont.adaptive(size: 16, weight: .black))
                             .foregroundStyle(color)
                     }
                     Text(label)
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     if let d = days {
                         Text(d < 0 ? "逾期" : "\(d)天")
-                            .font(.system(size: 8, weight: .semibold)).foregroundStyle(color)
+                            .font(OhanaFont.adaptive(size: 8, weight: .semibold)).foregroundStyle(color)
                     } else {
                         Text("未记录")
-                            .font(.system(size: 8)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                            .font(OhanaFont.adaptive(size: 8)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -2071,7 +2071,7 @@ struct PetHealthDetailView: View {
                     let rowIndex = rows.firstIndex(of: pt.typeEnum) ?? 0
                     Circle()
                         .fill(colorForType(pt.typeEnum))
-                        .frame(width: 11, height: 11)
+                        .frame(width: 11, height: 11) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .position(
                             x: min(max(CGFloat(xRatio) * proxy.size.width * scatterRevealProgress, 0), proxy.size.width),
                             y: rowY(index: rowIndex, count: rows.count, height: proxy.size.height)
@@ -2099,9 +2099,9 @@ struct PetHealthDetailView: View {
                     HStack(spacing: 4) {
                         Circle()
                             .fill(colorForType(type))
-                            .frame(width: 7, height: 7)
+                            .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         Text(type.rawValue)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                     }
                 }
@@ -2114,11 +2114,11 @@ struct PetHealthDetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Label("健康记录趋势", systemImage: "waveform.path.ecg")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(chromeAccent)
                 Spacer()
                 Text("最近 12 个月")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             scatterChart
@@ -2131,11 +2131,11 @@ struct PetHealthDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Label("健康时间轴", systemImage: "list.bullet.clipboard.fill")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(chromeAccent)
                 Spacer()
                 Text("\(sortedLogs.count) 条")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.primary.opacity(0.06), in: Capsule())
@@ -2143,11 +2143,11 @@ struct PetHealthDetailView: View {
 
             if sortedLogs.isEmpty {
                 VStack(spacing: 10) {
-                    Image(systemName: "heart.text.square")
-                        .font(.system(size: 34, weight: .black))
+                    Image(systemName: "heart.text.square").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 34, weight: .black))
                         .foregroundStyle(chromeAccent)
                     Text(l.tr(zh: "暂无健康记录", en: "No health records yet", de: "Noch keine Gesundheitseinträge"))
-                        .font(.system(size: 13, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         .multilineTextAlignment(.center)
                 }
@@ -2157,22 +2157,22 @@ struct PetHealthDetailView: View {
                 ForEach(sortedLogs) { log in
                     HStack(spacing: 12) {
                         ZStack {
-                            Circle().fill(colorForType(log.healthLogType).opacity(0.15)).frame(width: 38, height: 38)
+                            Circle().fill(colorForType(log.healthLogType).opacity(0.15)).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             Image(systemName: healthIcon(for: log.healthLogType))
-                                .font(.system(size: 15, weight: .black))
+                                .font(OhanaFont.adaptive(size: 15, weight: .black))
                                 .foregroundStyle(colorForType(log.healthLogType))
                         }
                         VStack(alignment: .leading, spacing: 3) {
                             Text(log.type)
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             HStack(spacing: 6) {
                                 Text(log.date, format: .dateTime.year().month().day())
-                                    .font(.system(size: 11, weight: .medium))
+                                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                 if !log.note.isEmpty {
                                     Text(log.note)
-                                        .font(.system(size: 11))
+                                        .font(OhanaFont.adaptive(size: 11))
                                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                         .lineLimit(1)
                                 }
@@ -2182,14 +2182,14 @@ struct PetHealthDetailView: View {
                         VStack(alignment: .trailing, spacing: 3) {
                             if log.cost > 0 {
                                 Text(AppCurrency.format(log.cost, fractionDigits: 0))
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                             }
                             Button {
                                 deleteHealthLog(log)
                             } label: {
                                 Image(systemName: deletingHealthRecordIDs.contains(log.id) ? "hourglass" : "trash")
-                                    .font(.system(size: 11))
+                                    .font(OhanaFont.adaptive(size: 11))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                             }
                             .disabled(deletingHealthRecordIDs.contains(log.id))
@@ -2209,11 +2209,11 @@ struct PetHealthDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Label("异常症状记录", systemImage: "exclamationmark.triangle.fill")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.red)
                 Spacer()
                 Text("\(pet.symptomLogs.count) 条")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.primary.opacity(0.06), in: Capsule())
@@ -2222,28 +2222,28 @@ struct PetHealthDetailView: View {
             ForEach(pet.symptomLogs.sorted(by: { $0.date > $1.date })) { log in
                 HStack(spacing: 12) {
                     ZStack {
-                        Circle().fill(Color.red.opacity(0.15)).frame(width: 38, height: 38)
+                        Circle().fill(Color.red.opacity(0.15)).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         Image(systemName: symptomCategoryIcon(log.category))
-                            .font(.system(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black))
                             .foregroundStyle(Color.goRed)
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(log.symptomName)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         HStack(spacing: 6) {
                             Text(log.date, format: .dateTime.year().month().day())
-                                .font(.system(size: 11, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             Text(log.severity.label)
-                                .font(.system(size: 10, weight: .bold))
+                                .font(OhanaFont.adaptive(size: 10, weight: .bold))
                                 .foregroundStyle(log.severity == .critical || log.severity == .severe ? Color.red : Color.orange)
                                 .padding(.horizontal, 4).padding(.vertical, 2)
                                 .background((log.severity == .critical || log.severity == .severe ? Color.red : Color.orange).opacity(0.15), in: Capsule())
                         }
                         if !log.note.isEmpty {
                             Text(log.note)
-                                .font(.system(size: 11))
+                                .font(OhanaFont.adaptive(size: 11))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                                 .lineLimit(2)
                         }
@@ -2253,7 +2253,7 @@ struct PetHealthDetailView: View {
                         deleteSymptomLog(log)
                     } label: {
                         Image(systemName: deletingHealthRecordIDs.contains(log.id) ? "hourglass" : "trash")
-                            .font(.system(size: 11))
+                            .font(OhanaFont.adaptive(size: 11))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                     .disabled(deletingHealthRecordIDs.contains(log.id))
@@ -2271,11 +2271,11 @@ struct PetHealthDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Label("生理期与繁育", systemImage: "heart.text.square.fill")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.pink)
                 Spacer()
                 Text("\(pet.heatCycleLogs.count) 条")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color.primary.opacity(0.06), in: Capsule())
@@ -2284,22 +2284,22 @@ struct PetHealthDetailView: View {
             ForEach(pet.heatCycleLogs.sorted(by: { $0.startDate > $1.startDate })) { log in
                 HStack(spacing: 12) {
                     ZStack {
-                        Circle().fill(Color(hex: log.status.colorHex).opacity(0.15)).frame(width: 38, height: 38)
-                        Image(systemName: "heart.text.square.fill")
-                            .font(.system(size: 15, weight: .black))
+                        Circle().fill(Color(hex: log.status.colorHex).opacity(0.15)).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                        Image(systemName: "heart.text.square.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 15, weight: .black))
                             .foregroundStyle(Color(hex: log.status.colorHex))
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(log.status.rawValue)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         HStack(spacing: 6) {
                             Text(log.startDate, format: .dateTime.year().month().day())
-                                .font(.system(size: 11, weight: .medium))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             if log.isMated {
                                 Text("已交配")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(OhanaFont.adaptive(size: 10, weight: .bold))
                                     .foregroundStyle(Color.pink)
                                     .padding(.horizontal, 4).padding(.vertical, 2)
                                     .background(Color.pink.opacity(0.15), in: Capsule())
@@ -2311,7 +2311,7 @@ struct PetHealthDetailView: View {
                         deleteHeatCycleLog(log)
                     } label: {
                         Image(systemName: deletingHealthRecordIDs.contains(log.id) ? "hourglass" : "trash")
-                            .font(.system(size: 11))
+                            .font(OhanaFont.adaptive(size: 11))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     }
                     .disabled(deletingHealthRecordIDs.contains(log.id))
@@ -2328,15 +2328,15 @@ struct PetHealthDetailView: View {
     private var alertsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 12, weight: .bold))
+                Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold))
                     .foregroundStyle(isDark ? Color.goPrimary : Color.goOrange)
                 Text("健康预警")
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 Spacer()
                 Text("\(healthAlerts.count) 条")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             }
 
@@ -2345,17 +2345,17 @@ struct PetHealthDetailView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(alertColor(alert).opacity(0.15))
-                            .frame(width: 32, height: 32)
+                            .frame(width: 32, height: 32) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         Image(systemName: alertIcon(for: alert.type))
-                            .font(.system(size: 13, weight: .black))
+                            .font(OhanaFont.adaptive(size: 13, weight: .black))
                             .foregroundStyle(alertColor(alert))
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(alert.title)
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(alert.detail)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             .lineLimit(2)
                     }
@@ -2388,7 +2388,7 @@ struct PetHealthDetailView: View {
             }
         }()
         Text(label)
-            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(color)
             .padding(.horizontal, 7).padding(.vertical, 3)
             .background(color.opacity(0.15), in: Capsule())
@@ -2481,7 +2481,7 @@ private struct PetHealthRecordInlinePopup: View {
 
             HStack(spacing: 12) {
                 Image(systemName: healthIcon(for: selectedType))
-                    .font(.system(size: 20, weight: .black))
+                    .font(OhanaFont.adaptive(size: 20, weight: .black))
                     .foregroundStyle(accent)
                     .frame(width: 46, height: 46)
                     .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -2625,7 +2625,7 @@ private struct PetHealthRecordInlinePopup: View {
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: healthIcon(for: type))
-                            .font(.system(size: 11, weight: .black))
+                            .font(OhanaFont.adaptive(size: 11, weight: .black))
                         Text(title)
                             .font(OhanaFont.caption(.black))
                     }
@@ -2648,7 +2648,7 @@ private struct PetHealthRecordInlinePopup: View {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(tint)
                 .frame(width: 22)
             content()
@@ -2882,7 +2882,7 @@ private struct PetHealthArchiveView: View {
                     filter = option
                 } label: {
                     Text(filterTitle(option))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(filter == option ? Color.arkInk : .primary.opacity(0.68))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
@@ -2895,11 +2895,11 @@ private struct PetHealthArchiveView: View {
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "folder")
-                .font(.system(size: 34, weight: .bold))
+            Image(systemName: "folder").accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 34, weight: .bold))
                 .foregroundStyle(accent)
             Text(l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge"))
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
@@ -2910,30 +2910,30 @@ private struct PetHealthArchiveView: View {
     private func archiveRow(_ item: PetHealthArchiveItem) -> some View {
         HStack(spacing: 12) {
             Image(systemName: item.icon)
-                .font(.system(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .black))
                 .foregroundStyle(item.tint)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(item.tint.opacity(isDark ? 0.20 : 0.12), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(item.detail)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
                 Text(item.date.formatted(.dateTime.month().day()))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .foregroundStyle(.tertiary)
                 Button(role: .destructive) {
                     delete(item)
                 } label: {
                     Image(systemName: deletingItemIDs.contains(item.id) ? "hourglass" : "trash")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .buttonStyle(ScaleButtonStyle())

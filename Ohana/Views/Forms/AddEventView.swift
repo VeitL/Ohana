@@ -16,7 +16,6 @@ struct AddEventView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
-    @Query(sort: \Plant.createdAt) private var plants: [Plant]
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
 
@@ -181,7 +180,7 @@ struct AddEventView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.addEvent)
-                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(dateSummary)
@@ -195,8 +194,8 @@ struct AddEventView: View {
             Button {
                 closeEditor()
             } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -220,9 +219,9 @@ struct AddEventView: View {
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: eventType.silhouetteSymbol)
-                                .font(.system(size: 18, weight: .black))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 8, weight: .black))
+                                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                            Image(systemName: "chevron.down").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 8, weight: .black))
                                 .rotationEffect(.degrees(showsTypePicker ? 180 : 0))
                                 .offset(y: 1)
                         }
@@ -238,7 +237,7 @@ struct AddEventView: View {
                         .submitLabel(.done)
                         .textInputAutocapitalization(.sentences)
                         .autocorrectionDisabled()
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .onSubmit {
                             titleFocused = false
@@ -249,8 +248,8 @@ struct AddEventView: View {
                         Button {
                             withAnimation(GoMotion.feedback) { title = "" }
                         } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 17, weight: .bold))
+                            Image(systemName: "xmark.circle.fill").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 17, weight: .bold))
                                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -351,18 +350,6 @@ struct AddEventView: View {
                         }
                     }
 
-                    ForEach(plants) { plant in
-                        relatedPersonChip(
-                            title: plant.name,
-                            imageData: plant.avatarImageData,
-                            fallback: plant.avatarEmoji,
-                            tint: Color(hex: plant.themeColorHex),
-                            isSelected: relatedEntityId == plant.id.uuidString
-                        ) {
-                            relatedEntityType = EntityKind.plant.rawValue
-                            relatedEntityId = plant.id.uuidString
-                        }
-                    }
                 }
                 .padding(.vertical, 1)
             }
@@ -474,7 +461,7 @@ struct AddEventView: View {
                     Image(systemName: didSave ? "checkmark.circle.fill" : "calendar.badge.plus")
                     Text(didSave ? l.tr(zh: "已添加", en: "Added", de: "Hinzugefügt") : l.addEvent)
                 }
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(canSave ? Color.arkInk : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -555,9 +542,9 @@ struct AddEventView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: type.silhouetteSymbol)
-                    .font(.system(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 20, height: 20) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
                 Text(eventTypeTitle(type))
                     .font(OhanaFont.caption(.black))
@@ -568,8 +555,8 @@ struct AddEventView: View {
                 Spacer()
 
                 if selected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .black))
+                    Image(systemName: "checkmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .black))
                         .foregroundStyle(Color.goPrimary)
                 }
             }
@@ -589,9 +576,9 @@ struct AddEventView: View {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.goPrimary)
-                .frame(width: 28, height: 28)
+                .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
             Text(title)
                 .font(OhanaFont.caption(.black))
@@ -648,7 +635,7 @@ struct AddEventView: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
                 Text(title)
                     .lineLimit(1)
             }

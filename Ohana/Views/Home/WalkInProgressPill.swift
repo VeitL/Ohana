@@ -39,16 +39,16 @@ struct WalkInProgressPill: View {
                 ZStack {
                     Circle()
                         .fill(Color.goPrimary.opacity(0.25))
-                        .frame(width: 30, height: 30)
-                    Image(systemName: "figure.walk.motion")
-                        .font(.system(size: 14, weight: .bold))
+                        .frame(width: 30, height: 30) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                    Image(systemName: "figure.walk.motion").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold))
                         .foregroundStyle(Color.goPrimary)
                 }
 
                 // 中：宠物名 + 时长
                 VStack(alignment: .leading, spacing: 1) {
                     Text("\(pet.name) 正在巡岛")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     walkElapsedLabel
@@ -57,10 +57,10 @@ struct WalkInProgressPill: View {
                 Spacer(minLength: 0)
 
                 // 右：展开箭头
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 11, weight: .bold))
+                Image(systemName: "arrow.up.left.and.arrow.down.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold))
                     .foregroundStyle(Color.goPrimary)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 26, height: 26) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goPrimary.opacity(0.12), in: Circle())
             }
             .padding(.horizontal, 10)
@@ -91,7 +91,7 @@ struct WalkInProgressPill: View {
         let m = elapsed / 60
         let s = elapsed % 60
         return Text(String(format: "已巡 %02d:%02d", m, s))
-            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
             .monospacedDigit()
             .contentTransition(.numericText())

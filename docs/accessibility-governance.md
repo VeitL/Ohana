@@ -46,7 +46,8 @@ safety before it ships.
 ## Validation
 
 - Run `scripts/audit-accessibility.sh --changed` (or pass files) before reporting
-  UI work complete; CI runs it on changed files.
+  focused UI work complete; CI and release hardening run
+  `scripts/audit-accessibility.sh --all` as a whole-repo strict gate.
 - For high-traffic flows (Home cards, Today Focus, quick actions, calendar,
   sheets, Oasis), do a manual VoiceOver + largest-Dynamic-Type pass on the fixed
   iPhone 17 simulator and report what you checked.

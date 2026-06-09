@@ -45,6 +45,339 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func coconutEconomyV2FeedRewardUsesGrowthXPAndLedgerMetadata() async throws {
+        let userKey = "policy-feed-\(UUID().uuidString)"
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        EconomyDailyBudgetStore.reset(userKey: userKey, date: date)
+
+        let result = CoconutEconomyPolicyV2.reward(
+            for: .feed,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: userKey,
+            careObjectCount: 1,
+            hasHumanAccount: true,
+            hasPetAccount: true,
+            date: date,
+            forcedLuck: EconomyLuckTier.none
+        )
+
+        #expect(result.growthXP == 6)
+        #expect(result.humanCoconuts == 2)
+        #expect(result.petCoconuts == 1)
+        #expect(result.totalCoconuts == 3)
+        #expect(result.bonusCoconuts == 0)
+        #expect(result.metadataJSON.contains("\"economyVersion\":2"))
+        #expect(CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: result.metadataJSON) == 6)
+    }
+
+    @MainActor
+    @Test func coconutEconomyV2CooldownRecordsDataButReducesReward() async throws {
+        let userKey = "policy-cooldown-\(UUID().uuidString)"
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        EconomyDailyBudgetStore.reset(userKey: userKey, date: date)
+
+        let result = CoconutEconomyPolicyV2.reward(
+            for: .feed,
+            quality: .none,
+            isOnCooldown: true,
+            userKey: userKey,
+            careObjectCount: 1,
+            hasHumanAccount: true,
+            hasPetAccount: true,
+            date: date,
+            forcedLuck: EconomyLuckTier.none
+        )
+
+        #expect(result.growthXP == 2)
+        #expect(result.totalCoconuts == 0)
+        #expect(result.budgetMultiplier == 0.2)
+        #expect(result.reason == "cooldownReduced")
+    }
+
+    @MainActor
+    @Test func coconutEconomyV2DailyBudgetUsesFatigueBeforeRecordOnly() async throws {
+        let userKey = "policy-budget-\(UUID().uuidString)"
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        EconomyDailyBudgetStore.reset(userKey: userKey, date: date)
+
+        for _ in 0..<11 {
+            let result = CoconutEconomyPolicyV2.reward(
+                for: .feed,
+                quality: .none,
+                isOnCooldown: false,
+                userKey: userKey,
+                careObjectCount: 1,
+                hasHumanAccount: true,
+                hasPetAccount: true,
+                date: date,
+                forcedLuck: EconomyLuckTier.none
+            )
+            EconomyDailyBudgetStore.commit(result, userKey: userKey, date: date)
+        }
+
+        let fatigue = CoconutEconomyPolicyV2.reward(
+            for: .feed,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: userKey,
+            careObjectCount: 1,
+            hasHumanAccount: true,
+            hasPetAccount: true,
+            date: date,
+            forcedLuck: EconomyLuckTier.none
+        )
+
+        #expect(fatigue.totalCoconuts == 2)
+        #expect(fatigue.growthXP == 3)
+        #expect(fatigue.budgetStage == .fatigue)
+        #expect(fatigue.reason == "dailyBudgetFatigue")
+
+        EconomyDailyBudgetStore.commit(fatigue, userKey: userKey, date: date)
+        for _ in 0..<12 {
+            let result = CoconutEconomyPolicyV2.reward(
+                for: .feed,
+                quality: .none,
+                isOnCooldown: false,
+                userKey: userKey,
+                careObjectCount: 1,
+                hasHumanAccount: true,
+                hasPetAccount: true,
+                date: date,
+                forcedLuck: EconomyLuckTier.none
+            )
+            EconomyDailyBudgetStore.commit(result, userKey: userKey, date: date)
+        }
+
+        let recordOnly = CoconutEconomyPolicyV2.reward(
+            for: .feed,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: userKey,
+            careObjectCount: 1,
+            hasHumanAccount: true,
+            hasPetAccount: true,
+            date: date,
+            forcedLuck: EconomyLuckTier.none
+        )
+
+        #expect(recordOnly.totalCoconuts == 0)
+        #expect(recordOnly.growthXP == 2)
+        #expect(recordOnly.budgetStage == .recordOnly)
+        #expect(recordOnly.reason == "dailyBudgetRecordOnly")
+    }
+
+    @MainActor
+    @Test func coconutEconomyV2SharedCareScalesButDoesNotExplodeForThreePets() async throws {
+        let userKey = "policy-family-\(UUID().uuidString)"
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        EconomyDailyBudgetStore.reset(userKey: userKey, date: date)
+
+        let result = CoconutEconomyPolicyV2.sharedReward(
+            for: .feed,
+            targetCount: 3,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: userKey,
+            careObjectCount: 3,
+            hasHumanAccount: true,
+            date: date,
+            forcedLuck: EconomyLuckTier.none
+        )
+
+        #expect(result.growthXP == 12)
+        #expect(result.totalCoconuts == 5)
+        #expect(result.totalCoconuts < 9)
+        #expect(EconomyDailyBudgetStore.coconutBudget(careObjectCount: 3) == 48)
+        #expect(EconomyDailyBudgetStore.fatigueCoconutBudget(careObjectCount: 3) == 72)
+    }
+
+    @MainActor
+    @Test func coconutEconomyV2HouseholdBudgetPreventsActiveMemberSwitchBypass() async throws {
+        let householdKey = "household-budget-\(UUID().uuidString)"
+        let memberA = "member-a-\(UUID().uuidString)"
+        let memberB = "member-b-\(UUID().uuidString)"
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: memberA, date: date)
+        EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: memberB, date: date)
+
+        for _ in 0..<8 {
+            let result = CoconutEconomyPolicyV2.reward(
+                for: .health,
+                quality: .none,
+                isOnCooldown: false,
+                userKey: householdKey,
+                memberKey: memberA,
+                careObjectCount: 1,
+                hasHumanAccount: true,
+                hasPetAccount: true,
+                date: date,
+                forcedLuck: EconomyLuckTier.none
+            )
+            EconomyDailyBudgetStore.commit(result, householdKey: householdKey, memberKey: memberA, date: date)
+        }
+
+        let switchedMemberReward = CoconutEconomyPolicyV2.reward(
+            for: .feed,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: householdKey,
+            memberKey: memberB,
+            careObjectCount: 1,
+            hasHumanAccount: true,
+            hasPetAccount: true,
+            date: date,
+            forcedLuck: EconomyLuckTier.none
+        )
+
+        #expect(switchedMemberReward.budgetStage == .recordOnly)
+        #expect(switchedMemberReward.totalCoconuts == 0)
+        #expect(switchedMemberReward.reason == "dailyBudgetRecordOnly")
+    }
+
+    @MainActor
+    @Test func coconutEconomyV2CareObjectBudgetProtectsNaturalFrequencyWithoutPunishingOtherPets() async throws {
+        let householdKey = "object-budget-\(UUID().uuidString)"
+        let memberA = "object-member-a-\(UUID().uuidString)"
+        let memberB = "object-member-b-\(UUID().uuidString)"
+        let petA = "pet.object.a"
+        let petB = "pet.object.b"
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: memberA, careObjectKeys: [petA, petB], date: date)
+        EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: memberB, careObjectKeys: [petA, petB], date: date)
+
+        for _ in 0..<4 {
+            let result = CoconutEconomyPolicyV2.reward(
+                for: .health,
+                quality: .none,
+                isOnCooldown: false,
+                userKey: householdKey,
+                memberKey: memberA,
+                careObjectKeys: [petA],
+                careObjectCount: 3,
+                hasHumanAccount: true,
+                hasPetAccount: true,
+                date: date,
+                forcedLuck: EconomyLuckTier.none
+            )
+            EconomyDailyBudgetStore.commit(result, householdKey: householdKey, memberKey: memberA, careObjectKeys: [petA], date: date)
+        }
+
+        let samePetFromDifferentMember = CoconutEconomyPolicyV2.reward(
+            for: .feed,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: householdKey,
+            memberKey: memberB,
+            careObjectKeys: [petA],
+            careObjectCount: 3,
+            hasHumanAccount: true,
+            hasPetAccount: true,
+            date: date,
+            forcedLuck: EconomyLuckTier.none
+        )
+        let otherPetFromDifferentMember = CoconutEconomyPolicyV2.reward(
+            for: .feed,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: householdKey,
+            memberKey: memberB,
+            careObjectKeys: [petB],
+            careObjectCount: 3,
+            hasHumanAccount: true,
+            hasPetAccount: true,
+            date: date,
+            forcedLuck: EconomyLuckTier.none
+        )
+
+        #expect(samePetFromDifferentMember.budgetStage == .fatigue)
+        #expect(samePetFromDifferentMember.growthXP == 3)
+        #expect(samePetFromDifferentMember.totalCoconuts == 2)
+        #expect(otherPetFromDifferentMember.budgetStage == .normal)
+        #expect(otherPetFromDifferentMember.growthXP == 6)
+        #expect(otherPetFromDifferentMember.totalCoconuts == 3)
+    }
+
+    @MainActor
+    @Test func oasisTreeEnergyReadsGrowthXPFromLedgerMetadata() async throws {
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        context.insert(CareLedgerEvent(
+            actorKind: .human,
+            actorId: "human-1",
+            subjectKind: .pet,
+            subjectId: "pet-1",
+            eventKind: .care,
+            actionType: "feeding",
+            metadataJSON: "{\"economyVersion\":2,\"growthXP\":120}"
+        ))
+        try context.save()
+
+        OasisTreeManager.shared.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
+
+        #expect(OasisTreeManager.shared.islandEnergy == 120)
+        #expect(OasisTreeManager.treeLevel(forTotalEnergy: 120) == .lv2)
+    }
+
+    @MainActor
+    @Test func todayFocusDailyCompletionAwardsV2OncePerDay() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Focus Owner")
+        context.insert(human)
+        try context.save()
+
+        let userKey = human.id.uuidString
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        let oldActiveHuman = UserDefaults.standard.string(forKey: "currentActiveHumanId")
+        let manager = QuestManager.shared
+        let oldCount = manager.coconutCount
+        let oldLogs = manager.coconutLogs
+        let oldLastReward = manager.lastEconomyRewardResult
+        defer {
+            if let oldActiveHuman {
+                UserDefaults.standard.set(oldActiveHuman, forKey: "currentActiveHumanId")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "currentActiveHumanId")
+            }
+            manager.coconutCount = oldCount
+            manager.coconutLogs = oldLogs
+            manager.lastEconomyRewardResult = oldLastReward
+            manager.flushToDefaults()
+        }
+
+        UserDefaults.standard.set(userKey, forKey: "currentActiveHumanId")
+        EconomyDailyBudgetStore.reset(householdKey: CoconutEconomyPolicyV2.householdBudgetKey(), memberKey: userKey, date: date)
+        TodayFocusEconomyService.resetDailyCompletionMarker(userKey: userKey, date: date)
+
+        let first = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
+            context: context,
+            executorId: userKey,
+            now: date
+        )
+        let second = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
+            context: context,
+            executorId: userKey,
+            now: date
+        )
+        let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+
+        let awardedXP = first?.growthXP ?? 0
+        let awardedCoconuts = first?.totalCoconuts ?? 0
+        #expect((18...33).contains(awardedXP))
+        #expect((8...16).contains(awardedCoconuts))
+        #expect(second == nil)
+        #expect(human.coconutBalance == awardedCoconuts)
+        let focusLedger = ledger.first { $0.actionType == "todayFocusDailyCompletion" }
+        let focusLedgerGrowthXP = focusLedger.map {
+            CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: $0.metadataJSON)
+        } ?? 0
+        #expect(focusLedger != nil)
+        #expect(focusLedgerGrowthXP == awardedXP)
+    }
+
+    @MainActor
     @Test func privacyServiceMapsHumanQuickActions() async throws {
         let owner = Human(name: "Owner")
         let viewer = Human(name: "Viewer")

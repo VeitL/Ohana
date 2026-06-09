@@ -127,7 +127,6 @@ private struct OhanaDeferredInlinePageCoverChrome: ViewModifier {
                         .strokeBorder(Color.ohanaGlassStroke.opacity(0.18), lineWidth: 0.8)
                         .allowsHitTesting(false)
                 }
-                .shadow(color: Color.black.opacity(0.16), radius: 18, x: 0, y: -4)
         }
     }
 }

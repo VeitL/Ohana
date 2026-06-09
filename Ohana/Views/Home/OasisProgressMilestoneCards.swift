@@ -19,7 +19,7 @@ struct OasisProgressCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(localization.tr(zh: "成长进度", en: "Growth progress", de: "Wachstumsfortschritt"))
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text(localization.tr(
@@ -27,7 +27,7 @@ struct OasisProgressCard: View {
                     en: "Energy \(totalEnergy) · next \(nextLevelThreshold)",
                     de: "Energie \(totalEnergy) · nächstes Level \(nextLevelThreshold)"
                 ))
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -80,10 +80,10 @@ struct OasisProgressCard: View {
     private func progressStatCell(value: String, label: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(color)
             Text(label)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
@@ -107,33 +107,33 @@ struct OasisMilestoneCard: View {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(Color.goPrimary.opacity(0.15))
                         .frame(width: 48, height: 48)
-                    Image(systemName: "trophy.fill")
-                        .font(.system(size: 18, weight: .black))
+                    Image(systemName: "trophy.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 18, weight: .black))
                         .foregroundStyle(Color.goPrimary)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     if isMaxLevel {
                         Text(localization.tr(zh: "已达最高境界", en: "Final level reached", de: "Endstufe erreicht"))
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(localization.tr(
                             zh: "生命之树已至巅峰，繁荣永续",
                             en: "The Life Tree is fully thriving.",
                             de: "Der Lebensbaum ist vollständig erblüht."
                         ))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     } else {
                         Text("Lv.\(nextLv) · \(nextLevel.displayName)")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(localization.tr(
                             zh: "解锁被动收益 +\(passiveIncomeForLevel(nextLevel))🥥/日",
                             en: "Unlocks +\(passiveIncomeForLevel(nextLevel))🥥/day",
                             de: "Schaltet +\(passiveIncomeForLevel(nextLevel))🥥/Tag frei"
                         ))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.goPrimary.opacity(0.8))
                     }
                 }
@@ -141,8 +141,8 @@ struct OasisMilestoneCard: View {
                 Spacer()
 
                 if !isMaxLevel {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }

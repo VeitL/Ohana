@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum CareLedgerBackfillService {
+nonisolated enum CareLedgerBackfillService {
     /// Isolation-agnostic: operates only on the supplied ModelContext, so it can
     /// run on the main context or inside a background @ModelActor.
     static func backfill(context: ModelContext) throws {

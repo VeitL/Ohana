@@ -11,24 +11,24 @@ struct EmptyStateWelcomeCard: View {
     var body: some View {
         VStack(spacing: 18) {
             Text("🏝️")
-                .font(.system(size: 64))
+                .font(OhanaFont.adaptive(size: 64))
                 .accessibilityHidden(true)
 
             VStack(spacing: 6) {
                 Text("欢迎来到你的岛屿")
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(Color(hex: "23181A").opacity(0.88))
                 Text("添加第一位家人开始记录")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
                     .foregroundStyle(Color(hex: "23181A").opacity(0.55))
             }
 
             VStack(spacing: 10) {
                 Button(action: onAddPet) {
                     HStack(spacing: 8) {
-                        Text("🐾").font(.system(size: 16))
+                        Text("🐾").font(OhanaFont.adaptive(size: 16))
                         Text("添加宠物")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
@@ -41,9 +41,9 @@ struct EmptyStateWelcomeCard: View {
 
                 Button(action: onAddHuman) {
                     HStack(spacing: 8) {
-                        Text("👤").font(.system(size: 16))
+                        Text("👤").font(OhanaFont.adaptive(size: 16))
                         Text("添加家人")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(Color(hex: "23181A").opacity(0.88))
                     .frame(maxWidth: .infinity)

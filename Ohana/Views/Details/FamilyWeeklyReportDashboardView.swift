@@ -178,15 +178,15 @@ struct FamilyWeeklyReportDashboardView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("本周 Ohana")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text("\(weekInterval.start.formatted(.dateTime.month().day())) - \(weekInterval.end.formatted(.dateTime.month().day()))")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 ShareLink(item: shareText) {
                     Label("分享", systemImage: "square.and.arrow.up")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -209,10 +209,10 @@ struct FamilyWeeklyReportDashboardView: View {
             sectionHeader("本周故事", icon: "sparkles.rectangle.stack.fill")
             VStack(alignment: .leading, spacing: 6) {
                 Text(storyHeadline)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(storyBody)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineSpacing(3)
             }
@@ -251,14 +251,14 @@ struct FamilyWeeklyReportDashboardView: View {
                 ForEach(Array(rankedMembers.prefix(5).enumerated()), id: \.element.id) { index, stat in
                     HStack(spacing: 10) {
                         Text("\(index + 1)")
-                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.arkInk)
-                            .frame(width: 24, height: 24)
+                            .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(index == 0 ? Color.goPrimary : Color.primary.opacity(0.08), in: Circle())
                         Text(stat.emoji)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(stat.name).font(.system(size: 14, weight: .bold, design: .rounded))
-                            Text("\(stat.count) 次照护 · +\(stat.coconuts)🥥").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+                            Text(stat.name).font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            Text("\(stat.count) 次照护 · +\(stat.coconuts)🥥").font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         Spacer()
                     }
@@ -274,24 +274,24 @@ struct FamilyWeeklyReportDashboardView: View {
             sectionHeader("成长回忆与健康提醒", icon: "heart.text.square.fill")
             if let memory = weekPhotoMemories.first {
                 HStack(spacing: 12) {
-                    if let image = UIImage(data: memory.imageData), image.size != .zero {
+                    AsyncDecodedImageView(data: memory.imageData) { image in
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
                             .frame(width: 58, height: 58)
                             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    } else {
-                        Image(systemName: "photo.fill")
-                            .font(.system(size: 20, weight: .black))
+                    } placeholder: {
+                        Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 20, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                             .frame(width: 58, height: 58)
                             .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text("\(memory.petName) 的本周回忆")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text(memory.note.isEmpty ? memory.date.formatted(.dateTime.weekday().hour().minute()) : memory.note)
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(2)
                     }
@@ -325,12 +325,12 @@ struct FamilyWeeklyReportDashboardView: View {
                 HStack {
                     FMPetAvatar(pet: pet, size: 34)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(pet.name).font(.system(size: 14, weight: .bold, design: .rounded))
-                        Text(count > 0 ? "本周 \(count) 次记录" : "本周暂无记录").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+                        Text(pet.name).font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        Text(count > 0 ? "本周 \(count) 次记录" : "本周暂无记录").font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     Spacer()
                     Text(count > 0 ? "已照顾" : "待关注")
-                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(count > 0 ? Color.goPrimary : Color.goOrange)
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .background((count > 0 ? Color.goPrimary : Color.goOrange).opacity(0.14), in: Capsule())
@@ -350,15 +350,15 @@ struct FamilyWeeklyReportDashboardView: View {
                 ForEach(allEntries.prefix(8)) { entry in
                     HStack(spacing: 10) {
                         Image(systemName: entry.icon)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(entry.color)
-                            .frame(width: 28, height: 28)
+                            .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(entry.color.opacity(0.14), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(entry.actorName) · \(entry.title)")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text("\(entry.petName) · \(entry.date.formatted(.dateTime.weekday().hour().minute()))")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
@@ -380,7 +380,7 @@ struct FamilyWeeklyReportDashboardView: View {
                             .fill(Color.goPrimary.opacity(0.75))
                             .frame(height: CGFloat(max(8, min(90, week.count * 8))))
                         Text(week.label)
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     .frame(maxWidth: .infinity)
@@ -394,8 +394,8 @@ struct FamilyWeeklyReportDashboardView: View {
 
     private func metric(_ label: String, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
-            Text(value).font(.system(size: 24, weight: .black, design: .rounded)).foregroundStyle(color)
-            Text(label).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+            Text(value).font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)).foregroundStyle(color) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            Text(label).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -405,7 +405,7 @@ struct FamilyWeeklyReportDashboardView: View {
     private func sectionHeader(_ title: String, icon: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon).foregroundStyle(Color.goPrimary)
-            Text(title).font(.system(size: 15, weight: .black, design: .rounded))
+            Text(title).font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Spacer()
         }
     }
@@ -413,15 +413,15 @@ struct FamilyWeeklyReportDashboardView: View {
     private func storyPill(icon: String, title: String, subtitle: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(color)
             Text(title)
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
             Text(subtitle)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -432,11 +432,11 @@ struct FamilyWeeklyReportDashboardView: View {
     private func statusLine(icon: String, text: String, color: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(color)
                 .frame(width: 20)
             Text(text)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(2)
             Spacer()
@@ -448,7 +448,7 @@ struct FamilyWeeklyReportDashboardView: View {
 
     private func emptyText(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 8)

@@ -16,7 +16,7 @@ struct VerticalSolidHomeView: View {
     let onPresentAccountSwitcher: () -> Void
     let onPresentAddEntity: (EntityType) -> Void
     let onPresentAppSheet: (AppSheetRoute) -> Void
-    let onPresentCoconutLog: (CoconutLogSubject) -> Void
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
     let onPresentCrewRoster: (CrewRosterMode) -> Void
     let onPresentFunctionMenu: (FMDest?) -> Void
     let onPresentOasisReward: () -> Void
@@ -40,6 +40,8 @@ struct VerticalSolidHomeView: View {
     @AppStorage("debugShowDummyCards") private var showDummyCards = false
     @AppStorage("ohanaGrowthOnboardingCompletedV1") private var growthOnboardingCompleted = false
     @AppStorage("ohanaGrowthLastSeenTreeLevelV1") private var growthLastSeenTreeLevel = 0
+    @AppStorage(StarterGiftService.Key.claimed) private var starterGiftClaimed = false
+    @AppStorage(StarterGiftService.Key.ceremonySeen) private var starterGiftCeremonySeen = false
     @AppStorage("quickActionItems_v2") private var quickActionItemsRaw = ""
     @AppStorage("home_cards_enable_ambient_float") private var enablesHomeCardAmbientFloat = false
     @Environment(\.modelContext) private var modelContext
@@ -71,9 +73,14 @@ struct VerticalSolidHomeView: View {
     @State private var treeManager = OasisTreeManager.shared
     @State private var showGrowthOnboarding = false
     @State private var growthOnboardingTask: Task<Void, Never>?
+    @State private var showStarterGiftCeremony = false
+    @State private var starterGiftCeremonyTask: Task<Void, Never>?
     @State private var growthUnlockToastStatus: GrowthUnlockStatus?
     @State private var growthUnlockToastPresentationTask: Task<Void, Never>?
     @State private var growthUnlockToastDismissTask: Task<Void, Never>?
+    @State private var growthLoopPulseStatus: GrowthLoopPulseStatus?
+    @State private var growthLoopSyncTask: Task<Void, Never>?
+    @State private var growthLoopPulseDismissTask: Task<Void, Never>?
     @State private var snapshotRefreshGate = HomeSnapshotRefreshGate()
 
     init(
@@ -84,7 +91,7 @@ struct VerticalSolidHomeView: View {
         onPresentAccountSwitcher: @escaping () -> Void,
         onPresentAddEntity: @escaping (EntityType) -> Void,
         onPresentAppSheet: @escaping (AppSheetRoute) -> Void,
-        onPresentCoconutLog: @escaping (CoconutLogSubject) -> Void,
+        onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void,
         onPresentCrewRoster: @escaping (CrewRosterMode) -> Void,
         onPresentFunctionMenu: @escaping (FMDest?) -> Void,
         onPresentOasisReward: @escaping () -> Void,
@@ -238,7 +245,9 @@ struct VerticalSolidHomeView: View {
             let headerTopGap: CGFloat = 8
             let headerContentHeight: CGFloat = 30
             let focusTopGap: CGFloat = 2
-            let focusHeight = min(128, max(118, proxy.size.height * 0.145))
+            let todayFocusHeight = min(128, max(118, proxy.size.height * 0.145))
+            let growthLoopHeight = min(86, max(78, proxy.size.height * 0.092))
+            let focusHeight = todayFocusHeight + 7 + growthLoopHeight
             let contentTopGap: CGFloat = 4
             let compactContentGap: CGFloat = 8
             let isHomeTabVisible = controller.selectedTab == .home
@@ -254,6 +263,8 @@ struct VerticalSolidHomeView: View {
             let topChromeHeight = compactTopChromeHeight
             let bottomHeight = max(84, safeBottom + 70)
             let contentHeight = max(300, proxy.size.height - topChromeHeight - bottomHeight)
+            let growthPendingCount = Self.growthLoopPendingCount(from: controller.snapshot.todayFocus)
+            let hasAnyMember = !pets.isEmpty || !humans.isEmpty
 
             ZStack(alignment: .top) {
                 OhanaAppBackground()
@@ -294,7 +305,7 @@ struct VerticalSolidHomeView: View {
                         onAddPet: { routeCoordinator.openAddEntity(.pet) }
                     )
                 } calendar: { lifecycle in
-                    CalendarView(
+                    CalendarRouteContainer(
                         preselectedPetId: embeddedCalendarPreselectedPetId,
                         preselectedHumanId: embeddedCalendarPreselectedHumanId,
                         hideToolbar: true,
@@ -304,7 +315,10 @@ struct VerticalSolidHomeView: View {
                         isEmbeddedVisible: lifecycle.isVisible,
                         isEmbeddedActive: lifecycle.isLive,
                         onRequestAddEvent: openCalendarAddEvent,
-                        onOpenEventDestination: openCalendarEventDestination
+                        onOpenEventDestination: openCalendarEventDestination,
+                        onPresentCoconutLog: { subject in
+                            onPresentCoconutLog(subject)
+                        }
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     .padding(.horizontal, 10)
@@ -312,7 +326,8 @@ struct VerticalSolidHomeView: View {
                 } oasis: { lifecycle in
                     OasisHomeTabHost(
                         lifecycle: lifecycle,
-                        injectEnergyTrigger: oasisInjectEnergyTrigger
+                        injectEnergyTrigger: oasisInjectEnergyTrigger,
+                        onPresentCoconutLog: onPresentCoconutLog
                     )
                 } plants: { _ in
                     VerticalSolidHomePlantsPage(
@@ -337,10 +352,36 @@ struct VerticalSolidHomeView: View {
                         onConfirmExchange: confirmTodayFocusExchange
                     )
                     .padding(.horizontal, 8)
-                    .frame(width: proxy.size.width, height: focusHeight, alignment: .top)
+                    .frame(width: proxy.size.width, height: todayFocusHeight, alignment: .top)
                     .position(
                         x: proxy.size.width / 2 + todayFocusHorizontalOffset,
-                        y: safeTop + headerTopGap + headerContentHeight + focusTopGap + focusHeight / 2
+                        y: safeTop + headerTopGap + headerContentHeight + focusTopGap + todayFocusHeight / 2
+                    )
+                    .opacity(Double(todayFocusVisualProgress))
+                    .allowsHitTesting(isTodayFocusInteractive)
+                    .accessibilityHidden(!isHomeTabVisible || todayFocusVisualProgress < 0.5)
+                    .animation(canAnimate ? GoMotion.page : GoMotion.reduced, value: controller.selectedTab)
+                    .zIndex(8)
+
+                    GrowthDailyLoopStrip(
+                        currentLevel: treeManager.treeLevel.rawValue,
+                        progressToNextLevel: treeManager.progressToNextLevel,
+                        pendingFocusCount: growthPendingCount,
+                        hasAnyMember: hasAnyMember,
+                        appLanguage: appLanguage,
+                        onPrimaryAction: {
+                            openGrowthDailyLoop(
+                                hasAnyMember: hasAnyMember,
+                                pendingFocusCount: growthPendingCount,
+                                currentLevel: treeManager.treeLevel.rawValue
+                            )
+                        }
+                    )
+                    .padding(.horizontal, 12)
+                    .frame(width: proxy.size.width, height: growthLoopHeight, alignment: .top)
+                    .position(
+                        x: proxy.size.width / 2 + todayFocusHorizontalOffset,
+                        y: safeTop + headerTopGap + headerContentHeight + focusTopGap + todayFocusHeight + 7 + growthLoopHeight / 2
                     )
                     .opacity(Double(todayFocusVisualProgress))
                     .allowsHitTesting(isTodayFocusInteractive)
@@ -354,12 +395,18 @@ struct VerticalSolidHomeView: View {
                     topGap: headerTopGap,
                     contentHeight: headerContentHeight,
                     streak: headerStreak,
+                    treeLevel: treeManager.treeLevel.rawValue,
+                    treeProgress: treeManager.progressToNextLevel,
+                    appLanguage: appLanguage,
                     coconutBalance: headerCoconutBalance,
                     coconutDeltaContext: headerCoconutDeltaContext,
                     activeHumanDisplayName: activeHuman?.name ?? controller.snapshot.activeName,
                     activeHumanAvatarImage: activeHumanAvatarImage,
                     activeHumanAvatarEmoji: activeHuman?.avatarEmoji,
                     onStreak: { routeCoordinator.openStreakDetail() },
+                    onTreeLevel: {
+                        openHeaderTreeLevelDestination(hasAnyMember: hasAnyMember)
+                    },
                     onCoconut: openHeaderCoconutDestination,
                     onCrew: { routeCoordinator.openCrewRoster() },
                     onAccountSwitcher: { routeCoordinator.openAccountSwitcher() },
@@ -397,11 +444,26 @@ struct VerticalSolidHomeView: View {
                     .zIndex(40)
                 }
 
+                if let growthLoopPulseStatus {
+                    GrowthLoopPulseToastView(
+                        status: growthLoopPulseStatus,
+                        appLanguage: appLanguage
+                    )
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, max(92, safeBottom + 84))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(61)
+                }
+
                 if let growthUnlockToastStatus {
                     GrowthUnlockToastView(
                         status: growthUnlockToastStatus,
                         appLanguage: appLanguage,
-                        onDismiss: dismissGrowthUnlockToast
+                        onDismiss: dismissGrowthUnlockToast,
+                        onOpen: {
+                            openGrowthUnlockDestination(growthUnlockToastStatus)
+                        }
                     )
                     .padding(.horizontal, 12)
                     .padding(.bottom, max(92, safeBottom + 84))
@@ -419,6 +481,15 @@ struct VerticalSolidHomeView: View {
                     )
                     .zIndex(70)
                 }
+
+                if showStarterGiftCeremony {
+                    StarterGiftCeremonyOverlay(
+                        appLanguage: appLanguage,
+                        amount: StarterGiftService.giftAmount,
+                        onFinish: completeStarterGiftCeremony
+                    )
+                    .zIndex(72)
+                }
             }
             .onAppear {
                 safeAreaController.stabilize(from: proxy)
@@ -433,6 +504,7 @@ struct VerticalSolidHomeView: View {
             refreshHeaderStreak()
             controller.startWarmup()
             scheduleGrowthOnboardingIfNeeded()
+            scheduleStarterGiftCeremonyIfNeeded()
             scheduleGrowthUnlockFeedbackIfNeeded()
         }
         .onChange(of: dataSignature) { _, _ in
@@ -450,8 +522,12 @@ struct VerticalSolidHomeView: View {
             calendarAddEventPresentationTask?.cancel()
             calendarAddEventContentMountTask?.cancel()
             growthOnboardingTask?.cancel()
+            starterGiftCeremonyTask?.cancel()
             growthUnlockToastPresentationTask?.cancel()
             growthUnlockToastDismissTask?.cancel()
+            growthLoopSyncTask?.cancel()
+            growthLoopPulseDismissTask?.cancel()
+            growthLoopPulseStatus = nil
             avatarPipeline.cancel(key: avatarPreloadSignature)
             commandQueue.cancelAll()
             snapshotRefreshGate.cancel()
@@ -498,6 +574,16 @@ struct VerticalSolidHomeView: View {
         .onChange(of: expandedBottomBarCard?.id) { _, _ in
             closeVerticalFabMenu(immediate: true)
             requestExpandedExpensePreview()
+        }
+        .onChange(of: starterGiftClaimed) { _, _ in
+            scheduleStarterGiftCeremonyIfNeeded()
+        }
+        .onChange(of: starterGiftCeremonySeen) { _, seen in
+            if seen {
+                showStarterGiftCeremony = false
+                starterGiftCeremonyTask?.cancel()
+                starterGiftCeremonyTask = nil
+            }
         }
         .onChange(of: treeManager.treeLevel.rawValue) { _, _ in
             scheduleGrowthUnlockFeedbackIfNeeded()
@@ -588,6 +674,10 @@ struct VerticalSolidHomeView: View {
     }
 
     private func selectTab(_ tab: VerticalSolidHomeTab) {
+        guard AppFeatureRouteGuard.allowsHomeTab(tab) else {
+            AppFeatureRouteGuard.recordIntercept("homeTab:\(tab.rawValue)")
+            return
+        }
         guard controller.selectedTab != tab else { return }
         OhanaFeedback.selection()
         closeVerticalFabMenu(immediate: true)
@@ -624,6 +714,41 @@ struct VerticalSolidHomeView: View {
             oasisInjectEnergyTrigger += 1
         case .plants:
             routeCoordinator.openAddEntity(.plant)
+        }
+    }
+
+    private func openGrowthDailyLoop(
+        hasAnyMember: Bool,
+        pendingFocusCount: Int,
+        currentLevel: Int
+    ) {
+        closeVerticalFabMenu(immediate: true)
+        guard hasAnyMember else {
+            routeCoordinator.openAddEntity(.pet)
+            return
+        }
+
+        let destination: FMDest = pendingFocusCount > 0
+            ? .featureGroup(.dailyCare)
+            : AppFeatureRouteGuard.recommendedDestination(
+                for: AppFeatureRouteGuard.currentGrowthStep(currentLevel: currentLevel),
+                currentLevel: currentLevel
+            )
+        routeCoordinator.openFunctionMenu(destination: destination)
+    }
+
+    private func openHeaderTreeLevelDestination(hasAnyMember: Bool) {
+        closeVerticalFabMenu(immediate: true)
+        guard hasAnyMember else {
+            OhanaFrameScheduler.runAfterNextFrame {
+                routeCoordinator.openAddEntity(.pet)
+            }
+            return
+        }
+
+        OhanaFrameScheduler.runAfterNextFrame {
+            AppPerformanceMonitor.shared.record("growth_roadmap_opened", valueMS: 0, note: "homeHeader")
+            routeCoordinator.openFunctionMenu(destination: .growthRoadmap)
         }
     }
 
@@ -705,6 +830,35 @@ struct VerticalSolidHomeView: View {
         withAnimation(GoMotion.feedback) {
             showGrowthOnboarding = false
         }
+        scheduleStarterGiftCeremonyIfNeeded()
+    }
+
+    private func scheduleStarterGiftCeremonyIfNeeded() {
+        guard OnboardingJourneyCoordinator.shouldShowStarterCeremony(),
+              !showStarterGiftCeremony else {
+            return
+        }
+        starterGiftCeremonyTask?.cancel()
+        starterGiftCeremonyTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: showGrowthOnboarding ? 1_600 : 720) {
+            guard OnboardingJourneyCoordinator.shouldShowStarterCeremony(),
+                  !showGrowthOnboarding else {
+                starterGiftCeremonyTask = nil
+                return
+            }
+            withAnimation(GoMotion.feedback) {
+                showStarterGiftCeremony = true
+            }
+            starterGiftCeremonyTask = nil
+        }
+    }
+
+    private func completeStarterGiftCeremony() {
+        starterGiftCeremonyTask?.cancel()
+        starterGiftCeremonyTask = nil
+        OnboardingJourneyCoordinator.markStarterCeremonySeen()
+        withAnimation(GoMotion.feedback) {
+            showStarterGiftCeremony = false
+        }
     }
 
     private func scheduleGrowthUnlockFeedbackIfNeeded() {
@@ -723,7 +877,7 @@ struct VerticalSolidHomeView: View {
             return
         }
 
-        let unlockedSteps = GrowthUnlockPolicy.newlyUnlockedStages(
+        let unlockedSteps = AppFeatureRouteGuard.newlyUnlockedStages(
             from: growthLastSeenTreeLevel,
             to: currentLevel
         )
@@ -754,6 +908,88 @@ struct VerticalSolidHomeView: View {
         growthUnlockToastDismissTask = nil
         withAnimation(GoMotion.sheetEnter) {
             growthUnlockToastStatus = nil
+        }
+    }
+
+    private func openGrowthUnlockDestination(_ status: GrowthUnlockStatus) {
+        OhanaFeedback.light()
+        let destination = AppFeatureRouteGuard.recommendedDestination(
+            for: status.step,
+            currentLevel: status.currentLevel
+        )
+        dismissGrowthUnlockToast()
+        OhanaFrameScheduler.runAfterNextFrame {
+            routeCoordinator.openFunctionMenu(destination: destination)
+        }
+    }
+
+    private func scheduleGrowthLoopSync(after mutation: DomainMutationResult) {
+        guard mutation.wroteBusinessFact else { return }
+        OnboardingJourneyCoordinator.markFirstCareCompleted()
+        let previousLevel = treeManager.treeLevel.rawValue
+        let previousEnergy = treeManager.totalEnergy
+        let previousProgress = treeManager.progressToNextLevel
+
+        growthLoopSyncTask?.cancel()
+        growthLoopSyncTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
+            let startedAt = CFAbsoluteTimeGetCurrent()
+            treeManager.refreshEnergy(
+                modelContext: modelContext,
+                pets: pets,
+                humans: humans,
+                plants: plants
+            )
+            let currentLevel = treeManager.treeLevel.rawValue
+            let currentEnergy = treeManager.totalEnergy
+            let currentProgress = treeManager.progressToNextLevel
+            let energyDelta = max(0, currentEnergy - previousEnergy)
+
+            AppPerformanceMonitor.shared.record(
+                "growth_loop_energy_synced",
+                startedAt: startedAt,
+                note: "command=\(mutation.command), energyDelta=\(energyDelta), level=\(previousLevel)->\(currentLevel)"
+            )
+
+            if currentLevel > previousLevel {
+                growthLoopPulseDismissTask?.cancel()
+                growthLoopPulseDismissTask = nil
+                growthLoopPulseStatus = nil
+                scheduleGrowthUnlockFeedbackIfNeeded()
+            } else if energyDelta > 0 || currentProgress > previousProgress {
+                presentGrowthLoopPulse(
+                    currentLevel: currentLevel,
+                    energyDelta: max(energyDelta, 1),
+                    progress: currentProgress
+                )
+            }
+            growthLoopSyncTask = nil
+        }
+    }
+
+    private func presentGrowthLoopPulse(
+        currentLevel: Int,
+        energyDelta: Int,
+        progress: Double
+    ) {
+        growthLoopPulseDismissTask?.cancel()
+        let progressPercent = min(100, max(0, Int((progress * 100).rounded())))
+        withAnimation(GoMotion.sheetEnter) {
+            growthLoopPulseStatus = GrowthLoopPulseStatus(
+                currentLevel: currentLevel,
+                energyDelta: energyDelta,
+                progressPercent: progressPercent
+            )
+        }
+        growthLoopPulseDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 2_600) {
+            dismissGrowthLoopPulse()
+        }
+    }
+
+    private func dismissGrowthLoopPulse() {
+        growthLoopPulseDismissTask?.cancel()
+        growthLoopPulseDismissTask = nil
+        withAnimation(GoMotion.sheetEnter) {
+            growthLoopPulseStatus = nil
         }
     }
 
@@ -1069,6 +1305,15 @@ struct VerticalSolidHomeView: View {
                 label: nil
             )
         )
+        let pending = controller.snapshot.todayFocus.refreshedQuests.filter { !$0.isCompleted }
+        if pending.count == 1,
+           let finalQuest = pending.first,
+           TodayFocusService.quest(finalQuest, matchesCompletedEntity: entityId) {
+            TodayFocusEconomyService.awardDailyCompletionIfNeeded(
+                context: modelContext,
+                executorId: currentExecutorId()
+            )
+        }
     }
 
     private func openHeaderCoconutDestination() {
@@ -1415,7 +1660,8 @@ struct VerticalSolidHomeView: View {
         case let .humanDetail(human):
             routeCoordinator.openSheet(.humanBasicInfo(human.id))
         case .plant:
-            routeCoordinator.openFunctionMenu(destination: .plantsDashboard)
+            AppFeatureRouteGuard.recordIntercept("homeReminderPlant")
+            routeCoordinator.openFunctionMenu(destination: .growthRoadmap)
         case let .functionMenu(destination):
             routeCoordinator.openFunctionMenu(destination: destination)
         case let .calendar(entityId, humanId):
@@ -1499,6 +1745,14 @@ struct VerticalSolidHomeView: View {
         return visible * visible * (3 - 2 * visible)
     }
 
+    private static func growthLoopPendingCount(from snapshot: TodayFocusSnapshot) -> Int {
+        let pendingQuests = snapshot.refreshedQuests.filter { !$0.isCompleted }.count
+        return pendingQuests
+            + snapshot.assignedFamilyTasks.count
+            + snapshot.pendingExchangeRequests.count
+            + snapshot.negativeSignals.count
+    }
+
     private func preloadFirstScreenAvatars() async {
         let payloads = avatarPreloadPayloads()
         let popoutPayloads = popoutPreloadPayloads()
@@ -1534,7 +1788,14 @@ struct VerticalSolidHomeView: View {
         operation: @escaping @MainActor () -> Void
     ) {
         commandQueue.enqueue(command) {
+            let previousMutationID = ReadModelRevisionCenter.shared.lastMutation?.id
             operation()
+            guard let mutation = ReadModelRevisionCenter.shared.lastMutation,
+                  mutation.id != previousMutationID,
+                  mutation.wroteBusinessFact else {
+                return
+            }
+            scheduleGrowthLoopSync(after: mutation)
         }
     }
 }

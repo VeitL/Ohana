@@ -31,6 +31,36 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet == .requiredAccountSwitch)
     }
 
+    @Test func globalPresentationPolicyOwnsOpenAndLoadingStyle() {
+        let petID = UUID()
+        let pushPolicy = AppPresentationPolicyProvider.policy(
+            for: AppRoute.petProfile(id: petID, initialTab: .overview)
+        )
+        let menuPolicy = AppPresentationPolicyProvider.policy(
+            for: AppSheetRoute.functionMenu(destination: .growthRoadmap)
+        )
+        let accountPolicy = AppPresentationPolicyProvider.policy(
+            for: AppSheetRoute.requiredAccountSwitch
+        )
+        let fullScreenPolicy = AppPresentationPolicyProvider.policy(
+            for: AppFullScreenRoute.walk(petID: petID)
+        )
+        let overlayPolicy = AppPresentationPolicyProvider.policy(
+            for: AppOverlayRoute.settings
+        )
+
+        #expect(pushPolicy.surface == .navigationPush)
+        #expect(pushPolicy.loading == .shellFirst(delayMS: 48))
+        #expect(menuPolicy.surface == .sheetPage)
+        #expect(menuPolicy.loading == .shellFirst(delayMS: 80))
+        #expect(accountPolicy.surface == .compactSheet)
+        #expect(accountPolicy.loading == .shellFirst(delayMS: 64))
+        #expect(fullScreenPolicy.surface == .fullScreen)
+        #expect(fullScreenPolicy.loading == .shellFirst(delayMS: 64))
+        #expect(overlayPolicy.surface == .inlineOverlay)
+        #expect(overlayPolicy.loading == .shellFirst(delayMS: 64))
+    }
+
     @Test func accountSwitcherUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
 
@@ -45,11 +75,11 @@ struct AppRouteCoordinatorTests {
         let coordinator = AppRouteCoordinator()
 
         coordinator.presentSettings()
-        coordinator.presentFunctionMenu(destination: .plantsDashboard)
+        coordinator.presentFunctionMenu(destination: .featureGroup(.dailyCare))
 
         #expect(coordinator.overlay == nil)
         #expect(coordinator.fullScreen == nil)
-        #expect(coordinator.sheet == .functionMenu(destination: .plantsDashboard))
+        #expect(coordinator.sheet == .functionMenu(destination: .featureGroup(.dailyCare)))
     }
 
     @Test func calendarUsesGlobalSheetRoute() {
@@ -64,6 +94,18 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet == .calendar(entityID: petID, humanID: nil))
     }
 
+    @Test func coconutShopUsesGlobalSheetRoute() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentSettings()
+        coordinator.presentCoconutShop(category: .boost)
+
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.sheet == .coconutShop(.boost))
+        #expect(coordinator.sheet?.id == "coconut-shop-boost")
+    }
+
     @Test func addEntityUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
 
@@ -73,6 +115,31 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.overlay == nil)
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.sheet == .addEntity(.pet))
+    }
+
+    @Test func plantRoutesAreSuppressedWhilePlantsAreOutOfScope() {
+        let coordinator = AppRouteCoordinator()
+        let plantID = UUID()
+
+        coordinator.openPlant(plantID)
+        #expect(coordinator.path.isEmpty)
+
+        coordinator.push(.plantProfile(id: plantID))
+        #expect(coordinator.path.isEmpty)
+
+        coordinator.presentSettings()
+        coordinator.presentFunctionMenu(destination: .plantsDashboard)
+
+        #expect(coordinator.overlay == nil)
+        #expect(coordinator.sheet == .functionMenu(destination: nil))
+        #expect(coordinator.fullScreen == nil)
+
+        coordinator.presentSettings()
+        coordinator.presentAddEntity(.plant)
+
+        #expect(coordinator.overlay == .settings)
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.fullScreen == nil)
     }
 
     @Test func detailSheetUsesGlobalSheetRoute() {
@@ -187,6 +254,21 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.overlay == .coconutLog(.human(humanID)))
         #expect(coordinator.suppressesGlobalWalkBanner)
+
+        coordinator.presentCoconutLog(nil)
+        #expect(coordinator.overlay == .coconutLog(nil))
+        #expect(coordinator.overlay?.id == "coconut-log-all")
+    }
+
+    @Test func coconutLogClearsCoconutShopSheet() {
+        let coordinator = AppRouteCoordinator()
+
+        coordinator.presentCoconutShop(category: .boost)
+        coordinator.presentCoconutLog(nil)
+
+        #expect(coordinator.sheet == nil)
+        #expect(coordinator.fullScreen == nil)
+        #expect(coordinator.overlay == .coconutLog(nil))
     }
 
     @Test func quickMomentUsesGlobalOverlayRoute() {

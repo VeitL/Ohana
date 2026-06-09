@@ -11,6 +11,7 @@ struct OasisRewardPresentationModifier: ViewModifier {
     @Binding var sheetRoute: OasisSheetRoute?
     @Binding var fullScreenRoute: OasisFullScreenRoute?
     let pets: [Pet]
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
 
     func body(content: Content) -> some View {
         content
@@ -26,7 +27,11 @@ struct OasisRewardPresentationModifier: ViewModifier {
     private func fullScreenDestination(_ route: OasisFullScreenRoute) -> some View {
         switch route {
         case .coconutLog:
-            CoconutLogView()
+            Color.clear
+                .onAppear {
+                    onPresentCoconutLog?(nil)
+                    fullScreenRoute = nil
+                }
         }
     }
 
@@ -38,23 +43,36 @@ struct OasisRewardPresentationModifier: ViewModifier {
                 .ohanaSheetPagePresentation() // ui-v4: allow rules reference sheet
         case .achievements:
             if let pet = pets.first {
-                AchievementWallView(pet: pet, allPets: pets)
+                AchievementWallView(
+                    pet: pet,
+                    allPets: pets,
+                    onPresentCoconutLog: onPresentCoconutLog
+                )
                     .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
             }
         case .inventory:
             InventoryView()
                 .ohanaSheetPagePresentation() // ui-v4: allow long inventory overview
         case let .coconutShop(category):
-            CoconutShopView(initialCategory: category)
+            CoconutShopRouteContainer(initialCategory: category)
                 .ohanaSheetPagePresentation() // ui-v4: allow long shop overview
         case .gacha:
-            GachaView()
+            GachaRouteContainer(onPresentCoconutLog: onPresentCoconutLog)
                 .ohanaSheetPagePresentation() // ui-v4: allow long blind-box overview
         case .checkInDetail:
-            DailyStreakDetailView(pets: pets, onClose: { sheetRoute = nil })
+            DailyStreakDetailRouteContainer(
+                onClose: { sheetRoute = nil },
+                onPresentCoconutLog: onPresentCoconutLog,
+                onPresentCoconutShop: { category in
+                    sheetRoute = .coconutShop(category)
+                }
+            )
                 .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
         case .critterCodex:
-            OasisCritterCodexView(mode: .codex)
+            OasisCritterCodexRouteContainer(
+                mode: .codex,
+                onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
+            )
                 .ohanaSheetPagePresentation() // ui-v4: allow long critter codex overview
         }
     }

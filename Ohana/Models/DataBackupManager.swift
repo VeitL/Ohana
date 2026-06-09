@@ -10,7 +10,7 @@ import Foundation
 import SwiftData
 
 // MARK: - 顶层备份结构
-struct OhanaBackup: Codable {
+nonisolated struct OhanaBackup: Codable {
     var schemaVersion: Int = 22
     var exportedAt: String
     // 核心实体
@@ -61,7 +61,7 @@ struct OhanaBackup: Codable {
 }
 
 // MARK: - AppState
-struct AppStateBackup: Codable {
+nonisolated struct AppStateBackup: Codable {
     var coconutCount: Int
     var coconutLogsJSON: String
     var bountyTasksJSON: String
@@ -72,7 +72,7 @@ struct AppStateBackup: Codable {
 }
 
 // MARK: - 实体 Backup DTOs
-struct PetBackup: Codable {
+nonisolated struct PetBackup: Codable {
     var id: String; var name: String; var species: String; var breed: String
     var birthday: String?; var gender: String; var isNeutered: Bool
     var avatarEmoji: String; var microchipID: String; var vetContact: String
@@ -93,7 +93,7 @@ struct PetBackup: Codable {
     var personalityTagsRaw: String?
 }
 
-struct HumanBackup: Codable {
+nonisolated struct HumanBackup: Codable {
     var id: String; var name: String; var birthday: String?; var bloodType: String
     var avatarEmoji: String; var role: String; var appleUserIdentifier: String
     var notes: String; var createdAt: String; var nationality: String; var city: String
@@ -108,7 +108,7 @@ struct HumanBackup: Codable {
     // Intentionally excluded from backups: pinHash, pinSalt, pinFailedAttempts, pinLockedUntil.
 }
 
-struct EventBackup: Codable {
+nonisolated struct EventBackup: Codable {
     var id: String; var title: String; var startDate: String; var endDate: String?
     var isAllDay: Bool; var eventType: String
     var relatedEntityId: String; var relatedEntityType: String
@@ -118,7 +118,7 @@ struct EventBackup: Codable {
     var assigneeId: String?
 }
 
-struct ReminderBackup: Codable {
+nonisolated struct ReminderBackup: Codable {
     var id: String; var scheduledAt: String; var status: String
     var notificationId: String; var eventId: String?
     var completedAt: String?
@@ -126,7 +126,7 @@ struct ReminderBackup: Codable {
     var createdAt: String?
 }
 
-struct GachaOwnedItemBackup: Codable {
+nonisolated struct GachaOwnedItemBackup: Codable {
     var id: String
     var ownerHumanId: String
     var seriesId: String
@@ -139,7 +139,7 @@ struct GachaOwnedItemBackup: Codable {
     var createdAt: String
 }
 
-struct GachaDrawLogBackup: Codable {
+nonisolated struct GachaDrawLogBackup: Codable {
     var id: String
     var ownerHumanId: String
     var ownerName: String
@@ -164,11 +164,11 @@ struct GachaDrawLogBackup: Codable {
     var createdAt: String
 }
 
-struct HouseholdBackup: Codable {
+nonisolated struct HouseholdBackup: Codable {
     var id: String; var name: String; var createdAt: String; var totalProsperity: Int
 }
 
-struct PlantBackup: Codable {
+nonisolated struct PlantBackup: Codable {
     var id: String; var name: String; var species: String; var avatarEmoji: String
     var location: String; var notes: String; var createdAt: String
     var lastWateredDate: String?; var wateringIntervalDays: Int
@@ -176,14 +176,14 @@ struct PlantBackup: Codable {
     var themeColorHex: String?
 }
 
-struct PetCareLogBackup: Codable {
+nonisolated struct PetCareLogBackup: Codable {
     var id: String; var date: String; var type: String
     var amountGrams: Double; var amountMl: Double; var note: String
     var foodKindRaw: String?; var treatKindRaw: String?
     var sharedSessionId: String?; var executorId: String?; var petId: String?
 }
 
-struct PetPottyLogBackup: Codable {
+nonisolated struct PetPottyLogBackup: Codable {
     var id: String; var date: String; var type: String
     var executorId: String?; var petId: String?
     var latitude: Double?; var longitude: Double?
@@ -191,7 +191,7 @@ struct PetPottyLogBackup: Codable {
     var sharedSessionId: String?
 }
 
-struct SharedCareSessionBackup: Codable {
+nonisolated struct SharedCareSessionBackup: Codable {
     var id: String
     var date: String
     var actionKindRaw: String
@@ -208,42 +208,42 @@ struct SharedCareSessionBackup: Codable {
     var createdAt: String
 }
 
-struct PetWalkLogBackup: Codable {
+nonisolated struct PetWalkLogBackup: Codable {
     var id: String; var startDate: String; var endDate: String?
     var distanceMeters: Double; var coconutsEarned: Int
     var executorId: String?; var petId: String?
 }
 
-struct PetWeightLogBackup: Codable {
+nonisolated struct PetWeightLogBackup: Codable {
     var id: String; var date: String; var weight: Double; var petId: String?
     var executorId: String?
 }
 
-struct PetExpenseLogBackup: Codable {
+nonisolated struct PetExpenseLogBackup: Codable {
     var id: String; var date: String; var amount: Double
     var category: String; var note: String; var petId: String?
     var executorId: String?
 }
 
-struct PetHealthLogBackup: Codable {
+nonisolated struct PetHealthLogBackup: Codable {
     var id: String; var date: String; var type: String; var note: String
     var expirationDate: String?; var vetName: String; var cost: Double; var petId: String?
     var executorId: String?
 }
 
-struct PetHygieneLogBackup: Codable {
+nonisolated struct PetHygieneLogBackup: Codable {
     var id: String; var date: String; var type: String; var petId: String?
     var executorId: String?
 }
 
-struct PetFoodRecordBackup: Codable {
+nonisolated struct PetFoodRecordBackup: Codable {
     var id: String; var date: String; var brand: String
     var dailyGrams: Double; var totalGrams: Double?; var foodKindRaw: String?; var petId: String?
     var purchaseDate: String?; var remainingCorrectionGrams: Double?; var remainingCorrectionDate: String?
     var notes: String?; var executorId: String?
 }
 
-struct PetDocumentBackup: Codable {
+nonisolated struct PetDocumentBackup: Codable {
     var id: String; var title: String; var categoryRaw: String
     var expiryDate: String?; var petId: String?
     var issueDate: String?
@@ -255,32 +255,32 @@ struct PetDocumentBackup: Codable {
     var attachmentFilename: String?
 }
 
-struct PetDocumentAttachmentBackup: Codable {
+nonisolated struct PetDocumentAttachmentBackup: Codable {
     var id: String; var documentId: String
     var dataBase64: String; var filename: String; var isImage: Bool
 }
 
-struct PetMilestoneBackup: Codable {
+nonisolated struct PetMilestoneBackup: Codable {
     var id: String; var date: String; var title: String; var emoji: String; var notes: String; var petId: String?
 }
 
-struct HumanWeightLogBackup: Codable {
+nonisolated struct HumanWeightLogBackup: Codable {
     var id: String; var date: String; var weight: Double; var humanId: String?
     var executorId: String?
 }
 
-struct HumanWorkoutLogBackup: Codable {
+nonisolated struct HumanWorkoutLogBackup: Codable {
     var id: String; var date: String; var typeRaw: String
     var durationMinutes: Int; var notes: String; var humanId: String?
 }
 
-struct PetPhotoLogBackup: Codable {
+nonisolated struct PetPhotoLogBackup: Codable {
     var id: String; var date: String; var note: String; var createdAt: String
     var imageBase64: String; var petId: String?
     var locationLatitude: Double; var locationLongitude: Double; var locationPlacename: String
 }
 
-struct PetInsuranceBackup: Codable {
+nonisolated struct PetInsuranceBackup: Codable {
     var id: String; var companyName: String; var policyNumber: String; var productName: String
     var annualPremium: Double; var coverageAmount: Double
     var startDate: String; var renewalDate: String
@@ -290,7 +290,7 @@ struct PetInsuranceBackup: Codable {
     var firstPremiumPaymentDate: String?; var petId: String?
 }
 
-struct InsuranceClaimBackup: Codable {
+nonisolated struct InsuranceClaimBackup: Codable {
     var id: String; var insuranceId: String?
     var claimDate: String; var incidentDate: String
     var totalExpense: Double; var claimedAmount: Double; var approvedAmount: Double
@@ -298,27 +298,27 @@ struct InsuranceClaimBackup: Codable {
     var approvedAt: String?; var createdAt: String
 }
 
-struct PetMedicationBackup: Codable {
+nonisolated struct PetMedicationBackup: Codable {
     var id: String; var name: String; var dosage: String; var frequencyRaw: String
     var customFrequencyNote: String; var startDate: String; var endDate: String?
     var colorHex: String; var notes: String; var isActive: Bool; var createdAt: String
     var petId: String?
 }
 
-struct HumanMedicationBackup: Codable {
+nonisolated struct HumanMedicationBackup: Codable {
     var id: String; var humanId: String; var name: String; var dosage: String
     var frequencyRaw: String; var customFrequencyNote: String
     var firstDoseTime: String; var startDate: String; var endDate: String?
     var colorHex: String; var notes: String; var isActive: Bool; var createdAt: String
 }
 
-struct HumanMedicationLogBackup: Codable {
+nonisolated struct HumanMedicationLogBackup: Codable {
     var id: String; var humanId: String; var medicationId: String
     var scheduledTime: String; var recordedTime: String?
     var statusRaw: String; var createdAt: String
 }
 
-struct HumanHealthMetricLogBackup: Codable {
+nonisolated struct HumanHealthMetricLogBackup: Codable {
     var id: String
     var metricKey: String
     var unitCode: String
@@ -329,28 +329,28 @@ struct HumanHealthMetricLogBackup: Codable {
     var createdAt: String
 }
 
-struct SymptomLogBackup: Codable {
+nonisolated struct SymptomLogBackup: Codable {
     var id: String; var date: String; var categoryRaw: String
     var symptomName: String; var severityRaw: Int; var note: String
     var photoBase64: String?; var petId: String?
 }
 
-struct HeatCycleLogBackup: Codable {
+nonisolated struct HeatCycleLogBackup: Codable {
     var id: String; var startDate: String; var endDate: String?
     var statusRaw: String; var note: String; var isMated: Bool
     var expectedDeliveryDate: String?; var petId: String?
 }
 
-struct WaterLogBackup: Codable {
+nonisolated struct WaterLogBackup: Codable {
     var id: String; var date: String; var amountMl: Double; var note: String
 }
 
-struct WishlistItemBackup: Codable {
+nonisolated struct WishlistItemBackup: Codable {
     var id: String; var title: String; var cost: Int; var creatorId: String
     var isRedeemed: Bool; var createdAt: String
 }
 
-struct CareLedgerEventBackup: Codable {
+nonisolated struct CareLedgerEventBackup: Codable {
     var id: String
     var occurredAt: String
     var actorKind: String
@@ -374,7 +374,7 @@ struct CareLedgerEventBackup: Codable {
     var createdAt: String
 }
 
-struct FamilyCollaborationTaskBackup: Codable {
+nonisolated struct FamilyCollaborationTaskBackup: Codable {
     var id: String
     var title: String
     var note: String
@@ -399,7 +399,7 @@ struct FamilyCollaborationTaskBackup: Codable {
     var emoji: String
 }
 
-struct CoconutExchangeRequestBackup: Codable {
+nonisolated struct CoconutExchangeRequestBackup: Codable {
     var id: String
     var senderId: String
     var senderName: String
@@ -416,7 +416,7 @@ struct CoconutExchangeRequestBackup: Codable {
     var note: String
 }
 
-struct OasisUpgradeCoconutBackup: Codable {
+nonisolated struct OasisUpgradeCoconutBackup: Codable {
     var id: String
     var level: Int
     var createdAt: String
@@ -438,7 +438,7 @@ struct OasisUpgradeCoconutBackup: Codable {
     var descriptionDe: String
 }
 
-struct OasisElectronicPetBackup: Codable {
+nonisolated struct OasisElectronicPetBackup: Codable {
     var id: String
     var catalogId: String
     var nameZh: String
@@ -474,14 +474,14 @@ struct OasisElectronicPetBackup: Codable {
     var isArchived: Bool
 }
 
-struct OasisCritterFragmentBackup: Codable {
+nonisolated struct OasisCritterFragmentBackup: Codable {
     var id: String
     var catalogId: String
     var amount: Int
     var updatedAt: String
 }
 
-struct OasisUnlockBackup: Codable {
+nonisolated struct OasisUnlockBackup: Codable {
     var id: String
     var unlockId: String
     var unlockKindRaw: String
@@ -490,7 +490,7 @@ struct OasisUnlockBackup: Codable {
     var metadataJSON: String
 }
 
-struct OasisCritterActionLogBackup: Codable {
+nonisolated struct OasisCritterActionLogBackup: Codable {
     var id: String
     var critterId: String?
     var critterCatalogId: String
@@ -513,7 +513,7 @@ struct OasisCritterActionLogBackup: Codable {
 // full-table fetch + JSON encode never blocks the main thread. Import keeps the
 // main context (see @MainActor on importJSON) so SwiftData @Query-backed UI
 // refreshes immediately after a restore.
-final class DataBackupManager: @unchecked Sendable {
+nonisolated final class DataBackupManager: @unchecked Sendable {
     static let shared = DataBackupManager()
     private init() {}
 

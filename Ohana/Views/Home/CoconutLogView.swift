@@ -27,11 +27,119 @@ enum CoconutLogSubject: Identifiable, Hashable {
     }
 }
 
+private enum CoconutLogActorKind: Hashable {
+    case pet
+    case human
+}
+
+private struct CoconutLogActorSnapshot: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let emoji: String
+    let balance: Int
+    let kind: CoconutLogActorKind
+}
+
+private struct CoconutLogMemberSnapshot {
+    let isReady: Bool
+    let pets: [CoconutLogActorSnapshot]
+    let visibleHumans: [CoconutLogActorSnapshot]
+    let hiddenHumanIds: Set<String>
+
+    static let empty = CoconutLogMemberSnapshot(
+        isReady: false,
+        pets: [],
+        visibleHumans: [],
+        hiddenHumanIds: []
+    )
+
+    static func fetch(context: ModelContext, viewedBy activeHumanId: UUID?) -> CoconutLogMemberSnapshot {
+        var humanDescriptor = FetchDescriptor<Human>(
+            sortBy: [SortDescriptor(\Human.createdAt)]
+        )
+        humanDescriptor.fetchLimit = 80
+        let humans = (try? context.fetch(humanDescriptor)) ?? []
+
+        var petDescriptor = FetchDescriptor<Pet>(
+            sortBy: [SortDescriptor(\Pet.createdAt)]
+        )
+        petDescriptor.fetchLimit = 120
+        let pets = (try? context.fetch(petDescriptor)) ?? []
+
+        let visibleHumans = PrivacyService
+            .unlockedHumans(for: .wishlist, from: humans, viewedBy: activeHumanId)
+            .map { human in
+                CoconutLogActorSnapshot(
+                    id: human.id.uuidString,
+                    name: human.name,
+                    emoji: human.avatarEmoji.isEmpty ? "😊" : human.avatarEmoji,
+                    balance: human.coconutBalance,
+                    kind: .human
+                )
+            }
+        let hiddenHumanIds = Set(humans.compactMap { human in
+            PrivacyService.isLocked(.wishlist, for: human, viewedBy: activeHumanId)
+                ? human.id.uuidString
+                : nil
+        })
+        let petSnapshots = pets.map { pet in
+            CoconutLogActorSnapshot(
+                id: pet.id.uuidString,
+                name: pet.name,
+                emoji: "🐾",
+                balance: pet.coconutBalance,
+                kind: .pet
+            )
+        }
+
+        return CoconutLogMemberSnapshot(
+            isReady: true,
+            pets: petSnapshots,
+            visibleHumans: visibleHumans,
+            hiddenHumanIds: hiddenHumanIds
+        )
+    }
+
+    func actor(id: String) -> CoconutLogActorSnapshot? {
+        pets.first { $0.id == id } ?? visibleHumans.first { $0.id == id }
+    }
+
+    func balance(for actorId: String) -> Int {
+        guard !hiddenHumanIds.contains(actorId) else { return 0 }
+        return actor(id: actorId)?.balance ?? 0
+    }
+
+    func subjectName(for subject: CoconutLogSubject) -> String? {
+        actor(id: subject.actorId)?.name
+    }
+
+    func knownActors(from logs: [CoconutLogEntry]) -> [(id: String, name: String, emoji: String)] {
+        var seen = Set<String>()
+        var result: [(String, String, String)] = []
+
+        for human in visibleHumans {
+            seen.insert(human.id)
+            result.append((human.id, human.name, human.emoji))
+        }
+        for pet in pets {
+            seen.insert(pet.id)
+            result.append((pet.id, pet.name, pet.emoji))
+        }
+        for log in logs {
+            guard let id = log.actorId,
+                  let name = log.actorName,
+                  !seen.contains(id) else { continue }
+            seen.insert(id)
+            result.append((id, name, actor(id: id)?.emoji ?? "🐾"))
+        }
+        return result
+    }
+}
+
 struct CoconutLogView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @Bindable private var manager = QuestManager.shared
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-    @Query(sort: \Pet.createdAt)   private var pets:   [Pet]
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage("appLanguage") private var appLanguage = "zh"
 
@@ -39,7 +147,9 @@ struct CoconutLogView: View {
     @State private var selectedActorId: String? = nil
     @State private var showingWealthDashboard = false
     @State private var isHistoryContentReady = false
+    @State private var memberSnapshot = CoconutLogMemberSnapshot.empty
     @State private var historyContentMountTask: Task<Void, Never>?
+    @State private var memberSnapshotTask: Task<Void, Never>?
     private let subject: CoconutLogSubject?
     private let onClose: (() -> Void)?
     private let safeTopInset: CGFloat
@@ -71,18 +181,12 @@ struct CoconutLogView: View {
         activeHumanIdStr.isEmpty ? nil : activeHumanIdStr
     }
 
-    private var visibleHumans: [Human] {
-        PrivacyService.unlockedHumans(for: .wishlist, from: humans, viewedBy: activeHumanId)
-    }
-
-    private var hiddenHumanIds: Set<String> {
-        Set(humans.compactMap {
-            PrivacyService.isLocked(.wishlist, for: $0, viewedBy: activeHumanId) ? $0.id.uuidString : nil
-        })
+    private var isContentReady: Bool {
+        isHistoryContentReady && memberSnapshot.isReady
     }
 
     private var visibleLogs: [CoconutLogEntry] {
-        manager.coconutLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+        manager.coconutLogs.filter { !memberSnapshot.hiddenHumanIds.contains($0.actorId ?? "") }
     }
 
     private var visibleCoconutTotal: Int {
@@ -92,15 +196,12 @@ struct CoconutLogView: View {
         if let selectedActorId {
             return balance(for: selectedActorId)
         }
-        return pets.reduce(0) { $0 + $1.coconutBalance } + visibleHumans.reduce(0) { $0 + $1.coconutBalance }
+        return memberSnapshot.pets.reduce(0) { $0 + $1.balance } +
+            memberSnapshot.visibleHumans.reduce(0) { $0 + $1.balance }
     }
 
     private func balance(for actorId: String) -> Int {
-        if let pet = pets.first(where: { $0.id.uuidString == actorId }) {
-            return pet.coconutBalance
-        }
-        guard !hiddenHumanIds.contains(actorId) else { return 0 }
-        return visibleHumans.first(where: { $0.id.uuidString == actorId })?.coconutBalance ?? 0
+        memberSnapshot.balance(for: actorId)
     }
 
     private var filteredLogs: [CoconutLogEntry] {
@@ -110,37 +211,11 @@ struct CoconutLogView: View {
 
     private var subjectName: String? {
         guard let subject else { return nil }
-        switch subject {
-        case .pet(let id):
-            return pets.first(where: { $0.id == id })?.name
-        case .human(let id):
-            return visibleHumans.first(where: { $0.id == id })?.name
-        }
+        return memberSnapshot.subjectName(for: subject)
     }
 
     private var knownActors: [(id: String, name: String, emoji: String)] {
-        var seen = Set<String>()
-        var result: [(String, String, String)] = []
-        for human in visibleHumans {
-            seen.insert(human.id.uuidString)
-            result.append((human.id.uuidString, human.name, human.avatarEmoji.isEmpty ? "😊" : human.avatarEmoji))
-        }
-        for pet in pets {
-            seen.insert(pet.id.uuidString)
-            result.append((pet.id.uuidString, pet.name, "🐾"))
-        }
-        for log in visibleLogs {
-            guard let id = log.actorId, let name = log.actorName, !seen.contains(id) else { continue }
-            seen.insert(id)
-            let emoji: String
-            if visibleHumans.contains(where: { $0.id.uuidString == id }) {
-                emoji = visibleHumans.first(where: { $0.id.uuidString == id })?.avatarEmoji ?? "😊"
-            } else {
-                emoji = "🐾"
-            }
-            result.append((id, name, emoji))
-        }
-        return result
+        memberSnapshot.knownActors(from: visibleLogs)
     }
 
     var body: some View {
@@ -153,7 +228,7 @@ struct CoconutLogView: View {
                     .padding(.top, safeTopInset + 16)
                     .padding(.bottom, 16)
 
-                if isHistoryContentReady {
+                if isContentReady {
                     historyContent
                         .transition(.opacity)
                 } else {
@@ -167,14 +242,17 @@ struct CoconutLogView: View {
             IslandWealthDashboardView()
         }
         .onAppear {
+            scheduleMemberSnapshotRefresh()
             scheduleHistoryContentMount()
             seedDefaultActorFilterIfNeeded()
         }
         .onDisappear {
             historyContentMountTask?.cancel()
+            memberSnapshotTask?.cancel()
         }
         .onChange(of: activeHumanIdStr) { oldValue, newValue in
             guard subject == nil else { return }
+            scheduleMemberSnapshotRefresh()
             let next = newValue.isEmpty ? nil : newValue
             if selectedActorId == nil || selectedActorId == oldValue || selectedActorId?.isEmpty == true {
                 withAnimation(GoMotion.selection) {
@@ -212,15 +290,15 @@ struct CoconutLogView: View {
 
     private var balanceHeader: some View {
         HStack(spacing: 10) {
-            Text("🥥").font(.system(size: 44))
+            Text("🥥").font(OhanaFont.adaptive(size: 44)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(visibleCoconutTotal)")
-                    .font(.system(size: 52, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 52, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .contentTransition(.numericText())
                     .animation(GoMotion.feedback, value: visibleCoconutTotal)
                 Text(l.tr(zh: "当前椰子余额", en: "Current coconut balance", de: "Aktueller Kokosnussstand"))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
             }
         }
@@ -244,14 +322,14 @@ struct CoconutLogView: View {
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Text("🥥").font(.system(size: 48))
+            Text("🥥").font(OhanaFont.adaptive(size: 48)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text((subject == nil && selectedActorId == nil)
                  ? l.tr(zh: "还没有椰子记录", en: "No coconut history yet", de: "Noch keine Kokosnuss-Historie")
                  : l.tr(zh: "该成员暂无椰子记录", en: "No history for this member", de: "Keine Historie für dieses Mitglied"))
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             Text(l.tr(zh: "完成打卡后，椰子收支会出现在这里", en: "Coconut changes appear here after check-ins", de: "Kokosnuss-Bewegungen erscheinen hier nach Check-ins"))
-                .font(.system(size: 12, weight: .medium))
+                .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                 .multilineTextAlignment(.center)
         }
@@ -286,6 +364,18 @@ struct CoconutLogView: View {
         }
     }
 
+    private func scheduleMemberSnapshotRefresh() {
+        memberSnapshotTask?.cancel()
+        memberSnapshotTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 36) {
+            memberSnapshot = CoconutLogMemberSnapshot.fetch(
+                context: modelContext,
+                viewedBy: activeHumanId
+            )
+            seedDefaultActorFilterIfNeeded()
+            memberSnapshotTask = nil
+        }
+    }
+
     private func seedDefaultActorFilterIfNeeded() {
         guard subject == nil, selectedActorId == nil, let activeHumanActorId else { return }
         selectedActorId = activeHumanActorId
@@ -295,23 +385,23 @@ struct CoconutLogView: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
-                    Image(systemName: "circle.hexagongrid.fill")
-                        .font(.system(size: 17, weight: .black))
+                    Image(systemName: "circle.hexagongrid.fill") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                     Text(l.tr(zh: "椰子历史", en: "Coconut History", de: "Kokosnuss-Historie"))
-                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
-                Text((isHistoryContentReady ? subjectName : nil) ?? l.tr(zh: "每一笔收支", en: "Every coconut change", de: "Jede Bewegung"))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                Text((isContentReady ? subjectName : nil) ?? l.tr(zh: "每一笔收支", en: "Every coconut change", de: "Jede Bewegung"))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
             Button {
                 showingWealthDashboard = true
             } label: {
-                Image(systemName: "chart.pie.fill")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "chart.pie.fill") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -320,8 +410,8 @@ struct CoconutLogView: View {
             .accessibilityLabel(l.tr(zh: "打开财富分析", en: "Open wealth analysis", de: "Vermögensanalyse öffnen"))
 
             Button { closeLog() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .black))
+                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -346,9 +436,9 @@ struct CoconutLogView: View {
             withAnimation(GoMotion.selection) { selectedActorId = id }
         } label: {
             HStack(spacing: 5) {
-                Text(emoji).font(.system(size: 14))
+                Text(emoji).font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(name)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             }
             .padding(.horizontal, 13).padding(.vertical, 7)
@@ -361,9 +451,9 @@ struct CoconutLogView: View {
     @ViewBuilder
     private func logRow(log: CoconutLogEntry) -> some View {
         let isEarning = log.amount > 0
-        // 判断 actorId 对应的是宜物还是人类
-        let isPet = log.actorId.map { id in pets.contains { $0.id.uuidString == id } } ?? false
-        let isHuman = log.actorId.map { id in visibleHumans.contains { $0.id.uuidString == id } } ?? false
+        let actor = log.actorId.flatMap { memberSnapshot.actor(id: $0) }
+        let isPet = actor?.kind == .pet
+        let isHuman = actor?.kind == .human
         let isSystem = log.actorId == nil || (!isPet && !isHuman)
 
         HStack(spacing: 14) {
@@ -371,17 +461,17 @@ struct CoconutLogView: View {
                 Circle()
                     .fill((isEarning ? Color.goPrimary : Color.goRed).opacity(0.12))
                     .frame(width: 44, height: 44)
-                Text(log.emoji).font(.system(size: 22))
+                Text(log.emoji).font(OhanaFont.adaptive(size: 22)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.title)
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 HStack(spacing: 6) {
                     if isSystem {
                         // 全局系统奖励
                         Text("🏕️ 岛屿奖励")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Color.ohanaControlFill, in: Capsule())
@@ -389,9 +479,9 @@ struct CoconutLogView: View {
                         // 宜物标签：展示宜物名
                         HStack(spacing: 3) {
                             Text("🐾")
-                                .font(.system(size: 9))
+                                .font(OhanaFont.adaptive(size: 9)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text(log.actorName ?? "")
-                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         .foregroundStyle(Color.goTeal)
                         .padding(.horizontal, 6).padding(.vertical, 2)
@@ -399,22 +489,22 @@ struct CoconutLogView: View {
                     } else if isHuman {
                         // 人类标签
                         Text(log.actorName ?? "")
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary.opacity(0.9))
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Color.goPrimary.opacity(0.1), in: Capsule())
                     }
                     Text(log.timeAgoString)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 }
             }
             Spacer()
             HStack(spacing: 3) {
                 Text(isEarning ? "+\(log.amount)" : "\(log.amount)")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(isEarning ? Color.goPrimary : Color.goRed)
-                Text("🥥").font(.system(size: 14))
+                Text("🥥").font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 14)

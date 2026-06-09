@@ -35,6 +35,20 @@
                ReferencedContainer = "container:Ohana.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "4FDA02472F54E0D6004B725F"
+               BuildableName = "OhanaUITests.xctest"
+               BlueprintName = "OhanaUITests"
+               ReferencedContainer = "container:Ohana.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

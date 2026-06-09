@@ -13,6 +13,6 @@ struct QuickLitterDetailSheet: View {
     var onClose: (() -> Void)? = nil
 
     var body: some View {
-        QuickPottyDetailSheet(pet: pet, onRemove: onRemove, onClose: onClose)
+        QuickPottyDetailRouteContainer(id: pet.id, onRemove: onRemove, onClose: onClose)
     }
 }

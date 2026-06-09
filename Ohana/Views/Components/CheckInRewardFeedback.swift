@@ -12,6 +12,7 @@ import Combine
 struct OhanaCoconutRewardEvent: Identifiable, Equatable {
     let id: UUID
     let amount: Int
+    let growthXP: Int
     let emoji: String
     let title: String
     let actorId: String?
@@ -20,8 +21,9 @@ struct OhanaCoconutRewardEvent: Identifiable, Equatable {
     init(entry: CoconutLogEntry) {
         id = entry.id
         amount = entry.amount
+        growthXP = entry.growthXP ?? 0
         emoji = entry.emoji
-        title = entry.title
+        title = entry.feedbackMessage ?? entry.title
         actorId = entry.actorId
         date = entry.date
     }
@@ -35,14 +37,16 @@ extension Notification.Name {
 final class CoconutRewardFeedbackCenter: ObservableObject {
     @Published private(set) var activeEvent: OhanaCoconutRewardEvent?
     @Published private(set) var coalescedAmount = 0
+    @Published private(set) var coalescedGrowthXP = 0
 
     private var hideTask: Task<Void, Never>?
 
     func enqueue(_ event: OhanaCoconutRewardEvent) {
-        guard event.amount > 0 else { return }
+        guard event.amount > 0 || event.growthXP > 0 else { return }
         let shouldMerge = activeEvent != nil
         activeEvent = event
         coalescedAmount = shouldMerge ? coalescedAmount + event.amount : event.amount
+        coalescedGrowthXP = shouldMerge ? coalescedGrowthXP + event.growthXP : event.growthXP
 
         hideTask?.cancel()
         hideTask = Task { @MainActor in
@@ -54,6 +58,7 @@ final class CoconutRewardFeedbackCenter: ObservableObject {
             try? await Task.sleep(nanoseconds: 240_000_000)
             guard !Task.isCancelled else { return }
             self.coalescedAmount = 0
+            self.coalescedGrowthXP = 0
         }
     }
 }
@@ -102,12 +107,12 @@ struct CoconutRewardFeedbackOverlay: View {
 
             HStack(spacing: 8) {
                 Text(event.emoji)
-                    .font(.system(size: 20))
-                Text("+\(center.coalescedAmount)🥥")
-                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 20))
+                Text(rewardAmountText)
+                    .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
                     .contentTransition(.numericText())
                 Text(event.title)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
                     .lineLimit(1)
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -121,6 +126,12 @@ struct CoconutRewardFeedbackOverlay: View {
             )
         }
         .padding(.horizontal, 18)
+    }
+
+    private var rewardAmountText: String {
+        let coconutText = center.coalescedAmount > 0 ? "+\(center.coalescedAmount)🥥" : nil
+        let xpText = center.coalescedGrowthXP > 0 ? "+\(center.coalescedGrowthXP)XP" : nil
+        return [coconutText, xpText].compactMap { $0 }.joined(separator: " · ")
     }
 }
 
@@ -161,7 +172,7 @@ struct CheckInFeedbackBadge: View {
 
     var body: some View {
         Text(token.deltaText)
-            .font(.system(size: 12, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)

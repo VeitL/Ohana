@@ -96,9 +96,9 @@ struct InlineNumericInput: View {
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
                 .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36)
+                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(accent, in: Circle())
         }
         .buttonStyle(ScaleButtonStyle())

@@ -40,10 +40,10 @@ struct WalkTrackingFullScreen: View {
             dismiss()
         } label: {
             HStack(spacing: 5) {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 12, weight: .heavy))
+                Image(systemName: "chevron.down").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .heavy))
                 Text("收起")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
             }
             .foregroundStyle(Color.goCardWhite)
             .padding(.horizontal, 12)

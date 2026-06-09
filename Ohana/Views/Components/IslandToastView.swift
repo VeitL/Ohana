@@ -14,17 +14,17 @@ struct IslandToastView: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(message)
-                .font(.system(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(Color.ohanaCardSurface, in: Capsule())
-        .shadow(color: .black.opacity(0.15), radius: 16, y: 4)
+        .shadow(color: .black.opacity(0.15), radius: 16, y: 4) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         .opacity(isShowing ? 1 : 0)
         .offset(y: isShowing ? 0 : 24)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isShowing)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isShowing) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
 }
 

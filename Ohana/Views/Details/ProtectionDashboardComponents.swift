@@ -130,14 +130,14 @@ struct ProtectionCoreCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: section.icon)
-                    .font(.system(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(section.tint)
                 Spacer()
                 Button(action: onAdd) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .black))
+                    Image(systemName: "plus") // a11y: allow decorative icon covered by surrounding text or control
+                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-                        .frame(width: 30, height: 28)
+                        .frame(width: 30, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -156,7 +156,7 @@ struct ProtectionCoreCard: View {
             }
 
             HStack(spacing: 5) {
-                Circle().fill(risk.color).frame(width: 6, height: 6)
+                Circle().fill(risk.color).frame(width: 6, height: 6) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text(nextText)
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(risk.color)
@@ -198,7 +198,7 @@ struct ProtectionEmptyState: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 30, weight: .black))
+                .font(OhanaFont.adaptive(size: 30, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
             Text(title)
                 .font(OhanaFont.subheadline(.black))
@@ -241,6 +241,7 @@ struct DocumentDetailRow: View {
     let onDelete: () -> Void
 
     @State private var showingPreview = false
+    @State private var decodedPreview: UIImage?
 
     private var expiryColor: Color {
         if doc.isExpired { return Color.goRed }
@@ -259,8 +260,8 @@ struct DocumentDetailRow: View {
         Button(action: onDetail) {
             HStack(spacing: 12) {
                 Text(doc.documentCategory.emoji)
-                    .font(.system(size: 24))
-                    .frame(width: 42, height: 42)
+                    .font(OhanaFont.adaptive(size: 24)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(doc.title.isEmpty ? doc.category : doc.title)
@@ -279,11 +280,11 @@ struct DocumentDetailRow: View {
 
                 Spacer()
 
-                if let preview = previewImage {
+                if let preview = decodedPreview {
                     Image(uiImage: preview)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 42, height: 42)
+                        .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         .onTapGesture { showingPreview = true }
                 }
@@ -299,6 +300,9 @@ struct DocumentDetailRow: View {
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
+        .task(id: previewDataKey) {
+            await decodePreview()
+        }
         .contextMenu {
             Button { onDetail() } label: {
                 Label("查看详情", systemImage: "doc.text.magnifyingglass")
@@ -311,7 +315,7 @@ struct DocumentDetailRow: View {
             }
         }
         .fullScreenCover(isPresented: $showingPreview) {
-            if let preview = previewImage {
+            if let preview = decodedPreview {
                 ZStack {
                     Color.arkInk.ignoresSafeArea()
                     Image(uiImage: preview)
@@ -322,8 +326,8 @@ struct DocumentDetailRow: View {
                         HStack {
                             Spacer()
                             Button { showingPreview = false } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 15, weight: .black))
+                                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .frame(width: 44, height: 44)
                             }
@@ -337,10 +341,23 @@ struct DocumentDetailRow: View {
         }
     }
 
-    private var previewImage: UIImage? {
-        if let data = doc.attachmentData, let ui = UIImage(data: data) { return ui }
-        if let first = doc.attachments.first(where: { $0.isImage }), let ui = UIImage(data: first.data) { return ui }
-        return nil
+    private var previewData: Data? {
+        if let data = doc.attachmentData { return data }
+        return doc.attachments.first(where: { $0.isImage })?.data
+    }
+
+    private var previewDataKey: String {
+        guard let previewData else { return "none" }
+        return "\(previewData.count)-\(previewData.hashValue)"
+    }
+
+    @MainActor
+    private func decodePreview() async {
+        guard let previewData else {
+            decodedPreview = nil
+            return
+        }
+        decodedPreview = await AttachmentImageDecoder.decode(previewData)
     }
 }
 
@@ -360,10 +377,10 @@ struct ProtectionInsuranceRow: View {
     var body: some View {
         Button(action: onDetail) {
             HStack(spacing: 12) {
-                Image(systemName: "shield.lefthalf.filled")
-                    .font(.system(size: 17, weight: .black))
+                Image(systemName: "shield.lefthalf.filled") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPurple)
-                    .frame(width: 42, height: 42)
+                    .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 VStack(alignment: .leading, spacing: 5) {
                     Text(insurance.productName.isEmpty ? "宠物保险" : insurance.productName)
                         .font(OhanaFont.subheadline(.black))

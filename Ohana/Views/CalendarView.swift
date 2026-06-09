@@ -71,10 +71,10 @@ private struct CalendarContentHandoffState: Equatable {
 /// 日历宠物筛选条：点击时只回传本地视觉选择，持久化由 `CalendarView` 下一帧处理。
 private struct CalendarPetChipFilterBar: View {
     let selection: CalendarFilterSelection
+    let pets: [Pet]
+    let humans: [Human]
     let onSelect: (CalendarFilterSelection) -> Void
 
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-    @Query(sort: \Human.createdAt) private var humans: [Human]
     @Environment(\.colorScheme) private var colorScheme
 
     private var isMaterial: Bool { false }
@@ -148,16 +148,17 @@ struct CalendarView: View {
     var isEmbeddedActive: Bool = true
     var onRequestAddEvent: (() -> Void)? = nil
     var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var events: [Event] = []
+    var pets: [Pet] = []
+    var humans: [Human] = []
+    var plants: [Plant] = []
+    var insurances: [PetInsurance] = []
+    var petMedications: [PetMedication] = []
+    var humanMedications: [HumanMedication] = []
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Event.startDate, order: .reverse) private var events: [Event]
-    @Query(sort: \Pet.createdAt) private var pets: [Pet]
-    @Query(sort: \Human.createdAt) private var humans: [Human]
-    @Query(sort: \Plant.createdAt) private var plants: [Plant]
-    @Query(sort: \PetInsurance.createdAt) private var insurances: [PetInsurance]
-    @Query(sort: \PetMedication.createdAt) private var petMedications: [PetMedication]
-    @Query(sort: \HumanMedication.createdAt) private var humanMedications: [HumanMedication]
     
     @State private var selectedDate = Date()
     @AppStorage("calendar_filterPetId") private var calendarFilterPetId: String = ""
@@ -165,7 +166,6 @@ struct CalendarView: View {
     @State private var showingAddEvent = false
     @State private var addEventPresentationProgress: CGFloat = 0
     @State private var isAddEventContentMounted = false
-    @State private var showingCoconutLog = false
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage("calendar_viewMode") private var viewModeRaw: String = CalendarViewMode.list.rawValue
     @State private var displayedViewModeRaw: String?
@@ -490,6 +490,8 @@ struct CalendarView: View {
                 if shouldShowInlinePetChips {
                     CalendarPetChipFilterBar(
                         selection: displayedFilterSelection,
+                        pets: pets,
+                        humans: humans,
                         onSelect: selectCalendarFilter
                     )
                 }
@@ -517,10 +519,6 @@ struct CalendarView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .overlay { inlineAddEventLayer }
-        .sheet(isPresented: $showingCoconutLog) {
-            CoconutLogView()
-                .ohanaSheetPagePresentation() // ui-v4: allow coconut history as long sheet
-        }
         .onChange(of: addEventTrigger) { _, _ in requestAddEventPresentation() }
         .onChange(of: viewModeRaw) { _, newValue in
             syncCalendarViewModeFromStorage(newValue)
@@ -968,7 +966,7 @@ struct CalendarView: View {
 
             // Coconut count (rightmost, matches home)
             CoconutBalanceCapsule(balance: calendarCoconutBalance) {
-                showingCoconutLog = true
+                presentCoconutLog()
             }
             .frame(minHeight: 44)
             .contentShape(Rectangle())
@@ -1611,6 +1609,10 @@ struct CalendarView: View {
         }
         onOpenEventDestination(destination)
         return true
+    }
+
+    private func presentCoconutLog() {
+        onPresentCoconutLog?(nil)
     }
     
     // MARK: - Calendar Helpers

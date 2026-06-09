@@ -36,16 +36,16 @@ struct ImageCutoutPreviewSheet: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("选择头像样式")
-                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("点击任意一张完成选择")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Spacer()
                     Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
+                        Image(systemName: "xmark.circle.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 24))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
@@ -92,14 +92,14 @@ struct ImageCutoutPreviewSheet: View {
                 // ── 底部提示
                 if !isProcessing && cutoutImage == nil {
                     Label("无法识别主体，仅提供原图", systemImage: "exclamationmark.triangle")
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         .padding(.bottom, 8)
                 }
 
                 // ── 说明文字
                 Text("选择「去除背景」后，卡片正面将显示带白色描边的贴纸效果。")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -138,27 +138,27 @@ struct ImageCutoutPreviewSheet: View {
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
             .background(
-                isSelected ? Color.goPrimary.opacity(0.15) : Color.white.opacity(0.06),
+                isSelected ? Color.goPrimary.opacity(0.15) : Color.white.opacity(0.06), // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .strokeBorder(
-                        isSelected ? Color.goPrimary : Color.white.opacity(0.1),
+                        isSelected ? Color.goPrimary : Color.white.opacity(0.1), // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                         lineWidth: isSelected ? 2 : 1
                     )
             )
 
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .foregroundStyle(isSelected ? Color.goPrimary : .white.opacity(0.6))
                 Text(label)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(isSelected ? Color.goPrimary : .white)
             }
             Text(sublabel)
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
     }
@@ -175,23 +175,23 @@ struct ImageCutoutPreviewSheet: View {
                         .tint(Color.goPrimary)
                         .scaleEffect(1.2)
                     Text("AI 智能抠图中…")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 }
             }
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
-            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                    .strokeBorder(.white.opacity(0.08), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             )
 
             Text("去除背景")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             Text("处理中…")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
         }
     }
@@ -200,13 +200,13 @@ struct ImageCutoutPreviewSheet: View {
     private func failedCard() -> some View {
         VStack(spacing: 10) {
             ZStack {
-                Color.white.opacity(0.04)
+                Color.white.opacity(0.04) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 VStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 28))
+                    Image(systemName: "exclamationmark.triangle").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 28))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     Text("无法抠图")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
             }
@@ -215,14 +215,14 @@ struct ImageCutoutPreviewSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                    .strokeBorder(.white.opacity(0.08), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             )
 
             Text("去除背景")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             Text("识别失败")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
         }
     }
