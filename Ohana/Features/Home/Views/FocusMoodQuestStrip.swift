@@ -28,10 +28,6 @@ struct FocusMoodQuestStrip: View {
         Color(light: Color(hex: "23181A"), dark: .primary)
     }
 
-    private var secondaryInk: Color {
-        Color(light: Color(hex: "23181A").opacity(0.55), dark: .secondary)
-    }
-
     // MARK: - Mood
 
     private var mood: IslandMood {
@@ -106,174 +102,329 @@ struct FocusMoodQuestStrip: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(spacing: 0) {
-            // ── Row 1: Mood ──
-            Button(action: onExpand) {
-                HStack(spacing: 8) {
-                    Text(moodEmoji)
-                        .font(OhanaFont.adaptive(size: 17))
-                    Text(moodText)
-                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(primaryInk.opacity(0.82))
-                        .lineLimit(1)
-                    Spacer()
-                    if badgeCount > 0 {
-                        Text("\(badgeCount)")
-                            .font(OhanaFont.adaptive(size: 11, weight: .bold))
-                            .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.goRed, in: Capsule())
-                    }
-                    Image(systemName: "chevron.right").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 10, weight: .semibold))
-                        .foregroundStyle(primaryInk.opacity(0.25))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(moodText)
-            .accessibilityHint(badgeCount > 0 ? "有\(badgeCount)条提醒，点击展开详情" : "点击展开详情")
-
-            // Divider only when quest row exists below
-            if !pendingQuests.isEmpty || allDone {
-                Rectangle()
-                    .fill(primaryInk.opacity(0.07))
-                    .frame(height: 1)
-                    .padding(.horizontal, 12)
-            }
-
-            // ── Row 2: Quest pager ──
-            if !pendingQuests.isEmpty {
-                TabView(selection: $currentPage) {
-                    ForEach(Array(pendingQuests.enumerated()), id: \.offset) { idx, q in
-                        questRow(q)
-                            .tag(idx)
-                            .padding(.horizontal, 16)
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(height: 54)
-                .accessibilityLabel("今日任务第 \(currentPage + 1) 项，共 \(pendingQuests.count) 项")
-
-                // Page dots
-                if pendingQuests.count > 1 {
-                    HStack(spacing: 5) {
-                        ForEach(0 ..< pendingQuests.count, id: \.self) { i in
-                            Capsule()
-                                .fill(i == currentPage
-                                    ? Color(hex: "1A2E8A")
-                                    : Color(hex: "23181A").opacity(0.18))
-                                .frame(width: i == currentPage ? 14 : 5, height: 5)
-                                .animation(.spring(response: 0.3), value: currentPage) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-                        }
-                    }
-                    .padding(.bottom, 10)
-                    .accessibilityHidden(true)
-                } else {
-                    Spacer().frame(height: 6)
-                }
-
-            } else if allDone {
-                Button(action: onExpand) {
-                    HStack(spacing: 8) {
-                        Text("✅").font(OhanaFont.adaptive(size: 16))
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("今日任务全部完成")
-                                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(primaryInk.opacity(0.7))
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-        }
-        .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
-                .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
+        FocusMoodQuestStripCard(
+            moodEmoji: moodEmoji,
+            moodText: moodText,
+            badgeCount: badgeCount,
+            pendingQuests: pendingQuests,
+            allDone: allDone,
+            pets: pets,
+            cardSurface: cardSurface,
+            primaryInk: primaryInk,
+            borderOpacity: colorScheme == .dark ? 0.12 : 0.04,
+            shadowColor: colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "23181A").opacity(0.09),
+            currentPage: $currentPage,
+            completingId: $completingId,
+            onExpand: onExpand,
+            onCompleteQuest: onCompleteQuest
         )
-        .shadow(color: colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "23181A").opacity(0.09), radius: 12, y: 4) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         .onChange(of: pendingQuests.count) { _, newCount in
             if currentPage >= newCount, newCount > 0 {
                 currentPage = newCount - 1
             }
         }
     }
+}
 
-    // MARK: - Quest row
+private struct FocusMoodQuestStripCard: View {
+    let moodEmoji: String
+    let moodText: String
+    let badgeCount: Int
+    let pendingQuests: [IslandQuest]
+    let allDone: Bool
+    let pets: [Pet]
+    let cardSurface: Color
+    let primaryInk: Color
+    let borderOpacity: Double
+    let shadowColor: Color
+    @Binding var currentPage: Int
+    @Binding var completingId: String?
+    let onExpand: () -> Void
+    let onCompleteQuest: (IslandQuest) -> Void
 
-    @ViewBuilder
-    private func questRow(_ q: IslandQuest) -> some View {
-        let isCompleting = completingId == q.id
-        let targetPet = q.targetPetId.flatMap { id in pets.first { $0.id == id } }
+    var body: some View {
+        VStack(spacing: 0) {
+            FocusMoodQuestHeaderButton(
+                moodEmoji: moodEmoji,
+                moodText: moodText,
+                badgeCount: badgeCount,
+                primaryInk: primaryInk,
+                onExpand: onExpand
+            )
 
+            if !pendingQuests.isEmpty || allDone {
+                FocusMoodQuestDivider(primaryInk: primaryInk)
+            }
+
+            FocusMoodQuestContent(
+                pendingQuests: pendingQuests,
+                allDone: allDone,
+                pets: pets,
+                primaryInk: primaryInk,
+                currentPage: $currentPage,
+                completingId: $completingId,
+                onExpand: onExpand,
+                onCompleteQuest: onCompleteQuest
+            )
+        }
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
+                .strokeBorder(Color.primary.opacity(borderOpacity), lineWidth: 1)
+        )
+        .shadow(color: shadowColor, radius: 12, y: 4) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+    }
+}
+
+private struct FocusMoodQuestHeaderButton: View {
+    let moodEmoji: String
+    let moodText: String
+    let badgeCount: Int
+    let primaryInk: Color
+    let onExpand: () -> Void
+
+    var body: some View {
+        Button(action: onExpand) {
+            HStack(spacing: 8) {
+                Text(moodEmoji)
+                    .font(OhanaFont.adaptive(size: 17))
+                Text(moodText)
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(primaryInk.opacity(0.82))
+                    .lineLimit(1)
+                Spacer()
+                if badgeCount > 0 {
+                    FocusMoodQuestBadge(count: badgeCount)
+                }
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold))
+                    .foregroundStyle(primaryInk.opacity(0.25))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(moodText)
+        .accessibilityHint(badgeCount > 0 ? "有\(badgeCount)条提醒，点击展开详情" : "点击展开详情")
+    }
+}
+
+private struct FocusMoodQuestBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(OhanaFont.adaptive(size: 11, weight: .bold))
+            .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.goRed, in: Capsule())
+    }
+}
+
+private struct FocusMoodQuestDivider: View {
+    let primaryInk: Color
+
+    var body: some View {
+        Rectangle()
+            .fill(primaryInk.opacity(0.07))
+            .frame(height: 1)
+            .padding(.horizontal, 12)
+    }
+}
+
+private struct FocusMoodQuestContent: View {
+    let pendingQuests: [IslandQuest]
+    let allDone: Bool
+    let pets: [Pet]
+    let primaryInk: Color
+    @Binding var currentPage: Int
+    @Binding var completingId: String?
+    let onExpand: () -> Void
+    let onCompleteQuest: (IslandQuest) -> Void
+
+    var body: some View {
+        if !pendingQuests.isEmpty {
+            FocusMoodQuestPager(
+                pendingQuests: pendingQuests,
+                pets: pets,
+                primaryInk: primaryInk,
+                currentPage: $currentPage,
+                completingId: $completingId,
+                onCompleteQuest: onCompleteQuest
+            )
+        } else if allDone {
+            FocusMoodQuestAllDoneButton(primaryInk: primaryInk, onExpand: onExpand)
+        }
+    }
+}
+
+private struct FocusMoodQuestPager: View {
+    let pendingQuests: [IslandQuest]
+    let pets: [Pet]
+    let primaryInk: Color
+    @Binding var currentPage: Int
+    @Binding var completingId: String?
+    let onCompleteQuest: (IslandQuest) -> Void
+
+    var body: some View {
+        TabView(selection: $currentPage) {
+            ForEach(Array(pendingQuests.enumerated()), id: \.offset) { idx, quest in
+                FocusMoodQuestRow(
+                    quest: quest,
+                    pets: pets,
+                    primaryInk: primaryInk,
+                    completingId: $completingId,
+                    onCompleteQuest: onCompleteQuest
+                )
+                .tag(idx)
+                .padding(.horizontal, 16)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .frame(height: 54)
+        .accessibilityLabel("今日任务第 \(currentPage + 1) 项，共 \(pendingQuests.count) 项")
+
+        if pendingQuests.count > 1 {
+            FocusMoodQuestPageDots(count: pendingQuests.count, currentPage: currentPage)
+        } else {
+            Spacer().frame(height: 6)
+        }
+    }
+}
+
+private struct FocusMoodQuestPageDots: View {
+    let count: Int
+    let currentPage: Int
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(0 ..< count, id: \.self) { index in
+                Capsule()
+                    .fill(index == currentPage
+                        ? Color(hex: "1A2E8A")
+                        : Color(hex: "23181A").opacity(0.18))
+                    .frame(width: index == currentPage ? 14 : 5, height: 5)
+                    .animation(.spring(response: 0.3), value: currentPage) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+            }
+        }
+        .padding(.bottom, 10)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct FocusMoodQuestAllDoneButton: View {
+    let primaryInk: Color
+    let onExpand: () -> Void
+
+    var body: some View {
+        Button(action: onExpand) {
+            HStack(spacing: 8) {
+                Text("✅").font(OhanaFont.adaptive(size: 16))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("今日任务全部完成")
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(primaryInk.opacity(0.7))
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+}
+
+private struct FocusMoodQuestRow: View {
+    let quest: IslandQuest
+    let pets: [Pet]
+    let primaryInk: Color
+    @Binding var completingId: String?
+    let onCompleteQuest: (IslandQuest) -> Void
+
+    private var isCompleting: Bool {
+        completingId == quest.id
+    }
+
+    private var targetPet: Pet? {
+        guard let targetPetId = quest.targetPetId else { return nil }
+        return pets.first { $0.id == targetPetId }
+    }
+
+    var body: some View {
         HStack(spacing: 10) {
-            // ── 宠物头像（有关联宠物时显示，替换 emoji）──
             if let pet = targetPet {
-                petAvatar(pet)
+                FocusMoodQuestPetAvatar(pet: pet)
             } else {
-                Text(q.emoji).font(OhanaFont.adaptive(size: 20))
+                Text(quest.emoji).font(OhanaFont.adaptive(size: 20))
             }
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(q.title)
+                Text(quest.title)
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(primaryInk)
                     .lineLimit(1)
             }
             Spacer()
 
-            // ── 完成按钮（完成中短暂变为 ✓）──
             Button {
                 guard completingId == nil else { return }
-                completingId = q.id
+                completingId = quest.id
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    onCompleteQuest(q)
+                    onCompleteQuest(quest)
                     completingId = nil
                 }
             } label: {
-                ZStack {
-                    Capsule()
-                        .fill(isCompleting ? Color.green.opacity(0.85) : Color.goLime)
-                        .frame(height: 30)
-                    if isCompleting {
-                        Image(systemName: "checkmark").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
-                            .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-                            .transition(.scale.combined(with: .opacity))
-                    } else {
-                        Text("完成")
-                            .font(OhanaFont.adaptive(size: 12, weight: .bold))
-                            .foregroundStyle(.black) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                }
-                .frame(width: 52)
-                .animation(.spring(response: 0.25), value: isCompleting) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                FocusMoodQuestCompleteButtonLabel(isCompleting: isCompleting)
             }
             .buttonStyle(ScaleButtonStyle())
             .scaleEffect(isCompleting ? 0.92 : 1)
             .animation(.spring(response: 0.2), value: isCompleting) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-            .accessibilityLabel("完成任务：\(q.title)")
+            .accessibilityLabel("完成任务：\(quest.title)")
         }
     }
+}
 
-    // MARK: - Pet avatar (small, for quest row)
+private struct FocusMoodQuestPetAvatar: View {
+    let pet: Pet
 
-    @ViewBuilder
-    private func petAvatar(_ pet: Pet) -> some View {
-        let color = Color(hex: pet.themeColorHex.isEmpty ? "B0C4DE" : pet.themeColorHex)
+    private var themeColor: Color {
+        Color(hex: pet.themeColorHex.isEmpty ? "B0C4DE" : pet.themeColorHex)
+    }
+
+    var body: some View {
         PetAvatarPortraitView(
             imageData: pet.avatarImageData,
             fallbackText: pet.avatarEmoji.isEmpty ? "🐾" : pet.avatarEmoji,
-            themeColor: color,
+            themeColor: themeColor,
             size: 34,
             backgroundOpacity: 0.25
         )
+    }
+}
+
+private struct FocusMoodQuestCompleteButtonLabel: View {
+    let isCompleting: Bool
+
+    var body: some View {
+        ZStack {
+            Capsule()
+                .fill(isCompleting ? Color.green.opacity(0.85) : Color.goLime)
+                .frame(height: 30)
+            if isCompleting {
+                Image(systemName: "checkmark").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .foregroundStyle(.white) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                    .transition(.scale.combined(with: .opacity))
+            } else {
+                Text("完成")
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold))
+                    .foregroundStyle(.black) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .frame(width: 52)
+        .animation(.spring(response: 0.25), value: isCompleting) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
 }

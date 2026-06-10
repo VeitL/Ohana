@@ -316,6 +316,102 @@ struct OasisCritterDailyWishTests {
     }
 
     @MainActor
+    @Test func starUpgradeStagesSpendAndRefreshesProjectionAfterSave() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let critter = makeCritter()
+        let balance = OasisCritterFragmentBalance(catalogId: critter.catalogId, amount: 40)
+        let human = Human(name: "Ava")
+        human.coconutBalance = 120
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        context.insert(critter)
+        context.insert(balance)
+        context.insert(human)
+        try context.save()
+        let wallet = ProjectionSpyWallet()
+        let questManager = QuestManager(wallet: wallet)
+
+        #expect(try OasisUpgradeRewardService.upgradeStar(
+            for: critter,
+            context: context,
+            wallet: wallet,
+            questManager: questManager
+        ))
+
+        #expect(wallet.applyUpdatesProjection == [false])
+        #expect(wallet.refreshCount == 1)
+        #expect(critter.starLevel == 2)
+        #expect(balance.amount == 0)
+        #expect(CoconutWalletService.balance(for: human, context: context) == 40)
+    }
+
+    @MainActor
+    @Test func fragmentAwakenStagesSpendAndRefreshesProjectionAfterSave() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let entry = try #require(OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId))
+        let cost = OasisUpgradeRewardService.awakeningCost(for: entry.rarity)
+        let balance = OasisCritterFragmentBalance(catalogId: entry.id, amount: cost.fragments)
+        let human = Human(name: "Ava")
+        human.coconutBalance = cost.coconuts + 15
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldInjectedEnergy = defaults.object(forKey: "oasis_injectedEnergy")
+        let oldLastRewardedLevel = defaults.object(forKey: "oasis_lastRewardedLevel")
+        let oldTreeManager = OasisTreeManagerRegistry.current
+        let treeManager = OasisTreeManager()
+        OasisTreeManagerRegistry.current = treeManager
+        treeManager.injectedEnergy = 3_600
+        defer {
+            OasisTreeManagerRegistry.current = oldTreeManager
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldInjectedEnergy {
+                defaults.set(oldInjectedEnergy, forKey: "oasis_injectedEnergy")
+            } else {
+                defaults.removeObject(forKey: "oasis_injectedEnergy")
+            }
+            if let oldLastRewardedLevel {
+                defaults.set(oldLastRewardedLevel, forKey: "oasis_lastRewardedLevel")
+            } else {
+                defaults.removeObject(forKey: "oasis_lastRewardedLevel")
+            }
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        context.insert(balance)
+        context.insert(human)
+        try context.save()
+        let wallet = ProjectionSpyWallet()
+        let questManager = QuestManager(wallet: wallet)
+
+        let awakened = try OasisUpgradeRewardService.awakenWithFragments(
+            catalogId: entry.id,
+            context: context,
+            wallet: wallet,
+            questManager: questManager
+        )
+        let critter = try #require(awakened)
+
+        #expect(wallet.applyUpdatesProjection == [false])
+        #expect(wallet.refreshCount == 1)
+        #expect(critter.catalogId == entry.id)
+        #expect(balance.amount == 0)
+        #expect(CoconutWalletService.balance(for: human, context: context) == 15)
+    }
+
+    @MainActor
     @Test func displayDailyWishDoesNotMutateLifecycleDuringRendering() throws {
         let now = Date()
         let critter = makeCritter(hunger: 0, mood: 12, health: 32, lastStateRefreshAt: now)
@@ -390,5 +486,72 @@ struct OasisCritterDailyWishTests {
             lastInteractionAt: lastInteractionAt,
             lastStateRefreshAt: lastStateRefreshAt
         )
+    }
+
+    @MainActor
+    private final class ProjectionSpyWallet: CoconutWalletManaging {
+        private let wrapped = SwiftDataCoconutWalletManager()
+        var applyUpdatesProjection: [Bool] = []
+        var refreshCount = 0
+
+        func apply(
+            deltas: [CoconutWalletDelta],
+            context: ModelContext,
+            save: Bool,
+            postsRewardFeedback: Bool,
+            updatesProjection: Bool,
+            projectionManager: QuestManager?
+        ) throws -> [CoconutLedgerEntry] {
+            applyUpdatesProjection.append(updatesProjection)
+            return try wrapped.apply(
+                deltas: deltas,
+                context: context,
+                save: save,
+                postsRewardFeedback: postsRewardFeedback,
+                updatesProjection: updatesProjection,
+                projectionManager: projectionManager
+            )
+        }
+
+        func applyActorDelta(
+            amount: Int,
+            emoji: String,
+            title: String,
+            actorId: String?,
+            actorName: String?,
+            entryKind: CoconutWalletEntryKind,
+            source: CoconutWalletSource,
+            context: ModelContext,
+            save: Bool,
+            postsRewardFeedback: Bool,
+            projectionManager: QuestManager?
+        ) throws -> [CoconutLedgerEntry] {
+            try wrapped.applyActorDelta(
+                amount: amount,
+                emoji: emoji,
+                title: title,
+                actorId: actorId,
+                actorName: actorName,
+                entryKind: entryKind,
+                source: source,
+                context: context,
+                save: save,
+                postsRewardFeedback: postsRewardFeedback,
+                projectionManager: projectionManager
+            )
+        }
+
+        func totalBalance(context: ModelContext) -> Int {
+            wrapped.totalBalance(context: context)
+        }
+
+        func refreshQuestProjection(context: ModelContext, manager: QuestManager?) {
+            refreshCount += 1
+            wrapped.refreshQuestProjection(context: context, manager: manager)
+        }
+
+        func bootstrapIfNeeded(context: ModelContext, projectionManager: QuestManager?) throws {
+            try wrapped.bootstrapIfNeeded(context: context, projectionManager: projectionManager)
+        }
     }
 }

@@ -19,7 +19,8 @@ extension QuestManager {
         pet: Pet?,
         context: ModelContext,
         quality: QualityBonus = .none,
-        date: Date = Date()
+        date: Date = Date(),
+        executorId: String? = nil
     ) -> (humanGot: Int, petGot: Int) {
         if pet?.hasPassedAway == true {
             lastEconomyRewardResult = .empty
@@ -27,7 +28,7 @@ extension QuestManager {
         }
 
         // ── 1. 人类账户（从 context fetch，安全降级）
-        let human = currentActiveHuman(context: context)
+        let human = human(withId: executorId, context: context) ?? currentActiveHuman(context: context)
         let consumesBoost = isDoubleRewardBoostActive()
         let isCoolingDown = isOnCooldown(petId: pet?.id, type: type)
         let budgetKeys = economyBudgetKeys(for: human, context: context)
@@ -145,6 +146,12 @@ extension QuestManager {
             return (0, 0)
         }
         return (finalHuman, finalPet)
+    }
+
+    func human(withId humanId: String?, context: ModelContext) -> Human? {
+        guard let humanId, !humanId.isEmpty else { return nil }
+        let desc = FetchDescriptor<Human>()
+        return (try? context.fetch(desc))?.first { $0.id.uuidString == humanId }
     }
 
     /// 多宠共同照护奖励：人类奖励只发一次，每只在世目标宠物各自获得成长椰子。

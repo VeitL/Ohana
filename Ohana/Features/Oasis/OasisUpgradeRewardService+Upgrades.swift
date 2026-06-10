@@ -40,26 +40,34 @@ extension OasisUpgradeRewardService {
             context: context,
             activeHumanSelection: activeHumanSelection,
             wallet: wallet,
-            questManager: questManager
+            questManager: questManager,
+            updatesProjection: false
         ) else {
             balance.amount += cost.fragments
             balance.updatedAt = Date()
             return false
         }
-        critter.starLevel += 1
-        critter.bond = min(999, critter.bond + 20)
-        critter.mood = min(100, critter.mood + 16)
-        critter.appearanceStage = min(maxCritterAppearanceStage, max(appearanceStage(forLevel: critter.level), critter.starLevel))
-        critter.lastInteractionAt = Date()
-        critter.lastStateRefreshAt = Date()
-        context.insert(actionLog(
-            for: critter,
-            action: .starUpgrade,
-            coconutDelta: -cost.coconuts,
-            fragmentDelta: -cost.fragments,
-            xpDelta: 0
-        ))
-        try context.save()
+        do {
+            critter.starLevel += 1
+            critter.bond = min(999, critter.bond + 20)
+            critter.mood = min(100, critter.mood + 16)
+            critter.appearanceStage = min(maxCritterAppearanceStage, max(appearanceStage(forLevel: critter.level), critter.starLevel))
+            critter.lastInteractionAt = Date()
+            critter.lastStateRefreshAt = Date()
+            context.insert(actionLog(
+                for: critter,
+                action: .starUpgrade,
+                coconutDelta: -cost.coconuts,
+                fragmentDelta: -cost.fragments,
+                xpDelta: 0
+            ))
+            try context.save()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            throw error
+        }
         return true
     }
 
@@ -101,41 +109,49 @@ extension OasisUpgradeRewardService {
             context: context,
             activeHumanSelection: activeHumanSelection,
             wallet: wallet,
-            questManager: questManager
+            questManager: questManager,
+            updatesProjection: false
         ) else {
             balance.amount += cost.fragments
             balance.updatedAt = Date()
             return nil
         }
 
-        let hasFeatured = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-            .contains { $0.isFeaturedOnOasis && !$0.isArchived }
-        let critter = OasisElectronicPet(
-            catalogId: entry.id,
-            nameZh: entry.nameZh,
-            nameEn: entry.nameEn,
-            nameDe: entry.nameDe,
-            emoji: entry.emoji,
-            rarity: entry.rarity,
-            isFeaturedOnOasis: !hasFeatured,
-            habitatSlot: hasFeatured ? 1 : 0,
-            favoriteItemId: entry.preferredItemId,
-            personalityRaw: entry.personalityRaw,
-            sourceLevel: entry.sourceLevel
-        )
-        context.insert(critter)
-        context.insert(OasisCritterActionLog(
-            critterId: critter.id,
-            critterCatalogId: critter.catalogId,
-            action: .fragmentAwaken,
-            coconutDelta: -cost.coconuts,
-            fragmentDelta: -cost.fragments,
-            noteZh: "用碎片唤醒伙伴",
-            noteEn: "Awakened a companion with fragments.",
-            noteDe: "Begleiter mit Fragmenten geweckt."
-        ))
-        try context.save()
-        return critter
+        do {
+            let hasFeatured = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+                .contains { $0.isFeaturedOnOasis && !$0.isArchived }
+            let critter = OasisElectronicPet(
+                catalogId: entry.id,
+                nameZh: entry.nameZh,
+                nameEn: entry.nameEn,
+                nameDe: entry.nameDe,
+                emoji: entry.emoji,
+                rarity: entry.rarity,
+                isFeaturedOnOasis: !hasFeatured,
+                habitatSlot: hasFeatured ? 1 : 0,
+                favoriteItemId: entry.preferredItemId,
+                personalityRaw: entry.personalityRaw,
+                sourceLevel: entry.sourceLevel
+            )
+            context.insert(critter)
+            context.insert(OasisCritterActionLog(
+                critterId: critter.id,
+                critterCatalogId: critter.catalogId,
+                action: .fragmentAwaken,
+                coconutDelta: -cost.coconuts,
+                fragmentDelta: -cost.fragments,
+                noteZh: "用碎片唤醒伙伴",
+                noteEn: "Awakened a companion with fragments.",
+                noteDe: "Begleiter mit Fragmenten geweckt."
+            ))
+            try context.save()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            return critter
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            throw error
+        }
     }
 
     static func setFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws {

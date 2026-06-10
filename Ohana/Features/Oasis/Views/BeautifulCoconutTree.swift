@@ -61,6 +61,12 @@ private let blossomPositions: [(x: CGFloat, y: CGFloat)] = [
 
 private let maxLeafSlots = 22
 
+private func treeLeafColor(index i: Int, isMax: Bool, level: Int) -> Color {
+    if isMax { return i % 2 == 0 ? Color(hex: "00FFD1") : Color(hex: "0284C7") }
+    if level >= 7 { return i % 2 == 0 ? Color(hex: "22C55E") : Color(hex: "15803D") }
+    return i % 2 == 0 ? Color(hex: "84CC16") : Color(hex: "4D7C0F")
+}
+
 // MARK: - BeautifulCoconutTree
 
 struct BeautifulCoconutTree: View {
@@ -100,9 +106,7 @@ struct BeautifulCoconutTree: View {
     }
 
     private func leafColor(index i: Int) -> Color {
-        if isMax { return i % 2 == 0 ? Color(hex: "00FFD1") : Color(hex: "0284C7") }
-        if level >= 7 { return i % 2 == 0 ? Color(hex: "22C55E") : Color(hex: "15803D") }
-        return i % 2 == 0 ? Color(hex: "84CC16") : Color(hex: "4D7C0F")
+        treeLeafColor(index: i, isMax: isMax, level: level)
     }
 
     var body: some View {
@@ -140,21 +144,12 @@ struct BeautifulCoconutTree: View {
                 .frame(width: max(CGFloat(72), trunkW * 5.2), height: max(CGFloat(18), trunkW * 1.45))
                 .animation(GoMotion.hero, value: level)
 
-            if cfg.rootCount > 0 {
-                ZStack {
-                    ForEach(0 ..< cfg.rootCount, id: \.self) { i in
-                        let direction: CGFloat = i.isMultiple(of: 2) ? -1 : 1
-                        Capsule()
-                            .fill(isMax ? Color(hex: "334155") : Color(hex: "4A2B16"))
-                            .frame(width: CGFloat(38 + i * 8), height: max(CGFloat(3), trunkW * 0.13))
-                            .rotationEffect(.degrees(direction * Double(8 + i * 2)))
-                            .offset(x: direction * CGFloat(8 + i * 4), y: CGFloat(i % 3) * 2)
-                            .opacity(0.88)
-                    }
-                }
-                .offset(x: bend * 0.18, y: 1)
-                .allowsHitTesting(false)
-            }
+            TreeRootClusterView(
+                rootCount: cfg.rootCount,
+                trunkWidth: trunkW,
+                bend: bend,
+                isMax: isMax
+            )
 
             EnergyRootPulseView(token: injectionPulseToken, color: glowColor, isActive: isInjecting)
                 .offset(x: bend * 0.18, y: 2)
@@ -382,37 +377,186 @@ private struct LevelUpBurstView: View {
     let opacity: Double
     let glowColor: Color
 
-    private let sparkAngles: [Double] = [0, 24, 52, 82, 116, 148, 180, 214, 246, 278, 310, 336]
+    private static let sparkSpecs: [LevelUpSparkSpec] = [
+        .init(index: 0, angle: 0),
+        .init(index: 1, angle: 24),
+        .init(index: 2, angle: 52),
+        .init(index: 3, angle: 82),
+        .init(index: 4, angle: 116),
+        .init(index: 5, angle: 148),
+        .init(index: 6, angle: 180),
+        .init(index: 7, angle: 214),
+        .init(index: 8, angle: 246),
+        .init(index: 9, angle: 278),
+        .init(index: 10, angle: 310),
+        .init(index: 11, angle: 336)
+    ]
 
     var body: some View {
         ZStack {
             ForEach(0 ..< 3, id: \.self) { i in
-                Circle()
-                    .stroke(
-                        glowColor.opacity(0.82 - Double(i) * 0.18),
-                        lineWidth: CGFloat(4 - i)
-                    )
-                    .frame(width: CGFloat(30 + i * 18), height: CGFloat(30 + i * 18))
-                    .scaleEffect(1 + progress * CGFloat(5 + i * 3))
-                    .opacity(opacity)
+                LevelUpBurstRing(
+                    index: i,
+                    progress: progress,
+                    opacity: opacity,
+                    glowColor: glowColor
+                )
             }
 
-            ForEach(0 ..< sparkAngles.count, id: \.self) { i in
-                let radians = sparkAngles[i] * .pi / 180
-                let distance = CGFloat(28 + (i % 4) * 7) + progress * CGFloat(96 + (i % 3) * 18)
-                Capsule()
-                    .fill(i.isMultiple(of: 2) ? glowColor : Color.goYellow)
-                    .frame(width: 3, height: CGFloat(12 + (i % 3) * 5))
-                    .rotationEffect(.degrees(sparkAngles[i] + 90))
-                    .offset(
-                        x: CGFloat(cos(radians)) * distance,
-                        y: CGFloat(sin(radians)) * distance
-                    )
-                    .opacity(opacity)
+            ForEach(Self.sparkSpecs) { spec in
+                LevelUpSparkView(
+                    spec: spec,
+                    progress: progress,
+                    opacity: opacity,
+                    glowColor: glowColor
+                )
             }
         }
         .blendMode(.screen)
         .allowsHitTesting(false)
+    }
+}
+
+private struct TreeRootClusterView: View {
+    let rootCount: Int
+    let trunkWidth: CGFloat
+    let bend: CGFloat
+    let isMax: Bool
+
+    var body: some View {
+        if rootCount > 0 {
+            ZStack {
+                ForEach(0 ..< rootCount, id: \.self) { index in
+                    TreeRootSegment(index: index, trunkWidth: trunkWidth, isMax: isMax)
+                }
+            }
+            .offset(x: bend * 0.18, y: 1)
+            .allowsHitTesting(false)
+        }
+    }
+}
+
+private struct TreeRootSegment: View {
+    let index: Int
+    let trunkWidth: CGFloat
+    let isMax: Bool
+
+    private var direction: CGFloat {
+        index.isMultiple(of: 2) ? -1 : 1
+    }
+
+    private var fill: Color {
+        isMax ? Color(hex: "334155") : Color(hex: "4A2B16")
+    }
+
+    private var segmentWidth: CGFloat {
+        CGFloat(38 + index * 8)
+    }
+
+    private var segmentHeight: CGFloat {
+        max(CGFloat(3), trunkWidth * 0.13)
+    }
+
+    private var rotation: Angle {
+        .degrees(direction * Double(8 + index * 2))
+    }
+
+    private var segmentOffset: CGSize {
+        CGSize(
+            width: direction * CGFloat(8 + index * 4),
+            height: CGFloat(index % 3) * 2
+        )
+    }
+
+    var body: some View {
+        Capsule()
+            .fill(fill)
+            .frame(width: segmentWidth, height: segmentHeight)
+            .rotationEffect(rotation)
+            .offset(segmentOffset)
+            .opacity(0.88)
+    }
+}
+
+private struct LevelUpSparkSpec: Identifiable {
+    let id: Int
+    let angle: Double
+    let radians: CGFloat
+    let baseDistance: CGFloat
+    let progressDistance: CGFloat
+    let height: CGFloat
+    let usesGlowColor: Bool
+
+    init(index: Int, angle: Double) {
+        self.id = index
+        self.angle = angle
+        self.radians = CGFloat(angle * .pi / 180)
+        self.baseDistance = CGFloat(28 + (index % 4) * 7)
+        self.progressDistance = CGFloat(96 + (index % 3) * 18)
+        self.height = CGFloat(12 + (index % 3) * 5)
+        self.usesGlowColor = index.isMultiple(of: 2)
+    }
+}
+
+private struct LevelUpBurstRing: View {
+    let index: Int
+    let progress: CGFloat
+    let opacity: Double
+    let glowColor: Color
+
+    private var diameter: CGFloat {
+        CGFloat(30 + index * 18)
+    }
+
+    private var lineWidth: CGFloat {
+        CGFloat(4 - index)
+    }
+
+    private var ringOpacity: Double {
+        0.82 - Double(index) * 0.18
+    }
+
+    private var scale: CGFloat {
+        1 + progress * CGFloat(5 + index * 3)
+    }
+
+    var body: some View {
+        Circle()
+            .stroke(glowColor.opacity(ringOpacity), lineWidth: lineWidth)
+            .frame(width: diameter, height: diameter)
+            .scaleEffect(scale)
+            .opacity(opacity)
+    }
+}
+
+private struct LevelUpSparkView: View {
+    let spec: LevelUpSparkSpec
+    let progress: CGFloat
+    let opacity: Double
+    let glowColor: Color
+
+    private var distance: CGFloat {
+        spec.baseDistance + progress * spec.progressDistance
+    }
+
+    private var sparkColor: Color {
+        spec.usesGlowColor ? glowColor : Color.goYellow
+    }
+
+    private var sparkOffset: CGSize {
+        CGSize(
+            width: cos(spec.radians) * distance,
+            height: sin(spec.radians) * distance
+        )
+    }
+
+    var body: some View {
+        Capsule()
+            .fill(sparkColor)
+            .frame(width: 3, height: spec.height)
+            .rotationEffect(.degrees(spec.angle + 90))
+            .offset(sparkOffset)
+            .opacity(opacity)
     }
 }
 

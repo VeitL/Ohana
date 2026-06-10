@@ -347,53 +347,46 @@ final class OasisTreeManager {
 
     func refreshPreviewEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
         _ = plants
+        let ledgerEvents = Self.ledgerEvents(modelContext: modelContext)
         islandEnergy = Self.calculatedIslandEnergy(
+            ledgerEvents: ledgerEvents,
             modelContext: modelContext,
             pets: pets,
             humans: humans
         )
+        refreshInjectedEnergy(ledgerEvents: ledgerEvents)
     }
 
     func refreshEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
         _ = plants
+        let ledgerEvents = Self.ledgerEvents(modelContext: modelContext)
         islandEnergy = Self.calculatedIslandEnergy(
+            ledgerEvents: ledgerEvents,
             modelContext: modelContext,
             pets: pets,
             humans: humans
         )
+        refreshInjectedEnergy(ledgerEvents: ledgerEvents)
         checkAndRewardLevelUp(modelContext: modelContext)
     }
 
     @discardableResult
     @MainActor
     func refreshLedgerEnergy(modelContext: ModelContext) -> TreeLevel {
-        islandEnergy = Self.calculatedLedgerEnergy(modelContext: modelContext)
-        checkAndRewardLevelUp(modelContext: modelContext)
-        return treeLevel
-    }
-
-    private static func calculatedIslandEnergy(
-        modelContext: ModelContext,
-        pets: [Pet],
-        humans: [Human]
-    ) -> Int {
-        let ledgerEvents = (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return calculatedIslandEnergy(
-            ledgerEvents: ledgerEvents,
-            modelContext: modelContext,
-            pets: pets,
-            humans: humans
-        )
-    }
-
-    private static func calculatedLedgerEnergy(modelContext: ModelContext) -> Int {
-        let ledgerEvents = (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        return calculatedIslandEnergy(
+        let ledgerEvents = Self.ledgerEvents(modelContext: modelContext)
+        islandEnergy = Self.calculatedIslandEnergy(
             ledgerEvents: ledgerEvents,
             modelContext: modelContext,
             pets: [],
             humans: []
         )
+        refreshInjectedEnergy(ledgerEvents: ledgerEvents)
+        checkAndRewardLevelUp(modelContext: modelContext)
+        return treeLevel
+    }
+
+    private static func ledgerEvents(modelContext: ModelContext) -> [CareLedgerEvent] {
+        (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private static func calculatedIslandEnergy(
@@ -411,6 +404,16 @@ final class OasisTreeManager {
             pets: pets,
             humans: humans
         ) + v2GrowthXP
+    }
+
+    private func refreshInjectedEnergy(ledgerEvents: [CareLedgerEvent]) {
+        let ledgerInjectedXP = ledgerEvents.reduce(0) { partial, event in
+            partial + CoconutEconomyPolicyV2.metadataValue(named: "injectedXP", in: event.metadataJSON)
+        }
+        let recoveredXP = max(OasisTreePreferenceStore.injectedEnergy, ledgerInjectedXP)
+        if injectedEnergy != recoveredXP {
+            injectedEnergy = recoveredXP
+        }
     }
 
     // MARK: - Inject Energy（消耗椰子，增加树经验）

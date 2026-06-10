@@ -321,14 +321,56 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func oasisTreeInjectedEnergyCanBeRecoveredFromLedgerMetadata() async throws {
+        UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        defer {
+            UserDefaults.standard.removeObject(forKey: "oasis_injectedEnergy")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        }
+
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        context.insert(CareLedgerEvent(
+            actorKind: .human,
+            actorId: "human-1",
+            subjectKind: .system,
+            subjectId: nil,
+            eventKind: .coconut,
+            actionType: "treeInjection",
+            metadataJSON: "{\"economyVersion\":2,\"injectedXP\":40,\"reason\":\"treeInjection\"}"
+        ))
+        try context.save()
+
+        let manager = OasisTreeManager()
+        manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
+
+        #expect(manager.islandEnergy == 0)
+        #expect(manager.injectedEnergy == 40)
+        #expect(manager.totalEnergy == 40)
+    }
+
+    @MainActor
     @Test func todayFocusDailyCompletionAwardsV2OncePerDay() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Focus Owner")
-        let date = dateForTest(year: 2026, month: 6, day: 9)
+        let pet = Pet(name: "Momo", species: "猫")
+        let date = dateForTest(year: 2026, month: 6, day: 19)
         let weightLog = HumanWeightLog(date: date, weight: 68, human: human)
+        human.weightLogs.append(weightLog)
+        let playLog = PetCareLog(date: date, type: .play, pet: pet)
+        let petWeightLog = PetWeightLog(date: date, weight: 4.8, pet: pet)
+        let photoLog = PetPhotoLog(imageData: Data([1, 2, 3]), date: date, note: "today", pet: pet)
+        pet.careLogs.append(playLog)
+        pet.weightLogs.append(petWeightLog)
+        pet.photoLogs.append(photoLog)
         context.insert(human)
+        context.insert(pet)
         context.insert(weightLog)
+        context.insert(playLog)
+        context.insert(petWeightLog)
+        context.insert(photoLog)
         try context.save()
 
         let userKey = human.id.uuidString
@@ -378,13 +420,15 @@ struct OhanaTests {
             context: context,
             executorId: userKey,
             visibleQuests: visibleQuests,
-            now: date
+            now: date,
+            questManager: manager
         )
         let second = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
             context: context,
             executorId: userKey,
             visibleQuests: visibleQuests,
-            now: date
+            now: date,
+            questManager: manager
         )
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
 
@@ -444,6 +488,7 @@ struct OhanaTests {
         let human = Human(name: "Focus Owner")
         let date = dateForTest(year: 2026, month: 6, day: 9)
         let weightLog = HumanWeightLog(date: date, weight: 68, human: human)
+        human.weightLogs.append(weightLog)
         context.insert(human)
         context.insert(weightLog)
         try context.save()

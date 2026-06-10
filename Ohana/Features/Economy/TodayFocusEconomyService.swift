@@ -54,7 +54,8 @@ enum TodayFocusEconomyService {
             pet: nil,
             context: context,
             quality: .none,
-            date: now
+            date: now,
+            executorId: executorId
         )
         guard let result = questManager.lastEconomyRewardResult else { return nil }
         guard result.growthXP > 0 || result.totalCoconuts > 0 || reward.humanGot > 0 || reward.petGot > 0 else { return nil }

@@ -91,7 +91,8 @@ enum OasisCritterEconomyService {
         context: ModelContext,
         activeHumanSelection: ActiveHumanSelecting,
         wallet: CoconutWalletManaging,
-        questManager: QuestManager
+        questManager: QuestManager,
+        updatesProjection: Bool = true
     ) -> Bool {
         guard amount > 0 else { return true }
         if let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) {
@@ -115,7 +116,7 @@ enum OasisCritterEconomyService {
                     context: context,
                     save: false,
                     postsRewardFeedback: true,
-                    updatesProjection: true,
+                    updatesProjection: updatesProjection,
                     projectionManager: questManager
                 )
                 return true
@@ -143,7 +144,7 @@ enum OasisCritterEconomyService {
                 context: context,
                 save: false,
                 postsRewardFeedback: true,
-                updatesProjection: true,
+                updatesProjection: updatesProjection,
                 projectionManager: questManager
             )
             return true

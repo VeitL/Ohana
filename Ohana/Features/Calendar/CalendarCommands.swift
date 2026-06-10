@@ -141,20 +141,96 @@ enum EventCompletionCommandService {
             return EventCompletionRewardResult(awarded: false, skippedByExistingCare: true, coconutDelta: 0)
         }
 
+        let occurrenceKey = Event.occurrenceStorageKey(for: occurrenceDate)
+        let transactionKey = "eventReward:\(event.id.uuidString):\(occurrenceKey)"
+        guard !hasExistingCalendarReward(transactionKey: transactionKey, context: context) else {
+            return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
+        }
+
+        let human = currentHuman(id: executorId, context: context)
+        let budgetKeys = calendarBudgetKeys(for: human, fallbackMemberId: executorId, context: context)
+        let budget = EconomyDailyBudgetStore.snapshot(
+            householdKey: budgetKeys.household,
+            memberKey: budgetKeys.member,
+            careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
+            date: now,
+            context: context
+        )
+        let requestedCoconuts = 5
+        let scaledCoconuts = Int(ceil(Double(requestedCoconuts) * budget.budgetStage.coconutMultiplier))
+        let awardedCoconuts = min(scaledCoconuts, budget.remainingFatigueCoconuts)
+        let effectiveStage: EconomyBudgetStage = if budget.budgetStage == .normal, awardedCoconuts < requestedCoconuts {
+            .fatigue
+        } else if budget.budgetStage != .cooldown, awardedCoconuts == 0 {
+            .recordOnly
+        } else {
+            budget.budgetStage
+        }
+        guard awardedCoconuts > 0 else {
+            return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
+        }
+
         let rewardTitle = event.title + " 完成奖励"
-        let walletEntries: [CoconutLedgerEntry]
-        do {
-            walletEntries = try wallet.applyActorDelta(
-                amount: 5,
-                emoji: "🥥",
-                title: rewardTitle,
-                actorId: executorId,
-                actorName: nil,
+        let result = EconomyRewardResult(
+            growthXP: 0,
+            humanCoconuts: awardedCoconuts,
+            petCoconuts: 0,
+            bonusCoconuts: 0,
+            luckyCoconuts: 0,
+            budgetMultiplier: budget.budgetStage.coconutMultiplier,
+            budgetStage: effectiveStage,
+            reason: effectiveStage.reason,
+            actionKey: "calendarEventCompletion",
+            isOnCooldown: false,
+            baseGrowthXP: 0,
+            baseCoconuts: min(requestedCoconuts, awardedCoconuts),
+            luck: .none
+        )
+        let metadataJSON = rewardMetadata(result: result, occurrenceKey: occurrenceKey)
+        let delta: CoconutWalletDelta = if let human {
+            .human(
+                human,
+                delta: awardedCoconuts,
                 entryKind: .reward,
                 source: .service,
+                title: rewardTitle,
+                emoji: "🥥",
+                actorId: human.id.uuidString,
+                actorName: human.name,
+                subjectKind: subjectKind(for: event),
+                subjectId: event.relatedEntityId.isEmpty ? nil : event.relatedEntityId,
+                sourceModelName: "CalendarEventCompletionReward",
+                sourceModelId: "\(event.id.uuidString):\(occurrenceKey)",
+                metadataJSON: metadataJSON,
+                occurredAt: now,
+                transactionKey: transactionKey
+            )
+        } else {
+            .system(
+                delta: awardedCoconuts,
+                entryKind: .reward,
+                source: .service,
+                title: rewardTitle,
+                emoji: "🥥",
+                actorId: executorId ?? "system",
+                actorName: nil,
+                sourceModelName: "CalendarEventCompletionReward",
+                sourceModelId: "\(event.id.uuidString):\(occurrenceKey)",
+                metadataJSON: metadataJSON,
+                occurredAt: now,
+                transactionKey: transactionKey
+            )
+        }
+
+        let walletEntries: [CoconutLedgerEntry]
+        do {
+            walletEntries = try wallet.apply(
+                deltas: [delta],
                 context: context,
                 save: false,
-                postsRewardFeedback: true
+                postsRewardFeedback: true,
+                updatesProjection: true,
+                projectionManager: nil
             )
         } catch {
             AppPerformanceMonitor.shared.record(
@@ -165,14 +241,58 @@ enum EventCompletionCommandService {
             return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
         }
         let coconutDelta = walletEntries.reduce(0) { $0 + max(0, $1.delta) }
-        careLedger.recordEventCompletionReward(
-            event: event,
-            occurrenceDate: occurrenceDate,
-            actorId: executorId,
-            coconutDelta: coconutDelta,
+        careLedger.record(
             occurredAt: now,
-            context: context
+            actorKind: human == nil ? .unknown : .human,
+            actorId: human?.id.uuidString ?? executorId,
+            subjectKind: subjectKind(for: event),
+            subjectId: event.relatedEntityId.isEmpty ? nil : event.relatedEntityId,
+            eventKind: .coconut,
+            actionType: "eventCompletionReward",
+            amountValue: 0,
+            amountUnit: "",
+            note: event.title,
+            source: .calendar,
+            sourceEventId: event.id.uuidString,
+            sourceReminderId: nil,
+            legacyModelName: nil,
+            legacyModelId: nil,
+            coconutDelta: coconutDelta,
+            rewardLogId: nil,
+            privacyFieldRaw: nil,
+            metadataJSON: metadataJSON,
+            context: context,
+            save: false
         )
+        EconomyDailyBudgetStore.commit(
+            result,
+            householdKey: budgetKeys.household,
+            memberKey: budgetKeys.member,
+            date: now,
+            context: context,
+            save: false,
+            writeDefaults: false
+        )
+        do {
+            try context.save()
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: budgetKeys.household,
+                memberKey: budgetKeys.member,
+                date: now,
+                context: nil,
+                save: false
+            )
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context)
+            AppPerformanceMonitor.shared.record(
+                "calendar.eventCompletion.saveFailed",
+                valueMS: 0,
+                note: error.localizedDescription
+            )
+            return EventCompletionRewardResult(awarded: false, skippedByExistingCare: false, coconutDelta: 0)
+        }
         return EventCompletionRewardResult(awarded: coconutDelta > 0, skippedByExistingCare: false, coconutDelta: coconutDelta)
     }
 
@@ -230,6 +350,49 @@ enum EventCompletionCommandService {
         default:
             event.relatedEntityId.isEmpty ? .system : .unknown
         }
+    }
+
+    @MainActor
+    private static func hasExistingCalendarReward(transactionKey: String, context: ModelContext) -> Bool {
+        var descriptor = FetchDescriptor<CoconutLedgerEntry>(
+            predicate: #Predicate<CoconutLedgerEntry> { $0.transactionKey == transactionKey }
+        )
+        descriptor.fetchLimit = 1
+        return ((try? context.fetch(descriptor))?.isEmpty == false)
+    }
+
+    @MainActor
+    private static func currentHuman(id: String?, context: ModelContext) -> Human? {
+        guard let id, let uuid = UUID(uuidString: id) else { return nil }
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { $0.id == uuid }
+        )
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    private static func calendarBudgetKeys(
+        for human: Human?,
+        fallbackMemberId: String?,
+        context: ModelContext
+    ) -> (household: String, member: String) {
+        (
+            CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+            human?.id.uuidString ?? fallbackMemberId ?? CoconutEconomyPolicyV2.currentUserKey()
+        )
+    }
+
+    private static func rewardMetadata(result: EconomyRewardResult, occurrenceKey: String) -> String {
+        guard let data = result.metadataJSON.data(using: .utf8),
+              var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return "{\"occurrence\":\"\(occurrenceKey)\"}"
+        }
+        object["occurrence"] = occurrenceKey
+        guard let mergedData = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let json = String(data: mergedData, encoding: .utf8) else {
+            return result.metadataJSON
+        }
+        return json
     }
 }
 

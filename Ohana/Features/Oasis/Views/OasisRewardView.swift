@@ -41,8 +41,90 @@ struct OasisRewardRuntimeModifier: ViewModifier {
     let onEmbeddedActiveChanged: (Bool) -> Void
     let onApplyMakeup: (String) -> Void
     let onOpenSheet: (OasisSheetRoute) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .modifier(lifecycleModifier)
+            .modifier(identityModifier)
+            .modifier(makeupConfirmationModifier)
+            .modifier(oasisDataRefreshModifier)
+            .modifier(sheetTriggerModifier)
+            .modifier(injectionTriggerModifier)
+            .modifier(embeddedStateModifier)
+    }
+
+    private var lifecycleModifier: OasisRewardLifecycleModifier {
+        OasisRewardLifecycleModifier(
+            onAppearAction: onAppearAction,
+            onDisappearAction: onDisappearAction
+        )
+    }
+
+    private var identityModifier: OasisRewardIdentityModifier {
+        OasisRewardIdentityModifier(
+            shouldRunAmbientMotion: shouldRunAmbientMotion,
+            currentActiveHumanId: currentActiveHumanId,
+            onAmbientMotionChanged: onAmbientMotionChanged,
+            onActiveHumanChanged: onActiveHumanChanged
+        )
+    }
+
+    private var makeupConfirmationModifier: OasisRewardMakeupConfirmationModifier {
+        OasisRewardMakeupConfirmationModifier(
+            makeupConfirmationTitle: makeupConfirmationTitle,
+            confirmTitle: makeupConfirmationConfirmTitle,
+            cancelTitle: makeupConfirmationCancelTitle,
+            makeupConfirmationBinding: makeupConfirmationBinding,
+            confirmationRoute: $confirmationRoute,
+            onApplyMakeup: onApplyMakeup
+        )
+    }
+
+    private var oasisDataRefreshModifier: OasisRewardDataRefreshModifier {
+        OasisRewardDataRefreshModifier(
+            petsCount: petsCount,
+            humansCount: humansCount,
+            plantsCount: plantsCount,
+            electronicPetsCount: electronicPetsCount,
+            critterFragmentsCount: critterFragmentsCount,
+            activeHumanCoconutBalance: activeHumanCoconutBalance,
+            onRefreshOasisEnergy: onRefreshOasisEnergy,
+            onRefreshFeaturedCritterLifecycle: onRefreshFeaturedCritterLifecycle,
+            onRefreshRenderSnapshots: onRefreshRenderSnapshots
+        )
+    }
+
+    private var sheetTriggerModifier: OasisRewardSheetTriggerModifier {
+        OasisRewardSheetTriggerModifier(
+            rulesTrigger: rulesTrigger,
+            inventoryTrigger: inventoryTrigger,
+            onOpenSheet: onOpenSheet
+        )
+    }
+
+    private var injectionTriggerModifier: OasisRewardInjectionTriggerModifier {
+        OasisRewardInjectionTriggerModifier(
+            injectEnergyTrigger: injectEnergyTrigger,
+            onInjectTreeEnergy: onInjectTreeEnergy
+        )
+    }
+
+    private var embeddedStateModifier: OasisRewardEmbeddedStateModifier {
+        OasisRewardEmbeddedStateModifier(
+            isEmbeddedPrepared: isEmbeddedPrepared,
+            isEmbeddedVisible: isEmbeddedVisible,
+            isEmbeddedActive: isEmbeddedActive,
+            onEmbeddedPreparedChanged: onEmbeddedPreparedChanged,
+            onEmbeddedVisibleChanged: onEmbeddedVisibleChanged,
+            onEmbeddedActiveChanged: onEmbeddedActiveChanged
+        )
+    }
+}
+
+private struct OasisRewardLifecycleModifier: ViewModifier {
+    let onAppearAction: () -> Void
+    let onDisappearAction: () -> Void
     @State private var appearHandoffTask: Task<Void, Never>?
-    @State private var injectHandoffTask: Task<Void, Never>?
 
     func body(content: Content) -> some View {
         content
@@ -52,31 +134,8 @@ struct OasisRewardRuntimeModifier: ViewModifier {
             .onDisappear {
                 appearHandoffTask?.cancel()
                 appearHandoffTask = nil
-                injectHandoffTask?.cancel()
-                injectHandoffTask = nil
                 onDisappearAction()
             }
-            .onChange(of: shouldRunAmbientMotion) { _, shouldAnimate in
-                onAmbientMotionChanged(shouldAnimate)
-            }
-            .onChange(of: currentActiveHumanId) { _, _ in
-                onActiveHumanChanged()
-            }
-            .modifier(makeupConfirmationModifier)
-            .onChange(of: petsCount) { onRefreshOasisEnergy() }
-            .onChange(of: humansCount) { onRefreshOasisEnergy() }
-            .onChange(of: plantsCount) { onRefreshOasisEnergy() }
-            .onChange(of: electronicPetsCount) { _, _ in onRefreshFeaturedCritterLifecycle() }
-            .onChange(of: critterFragmentsCount) { _, _ in onRefreshRenderSnapshots() }
-            .onChange(of: activeHumanCoconutBalance) { _, _ in onRefreshRenderSnapshots() }
-            .onChange(of: rulesTrigger) { _, _ in onOpenSheet(.coconutRules) }
-            .onChange(of: inventoryTrigger) { _, _ in onOpenSheet(.inventory) }
-            .onChange(of: injectEnergyTrigger) { _, _ in
-                scheduleInjectHandoff()
-            }
-            .onChange(of: isEmbeddedPrepared) { _, isPrepared in onEmbeddedPreparedChanged(isPrepared) }
-            .onChange(of: isEmbeddedVisible) { _, isVisible in onEmbeddedVisibleChanged(isVisible) }
-            .onChange(of: isEmbeddedActive) { _, isActive in onEmbeddedActiveChanged(isActive) }
     }
 
     private func scheduleAppearHandoff() {
@@ -86,6 +145,74 @@ struct OasisRewardRuntimeModifier: ViewModifier {
             appearHandoffTask = nil
         }
     }
+}
+
+private struct OasisRewardIdentityModifier: ViewModifier {
+    let shouldRunAmbientMotion: Bool
+    let currentActiveHumanId: String
+    let onAmbientMotionChanged: (Bool) -> Void
+    let onActiveHumanChanged: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: shouldRunAmbientMotion) { _, shouldAnimate in
+                onAmbientMotionChanged(shouldAnimate)
+            }
+            .onChange(of: currentActiveHumanId) { _, _ in
+                onActiveHumanChanged()
+            }
+    }
+}
+
+private struct OasisRewardDataRefreshModifier: ViewModifier {
+    let petsCount: Int
+    let humansCount: Int
+    let plantsCount: Int
+    let electronicPetsCount: Int
+    let critterFragmentsCount: Int
+    let activeHumanCoconutBalance: Int
+    let onRefreshOasisEnergy: () -> Void
+    let onRefreshFeaturedCritterLifecycle: () -> Void
+    let onRefreshRenderSnapshots: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: petsCount) { _, _ in onRefreshOasisEnergy() }
+            .onChange(of: humansCount) { _, _ in onRefreshOasisEnergy() }
+            .onChange(of: plantsCount) { _, _ in onRefreshOasisEnergy() }
+            .onChange(of: electronicPetsCount) { _, _ in onRefreshFeaturedCritterLifecycle() }
+            .onChange(of: critterFragmentsCount) { _, _ in onRefreshRenderSnapshots() }
+            .onChange(of: activeHumanCoconutBalance) { _, _ in onRefreshRenderSnapshots() }
+    }
+}
+
+private struct OasisRewardSheetTriggerModifier: ViewModifier {
+    let rulesTrigger: Bool
+    let inventoryTrigger: Bool
+    let onOpenSheet: (OasisSheetRoute) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: rulesTrigger) { _, _ in onOpenSheet(.coconutRules) }
+            .onChange(of: inventoryTrigger) { _, _ in onOpenSheet(.inventory) }
+    }
+}
+
+private struct OasisRewardInjectionTriggerModifier: ViewModifier {
+    let injectEnergyTrigger: Int
+    let onInjectTreeEnergy: () -> Void
+    @State private var injectHandoffTask: Task<Void, Never>?
+
+    func body(content: Content) -> some View {
+        content
+            .onDisappear {
+                injectHandoffTask?.cancel()
+                injectHandoffTask = nil
+            }
+            .onChange(of: injectEnergyTrigger) { _, _ in
+                scheduleInjectHandoff()
+            }
+    }
 
     private func scheduleInjectHandoff() {
         injectHandoffTask?.cancel()
@@ -94,16 +221,21 @@ struct OasisRewardRuntimeModifier: ViewModifier {
             injectHandoffTask = nil
         }
     }
+}
 
-    var makeupConfirmationModifier: some ViewModifier {
-        OasisRewardMakeupConfirmationModifier(
-            makeupConfirmationTitle: makeupConfirmationTitle,
-            confirmTitle: makeupConfirmationConfirmTitle,
-            cancelTitle: makeupConfirmationCancelTitle,
-            makeupConfirmationBinding: makeupConfirmationBinding,
-            confirmationRoute: $confirmationRoute,
-            onApplyMakeup: onApplyMakeup
-        )
+private struct OasisRewardEmbeddedStateModifier: ViewModifier {
+    let isEmbeddedPrepared: Bool
+    let isEmbeddedVisible: Bool
+    let isEmbeddedActive: Bool
+    let onEmbeddedPreparedChanged: (Bool) -> Void
+    let onEmbeddedVisibleChanged: (Bool) -> Void
+    let onEmbeddedActiveChanged: (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: isEmbeddedPrepared) { _, isPrepared in onEmbeddedPreparedChanged(isPrepared) }
+            .onChange(of: isEmbeddedVisible) { _, isVisible in onEmbeddedVisibleChanged(isVisible) }
+            .onChange(of: isEmbeddedActive) { _, isActive in onEmbeddedActiveChanged(isActive) }
     }
 }
 

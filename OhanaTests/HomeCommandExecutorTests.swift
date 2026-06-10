@@ -3902,6 +3902,115 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func eventCompletionRewardIsIdempotentPerOccurrence() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let human = Human(name: "Li")
+        let event = Event(
+            title: "整理补给",
+            startDate: now,
+            eventType: EventType.task.rawValue
+        )
+        context.insert(human)
+        context.insert(event)
+        try context.save()
+
+        let householdKey = CoconutEconomyPolicyV2.householdBudgetKey(context: context)
+        EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: human.id.uuidString, date: now)
+        defer {
+            EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: human.id.uuidString, date: now)
+        }
+
+        let first = EventCompletionCommandService.awardCompletionIfEligible(
+            event: event,
+            occurrenceDate: now,
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService(),
+            executorId: human.id.uuidString,
+            now: now
+        )
+        let replay = EventCompletionCommandService.awardCompletionIfEligible(
+            event: event,
+            occurrenceDate: now,
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService(),
+            executorId: human.id.uuidString,
+            now: now.addingTimeInterval(30)
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        #expect(first.coconutDelta == 5)
+        #expect(replay.awarded == false)
+        #expect(human.coconutBalance == 5)
+        #expect(walletEntries.count == 1)
+        #expect(walletEntries.first?.transactionKey == "eventReward:\(event.id.uuidString):\(Event.occurrenceStorageKey(for: now))")
+        #expect(budgetEvents.filter { $0.actionKey == "calendarEventCompletion" }.count == 2)
+    }
+
+    @MainActor
+    @Test func eventCompletionRewardConsumesRemainingDailyBudget() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let human = Human(name: "Li")
+        let event = Event(
+            title: "整理补给",
+            startDate: now,
+            eventType: EventType.task.rawValue
+        )
+        context.insert(human)
+        context.insert(event)
+        try context.save()
+
+        let householdKey = CoconutEconomyPolicyV2.householdBudgetKey(context: context)
+        EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: human.id.uuidString, date: now)
+        defer {
+            EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: human.id.uuidString, date: now)
+        }
+        EconomyDailyBudgetStore.commit(
+            EconomyRewardResult(
+                growthXP: 0,
+                humanCoconuts: 54,
+                petCoconuts: 0,
+                bonusCoconuts: 0,
+                luckyCoconuts: 0,
+                budgetMultiplier: 1,
+                budgetStage: .normal,
+                reason: "test",
+                actionKey: "budget_filler",
+                isOnCooldown: false,
+                baseGrowthXP: 0,
+                baseCoconuts: 54,
+                luck: .none
+            ),
+            householdKey: householdKey,
+            memberKey: human.id.uuidString,
+            date: now,
+            context: context
+        )
+
+        let result = EventCompletionCommandService.awardCompletionIfEligible(
+            event: event,
+            occurrenceDate: now,
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService(),
+            executorId: human.id.uuidString,
+            now: now
+        )
+
+        #expect(result.coconutDelta == 2)
+        #expect(human.coconutBalance == 2)
+        let rewardEntry = try #require(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).first)
+        #expect(rewardEntry.delta == 2)
+        #expect(rewardEntry.metadataJSON.contains("\"budgetStage\":\"fatigue\""))
+    }
+
+    @MainActor
     @Test func eventCompletionCommandExecutorPublishesRewardRevision() throws {
         let revisionCenter = ReadModelRevisionCenter()
         let container = try makeInMemoryContainer()
@@ -5591,6 +5700,63 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func familyTaskBountyTransferIsDedupedByWalletTransactionKey() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let payer = Human(name: "Parent")
+        let receiver = Human(name: "Kid")
+        payer.coconutBalance = 160
+        let task = FamilyCollaborationTask(
+            title: "Water plants",
+            kind: .bounty,
+            status: .pendingReview,
+            createdById: payer.id.uuidString,
+            createdByName: payer.name,
+            assignedToId: receiver.id.uuidString,
+            assignedToName: receiver.name,
+            rewardCoconuts: 40
+        )
+        task.completedById = receiver.id.uuidString
+        task.completedByName = receiver.name
+        task.completedAt = makeDate(year: 2026, month: 6, day: 11)
+        context.insert(payer)
+        context.insert(receiver)
+        context.insert(task)
+        try context.save()
+
+        FamilyTaskService.confirmCompletion(
+            task,
+            by: payer,
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        task.status = .pendingReview
+        try context.save()
+        FamilyTaskService.confirmCompletion(
+            task,
+            by: payer,
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        let entries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+            .filter { $0.sourceModelId == task.id.uuidString && $0.source == .familyTask }
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+            .filter { $0.metadataJSON.hasPrefix("familyTaskRewardTransfer:\(task.id.uuidString)") }
+        #expect(entries.count == 2)
+        #expect(Set(entries.map(\.transactionKey)) == [
+            "familyTaskRewardTransfer:\(task.id.uuidString):payer",
+            "familyTaskRewardTransfer:\(task.id.uuidString):receiver"
+        ])
+        #expect(ledgerEvents.count == 2)
+        #expect(CoconutWalletService.balance(for: payer, context: context) == 120)
+        #expect(CoconutWalletService.balance(for: receiver, context: context) == 40)
+    }
+
+    @MainActor
     @Test func economyBudgetUsageSurvivesUserDefaultsReset() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -5847,7 +6013,7 @@ struct HomeCommandExecutorTests {
         let claimed = defaults.dictionary(forKey: "streakRewards_claimed") ?? [:]
         #expect(human.coconutBalance == 2000)
         #expect(walletEntries.count == 1)
-        #expect(walletEntries.first?.sourceModelId == "365")
+        #expect(walletEntries.first?.sourceModelId == "family_365")
         #expect(budgetEvents.count == budgetEventCountBefore)
         #expect(budgetEvents.filter { $0.actionKey == "streak_365" }.isEmpty)
         #expect(claimed["family_365"] != nil)

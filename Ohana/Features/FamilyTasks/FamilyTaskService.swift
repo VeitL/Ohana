@@ -268,9 +268,9 @@ enum FamilyTaskService {
         _ task: FamilyCollaborationTask,
         by human: Human?,
         context: ModelContext,
-        wallet: CoconutWalletManaging,
+        wallet _: CoconutWalletManaging,
         careLedger: CareLedgerRecording,
-        projectionManager: QuestManager? = nil
+        projectionManager _: QuestManager? = nil
     ) {
         guard !task.isFinished else { return }
         if task.hasReward {
@@ -293,14 +293,6 @@ enum FamilyTaskService {
             )
         }
 
-        awardRewardIfNeeded(
-            task,
-            human: human,
-            context: context,
-            wallet: wallet,
-            careLedger: careLedger,
-            projectionManager: projectionManager
-        )
         context.safeSave()
     }
 
@@ -493,9 +485,9 @@ enum FamilyTaskService {
         _ reminder: Reminder,
         completedBy humanId: String?,
         context: ModelContext,
-        wallet: CoconutWalletManaging,
-        careLedger: CareLedgerRecording,
-        projectionManager: QuestManager? = nil
+        wallet _: CoconutWalletManaging,
+        careLedger _: CareLedgerRecording,
+        projectionManager _: QuestManager? = nil
     ) {
         guard let task = activeTask(forReminderId: reminder.id.uuidString, context: context),
               task.status != .completed else { return }
@@ -505,17 +497,6 @@ enum FamilyTaskService {
         task.status = task.hasReward ? .pendingReview : .completed
         task.touch()
 
-        let human = human(id: humanId, context: context)
-        if !task.hasReward {
-            awardRewardIfNeeded(
-                task,
-                human: human,
-                context: context,
-                wallet: wallet,
-                careLedger: careLedger,
-                projectionManager: projectionManager
-            )
-        }
         context.safeSave()
     }
 
@@ -533,17 +514,22 @@ enum FamilyTaskService {
 
     @MainActor
     static func activeTask(forReminderId reminderId: String, context: ModelContext) -> FamilyCollaborationTask? {
-        let active = FamilyCollaborationTaskStatus.active.rawValue
-        let claimed = FamilyCollaborationTaskStatus.claimed.rawValue
-        let pendingReview = FamilyCollaborationTaskStatus.pendingReview.rawValue
-        var descriptor = FetchDescriptor<FamilyCollaborationTask>(
+        let descriptor = FetchDescriptor<FamilyCollaborationTask>(
             predicate: #Predicate<FamilyCollaborationTask> { task in
-                task.relatedReminderId == reminderId && (task.statusRaw == active || task.statusRaw == claimed || task.statusRaw == pendingReview)
+                task.relatedReminderId == reminderId
             },
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
-        descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return (try? context.fetch(descriptor))?.first(where: isReminderSyncActiveTask)
+    }
+
+    private static func isReminderSyncActiveTask(_ task: FamilyCollaborationTask) -> Bool {
+        switch task.status {
+        case .active, .claimed, .pendingReview:
+            true
+        case .completed, .cancelled:
+            false
+        }
     }
 
     @MainActor
@@ -584,80 +570,6 @@ enum FamilyTaskService {
     }
 
     @MainActor
-    private static func awardRewardIfNeeded(
-        _ task: FamilyCollaborationTask,
-        human: Human?,
-        context: ModelContext,
-        wallet: CoconutWalletManaging,
-        careLedger: CareLedgerRecording,
-        projectionManager: QuestManager?
-    ) {
-        guard task.rewardCoconuts > 0,
-              let human,
-              task.completedById == human.id.uuidString else { return }
-        let marker = "familyTaskReward:\(task.id.uuidString)"
-        let existing = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        guard !existing.contains(where: { $0.metadataJSON == marker }) else { return }
-
-        let ledger = careLedger.record(
-            occurredAt: Date(),
-            actorKind: .human,
-            actorId: human.id.uuidString,
-            subjectKind: task.relatedPetId == nil ? .household : .pet,
-            subjectId: task.relatedPetId,
-            eventKind: .coconut,
-            actionType: "familyTaskReward",
-            amountValue: 0,
-            amountUnit: "",
-            note: "\(human.name) · \(task.title)",
-            source: .service,
-            sourceEventId: nil,
-            sourceReminderId: task.relatedReminderId,
-            legacyModelName: nil,
-            legacyModelId: nil,
-            coconutDelta: task.rewardCoconuts,
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: marker,
-            context: context,
-            save: false
-        )
-        do {
-            try wallet.apply(
-                deltas: [
-                    .human(
-                        human,
-                        delta: task.rewardCoconuts,
-                        entryKind: .reward,
-                        source: .familyTask,
-                        title: "完成家庭任务",
-                        emoji: "🎯",
-                        actorId: human.id.uuidString,
-                        actorName: human.name,
-                        subjectKind: task.relatedPetId == nil ? .household : .pet,
-                        subjectId: task.relatedPetId,
-                        sourceModelName: "FamilyCollaborationTask",
-                        sourceModelId: task.id.uuidString,
-                        careLedgerEventId: ledger.id.uuidString,
-                        metadataJSON: marker
-                    )
-                ],
-                context: context,
-                save: false,
-                postsRewardFeedback: true,
-                updatesProjection: true,
-                projectionManager: projectionManager
-            )
-            context.safeSave()
-        } catch {
-            context.rollback()
-            #if DEBUG
-                OhanaLog.error("[FamilyTaskService] reward wallet write failed: \(error.localizedDescription)", category: "FamilyTasks")
-            #endif
-        }
-    }
-
-    @MainActor
     private static func transferRewardIfNeeded(
         _ task: FamilyCollaborationTask,
         reviewer: Human?,
@@ -672,8 +584,10 @@ enum FamilyTaskService {
               task.completedById == receiver.id.uuidString,
               payer.id != receiver.id else { return }
         let marker = "familyTaskRewardTransfer:\(task.id.uuidString)"
-        let existing = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
-        guard !existing.contains(where: { $0.metadataJSON.hasPrefix(marker) }) else { return }
+        let payerTransactionKey = "\(marker):payer"
+        let receiverTransactionKey = "\(marker):receiver"
+        guard !hasWalletTransaction(payerTransactionKey, context: context),
+              !hasWalletTransaction(receiverTransactionKey, context: context) else { return }
 
         let payerLedger = careLedger.record(
             occurredAt: Date(),
@@ -739,7 +653,7 @@ enum FamilyTaskService {
                         sourceModelId: task.id.uuidString,
                         careLedgerEventId: payerLedger.id.uuidString,
                         metadataJSON: "\(marker):payer",
-                        transactionKey: "\(marker):payer"
+                        transactionKey: payerTransactionKey
                     ),
                     .human(
                         receiver,
@@ -756,7 +670,7 @@ enum FamilyTaskService {
                         sourceModelId: task.id.uuidString,
                         careLedgerEventId: receiverLedger.id.uuidString,
                         metadataJSON: "\(marker):receiver",
-                        transactionKey: "\(marker):receiver"
+                        transactionKey: receiverTransactionKey
                     )
                 ],
                 context: context,
@@ -771,6 +685,17 @@ enum FamilyTaskService {
                 OhanaLog.error("[FamilyTaskService] transfer wallet write failed: \(error.localizedDescription)", category: "FamilyTasks")
             #endif
         }
+    }
+
+    @MainActor
+    private static func hasWalletTransaction(_ transactionKey: String, context: ModelContext) -> Bool {
+        var descriptor = FetchDescriptor<CoconutLedgerEntry>(
+            predicate: #Predicate<CoconutLedgerEntry> { entry in
+                entry.transactionKey == transactionKey
+            }
+        )
+        descriptor.fetchLimit = 1
+        return ((try? context.fetch(descriptor)) ?? []).isEmpty == false
     }
 
     @MainActor
