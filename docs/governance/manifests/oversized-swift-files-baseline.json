@@ -17,7 +17,7 @@
     { "path": "Ohana/Features/CrewRoster/Views/CrewRosterOverlay.swift", "lines": 883 },
     { "path": "Ohana/Features/CrewRoster/Views/CrewRosterOverlayEditors.swift", "lines": 911 },
     { "path": "Ohana/Features/DailyStreak/Views/DailyStreakDetailView.swift", "lines": 861 },
-    { "path": "Ohana/Features/Home/Views/ExpandedQuickActionLogic.swift", "lines": 805 },
+    { "path": "Ohana/Features/Home/ExpandedQuickActionLogic.swift", "lines": 805 },
     { "path": "Ohana/Features/Home/Views/FocusHomeRouteSheetModifier.swift", "lines": 821 },
     { "path": "Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift", "lines": 913 },
     { "path": "Ohana/Shared/Components/WalletCards/FocusWalletCardView.swift", "lines": 887 },
