@@ -8,7 +8,7 @@ import SwiftUI
 import SwiftData
 
 // MARK: - Quest Model
-struct IslandQuest: Identifiable, Equatable {
+nonisolated struct IslandQuest: Identifiable, Equatable, Sendable {
     let id: String          // 稳定 ID，用于持久化完成状态
     let emoji: String
     let title: String
@@ -21,7 +21,7 @@ struct IslandQuest: Identifiable, Equatable {
 }
 
 // MARK: - Quest Engine
-struct IslandQuestEngine {
+nonisolated struct IslandQuestEngine {
     private static let initialHumanWeightRecordedPrefix = "ohana.initialHumanWeightRecorded."
     static let oasisPetWizardQuestId = "q_oasis_pet_wizard"
     static let oasisFirstMealQuestId = "q_oasis_first_meal"

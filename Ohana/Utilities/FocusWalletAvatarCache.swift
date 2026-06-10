@@ -11,16 +11,18 @@ enum FocusWalletAvatarCache {
         let isFinal: Bool
     }
 
-    struct Payload {
+    nonisolated struct Payload: Sendable {
         let id: UUID
         let data: Data?
     }
 
     private static var entries: [UUID: Entry] = [:]
     private static var inFlightKeys: Set<String> = []
+    private static var evictionGeneration = 0
 
     @discardableResult
     static func seedPreviewEntries(payloads: [Payload]) -> Bool {
+        ensureMemoryWarningEvictionRegistered()
         var didChange = false
 
         for payload in payloads {
@@ -49,6 +51,7 @@ enum FocusWalletAvatarCache {
     }
 
     static func cachedEntry(for cardId: UUID, signature: String) -> Entry? {
+        ensureMemoryWarningEvictionRegistered()
         guard !signature.isEmpty,
               let cached = entries[cardId],
               cached.signature == signature else {
@@ -58,6 +61,7 @@ enum FocusWalletAvatarCache {
     }
 
     static func storeDecodedImage(cardId: UUID, data: Data?, image: UIImage?, isTransparent: Bool) {
+        ensureMemoryWarningEvictionRegistered()
         guard let data, let image else { return }
         let signature = signature(for: data)
         entries[cardId] = Entry(
@@ -70,7 +74,9 @@ enum FocusWalletAvatarCache {
 
     @discardableResult
     static func preload(payloads: [Payload]) async -> Bool {
+        ensureMemoryWarningEvictionRegistered()
         var didChange = false
+        let generation = evictionGeneration
         let decodePayloads: [(UUID, Data, String, String)] = payloads.compactMap { payload in
             guard let data = payload.data else {
                 if entries.removeValue(forKey: payload.id) != nil {
@@ -108,6 +114,13 @@ enum FocusWalletAvatarCache {
             }
         }.value
 
+        guard generation == evictionGeneration else {
+            for (_, _, _, inFlightKey) in decodePayloads {
+                inFlightKeys.remove(inFlightKey)
+            }
+            return didChange
+        }
+
         for (id, image, isTransparent, signature, isFinal, previewData, inFlightKey) in decoded {
             inFlightKeys.remove(inFlightKey)
             entries[id] = Entry(image: image, isTransparent: isTransparent, signature: signature, isFinal: isFinal)
@@ -124,6 +137,27 @@ enum FocusWalletAvatarCache {
         let tail = data.suffix(12).map { String(format: "%02x", $0) }.joined()
         return "\(data.count)-\(head)-\(tail)"
     }
+
+    private static func ensureMemoryWarningEvictionRegistered() {
+        MemoryWarningEvictionRegistry.register(ownerID: "focus-wallet-avatar-cache") {
+            evictDecodedCacheForMemoryWarning()
+        }
+    }
+
+    private static func evictDecodedCacheForMemoryWarning() {
+        guard !entries.isEmpty || !inFlightKeys.isEmpty else { return }
+        entries.removeAll(keepingCapacity: false)
+        inFlightKeys.removeAll(keepingCapacity: false)
+        evictionGeneration &+= 1
+    }
+
+#if DEBUG
+    static func resetForTesting() {
+        entries.removeAll(keepingCapacity: false)
+        inFlightKeys.removeAll(keepingCapacity: false)
+        evictionGeneration &+= 1
+    }
+#endif
 
     nonisolated private static func previewEntry(for cardId: UUID, signature: String) -> Entry? {
         let url = previewURL(cardId: cardId, signature: signature)

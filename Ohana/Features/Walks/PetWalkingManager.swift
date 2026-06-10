@@ -84,6 +84,7 @@ final class PetWalkingManager {
     private var pausedElapsed: TimeInterval = 0  // 暂停前已累计时间
     private var resumeTime: Date?                // 最近一次 resume/start 时间
     private var timer: Timer?
+    private var walkStopStartedAt: CFAbsoluteTime?
     private let locationManager: LocationManager
     private let questManager: QuestManager
     private let activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
@@ -114,7 +115,8 @@ final class PetWalkingManager {
         lastCompletedRouteCoordinates = []
         activePoopMarkers = []
         lastCompletedPoopMarkers = []
-        
+
+        AppFlowPerformance.start(AppPerformanceFlows.walkSession, note: ["action": "start"])
         locationManager.startWalkSession()
         startTimer()
     }
@@ -126,6 +128,11 @@ final class PetWalkingManager {
         }
         resumeTime = nil
         phase = .paused
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.walkSession,
+            AppPerformancePhases.sessionPaused,
+            note: walkSessionProbeNote(action: "pause")
+        )
         locationManager.pauseWalkSession()
         stopTimer()
     }
@@ -133,11 +140,17 @@ final class PetWalkingManager {
     func resume() {
         resumeTime = Date()
         phase = .running
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.walkSession,
+            AppPerformancePhases.sessionResumed,
+            note: walkSessionProbeNote(action: "resume")
+        )
         locationManager.resumeWalkSession()
         startTimer()
     }
     
     func stop(modelContext: ModelContext) {
+        walkStopStartedAt = CFAbsoluteTimeGetCurrent()
         // 最终elapsed：已暂停部分 + 本次跑步部分
         if let r = resumeTime {
             pausedElapsed += Date().timeIntervalSince(r)
@@ -152,7 +165,10 @@ final class PetWalkingManager {
         let poopMarkers = activePoopMarkers
         let poop = max(poopCount, poopMarkers.count)
         
-        guard let pet = currentPet else { return }
+        guard let pet = currentPet else {
+            walkStopStartedAt = nil
+            return
+        }
 
         // 隐式读取当前设备执行者（静默，不弹窗）
         let executorId = activeHumanSelection.currentHumanId
@@ -225,6 +241,18 @@ final class PetWalkingManager {
 
         phase = .finished(elapsed: elapsed, poopCount: poop)
         showSummary = true
+        AppFlowPerformance.mark(
+            AppPerformanceFlows.walkSession,
+            AppPerformancePhases.writeSuccess,
+            startedAt: walkStopStartedAt,
+            note: [
+                "action": "stop",
+                "points": "\(routeLocations.count)",
+                "poopCount": "\(poop)",
+                "rewarded": isTooShortForReward ? "false" : "true"
+            ]
+        )
+        walkStopStartedAt = nil
     }
     
     func reset() {
@@ -327,6 +355,14 @@ final class PetWalkingManager {
     private func updateElapsedFromClock() {
         guard let r = resumeTime else { return }
         elapsedTime = pausedElapsed + Date().timeIntervalSince(r)
+    }
+
+    private func walkSessionProbeNote(action: String) -> [String: String] {
+        [
+            "action": action,
+            "points": "\(locationManager.routeLocationsForPersistence(maxCount: 600).count)",
+            "poopCount": "\(poopCount)"
+        ]
     }
     
     // MARK: - Map Snapshot

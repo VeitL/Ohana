@@ -9,8 +9,10 @@ enum FocusPopoutImageCache {
     }
 
     private static var entries: [UUID: Entry] = [:]
+    private static var evictionGeneration = 0
 
     static func cachedImage(for id: UUID, signature: String) -> UIImage? {
+        ensureMemoryWarningEvictionRegistered()
         guard !signature.isEmpty,
               let cached = entries[id],
               cached.signature == signature else {
@@ -21,7 +23,9 @@ enum FocusPopoutImageCache {
 
     @discardableResult
     static func preload(payloads: [FocusWalletAvatarCache.Payload]) async -> Bool {
+        ensureMemoryWarningEvictionRegistered()
         var didChange = false
+        let generation = evictionGeneration
         let decodePayloads: [(UUID, Data, String)] = payloads.compactMap { payload in
             guard let data = payload.data, !data.isEmpty else {
                 if entries.removeValue(forKey: payload.id) != nil {
@@ -43,11 +47,34 @@ enum FocusPopoutImageCache {
             }
         }.value
 
+        guard generation == evictionGeneration else {
+            return didChange
+        }
+
         for (id, signature, image) in decoded {
             entries[id] = Entry(signature: signature, image: image)
         }
         return true
     }
+
+    private static func ensureMemoryWarningEvictionRegistered() {
+        MemoryWarningEvictionRegistry.register(ownerID: "focus-popout-image-cache") {
+            evictDecodedCacheForMemoryWarning()
+        }
+    }
+
+    private static func evictDecodedCacheForMemoryWarning() {
+        guard !entries.isEmpty else { return }
+        entries.removeAll(keepingCapacity: false)
+        evictionGeneration &+= 1
+    }
+
+#if DEBUG
+    static func resetForTesting() {
+        entries.removeAll(keepingCapacity: false)
+        evictionGeneration &+= 1
+    }
+#endif
 
     nonisolated private static func decodedImage(from data: Data) -> UIImage? {
         let raw = UIImage(data: data)

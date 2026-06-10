@@ -1,5 +1,14 @@
 # CODING AGENTS: READ THIS FIRST
 
+> **OHANA REPO NOTICE (overrides the instructions below):** Inside this
+> repository, the UI source of truth is `ui规范.selection.json` (root) plus the
+> shared Swift components (`OhanaDesignSystem.swift`, `OhanaFormControls.swift`,
+> `ScaleButtonStyle`, `GoMotion`, sheet/popup helpers). This bundle is a design
+> REFERENCE exported from Claude Design — use it for inspiration and intent,
+> but do NOT implement it "pixel-perfectly" if that conflicts with V4 tokens.
+> When in conflict, translate the idea into existing V4 tokens or stop and ask.
+> See `AGENTS.md` → "UI Design Source of Truth".
+
 This is a **handoff bundle** from Claude Design (claude.ai/design).
 
 A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.

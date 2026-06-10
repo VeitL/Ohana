@@ -416,8 +416,8 @@ struct VerticalSolidHomeTodayFocusChrome: View {
     let onOpenQuest: (IslandQuest) -> Void
     let onCompleteQuest: (IslandQuest) -> Void
     let onTapNegativeSignal: (IslandNegativeSignal) -> Void
-    let onTapFamilyTask: (FamilyCollaborationTask) -> Void
-    let onConfirmExchange: (CoconutExchangeRequest) -> Void
+    let onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void
+    let onConfirmExchange: (TodayFocusExchangeRequestSnapshot) -> Void
 
     var body: some View {
         TodayFocusCard(

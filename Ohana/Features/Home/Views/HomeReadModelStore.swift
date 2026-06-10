@@ -11,14 +11,14 @@ import SwiftData
 
 typealias HomeSnapshot = VerticalSolidHomeSnapshot
 
-struct PreparedTabSnapshot: Identifiable {
+nonisolated struct PreparedTabSnapshot: Identifiable {
     let id: VerticalSolidHomeTab
     let revision: HomeRevision
     let preparedAt: Date
     let title: String
 }
 
-struct HomeHeaderAvatarSnapshot: Equatable {
+nonisolated struct HomeHeaderAvatarSnapshot: Equatable, Sendable {
     let id: UUID?
     let signature: String
 
@@ -85,6 +85,30 @@ struct HomeReadModelPayload {
     )
 }
 
+nonisolated struct HomeReadModelActorInput: Sendable {
+    let activeHumanIdRaw: String
+    let hiddenPetIDsRaw: String
+    let homeCardOrderRaw: String
+    let showDummyCards: Bool
+    let petBondVaultRevision: Int
+    let equippedTitleRaw: String
+    let language: String
+    let loadPlants: Bool
+}
+
+nonisolated struct HomeReadModelActorResult: Sendable {
+    let snapshot: HomeSnapshot
+    let signature: String
+    let activeHumanAvatar: HomeHeaderAvatarSnapshot
+    let avatarPreloadSignature: String
+    let avatarPreloadPayloads: [FocusWalletAvatarCache.Payload]
+    let popoutPreloadSignature: String
+    let popoutPreloadPayloads: [FocusWalletAvatarCache.Payload]
+    let petCount: Int
+    let humanCount: Int
+    let eventCount: Int
+}
+
 @MainActor
 final class HomeReadModelStore: ObservableObject {
     @Published private(set) var snapshot: HomeSnapshot = .empty
@@ -130,15 +154,16 @@ final class HomeReadModelStore: ObservableObject {
     ) {
         refreshGeneration &+= 1
         let generation = refreshGeneration
+        let container = context.container
         refreshTask?.cancel()
-        refreshTask = Task { @MainActor in
+        refreshTask = Task { [weak self] in
             await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: force ? 0 : 48)
             guard !Task.isCancelled else {
-                finishRefreshTask(generation: generation)
+                self?.finishRefreshTask(generation: generation)
                 return
             }
-            await refresh(
-                context: context,
+            await self?.refresh(
+                container: container,
                 activeHumanIdRaw: activeHumanIdRaw,
                 hiddenPetIDsRaw: hiddenPetIDsRaw,
                 homeCardOrderRaw: homeCardOrderRaw,
@@ -150,7 +175,7 @@ final class HomeReadModelStore: ObservableObject {
                 generation: generation,
                 force: force
             )
-            finishRefreshTask(generation: generation)
+            self?.finishRefreshTask(generation: generation)
         }
     }
 
@@ -171,7 +196,7 @@ final class HomeReadModelStore: ObservableObject {
         refreshTask?.cancel()
         refreshTask = nil
         await refresh(
-            context: context,
+            container: context.container,
             activeHumanIdRaw: activeHumanIdRaw,
             hiddenPetIDsRaw: hiddenPetIDsRaw,
             homeCardOrderRaw: homeCardOrderRaw,
@@ -197,7 +222,7 @@ final class HomeReadModelStore: ObservableObject {
     }
 
     private func refresh(
-        context: ModelContext,
+        container: ModelContainer,
         activeHumanIdRaw: String,
         hiddenPetIDsRaw: String,
         homeCardOrderRaw: String,
@@ -210,88 +235,59 @@ final class HomeReadModelStore: ObservableObject {
         force: Bool = false
     ) async {
         let startedAt = CFAbsoluteTimeGetCurrent()
-        let fetches = HomeReadModelFetches(context: context)
-        let pets = fetches.pets()
-        let humans = fetches.humans()
-        guard await checkpoint(generation: generation, stage: "members", startedAt: startedAt) else { return }
-
-        let plants = AppFeatureRouteGuard.shouldLoadPlantData ? fetches.plants() : []
-        let electronicPets = fetches.electronicPets()
-        guard await checkpoint(generation: generation, stage: "livingSurfaces", startedAt: startedAt) else { return }
-
-        let events = fetches.events()
-        let pendingReminders = fetches.pendingReminders()
-        guard await checkpoint(generation: generation, stage: "schedule", startedAt: startedAt) else { return }
-
-        let humanMedications = fetches.humanMedications()
-        let humanMedicationLogs = fetches.humanMedicationLogs()
-        let careLogs = fetches.careLogs()
-        let walkLogs = fetches.walkLogs()
-        let pottyLogs = fetches.pottyLogs()
-        let humanWeightLogs = fetches.humanWeightLogs()
-        guard await checkpoint(generation: generation, stage: "care", startedAt: startedAt) else { return }
-
-        let familyTasks = fetches.familyTasks()
-        let exchangeRequests = fetches.exchangeRequests()
-        guard await checkpoint(generation: generation, stage: "collaboration", startedAt: startedAt) else { return }
-
-        let source = VerticalSolidHomeSourceState(
-            pets: pets,
-            humans: humans,
-            plants: plants,
-            electronicPets: electronicPets,
-            events: events,
-            pendingReminders: pendingReminders,
-            humanMedications: humanMedications,
-            humanMedicationLogs: humanMedicationLogs,
-            careLogs: careLogs,
-            walkLogs: walkLogs,
-            pottyLogs: pottyLogs,
-            humanWeightLogs: humanWeightLogs,
-            familyTasks: familyTasks,
-            exchangeRequests: exchangeRequests,
+        let input = HomeReadModelActorInput(
             activeHumanIdRaw: activeHumanIdRaw,
             hiddenPetIDsRaw: hiddenPetIDsRaw,
             homeCardOrderRaw: homeCardOrderRaw,
             showDummyCards: showDummyCards,
             petBondVaultRevision: petBondVaultRevision,
             equippedTitleRaw: equippedTitleRaw,
-            language: language
+            language: language,
+            loadPlants: AppFeatureRouteGuard.shouldLoadPlantData
         )
-        let signature = VerticalSolidHomeSnapshotBuilder.signature(for: source)
-        guard force || signature != lastSignature || externalRevision != revision else { return }
 
-        let nextSnapshot = VerticalSolidHomeSnapshotBuilder.build(
-            from: source,
-            privacy: privacy,
-            todayFocus: todayFocus,
-            healthAlerts: healthAlerts
-        )
-        guard await checkpoint(generation: generation, stage: "snapshot", startedAt: startedAt) else { return }
-        let activeHumanAvatar = HomeHeaderAvatarSnapshot(human: source.activeHuman)
-        let avatarPreloadPayloads = avatarPayloads(
-            snapshot: nextSnapshot,
-            activeHuman: source.activeHuman
-        )
-        let avatarPreloadSignature = VerticalSolidHomePreloadPlanner.avatarSignature(for: avatarPreloadPayloads)
-        let popoutPreloadPayloads = VerticalSolidHomePreloadPlanner.popoutPayloads(snapshot: nextSnapshot)
-        let popoutPreloadSignature = VerticalSolidHomePreloadPlanner.popoutSignature(for: popoutPreloadPayloads)
+        let actor = HomeReadModelActor(modelContainer: container)
+        let actorResult: HomeReadModelActorResult?
+        do {
+            actorResult = try await actor.refreshPayload(
+                input: input,
+                previousSignature: lastSignature,
+                currentRevision: revision,
+                externalRevision: externalRevision,
+                force: force
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            AppPerformanceMonitor.shared.record(
+                "home_read_model_refresh_failed",
+                startedAt: startedAt,
+                note: error.localizedDescription
+            )
+            return
+        }
+
+        guard let actorResult else { return }
+        guard await checkpoint(generation: generation, stage: "actorPayload", startedAt: startedAt) else { return }
+
+        let source = compatibilitySource(container: container, input: input)
+        guard await checkpoint(generation: generation, stage: "compatibilitySource", startedAt: startedAt) else { return }
 
         var nextRevision = externalRevision
         nextRevision.advance(for: externalRevision.lastCommand ?? .unknown(action: "homeReadModelRefresh"))
 
-        snapshot = nextSnapshot
+        snapshot = actorResult.snapshot
         revision = nextRevision
         payload = HomeReadModelPayload(
             source: source,
-            snapshot: nextSnapshot,
+            snapshot: actorResult.snapshot,
             revision: nextRevision,
-            signature: signature,
-            activeHumanAvatar: activeHumanAvatar,
-            avatarPreloadSignature: avatarPreloadSignature,
-            avatarPreloadPayloads: avatarPreloadPayloads,
-            popoutPreloadSignature: popoutPreloadSignature,
-            popoutPreloadPayloads: popoutPreloadPayloads
+            signature: actorResult.signature,
+            activeHumanAvatar: actorResult.activeHumanAvatar,
+            avatarPreloadSignature: actorResult.avatarPreloadSignature,
+            avatarPreloadPayloads: actorResult.avatarPreloadPayloads,
+            popoutPreloadSignature: actorResult.popoutPreloadSignature,
+            popoutPreloadPayloads: actorResult.popoutPreloadPayloads
         )
         preparedTabs[.home] = PreparedTabSnapshot(
             id: .home,
@@ -299,12 +295,12 @@ final class HomeReadModelStore: ObservableObject {
             preparedAt: Date(),
             title: "home"
         )
-        lastSignature = signature
+        lastSignature = actorResult.signature
 
         AppPerformanceMonitor.shared.record(
             "home_read_model_refresh",
             startedAt: startedAt,
-            note: "pets=\(source.pets.count), humans=\(source.humans.count), events=\(source.events.count)"
+            note: "pets=\(actorResult.petCount), humans=\(actorResult.humanCount), events=\(actorResult.eventCount)"
         )
     }
 
@@ -319,6 +315,36 @@ final class HomeReadModelStore: ObservableObject {
             return false
         }
         return true
+    }
+
+    private func compatibilitySource(
+        container: ModelContainer,
+        input: HomeReadModelActorInput
+    ) -> VerticalSolidHomeSourceState {
+        let fetches = HomeReadModelFetches(context: container.mainContext)
+        return VerticalSolidHomeSourceState(
+            pets: fetches.pets(),
+            humans: fetches.humans(),
+            plants: input.loadPlants ? fetches.plants() : [],
+            electronicPets: fetches.electronicPets(),
+            events: fetches.events(),
+            pendingReminders: fetches.pendingReminders(),
+            humanMedications: fetches.humanMedications(),
+            humanMedicationLogs: fetches.humanMedicationLogs(),
+            careLogs: fetches.careLogs(),
+            walkLogs: fetches.walkLogs(),
+            pottyLogs: fetches.pottyLogs(),
+            humanWeightLogs: fetches.humanWeightLogs(),
+            familyTasks: fetches.familyTasks(),
+            exchangeRequests: fetches.exchangeRequests(),
+            activeHumanIdRaw: input.activeHumanIdRaw,
+            hiddenPetIDsRaw: input.hiddenPetIDsRaw,
+            homeCardOrderRaw: input.homeCardOrderRaw,
+            showDummyCards: input.showDummyCards,
+            petBondVaultRevision: input.petBondVaultRevision,
+            equippedTitleRaw: input.equippedTitleRaw,
+            language: input.language
+        )
     }
 
     private func avatarPayloads(
@@ -345,7 +371,108 @@ final class HomeReadModelStore: ObservableObject {
     }
 }
 
-private struct HomeReadModelFetches {
+@ModelActor
+actor HomeReadModelActor {
+    func refreshPayload(
+        input: HomeReadModelActorInput,
+        previousSignature: String,
+        currentRevision: HomeRevision,
+        externalRevision: HomeRevision,
+        force: Bool
+    ) throws -> HomeReadModelActorResult? {
+        let fetches = HomeReadModelFetches(context: modelContext)
+        let pets = fetches.pets()
+        let humans = fetches.humans()
+        try Task.checkCancellation()
+
+        let plants = input.loadPlants ? fetches.plants() : []
+        let electronicPets = fetches.electronicPets()
+        try Task.checkCancellation()
+
+        let events = fetches.events()
+        let pendingReminders = fetches.pendingReminders()
+        try Task.checkCancellation()
+
+        let humanMedications = fetches.humanMedications()
+        let humanMedicationLogs = fetches.humanMedicationLogs()
+        let careLogs = fetches.careLogs()
+        let walkLogs = fetches.walkLogs()
+        let pottyLogs = fetches.pottyLogs()
+        let humanWeightLogs = fetches.humanWeightLogs()
+        try Task.checkCancellation()
+
+        let familyTasks = fetches.familyTasks()
+        let exchangeRequests = fetches.exchangeRequests()
+        try Task.checkCancellation()
+
+        let source = VerticalSolidHomeSourceState(
+            pets: pets,
+            humans: humans,
+            plants: plants,
+            electronicPets: electronicPets,
+            events: events,
+            pendingReminders: pendingReminders,
+            humanMedications: humanMedications,
+            humanMedicationLogs: humanMedicationLogs,
+            careLogs: careLogs,
+            walkLogs: walkLogs,
+            pottyLogs: pottyLogs,
+            humanWeightLogs: humanWeightLogs,
+            familyTasks: familyTasks,
+            exchangeRequests: exchangeRequests,
+            activeHumanIdRaw: input.activeHumanIdRaw,
+            hiddenPetIDsRaw: input.hiddenPetIDsRaw,
+            homeCardOrderRaw: input.homeCardOrderRaw,
+            showDummyCards: input.showDummyCards,
+            petBondVaultRevision: input.petBondVaultRevision,
+            equippedTitleRaw: input.equippedTitleRaw,
+            language: input.language
+        )
+        let signature = VerticalSolidHomeSnapshotBuilder.signature(for: source)
+        guard force || signature != previousSignature || externalRevision != currentRevision else { return nil }
+
+        let snapshot = VerticalSolidHomeSnapshotBuilder.buildForReadModelActor(from: source)
+        try Task.checkCancellation()
+
+        let activeHumanAvatar = HomeHeaderAvatarSnapshot(human: source.activeHuman)
+        let avatarPreloadPayloads = Self.avatarPayloads(
+            snapshot: snapshot,
+            activeHuman: source.activeHuman
+        )
+        let avatarPreloadSignature = VerticalSolidHomePreloadPlanner.avatarSignature(for: avatarPreloadPayloads)
+        let popoutPreloadPayloads = VerticalSolidHomePreloadPlanner.popoutPayloads(snapshot: snapshot)
+        let popoutPreloadSignature = VerticalSolidHomePreloadPlanner.popoutSignature(for: popoutPreloadPayloads)
+
+        return HomeReadModelActorResult(
+            snapshot: snapshot,
+            signature: signature,
+            activeHumanAvatar: activeHumanAvatar,
+            avatarPreloadSignature: avatarPreloadSignature,
+            avatarPreloadPayloads: avatarPreloadPayloads,
+            popoutPreloadSignature: popoutPreloadSignature,
+            popoutPreloadPayloads: popoutPreloadPayloads,
+            petCount: pets.count,
+            humanCount: humans.count,
+            eventCount: events.count
+        )
+    }
+
+    private static func avatarPayloads(
+        snapshot: HomeSnapshot,
+        activeHuman: Human?
+    ) -> [FocusWalletAvatarCache.Payload] {
+        var payloads = VerticalSolidHomePreloadPlanner.avatarPayloads(snapshot: snapshot)
+        guard let activeHuman,
+              activeHuman.avatarImageData != nil,
+              !payloads.contains(where: { $0.id == activeHuman.id }) else {
+            return payloads
+        }
+        payloads.append(FocusWalletAvatarCache.Payload(id: activeHuman.id, data: activeHuman.avatarImageData))
+        return payloads
+    }
+}
+
+nonisolated private struct HomeReadModelFetches {
     let context: ModelContext
     private let calendar = Calendar.current
 

@@ -203,11 +203,11 @@ extension VerticalSolidHomeView {
         openFunctionMenu(destination: .featureGroup(.healthBody))
     }
 
-    func openTodayFocusFamilyTask(_ task: FamilyCollaborationTask) {
+    func openTodayFocusFamilyTask(_ task: TodayFocusFamilyTaskSnapshot) {
         routeCoordinator.openCrewRoster(mode: .collaboration)
     }
 
-    func confirmTodayFocusExchange(_ request: CoconutExchangeRequest) {
+    func confirmTodayFocusExchange(_ request: TodayFocusExchangeRequestSnapshot) {
         guard let receiver = activeHuman else {
             routeCoordinator.openAccountSwitcher()
             return

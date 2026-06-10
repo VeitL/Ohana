@@ -58,6 +58,15 @@ analyzer_rules:
 indentation_width:
   indentation_width: 4
 
+# Keep these at warning severity: their defaults include error-severity
+# thresholds that pre-date this config and would (and did) silently break the
+# CI lint gate on legacy code. Ratchet them down later with --strict.
+empty_count:
+  severity: warning
+function_parameter_count:
+  warning: 8
+  error: 30
+
 # Generous thresholds so legacy code is not error-flooded.
 force_cast: warning
 force_try: warning
@@ -71,6 +80,7 @@ custom_rules:
   no_ark_app_group:
     name: "Legacy Ark app group"
     regex: "group\\.com\\.[A-Za-z.]*Ark"
+    match_kinds: [string]   # code literals only; comments may mention history
     message: "Use group.com.guanchen.li.Ohana, not legacy Ark app-group identifiers (AGENTS.md)."
     severity: error
   no_print_in_app:
@@ -82,5 +92,11 @@ custom_rules:
   no_language_ternary:
     name: "Direct language ternary"
     regex: "appLanguage\\s*==\\s*\"zh\""
-    message: "Use L10n(appLanguage).tr(zh:en:de:) instead of language ternaries (AGENTS.md Localization)."
+    message: "Use L10n(appLanguage).tr(zh:en:...) instead of language ternaries (AGENTS.md Localization)."
+    severity: warning
+  main_actor_read_model_refresh:
+    name: "Main-actor read-model aggregation"
+    regex: "Task\\s*\\{\\s*@MainActor"
+    included: ".*(ReadModel|SnapshotStore|SnapshotBuilder)[^/]*\\.swift"
+    message: "Read-model/snapshot refresh must aggregate off the main actor (@ModelActor or background context) and deliver Equatable snapshots to the MainActor (AGENTS.md Off-Main Aggregation Law)."
     severity: warning

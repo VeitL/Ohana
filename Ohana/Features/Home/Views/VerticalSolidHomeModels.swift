@@ -48,7 +48,7 @@ enum VerticalSolidHomeTab: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable {
+nonisolated struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable, Sendable {
     let id: UUID
     let name: String
     let subtitle: String
@@ -57,7 +57,7 @@ struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable {
     let needsCare: Bool
 }
 
-struct VerticalSolidHomeSnapshot {
+nonisolated struct VerticalSolidHomeSnapshot: @unchecked Sendable {
     var isReady = false
     var greeting = ""
     var activeName = ""

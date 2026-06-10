@@ -11,7 +11,7 @@ import SwiftData
 
 // MARK: - HealthAlert
 
-struct HealthAlert: Identifiable, Equatable {
+nonisolated struct HealthAlert: Identifiable, Equatable, Sendable {
     let id: UUID
     let petId: UUID
     let petName: String
@@ -22,14 +22,14 @@ struct HealthAlert: Identifiable, Equatable {
     let severity: Severity
     let generatedAt: Date
 
-    enum Severity: Int, Comparable {
+    enum Severity: Int, Comparable, Sendable {
         case info = 0
         case warning = 1
         case urgent = 2
         static func < (lhs: Severity, rhs: Severity) -> Bool { lhs.rawValue < rhs.rawValue }
     }
 
-    enum AlertType: String {
+    enum AlertType: String, Sendable {
         case vaccineExpired      = "vaccine_expired"
         case vaccineExpiringSoon = "vaccine_expiring_soon"
         case dewormingDue        = "deworming_due"
@@ -72,7 +72,7 @@ struct HealthAlert: Identifiable, Equatable {
 
 // MARK: - PetHealthAlertEngine
 
-final class PetHealthAlertEngine {
+nonisolated final class PetHealthAlertEngine {
     init() {}
 
     // MARK: - 主入口

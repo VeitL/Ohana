@@ -88,34 +88,47 @@ fi
 warnings_file="$(mktemp)"
 trap 'rm -f "$warnings_file"' EXIT
 
-file_has_runtime_policy() {
-  local file="$1"
-  rg -q 'AppWorkloadPolicy|AppPerformanceMode\.systemPrefersReducedWork|shouldReduceWork|powerSavingMode|reduceMotion' "$file"
-}
+# Files WITHOUT any runtime-policy reference, precomputed once with a single
+# rg pass. Timer/loop rules only scan these (policy-aware files are exempt).
+non_policy_files=()
+while IFS= read -r f; do
+  [[ -n "$f" ]] && non_policy_files+=("$f")
+done < <(
+  rg --files-without-match \
+    'AppWorkloadPolicy|AppPerformanceMode\.systemPrefersReducedWork|shouldReduceWork|powerSavingMode|reduceMotion' \
+    "${files[@]}" 2>/dev/null || true
+)
 
+# One rg invocation per rule (see audit-ui-v4.sh for why the per-file loop must
+# never come back). Output format is load-bearing for the fixture tests.
 scan() {
   local id="$1"
   local pattern="$2"
   local message="$3"
   local allowed="$4"
 
-  for file in "${files[@]}"; do
+  local -a targets
+  if [[ "$id" == "raw-timer-publisher" || "$id" == "repeat-forever" || "$id" == "timeline-animation" ]]; then
+    targets=("${non_policy_files[@]+"${non_policy_files[@]}"}")
+  else
+    targets=("${files[@]}")
+  fi
+
+  local scoped=()
+  for file in "${targets[@]+"${targets[@]}"}"; do
     [[ -f "$file" ]] || continue
-    if [[ "$file" == "$allowed" ]]; then
-      continue
-    fi
-    if [[ "$id" == "raw-timer-publisher" || "$id" == "repeat-forever" || "$id" == "timeline-animation" ]]; then
-      if file_has_runtime_policy "$file"; then
-        continue
-      fi
-    fi
-    rg --pcre2 -n --with-filename --no-heading "$pattern" "$file" 2>/dev/null | while IFS= read -r match; do
-    case "$match" in
-      *"$allowed"*|*"runtime-guardrail: allow"*) continue ;;
-    esac
-    printf '[%s] %s\n  %s\n  Allowed home: %s\n\n' "$id" "$match" "$message" "$allowed" >> "$warnings_file"
-  done || true
+    [[ "$file" == "$allowed" ]] && continue
+    scoped+=("$file")
   done
+  [[ ${#scoped[@]} -eq 0 ]] && return 0
+
+  rg --pcre2 -nH --no-heading "$pattern" "${scoped[@]}" 2>/dev/null \
+    | while IFS= read -r match; do
+        case "$match" in
+          *"$allowed"*|*"runtime-guardrail: allow"*) continue ;;
+        esac
+        printf '[%s] %s\n  %s\n  Allowed home: %s\n\n' "$id" "$match" "$message" "$allowed" >> "$warnings_file"
+      done || true
 }
 
 scan \

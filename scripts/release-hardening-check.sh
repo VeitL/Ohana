@@ -18,7 +18,7 @@ Purpose:
 
 Options:
   --skip-build   Run checks that do not require CoreSimulator.
-  --ui-all-soft  Deprecated compatibility no-op; UI/accessibility/smoothness are strict --all gates.
+  --ui-all-soft  Deprecated compatibility no-op; UI/accessibility/smoothness run through the full-scope ratchet.
 USAGE
 }
 
@@ -51,23 +51,21 @@ section "Working tree"
 git status --short
 
 section "Shell syntax"
-bash -n scripts/build-debug-fast.sh
-bash -n scripts/audit-runtime-guardrails.sh
-bash -n scripts/audit-ui-v4.sh
-bash -n scripts/audit-accessibility.sh
-bash -n scripts/audit-localization-coverage.sh
-bash -n scripts/audit-smoothness-risk.sh
-bash -n scripts/audit-release-data-safety.sh
-bash -n scripts/audit-governance-manifests.sh
-bash -n scripts/audit-resource-integrity.sh
-bash -n scripts/audit-git-size.sh
-bash -n scripts/release-hardening-check.sh
+for script in scripts/*.sh scripts/tests/*.sh scripts/git-hooks/pre-commit; do
+  bash -n "$script"
+done
 
 section "Diff whitespace"
 git diff --check
 
+section "Audit self-tests (fixtures + scope floor)"
+scripts/tests/run-audit-fixture-tests.sh
+
 section "Runtime guardrails"
 scripts/audit-runtime-guardrails.sh --all
+
+section "Architecture boundaries"
+scripts/audit-architecture-boundaries.sh --all
 
 section "Release data safety"
 scripts/audit-release-data-safety.sh
@@ -81,14 +79,15 @@ scripts/audit-governance-manifests.sh
 section "Resource integrity"
 scripts/audit-resource-integrity.sh
 
-section "UI V4 whole repo"
-scripts/audit-ui-v4.sh --all
+section "UI/accessibility/smoothness full-scope ratchet"
+scripts/audit-full-scope-ratchet.sh
 
-section "Accessibility whole repo"
-scripts/audit-accessibility.sh --all
-
-section "Smoothness whole repo"
-scripts/audit-smoothness-risk.sh --all
+section "Secret scan (working tree)"
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks detect --no-git --redact --no-banner --source . --config .gitleaks.toml
+else
+  echo "gitleaks not installed locally; CI runs it. Install with: brew install gitleaks"
+fi
 
 section "Git size"
 scripts/audit-git-size.sh

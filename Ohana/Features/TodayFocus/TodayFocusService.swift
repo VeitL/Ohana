@@ -9,11 +9,11 @@ import Foundation
 
 enum TodayFocusContent {
     case quest(IslandQuest)
-    case familyTask(FamilyCollaborationTask)
-    case coconutExchange(CoconutExchangeRequest)
+    case familyTask(TodayFocusFamilyTaskSnapshot)
+    case coconutExchange(TodayFocusExchangeRequestSnapshot)
     case negative(IslandNegativeSignal)
     case memory(MemoryFragment)
-    case celebrate(pets: [Pet])
+    case celebrate(pets: [TodayFocusPetSnapshot])
     case welcome
 
     var statusText: String {
@@ -36,7 +36,7 @@ enum TodayFocusContent {
     }
 }
 
-enum TodayFocusService {
+nonisolated enum TodayFocusService {
     typealias Content = TodayFocusContent
 
     static func refreshedQuests(
@@ -108,7 +108,7 @@ enum TodayFocusService {
         }
 
         if !refreshed.isEmpty || !pets.isEmpty || !plants.isEmpty {
-            return .celebrate(pets: pets)
+            return .celebrate(pets: pets.map(TodayFocusPetSnapshot.init))
         }
         return .welcome
     }
@@ -212,5 +212,33 @@ enum TodayFocusService {
             return pets.first(where: { $0.id == petId })?.photoLogs.contains { calendar.isDate($0.date, inSameDayAs: now) } == true
         }
         return false
+    }
+}
+
+nonisolated struct TodayFocusQuestRefresher {
+    func refreshedQuests(
+        _ quests: [IslandQuest],
+        pets: [Pet],
+        humans: [Human],
+        careLogs: [PetCareLog],
+        walkLogs: [PetWalkLog],
+        pottyLogs: [PetPottyLog],
+        humanWeightLogs: [HumanWeightLog],
+        calendar: Calendar,
+        now: Date,
+        questManager: QuestManager
+    ) -> [IslandQuest] {
+        TodayFocusService.refreshedQuests(
+            quests,
+            pets: pets,
+            humans: humans,
+            careLogs: careLogs,
+            walkLogs: walkLogs,
+            pottyLogs: pottyLogs,
+            humanWeightLogs: humanWeightLogs,
+            calendar: calendar,
+            now: now,
+            questManager: questManager
+        )
     }
 }

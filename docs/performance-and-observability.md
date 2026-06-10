@@ -73,6 +73,44 @@ Critical flows should emit privacy-safe signposts or diagnostics for:
 
 Diagnostics must not include pet names, human names, private notes, PIN, health values, precise routes, or raw user text.
 
+## Probe Naming Convention
+
+Probes registered in `docs/governance/manifests/performance-slo.json` use the
+existing `flow.<feature>.<step>` naming (for example `flow.home.card_expand`,
+`flow.calendar.open`) and must exist as literals in Swift source — the
+governance manifest audit fails when a declared probe disappears. When a probe
+graduates from the in-app recorder to `OSSignposter`, keep the same name as the
+signpost name so historical notes stay comparable.
+
+## Dense-Data Fixture Standard
+
+"Works on a fresh install" is not validation for aggregation code. The standard
+dense-data fixture for snapshot builder and read-model tests is:
+
+- 4 pets + 4 humans + 2 electronic pets.
+- 3 years of daily care events per pet (feeding, water, potty, walks)
+  ≈ 4,500–6,000 `Event` rows per pet, ≥ 18,000 total.
+- 200+ reminders (mixed recurring/one-shot, some overdue).
+- 100+ family tasks across states, 500+ ledger entries.
+- 50+ photos/attachments with missing-image gaps.
+- At least one memorial-mode member and one privacy-locked member.
+
+Aggregation-path tests (snapshot builders, read models, dashboard stores) must
+include at least one in-memory test on a dense fixture with an explicit upper
+bound on wall-clock build time. Treat the bound as a budget, not a benchmark:
+generous enough to be CI-stable (for example 500 ms for a full home snapshot on
+a CI runner), tight enough to catch accidental O(n²) regressions.
+
+## Off-Main Aggregation
+
+Deferred work that runs on the main actor still steals scroll frames as data
+grows. Snapshot builders and read models for high-frequency surfaces follow the
+Off-Main Aggregation Law in `AGENTS.md`: fetch + aggregate in `@ModelActor` or
+a background context, deliver small `Equatable` snapshots to the `MainActor`.
+The `main-actor-aggregation` smoothness audit rule and the
+`main_actor_read_model_refresh` SwiftLint rule flag the anti-pattern; existing
+violations are ratcheted in the full-scope audit baseline.
+
 ## Required Measurement Scenarios
 
 For performance-sensitive changes, validate at least the relevant subset:
@@ -83,10 +121,13 @@ For performance-sensitive changes, validate at least the relevant subset:
 - Reopen after background.
 - Low Power Mode.
 - Reduce Motion.
+- Elevated thermal state (Instruments or thermal-state override; the
+  `AppWorkloadPolicy` thermal budget is tracked in
+  `docs/release-hardening-plan.md`).
 - Smallest supported iPhone.
 - Long localized German text.
-- Large local dataset.
+- Dense local dataset (see Dense-Data Fixture Standard above).
 - Missing images.
 - Offline or degraded network.
-- Long session after repeated route open/dismiss.
+- Long session after repeated route open/dismiss (memory growth).
 

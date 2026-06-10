@@ -66,3 +66,37 @@ Prefetch and cache warmup must consider:
 
 A business write invalidates only the smallest affected read models. Do not use one write to rebuild every dashboard, report, reminder list, inventory view, and widget unless the service explicitly proves those outputs depend on the changed fact.
 
+## Data Growth and Archival Budget
+
+The framework moves aggregation cost out of the finger frame; this section caps
+the cost itself. A three-year-old family dataset must not make snapshots
+noticeably slower than a three-week-old one.
+
+- High-frequency read paths (home cards, Today Focus, calendar agenda,
+  dashboards) must use bounded fetches: `fetchLimit`, date-windowed predicates
+  (for example "last 90 days"), or precomputed running aggregates. Never scan a
+  member's full event history to render a current-state card.
+- Long-tail history (events, ledger entries, walk logs older than the active
+  window) is reachable from history/report screens with paginated or windowed
+  queries, not from high-frequency snapshots.
+- Every snapshot builder for a high-frequency surface must pass the dense-data
+  fixture test in `docs/performance-and-observability.md`.
+- When a model's row count grows without bound (events, ledger), the owning
+  service must document its windowing strategy in
+  `docs/governance/manifests/cache-ownership.json` or the feature entry in
+  `feature-ownership.json`.
+
+## Memory Pressure and Eviction
+
+- Caches that hold decoded images or large snapshots (`FocusPopoutImageCache`,
+  `FocusWalletAvatarCache`, avatar pipelines, map snapshot caches) must evict
+  on memory-pressure warnings and re-derive lazily. Wiring the eviction path is
+  tracked as P0 in `docs/release-hardening-plan.md`; new caches must ship with
+  eviction from day one.
+- A cache without an entry in `cache-ownership.json` (owner, invalidation,
+  expiry, recovery) fails the governance manifest audit — register it before
+  shipping.
+- Long-session memory growth is a release-blocking regression class: validate
+  repeated route open/dismiss cycles for leaks of frozen snapshots, motion
+  scenes, and route-scoped tasks.
+

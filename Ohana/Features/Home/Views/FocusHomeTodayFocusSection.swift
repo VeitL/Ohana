@@ -19,7 +19,7 @@ struct FocusHomeTodayFocusSection: View {
     let onCompleteQuest: (IslandQuest) -> Void
     let onTapNegativeSignal: (IslandNegativeSignal) -> Void
     let onTapOasis: () -> Void
-    let onTapFamilyTask: (FamilyCollaborationTask) -> Void
+    let onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void
     let onFirstSuccessFeed: (Pet) -> Void
     let onFirstSuccessPlay: (Pet) -> Void
     let onFirstSuccessMoment: (Pet) -> Void

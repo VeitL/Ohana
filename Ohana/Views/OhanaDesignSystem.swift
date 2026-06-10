@@ -725,8 +725,8 @@ extension View {
     /// chrome, hidden navigation bar, elastic vertical content). This modifier keeps
     /// the host sheet behavior consistent across entry points.
     func ohanaSheetPagePresentation(
-        detents: Set<PresentationDetent> = [.large],
-        cornerRadius: CGFloat = 36
+        detents: Set<PresentationDetent> = OhanaSheetDetents.full,
+        cornerRadius: CGFloat = OhanaRadius.sheetPage
     ) -> some View {
         self
             .presentationDetents(detents)
@@ -740,7 +740,7 @@ extension View {
     /// still system sheets rather than inline popups.
     func ohanaCompactSheetPresentation(
         detents: Set<PresentationDetent>,
-        cornerRadius: CGFloat = 32
+        cornerRadius: CGFloat = OhanaRadius.sheetCompact
     ) -> some View {
         self
             .presentationDetents(detents)

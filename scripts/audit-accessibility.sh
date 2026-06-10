@@ -12,9 +12,15 @@ Purpose:
   a full a11y audit; passing this does not prove VoiceOver/Dynamic Type quality.
 
 Modes:
-  --changed  Scan changed Swift files under Ohana/Views and Ohana/Utilities. Default.
-  --all      Scan all Swift files under Ohana/Views and Ohana/Utilities.
+  --changed  Scan changed Swift files under Ohana/. Default.
+  --all      Scan all Swift files under Ohana/ (app target source).
   --soft     Print warnings but exit 0.
+
+Scope note:
+  The scan root is the whole Ohana/ tree. Never narrow this back to a
+  subdirectory list: directory refactors silently removed 88% of files from
+  this audit once before. The fixture tests in scripts/tests/ enforce a
+  minimum scanned-file floor.
 
 Allowlist:
   Add "a11y: allow <reason>" on a line that intentionally violates a rule.
@@ -55,12 +61,12 @@ collect_files() {
     return
   fi
   if [[ "$mode" == "all" ]]; then
-    find Ohana/Views Ohana/Utilities -type f -name '*.swift'
+    find Ohana -type f -name '*.swift'
     return
   fi
   {
-    git diff --name-only --diff-filter=ACMR HEAD -- Ohana/Views Ohana/Utilities 2>/dev/null || true
-    git ls-files --others --exclude-standard -- Ohana/Views Ohana/Utilities 2>/dev/null || true
+    git diff --name-only --diff-filter=ACMR HEAD -- Ohana 2>/dev/null || true
+    git ls-files --others --exclude-standard -- Ohana 2>/dev/null || true
   } | awk '/\.swift$/ { print }'
 }
 
@@ -77,15 +83,15 @@ fi
 warnings_file="$(mktemp)"
 trap 'rm -f "$warnings_file"' EXIT
 
+# One rg invocation per rule across ALL files (see audit-ui-v4.sh for why the
+# per-file loop must never come back). Output format is load-bearing.
 scan_rule() {
   local rule_id="$1"; local pattern="$2"; local message="$3"; local suggestion="$4"
-  for file in "${files[@]}"; do
-    [[ -f "$file" ]] || continue
-    rg --pcre2 -n --no-heading "$pattern" "$file" 2>/dev/null | while IFS= read -r match; do
-      [[ "$match" == *"a11y: allow"* ]] && continue
-      printf '[%s] %s:%s\n  %s\n  Prefer: %s\n' "$rule_id" "$file" "$match" "$message" "$suggestion" >> "$warnings_file"
-    done || true
-  done
+  rg --pcre2 -nH --no-heading "$pattern" "${files[@]}" 2>/dev/null \
+    | while IFS= read -r match; do
+        [[ "$match" == *"a11y: allow"* ]] && continue
+        printf '[%s] %s\n  %s\n  Prefer: %s\n' "$rule_id" "$match" "$message" "$suggestion" >> "$warnings_file"
+      done || true
 }
 
 # 1. Icon-only buttons: a Button whose label is only an Image/Label-less icon

@@ -4,6 +4,20 @@ name: CI
 # before merge. This turns the prose rules in AGENTS.md and docs/ into
 # mechanically-enforced gates instead of "please remember to run the script".
 #
+# Gate model:
+#   - Audit self-tests run FIRST: fixtures prove every audit rule still fires,
+#     and a scanned-file floor proves no directory refactor silently shrank an
+#     audit's scope (this happened once: 88% of files dropped out of three
+#     "whole repo" gates after the Features/ refactor).
+#   - UI V4 / accessibility / smoothness run as a full-scope RATCHET against
+#     docs/governance/manifests/full-scope-audit-baseline.json: any new or
+#     increased per-file/per-rule debt fails; reductions are locked in with
+#     --update-baseline. When the baseline reaches zero again, promote back to
+#     direct `--all` strict gates (see docs/governance/full-scope-ratchet-policy.md).
+#   - Tool versions are pinned via scripts/ci-tool-versions.env so brew updates
+#     cannot silently change lint/audit behavior. A pin mismatch is a deliberate
+#     one-line bump, not an emergency.
+#
 # Branch protection (configure in GitHub repo settings, not in this file):
 #   - Require status checks: build-test, audits, lint
 #   - Require branches up to date before merging
@@ -23,7 +37,7 @@ jobs:
   # Repo audits: pure ripgrep/bash/Python, fast, no Xcode needed. These are the
   # cheap gates that catch most rule violations (UI tokens, runtime guardrails,
   # localization coverage, accessibility heuristics, release data safety,
-  # governance manifests, and resource/signing detritus).
+  # governance manifests, secret scanning, and resource/signing detritus).
   # ----------------------------------------------------------------------------
   audits:
     runs-on: macos-15
@@ -31,17 +45,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Install ripgrep
-        run: brew install ripgrep
-      # The full-scope baseline is now zero, so these run as direct whole-repo
-      # strict gates instead of changed-file gates plus a ratchet.
-      - name: UI V4 audit (whole repo, strict)
-        run: scripts/audit-ui-v4.sh --all
-      - name: Accessibility audit (whole repo, strict)
-        run: scripts/audit-accessibility.sh --all
-      - name: Smoothness risk audit (whole repo, strict)
-        run: scripts/audit-smoothness-risk.sh --all
-      # Whole-repo hard gates for mature-app invariants.
+      - name: Install tools
+        run: brew install ripgrep gitleaks
+      - name: Tool version pins
+        run: scripts/check-tool-versions.sh rg gitleaks
+      # Self-tests first: if the audits themselves are broken (dead regex,
+      # collapsed scan scope), every later "passed" line is meaningless.
+      - name: Audit self-tests (fixtures + scope floor)
+        run: scripts/tests/run-audit-fixture-tests.sh
+      # Full-scope ratchet for UI V4 + accessibility + smoothness. Fails on any
+      # new or increased per-file/per-rule debt vs the committed baseline.
+      - name: UI/accessibility/smoothness full-scope ratchet
+        run: scripts/audit-full-scope-ratchet.sh
+      # Whole-repo hard gates for mature-app invariants (baseline already zero).
       - name: Runtime guardrails audit (whole repo, strict)
         run: scripts/audit-runtime-guardrails.sh --all
       - name: Architecture boundaries audit (whole repo, strict)
@@ -56,9 +72,12 @@ jobs:
         run: scripts/audit-resource-integrity.sh
       - name: Git size audit
         run: scripts/audit-git-size.sh
+      - name: Secret scan (working tree)
+        run: gitleaks detect --no-git --redact --no-banner --source . --config .gitleaks.toml
 
   # ----------------------------------------------------------------------------
-  # Lint / format: SwiftLint + SwiftFormat (lint mode, no writes).
+  # Lint / format: SwiftLint + SwiftFormat (lint mode, no writes), versions
+  # pinned via scripts/ci-tool-versions.env.
   # ----------------------------------------------------------------------------
   lint:
     runs-on: macos-15
@@ -66,24 +85,30 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install tools
         run: brew install swiftlint swiftformat
+      - name: Tool version pins
+        run: scripts/check-tool-versions.sh swiftlint swiftformat
       # SwiftLint runs as a real gate: .swiftlint.yml is tuned lenient, so this
       # fails only on error-severity rules (no --strict yet — flip to --strict
-      # once the warning baseline is cleaned).
+      # once the warning baseline is cleaned; deadline tracked in
+      # docs/release-hardening-plan.md).
       - name: SwiftLint
         run: swiftlint lint --reporter github-actions-logging
       # SwiftFormat starts report-only. After one baseline pass (`swiftformat .`
-      # then commit), remove continue-on-error to enforce.
+      # then commit), remove continue-on-error to enforce. Deadline tracked in
+      # docs/release-hardening-plan.md.
       - name: SwiftFormat (lint only)
         continue-on-error: true
         run: swiftformat --lint .
 
   # ----------------------------------------------------------------------------
-  # Build + test on the fixed simulator.
+  # Build + test on the pinned-by-name simulator.
   #
-  # NOTE: Ohana targets iOS 26.2, so this job REQUIRES a runner image whose
+  # NOTE: Ohana targets iOS 26.x, so this job REQUIRES a runner image whose
   # Xcode ships the iOS 26 SDK + an "iPhone 17" simulator. GitHub-hosted images
-  # may lag the latest SDK; if so, use a self-hosted runner or the appropriate
-  # macos-26 image. See docs/os-support-matrix.md.
+  # may lag the latest SDK; if the preflight below fails persistently, move to
+  # a newer macos image or a self-hosted runner — do NOT mark this job optional
+  # and learn to ignore it. A required check that cannot go green is a gate in
+  # name only. See docs/os-support-matrix.md.
   # ----------------------------------------------------------------------------
   build-test:
     runs-on: macos-15
@@ -104,6 +129,7 @@ jobs:
           }
       - name: Build & test
         run: |
+          set -o pipefail
           xcodebuild test \
             -project Ohana.xcodeproj \
             -scheme Ohana \
@@ -112,7 +138,7 @@ jobs:
             -destination 'platform=iOS Simulator,name=iPhone 17' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify || exit 1
+            CODE_SIGNING_ALLOWED=NO | xcbeautify
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

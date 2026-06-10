@@ -28,8 +28,8 @@ struct TodayFocusCard: View {
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void = { _ in }
     var onTapMemory: () -> Void = {}
     var onTapOasis: () -> Void = {}
-    var onTapFamilyTask: (FamilyCollaborationTask) -> Void = { _ in }
-    var onConfirmExchange: (CoconutExchangeRequest) -> Void = { _ in }
+    var onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void = { _ in }
+    var onConfirmExchange: (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
     var freezesToFrontCard: Bool = false
     var allowsAmbientMotion: Bool = false
 
@@ -59,8 +59,8 @@ struct TodayFocusCard: View {
         onTapNegativeSignal: @escaping (IslandNegativeSignal) -> Void = { _ in },
         onTapMemory: @escaping () -> Void = {},
         onTapOasis: @escaping () -> Void = {},
-        onTapFamilyTask: @escaping (FamilyCollaborationTask) -> Void = { _ in },
-        onConfirmExchange: @escaping (CoconutExchangeRequest) -> Void = { _ in },
+        onTapFamilyTask: @escaping (TodayFocusFamilyTaskSnapshot) -> Void = { _ in },
+        onConfirmExchange: @escaping (TodayFocusExchangeRequestSnapshot) -> Void = { _ in },
         freezesToFrontCard: Bool = false,
         allowsAmbientMotion: Bool = false
     ) {
@@ -107,11 +107,11 @@ struct TodayFocusCard: View {
         renderDeck.pendingQuests
     }
 
-    var assignedFamilyTasks: [FamilyCollaborationTask] {
+    var assignedFamilyTasks: [TodayFocusFamilyTaskSnapshot] {
         renderDeck.assignedFamilyTasks
     }
 
-    var pendingExchangeRequests: [CoconutExchangeRequest] {
+    var pendingExchangeRequests: [TodayFocusExchangeRequestSnapshot] {
         renderDeck.pendingExchangeRequests
     }
 

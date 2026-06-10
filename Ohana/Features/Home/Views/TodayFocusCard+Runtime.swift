@@ -49,7 +49,7 @@ extension TodayFocusCard {
         freezesToFrontCard ? -1 : focusCards.count
     }
 
-    func confirmExchange(_ request: CoconutExchangeRequest) {
+    func confirmExchange(_ request: TodayFocusExchangeRequestSnapshot) {
         onConfirmExchange(request)
     }
 
@@ -77,19 +77,19 @@ extension TodayFocusCard {
         "quest:\(quest.id)"
     }
 
-    func familyTaskSkipKey(_ task: FamilyCollaborationTask) -> String {
+    func familyTaskSkipKey(_ task: TodayFocusFamilyTaskSnapshot) -> String {
         Self.familyTaskSkipKey(for: task)
     }
 
-    static func familyTaskSkipKey(for task: FamilyCollaborationTask) -> String {
+    static func familyTaskSkipKey(for task: TodayFocusFamilyTaskSnapshot) -> String {
         "familyTask:\(task.id.uuidString)"
     }
 
-    func exchangeSkipKey(_ request: CoconutExchangeRequest) -> String {
+    func exchangeSkipKey(_ request: TodayFocusExchangeRequestSnapshot) -> String {
         Self.exchangeSkipKey(for: request)
     }
 
-    static func exchangeSkipKey(for request: CoconutExchangeRequest) -> String {
+    static func exchangeSkipKey(for request: TodayFocusExchangeRequestSnapshot) -> String {
         "coconutExchange:\(request.id.uuidString)"
     }
 

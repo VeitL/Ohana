@@ -1,0 +1,23 @@
+# Gitleaks configuration for Ohana.
+#
+# Extends the default ruleset. Add allowlist entries ONLY for verified false
+# positives, with a comment explaining what the flagged string actually is.
+# Never allowlist a real credential "temporarily".
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Verified false positives"
+regexTarget = "line"
+regexes = [
+  # SharedCareSession note-format literal key ("stockOwner=1"), not a secret.
+  '''stockOwnerKey = "stockOwner=1"''',
+]
+paths = [
+  # Audit fixture files contain intentionally suspicious-looking Swift.
+  '''scripts/tests/fixtures/.*''',
+  # Local build state (CI checkouts never contain these; skipping keeps local runs fast).
+  '''\.build/.*''',
+  '''DerivedData/.*''',
+]

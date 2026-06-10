@@ -8,7 +8,7 @@
 
 import Foundation
 
-struct VerticalSolidHomeSourceState {
+nonisolated struct VerticalSolidHomeSourceState {
     let pets: [Pet]
     let humans: [Human]
     let plants: [Plant]
@@ -40,13 +40,94 @@ struct VerticalSolidHomeSourceState {
     }
 }
 
-enum VerticalSolidHomeSnapshotBuilder {
+nonisolated enum VerticalSolidHomeSnapshotBuilder {
+    @MainActor
     static func build(
         from source: VerticalSolidHomeSourceState,
         now: Date = Date(),
         privacy: HumanPrivacyManaging,
         todayFocus: TodayFocusManaging,
         healthAlerts: PetHealthAlerting
+    ) -> VerticalSolidHomeSnapshot {
+        build(
+            from: source,
+            now: now,
+            weightVisibleHumans: privacy.unlockedHumans(for: .weight, from: source.humans, viewedBy: source.activeHumanId),
+            makeTodayFocus: { pets, plants, reminders, events, humans, activeHumanId, careLogs, walkLogs, pottyLogs, humanWeightLogs, familyTasks, exchangeRequests in
+                TodayFocusSnapshot.make(
+                    pets: pets,
+                    plants: plants,
+                    reminders: reminders,
+                    events: events,
+                    humans: humans,
+                    activeHumanId: activeHumanId,
+                    careLogs: careLogs,
+                    walkLogs: walkLogs,
+                    pottyLogs: pottyLogs,
+                    humanWeightLogs: humanWeightLogs,
+                    familyTasks: familyTasks,
+                    exchangeRequests: exchangeRequests,
+                    todayFocus: todayFocus,
+                    healthAlerts: healthAlerts
+                )
+            }
+        )
+    }
+
+    static func buildForReadModelActor(
+        from source: VerticalSolidHomeSourceState,
+        now: Date = Date(),
+        questManager: QuestManager = QuestManager(),
+        healthAlertEngine: PetHealthAlertEngine = PetHealthAlertEngine()
+    ) -> VerticalSolidHomeSnapshot {
+        let clinicalAlerts = healthAlertEngine.scanAlerts(pets: source.pets.filter { !$0.hasPassedAway })
+        return build(
+            from: source,
+            now: now,
+            weightVisibleHumans: weightVisibleHumans(from: source),
+            makeTodayFocus: { pets, plants, reminders, events, humans, activeHumanId, careLogs, walkLogs, pottyLogs, humanWeightLogs, familyTasks, exchangeRequests in
+                TodayFocusSnapshot.make(
+                    pets: pets,
+                    plants: plants,
+                    reminders: reminders,
+                    events: events,
+                    humans: humans,
+                    activeHumanId: activeHumanId,
+                    careLogs: careLogs,
+                    walkLogs: walkLogs,
+                    pottyLogs: pottyLogs,
+                    humanWeightLogs: humanWeightLogs,
+                    familyTasks: familyTasks,
+                    exchangeRequests: exchangeRequests,
+                    questManager: questManager,
+                    clinicalAlerts: clinicalAlerts
+                )
+            }
+        )
+    }
+
+    private static func weightVisibleHumans(from source: VerticalSolidHomeSourceState) -> [Human] {
+        source.humans.filter { !$0.isPrivate(.weight, viewedBy: source.activeHumanId) }
+    }
+
+    private static func build(
+        from source: VerticalSolidHomeSourceState,
+        now: Date,
+        weightVisibleHumans: [Human],
+        makeTodayFocus: (
+            [Pet],
+            [Plant],
+            [Reminder],
+            [Event],
+            [Human],
+            String,
+            [PetCareLog],
+            [PetWalkLog],
+            [PetPottyLog],
+            [HumanWeightLog],
+            [FamilyCollaborationTask],
+            [CoconutExchangeRequest]
+        ) -> TodayFocusSnapshot
     ) -> VerticalSolidHomeSnapshot {
         let l = L10n(source.language)
         let cards = enrichCardsWithAvatarData(
@@ -69,21 +150,19 @@ enum VerticalSolidHomeSnapshotBuilder {
             equippedTitleRaw: source.equippedTitleRaw,
             language: source.language
         )
-        let todayFocus = TodayFocusSnapshot.make(
-            pets: source.pets.filter { !$0.hasPassedAway },
-            plants: source.plants,
-            reminders: source.pendingReminders,
-            events: source.events,
-            humans: privacy.unlockedHumans(for: .weight, from: source.humans, viewedBy: source.activeHumanId),
-            activeHumanId: source.activeHumanIdRaw,
-            careLogs: source.careLogs,
-            walkLogs: source.walkLogs,
-            pottyLogs: source.pottyLogs,
-            humanWeightLogs: source.humanWeightLogs,
-            familyTasks: source.familyTasks,
-            exchangeRequests: source.exchangeRequests,
-            todayFocus: todayFocus,
-            healthAlerts: healthAlerts
+        let todayFocus = makeTodayFocus(
+            source.pets.filter { !$0.hasPassedAway },
+            source.plants,
+            source.pendingReminders,
+            source.events,
+            weightVisibleHumans,
+            source.activeHumanIdRaw,
+            source.careLogs,
+            source.walkLogs,
+            source.pottyLogs,
+            source.humanWeightLogs,
+            source.familyTasks,
+            source.exchangeRequests
         )
 
         return VerticalSolidHomeSnapshot(
@@ -342,7 +421,7 @@ enum VerticalSolidHomeSnapshotBuilder {
     }
 }
 
-enum VerticalSolidHomePreloadPlanner {
+nonisolated enum VerticalSolidHomePreloadPlanner {
     static func avatarSignature(for payloads: [FocusWalletAvatarCache.Payload]) -> String {
         payloads.map { payload in
             [

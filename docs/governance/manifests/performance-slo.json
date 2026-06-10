@@ -1,6 +1,6 @@
 {
   "schema": "ohana.governance.performance-slo.v1",
-  "updated": "2026-06-08",
+  "updated": "2026-06-10",
   "policyDocuments": [
     "AGENTS.md",
     "docs/performance-and-observability.md",
@@ -93,6 +93,46 @@
         "Ohana/OhanaApp.swift",
         "Ohana/Utilities/MetricKitObserver.swift",
         "OhanaTests/AppLifecycleCoordinatorTests.swift"
+      ]
+    },
+    {
+      "id": "home-first-render",
+      "owner": "Home feature owner",
+      "interactionClass": "startup",
+      "budgets": [
+        "Home first render records a visible-shell probe without triggering extra fetches or aggregation.",
+        "The probe runs after the first home body has appeared and remains privacy-safe.",
+        "Home read-model refresh stays deferred behind the snapshot controller."
+      ],
+      "measurement": "In-app recorder plus OSSignposter event for the home first-render probe.",
+      "evidence": "home_first_render plus HomeReadModelStoreTests.",
+      "probeNames": [
+        "home_first_render"
+      ],
+      "paths": [
+        "Ohana/Features/Home/Views/VerticalSolidHomeView.swift",
+        "Ohana/Features/Home/Views/HomeReadModelStore.swift",
+        "OhanaTests/HomeReadModelStoreTests.swift"
+      ]
+    },
+    {
+      "id": "walk-session",
+      "owner": "Walks feature owner",
+      "interactionClass": "runtime",
+      "budgets": [
+        "Starting, pausing, resuming, and stopping a walk emit lifecycle probes without including pet names or precise coordinates.",
+        "Location delivery remains gated by active walk state and AppWorkloadPolicy.",
+        "Stop-session persistence records write completion separately from the tap frame."
+      ],
+      "measurement": "Stable AppPerformanceMonitor probes and OSSignposter events for walk session lifecycle.",
+      "evidence": "flow.walk.session plus location runtime guardrails.",
+      "probeNames": [
+        "flow.walk.session"
+      ],
+      "paths": [
+        "Ohana/Features/Walks/PetWalkingManager.swift",
+        "Ohana/Features/Walks/LocationManager.swift",
+        "Ohana/Features/Home/Views/WalkTrackingCard.swift"
       ]
     },
     {

@@ -10,8 +10,8 @@ extension TodayFocusCard {
 
     struct TodayFocusRenderDeck {
         let pendingQuests: [IslandQuest]
-        let assignedFamilyTasks: [FamilyCollaborationTask]
-        let pendingExchangeRequests: [CoconutExchangeRequest]
+        let assignedFamilyTasks: [TodayFocusFamilyTaskSnapshot]
+        let pendingExchangeRequests: [TodayFocusExchangeRequestSnapshot]
         let negativeSignals: [IslandNegativeSignal]
         let cards: [TodayFocusContent]
         let identity: String

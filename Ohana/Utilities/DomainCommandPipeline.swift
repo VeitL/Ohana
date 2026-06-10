@@ -8,7 +8,7 @@
 import Combine
 import Foundation
 
-struct DomainCommand: Hashable, CustomStringConvertible {
+nonisolated struct DomainCommand: Hashable, CustomStringConvertible, Sendable {
     let feature: String
     let action: String
     let parameters: [String: String]
@@ -58,7 +58,7 @@ struct DomainMutationResult: Identifiable, Hashable {
     }
 }
 
-struct HomeRevision: Equatable, Hashable {
+nonisolated struct HomeRevision: Equatable, Hashable, Sendable {
     var value: Int = 0
     var changedAt: Date = .distantPast
     var lastCommand: DomainCommand?

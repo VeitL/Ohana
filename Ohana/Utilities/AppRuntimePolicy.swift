@@ -7,6 +7,7 @@
 
 import Combine
 import Foundation
+import OSLog
 import SwiftUI
 import UIKit
 
@@ -60,31 +61,68 @@ enum OhanaFrameScheduler {
 final class AppWorkloadPolicy: ObservableObject {
     static let shared = AppWorkloadPolicy()
 
-    @Published private(set) var isForeground = true
-    @Published private(set) var isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
-    @Published private(set) var isReduceMotionEnabled = UIAccessibility.isReduceMotionEnabled
-    @Published private(set) var isUserPowerSavingMode = UserDefaults.standard.bool(forKey: AppPerformanceMode.powerSavingKey)
+    @Published private(set) var isForeground: Bool
+    @Published private(set) var isLowPowerModeEnabled: Bool
+    @Published private(set) var isReduceMotionEnabled: Bool
+    @Published private(set) var isUserPowerSavingMode: Bool
+    @Published private(set) var thermalState: ProcessInfo.ThermalState
     @Published private(set) var lastReductionReason = "foreground"
 
     var hasRunningWalkProvider: @MainActor () -> Bool = { false }
 
+    private let lowPowerModeProvider: @MainActor () -> Bool
+    private let reduceMotionProvider: @MainActor () -> Bool
+    private let userPowerSavingProvider: @MainActor () -> Bool
+    private let thermalStateProvider: @MainActor () -> ProcessInfo.ThermalState
     private var cancellables: Set<AnyCancellable> = []
 
-    private init() {
-        NotificationCenter.default.publisher(for: Notification.Name.NSProcessInfoPowerStateDidChange)
+    init(
+        notificationCenter: NotificationCenter = .default,
+        lowPowerModeProvider: (@MainActor () -> Bool)? = nil,
+        reduceMotionProvider: (@MainActor () -> Bool)? = nil,
+        userPowerSavingProvider: (@MainActor () -> Bool)? = nil,
+        thermalStateProvider: (@MainActor () -> ProcessInfo.ThermalState)? = nil
+    ) {
+        let lowPowerModeProvider = lowPowerModeProvider ?? { ProcessInfo.processInfo.isLowPowerModeEnabled }
+        let reduceMotionProvider = reduceMotionProvider ?? { UIAccessibility.isReduceMotionEnabled }
+        let userPowerSavingProvider = userPowerSavingProvider ?? {
+            UserDefaults.standard.bool(forKey: AppPerformanceMode.powerSavingKey)
+        }
+        let thermalStateProvider = thermalStateProvider ?? { ProcessInfo.processInfo.thermalState }
+
+        self.lowPowerModeProvider = lowPowerModeProvider
+        self.reduceMotionProvider = reduceMotionProvider
+        self.userPowerSavingProvider = userPowerSavingProvider
+        self.thermalStateProvider = thermalStateProvider
+        isForeground = true
+        isLowPowerModeEnabled = lowPowerModeProvider()
+        isReduceMotionEnabled = reduceMotionProvider()
+        isUserPowerSavingMode = userPowerSavingProvider()
+        thermalState = thermalStateProvider()
+
+        notificationCenter.publisher(for: Notification.Name.NSProcessInfoPowerStateDidChange)
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    self?.isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
+                    self?.isLowPowerModeEnabled = self?.lowPowerModeProvider() ?? false
                     self?.recordPolicySample(reason: "powerStateChanged")
                 }
             }
             .store(in: &cancellables)
 
-        NotificationCenter.default.publisher(for: UIAccessibility.reduceMotionStatusDidChangeNotification)
+        notificationCenter.publisher(for: UIAccessibility.reduceMotionStatusDidChangeNotification)
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    self?.isReduceMotionEnabled = UIAccessibility.isReduceMotionEnabled
+                    self?.isReduceMotionEnabled = self?.reduceMotionProvider() ?? false
                     self?.recordPolicySample(reason: "reduceMotionChanged")
+                }
+            }
+            .store(in: &cancellables)
+
+        notificationCenter.publisher(for: ProcessInfo.thermalStateDidChangeNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.thermalState = self?.thermalStateProvider() ?? .nominal
+                    self?.recordPolicySample(reason: "thermalStateChanged")
                 }
             }
             .store(in: &cancellables)
@@ -107,9 +145,10 @@ final class AppWorkloadPolicy: ObservableObject {
     }
 
     func refresh(reason: String) {
-        isLowPowerModeEnabled = ProcessInfo.processInfo.isLowPowerModeEnabled
-        isReduceMotionEnabled = UIAccessibility.isReduceMotionEnabled
-        isUserPowerSavingMode = UserDefaults.standard.bool(forKey: AppPerformanceMode.powerSavingKey)
+        isLowPowerModeEnabled = lowPowerModeProvider()
+        isReduceMotionEnabled = reduceMotionProvider()
+        isUserPowerSavingMode = userPowerSavingProvider()
+        thermalState = thermalStateProvider()
         recordPolicySample(reason: reason)
     }
 
@@ -136,24 +175,32 @@ final class AppWorkloadPolicy: ObservableObject {
     func interactionMotionBudget(isVisible: Bool = true) -> OhanaMotionBudget {
         guard isVisible else { return .static }
         guard isForeground else { return .static }
-        if isReduceMotionEnabled { return .efficient }
-        return .full
+        let base: OhanaMotionBudget = isReduceMotionEnabled ? .efficient : .full
+        return stricterMotionBudget(base, thermalInteractionMotionBudget)
     }
 
     func ambientMotionBudget(isVisible: Bool = true, allowDuringActiveWalk: Bool = false) -> OhanaMotionBudget {
         guard isVisible else { return .static }
         guard isForeground || (allowDuringActiveWalk && hasRunningWalk) else { return .static }
-        if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode { return .static }
-        return .full
+        let base: OhanaMotionBudget = if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode {
+            .static
+        } else {
+            .full
+        }
+        return stricterMotionBudget(base, thermalAmbientMotionBudget)
     }
 
     func refreshBudget(isVisible: Bool = true, allowDuringActiveWalk: Bool = false) -> OhanaRefreshBudget {
         guard isVisible else { return .paused }
-        guard isForeground else {
-            return allowDuringActiveWalk && hasRunningWalk ? .throttled : .paused
+        let base: OhanaRefreshBudget
+        if !isForeground {
+            base = allowDuringActiveWalk && hasRunningWalk ? .throttled : .paused
+        } else if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode {
+            base = .throttled
+        } else {
+            base = .live
         }
-        if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode { return .throttled }
-        return .live
+        return stricterRefreshBudget(base, thermalRefreshBudget)
     }
 
     func refreshInterval(
@@ -173,17 +220,80 @@ final class AppWorkloadPolicy: ObservableObject {
     private func reductionReason(isVisible: Bool, allowDuringActiveWalk: Bool) -> String? {
         if !isVisible { return "notVisible" }
         if !isForeground && !(allowDuringActiveWalk && hasRunningWalk) { return "background" }
+        if thermalState == .critical { return "thermalCritical" }
+        if thermalState == .serious { return "thermalSerious" }
         if isLowPowerModeEnabled { return "lowPowerMode" }
         if isReduceMotionEnabled { return "reduceMotion" }
         if userPowerSavingMode { return "appPowerSaving" }
         return nil
     }
 
+    private var thermalInteractionMotionBudget: OhanaMotionBudget {
+        switch thermalState {
+        case .serious, .critical:
+            return .efficient
+        case .nominal, .fair:
+            return .full
+        @unknown default:
+            return .efficient
+        }
+    }
+
+    private var thermalAmbientMotionBudget: OhanaMotionBudget {
+        switch thermalState {
+        case .critical:
+            return .static
+        case .serious:
+            return .efficient
+        case .nominal, .fair:
+            return .full
+        @unknown default:
+            return .efficient
+        }
+    }
+
+    private var thermalRefreshBudget: OhanaRefreshBudget {
+        switch thermalState {
+        case .critical:
+            return .paused
+        case .serious:
+            return .throttled
+        case .nominal, .fair:
+            return .live
+        @unknown default:
+            return .throttled
+        }
+    }
+
+    private func stricterMotionBudget(_ first: OhanaMotionBudget, _ second: OhanaMotionBudget) -> OhanaMotionBudget {
+        motionSeverity(first) >= motionSeverity(second) ? first : second
+    }
+
+    private func stricterRefreshBudget(_ first: OhanaRefreshBudget, _ second: OhanaRefreshBudget) -> OhanaRefreshBudget {
+        refreshSeverity(first) >= refreshSeverity(second) ? first : second
+    }
+
+    private func motionSeverity(_ budget: OhanaMotionBudget) -> Int {
+        switch budget {
+        case .full: return 0
+        case .efficient: return 1
+        case .static: return 2
+        }
+    }
+
+    private func refreshSeverity(_ budget: OhanaRefreshBudget) -> Int {
+        switch budget {
+        case .live: return 0
+        case .throttled: return 1
+        case .paused: return 2
+        }
+    }
+
     private func recordPolicySample(reason: String) {
         AppPerformanceMonitor.shared.record(
             "能耗策略",
             valueMS: 0,
-            note: "reason=\(reason), foreground=\(isForeground), lowPower=\(isLowPowerModeEnabled), reduceMotion=\(isReduceMotionEnabled), appPowerSaving=\(userPowerSavingMode), walk=\(hasRunningWalk)"
+            note: "reason=\(reason), foreground=\(isForeground), lowPower=\(isLowPowerModeEnabled), reduceMotion=\(isReduceMotionEnabled), appPowerSaving=\(userPowerSavingMode), thermal=\(thermalState), walk=\(hasRunningWalk)"
         )
     }
 }
@@ -220,6 +330,7 @@ final class AppPerformanceMonitor: ObservableObject {
     }
 
     func record(_ name: String, valueMS: Double, note: String? = nil) {
+        AppPerformanceSignposts.recordSample(name, valueMS: valueMS, note: note)
         samples.insert(Sample(name: name, valueMS: valueMS, timestamp: Date(), note: note), at: 0)
         if samples.count > 80 {
             samples.removeLast(samples.count - 80)
@@ -243,6 +354,7 @@ enum AppPerformanceFlows {
     static let calendarAddEventSheet = "flow.calendar.add_event_sheet"
     static let oasisOpen = "flow.oasis.open"
     static let backupExport = "flow.backup.export"
+    static let walkSession = "flow.walk.session"
 }
 
 enum AppPerformancePhases {
@@ -258,6 +370,9 @@ enum AppPerformancePhases {
     static let noop = "noop"
     static let routeDismiss = "route_dismiss"
     static let outgoingUnmounted = "outgoing_unmounted"
+    static let sessionPaused = "session_paused"
+    static let sessionResumed = "session_resumed"
+    static let locationReady = "location_ready"
 }
 
 @MainActor
@@ -278,8 +393,11 @@ enum AppFlowPerformance {
         let sampleName = "\(flow).\(phase)"
         let noteString = formattedNote(note)
         if let startedAt {
-            AppPerformanceMonitor.shared.record(sampleName, startedAt: startedAt, note: noteString)
+            let elapsedMS = max(0, (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+            AppPerformanceSignposts.recordFlow(flow, phase: phase, valueMS: elapsedMS, note: noteString)
+            AppPerformanceMonitor.shared.record(sampleName, valueMS: elapsedMS, note: noteString)
         } else {
+            AppPerformanceSignposts.recordFlow(flow, phase: phase, valueMS: 0, note: noteString)
             AppPerformanceMonitor.shared.record(sampleName, valueMS: 0, note: noteString)
         }
     }
@@ -298,5 +416,63 @@ enum AppFlowPerformance {
         return note.keys.sorted().map { key in
             "\(key)=\(note[key] ?? "")"
         }.joined(separator: ", ")
+    }
+}
+
+@MainActor
+private enum AppPerformanceSignposts {
+    private static let signposter = OSSignposter(subsystem: "HT.Ohana", category: "PerformanceProbes")
+
+    static func recordSample(_ name: String, valueMS: Double, note: String?) {
+        switch name {
+        case "launch_shell_ready":
+            emit("launch_shell_ready", phase: "sample", valueMS: valueMS, note: note)
+        case "first_render":
+            emit("first_render", phase: "sample", valueMS: valueMS, note: note)
+        case "home_first_render":
+            emit("home_first_render", phase: "sample", valueMS: valueMS, note: note)
+        case "metrickit_metrics":
+            emit("metrickit_metrics", phase: "sample", valueMS: valueMS, note: note)
+        default:
+            break
+        }
+    }
+
+    static func recordFlow(_ flow: String, phase: String, valueMS: Double, note: String?) {
+        switch flow {
+        case AppPerformanceFlows.homeCardExpand:
+            emit("flow.home.card_expand", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.homeCardCollapse:
+            emit("flow.home.card_collapse", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.homeTabSwitch:
+            emit("flow.home.tab_switch", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.quickCareCommand:
+            emit("flow.quick_care.command", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.calendarOpen:
+            emit("flow.calendar.open", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.calendarModeSwitch:
+            emit("flow.calendar.mode_switch", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.calendarFilter:
+            emit("flow.calendar.filter", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.calendarAddEventSheet:
+            emit("flow.calendar.add_event_sheet", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.oasisOpen:
+            emit("flow.oasis.open", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.backupExport:
+            emit("flow.backup.export", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.walkSession:
+            emit("flow.walk.session", phase: phase, valueMS: valueMS, note: note)
+        default:
+            break
+        }
+    }
+
+    private static func emit(_ name: StaticString, phase: String, valueMS: Double, note: String?) {
+        let elapsed = String(format: "%.2f", valueMS)
+        let note = note ?? ""
+        signposter.emitEvent(
+            name,
+            "phase=\(phase, privacy: .public), elapsed_ms=\(elapsed, privacy: .public), note=\(note, privacy: .public)"
+        )
     }
 }

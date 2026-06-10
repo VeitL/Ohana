@@ -70,7 +70,7 @@ extension TodayFocusCard {
         .background(cardBackground(accent))
     }
 
-    func familyTaskCard(_ task: FamilyCollaborationTask) -> some View {
+    func familyTaskCard(_ task: TodayFocusFamilyTaskSnapshot) -> some View {
         let accent = task.hasReward ? Color.goTeal : Color.goPurple
         let rewardText = task.rewardCoconuts > 0 ? " · +\(task.rewardCoconuts)🥥" : ""
         let performer = task.completedByName ?? l.tr(zh: "对方", en: "Someone", de: "Jemand")
@@ -131,7 +131,7 @@ extension TodayFocusCard {
         .ohanaShine(trigger: task.statusRaw, cornerRadius: 20, isEnabled: task.status == .pendingReview)
     }
 
-    func exchangeCard(_ request: CoconutExchangeRequest) -> some View {
+    func exchangeCard(_ request: TodayFocusExchangeRequestSnapshot) -> some View {
         let accent = Color.goYellow
         let amount = CoconutExchangeOption.format(request.localAmount, currencyCode: request.currencyCode)
         return HStack(spacing: 14) {
@@ -233,7 +233,7 @@ extension TodayFocusCard {
         return nil
     }
 
-    func taskStatusLine(_ task: FamilyCollaborationTask, performer: String, rewardText: String) -> String {
+    func taskStatusLine(_ task: TodayFocusFamilyTaskSnapshot, performer: String, rewardText: String) -> String {
         if task.status == .pendingReview {
             return l.tr(
                 zh: "\(performer) 待确认\(rewardText)",

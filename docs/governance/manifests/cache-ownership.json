@@ -1,6 +1,6 @@
 {
   "schema": "ohana.governance.cache-ownership.v1",
-  "updated": "2026-06-08",
+  "updated": "2026-06-10",
   "policyDocuments": [
     "AGENTS.md",
     "docs/data-cache-sync-policy.md",
@@ -21,6 +21,33 @@
         "Ohana/Features/Home/Views/HomeSnapshotBuilder.swift",
         "Ohana/Features/Home/Views/VerticalSolidHomeSnapshotBuilder.swift",
         "OhanaTests/HomeReadModelStoreTests.swift"
+      ]
+    },
+    {
+      "id": "focus-wallet-avatar-cache",
+      "owner": "Home feature owner",
+      "scope": "process",
+      "sourceOfTruth": "Human and pet avatar image data plus cached preview PNG files derived from those payload signatures.",
+      "invalidation": "Avatar payload signature changes, explicit nil payloads, and UIApplication memory warnings invalidate decoded UIImage entries; in-flight decodes are generation-checked so memory warning evictions do not get repopulated by stale work.",
+      "expiry": "Decoded memory entries live only while process memory pressure allows; preview files remain lazy fallback cache data.",
+      "recovery": "Render placeholders or preview entries, then rebuild decoded images through the existing deferred AvatarPipeline / FocusWalletAvatarCache preload path after the first frame.",
+      "paths": [
+        "Ohana/Utilities/FocusWalletAvatarCache.swift",
+        "Ohana/Utilities/AvatarPipeline.swift",
+        "OhanaTests/DecodedImageCacheMemoryWarningTests.swift"
+      ]
+    },
+    {
+      "id": "focus-popout-image-cache",
+      "owner": "Home feature owner",
+      "scope": "process",
+      "sourceOfTruth": "Card popout image data keyed by payload signature.",
+      "invalidation": "Popout payload signature changes, explicit nil or empty payloads, and UIApplication memory warnings invalidate decoded UIImage entries; generation checks prevent stale in-flight decodes from restoring evicted entries.",
+      "expiry": "Decoded memory entries live only while process memory pressure allows.",
+      "recovery": "Render without the popout image until route-scoped preload rebuilds it through the existing detached decode path.",
+      "paths": [
+        "Ohana/Utilities/FocusPopoutImageCache.swift",
+        "OhanaTests/DecodedImageCacheMemoryWarningTests.swift"
       ]
     },
     {

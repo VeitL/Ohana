@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-struct FocusCard: Identifiable {
+nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
     let id: UUID
     let name: String
     let kind: String
@@ -59,7 +59,7 @@ struct FocusCard: Identifiable {
     var homeWalkDistanceMeters: Double = 0
     var actions: [Action]
 
-    struct Action: Identifiable {
+    struct Action: Identifiable, Sendable {
         let id = UUID()
         let label: String
         let icon: String

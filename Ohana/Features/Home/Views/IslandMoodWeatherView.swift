@@ -232,7 +232,7 @@ struct IslandMoodCalculator {
 // P0 留存：连断天气变阴 / 护理超期 / 用药遗漏叶发黄
 // 统一作为 mood/banner 的数据源，避免到处散落的零散判断
 //
-struct IslandNegativeSignal: Identifiable {
+nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
     let id = UUID()
     let iconName: String      // SF Symbol
     let emoji: String         // fallback emoji
@@ -242,7 +242,7 @@ struct IslandNegativeSignal: Identifiable {
     let petId: UUID?
     let healthAlertType: HealthAlert.AlertType?
 
-    enum Severity {
+    enum Severity: Sendable {
         case warning       // 黄色 - 可缓冲
         case critical      // 红色 - 紧急
     }
@@ -273,12 +273,24 @@ struct IslandNegativeFeedback {
         plants: [Plant] = [],
         healthAlerts: PetHealthAlerting
     ) -> [IslandNegativeSignal] {
+        signals(
+            pets: pets,
+            plants: plants,
+            clinicalAlerts: healthAlerts.scanAlerts(pets: pets)
+        )
+    }
+
+    static func signals(
+        pets: [Pet],
+        plants: [Plant] = [],
+        clinicalAlerts: [HealthAlert]
+    ) -> [IslandNegativeSignal] {
         var result: [IslandNegativeSignal] = []
         let cal = Calendar.current
         let now = Date()
 
         // 0. 健康异常引擎：疫苗/驱虫/体重/症状/证件等风险优先进入 Today Focus。
-        let clinicalAlerts = healthAlerts.scanAlerts(pets: pets)
+        let filteredClinicalAlerts = clinicalAlerts
             .filter { alert in
                 switch alert.type {
                 case .noCheckIn, .noWalk, .noPotty:
@@ -287,7 +299,7 @@ struct IslandNegativeFeedback {
                     return true
                 }
             }
-        for alert in clinicalAlerts.prefix(2) {
+        for alert in filteredClinicalAlerts.prefix(2) {
             result.append(IslandNegativeSignal(
                 iconName: iconName(for: alert),
                 emoji: alert.emoji,

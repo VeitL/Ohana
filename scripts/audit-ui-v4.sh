@@ -10,9 +10,15 @@ Purpose:
   Check new or modified SwiftUI views against Ohana V4 UI rules from ui规范.selection.json.
 
 Modes:
-  --changed  Scan changed Swift files under Ohana/Views and Ohana/Utilities. Default.
-  --all      Scan all Swift files under Ohana/Views and Ohana/Utilities.
+  --changed  Scan changed Swift files under Ohana/. Default.
+  --all      Scan all Swift files under Ohana/ (app target source).
   --soft     Print warnings but exit 0.
+
+Scope note:
+  The scan root is the whole Ohana/ tree (Features/, Views/, Shared/, App/,
+  Utilities/, ...). Never narrow this back to a subdirectory list: directory
+  refactors silently removed 88% of files from this audit once before. The
+  fixture tests in scripts/tests/ enforce a minimum scanned-file floor.
 
 Allowlist:
   Add "ui-v4: allow <reason>" on a line that intentionally violates a rule.
@@ -74,13 +80,13 @@ collect_files() {
   fi
 
   if [[ "$mode" == "all" ]]; then
-    find Ohana/Views Ohana/Utilities -type f -name '*.swift'
+    find Ohana -type f -name '*.swift'
     return
   fi
 
   {
-    git diff --name-only --diff-filter=ACMR HEAD -- Ohana/Views Ohana/Utilities 2>/dev/null || true
-    git ls-files --others --exclude-standard -- Ohana/Views Ohana/Utilities 2>/dev/null || true
+    git diff --name-only --diff-filter=ACMR HEAD -- Ohana 2>/dev/null || true
+    git ls-files --others --exclude-standard -- Ohana 2>/dev/null || true
   } | awk '/\.swift$/ { print }'
 }
 
@@ -97,21 +103,23 @@ fi
 warnings_file="$(mktemp)"
 trap 'rm -f "$warnings_file"' EXIT
 
+# One rg invocation per rule across ALL files. Never switch this back to a
+# per-file loop: rules x files process spawning made the whole-repo scan take
+# 70+ seconds; batched it is ~1s. Output format ([rule] path:line:content) is
+# load-bearing for the full-scope ratchet parser and the fixture tests.
 scan_rule() {
   local rule_id="$1"
   local pattern="$2"
   local message="$3"
   local suggestion="$4"
 
-  for file in "${files[@]}"; do
-    [[ -f "$file" ]] || continue
-    rg --pcre2 -n --no-heading "$pattern" "$file" 2>/dev/null | while IFS= read -r match; do
-      if [[ "$match" == *"ui-v4: allow"* ]]; then
-        continue
-      fi
-      printf '[%s] %s:%s\n  %s\n  Prefer: %s\n' "$rule_id" "$file" "$match" "$message" "$suggestion" >> "$warnings_file"
-    done || true
-  done
+  rg --pcre2 -nH --no-heading "$pattern" "${files[@]}" 2>/dev/null \
+    | while IFS= read -r match; do
+        if [[ "$match" == *"ui-v4: allow"* ]]; then
+          continue
+        fi
+        printf '[%s] %s\n  %s\n  Prefer: %s\n' "$rule_id" "$match" "$message" "$suggestion" >> "$warnings_file"
+      done || true
 }
 
 scan_rule \
@@ -161,6 +169,24 @@ scan_rule \
   'presentationBackground\(\s*\.(regularMaterial|ultraThinMaterial|thinMaterial)|presentationDetents\(\s*\[\s*\.large\s*\]\s*\)' \
   "New sheets should default to bottom clear glass and minimum useful height." \
   ".presentationBackground(.clear), pill close, compact detents unless the sheet is a long overview/history"
+
+scan_rule \
+  "raw-textfield" \
+  '\bTextField\(' \
+  "Raw TextField bypasses the V4 flat-input token (font, surface, stroke, focus emphasis drift per call site)." \
+  "OhanaTextField(placeholder:text:style:), InlineNumericInput, or GoDraftInput; // ui-v4: allow only inside blessed input wrappers"
+
+scan_rule \
+  "hardcoded-detent-height" \
+  'presentationDetents\(\s*\[[^]]*\.height\(\s*[0-9]' \
+  "Per-sheet numeric detent heights fragment sheet geometry across the app." \
+  "OhanaSheetDetents.overview/.full/.compactMedium, ohanaSheetPagePresentation/ohanaCompactSheetPresentation, or a computed adaptive height"
+
+scan_rule \
+  "hardcoded-corner-radius" \
+  'cornerRadius:\s*[0-9]|\.cornerRadius\(\s*[0-9]|presentationCornerRadius\(\s*[0-9]' \
+  "Literal corner radii drift (12/14/16/18/20/22/24... all coexist); use the semantic radius scale." \
+  "OhanaRadius.input/.card/.cardLarge/.sheetCompact/.sheetPage/.inlinePopup"
 
 if [[ ! -s "$warnings_file" ]]; then
   echo "V4 UI audit: passed (${#files[@]} file(s))."

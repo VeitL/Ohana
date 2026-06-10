@@ -102,6 +102,69 @@ struct HomeReadModelStoreTests {
         #expect(store.payload.avatarPreloadPayloads.map(\.id) == [human.id])
     }
 
+    @Test func actorPayloadMatchesMainThreadSnapshotBuilder() async throws {
+        let container = try makeContainer()
+        let human = Human(name: "Owner")
+        let pet = Pet(name: "Mochi", species: "Cat")
+        container.mainContext.insert(human)
+        container.mainContext.insert(pet)
+        try container.mainContext.save()
+
+        let input = HomeReadModelActorInput(
+            activeHumanIdRaw: human.id.uuidString,
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            petBondVaultRevision: 0,
+            equippedTitleRaw: "",
+            language: AppLanguage.code,
+            loadPlants: true
+        )
+
+        let actor = HomeReadModelActor(modelContainer: container)
+        let actorPayload = try #require(await actor.refreshPayload(
+            input: input,
+            previousSignature: "",
+            currentRevision: HomeRevision(),
+            externalRevision: HomeRevision(),
+            force: true
+        ))
+
+        let source = VerticalSolidHomeSourceState(
+            pets: [pet],
+            humans: [human],
+            plants: [],
+            electronicPets: [],
+            events: [],
+            pendingReminders: [],
+            humanMedications: [],
+            humanMedicationLogs: [],
+            careLogs: [],
+            walkLogs: [],
+            pottyLogs: [],
+            humanWeightLogs: [],
+            familyTasks: [],
+            exchangeRequests: [],
+            activeHumanIdRaw: human.id.uuidString,
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            petBondVaultRevision: 0,
+            equippedTitleRaw: "",
+            language: AppLanguage.code
+        )
+        let mainSnapshot = VerticalSolidHomeSnapshotBuilder.build(
+            from: source,
+            privacy: StaticHumanPrivacyManager(),
+            todayFocus: StaticTodayFocusManager(),
+            healthAlerts: SharedPetHealthAlertEngine()
+        )
+
+        #expect(actorPayload.signature == VerticalSolidHomeSnapshotBuilder.signature(for: source))
+        #expect(actorPayload.snapshot.cards.map(\.id) == mainSnapshot.cards.map(\.id))
+        #expect(actorPayload.snapshot.todayFocus.refreshedQuests.map(\.id) == mainSnapshot.todayFocus.refreshedQuests.map(\.id))
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV58.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)

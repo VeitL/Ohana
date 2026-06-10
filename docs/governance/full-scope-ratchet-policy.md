@@ -1,29 +1,39 @@
 # Full-Scope Ratchet Policy
 
-> Date: 2026-06-08
+> Date: 2026-06-08; updated 2026-06-10.
 >
-> Status: promoted on 2026-06-09. UI/accessibility/smoothness governance now
-> uses direct whole-repo strict gates because the full-scope baseline is zero.
+> Status: RE-ACTIVATED on 2026-06-10. The 2026-06-09 promotion to direct strict
+> gates was based on a scan scope of `Ohana/Views` + `Ohana/Utilities` (91
+> files). The Features/ directory refactor had silently moved ~88% of Swift
+> files outside that scope, so the "zero baseline" was zero over a shrinking
+> subset. On 2026-06-10 the three audits were widened to the whole `Ohana/`
+> tree (~760 files), new smoothness rules were added (main-actor aggregation,
+> imperative view fetch, detached view tasks), and construction-consistency
+> UI rules followed the same day (raw-textfield, hardcoded-corner-radius,
+> hardcoded-detent-height). The surfaced debt (1381 warnings: ui-v4 1309 —
+> dominated by legacy radius literals — accessibility 60, smoothness 12) was
+> captured back into the ratchet baseline. `scripts/tests/run-audit-fixture-tests.sh`
+> now enforces a scanned-file floor so scope can never silently collapse again.
 
 ## Active Gate
 
-CI runs direct whole-repo strict audits:
+CI runs `scripts/audit-full-scope-ratchet.sh`:
 
-1. `scripts/audit-ui-v4.sh --all`
-2. `scripts/audit-accessibility.sh --all`
-3. `scripts/audit-smoothness-risk.sh --all`
+- Any NEW or INCREASED per-file/per-rule warning count fails CI.
+- Reductions pass and are locked in with `--update-baseline`.
+- When the baseline reaches zero again (target tracked in
+  `docs/release-hardening-plan.md`), promote CI back to direct
+  `--all` strict audits and update this policy.
 
-The historical zero baseline lives at
-`docs/governance/manifests/full-scope-audit-baseline.json`. It is retained as
-promotion evidence, not as an allowance for future warnings.
+## Ratchet Rules
 
-## Strict Rules
-
-- Any UI V4, accessibility, or smoothness warning fails CI.
-- Do not reintroduce changed-file-only gates for these audit families.
-- Do not increase the zero baseline to hide newly introduced debt.
-- Use inline allow comments only for deliberate, documented exceptions that the
-  strict audit scripts already recognize.
+- Never increase the baseline to absorb newly introduced debt; fix the new
+  warning or use a documented inline allow comment instead.
+- `--update-baseline` may only be run after intentional cleanup, and the
+  baseline diff must ship in the same commit as the cleanup.
+- Do not reintroduce changed-file-only gates for these audit families in CI.
+- Do not narrow audit scan scope below the whole `Ohana/` tree; the fixture
+  tests' scope floor is the enforcement for this rule.
 
 ## Baseline History
 

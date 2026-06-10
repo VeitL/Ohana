@@ -21,10 +21,10 @@ Rule precedence:
 
 - Ohana is an iOS SwiftUI app using SwiftData and Swift Charts.
 - The current app group in code is `group.com.guanchen.li.Ohana`; do not reintroduce older `Ark` app-group identifiers.
-- The latest SwiftData schema is defined in `Ohana/Models/SharedModelContainer.swift`; as of this consolidation it is `ArkSchemaV57`.
+- The latest SwiftData schema is defined in `Ohana/Models/SharedModelContainer.swift`; as of this consolidation it is `ArkSchemaV58`. Always verify the current `ArkSchemaV*` in that file rather than trusting this number — bump this line whenever a schema version lands.
 - Before changing any SwiftData model field or adding a model, inspect the latest `ArkSchemaV*`, add the next schema version, append it to `ArkMigrationPlan.schemas`, and keep added fields lightweight-migration friendly with defaults when possible.
 - Keep `ArkMigrationPlan.stages` empty for add-only/lightweight changes. Add an explicit migration stage only when there is real custom migration logic.
-- User-facing copy must support Chinese, English, and German through the localization rules below.
+- User-facing copy must support the registered app languages (currently Chinese, English, German, Spanish, Portuguese, French, Japanese, Korean, Italian — see `Ohana/Shared/LocalizationSettings.swift`) through the localization rules below. Chinese and English are mandatory at authoring time; the others resolve through the fallback chain.
 
 ## Business Fact Rules
 
@@ -35,44 +35,60 @@ Rule precedence:
 
 ## Project Structure & Module Organization
 
-This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohana/`, with `Models/`, `ViewModels/`, `Views/`, `Utilities/`, localized resources in `*.lproj/`, and catalog assets in `Assets.xcassets/`. Active non-catalog app resources live under `Resources/` and must stay referenced through `Ohana.xcodeproj`. Unit tests are in `OhanaTests/`; UI tests are in `OhanaUITests/`. Project documentation, planning notes, design references, archived backups, and governance manifests live under `docs/`; active UI machine tokens stay at the repository root in `ui规范.selection.json`. Helper automation belongs in `scripts/`. `DesignExports/archive/` and `docs/archive/` hold historical artifacts only. `ohana-design-system/` is a separate design/reference project; avoid changing it unless the task explicitly targets that folder.
+This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohana/`, organized into `App/` (app shell, route containers), `Features/<FeatureName>/` (feature modules, each with its own `Views/`, services, and read models), `Domain/` (cross-feature domain services and the economy), `Models/` (SwiftData models only), `Shared/` (localization and cross-feature UI utilities), plus legacy `Views/`, `ViewModels/`, and `Utilities/` trees that are being absorbed into the feature layout. Localized resources live in `*.lproj/`, and catalog assets in `Assets.xcassets/`. Audit scripts must always scan the whole `Ohana/` tree, never a subdirectory allowlist — a directory refactor once silently removed 88% of files from three "whole repo" gates, which is why `scripts/tests/run-audit-fixture-tests.sh` enforces a scanned-file floor. Active non-catalog app resources live under `Resources/` and must stay referenced through `Ohana.xcodeproj`. Unit tests are in `OhanaTests/`; UI tests are in `OhanaUITests/`. Project documentation, planning notes, design references, archived backups, and governance manifests live under `docs/`; active UI machine tokens stay at the repository root in `ui规范.selection.json`. Helper automation belongs in `scripts/`. `DesignExports/archive/` and `docs/archive/` hold historical artifacts only. `ohana-design-system/` is a separate design/reference project; avoid changing it unless the task explicitly targets that folder.
 
 ## Build, Test, and Development Commands
 
 - `open Ohana.xcodeproj` opens the app in Xcode for local development.
-- `scripts/build-debug-fast.sh` is the default quick Debug build. It intentionally uses `-sdk iphonesimulator` and the fixed local destination `platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66` without an `OS=` pin so Xcode uses the installed default iOS 26.5 simulator runtime and does not try to download or resolve an older runtime.
-- `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66' build` builds the app directly when the script is not appropriate.
-- `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66'` runs unit and UI tests on the fixed simulator.
+- `scripts/build-debug-fast.sh` is the default quick Debug build. It uses `-sdk iphonesimulator` and resolves the `iPhone 17` simulator BY NAME at run time (newest installed iOS runtime), so it survives new Macs, Xcode reinstalls, and device resets. It does not pin an `OS=` so Xcode uses the installed default runtime instead of downloading an older one.
+- `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build` builds the app directly when the script is not appropriate.
+- `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17'` runs unit and UI tests on the pinned-by-name simulator.
 - `xcodebuild -list -project Ohana.xcodeproj` lists available targets, schemes, and configurations.
 
-### Fixed Simulator Build Rule
+### Pinned Simulator Build Rule
 
-Local command-line builds and tests must target the fixed simulator `platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66` with `-sdk iphonesimulator`. This is the current local `iPhone 17` simulator; do not fall back to another simulator with the same name. Do not build against a connected physical iPhone, `generic/platform=iOS`, `Any iOS Device`, or an auto-selected device. Do not switch simulator model or pin an older `OS=` unless the user explicitly asks for that validation. If Xcode prints passcode-protected physical-device discovery warnings while the command is still using `-sdk iphonesimulator` and the fixed iPhone 17 simulator destination, treat those warnings as environment noise; do not change the destination to a physical device to "fix" them.
+Local command-line builds and tests must target the `iPhone 17` simulator with `-sdk iphonesimulator`. The simulator is pinned by NAME, not by UDID: `scripts/build-debug-fast.sh` resolves the device named `iPhone 17` on the newest installed iOS runtime; `OHANA_SIMULATOR_UDID` or `OHANA_SIMULATOR_NAME` override the resolution when a task explicitly needs a different device. Never hardcode a UDID in scripts or docs — a UDID is machine-local state and becomes a single point of failure on any other machine.
+
+Do not build against a connected physical iPhone, `generic/platform=iOS`, `Any iOS Device`, or an auto-selected non-iPhone-17 device. Do not switch simulator model or pin an older `OS=` unless the user explicitly asks for that validation. If Xcode prints passcode-protected physical-device discovery warnings while the command is still using `-sdk iphonesimulator` and the iPhone 17 simulator destination, treat those warnings as environment noise; do not change the destination to a physical device to "fix" them.
 
 ## Continuous Integration & Automated Gates
 
 Rules in this file and `docs/` are enforced mechanically, not only by memory.
 `.github/workflows/ci.yml` runs on every push and pull request:
 
-- `audits`: repo audits (UI V4, accessibility, and smoothness whole-repo strict
-  gates; full-repo runtime guardrails, localization coverage, release
-  data-safety, governance manifests, resource integrity / xattr pre-sign checks,
-  git size).
-- `lint`: SwiftLint (`.swiftlint.yml`) and SwiftFormat (`.swiftformat`).
-- `build-test`: `xcodebuild test` on the fixed iPhone 17 simulator.
+- `audits`: audit self-tests first (`scripts/tests/run-audit-fixture-tests.sh`
+  proves every audit rule still fires and that scan scope has not collapsed),
+  then the UI/accessibility/smoothness full-scope ratchet
+  (`scripts/audit-full-scope-ratchet.sh`), whole-repo strict runtime guardrails
+  and architecture boundaries, localization coverage, release data-safety,
+  governance manifests, resource integrity / xattr pre-sign checks, git size,
+  and a gitleaks secret scan (`.gitleaks.toml`).
+- `lint`: SwiftLint (`.swiftlint.yml`) and SwiftFormat (`.swiftformat`), with
+  tool versions pinned via `scripts/ci-tool-versions.env` and
+  `scripts/check-tool-versions.sh`.
+- `build-test`: `xcodebuild test` on the `iPhone 17` simulator (by name).
 
 Treat a red CI as a blocking failure. Do not merge around it. When you add a new
 rule, prefer encoding it as a lint rule, audit script check, or test so it is
-enforced automatically rather than as prose. The `build-test` job requires a
-runner whose Xcode ships the iOS 26 SDK and an iPhone 17 simulator; see
-`docs/os-support-matrix.md`.
+enforced automatically rather than as prose — and add a bad/good fixture pair in
+`scripts/tests/fixtures/` so the rule cannot silently die. The `build-test` job
+requires a runner whose Xcode ships the iOS 26 SDK and an iPhone 17 simulator;
+see `docs/os-support-matrix.md`.
 
-UI/accessibility/smoothness are full-repo strict gates. CI runs
-`scripts/audit-ui-v4.sh --all`, `scripts/audit-accessibility.sh --all`, and
-`scripts/audit-smoothness-risk.sh --all`; these baselines are now zero and must
-stay zero. `docs/governance/manifests/full-scope-audit-baseline.json` is retained
-as historical promotion evidence, not as a debt allowance. SwiftFormat remains
-the last report-only ratchet until its baseline is formatted and committed.
+UI/accessibility/smoothness run as a full-scope RATCHET, not a zero gate. The
+scan scope was widened from `Ohana/Views` + `Ohana/Utilities` (91 files) to the
+whole `Ohana/` tree on 2026-06-10, and construction-consistency rules
+(raw-textfield, hardcoded-corner-radius, hardcoded-detent-height) were added
+the same day, which surfaced pre-existing debt into
+`docs/governance/manifests/full-scope-audit-baseline.json` (ui-v4 1309,
+accessibility 60, smoothness 12 as of 2026-06-10 — the ui-v4 number is
+dominated by legacy radius literals). Any new or increased per-file/per-rule
+warning count fails CI; reductions are locked in with
+`scripts/audit-full-scope-ratchet.sh --update-baseline`. Drive the baseline
+back to zero, then promote CI back to direct `--all` strict gates per
+`docs/governance/full-scope-ratchet-policy.md`. SwiftFormat remains the last
+report-only ratchet until its baseline is formatted and committed; both
+deadlines are tracked in `docs/release-hardening-plan.md`.
 
 ## Parallel Agent & Build Isolation
 
@@ -82,7 +98,7 @@ Do not create a new worktree or branch by default. Stay in the current worktree 
 
 Each conversation owns only its current worktree. Before editing, run `git status --short` and keep changes inside the requested task scope. If a file is already being changed for an unrelated task, do not patch it to satisfy the current build unless the user explicitly asks you to take over that blocker.
 
-Use `scripts/build-debug-fast.sh` for local Debug builds. The script uses `-sdk iphonesimulator`, the fixed local iPhone 17 simulator destination `platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66`, a per-worktree/per-branch DerivedData path under `.build/DerivedData/`, and a matching lock under `.build/locks/`, which avoids the common Xcode `build.db` lock failure when two conversations build at once. If you must call `xcodebuild` directly while other work is active, pass `-sdk iphonesimulator`, `-destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66'`, and a unique `-derivedDataPath` for the current worktree/task.
+Use `scripts/build-debug-fast.sh` for local Debug builds. The script uses `-sdk iphonesimulator`, resolves the `iPhone 17` simulator by name, and uses a per-worktree/per-branch DerivedData path under `.build/DerivedData/` plus a matching lock under `.build/locks/`, which avoids the common Xcode `build.db` lock failure when two conversations build at once. If you must call `xcodebuild` directly while other work is active, pass `-sdk iphonesimulator`, `-destination 'platform=iOS Simulator,name=iPhone 17'`, and a unique `-derivedDataPath` for the current worktree/task.
 
 When validation fails in files outside the current task scope or outside the files changed by this conversation, report it as an external blocker. Do not “fix forward” into another conversation's feature area just to make the build green unless the user explicitly authorizes that cross-task repair.
 
@@ -107,9 +123,9 @@ Default to fast-change mode unless the user explicitly asks for exhaustive valid
 
 Keep the development loop CLI-first. Start with the narrowest trustworthy check for the code touched, then expand only when needed:
 - Use `xcodebuild -list -project Ohana.xcodeproj` when schemes or targets are unclear.
-- Use `scripts/build-debug-fast.sh` for day-to-day validation; do not hardcode older simulator OS versions such as `OS=26.4.1`. Let Xcode select the installed default iOS 26.5 runtime for the fixed local iPhone 17 simulator unless a task explicitly requires another destination.
-- Use `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66' build` only when a direct app build is necessary.
-- Use `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC2C2B3B-3135-4427-89B7-F4B6A6049D66'` for test validation when behavior or persistence changes.
+- Use `scripts/build-debug-fast.sh` for day-to-day validation; do not hardcode older simulator OS versions such as `OS=26.4.1`. Let Xcode select the newest installed iOS runtime for the iPhone 17 simulator unless a task explicitly requires another destination.
+- Use `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build` only when a direct app build is necessary.
+- Use `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17'` for test validation when behavior or persistence changes.
 - For pure UI changes, do not build by default. If a UI change has already been escalated to compile validation or the user asks for visual verification, prefer the fixed iPhone 17 simulator build/run and screenshots; if deeper simulator control is available through XcodeBuildMCP or similar tooling, use it to launch, inspect logs, and capture screenshots.
 
 For iPhone and iPad work, keep the implementation focused on those platforms unless the task explicitly asks for broader Apple-platform support. When reporting completion, include the scheme, simulator destination, and validation commands that were actually used.
@@ -254,6 +270,16 @@ Use SwiftData as the persistence/model layer, not as a render-time aggregation e
 - ViewModels are allowed only for one screen's complex read-only aggregation or interaction coordination. They must not hide SwiftData write logic or cross-page business rules.
 - Persistence writes go through domain services. A user action writes one business fact once, then services synchronize derived states.
 
+### Off-Main Aggregation Law
+
+Deferring heavy work past the first frame is necessary but NOT sufficient: deferred work that still runs on the main actor steals scroll and animation frames as data grows. The finger-first frame law moves cost out of the tap frame; this law moves it off the main thread entirely.
+
+- New read models, snapshot stores, and snapshot builders for high-frequency surfaces must perform SwiftData fetching and aggregation off the main actor — use `@ModelActor` (as `DataBackupRuntime` and `CareLedgerBackfillService` already do) or a background `ModelContext` — and deliver small, `Equatable` value snapshots back to the `MainActor` for rendering.
+- `Task { @MainActor in ... fetch ... aggregate ... }` inside a `*ReadModelStore`, `*SnapshotStore`, or `*SnapshotBuilder` is the anti-pattern this law exists to stop. It is flagged by the `main-actor-aggregation` smoothness audit rule and the `main_actor_read_model_refresh` SwiftLint rule.
+- Existing main-actor aggregation (for example `HomeReadModelStore`) is ratcheted debt in `docs/governance/manifests/full-scope-audit-baseline.json`: do not add more, and migrate the existing cases when touching those features.
+- Aggregation cost must be bounded by data-scale budgets: snapshot builders are tested against the dense-data fixture standard in `docs/performance-and-observability.md`, not only against fresh-install data.
+- The snapshot handoff remains main-actor: only the prepared value crosses back. Never pass live `@Model` objects across actors into render layers.
+
 Core Location must stay centralized in `LocationManager` and `PetWalkingManager`. Only a running dog walk may keep background location active; paused, stopped, or non-walk app states must stop location updates. Do not create `CLLocationManager`, set `allowsBackgroundLocationUpdates = true`, or request Always authorization outside that flow.
 
 Repeating work must be visible and intentional. New `Timer.publish`, `TimelineView(.animation)`, `repeatForever`, Canvas loops, particle loops, or Map live updates must be paused or downgraded through `AppWorkloadPolicy` when the page is invisible, app is backgrounded, Low Power Mode is on, Reduce Motion is enabled, or app power-saving mode is enabled. Use elapsed-time calculations instead of background timers for durations.
@@ -298,6 +324,8 @@ High-risk reminders for agents:
 
 For new pages or major view refactors, start from `docs/ui-v4-new-page-template.md`. New SwiftUI views should use `OhanaAppBackground()`, semantic Ohana text colors, shared card/button/sheet helpers, `ScaleButtonStyle()`, and `GoMotion` tokens by default.
 
+Construction-level consistency (`Ohana/Views/Components/OhanaFormControls.swift`): text inputs use `OhanaTextField` (or `InlineNumericInput`/`GoDraftInput`) instead of raw `TextField`; corner radii come from the `OhanaRadius` semantic scale instead of literals; system sheet detents come from `OhanaSheetDetents` presets or the shared `ohanaSheetPagePresentation`/`ohanaCompactSheetPresentation` helpers instead of per-sheet `.height(<number>)`. The `raw-textfield`, `hardcoded-corner-radius`, and `hardcoded-detent-height` audit rules enforce this for new code; legacy literals are ratcheted in the full-scope baseline and migrate when their files are touched. `ohana-design-system/` is reference-only — its README carries a repo notice that V4 tokens win on conflict.
+
 Before reporting UI work complete, run `scripts/audit-ui-v4.sh --changed` or a path-specific scan such as `scripts/audit-ui-v4.sh Ohana/Views/Components/NewView.swift`. Fix warnings, or add an inline `// ui-v4: allow <reason>` only for intentional exceptions like modal scrims or asset-specific ink colors.
 
 Also run `scripts/audit-accessibility.sh --changed` and follow `docs/accessibility-governance.md`: icon-only controls need localized `accessibilityLabel`s, interactive targets need a 44x44pt hit area, text uses Dynamic Type (`OhanaFont.*`, not fixed `.system(size:)`), state is never conveyed by color alone, and high-traffic flows get a VoiceOver + largest-Dynamic-Type pass. Use `// a11y: allow <reason>` only for genuinely decorative or non-interactive exceptions.
@@ -330,19 +358,25 @@ Ohana's default motion taste is restrained, elastic, and legible: never stiff, n
 
 ## Localization Source of Truth
 
-Ohana must support Chinese, English, and German across user-facing pages. Use `Ohana/Models/Localization.swift` (`L10n`, `AppLanguage`, and `AppLocalizedText`) as the code source of truth for dynamic strings, interpolated text, formatter labels, alerts, sheet titles, button labels, and any text built outside a static SwiftUI `Text("...")` key.
+Ohana must support all registered app languages (currently zh-Hans, en, de, es, pt, fr, ja, ko, it; the registry is `Ohana/Shared/LocalizationSettings.swift`) across user-facing pages. Use `Ohana/Shared/Localization.swift` (`L10n`, `AppLanguage`, and `AppLocalizedText`) as the code source of truth for dynamic strings, interpolated text, formatter labels, alerts, sheet titles, button labels, and any text built outside a static SwiftUI `Text("...")` key. Chinese and English are mandatory at authoring time (`L10n.tr(zh:en:...)`); other languages are optional parameters that resolve through the fallback chain, with curated static translations for high-traffic strings.
 
-Use `Ohana/en.lproj/Localizable.strings` and `Ohana/de.lproj/Localizable.strings` as the resource source for static SwiftUI localization keys. Chinese is the source language in code/base UI, while English and German resources must avoid leaking Chinese text. If a German translation is not ready, use a clear English fallback rather than Chinese.
+Use the per-language `Ohana/<code>.lproj/Localizable.strings` files as the resource source for static SwiftUI localization keys, with `en` as the parity reference (`scripts/audit-localization-coverage.sh` checks key parity against `en.lproj`). Chinese is the source language in code/base UI; non-Chinese resources must avoid leaking Chinese text. If a translation is not ready for a language, use a clear English fallback rather than Chinese.
 
-Do not add new direct language ternaries such as `appLanguage == "zh" ? ... : ...` or `AppLanguage.isEnglish ? ... : ...` in views. Prefer `L10n(appLanguage).tr(zh:en:de:)`, `L10n.current`, or `AppLocalizedText(zh:en:de:)`. For legacy APIs that only accept `isEnglish`, pass `L10n(...).isEn` so German falls back to English instead of Chinese.
+Do not add new direct language ternaries such as `appLanguage == "zh" ? ... : ...` or `AppLanguage.isEnglish ? ... : ...` in views. Prefer `L10n(appLanguage).tr(zh:en:...)`, `L10n.current`, or `AppLocalizedText(zh:en:...)`. For legacy APIs that only accept `isEnglish`, pass `L10n(...).isEn` so other languages fall back to English instead of Chinese.
 
-When adding or refactoring pages, include Chinese, English, and German copy at the same time. For dates, numbers, currency, units, and relative labels, use `AppLanguage.effectiveLocale`, `AppLanguage.compactMonthDayFormat`, `AppLanguage.fullMonthYearFormat`, or a localized helper instead of hardcoded Chinese date formats.
+When adding or refactoring pages, include at least Chinese and English copy at the same time and add other languages where translations are available. For dates, numbers, currency, units, and relative labels, use `AppLanguage.effectiveLocale`, `AppLanguage.compactMonthDayFormat`, `AppLanguage.fullMonthYearFormat`, or a localized helper instead of hardcoded Chinese date formats.
 
 ## Performance & Observability Gates
 
 For high-traffic flows, do not report "feels fast" as validation. Report the user flow, the measurement method, and whether the change affects launch, first render, tap response, route transition, scrolling, memory, SwiftData reads, image decoding, timers, or background work.
 
-Use `docs/performance-and-observability.md` for flow budgets. Add privacy-safe signposts or diagnostics for critical flows when measurement would otherwise be guesswork.
+Use `docs/performance-and-observability.md` for flow budgets, the dense-data fixture standard, and probe naming. Add privacy-safe probes/signposts for critical flows when measurement would otherwise be guesswork; flows listed in `docs/governance/manifests/performance-slo.json` must keep their `probeNames` present in source (the governance manifest audit enforces this).
+
+### Thermal, Memory, and Energy Budgets
+
+- `AppWorkloadPolicy` is the single budget arbiter. It currently gates on foreground/background, Low Power Mode, Reduce Motion, and the user power-saving mode; extending it with `ProcessInfo.thermalState` gating (downgrade ambient and interaction motion budgets at `.serious`, pause ambient work at `.critical`) is tracked as P0 work in `docs/release-hardening-plan.md`. New runtime surfaces must consume the thermal budget once it exists rather than reading `thermalState` locally.
+- Every cache (image, avatar, snapshot, read-model) must have an owner entry in `docs/governance/manifests/cache-ownership.json` with an eviction story. Caches holding decoded images or large snapshots must evict on memory-pressure warnings; adding that eviction path to the existing caches is tracked as P0 work in `docs/release-hardening-plan.md`.
+- MetricKit hang/launch summaries flow through `Ohana/Utilities/MetricKitObserver.swift`. When a perf-sensitive change ships, check the next MetricKit payload rather than assuming success.
 
 ## Testing Guidelines
 
