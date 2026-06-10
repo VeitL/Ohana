@@ -10,6 +10,7 @@ import SwiftUI
 
 struct HomeReadModelRefreshKey: Hashable {
     let revisionValue: Int
+    let dayToken: Int
     let activeHumanIdRaw: String
     let hiddenPetIDsRaw: String
     let homeCardOrderRaw: String
@@ -17,6 +18,10 @@ struct HomeReadModelRefreshKey: Hashable {
     let petBondVaultRevision: Int
     let equippedTitleRaw: String
     let language: String
+
+    static func dayToken(for date: Date, calendar: Calendar = .current) -> Int {
+        Int(calendar.startOfDay(for: date).timeIntervalSince1970)
+    }
 }
 
 struct HomeCreatedEntitySignal: Equatable {
@@ -48,6 +53,7 @@ struct VerticalSolidHomeDataContainer: View {
 
     @StateObject private var readModelStore = HomeReadModelStore()
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
@@ -57,6 +63,7 @@ struct VerticalSolidHomeDataContainer: View {
     @AppStorage(PetBondVaultStore.revisionKey) private var petBondVaultRevision = 0
     @AppStorage("shop_equipped_title") private var equippedTitleRaw = ""
     @State private var observedHomeRevision = HomeRevision()
+    @State private var currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
 
     init(
         onOpenPet: @escaping (UUID, PetDetailTab) -> Void,
@@ -128,9 +135,18 @@ struct VerticalSolidHomeDataContainer: View {
         }
         .onAppear {
             observedHomeRevision = appServices.domainRevisions.homeRevision
+            refreshCurrentDayToken()
         }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
             observedHomeRevision = revision
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            observedHomeRevision = appServices.domainRevisions.homeRevision
+            refreshCurrentDayToken()
+        }
+        .task(id: currentDayToken) {
+            await updateDayTokenAfterNextMidnight()
         }
         .onDisappear {
             readModelStore.cancel()
@@ -140,6 +156,7 @@ struct VerticalSolidHomeDataContainer: View {
     private var refreshKey: HomeReadModelRefreshKey {
         HomeReadModelRefreshKey(
             revisionValue: observedHomeRevision.value,
+            dayToken: currentDayToken,
             activeHumanIdRaw: activeHumanIdRaw,
             hiddenPetIDsRaw: hiddenPetIDsRaw,
             homeCardOrderRaw: homeCardOrderRaw,
@@ -148,5 +165,21 @@ struct VerticalSolidHomeDataContainer: View {
             equippedTitleRaw: equippedTitleRaw,
             language: appLanguage
         )
+    }
+
+    private func refreshCurrentDayToken() {
+        currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
+    }
+
+    private func updateDayTokenAfterNextMidnight() async {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: Date())
+        let next = calendar.date(byAdding: .day, value: 1, to: start) ?? Date(timeIntervalSinceNow: 24 * 60 * 60)
+        let nanoseconds = UInt64(max(1.0, next.timeIntervalSinceNow) * 1_000_000_000)
+        try? await Task.sleep(nanoseconds: nanoseconds)
+        guard !Task.isCancelled else { return }
+        await MainActor.run {
+            refreshCurrentDayToken()
+        }
     }
 }

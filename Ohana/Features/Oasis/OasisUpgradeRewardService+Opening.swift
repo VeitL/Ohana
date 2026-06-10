@@ -47,7 +47,8 @@ extension OasisUpgradeRewardService {
         }
 
         var duplicateCritter = false
-        coconut.openedAt = Date()
+        let treeManager = OasisTreeManagerRegistry.current
+        let previousInjectedEnergy = treeManager.injectedEnergy
 
         if coconut.rewardKind == .electronicPet,
            let critterId = coconut.guaranteedCritterId,
@@ -65,7 +66,7 @@ extension OasisUpgradeRewardService {
             coconut.descriptionDe = "Dieser Begleiter ist bei Lebensbaum Lv.\(entry.sourceLevel) garantiert."
         }
 
-        OasisCritterEconomyService.awardCurrentHumanCoconuts(
+        guard OasisCritterEconomyService.awardCurrentHumanCoconuts(
             coconut.coconutAmount,
             emoji: "🥥",
             title: "升级椰子 Lv.\(coconut.level)",
@@ -73,10 +74,16 @@ extension OasisUpgradeRewardService {
             activeHumanSelection: activeHumanSelection,
             wallet: wallet,
             questManager: questManager
-        )
+        ) else {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            throw OasisRewardWriteError.coconutAwardFailed
+        }
+
+        coconut.openedAt = Date()
 
         if coconut.treeEnergyAmount > 0 {
-            OasisTreeManagerRegistry.current.injectedEnergy += coconut.treeEnergyAmount
+            treeManager.injectedEnergy += coconut.treeEnergyAmount
         }
 
         if coconut.fragmentAmount > 0 {
@@ -132,11 +139,18 @@ extension OasisUpgradeRewardService {
             }
         }
 
-        if coconut.treeEnergyAmount > 0 {
-            _ = OasisTreeManagerRegistry.current.checkAndRewardLevelUp(modelContext: context)
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            treeManager.injectedEnergy = previousInjectedEnergy
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            throw error
         }
 
-        try context.save()
+        if coconut.treeEnergyAmount > 0 {
+            _ = treeManager.checkAndRewardLevelUp(modelContext: context)
+        }
         return openedResult(for: coconut, duplicate: duplicateCritter)
     }
 }

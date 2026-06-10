@@ -98,8 +98,12 @@ extension OasisRewardView {
         .overlay(stageShape.strokeBorder(Color.goPrimary.opacity(0.22), lineWidth: 1))
         .contentShape(stageShape)
         .onAppear {
-            refreshTreeHarvestSnapshot()
-            updateGlowMotion()
+            treeStageAppearTask?.cancel()
+            treeStageAppearTask = OhanaFrameScheduler.runAfterNextFrame {
+                refreshTreeHarvestSnapshot()
+                updateGlowMotion()
+                treeStageAppearTask = nil
+            }
         }
         .onChange(of: treeVisualLevel) { oldLevel, newLevel in
             refreshTreeHarvestSnapshot()
@@ -232,20 +236,38 @@ extension OasisRewardView {
 
     var stageTopHUD: some View {
         HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Lv.\(treeVisualLevel.rawValue)")
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                Text(treeVisualLevel.displayName)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
-                    .lineLimit(1)
+            Button {
+                OhanaFeedback.light()
+                openSheet(.growthRoadmap)
+            } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Lv.\(treeVisualLevel.rawValue)")
+                        .font(OhanaFont.title3(.black))
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                    Text(treeVisualLevel.displayName)
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+            .buttonStyle(ScaleButtonStyle())
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            .accessibilityLabel(l.tr(
+                zh: "椰子树等级 Lv.\(treeVisualLevel.rawValue)",
+                en: "Coconut Tree level \(treeVisualLevel.rawValue)",
+                de: "Kokosbaum Stufe \(treeVisualLevel.rawValue)"
+            ))
+            .accessibilityHint(l.tr(
+                zh: "打开升级路线和解锁规则",
+                en: "Open upgrade roadmap and unlock rules",
+                de: "Upgrade-Roadmap und Freischaltregeln öffnen"
+            ))
 
             Spacer(minLength: 4)
         }
@@ -644,11 +666,12 @@ extension OasisRewardView {
     }
 
     func injectTreeEnergy() {
-        guard canInjectTreeEnergy else {
+        guard !treeInjectionLocked else { return }
+        guard hasAvailableTreeInjection else {
             OhanaFeedback.error()
+            scheduleOasisRenderSnapshotRefresh(milliseconds: 60)
             return
         }
-        guard !isInjecting else { return }
 
         let motionBudget = interactionMotionBudget
         let visualAnimation = motionBudget.allowsMotion ? GoMotion.feedback : GoMotion.reduced
@@ -665,6 +688,7 @@ extension OasisRewardView {
         injectionPulseToken += 1
         let pulseToken = injectionPulseToken
         OhanaFeedback.light()
+        treeInjectionLocked = true
         withAnimation(visualAnimation) {
             coconutBalanceVisualOverride = targetBalance
             actionSnapshot.activeCoconutBalance = targetBalance
@@ -689,6 +713,7 @@ extension OasisRewardView {
                     withTransaction(transaction) {
                         rebuildOasisRenderSnapshots()
                         isInjecting = false
+                        treeInjectionLocked = false
                         treeVisualEnergyOverride = nil
                         coconutBalanceVisualOverride = nil
                     }
@@ -699,6 +724,7 @@ extension OasisRewardView {
                 injectionResetTask = nil
                 withAnimation(visualAnimation) {
                     isInjecting = false
+                    treeInjectionLocked = false
                     treeInjectionProgress = 0
                     treeInjectionBoost = 0.026
                     treeVisualEnergyOverride = nil

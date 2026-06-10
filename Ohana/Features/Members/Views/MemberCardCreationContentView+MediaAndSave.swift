@@ -361,17 +361,36 @@ extension MemberCardCreationContentView {
         }
     }
 
+    var homeJoinHandoffStartDelayMilliseconds: UInt64 {
+        reduceMotion ? 20 : 24
+    }
+
+    var homeJoinHandoffSaveDelayMilliseconds: UInt64 {
+        reduceMotion ? 120 : 520
+    }
+
+    var homeJoinHandoffSettleDelayMilliseconds: UInt64 {
+        reduceMotion ? 120 : 280
+    }
+
     func startHomeJoinHandoff() {
-        joinHandoffSnapshot = snapshot
-        isSaving = true
-        isJoinHandoffRunning = true
-        joinHandoffProgress = 0
-        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.sheetEnter) {
-            joinHandoffProgress = 1
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            joinHandoffSnapshot = snapshot
+            isSaving = true
+            isJoinHandoffRunning = true
+            joinHandoffProgress = 0
         }
-        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 140 : 620) {
-            performSave(showsHomeJoinHandoff: true)
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffStartDelayMilliseconds) {
+            guard isJoinHandoffRunning else { return }
+            withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.zStackHero) {
+                joinHandoffProgress = 1
+            }
+            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffSaveDelayMilliseconds) {
+                performSave(showsHomeJoinHandoff: true)
+            }
         }
     }
 
@@ -391,7 +410,6 @@ extension MemberCardCreationContentView {
                     image: decodedAvatar,
                     isTransparent: decodedAvatarTransparent
                 )
-                onPetSaved?(pet)
             }
             if let human = result.human {
                 FocusWalletAvatarCache.storeDecodedImage(
@@ -400,15 +418,10 @@ extension MemberCardCreationContentView {
                     image: decodedAvatar,
                     isTransparent: decodedAvatarTransparent
                 )
-                onHumanSaved?(human)
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             if showsHomeJoinHandoff {
-                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 60 : 80) {
-                    isSaving = false
-                    clearMediaReturnStepStorage()
-                    onComplete()
-                }
+                finishSaveAfterHomeJoinHandoff(pet: result.pet, human: result.human)
                 return
             }
             withAnimation(GoMotion.sheet) {
@@ -418,7 +431,12 @@ extension MemberCardCreationContentView {
                 didShowSuccess = false
                 isSaving = false
                 clearMediaReturnStepStorage()
-                onComplete()
+                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
+                    notifySavedMembers(pet: result.pet, human: result.human)
+                    joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
+                        onComplete()
+                    }
+                }
             }
         } catch MemberCreationError.duplicateName {
             handleSaveFailure(l.tr(zh: "这个名字已经被使用。", en: "This name is already in use.", de: "Dieser Name wird bereits verwendet."))
@@ -429,21 +447,55 @@ extension MemberCardCreationContentView {
         }
     }
 
+    func finishSaveAfterHomeJoinHandoff(pet: Pet?, human: Human?) {
+        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffSettleDelayMilliseconds) {
+            guard isJoinHandoffRunning else { return }
+            clearMediaReturnStepStorage()
+            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
+                notifySavedMembers(pet: pet, human: human)
+                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
+                    onComplete()
+                    joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 240) {
+                        resetHomeJoinHandoffState()
+                    }
+                }
+            }
+        }
+    }
+
+    func notifySavedMembers(pet: Pet?, human: Human?) {
+        if let pet {
+            onPetSaved?(pet)
+        }
+        if let human {
+            onHumanSaved?(human)
+        }
+    }
+
     func handleSaveFailure(_ message: String) {
         isSaving = false
         restoreHomeJoinHandoffAfterFailure()
         showInlineError(message)
     }
 
+    func resetHomeJoinHandoffState() {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isSaving = false
+            isJoinHandoffRunning = false
+            joinHandoffProgress = 0
+            joinHandoffSnapshot = nil
+        }
+    }
+
     func restoreHomeJoinHandoffAfterFailure() {
         guard isJoinHandoffRunning else { return }
-        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.sheet) {
+        withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.selection) {
             joinHandoffProgress = 0
         }
         joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: reduceMotion ? 90 : 240) {
-            isSaving = false
-            isJoinHandoffRunning = false
-            joinHandoffSnapshot = nil
+            resetHomeJoinHandoffState()
         }
     }
 

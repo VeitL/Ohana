@@ -525,6 +525,7 @@ private final class DenseFixtureTodayFocusManager: TodayFocusManaging {
         _ quests: [IslandQuest],
         pets _: [Pet],
         humans _: [Human],
+        events _: [Event],
         careLogs _: [PetCareLog],
         walkLogs _: [PetWalkLog],
         pottyLogs _: [PetPottyLog],
@@ -543,11 +544,16 @@ private final class DenseFixtureTodayFocusManager: TodayFocusManaging {
         TodayFocusEventCompletionCommandResult(eventID: event.id, isCompleted: true, didChange: true)
     }
 
-    func awardDailyCompletionIfNeeded(context _: ModelContext, executorId _: String?) -> EconomyRewardResult? {
+    func awardDailyCompletionIfNeeded(
+        context _: ModelContext,
+        executorId _: String?,
+        visibleQuests _: [IslandQuest],
+        visibleSnapshot _: TodayFocusSnapshot?
+    ) -> EconomyRewardResult? {
         nil
     }
 
-    func ensureTodayCheckIn(activeHumanId _: String, rewardTitle _: String) {}
+    func ensureTodayCheckIn(activeHumanId _: String, rewardTitle _: String, context _: ModelContext) {}
 
     func currentStreak(activeHumanId _: String) -> Int {
         0

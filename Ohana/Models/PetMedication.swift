@@ -155,12 +155,15 @@ final class PetMedication {
         set { frequencyRaw = newValue.rawValue }
     }
 
-    var isActiveToday: Bool {
+    func isActive(on date: Date) -> Bool {
         guard isActive else { return false }
-        let now = Date()
-        if now < startDate { return false }
-        if let end = endDate, now > end { return false }
+        if date < startDate { return false }
+        if let end = endDate, date > end { return false }
         return true
+    }
+
+    var isActiveToday: Bool {
+        isActive(on: Date())
     }
 
     var daysRemaining: Int? {

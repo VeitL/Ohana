@@ -8,6 +8,17 @@
 import Foundation
 import SwiftData
 
+enum OasisRewardWriteError: LocalizedError {
+    case coconutAwardFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .coconutAwardFailed:
+            "Oasis coconut reward could not be saved."
+        }
+    }
+}
+
 @MainActor
 enum OasisCritterEconomyService {
     static func currentHuman(
@@ -31,7 +42,10 @@ enum OasisCritterEconomyService {
         activeHumanSelection: ActiveHumanSelecting,
         questManager: QuestManager
     ) -> Int {
-        currentHuman(context: context, activeHumanSelection: activeHumanSelection)?.coconutBalance ?? questManager.coconutCount
+        if let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) {
+            return CoconutWalletService.balance(for: human, context: context)
+        }
+        return CoconutWalletService.legacySystemBalance(context: context, fallback: questManager.coconutCount)
     }
 
     static func canSpendCurrentHumanCoconuts(_ amount: Int, context: ModelContext) -> Bool {
@@ -51,9 +65,9 @@ enum OasisCritterEconomyService {
     ) -> Bool {
         guard amount > 0 else { return true }
         if let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) {
-            return human.coconutBalance >= amount
+            return CoconutWalletService.balance(for: human, context: context) >= amount
         }
-        return questManager.coconutCount >= amount
+        return CoconutWalletService.legacySystemBalance(context: context, fallback: questManager.coconutCount) >= amount
     }
 
     @discardableResult
@@ -81,7 +95,7 @@ enum OasisCritterEconomyService {
     ) -> Bool {
         guard amount > 0 else { return true }
         if let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) {
-            guard human.coconutBalance >= amount else { return false }
+            guard CoconutWalletService.balance(for: human, context: context) >= amount else { return false }
             do {
                 try wallet.apply(
                     deltas: [
@@ -112,7 +126,7 @@ enum OasisCritterEconomyService {
                 return false
             }
         }
-        guard questManager.coconutCount >= amount else { return false }
+        guard CoconutWalletService.legacySystemBalance(context: context, fallback: questManager.coconutCount) >= amount else { return false }
         do {
             try wallet.apply(
                 deltas: [
@@ -141,15 +155,16 @@ enum OasisCritterEconomyService {
         }
     }
 
+    @discardableResult
     static func awardCurrentHumanCoconuts(
         _ amount: Int,
         emoji: String,
         title: String,
         context: ModelContext,
         postsRewardFeedback: Bool = true
-    ) {
-        guard amount > 0 else { return }
-        awardCurrentHumanCoconuts(
+    ) -> Bool {
+        guard amount > 0 else { return true }
+        return awardCurrentHumanCoconuts(
             amount,
             emoji: emoji,
             title: title,
@@ -161,6 +176,7 @@ enum OasisCritterEconomyService {
         )
     }
 
+    @discardableResult
     static func awardCurrentHumanCoconuts(
         _ amount: Int,
         emoji: String,
@@ -170,49 +186,65 @@ enum OasisCritterEconomyService {
         activeHumanSelection: ActiveHumanSelecting,
         wallet: CoconutWalletManaging,
         questManager: QuestManager
-    ) {
-        guard amount > 0 else { return }
+    ) -> Bool {
+        guard amount > 0 else { return true }
         if let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) {
-            _ = try? wallet.apply(
-                deltas: [
-                    .human(
-                        human,
-                        delta: amount,
-                        entryKind: .reward,
-                        source: .oasis,
-                        title: title,
-                        emoji: emoji,
-                        actorId: human.id.uuidString,
-                        actorName: human.name,
-                        subjectKind: .system,
-                        subjectId: nil
-                    )
-                ],
-                context: context,
-                save: false,
-                postsRewardFeedback: postsRewardFeedback,
-                updatesProjection: true,
-                projectionManager: questManager
-            )
+            do {
+                try wallet.apply(
+                    deltas: [
+                        .human(
+                            human,
+                            delta: amount,
+                            entryKind: .reward,
+                            source: .oasis,
+                            title: title,
+                            emoji: emoji,
+                            actorId: human.id.uuidString,
+                            actorName: human.name,
+                            subjectKind: .system,
+                            subjectId: nil
+                        )
+                    ],
+                    context: context,
+                    save: false,
+                    postsRewardFeedback: postsRewardFeedback,
+                    updatesProjection: true,
+                    projectionManager: questManager
+                )
+                return true
+            } catch {
+                #if DEBUG
+                    OhanaLog.error("[OasisCritterEconomyService] human award failed: \(error.localizedDescription)", category: "Oasis")
+                #endif
+                return false
+            }
         } else {
-            _ = try? wallet.apply(
-                deltas: [
-                    .system(
-                        delta: amount,
-                        entryKind: .reward,
-                        source: .oasis,
-                        title: title,
-                        emoji: emoji,
-                        actorId: "system",
-                        actorName: "Oasis"
-                    )
-                ],
-                context: context,
-                save: false,
-                postsRewardFeedback: postsRewardFeedback,
-                updatesProjection: true,
-                projectionManager: questManager
-            )
+            do {
+                try wallet.apply(
+                    deltas: [
+                        .system(
+                            delta: amount,
+                            entryKind: .reward,
+                            source: .oasis,
+                            title: title,
+                            emoji: emoji,
+                            actorId: "system",
+                            actorName: "Oasis"
+                        )
+                    ],
+                    context: context,
+                    save: false,
+                    postsRewardFeedback: postsRewardFeedback,
+                    updatesProjection: true,
+                    projectionManager: questManager
+                )
+                return true
+            } catch {
+                #if DEBUG
+                    OhanaLog.error("[OasisCritterEconomyService] system award failed: \(error.localizedDescription)", category: "Oasis")
+                #endif
+                return false
+            }
         }
     }
 }

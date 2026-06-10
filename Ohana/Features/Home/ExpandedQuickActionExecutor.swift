@@ -326,12 +326,16 @@ enum ExpandedQuickActionExecutor {
         modelContext: ModelContext,
         feedback: (Feedback) -> Void,
         careEvents: CareEventRecording
-    ) {
-        let type = PottyType(rawValue: raw) ?? .perfectPoop
+    ) -> Bool {
+        guard let type = PottyType(rawValue: raw) else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return false
+        }
         let got = careEvents.recordPotty(pet: pet, type: type, context: modelContext, executorId: executorId, date: Date())
         let delta = got.humanGot + got.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "\(type.emoji) +\(delta)🥥" : nil))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
+        return true
     }
 
     static func applyHealthCheckIn(

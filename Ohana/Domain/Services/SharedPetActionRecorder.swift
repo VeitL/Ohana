@@ -243,6 +243,12 @@ enum SharedPetActionRecorder {
         } else {
             (0, 0)
         }
+        if !walkLogs.isEmpty {
+            let actualWalkCoconuts = max(0, reward.humanGot + reward.petGot)
+            for (index, pair) in walkLogs.enumerated() {
+                pair.1.coconutsEarned = index == 0 ? actualWalkCoconuts : 0
+            }
+        }
 
         recordLedger(
             descriptor: descriptor,

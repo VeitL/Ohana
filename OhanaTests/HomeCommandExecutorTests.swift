@@ -1943,6 +1943,8 @@ struct HomeCommandExecutorTests {
             legacyLogsJSON: "[]",
             projectionManager: questManager
         )
+        let ledgerEntriesBefore = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let coconutLogsBefore = questManager.coconutLogs
 
         let result = SettingsCommandService.applyCoconutBalanceTest(
             amount: 120,
@@ -1953,12 +1955,21 @@ struct HomeCommandExecutorTests {
             wallet: wallet,
             projectionManager: questManager
         )
+        let accountKey = CoconutAccountKey.human(human.id)
+        let accountDescriptor = FetchDescriptor<CoconutAccount>(
+            predicate: #Predicate<CoconutAccount> { $0.accountKey == accountKey }
+        )
+        let account = try #require(context.fetch(accountDescriptor).first)
+        let ledgerEntriesAfter = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
 
         #expect(result.humanID == human.id)
         #expect(result.amount == 120)
         #expect(result.legacyDelta == 80)
         #expect(human.coconutBalance == 120)
+        #expect(account.balance == 120)
         #expect(questManager.coconutCount == 120)
+        #expect(questManager.coconutLogs.map(\.id) == coconutLogsBefore.map(\.id))
+        #expect(ledgerEntriesAfter.count == ledgerEntriesBefore.count)
     }
 
     @MainActor
@@ -1998,6 +2009,7 @@ struct HomeCommandExecutorTests {
         #expect(result.humanID == human.id)
         #expect(mutation.command == .settingsCoconutBalance(humanID: human.id, amount: 120))
         #expect(mutation.affectedEntityIDs == [human.id])
+        #expect(mutation.wroteBusinessFact == false)
         #expect(mutation.note == "test.settings.coconut")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
     }
@@ -5190,6 +5202,52 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func shopPurchaseUsesWalletAccountBalanceWhenCachedHumanBalanceIsStale() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        human.coconutBalance = 0
+        let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
+        let account = CoconutAccount(
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            displayName: human.name,
+            balance: item.cost
+        )
+        let questManager = TestQuestManagerProjection.manager
+        let oldCoconutCount = questManager.coconutCount
+        let oldCoconutLogs = questManager.coconutLogs
+        defer {
+            questManager.coconutCount = oldCoconutCount
+            questManager.coconutLogs = oldCoconutLogs
+            questManager.persistQuestFlags()
+        }
+        questManager.coconutCount = item.cost
+        questManager.coconutLogs = []
+        context.insert(human)
+        context.insert(account)
+        try context.save()
+
+        let result = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Redeemed Lime Glow",
+            context: context,
+            questManager: questManager,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(result.didPurchase)
+        #expect(account.balance == 0)
+        #expect(human.coconutBalance == 0)
+        #expect(questManager.coconutCount == 0)
+        #expect(walletEntries.count(where: { $0.source == .shop && $0.entryKind == .spend }) == 1)
+    }
+
+    @MainActor
     @Test func repeatedConsumableShopPurchasesUseDistinctWalletKeys() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -5263,6 +5321,33 @@ struct HomeCommandExecutorTests {
         #expect(result.failure == .insufficientBalance(missing: item.cost - 10))
         #expect(human.coconutBalance == 10)
         #expect(ledgerEvents.isEmpty)
+    }
+
+    @MainActor
+    @Test func questManagerDoesNotMutateProjectionWhenWalletWriteFails() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let questManager = QuestManager(
+            wallet: FailingCoconutWalletManager(),
+            revisions: SharedDomainRevisionPublisher()
+        )
+        questManager.coconutCount = 7
+        questManager.coconutLogs = []
+
+        let awarded = questManager.addCoconuts(
+            15,
+            emoji: "🥥",
+            title: "Forced failure",
+            actorId: nil,
+            actorName: nil,
+            context: context,
+            save: true
+        )
+
+        #expect(awarded == 0)
+        #expect(questManager.coconutCount == 7)
+        #expect(questManager.coconutLogs.isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 
     @MainActor
@@ -5471,6 +5556,324 @@ struct HomeCommandExecutorTests {
         #expect(duplicate.failure == .alreadyUnlocked)
         #expect(pet.coconutBalance == 20)
         #expect(ledgerEventsAfterDuplicate.count == 1)
+    }
+
+    @MainActor
+    @Test func economyBudgetUsageSurvivesUserDefaultsReset() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let date = makeDate(year: 2026, month: 6, day: 10)
+        let householdKey = "household.test.\(UUID().uuidString)"
+        let memberKey = "member.test.\(UUID().uuidString)"
+        let petKey = "pet.\(UUID().uuidString)"
+        EconomyDailyBudgetStore.reset(
+            householdKey: householdKey,
+            memberKey: memberKey,
+            careObjectKeys: [petKey],
+            date: date
+        )
+
+        let result = CoconutEconomyPolicyV2.reward(
+            for: .feed,
+            quality: .none,
+            isOnCooldown: false,
+            userKey: householdKey,
+            memberKey: memberKey,
+            careObjectKeys: [petKey],
+            careObjectCount: 1,
+            hasHumanAccount: true,
+            hasPetAccount: true,
+            date: date,
+            forcedLuck: EconomyLuckTier.none,
+            context: context
+        )
+        EconomyDailyBudgetStore.commit(
+            result,
+            householdKey: householdKey,
+            memberKey: memberKey,
+            careObjectKeys: [petKey],
+            date: date,
+            context: context,
+            save: true
+        )
+        EconomyDailyBudgetStore.reset(
+            householdKey: householdKey,
+            memberKey: memberKey,
+            careObjectKeys: [petKey],
+            date: date
+        )
+
+        let snapshot = EconomyDailyBudgetStore.snapshot(
+            householdKey: householdKey,
+            memberKey: memberKey,
+            careObjectKeys: [petKey],
+            careObjectCount: 1,
+            date: date,
+            context: context
+        )
+        let events = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        #expect(snapshot.xpUsed == result.growthXP)
+        #expect(snapshot.coconutUsed == result.totalCoconuts)
+        #expect(snapshot.memberXPUsed == result.growthXP)
+        #expect(snapshot.memberCoconutUsed == result.totalCoconuts)
+        #expect(snapshot.careObjectXPUsed[petKey] == result.growthXP)
+        #expect(snapshot.careObjectCoconutUsed[petKey] == result.totalCoconuts)
+        #expect(events.count == 3)
+    }
+
+    @MainActor
+    @Test func petBondVaultRepeatableTreatSpendsEveryTimeWithUniqueTransactions() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let item = try #require(PetBondVaultCatalog.items.first { $0.isRepeatable })
+        pet.coconutBalance = item.cost * 2 + 5
+        let defaults = UserDefaults.standard
+        let oldRevision = defaults.object(forKey: PetBondVaultStore.revisionKey)
+        let questManager = TestQuestManagerProjection.manager
+        let oldCoconutCount = questManager.coconutCount
+        let oldCoconutLogs = questManager.coconutLogs
+        defer {
+            if let oldRevision {
+                defaults.set(oldRevision, forKey: PetBondVaultStore.revisionKey)
+            } else {
+                defaults.removeObject(forKey: PetBondVaultStore.revisionKey)
+            }
+            questManager.coconutCount = oldCoconutCount
+            questManager.coconutLogs = oldCoconutLogs
+            questManager.persistQuestFlags()
+        }
+        context.insert(pet)
+        try context.save()
+
+        let first = PetBondVaultUnlockCommandService.unlock(
+            item: item,
+            pet: pet,
+            title: "Treat \(item.id)",
+            context: context,
+            questManager: questManager,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+        let second = PetBondVaultUnlockCommandService.unlock(
+            item: item,
+            pet: pet,
+            title: "Treat \(item.id)",
+            context: context,
+            questManager: questManager,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let transactionKeys = Set(walletEntries.map(\.transactionKey))
+        #expect(first.didUnlock == true)
+        #expect(second.didUnlock == true)
+        #expect(pet.coconutBalance == 5)
+        #expect(PetBondVaultStore.consumptionCount(item.kind, for: pet.id) == 2)
+        #expect(ledgerEvents.filter { $0.actionType == "petBondVaultConsume" }.count == 2)
+        #expect(walletEntries.count == 2)
+        #expect(transactionKeys.count == 2)
+    }
+
+    @MainActor
+    @Test func streakMilestoneRewardIsFamilyDedupedAndDoesNotUseDailyBudget() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Li")
+        let firstPet = Pet(name: "Momo", species: "猫")
+        let secondPet = Pet(name: "Kiki", species: "猫")
+        firstPet.currentStreak = 7
+        secondPet.currentStreak = 7
+        context.insert(human)
+        context.insert(firstPet)
+        context.insert(secondPet)
+        try context.save()
+
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldClaimed = defaults.object(forKey: "streakRewards_claimed")
+        let questManager = makeQuestManager()
+        let careObjectKeys = questManager.careObjectKeys(for: [firstPet, secondPet])
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldClaimed {
+                defaults.set(oldClaimed, forKey: "streakRewards_claimed")
+            } else {
+                defaults.removeObject(forKey: "streakRewards_claimed")
+            }
+            EconomyDailyBudgetStore.reset(
+                householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+                memberKey: human.id.uuidString,
+                careObjectKeys: careObjectKeys,
+                date: Date()
+            )
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: "streakRewards_claimed")
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+            memberKey: human.id.uuidString,
+            careObjectKeys: careObjectKeys,
+            date: Date()
+        )
+
+        let manager = StreakRewardManager()
+        manager.checkAndAward(pet: firstPet, questManager: questManager, context: context)
+        manager.checkAndAward(pet: secondPet, questManager: questManager, context: context)
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        #expect(human.coconutBalance == 20)
+        #expect(walletEntries.count == 1)
+        #expect(walletEntries.first?.sourceModelName == "StreakRewardManager")
+        #expect(budgetEvents.filter { $0.actionKey == "streak_7" }.isEmpty)
+        #expect((defaults.dictionary(forKey: "streakRewards_claimed") ?? [:])["family_7"] != nil)
+    }
+
+    @MainActor
+    @Test func streakLargeMilestoneIgnoresDailyBudgetLimit() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Li")
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.currentStreak = 365
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let now = Date()
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldClaimed = defaults.object(forKey: "streakRewards_claimed")
+        let questManager = makeQuestManager()
+        let careObjectKeys = questManager.careObjectKeys(for: pet)
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldClaimed {
+                defaults.set(oldClaimed, forKey: "streakRewards_claimed")
+            } else {
+                defaults.removeObject(forKey: "streakRewards_claimed")
+            }
+            EconomyDailyBudgetStore.reset(
+                householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+                memberKey: human.id.uuidString,
+                careObjectKeys: careObjectKeys,
+                date: Date()
+            )
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.set([
+            "family_7": now.timeIntervalSince1970,
+            "family_30": now.timeIntervalSince1970,
+            "family_100": now.timeIntervalSince1970
+        ], forKey: "streakRewards_claimed")
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+            memberKey: human.id.uuidString,
+            careObjectKeys: careObjectKeys,
+            date: now
+        )
+        let budgetFiller = EconomyRewardResult(
+            growthXP: 0,
+            humanCoconuts: 56,
+            petCoconuts: 0,
+            bonusCoconuts: 0,
+            luckyCoconuts: 0,
+            budgetMultiplier: 1,
+            budgetStage: .normal,
+            reason: "test",
+            actionKey: "test_budget_fill",
+            isOnCooldown: false,
+            baseGrowthXP: 0,
+            baseCoconuts: 56,
+            luck: .none
+        )
+        EconomyDailyBudgetStore.commit(
+            budgetFiller,
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+            memberKey: human.id.uuidString,
+            careObjectKeys: careObjectKeys,
+            date: now,
+            context: context
+        )
+        let budgetEventCountBefore = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).count
+
+        StreakRewardManager().checkAndAward(pet: pet, questManager: questManager, context: context)
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        let claimed = defaults.dictionary(forKey: "streakRewards_claimed") ?? [:]
+        #expect(human.coconutBalance == 2000)
+        #expect(walletEntries.count == 1)
+        #expect(walletEntries.first?.sourceModelId == "365")
+        #expect(budgetEvents.count == budgetEventCountBefore)
+        #expect(budgetEvents.filter { $0.actionKey == "streak_365" }.isEmpty)
+        #expect(claimed["family_365"] != nil)
+    }
+
+    @MainActor
+    @Test func economyBudgetUsagePruneKeepsRecentRows() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 10)
+        let oldDate = Calendar(identifier: .gregorian).date(byAdding: .day, value: -60, to: now) ?? now
+        let recentDate = Calendar(identifier: .gregorian).date(byAdding: .day, value: -10, to: now) ?? now
+        let defaults = UserDefaults.standard
+        let pruneKey = "economyV2.dailyBudget.usagePrune.lastDay"
+        let oldPruneDay = defaults.object(forKey: pruneKey)
+        defer {
+            if let oldPruneDay {
+                defaults.set(oldPruneDay, forKey: pruneKey)
+            } else {
+                defaults.removeObject(forKey: pruneKey)
+            }
+        }
+        defaults.removeObject(forKey: pruneKey)
+        context.insert(EconomyBudgetUsageEvent(
+            dayKey: EconomyDailyBudgetStore.dayKey(for: oldDate),
+            householdKey: "household.local",
+            memberKey: "member",
+            scope: .household,
+            scopeKey: "household.local",
+            growthXPUsed: 1,
+            coconutUsed: 1,
+            actionKey: "old",
+            source: "test"
+        ))
+        context.insert(EconomyBudgetUsageEvent(
+            dayKey: EconomyDailyBudgetStore.dayKey(for: recentDate),
+            householdKey: "household.local",
+            memberKey: "member",
+            scope: .household,
+            scopeKey: "household.local",
+            growthXPUsed: 1,
+            coconutUsed: 1,
+            actionKey: "recent",
+            source: "test"
+        ))
+        try context.save()
+
+        let deleted = EconomyDailyBudgetStore.pruneOldUsageEvents(
+            context: context,
+            retainingDays: 45,
+            now: now,
+            defaults: defaults
+        )
+        let remaining = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+
+        #expect(deleted == 1)
+        #expect(remaining.count == 1)
+        #expect(remaining.first?.actionKey == "recent")
     }
 
     @MainActor
@@ -5913,7 +6316,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV58.models)
+        let schema = Schema(ArkSchemaV59.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -5921,6 +6324,48 @@ struct HomeCommandExecutorTests {
     @MainActor
     private func makeQuestManager() -> QuestManager {
         QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: SharedDomainRevisionPublisher())
+    }
+
+    @MainActor
+    private final class FailingCoconutWalletManager: CoconutWalletManaging {
+        enum Failure: Error {
+            case forced
+        }
+
+        func apply(
+            deltas _: [CoconutWalletDelta],
+            context _: ModelContext,
+            save _: Bool,
+            postsRewardFeedback _: Bool,
+            updatesProjection _: Bool,
+            projectionManager _: QuestManager?
+        ) throws -> [CoconutLedgerEntry] {
+            throw Failure.forced
+        }
+
+        func applyActorDelta(
+            amount _: Int,
+            emoji _: String,
+            title _: String,
+            actorId _: String?,
+            actorName _: String?,
+            entryKind _: CoconutWalletEntryKind,
+            source _: CoconutWalletSource,
+            context _: ModelContext,
+            save _: Bool,
+            postsRewardFeedback _: Bool,
+            projectionManager _: QuestManager?
+        ) throws -> [CoconutLedgerEntry] {
+            throw Failure.forced
+        }
+
+        func totalBalance(context _: ModelContext) -> Int {
+            0
+        }
+
+        func refreshQuestProjection(context _: ModelContext, manager _: QuestManager?) {}
+
+        func bootstrapIfNeeded(context _: ModelContext, projectionManager _: QuestManager?) throws {}
     }
 
     private func makeDate(year: Int, month: Int, day: Int) -> Date {

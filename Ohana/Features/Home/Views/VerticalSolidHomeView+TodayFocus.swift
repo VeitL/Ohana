@@ -14,13 +14,20 @@ extension VerticalSolidHomeView {
 
     func handleNewHomeMemberSaved(id: UUID) {
         homeCardOrderRaw = FocusHomeCardDataSource.promotedOrderRaw(id: id, currentRaw: homeCardOrderRaw)
-        arrivingHomeCardId = id
         arrivalClearTask?.cancel()
-        arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1500) {
-            guard arrivingHomeCardId == id else { return }
-            arrivingHomeCardId = nil
-            arrivalClearTask = nil
+        arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: newMemberArrivalStartDelayMilliseconds) {
+            guard arrivingHomeCardId != id else { return }
+            arrivingHomeCardId = id
+            arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1500) {
+                guard arrivingHomeCardId == id else { return }
+                arrivingHomeCardId = nil
+                arrivalClearTask = nil
+            }
         }
+    }
+
+    var newMemberArrivalStartDelayMilliseconds: UInt64 {
+        AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true).allowsMotion ? 560 : 120
     }
 
     func clearArrivalState() {
@@ -107,7 +114,7 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if quest.id == "q_water_plant",
+        if quest.id == "q_water_plant" || quest.id.hasPrefix("q_water_plant_"),
            let plant = targetPlant(for: quest) {
             let plantID = plant.id
             enqueueHomeCommand(.plantCare(plantID: plantID, action: PlantCareType.watering.rawValue)) {
@@ -118,7 +125,7 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if quest.id == "q_fertilize_plant",
+        if quest.id == "q_fertilize_plant" || quest.id.hasPrefix("q_fertilize_plant_"),
            let plant = targetPlant(for: quest) {
             let plantID = plant.id
             enqueueHomeCommand(.plantCare(plantID: plantID, action: PlantCareType.fertilizing.rawValue)) {
@@ -144,15 +151,7 @@ extension VerticalSolidHomeView {
         case "feed", "water", "walk", "play":
             performPetQuickAction(todayFocusPetQuickKey(for: quest, pet: pet), petID: pet.id)
         case "potty":
-            let petID = pet.id
-            enqueueHomeCommand(.quickCare(entityID: petID, action: "potty")) {
-                commandExecutor.applyPottyCheckIn(
-                    raw: PottyType.perfectPoop.rawValue,
-                    petID: petID,
-                    executorId: currentExecutorId(),
-                    feedback: applyQuickActionExecutorFeedback
-                )
-            }
+            routeCoordinator.openSheet(.petPotty(pet.id))
         case "litter":
             performPetQuickAction("litter", petID: pet.id)
         case "weight", "moment":
@@ -177,26 +176,22 @@ extension VerticalSolidHomeView {
             case .some(.documentExpiringSoon):
                 routeCoordinator.openSheet(.petAllFeatures(pet.id))
             default:
-                routeCoordinator.openSheet(.petHealth(pet.id, initialSection: .preventive))
+                if signal.iconName.contains("fork.knife") {
+                    routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
+                } else if signal.iconName.contains("drop") {
+                    routeCoordinator.openSheet(.petWater(pet.id))
+                } else if signal.iconName.contains("triangle") {
+                    routeCoordinator.openSheet(.petPotty(pet.id))
+                } else {
+                    routeCoordinator.openSheet(.petHealth(pet.id, initialSection: .preventive))
+                }
             }
             return
         }
 
-        if signal.iconName.contains("fork.knife"),
-           let pet = pets.first(where: { signal.title.contains($0.name) && !$0.hasPassedAway }) {
-            routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
-            return
-        }
-
-        if signal.iconName.contains("drop"),
-           let pet = pets.first(where: { signal.title.contains($0.name) && !$0.hasPassedAway }) {
-            routeCoordinator.openSheet(.petWater(pet.id))
-            return
-        }
-
-        if signal.iconName.contains("triangle"),
-           let pet = pets.first(where: { signal.title.contains($0.name) && !$0.hasPassedAway }) {
-            routeCoordinator.openSheet(.petPotty(pet.id))
+        if let plantId = signal.plantId,
+           plants.contains(where: { $0.id == plantId }) {
+            onOpenPlant(plantId)
             return
         }
 
@@ -247,8 +242,9 @@ extension VerticalSolidHomeView {
     }
 
     func eventDestination(for quest: IslandQuest) -> FocusHomeReminderDestination? {
-        guard let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id),
-              let event = allEvents.first(where: { $0.id == eventId }) else {
+        guard let eventId = IslandQuestEngine.eventId(fromQuestId: quest.id)
+            ?? IslandQuestEngine.carePlanEventId(fromQuestId: quest.id),
+            let event = allEvents.first(where: { $0.id == eventId }) else {
             return nil
         }
         return FocusHomeReminderDeepLinkRouter.destination(
@@ -274,7 +270,7 @@ extension VerticalSolidHomeView {
            let pet = pets.first(where: { $0.id == targetPetId && !$0.hasPassedAway }) {
             return pet
         }
-        if quest.id == "q_walk" || quest.id == "q_potty" {
+        if quest.id == "q_walk" || quest.id == "q_potty" || quest.id.hasPrefix("q_walk_") || quest.id.hasPrefix("q_potty_") {
             return pets.first(where: { !$0.hasPassedAway })
         }
         return nil
@@ -286,12 +282,20 @@ extension VerticalSolidHomeView {
         }
         switch quest.id {
         case "q_water_plant":
-            return plants.first(where: { $0.needsWatering })
+            let focusDate = todayFocusSnapshotDate()
+            return plants.first(where: { $0.needsWatering(on: focusDate) })
         case "q_fertilize_plant":
-            return plants.first(where: { $0.needsFertilizing })
+            let focusDate = todayFocusSnapshotDate()
+            return plants.first(where: { $0.needsFertilizing(on: focusDate) })
         default:
             return nil
         }
+    }
+
+    func todayFocusSnapshotDate() -> Date {
+        let dayToken = controller.snapshot.todayFocus.dayToken
+        guard dayToken > 0 else { return Date() }
+        return Date(timeIntervalSince1970: TimeInterval(dayToken))
     }
 
     func openTodayFocusPlant(_ plant: Plant) {
@@ -301,8 +305,8 @@ extension VerticalSolidHomeView {
     func todayFocusPetQuickKey(for quest: IslandQuest, pet: Pet) -> String {
         if quest.id.hasPrefix("q_feed_") { return "feed" }
         if quest.id.hasPrefix("q_water_") { return "water" }
-        if quest.id == "q_walk" { return "walk" }
-        if quest.id == "q_potty" {
+        if quest.id == "q_walk" || quest.id.hasPrefix("q_walk_") { return "walk" }
+        if quest.id == "q_potty" || quest.id.hasPrefix("q_potty_") {
             return pet.species.contains("猫") || pet.species.contains("兔") ? "litter" : "potty"
         }
         if quest.id.hasPrefix("q_play_") { return "play" }
@@ -319,14 +323,38 @@ extension VerticalSolidHomeView {
                 label: nil
             )
         )
-        let pending = controller.snapshot.todayFocus.refreshedQuests.filter { !$0.isCompleted }
+    }
+
+    func tryAwardTodayFocusDailyCompletion(afterCompleting entityId: UUID) {
+        let visibleQuests = controller.snapshot.todayFocus.refreshedQuests
+        let pending = visibleQuests.filter { !$0.isCompleted }
         if pending.count == 1,
            let finalQuest = pending.first,
            appServices.todayFocus.quest(finalQuest, matchesCompletedEntity: entityId) {
-            _ = appServices.todayFocus.awardDailyCompletionIfNeeded(
-                context: modelContext,
-                executorId: currentExecutorId()
-            )
+            awardTodayFocusDailyCompletion(visibleQuests: visibleQuests)
         }
+    }
+
+    func awardTodayFocusDailyCompletionIfCleared(previousQuests: [IslandQuest], currentQuests: [IslandQuest]) {
+        let pending = previousQuests.filter { !$0.isCompleted }
+        guard pending.count == 1 else { return }
+
+        let previousIds = Set(previousQuests.map(\.id))
+        let hasSamePendingQuest = currentQuests.contains {
+            previousIds.contains($0.id) && !$0.isCompleted
+        }
+        guard !hasSamePendingQuest else { return }
+
+        awardTodayFocusDailyCompletion(visibleQuests: previousQuests)
+    }
+
+    func awardTodayFocusDailyCompletion(visibleQuests: [IslandQuest]) {
+        guard !visibleQuests.isEmpty else { return }
+        _ = appServices.todayFocus.awardDailyCompletionIfNeeded(
+            context: modelContext,
+            executorId: currentExecutorId(),
+            visibleQuests: visibleQuests,
+            visibleSnapshot: controller.snapshot.todayFocus
+        )
     }
 }

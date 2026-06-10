@@ -9,6 +9,7 @@ import Foundation
 
 enum OasisSheetRoute: Identifiable, Equatable {
     case coconutRules
+    case growthRoadmap
     case achievements
     case inventory
     case coconutShop(ShopItem.ShopCategory)
@@ -20,6 +21,8 @@ enum OasisSheetRoute: Identifiable, Equatable {
         switch self {
         case .coconutRules:
             "coconut-rules"
+        case .growthRoadmap:
+            "growth-roadmap"
         case .achievements:
             "achievements"
         case .inventory:

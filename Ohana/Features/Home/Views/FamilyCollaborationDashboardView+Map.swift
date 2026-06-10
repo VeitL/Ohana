@@ -208,7 +208,7 @@ extension FamilyCollaborationDashboardView {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
-                            .frame(width: size - 6, height: size - 6)
+                            .frame(width: max(0, size - 6), height: max(0, size - 6))
                             .clipShape(Circle())
                     }
                     .overlay(Circle().strokeBorder(selected ? tint : Color.ohanaCardStroke, lineWidth: selected ? 2.5 : 1))
@@ -221,7 +221,7 @@ extension FamilyCollaborationDashboardView {
                         .frame(width: size, height: size)
                     Text(pet.avatarEmoji)
                         .font(OhanaFont.adaptive(size: 32)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .frame(width: size - 6, height: size - 6)
+                        .frame(width: max(0, size - 6), height: max(0, size - 6))
                 }
                 .overlay(Circle().strokeBorder(selected ? tint : Color.ohanaCardStroke, lineWidth: selected ? 2.5 : 1))
                 .shadow(color: selected ? tint.opacity(0.24) : Color.clear, radius: 16, x: 0, y: 8) // ui-v4: allow selected pet map node focus glow

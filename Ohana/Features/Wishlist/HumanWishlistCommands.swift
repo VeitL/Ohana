@@ -101,8 +101,9 @@ enum HumanWishlistCommandService {
         }
         guard !item.isRedeemed else { throw HumanWishlistCommandError.alreadyRedeemed }
         guard item.cost > 0 else { throw HumanWishlistCommandError.invalidCost }
-        guard human.coconutBalance >= item.cost else {
-            throw HumanWishlistCommandError.insufficientCoconuts(missing: item.cost - human.coconutBalance)
+        let humanBalance = CoconutWalletService.balance(for: human, context: context)
+        guard humanBalance >= item.cost else {
+            throw HumanWishlistCommandError.insufficientCoconuts(missing: item.cost - humanBalance)
         }
 
         item.isRedeemed = true
@@ -131,33 +132,39 @@ enum HumanWishlistCommandService {
             context: context,
             save: false
         )
-        try wallet.apply(
-            deltas: [
-                .human(
-                    human,
-                    delta: -item.cost,
-                    entryKind: .spend,
-                    source: .shop,
-                    title: "兑换「\(item.title)」",
-                    emoji: "🎁",
-                    actorId: human.id.uuidString,
-                    actorName: human.name,
-                    subjectKind: .human,
-                    subjectId: human.id.uuidString,
-                    sourceModelName: "WishlistItem",
-                    sourceModelId: item.id.uuidString,
-                    careLedgerEventId: ledger.id.uuidString,
-                    metadataJSON: "{\"wishlistItemId\":\"\(item.id.uuidString)\"}",
-                    transactionKey: "wishlist:\(item.id.uuidString):redeem"
-                )
-            ],
-            context: context,
-            save: false,
-            postsRewardFeedback: true,
-            updatesProjection: true,
-            projectionManager: questManager
-        )
-        context.safeSave()
+        do {
+            try wallet.apply(
+                deltas: [
+                    .human(
+                        human,
+                        delta: -item.cost,
+                        entryKind: .spend,
+                        source: .shop,
+                        title: "兑换「\(item.title)」",
+                        emoji: "🎁",
+                        actorId: human.id.uuidString,
+                        actorName: human.name,
+                        subjectKind: .human,
+                        subjectId: human.id.uuidString,
+                        sourceModelName: "WishlistItem",
+                        sourceModelId: item.id.uuidString,
+                        careLedgerEventId: ledger.id.uuidString,
+                        metadataJSON: "{\"wishlistItemId\":\"\(item.id.uuidString)\"}",
+                        transactionKey: "wishlist:\(item.id.uuidString):redeem"
+                    )
+                ],
+                context: context,
+                save: false,
+                postsRewardFeedback: true,
+                updatesProjection: true,
+                projectionManager: questManager
+            )
+            try context.save()
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            throw error
+        }
 
         return HumanWishlistCommandResult(
             humanID: human.id,

@@ -66,6 +66,8 @@ struct VerticalSolidHomeBottomBar: View {
     let homeShortcuts: [HomeFabFunctionShortcut]
     let expandedShortcuts: [ExpandedCardFabShortcut]
     let safeBottom: CGFloat
+    let treeLevel: Int
+    let treeProgress: Double
     let canAnimate: Bool
     let localization: L10n
     let onSelect: (VerticalSolidHomeTab) -> Void
@@ -137,6 +139,8 @@ struct VerticalSolidHomeBottomBar: View {
                     tab: tab,
                     isSelected: selectedTab == tab,
                     showsSelectedLabel: metrics.showsSelectedLabel,
+                    treeLevel: treeLevel,
+                    treeProgress: treeProgress,
                     localization: l,
                     selectionAnimation: canAnimate ? GoMotion.selection : GoMotion.reduced,
                     action: onSelect
@@ -297,9 +301,15 @@ private struct HomeBottomNavigationTabButton: View {
     let tab: VerticalSolidHomeTab
     let isSelected: Bool
     let showsSelectedLabel: Bool
+    let treeLevel: Int
+    let treeProgress: Double
     let localization: L10n
     let selectionAnimation: Animation
     let action: (VerticalSolidHomeTab) -> Void
+
+    private var title: String {
+        HomeBottomNavigationTreePresentation.title(for: tab, treeLevel: treeLevel, localization: localization)
+    }
 
     var body: some View {
         Button {
@@ -315,7 +325,7 @@ private struct HomeBottomNavigationTabButton: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(tab.title(localization))
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -324,7 +334,7 @@ private struct HomeBottomNavigationTabButton: View {
         if isSelected, showsSelectedLabel {
             HStack(spacing: 5) {
                 icon
-                Text(tab.title(localization))
+                Text(title)
                     .font(OhanaFont.caption2(.black))
                     .lineLimit(1)
                     .minimumScaleFactor(0.68)
@@ -335,16 +345,133 @@ private struct HomeBottomNavigationTabButton: View {
     }
 
     private var iconOnly: some View {
-        icon
-            .frame(width: 44, height: 44) // a11y: allow icon-only nav tab; this is the complete 44pt hit target.
+        Group {
+            if tab == .oasis {
+                VStack(spacing: 0) {
+                    icon
+                    Text(HomeBottomNavigationTreePresentation.levelText(treeLevel))
+                        .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.68)
+                        .monospacedDigit()
+                }
+            } else {
+                icon
+            }
+        }
+        .frame(width: 44, height: 44) // a11y: allow icon-only nav tab; this is the complete 44pt hit target.
     }
 
+    @ViewBuilder
     private var icon: some View {
-        Image(systemName: tab.icon)
-            .font(OhanaFont.adaptive(size: isSelected ? 16 : 15, weight: .black))
-            .symbolRenderingMode(.monochrome)
-            .contentTransition(.symbolEffect(.replace))
+        if tab == .oasis {
+            HomeBottomNavigationTreeIcon(
+                progress: treeProgress,
+                isSelected: isSelected,
+                size: isSelected ? 17 : 16
+            )
+        } else {
+            Image(systemName: tab.icon)
+                .font(OhanaFont.adaptive(size: isSelected ? 16 : 15, weight: .black))
+                .symbolRenderingMode(.monochrome)
+                .contentTransition(.symbolEffect(.replace))
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var accessibilityLabel: String {
+        if tab == .oasis {
+            return localization.tr(
+                zh: "椰子树 \(HomeBottomNavigationTreePresentation.levelText(treeLevel))",
+                en: "Coconut Tree \(HomeBottomNavigationTreePresentation.levelText(treeLevel))",
+                de: "Kokosbaum \(HomeBottomNavigationTreePresentation.levelText(treeLevel))"
+            )
+        }
+        return tab.title(localization)
+    }
+}
+
+enum HomeBottomNavigationTreePresentation {
+    static func levelText(_ level: Int) -> String {
+        "Lv.\(max(0, level))"
+    }
+
+    static func progressFill(_ progress: Double) -> CGFloat {
+        guard progress.isFinite else { return 0 }
+        return CGFloat(min(1, max(0, progress)))
+    }
+
+    static func title(for tab: VerticalSolidHomeTab, treeLevel: Int, localization: L10n) -> String {
+        if tab == .oasis {
+            return levelText(treeLevel)
+        }
+        return tab.title(localization)
+    }
+}
+
+private struct HomeBottomNavigationTreeIcon: View {
+    let progress: Double
+    let isSelected: Bool
+    let size: CGFloat
+
+    private var fillProgress: CGFloat {
+        HomeBottomNavigationTreePresentation.progressFill(progress)
+    }
+
+    var body: some View {
+        treeSymbol
+            .foregroundStyle(baseColor)
+            .overlay {
+                treeSymbol
+                    .foregroundStyle(progressGradient)
+                    .mask {
+                        GeometryReader { proxy in
+                            let fillHeight = finiteFillHeight(for: proxy.size.height)
+                            VStack(spacing: 0) {
+                                Spacer(minLength: 0)
+                                Rectangle()
+                                    .frame(height: fillHeight)
+                            }
+                        }
+                    }
+            }
+            .shadow( // ui-v4: allow tree icon separation from selected tab fill
+                color: isSelected ? Color.arkInk.opacity(0.38) : Color.goPrimary.opacity(0.24),
+                radius: isSelected ? 2.8 : 1.6,
+                x: 0,
+                y: isSelected ? 1.8 : 1
+            )
             .accessibilityHidden(true)
+    }
+
+    private var treeSymbol: some View {
+        Image(systemName: "tree.fill")
+            .font(OhanaFont.adaptive(size: size, weight: .black))
+            .symbolRenderingMode(.monochrome)
+            .frame(width: 22, height: 22)
+            .contentTransition(.symbolEffect(.replace))
+    }
+
+    private func finiteFillHeight(for height: CGFloat) -> CGFloat {
+        guard height.isFinite, height > 0 else { return 1 }
+        let candidate = height * fillProgress
+        guard candidate.isFinite else { return 1 }
+        return max(1, candidate)
+    }
+
+    private var baseColor: Color {
+        isSelected ? Color.ohanaPrimaryActionText.opacity(0.82) : Color.ohanaSecondaryText.opacity(0.52)
+    }
+
+    private var progressGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.goPrimary,
+                Color.goTeal
+            ],
+            startPoint: .bottom,
+            endPoint: .top
+        )
     }
 }
 

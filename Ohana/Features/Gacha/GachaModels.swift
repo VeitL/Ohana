@@ -618,8 +618,9 @@ enum GachaDrawService {
 
         let logs = (try? context.fetch(FetchDescriptor<GachaDrawLog>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let usedToday = dailyDrawCount(for: human.id.uuidString, in: logs, now: now)
-        guard human.coconutBalance >= costPerDraw else {
-            throw GachaDrawError.insufficientBalance(missing: costPerDraw - human.coconutBalance)
+        let humanBalance = CoconutWalletService.balance(for: human, context: context)
+        guard humanBalance >= costPerDraw else {
+            throw GachaDrawError.insufficientBalance(missing: costPerDraw - humanBalance)
         }
 
         let ownedItems = (try? context.fetch(FetchDescriptor<GachaOwnedItem>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
@@ -778,6 +779,7 @@ enum GachaDrawService {
             try context.save()
         } catch {
             context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: projectionManager)
             throw error
         }
 

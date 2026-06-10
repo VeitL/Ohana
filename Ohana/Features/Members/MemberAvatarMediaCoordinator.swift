@@ -66,6 +66,7 @@ final class MemberAvatarMediaCoordinator: ObservableObject {
 
     func prepareCameraIfNeeded() {
         guard !didPrepareCamera else { return }
+        guard ohanaCameraHardwareAvailable() else { return }
         didPrepareCamera = true
         Task.detached(priority: .utility) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
             let signpostID = MemberCreationPerformance.begin("Camera Device Warmup")
@@ -81,6 +82,10 @@ final class MemberAvatarMediaCoordinator: ObservableObject {
 
     func openCamera() {
         MemberCreationPerformance.event("Avatar Camera Open Request")
+        guard ohanaCameraHardwareAvailable() else {
+            route = .permissionAlert
+            return
+        }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             MemberCreationPerformance.event("Avatar Camera Route Presented")

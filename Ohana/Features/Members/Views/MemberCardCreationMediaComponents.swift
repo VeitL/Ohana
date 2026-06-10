@@ -130,13 +130,14 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                             }
                     }
                 }
+                .frame(height: 50, alignment: .top)
                 Spacer(minLength: 18)
                 avatar(width: width)
                     .frame(maxWidth: .infinity, alignment: .center)
                 Spacer(minLength: 12)
             }
-            .padding(.top, 24)
-            .padding(.horizontal, 20)
+            .padding(.top, 22)
+            .padding(.horizontal, 22)
             .padding(.bottom, 18)
         }
     }

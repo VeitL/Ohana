@@ -9,6 +9,7 @@ extension TodayFocusCard {
     var renderDeckDependencyKey: String {
         [
             Self.snapshotDeckDependencyKey(snapshot),
+            "hiddenDay:\(hiddenFocusDayToken)",
             "hidden:\(hiddenFocusVersion)"
         ].joined(separator: "#")
     }
@@ -98,26 +99,74 @@ extension TodayFocusCard {
     }
 
     static func negativeSkipKey(for signal: IslandNegativeSignal) -> String {
-        if let petId = signal.petId, let alertType = signal.healthAlertType {
-            return "negative:health:\(petId.uuidString):\(alertType.rawValue)"
-        }
-        return "negative:\(signal.title)|\(signal.detail)"
+        signal.id
     }
 
     static func snapshotDeckDependencyKey(_ snapshot: TodayFocusSnapshot) -> String {
         [
-            snapshot.refreshedQuests.map { "\($0.id):\($0.isCompleted)" }.joined(separator: "|"),
-            snapshot.assignedFamilyTasks.map { "\($0.id.uuidString):\($0.statusRaw):\(timestamp($0.updatedAt))" }.joined(separator: "|"),
-            snapshot.pendingExchangeRequests.map { "\($0.id.uuidString):\($0.statusRaw):\(timestamp($0.updatedAt))" }.joined(separator: "|"),
-            snapshot.negativeSignals.map { negativeSkipKey(for: $0) }.joined(separator: "|"),
-            "pets:\(snapshot.pets.count)",
-            "plants:\(snapshot.plants.count)",
-            "humans:\(snapshot.humans.count)"
+            "day:\(snapshot.dayToken)",
+            snapshot.refreshedQuests.map { quest in
+                [
+                    quest.id,
+                    quest.title,
+                    quest.subtitle,
+                    quest.emoji,
+                    "\(quest.isCompleted)",
+                    quest.targetPetId?.uuidString ?? "",
+                    quest.targetPlantId?.uuidString ?? ""
+                ].joined(separator: ":")
+            }.joined(separator: "|"),
+            snapshot.assignedFamilyTasks.map { task in
+                [
+                    task.id.uuidString,
+                    task.title,
+                    task.statusRaw,
+                    task.createdByName,
+                    task.assignedToId ?? "",
+                    task.assignedToName ?? "",
+                    task.claimedById ?? "",
+                    task.claimedByName ?? "",
+                    task.completedByName ?? "",
+                    "\(task.rewardCoconuts)",
+                    "\(timestamp(task.updatedAt))"
+                ].joined(separator: ":")
+            }.joined(separator: "|"),
+            snapshot.pendingExchangeRequests.map { request in
+                [
+                    request.id.uuidString,
+                    request.senderName,
+                    request.receiverId,
+                    request.statusRaw,
+                    request.currencyCode,
+                    "\(request.localAmount)",
+                    "\(request.coconutCost)",
+                    "\(timestamp(request.updatedAt))"
+                ].joined(separator: ":")
+            }.joined(separator: "|"),
+            snapshot.negativeSignals.map { signal in
+                [
+                    negativeSkipKey(for: signal),
+                    signal.title,
+                    signal.detail,
+                    signal.iconName,
+                    "\(signal.severity)",
+                    signal.petId?.uuidString ?? "",
+                    signal.plantId?.uuidString ?? ""
+                ].joined(separator: ":")
+            }.joined(separator: "|"),
+            "pets:\(snapshot.pets.map { "\($0.id.uuidString):\($0.name):\($0.currentStreak):\($0.coconutBalance):\($0.hasPassedAway)" }.joined(separator: "|"))",
+            "plants:\(snapshot.plants.map { "\($0.id.uuidString):\($0.name):\($0.wateringIntervalDays):\($0.fertilizingIntervalDays):\(timestamp($0.lastWateredDate)):\(timestamp($0.lastFertilizedDate))" }.joined(separator: "|"))",
+            "humans:\(snapshot.humans.map { "\($0.id.uuidString):\($0.name):\($0.coconutBalance)" }.joined(separator: "|"))"
         ].joined(separator: "#")
     }
 
-    static func timestamp(_ date: Date) -> String {
-        String(Int(date.timeIntervalSince1970))
+    static func timestamp(_ date: Date) -> Int {
+        Int(date.timeIntervalSince1970)
+    }
+
+    static func timestamp(_ date: Date?) -> Int {
+        guard let date else { return 0 }
+        return timestamp(date)
     }
 
     func skipButton(for content: TodayFocusContent, accent: Color) -> some View {
@@ -163,27 +212,54 @@ extension TodayFocusCard {
     func restoreSkippedFocusCards() {
         withAnimation(GoMotion.hero) {
             skippedFocusKeys.removeAll()
+            closedNegativeKeys.removeAll()
             selectedFocusIndex = 0
             hiddenFocusVersion += 1
         }
         rebuildRenderDeck(disablesAnimations: false)
-        TodayFocusHiddenStateStore.clearSkippedFocusKeys()
+        TodayFocusHiddenStateStore.clearHiddenFocusKeys(date: Self.hiddenFocusDate(for: hiddenFocusDayToken))
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     func persistHiddenFocusKeys() {
         TodayFocusHiddenStateStore.save(
             skippedFocusKeys: skippedFocusKeys,
-            closedNegativeKeys: closedNegativeKeys
+            closedNegativeKeys: closedNegativeKeys,
+            date: Self.hiddenFocusDate(for: hiddenFocusDayToken)
         )
     }
 
-    static func loadSkippedFocusKeys() -> Set<String> {
-        TodayFocusHiddenStateStore.loadSkippedFocusKeys()
+    func reloadHiddenFocusKeysIfNeeded(for snapshotDayToken: Int) {
+        let dayToken = snapshotDayToken == 0 ? Self.currentHiddenFocusDayToken() : snapshotDayToken
+        guard dayToken != hiddenFocusDayToken else { return }
+        hiddenFocusDayToken = dayToken
+        skippedFocusKeys = Self.loadSkippedFocusKeys(dayToken: dayToken)
+        closedNegativeKeys = Self.loadClosedNegativeKeys(dayToken: dayToken)
+        selectedFocusIndex = 0
+        hiddenFocusVersion += 1
     }
 
-    static func loadClosedNegativeKeys() -> Set<String> {
-        TodayFocusHiddenStateStore.loadClosedNegativeKeys()
+    static func currentHiddenFocusDayToken(date: Date = Date()) -> Int {
+        TodayFocusSnapshot.dayToken(for: date)
+    }
+
+    static func hiddenFocusDate(for dayToken: Int) -> Date {
+        guard dayToken > 0 else { return Date() }
+        return Date(timeIntervalSince1970: TimeInterval(dayToken))
+    }
+
+    static func loadSkippedFocusKeys(dayToken: Int? = nil) -> Set<String> {
+        if let dayToken {
+            return TodayFocusHiddenStateStore.loadSkippedFocusKeys(date: hiddenFocusDate(for: dayToken))
+        }
+        return TodayFocusHiddenStateStore.loadSkippedFocusKeys()
+    }
+
+    static func loadClosedNegativeKeys(dayToken: Int? = nil) -> Set<String> {
+        if let dayToken {
+            return TodayFocusHiddenStateStore.loadClosedNegativeKeys(date: hiddenFocusDate(for: dayToken))
+        }
+        return TodayFocusHiddenStateStore.loadClosedNegativeKeys()
     }
 
     @ViewBuilder

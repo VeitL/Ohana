@@ -48,10 +48,20 @@ extension MedicationReminderService {
     }
 }
 
-enum MedicationDoseProgressStore {
+nonisolated enum MedicationDoseProgressStore {
     static func dosesTakenToday(for medicationId: UUID) -> Int {
-        let today = DateFormatter.yyyyMMdd.string(from: Date())
+        let today = dayKey(for: Date())
         return UserDefaults.standard.integer(forKey: "med_doses_\(today)_\(medicationId.uuidString)")
+    }
+
+    private static func dayKey(for date: Date, calendar: Calendar = .current) -> String {
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(
+            format: "%04d-%02d-%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
     }
 }
 

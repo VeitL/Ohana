@@ -4,6 +4,7 @@
 //
 //  今日岛屿委托：3个动态任务 + 全部完成后解锁椰子盲盒
 
+import Foundation
 import SwiftData
 import SwiftUI
 
@@ -20,6 +21,41 @@ nonisolated struct IslandQuest: Identifiable, Equatable, Sendable {
     let targetPlantId: UUID?
 }
 
+nonisolated struct TodayFocusQuestProgress: Equatable, Sendable {
+    let isPetWizardCompleted: Bool
+    let isFirstMealRecorded: Bool
+    let isThemeColorSet: Bool
+
+    static func fromDefaults(_ defaults: UserDefaults = .standard) -> TodayFocusQuestProgress {
+        TodayFocusQuestProgress(
+            isPetWizardCompleted: defaults.bool(forKey: petWizardKey),
+            isFirstMealRecorded: defaults.bool(forKey: firstMealKey),
+            isThemeColorSet: defaults.bool(forKey: themeColorKey)
+        )
+    }
+
+    @MainActor
+    init(questManager: QuestManager) {
+        isPetWizardCompleted = questManager.isPetWizardCompleted
+        isFirstMealRecorded = questManager.isFirstMealRecorded
+        isThemeColorSet = questManager.isThemeColorSet
+    }
+
+    init(
+        isPetWizardCompleted: Bool,
+        isFirstMealRecorded: Bool,
+        isThemeColorSet: Bool
+    ) {
+        self.isPetWizardCompleted = isPetWizardCompleted
+        self.isFirstMealRecorded = isFirstMealRecorded
+        self.isThemeColorSet = isThemeColorSet
+    }
+
+    private static let petWizardKey = "quest_isPetWizardCompleted"
+    private static let firstMealKey = "quest_isFirstMealRecorded"
+    private static let themeColorKey = "quest_isThemeColorSet"
+}
+
 // MARK: - Quest Engine
 nonisolated enum IslandQuestEngine {
     private static let initialHumanWeightRecordedPrefix = "ohana.initialHumanWeightRecorded."
@@ -27,34 +63,49 @@ nonisolated enum IslandQuestEngine {
     static let oasisFirstMealQuestId = "q_oasis_first_meal"
     static let oasisThemeQuestId = "q_oasis_theme_color"
 
+    private static func localized(zh: String, en: String) -> String {
+        AppLocalizedText(zh: zh, en: en).resolve()
+    }
+
+    private static func fallbackName(_ value: String, zh: String, en: String) -> String {
+        value.isEmpty ? localized(zh: zh, en: en) : value
+    }
+
     static func todayQuests(
         pets: [Pet],
         reminders: [Reminder],
         plants: [Plant] = [],
         events: [Event] = [],
         humans: [Human] = [],
-        questManager: QuestManager = QuestManager()
+        now: Date = Date(),
+        questProgress: TodayFocusQuestProgress = .fromDefaults()
     ) -> [IslandQuest] {
         let cal = Calendar.current
-        let now = Date()
+        TodayFocusDailyPreferenceCleanupStore.cleanupIfNeeded(date: now, calendar: cal)
         var quests: [IslandQuest] = []
         let activePets = pets.filter { !$0.hasPassedAway }
 
         // ── 用药委托（最高优先级）：今日未达频次的活跃疗程
         for pet in activePets {
             guard quests.count < 3 else { break }
-            for med in pet.medications where med.isActiveToday {
+            for med in pet.medications where med.isActive(on: now) {
                 guard quests.count < 3 else { break }
                 let need = PetMedicationDoseLogging.requiredDoses(on: now, for: med)
                 guard need > 0 else { continue }
-                let done = PetMedicationDoseLogging.todayDoseCount(events: events, medicationId: med.id)
+                let done = PetMedicationDoseLogging.doseCount(on: now, events: events, medicationId: med.id, calendar: cal)
                 if done >= need { continue }
                 let left = need - done
                 quests.append(IslandQuest(
                     id: "q_med_\(med.id.uuidString)",
                     emoji: "💊",
-                    title: "给 \(pet.name) 喂 \(med.name.isEmpty ? "药" : med.name)",
-                    subtitle: "今日还需喂 \(left) 次 · 每次 \(med.dosage.isEmpty ? "按医嘱" : med.dosage)",
+                    title: localized(
+                        zh: "给 \(pet.name) 喂 \(med.name.isEmpty ? "药" : med.name)",
+                        en: "Give \(pet.name) \(med.name.isEmpty ? "medicine" : med.name)"
+                    ),
+                    subtitle: localized(
+                        zh: "今日还需喂 \(left) 次 · 每次 \(med.dosage.isEmpty ? "按医嘱" : med.dosage)",
+                        en: "\(left) dose\(left == 1 ? "" : "s") left today · \(med.dosage.isEmpty ? "as prescribed" : med.dosage)"
+                    ),
                     isCompleted: false,
                     targetPetId: pet.id,
                     targetPlantId: nil
@@ -71,7 +122,7 @@ nonisolated enum IslandQuestEngine {
         }
 
         if activePets.isEmpty {
-            for quest in oasisBuildQuests(activePets: activePets, humans: humans, questManager: questManager) {
+            for quest in oasisBuildQuests(activePets: activePets, humans: humans, questProgress: questProgress) {
                 guard quests.count < 3 else { break }
                 quests.append(quest)
             }
@@ -82,7 +133,10 @@ nonisolated enum IslandQuestEngine {
             quests.append(IslandQuest(
                 id: "q_human_weight_\(human.id.uuidString)",
                 emoji: "⚖️",
-                title: "记录 \(human.name.isEmpty ? "家人" : human.name) 的体重",
+                title: localized(
+                    zh: "记录 \(human.name.isEmpty ? "家人" : human.name) 的体重",
+                    en: "Log \(fallbackName(human.name, zh: "家人", en: "family member"))'s weight"
+                ),
                 subtitle: humanWeightSubtitle(for: human, calendar: cal, now: now),
                 isCompleted: false,
                 targetPetId: nil,
@@ -92,8 +146,8 @@ nonisolated enum IslandQuestEngine {
 
         // ── 轻量互动：每天最多一次家庭级陪玩引导；遛狗也视为已互动，避免给每只宠物轮流派发陪玩任务。
         let hasAnyPlayEquivalentToday = activePets.contains { pet in
-            pet.careLogs.contains { $0.careType == .play && cal.isDateInToday($0.date) }
-                || pet.walkLogs.contains { cal.isDateInToday($0.startDate) }
+            pet.careLogs.contains { $0.careType == .play && cal.isDate($0.date, inSameDayAs: now) }
+                || pet.walkLogs.contains { cal.isDate($0.startDate, inSameDayAs: now) }
         }
         if quests.count < 3,
            !hasAnyPlayEquivalentToday,
@@ -101,8 +155,12 @@ nonisolated enum IslandQuestEngine {
             quests.append(IslandQuest(
                 id: "q_play_\(pet.id.uuidString)",
                 emoji: "🎾",
-                title: "陪 \(pet.name) 玩一会儿",
-                subtitle: personalitySubtitle(for: "play", pet: pet, fallback: "轻松互动，不是固定照护计划"),
+                title: localized(zh: "陪 \(pet.name) 玩一会儿", en: "Play with \(pet.name)"),
+                subtitle: personalitySubtitle(
+                    for: "play",
+                    pet: pet,
+                    fallback: localized(zh: "轻松互动，不是固定照护计划", en: "A light check-in, not a fixed care plan")
+                ),
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
@@ -111,13 +169,17 @@ nonisolated enum IslandQuestEngine {
 
         if quests.count < 3,
            let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "weight", calendar: cal, now: now, isAlreadyDone: { p in
-               p.weightLogs.contains { cal.isDateInToday($0.date) }
+               p.weightLogs.contains { cal.isDate($0.date, inSameDayAs: now) }
            }) {
             quests.append(IslandQuest(
                 id: "q_weight_\(pet.id.uuidString)",
                 emoji: "⚖️",
-                title: "记录 \(pet.name) 的体重",
-                subtitle: personalitySubtitle(for: "weight", pet: pet, fallback: "建立健康趋势，从第一条数据开始"),
+                title: localized(zh: "记录 \(pet.name) 的体重", en: "Log \(pet.name)'s weight"),
+                subtitle: personalitySubtitle(
+                    for: "weight",
+                    pet: pet,
+                    fallback: localized(zh: "建立健康趋势，从第一条数据开始", en: "Start a health trend with the first entry")
+                ),
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
@@ -126,13 +188,17 @@ nonisolated enum IslandQuestEngine {
 
         if quests.count < 3,
            let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "moment", calendar: cal, now: now, isAlreadyDone: { p in
-               p.photoLogs.contains { cal.isDateInToday($0.date) }
+               p.photoLogs.contains { cal.isDate($0.date, inSameDayAs: now) }
            }) {
             quests.append(IslandQuest(
                 id: "q_moment_\(pet.id.uuidString)",
                 emoji: "📝",
-                title: "记录 \(pet.name) 的日常",
-                subtitle: personalitySubtitle(for: "moment", pet: pet, fallback: "写一句话或加一张照片，留下今天"),
+                title: localized(zh: "记录 \(pet.name) 的日常", en: "Capture \(pet.name)'s day"),
+                subtitle: personalitySubtitle(
+                    for: "moment",
+                    pet: pet,
+                    fallback: localized(zh: "写一句话或加一张照片，留下今天", en: "Add a note or photo from today")
+                ),
                 isCompleted: false,
                 targetPetId: pet.id,
                 targetPlantId: nil
@@ -140,19 +206,19 @@ nonisolated enum IslandQuestEngine {
         }
 
         if !activePets.isEmpty {
-            for quest in oasisBuildQuests(activePets: activePets, humans: humans, questManager: questManager) {
+            for quest in oasisBuildQuests(activePets: activePets, humans: humans, questProgress: questProgress) {
                 guard quests.count < 3 else { break }
                 quests.append(quest)
             }
         }
 
         // ── 植物浇水（需要浇水的植物）
-        if quests.count < 3, let thirstyPlant = plants.first(where: { $0.needsWatering }) {
+        if quests.count < 3, let thirstyPlant = plants.first(where: { $0.needsWatering(on: now, calendar: cal) }) {
             quests.append(IslandQuest(
-                id: "q_water_plant",
+                id: "q_water_plant_\(thirstyPlant.id.uuidString)",
                 emoji: "💧",
-                title: "给 \(thirstyPlant.name) 浇水",
-                subtitle: "植物渴了，快去浇水",
+                title: localized(zh: "给 \(thirstyPlant.name) 浇水", en: "Water \(thirstyPlant.name)"),
+                subtitle: localized(zh: "植物渴了，快去浇水", en: "This plant needs water today"),
                 isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: thirstyPlant.id
@@ -160,12 +226,12 @@ nonisolated enum IslandQuestEngine {
         }
 
         // ── 植物施肥（需要施肥的植物）
-        if quests.count < 3, let hungryPlant = plants.first(where: { $0.needsFertilizing }) {
+        if quests.count < 3, let hungryPlant = plants.first(where: { $0.needsFertilizing(on: now, calendar: cal) }) {
             quests.append(IslandQuest(
-                id: "q_fertilize_plant",
+                id: "q_fertilize_plant_\(hungryPlant.id.uuidString)",
                 emoji: "🌿",
-                title: "给 \(hungryPlant.name) 施肥",
-                subtitle: "植物需要补充养分",
+                title: localized(zh: "给 \(hungryPlant.name) 施肥", en: "Fertilize \(hungryPlant.name)"),
+                subtitle: localized(zh: "植物需要补充养分", en: "This plant needs nutrients"),
                 isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: hungryPlant.id
@@ -173,15 +239,19 @@ nonisolated enum IslandQuestEngine {
         }
 
         // ── 今日提醒（仅在有真实提醒时显示）
-        let todayReminders = reminders.filter { cal.isDateInToday($0.scheduledAt) }
+        let todayReminders = reminders.filter { cal.isDate($0.scheduledAt, inSameDayAs: now) }
         if quests.count < 3, !todayReminders.isEmpty {
             let allDone = todayReminders.allSatisfy(\.isCompleted)
             let pending = todayReminders.count(where: { !$0.isCompleted })
             quests.append(IslandQuest(
                 id: "q_reminder",
                 emoji: allDone ? "✅" : "📅",
-                title: allDone ? "今日提醒全部完成" : "完成今日 \(pending) 个提醒",
-                subtitle: allDone ? "所有提醒已处理" : "查看日历，处理待办提醒",
+                title: allDone
+                    ? localized(zh: "今日提醒全部完成", en: "Today's reminders are done")
+                    : localized(zh: "完成今日 \(pending) 个提醒", en: "Complete \(pending) reminder\(pending == 1 ? "" : "s") today"),
+                subtitle: allDone
+                    ? localized(zh: "所有提醒已处理", en: "All reminders are handled")
+                    : localized(zh: "查看日历，处理待办提醒", en: "Open Calendar and handle pending reminders"),
                 isCompleted: allDone,
                 targetPetId: activePets.first?.id,
                 targetPlantId: nil
@@ -189,6 +259,27 @@ nonisolated enum IslandQuestEngine {
         }
 
         return Array(quests.prefix(3))
+    }
+
+    @MainActor
+    static func todayQuests(
+        pets: [Pet],
+        reminders: [Reminder],
+        plants: [Plant] = [],
+        events: [Event] = [],
+        humans: [Human] = [],
+        now: Date = Date(),
+        questManager: QuestManager
+    ) -> [IslandQuest] {
+        todayQuests(
+            pets: pets,
+            reminders: reminders,
+            plants: plants,
+            events: events,
+            humans: humans,
+            now: now,
+            questProgress: TodayFocusQuestProgress(questManager: questManager)
+        )
     }
 
     /// 解析委托 ID 是否为用药打卡（`q_med_<UUID>`）
@@ -203,6 +294,29 @@ nonisolated enum IslandQuestEngine {
         let prefix = "q_event_"
         guard id.hasPrefix(prefix) else { return nil }
         return UUID(uuidString: String(id.dropFirst(prefix.count)))
+    }
+
+    /// 解析日历护理计划委托中的 Event ID（`q_feed_<petId>_<eventId>` 等）。
+    static func carePlanEventId(fromQuestId id: String) -> UUID? {
+        guard !id.hasPrefix("q_water_plant_"),
+              !id.hasPrefix("q_fertilize_plant_") else {
+            return nil
+        }
+        let prefixes = [
+            "q_feed_",
+            "q_water_",
+            "q_walk_",
+            "q_potty_",
+            "q_play_",
+            "q_weight_"
+        ]
+        for prefix in prefixes where id.hasPrefix(prefix) {
+            let suffix = String(id.dropFirst(prefix.count))
+            guard let separator = suffix.lastIndex(of: "_") else { return nil }
+            let eventId = suffix[suffix.index(after: separator)...]
+            return UUID(uuidString: String(eventId))
+        }
+        return nil
     }
 
     /// 解析委托 ID 是否为人类体重记录（`q_human_weight_<UUID>`）
@@ -240,21 +354,36 @@ nonisolated enum IslandQuestEngine {
         switch actionType {
         case "play":
             if tags.contains("energetic") || tags.contains("playful") || tags.contains("toy") {
-                return "按 \(pet.name) 的性格，今天更适合主动陪玩"
+                return localized(
+                    zh: "按 \(pet.name) 的性格，今天更适合主动陪玩",
+                    en: "\(pet.name)'s traits make active play a good fit today"
+                )
             }
             if tags.contains("shy") || tags.contains("anxious") || tags.contains("gentle") {
-                return "用温柔一点的方式陪 \(pet.name) 放松"
+                return localized(
+                    zh: "用温柔一点的方式陪 \(pet.name) 放松",
+                    en: "Use a gentler play style to help \(pet.name) relax"
+                )
             }
         case "weight":
             if tags.contains("foodie") || tags.contains("greedy") || tags.contains("lazy") {
-                return "结合性格标签，体重趋势值得持续观察"
+                return localized(
+                    zh: "结合性格标签，体重趋势值得持续观察",
+                    en: "Their traits make weight trends worth watching"
+                )
             }
         case "moment":
             if tags.contains("photogenic") || tags.contains("drama") {
-                return "\(pet.name) 今天也很适合留下一张照片"
+                return localized(
+                    zh: "\(pet.name) 今天也很适合留下一张照片",
+                    en: "\(pet.name) looks ready for a photo today"
+                )
             }
             if tags.contains("mischief") || tags.contains("curious") {
-                return "记录一下 \(pet.name) 今天的新发现"
+                return localized(
+                    zh: "记录一下 \(pet.name) 今天的新发现",
+                    en: "Capture what \(pet.name) discovered today"
+                )
             }
         default:
             break
@@ -262,42 +391,45 @@ nonisolated enum IslandQuestEngine {
         return fallback
     }
 
-    private static func oasisBuildQuests(activePets: [Pet], humans: [Human], questManager: QuestManager) -> [IslandQuest] {
-        let manager = questManager
+    private static func oasisBuildQuests(activePets: [Pet], humans: [Human], questProgress: TodayFocusQuestProgress) -> [IslandQuest] {
         var quests: [IslandQuest] = []
         let hasAnyMember = !activePets.isEmpty || !humans.isEmpty
 
-        if !manager.isPetWizardCompleted, activePets.isEmpty {
+        if !questProgress.isPetWizardCompleted, activePets.isEmpty {
             let needsFirstHuman = humans.isEmpty
             quests.append(IslandQuest(
                 id: oasisPetWizardQuestId,
                 emoji: needsFirstHuman ? "👤" : "🐾",
-                title: needsFirstHuman ? "先建立你的本人档案" : "迎接第一只宠物",
-                subtitle: needsFirstHuman ? "创建主人身份卡" : "让第一位伙伴住进岛屿 · +50🥥",
+                title: needsFirstHuman
+                    ? localized(zh: "先建立你的本人档案", en: "Create your own profile first")
+                    : localized(zh: "迎接第一只宠物", en: "Welcome your first pet"),
+                subtitle: needsFirstHuman
+                    ? localized(zh: "创建主人身份卡", en: "Set up the owner profile card")
+                    : localized(zh: "让第一位伙伴住进岛屿 · +50🥥", en: "Bring your first companion home · +50🥥"),
                 isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: nil
             ))
         }
 
-        if !manager.isFirstMealRecorded, !activePets.isEmpty {
+        if !questProgress.isFirstMealRecorded, !activePets.isEmpty {
             quests.append(IslandQuest(
                 id: oasisFirstMealQuestId,
                 emoji: "🍗",
-                title: "记录第一顿美餐",
-                subtitle: "完成一次喂食，让岛屿开始运转 · +15🥥",
+                title: localized(zh: "记录第一顿美餐", en: "Log the first meal"),
+                subtitle: localized(zh: "完成一次喂食，让岛屿开始运转 · +15🥥", en: "Finish one feeding to wake the oasis · +15🥥"),
                 isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: nil
             ))
         }
 
-        if !manager.isThemeColorSet, hasAnyMember {
+        if !questProgress.isThemeColorSet, hasAnyMember {
             quests.append(IslandQuest(
                 id: oasisThemeQuestId,
                 emoji: "🎨",
-                title: "设置主题颜色",
-                subtitle: "给家人或宠物一个专属视觉身份 · +10🥥",
+                title: localized(zh: "设置主题颜色", en: "Set a theme color"),
+                subtitle: localized(zh: "给家人或宠物一个专属视觉身份 · +10🥥", en: "Give a family member or pet a visual identity · +10🥥"),
                 isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: nil
@@ -321,6 +453,7 @@ nonisolated enum IslandQuestEngine {
     }
 
     static func markInitialHumanWeightRecorded(humanId: UUID, date: Date = Date()) {
+        TodayFocusDailyPreferenceCleanupStore.cleanupIfNeeded(date: date)
         let key = initialHumanWeightRecordedKey(humanId: humanId, date: date, calendar: .current)
         UserDefaults.standard.set(true, forKey: key)
     }
@@ -355,15 +488,23 @@ nonisolated enum IslandQuestEngine {
         now: Date
     ) -> String {
         guard let last = human.weightLogs.max(by: { $0.date < $1.date }) else {
-            return "建立自己的健康趋势，从第一条数据开始"
+            return localized(zh: "建立自己的健康趋势，从第一条数据开始", en: "Start your health trend with the first entry")
         }
         let days = max(0, calendar.dateComponents(
             [.day],
             from: calendar.startOfDay(for: last.date),
             to: calendar.startOfDay(for: now)
         ).day ?? 0)
-        if days == 0 { return String(format: "今天最新记录 %.1fkg", last.weight) }
-        return String(format: "上次 %.1fkg · %d 天前", last.weight, days)
+        if days == 0 {
+            return localized(
+                zh: String(format: "今天最新记录 %.1fkg", last.weight),
+                en: String(format: "Latest today %.1f kg", last.weight)
+            )
+        }
+        return localized(
+            zh: String(format: "上次 %.1fkg · %d 天前", last.weight, days),
+            en: String(format: "Last %.1f kg · %d day%@ ago", last.weight, days, days == 1 ? "" : "s")
+        )
     }
 
     private static func carePlanQuests(
@@ -376,21 +517,22 @@ nonisolated enum IslandQuestEngine {
         let petById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0) })
         return events
             .filter { event in
-                event.relatedEntityType == EntityKind.pet.rawValue
+                let relatedType = event.relatedEntityType.lowercased()
+                return (relatedType == EntityKind.pet.rawValue.lowercased() || relatedType == "pet")
                     && event.isActionableTask
                     && eventOccursToday(event, calendar: calendar, now: now)
             }
             .compactMap { event -> IslandQuest? in
                 guard let pet = petById[event.relatedEntityId] else { return nil }
                 let kind = routineKind(for: event)
-                if isRoutineDoneToday(kind, pet: pet, calendar: calendar, now: now) {
+                if isCarePlanEventCompleted(kind, event: event, pet: pet, calendar: calendar, now: now) {
                     return nil
                 }
                 let id = questId(for: kind, event: event, pet: pet)
                 return IslandQuest(
                     id: id,
                     emoji: emoji(for: kind, event: event),
-                    title: event.title,
+                    title: routineTitle(for: kind, event: event, pet: pet),
                     subtitle: routineSubtitle(for: kind, pet: pet, humans: humans, calendar: calendar, now: now),
                     isCompleted: false,
                     targetPetId: pet.id,
@@ -416,11 +558,32 @@ nonisolated enum IslandQuestEngine {
 
     private static func routineKind(for event: Event) -> RoutineKind {
         let text = "\(event.title) \(event.eventType)".lowercased()
-        if text.contains("喂食") || text.contains("feed") { return .feeding }
-        if text.contains("饮水") || text.contains("喂水") || text.contains("补充饮水") { return .watering }
+        if event.eventType == EventType.foodChange.rawValue ||
+            text.contains("喂食") ||
+            text.contains("feed") ||
+            text.contains("meal") ||
+            text.contains("吃") ||
+            text.contains("粮") {
+            return .feeding
+        }
+        if text.contains("饮水") ||
+            text.contains("喂水") ||
+            text.contains("补充饮水") ||
+            text.contains("喝水") ||
+            text.contains("drink") ||
+            text.contains("wasser") {
+            return .watering
+        }
         if text.contains("遛") || text.contains("walk") { return .walk }
-        if text.contains("铲") || text.contains("厕所") || text.contains("便") || text.contains("litter") { return .potty }
-        if text.contains("陪玩") || text.contains("互动") || text.contains("play") || text.contains("放飞") { return .play }
+        if event.eventType == EventType.litterBox.rawValue ||
+            text.contains("铲") ||
+            text.contains("厕所") ||
+            text.contains("便") ||
+            text.contains("litter") ||
+            text.contains("scoop") {
+            return .potty
+        }
+        if text.contains("陪玩") || text.contains("互动") || text.contains("play") || text.contains("放飞") || text.contains("逗") { return .play }
         if text.contains("体重") || text.contains("weight") { return .weight }
         return .generic
     }
@@ -428,17 +591,17 @@ nonisolated enum IslandQuestEngine {
     private static func questId(for kind: RoutineKind, event: Event, pet: Pet) -> String {
         switch kind {
         case .feeding:
-            "q_feed_\(pet.id.uuidString)"
+            "q_feed_\(pet.id.uuidString)_\(event.id.uuidString)"
         case .watering:
-            "q_water_\(pet.id.uuidString)"
+            "q_water_\(pet.id.uuidString)_\(event.id.uuidString)"
         case .walk:
-            "q_walk"
+            "q_walk_\(pet.id.uuidString)_\(event.id.uuidString)"
         case .potty:
-            "q_potty"
+            "q_potty_\(pet.id.uuidString)_\(event.id.uuidString)"
         case .play:
-            "q_play_\(pet.id.uuidString)"
+            "q_play_\(pet.id.uuidString)_\(event.id.uuidString)"
         case .weight:
-            "q_weight_\(pet.id.uuidString)"
+            "q_weight_\(pet.id.uuidString)_\(event.id.uuidString)"
         case .generic:
             "q_event_\(event.id.uuidString)"
         }
@@ -456,32 +619,101 @@ nonisolated enum IslandQuestEngine {
         }
     }
 
+    private static func routineTitle(for kind: RoutineKind, event: Event, pet: Pet) -> String {
+        switch kind {
+        case .feeding:
+            localized(zh: "给 \(pet.name) 喂食", en: "Feed \(pet.name)")
+        case .watering:
+            localized(zh: "给 \(pet.name) 喂水", en: "Give \(pet.name) water")
+        case .walk:
+            localized(zh: "带 \(pet.name) 出门", en: "Walk \(pet.name)")
+        case .potty:
+            localized(zh: "记录 \(pet.name) 的厕所", en: "Log \(pet.name)'s potty")
+        case .play:
+            localized(zh: "陪 \(pet.name) 玩一会儿", en: "Play with \(pet.name)")
+        case .weight:
+            localized(zh: "记录 \(pet.name) 的体重", en: "Log \(pet.name)'s weight")
+        case .generic:
+            event.title
+        }
+    }
+
     private static func carePlanPriority(_ id: String) -> Int {
         if id.hasPrefix("q_med_") { return 0 }
         if id.hasPrefix("q_feed_") { return 1 }
         if id.hasPrefix("q_water_") { return 2 }
-        if id == "q_walk" || id == "q_potty" { return 3 }
+        if id == "q_walk" || id == "q_potty" || id.hasPrefix("q_walk_") || id.hasPrefix("q_potty_") { return 3 }
         if id.hasPrefix("q_event_") { return 4 }
         return 5
     }
 
-    private static func isRoutineDoneToday(_ kind: RoutineKind, pet: Pet, calendar: Calendar, now: Date) -> Bool {
+    private static func isCarePlanEventCompleted(
+        _ kind: RoutineKind,
+        event: Event,
+        pet: Pet,
+        calendar: Calendar,
+        now: Date
+    ) -> Bool {
+        if event.isOccurrenceMarkedComplete(on: now) {
+            return true
+        }
         switch kind {
         case .feeding:
-            pet.careLogs.contains { $0.careType == .feeding && calendar.isDate($0.date, inSameDayAs: now) }
+            return hasPlannedCareLog(
+                event: event,
+                pet: pet,
+                careTypes: [.feeding],
+                notePrefix: PetCareLog.plannedFeedNotePrefix,
+                calendar: calendar,
+                now: now
+            )
         case .watering:
-            pet.careLogs.contains { $0.careType == .watering && calendar.isDate($0.date, inSameDayAs: now) }
+            return hasPlannedCareLog(
+                event: event,
+                pet: pet,
+                careTypes: [.watering, .waterChange],
+                notePrefix: PetCareLog.plannedWaterNotePrefix,
+                calendar: calendar,
+                now: now
+            )
         case .walk:
-            pet.walkLogs.contains { calendar.isDate($0.startDate, inSameDayAs: now) }
+            return pet.walkLogs.contains {
+                calendar.isDate($0.startDate, inSameDayAs: now)
+            }
         case .potty:
-            pet.pottyLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
-                || pet.careLogs.contains { $0.careType == .litter && calendar.isDate($0.date, inSameDayAs: now) }
+            return pet.pottyLogs.contains {
+                calendar.isDate($0.date, inSameDayAs: now)
+            } || pet.careLogs.contains {
+                $0.careType == .litter && calendar.isDate($0.date, inSameDayAs: now)
+            }
         case .play:
-            pet.careLogs.contains { $0.careType == .play && calendar.isDate($0.date, inSameDayAs: now) }
+            return pet.careLogs.contains {
+                $0.careType == .play && calendar.isDate($0.date, inSameDayAs: now)
+            } || pet.walkLogs.contains {
+                calendar.isDate($0.startDate, inSameDayAs: now)
+            }
         case .weight:
-            pet.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
+            return pet.weightLogs.contains {
+                calendar.isDate($0.date, inSameDayAs: now)
+            }
         case .generic:
-            false
+            return false
+        }
+    }
+
+    private static func hasPlannedCareLog(
+        event: Event,
+        pet: Pet,
+        careTypes: [CareType],
+        notePrefix: String,
+        calendar: Calendar,
+        now: Date
+    ) -> Bool {
+        let plannedPrefix = "\(notePrefix)\(event.id.uuidString)"
+        return pet.careLogs.contains {
+            careTypes.contains($0.careType)
+                && $0.note.hasPrefix(plannedPrefix)
+                && calendar.isDate($0.date, inSameDayAs: now)
         }
     }
 
@@ -493,18 +725,21 @@ nonisolated enum IslandQuestEngine {
         now: Date
     ) -> String {
         let fallback = switch kind {
-        case .feeding: "今天还缺喂食"
-        case .watering: "今天还缺饮水记录"
-        case .walk: "今天还缺遛狗"
-        case .potty: "今天还缺厕所/便便记录"
-        case .play: "今天还缺互动陪伴"
-        case .weight: "今天还缺体重记录"
-        case .generic: "按计划完成后，家人都能看到状态"
+        case .feeding: localized(zh: "今天还缺喂食", en: "Feeding is still due today")
+        case .watering: localized(zh: "今天还缺饮水记录", en: "Water intake is still due today")
+        case .walk: localized(zh: "今天还缺遛狗", en: "A walk is still due today")
+        case .potty: localized(zh: "今天还缺厕所/便便记录", en: "Potty or litter tracking is still due today")
+        case .play: localized(zh: "今天还缺互动陪伴", en: "Play time is still due today")
+        case .weight: localized(zh: "今天还缺体重记录", en: "Weight tracking is still due today")
+        case .generic: localized(zh: "按计划完成后，家人都能看到状态", en: "Complete the plan so the family can see the status")
         }
 
         guard let last = lastRoutineActor(for: kind, pet: pet) else { return fallback }
         let actor = humanDisplayName(id: last.executorId, humans: humans)
-        return "上次由 \(actor) · \(relativeTime(from: last.date, to: now, calendar: calendar))"
+        return localized(
+            zh: "上次由 \(actor) · \(relativeTime(from: last.date, to: now, calendar: calendar))",
+            en: "Last by \(actor) · \(relativeTime(from: last.date, to: now, calendar: calendar))"
+        )
     }
 
     private static func lastRoutineActor(for kind: RoutineKind, pet: Pet) -> (date: Date, executorId: String?)? {
@@ -546,34 +781,33 @@ nonisolated enum IslandQuestEngine {
 
     private static func humanDisplayName(id: String?, humans: [Human]) -> String {
         guard let id, let human = humans.first(where: { $0.id.uuidString == id }) else {
-            return "家人"
+            return localized(zh: "家人", en: "Family")
         }
-        return human.name.isEmpty ? "家人" : human.name
+        return human.name.isEmpty ? localized(zh: "家人", en: "Family") : human.name
     }
 
     private static func relativeTime(from date: Date, to now: Date, calendar: Calendar) -> String {
         if calendar.isDate(date, inSameDayAs: now) {
             let minutes = max(1, Int(now.timeIntervalSince(date) / 60))
-            if minutes < 60 { return "\(minutes) 分钟前" }
-            return "\(minutes / 60) 小时前"
+            if minutes < 60 {
+                return localized(zh: "\(minutes) 分钟前", en: "\(minutes)m ago")
+            }
+            let hours = minutes / 60
+            return localized(zh: "\(hours) 小时前", en: "\(hours)h ago")
         }
         let days = max(1, calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 1)
-        return "\(days) 天前"
-    }
-
-    static func allCompleted(quests: [IslandQuest]) -> Bool {
-        !quests.isEmpty && quests.allSatisfy(\.isCompleted)
+        return localized(zh: "\(days) 天前", en: "\(days)d ago")
     }
 
     /// 委托完成时椰子粒子数量
     static func coconutReward(forQuestId id: String) -> Int {
         switch id {
-        case "q_water_plant": return 1
-        case "q_fertilize_plant": return 1
         case "q_reminder": return 2
         default:
             if id.hasPrefix("q_med_") { return 2 }
             if id.hasPrefix("q_feed_") { return 2 }
+            if id.hasPrefix("q_water_plant") { return 1 }
+            if id.hasPrefix("q_fertilize_plant") { return 1 }
             if id.hasPrefix("q_water_") { return 1 }
             if id.hasPrefix("q_play_") { return 2 }
             if id.hasPrefix("q_weight_") { return 2 }
@@ -583,119 +817,4 @@ nonisolated enum IslandQuestEngine {
             return 1
         }
     }
-
-    // 标记「探访」任务已完成
-    static func markVisited() {
-        let key = "quest_visit_\(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970)"
-        UserDefaults.standard.set(true, forKey: key)
-    }
 }
-
-// MARK: - Coconut Drop Sheet
-struct CoconutDropSheet: View {
-    @Binding var isPresented: Bool
-    @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
-    @State private var revealed = false
-    @State private var bounce = false
-    @State private var isVisible = false
-
-    private let rewards: [(emoji: String, text: String)] = [
-        ("🥥", "今日解锁：椰子咖啡主题"),
-        ("🦜", "冷知识：狗狗能识别 250 个单词！"),
-        ("🌺", "今日解锁：繁花岛限定卡片"),
-        ("⭐️", "你的宠物今天特别可爱"),
-        ("🍀", "幸运签：今天出门一定艳阳天"),
-        ("🐠", "冷知识：猫咪平均每天睡 14 小时")
-    ]
-    private var reward: (emoji: String, text: String) {
-        // 用今日日期做种子，保证同天拿到同一个奖励
-        let day = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 1
-        return rewards[day % rewards.count]
-    }
-
-    private var shouldAnimate: Bool {
-        workloadPolicy.shouldAnimate(isVisible: isVisible)
-    }
-
-    var body: some View {
-        ZStack {
-            Color.arkInk.opacity(0.85).ignoresSafeArea()
-
-            VStack(spacing: 32) {
-                Spacer()
-
-                // 椰子
-                Button {
-                    withAnimation(GoMotion.feedback) {
-                        revealed = true
-                    }
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [Color(hex: "A8711A"), Color(hex: "5C3A0A")],
-                                    center: .topLeading,
-                                    startRadius: 10,
-                                    endRadius: 100
-                                )
-                            )
-                            .frame(width: 120, height: 120)
-                            .shadow(color: Color(hex: "A8711A").opacity(0.5), radius: 20, y: 8) // ui-v4: allow reward coconut lift in modal prize reveal.
-                            .scaleEffect(bounce ? 1.08 : 1.0)
-                            .animation(shouldAnimate ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : nil, value: bounce) // smoothness: allow AppWorkloadPolicy-gated visible-only prize pulse.
-
-                        Text(revealed ? reward.emoji : "🥥")
-                            .font(OhanaFont.metric(size: 52))
-                            .scaleEffect(revealed ? 1.3 : 1.0)
-                            .animation(GoMotion.feedback, value: revealed)
-                    }
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .disabled(revealed)
-
-                VStack(spacing: 12) {
-                    Text(revealed ? "今日盲盒已开启！" : "敲开你的椰子")
-                        .font(OhanaFont.title2(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-
-                    Text(revealed ? reward.text : "完成所有委托换取的神秘礼物")
-                        .font(OhanaFont.body(.medium))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
-
-                if revealed {
-                    Button {
-                        isPresented = false
-                    } label: {
-                        Text("收下！")
-                            .font(OhanaFont.headline(.bold))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.goPrimary, in: Capsule())
-                            .padding(.horizontal, 48)
-                    }
-                }
-
-                Spacer()
-            }
-        }
-        .onAppear {
-            isVisible = true
-            bounce = shouldAnimate
-        }
-        .onDisappear {
-            isVisible = false
-            bounce = false
-        }
-        .onChange(of: shouldAnimate) { _, canAnimate in
-            bounce = canAnimate
-        }
-    }
-}
-
-// MARK: - Daily Quests Card

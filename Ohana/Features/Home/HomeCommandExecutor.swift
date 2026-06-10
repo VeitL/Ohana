@@ -242,7 +242,7 @@ struct HomeCommandExecutor {
         executorId: String?,
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
     ) {
-        ExpandedQuickActionExecutor.applyPottyCheckIn(
+        let didRecord = ExpandedQuickActionExecutor.applyPottyCheckIn(
             raw: raw,
             pet: pet,
             executorId: executorId,
@@ -250,7 +250,9 @@ struct HomeCommandExecutor {
             feedback: feedback,
             careEvents: careEvents
         )
-        publishMutation(QuickCareCommand.potty(petID: pet.id, type: raw))
+        if didRecord {
+            publishMutation(QuickCareCommand.potty(petID: pet.id, type: raw))
+        }
     }
 
     func applyPottyCheckIn(

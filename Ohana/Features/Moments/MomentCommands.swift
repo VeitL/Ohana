@@ -52,42 +52,55 @@ enum MomentCommandService {
             savedLogs.append(log)
         }
 
-        let coconutDelta = questManager.addCoconuts(
-            1,
-            emoji: "📸",
-            title: "记录时刻 +1🥥",
-            actorId: executorId,
-            context: context,
-            save: false
-        )
-
+        var coconutDelta = 0
         if let savedLog = savedLogs.first {
-            careLedger.record(
-                occurredAt: savedLog.date,
-                actorKind: executorId == nil ? .unknown : .human,
-                actorId: executorId,
-                subjectKind: pet == nil ? .system : .pet,
-                subjectId: pet?.id.uuidString,
-                eventKind: .milestone,
-                actionType: "petMoment",
-                amountValue: 0,
-                amountUnit: "",
-                note: savedLog.note,
-                source: .quickAction,
-                sourceEventId: nil,
-                sourceReminderId: nil,
-                legacyModelName: "PetPhotoLog",
-                legacyModelId: savedLog.id.uuidString,
-                coconutDelta: coconutDelta,
-                rewardLogId: nil,
-                privacyFieldRaw: nil,
-                metadataJSON: "",
-                context: context,
-                save: false
-            )
+            do {
+                coconutDelta = try questManager.stageSpecialCoconutReward(
+                    amount: 1,
+                    emoji: "📸",
+                    title: "记录时刻 +1🥥",
+                    actorId: executorId,
+                    source: .careEvent,
+                    sourceModelName: "PetPhotoLog",
+                    sourceModelId: savedLog.id.uuidString,
+                    metadataJSON: "{\"kind\":\"petMoment\"}",
+                    transactionKey: "moment:\(savedLog.id.uuidString):reward",
+                    context: context,
+                    occurredAt: savedLog.date
+                )
+                careLedger.record(
+                    occurredAt: savedLog.date,
+                    actorKind: executorId == nil ? .unknown : .human,
+                    actorId: executorId,
+                    subjectKind: pet == nil ? .system : .pet,
+                    subjectId: pet?.id.uuidString,
+                    eventKind: .milestone,
+                    actionType: "petMoment",
+                    amountValue: 0,
+                    amountUnit: "",
+                    note: savedLog.note,
+                    source: .quickAction,
+                    sourceEventId: nil,
+                    sourceReminderId: nil,
+                    legacyModelName: "PetPhotoLog",
+                    legacyModelId: savedLog.id.uuidString,
+                    coconutDelta: coconutDelta,
+                    rewardLogId: nil,
+                    privacyFieldRaw: nil,
+                    metadataJSON: "",
+                    context: context,
+                    save: false
+                )
+                try context.save()
+            } catch {
+                context.rollback()
+                questManager.wallet.refreshQuestProjection(context: context, manager: questManager)
+                #if DEBUG
+                    OhanaLog.error("[MomentCommandService] moment reward save failed: \(error.localizedDescription)", category: "Economy")
+                #endif
+                return MomentCommandResult(savedLogIDs: [], coconutDelta: 0)
+            }
         }
-
-        context.safeSave()
 
         return MomentCommandResult(savedLogIDs: savedLogs.map(\.id), coconutDelta: coconutDelta)
     }

@@ -22,6 +22,10 @@ struct PetBondVaultContentView: View {
     @State private var activePreviewItem: PetBondVaultItem?
 
     private var l: L10n { L10n(appLanguage) }
+    private var petWalletBalance: Int {
+        CoconutWalletService.balance(for: pet, context: modelContext)
+    }
+
     private var petLogs: [CoconutLogEntry] {
         walletLedgerEntries
             .filter { $0.ownerKind == .pet && $0.ownerId == pet.id.uuidString && $0.delta != 0 }
@@ -138,8 +142,12 @@ struct PetBondVaultContentView: View {
     private var unlockGrid: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle(
-                l.tr(zh: "可解锁内容", en: "Unlocks", de: "Freischaltungen"),
-                subtitle: l.tr(zh: "消耗该宠物自己的成长椰子", en: "Uses this pet's own bond balance", de: "Nutzt nur das eigene Haustierguthaben")
+                l.tr(zh: "解锁与投喂", en: "Unlocks & Treats", de: "Freischaltungen & Snacks"),
+                subtitle: l.tr(
+                    zh: "消耗该宠物自己的成长椰子",
+                    en: "Uses this pet's own bond balance",
+                    de: "Nutzt nur das eigene Haustierguthaben"
+                )
             )
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
@@ -151,8 +159,9 @@ struct PetBondVaultContentView: View {
     }
 
     private func unlockCard(_ item: PetBondVaultItem) -> some View {
-        let unlocked = unlockedIDs.contains(item.id)
-        let canUnlock = pet.coconutBalance >= item.cost && !unlocked
+        let unlocked = !item.isRepeatable && unlockedIDs.contains(item.id)
+        let balance = petWalletBalance
+        let canUnlock = balance >= item.cost && !unlocked
         let tint = Color(hex: item.tintHex)
 
         return VStack(alignment: .leading, spacing: 11) {
@@ -198,7 +207,7 @@ struct PetBondVaultContentView: View {
                 Button {
                     unlock(item)
                 } label: {
-                    Text(actionTitle(for: item, unlocked: unlocked))
+                    Text(actionTitle(for: item, unlocked: unlocked, balance: balance))
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(canUnlock ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .frame(maxWidth: .infinity)
@@ -284,38 +293,48 @@ struct PetBondVaultContentView: View {
         }
     }
 
-    private func actionTitle(for item: PetBondVaultItem, unlocked: Bool) -> String {
+    private func actionTitle(for item: PetBondVaultItem, unlocked: Bool, balance: Int) -> String {
         if unlocked {
             return l.tr(zh: "已拥有", en: "Owned", de: "Besitzt")
         }
-        if pet.coconutBalance >= item.cost {
-            return l.tr(zh: "解锁", en: "Unlock", de: "Freischalten")
+        if balance >= item.cost {
+            return item.isRepeatable
+                ? l.tr(zh: "投喂", en: "Treat", de: "Füttern")
+                : l.tr(zh: "解锁", en: "Unlock", de: "Freischalten")
         }
         return l.tr(
-            zh: "还差 \(item.cost - pet.coconutBalance)🥥",
-            en: "\(item.cost - pet.coconutBalance)🥥 short",
-            de: "\(item.cost - pet.coconutBalance)🥥 fehlen"
+            zh: "还差 \(item.cost - balance)🥥",
+            en: "\(item.cost - balance)🥥 short",
+            de: "\(item.cost - balance)🥥 fehlen"
         )
     }
 
     private func unlock(_ item: PetBondVaultItem) {
-        let title = l.tr(
-            zh: "\(pet.name) 解锁 \(l.text(item.title))",
-            en: "\(pet.name) unlocked \(l.text(item.title))",
-            de: "\(pet.name) hat \(l.text(item.title)) freigeschaltet"
-        )
+        let title = item.isRepeatable
+            ? l.tr(
+                zh: "\(pet.name) 投喂 \(l.text(item.title))",
+                en: "\(pet.name) used \(l.text(item.title))",
+                de: "\(pet.name) nutzt \(l.text(item.title))"
+            )
+            : l.tr(
+                zh: "\(pet.name) 解锁 \(l.text(item.title))",
+                en: "\(pet.name) unlocked \(l.text(item.title))",
+                de: "\(pet.name) hat \(l.text(item.title)) freigeschaltet"
+            )
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(.petBondVaultUnlock(petID: pet.id, itemID: item.id)) {
             let result = RewardEconomyCommandExecutor(context: modelContext, services: appServices).unlockBondVaultItem(
                 item,
                 pet: pet,
                 title: title,
-                note: "petBondVault.unlock"
+                note: item.isRepeatable ? "petBondVault.consume" : "petBondVault.unlock"
             )
             unlockedIDs = PetBondVaultStore.unlockedIDs(for: pet.id)
             if result.didUnlock {
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-                showToast(l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet"))
+                showToast(item.isRepeatable
+                    ? l.tr(zh: "已投喂", en: "Treated", de: "Gefüttert")
+                    : l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet"))
             } else if result.failure == .insufficientBalance {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 showToast(l.tr(zh: "椰子不足", en: "Not enough coconuts", de: "Nicht genug Kokosnüsse"))
@@ -435,6 +454,8 @@ private struct PetBondVaultPreviewOverlay: View {
             l.tr(zh: "Oasis 装饰会用于这只宠物的小窝展示。", en: "Oasis decor is for this pet's nest display.", de: "Oase-Deko gilt für das Nest dieses Haustiers.")
         case .memorialFrame:
             l.tr(zh: "纪念相框只是预览黑白纪念效果，不会改变宠物状态。", en: "This previews the memorial frame without changing pet status.", de: "Nur Vorschau, der Status bleibt unverändert.")
+        case .bondTreat:
+            l.tr(zh: "点心可以重复投喂，每次都会消耗椰子加深羁绊。", en: "Treats are repeatable; each one spends coconuts to deepen the bond.", de: "Snacks sind wiederholbar und vertiefen die Bindung gegen Kokosnüsse.")
         }
     }
 
@@ -479,6 +500,8 @@ private struct PetBondVaultAppliedPreview: View {
                 oasisNestPreview
             case .memorialFrame:
                 miniPetCard(showBorder: true, showNameplate: true, memorial: true)
+            case .bondTreat:
+                bondTreatPreview
             }
         }
         .onAppear {
@@ -613,6 +636,31 @@ private struct PetBondVaultAppliedPreview: View {
             .background(Color.ohanaCardSurface, in: Capsule())
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(compact ? 10 : 16)
+        }
+    }
+
+    private var bondTreatPreview: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: compact ? 18 : 28, style: .continuous)
+                .fill(tint.opacity(0.16))
+
+            VStack(spacing: compact ? 8 : 14) {
+                petAvatar(size: compact ? 66 : 118)
+                    .scaleEffect(animate ? 1 : 0.9)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "heart.fill") // a11y: allow decorative preview icon
+                        .foregroundStyle(tint)
+                    Text(l.tr(zh: "羁绊 +1", en: "Bond +1", de: "Bindung +1"))
+                }
+                .font(compact ? OhanaFont.caption2(.black) : OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.ohanaCardSurface, in: Capsule())
+                .opacity(animate ? 1 : 0)
+                .offset(y: animate ? 0 : 8)
+            }
         }
     }
 

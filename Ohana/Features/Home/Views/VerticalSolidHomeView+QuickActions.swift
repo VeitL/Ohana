@@ -171,6 +171,7 @@ extension VerticalSolidHomeView {
         if feedback.coconutDelta > 0 {
             OhanaFeedback.success()
         }
+        tryAwardTodayFocusDailyCompletion(afterCompleting: feedback.cardId)
     }
 
     func currentExecutorId() -> String? {

@@ -137,7 +137,7 @@ extension OasisUpgradeRewardService {
             let wishXPDelta = addXP(wish.rewardXP, to: critter)
             critter.bond = min(999, critter.bond + wish.rewardBond)
             addFragments(critterId: critter.catalogId, amount: wish.rewardFragments, context: context)
-            OasisCritterEconomyService.awardCurrentHumanCoconuts(
+            guard OasisCritterEconomyService.awardCurrentHumanCoconuts(
                 wish.rewardCoconuts,
                 emoji: "💌",
                 title: "电子宠物小愿望",
@@ -145,7 +145,11 @@ extension OasisUpgradeRewardService {
                 activeHumanSelection: activeHumanSelection,
                 wallet: wallet,
                 questManager: questManager
-            )
+            ) else {
+                context.rollback()
+                wallet.refreshQuestProjection(context: context, manager: questManager)
+                throw OasisRewardWriteError.coconutAwardFailed
+            }
             context.insert(OasisCritterActionLog(
                 critterId: critter.id,
                 critterCatalogId: critter.catalogId,
@@ -165,7 +169,13 @@ extension OasisUpgradeRewardService {
         critter.lastInteractionAt = Date()
         critter.lastStateRefreshAt = Date()
         refreshLifecycleState(for: critter, now: Date())
-        try context.save()
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            throw error
+        }
         if !completedWish, let interactionOverride {
             return interactionOverride
         }

@@ -68,7 +68,8 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                     familyTasks: familyTasks,
                     exchangeRequests: exchangeRequests,
                     todayFocus: todayFocus,
-                    healthAlerts: healthAlerts
+                    healthAlerts: healthAlerts,
+                    now: now
                 )
             }
         )
@@ -77,7 +78,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
     static func buildForReadModelActor(
         from source: VerticalSolidHomeSourceState,
         now: Date = Date(),
-        questManager: QuestManager = QuestManager(),
+        questProgress: TodayFocusQuestProgress = .fromDefaults(),
         healthAlertEngine: PetHealthAlertEngine = PetHealthAlertEngine()
     ) -> VerticalSolidHomeSnapshot {
         let clinicalAlerts = healthAlertEngine.scanAlerts(pets: source.pets.filter { !$0.hasPassedAway })
@@ -99,8 +100,9 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                     humanWeightLogs: humanWeightLogs,
                     familyTasks: familyTasks,
                     exchangeRequests: exchangeRequests,
-                    questManager: questManager,
-                    clinicalAlerts: clinicalAlerts
+                    questProgress: questProgress,
+                    clinicalAlerts: clinicalAlerts,
+                    now: now
                 )
             }
         )
@@ -179,18 +181,19 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                     subtitle: plant.species.isEmpty ? plant.location : plant.species,
                     emoji: plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji,
                     themeHex: plant.themeColorHex,
-                    needsCare: plant.needsWatering || plant.needsFertilizing
+                    needsCare: plant.needsWatering(on: now) || plant.needsFertilizing(on: now)
                 )
             },
             heroPreparationRevision: heroPreparationRevision(for: cards)
         )
     }
 
-    static func signature(for source: VerticalSolidHomeSourceState) -> String {
+    static func signature(for source: VerticalSolidHomeSourceState, now: Date = Date()) -> String {
         [
+            "day:\(dayToken(for: now))",
             petSignature(source.pets),
             humanSignature(source.humans),
-            plantSignature(source.plants),
+            plantSignature(source.plants, now: now),
             electronicPetSignature(source.electronicPets),
             eventSignature(source.events),
             reminderSignature(source.pendingReminders),
@@ -310,7 +313,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         }.joined(separator: "|")
     }
 
-    private static func plantSignature(_ plants: [Plant]) -> String {
+    private static func plantSignature(_ plants: [Plant], now: Date) -> String {
         plants.map { plant in
             [
                 plant.id.uuidString,
@@ -319,8 +322,12 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 plant.location,
                 plant.avatarEmoji,
                 plant.themeColorHex,
-                String(plant.needsWatering),
-                String(plant.needsFertilizing)
+                String(timestamp(plant.lastWateredDate)),
+                String(timestamp(plant.lastFertilizedDate)),
+                String(plant.wateringIntervalDays),
+                String(plant.fertilizingIntervalDays),
+                String(plant.needsWatering(on: now)),
+                String(plant.needsFertilizing(on: now))
             ].joined(separator: ":")
         }.joined(separator: "|")
     }
@@ -339,34 +346,53 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
     }
 
     private static func eventSignature(_ events: [Event]) -> String {
-        events.prefix(24).map { event in
+        events.map { event in
             [
                 event.id.uuidString,
+                event.title,
+                event.eventType,
+                event.relatedEntityType,
+                event.relatedEntityId,
                 String(Int(event.startDate.timeIntervalSince1970)),
-                String(event.isCompleted)
+                String(timestamp(event.endDate)),
+                String(event.isAllDay),
+                String(event.recurrenceDays),
+                String(timestamp(event.recurrenceEndDate)),
+                event.completedOccurrences.sorted().joined(separator: ","),
+                String(event.isCompleted),
+                event.assigneeId ?? ""
             ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
     private static func reminderSignature(_ reminders: [Reminder]) -> String {
-        reminders.prefix(8).map { reminder in
+        reminders.map { reminder in
             [
                 reminder.id.uuidString,
                 String(Int(reminder.scheduledAt.timeIntervalSince1970)),
                 reminder.status,
+                reminder.completedBy,
+                String(timestamp(reminder.completedAt)),
+                reminder.event?.id.uuidString ?? "",
                 reminder.event?.title ?? ""
             ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
     private static func medicationSignature(_ medications: [HumanMedication]) -> String {
-        medications.prefix(12).map { medication in
-            [medication.id.uuidString, medication.name].joined(separator: ":")
+        medications.map { medication in
+            [
+                medication.id.uuidString,
+                medication.name,
+                String(medication.isActive),
+                String(timestamp(medication.startDate)),
+                String(timestamp(medication.endDate))
+            ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
     private static func medicationLogSignature(_ logs: [HumanMedicationLog]) -> String {
-        logs.prefix(12).map { log in
+        logs.map { log in
             [
                 log.id.uuidString,
                 String(Int(log.scheduledTime.timeIntervalSince1970)),
@@ -376,48 +402,95 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
     }
 
     private static func careSignature(_ logs: [PetCareLog]) -> String {
-        logs.prefix(16).map { log in
-            [log.id.uuidString, String(Int(log.date.timeIntervalSince1970))].joined(separator: ":")
+        logs.map { log in
+            [
+                log.id.uuidString,
+                log.pet?.id.uuidString ?? "",
+                log.type,
+                String(Int(log.date.timeIntervalSince1970)),
+                log.note
+            ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
     private static func walkSignature(_ logs: [PetWalkLog]) -> String {
-        logs.prefix(16).map { log in
-            [log.id.uuidString, String(Int(log.startDate.timeIntervalSince1970))].joined(separator: ":")
+        logs.map { log in
+            [
+                log.id.uuidString,
+                log.pet?.id.uuidString ?? "",
+                String(Int(log.startDate.timeIntervalSince1970)),
+                String(timestamp(log.endDate))
+            ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
     private static func pottySignature(_ logs: [PetPottyLog]) -> String {
-        logs.prefix(16).map { log in
-            [log.id.uuidString, String(Int(log.date.timeIntervalSince1970))].joined(separator: ":")
+        logs.map { log in
+            [
+                log.id.uuidString,
+                log.pet?.id.uuidString ?? "",
+                String(Int(log.date.timeIntervalSince1970)),
+                log.type
+            ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
     private static func humanWeightSignature(_ logs: [HumanWeightLog]) -> String {
-        logs.prefix(12).map { log in
-            [log.id.uuidString, String(Int(log.date.timeIntervalSince1970))].joined(separator: ":")
+        logs.map { log in
+            [
+                log.id.uuidString,
+                log.human?.id.uuidString ?? "",
+                String(Int(log.date.timeIntervalSince1970)),
+                String(log.weight)
+            ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
     private static func familyTaskSignature(_ tasks: [FamilyCollaborationTask]) -> String {
-        tasks.prefix(16).map { task in
+        tasks.map { task in
             [
                 task.id.uuidString,
+                task.title,
                 task.statusRaw,
+                task.createdByName,
                 task.assignedToId ?? "",
-                task.claimedById ?? ""
+                task.assignedToName ?? "",
+                task.claimedById ?? "",
+                task.claimedByName ?? "",
+                task.completedByName ?? "",
+                String(task.rewardCoconuts),
+                String(timestamp(task.dueAt)),
+                String(timestamp(task.updatedAt))
             ].joined(separator: ":")
         }.joined(separator: "|")
     }
 
     private static func exchangeSignature(_ requests: [CoconutExchangeRequest]) -> String {
-        requests.prefix(12).map { request in
+        requests.map { request in
             [
                 request.id.uuidString,
+                request.senderName,
                 request.statusRaw,
-                request.receiverId
+                request.receiverId,
+                request.currencyCode,
+                String(request.localAmount),
+                String(request.coconutCost),
+                String(timestamp(request.updatedAt))
             ].joined(separator: ":")
         }.joined(separator: "|")
+    }
+
+    private static func dayToken(for date: Date, calendar: Calendar = .current) -> Int {
+        timestamp(calendar.startOfDay(for: date))
+    }
+
+    private static func timestamp(_ date: Date) -> Int {
+        Int(date.timeIntervalSince1970)
+    }
+
+    private static func timestamp(_ date: Date?) -> Int {
+        guard let date else { return 0 }
+        return timestamp(date)
     }
 }
 

@@ -11,6 +11,7 @@ struct AddHumanWizardContentView: View {
     let onComplete: () -> Void
     var onCancel: (() -> Void)?
     var onHumanSaved: ((Human) -> Void)?
+    var presentationStyle: MemberCreationPresentationStyle = .standard
 
     @State private var memberCreationSessionId = UUID()
 
@@ -20,7 +21,8 @@ struct AddHumanWizardContentView: View {
             onComplete: onComplete,
             onCancel: onCancel,
             onHumanSaved: onHumanSaved,
-            recoverySessionId: memberCreationSessionId
+            recoverySessionId: memberCreationSessionId,
+            presentationStyle: presentationStyle
         )
     }
 }

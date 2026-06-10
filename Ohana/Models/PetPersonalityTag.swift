@@ -307,7 +307,7 @@ enum PetTagGreeting {
 
 // MARK: - 标签驱动的轻量行为偏好
 
-enum PetPersonalityBehavior {
+nonisolated enum PetPersonalityBehavior {
     static func priorityBonus(for actionType: String, pet: Pet) -> Int {
         let tags = Set(pet.personalityTagIdList)
         guard !tags.isEmpty else { return 0 }

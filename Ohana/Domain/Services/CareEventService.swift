@@ -127,7 +127,7 @@ final class CareEventService: CareEventRecording {
         context.insert(log)
         context.safeSave()
 
-        dependencies.questManager.recordFirstMeal()
+        dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
         let reward = dependencies.economy.awardCareAction(type: .feed, pet: pet, context: context, quality: quality)
         dependencies.careLedger.recordPetCare(
             log: log,
@@ -259,7 +259,7 @@ final class CareEventService: CareEventRecording {
             return (0, 0)
         }
 
-        dependencies.questManager.recordFirstMeal()
+        dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
         let reward = dependencies.economy.awardCareAction(type: .feed, pet: pet, context: context, quality: quality)
         dependencies.careLedger.recordPetCare(
             log: log,
@@ -627,7 +627,7 @@ final class CareEventService: CareEventRecording {
         }
 
         let stockOwner = stockOwnerPet(for: liveTargets, preferred: sourcePet, foodKind: foodKind, context: context)
-        dependencies.questManager.recordFirstMeal()
+        dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
         let result = SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
                 actionKind: .feeding,
@@ -844,7 +844,9 @@ final class CareEventService: CareEventRecording {
         source: CareLedgerSource = .quickAction,
         dependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
-        let reward = QuestManager.OhanaActionType.walk(distanceMeters: distanceMeters)
+        let reward: QuestManager.OhanaActionType? = CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
+            ? .walk(distanceMeters: distanceMeters)
+            : nil
         let coconutsEarned = PetWalkLog.coconuts(for: distanceMeters)
         return SharedPetActionRecorder.record(
             SharedPetActionDescriptor(

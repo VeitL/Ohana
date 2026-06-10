@@ -198,6 +198,16 @@ extension CoconutShopView {
                     icon: "exclamationmark.triangle.fill",
                     tint: Color.goOrange
                 )
+            case .persistenceFailed:
+                showToast(
+                    l.tr(
+                        zh: "兑换没有保存成功，请稍后再试。",
+                        en: "Purchase was not saved. Try again.",
+                        de: "Einlösen wurde nicht gespeichert. Versuch es erneut."
+                    ),
+                    icon: "exclamationmark.triangle.fill",
+                    tint: Color.goOrange
+                )
             case nil:
                 showToast(
                     l.tr(
@@ -286,33 +296,47 @@ extension CoconutShopView {
         let refundSource = purchase.transactionKey
             ?? purchase.ledgerEventID?.uuidString
             ?? UUID().uuidString
-        _ = try? appServices.coconutWallet.apply(
-            deltas: [
-                .human(
-                    currentHuman,
-                    delta: item.cost,
-                    entryKind: .refund,
-                    source: .shop,
-                    title: title,
-                    emoji: item.emoji,
-                    actorId: currentHuman.id.uuidString,
-                    actorName: currentHuman.name,
-                    subjectKind: .system,
-                    subjectId: nil,
-                    sourceModelName: "ShopCatalog",
-                    sourceModelId: item.id,
-                    careLedgerEventId: purchase.ledgerEventID?.uuidString,
-                    metadataJSON: "{\"shopItemId\":\"\(item.id)\",\"refund\":true,\"purchaseTransactionKey\":\"\(refundSource)\"}",
-                    transactionKey: "shop:\(item.id):refund:\(currentHuman.id.uuidString):\(refundSource)"
-                )
-            ],
-            context: modelContext,
-            save: false,
-            postsRewardFeedback: true,
-            updatesProjection: true,
-            projectionManager: appServices.questManager
-        )
-        modelContext.safeSave()
+        do {
+            try appServices.coconutWallet.apply(
+                deltas: [
+                    .human(
+                        currentHuman,
+                        delta: item.cost,
+                        entryKind: .refund,
+                        source: .shop,
+                        title: title,
+                        emoji: item.emoji,
+                        actorId: currentHuman.id.uuidString,
+                        actorName: currentHuman.name,
+                        subjectKind: .system,
+                        subjectId: nil,
+                        sourceModelName: "ShopCatalog",
+                        sourceModelId: item.id,
+                        careLedgerEventId: purchase.ledgerEventID?.uuidString,
+                        metadataJSON: "{\"shopItemId\":\"\(item.id)\",\"refund\":true,\"purchaseTransactionKey\":\"\(refundSource)\"}",
+                        transactionKey: "shop:\(item.id):refund:\(currentHuman.id.uuidString):\(refundSource)"
+                    )
+                ],
+                context: modelContext,
+                save: false,
+                postsRewardFeedback: true,
+                updatesProjection: true,
+                projectionManager: appServices.questManager
+            )
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            appServices.coconutWallet.refreshQuestProjection(context: modelContext, manager: appServices.questManager)
+            showToast(
+                l.tr(
+                    zh: "退款没有保存成功，请稍后再试。",
+                    en: "Refund was not saved. Try again.",
+                    de: "Erstattung wurde nicht gespeichert. Versuch es erneut."
+                ),
+                icon: "exclamationmark.triangle.fill",
+                tint: Color.goOrange
+            )
+        }
     }
 
     func activateOwnedItem(_ item: ShopItem) {

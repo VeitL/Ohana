@@ -66,4 +66,12 @@ enum OasisTreePreferenceStore {
     static func markInjectionUsed(limitKey: String, periodKey: String) {
         defaults.set(periodKey, forKey: limitKey)
     }
+
+    static func restoreInjectionUsed(limitKey: String, previousPeriodKey: String?) {
+        if let previousPeriodKey {
+            defaults.set(previousPeriodKey, forKey: limitKey)
+        } else {
+            defaults.removeObject(forKey: limitKey)
+        }
+    }
 }

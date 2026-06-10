@@ -233,41 +233,94 @@ enum IslandMoodCalculator {
 // 统一作为 mood/banner 的数据源，避免到处散落的零散判断
 //
 nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
-    let id = UUID()
+    let id: String
     let iconName: String // SF Symbol
     let emoji: String // fallback emoji
     let title: String
     let detail: String
     let severity: Severity
     let petId: UUID?
+    let plantId: UUID?
     let healthAlertType: HealthAlert.AlertType?
 
     enum Severity: Sendable {
         case warning // 黄色 - 可缓冲
         case critical // 红色 - 紧急
+
+        var identityToken: String {
+            switch self {
+            case .warning: "warning"
+            case .critical: "critical"
+            }
+        }
     }
 
     init(
+        id: String? = nil,
         iconName: String,
         emoji: String,
         title: String,
         detail: String,
         severity: Severity,
         petId: UUID? = nil,
+        plantId: UUID? = nil,
         healthAlertType: HealthAlert.AlertType? = nil
     ) {
+        self.id = id ?? Self.identityKey(
+            title: title,
+            detail: detail,
+            severity: severity,
+            petId: petId,
+            plantId: plantId,
+            healthAlertType: healthAlertType
+        )
         self.iconName = iconName
         self.emoji = emoji
         self.title = title
         self.detail = detail
         self.severity = severity
         self.petId = petId
+        self.plantId = plantId
         self.healthAlertType = healthAlertType
+    }
+
+    private static func identityKey(
+        title: String,
+        detail: String,
+        severity: Severity,
+        petId: UUID?,
+        plantId: UUID?,
+        healthAlertType: HealthAlert.AlertType?
+    ) -> String {
+        let subject = if let petId {
+            "pet:\(petId.uuidString)"
+        } else if let plantId {
+            "plant:\(plantId.uuidString)"
+        } else {
+            "household"
+        }
+        let alert = healthAlertType.map { ":health:\($0.rawValue)" } ?? ""
+        return [
+            "negative",
+            subject + alert,
+            severity.identityToken,
+            stableHash(title),
+            stableHash(detail)
+        ].joined(separator: ":")
+    }
+
+    private static func stableHash(_ value: String) -> String {
+        var hash: UInt64 = 5381
+        for scalar in value.unicodeScalars {
+            hash = ((hash << 5) &+ hash) &+ UInt64(scalar.value)
+        }
+        return String(hash, radix: 16)
     }
 }
 
-enum IslandNegativeFeedback {
+nonisolated enum IslandNegativeFeedback {
     /// 返回所有负反馈信号，按严重程度排序（critical 在前）
+    @MainActor
     static func signals(
         pets: [Pet],
         plants: [Plant] = [],
@@ -303,8 +356,14 @@ enum IslandNegativeFeedback {
             result.append(IslandNegativeSignal(
                 iconName: iconName(for: alert),
                 emoji: alert.emoji,
-                title: "\(alert.petName)：\(alert.title)",
-                detail: alert.detail,
+                title: localized(
+                    zh: "\(alert.petName)：\(alert.title)",
+                    en: "\(alert.petName): \(clinicalTitle(for: alert))"
+                ),
+                detail: localized(
+                    zh: alert.detail,
+                    en: clinicalDetail(for: alert)
+                ),
                 severity: alert.severity == .urgent ? .critical : .warning,
                 petId: alert.petId,
                 healthAlertType: alert.type
@@ -330,12 +389,15 @@ enum IslandNegativeFeedback {
                 && !hasAnyPetCheckInToday(pet, calendar: cal)
         }
         if !brokenStreakPets.isEmpty {
-            let names = brokenStreakPets.prefix(2).map(\.name).joined(separator: "、")
+            let names = joinedNames(brokenStreakPets.prefix(2).map(\.name))
             result.append(IslandNegativeSignal(
                 iconName: "cloud.fill",
                 emoji: "🌥",
-                title: "今日还未打卡",
-                detail: "给 \(names) 完成一次喂食、喂水或遛狗打卡即可",
+                title: localized(zh: "今日还未打卡", en: "No check-in yet today"),
+                detail: localized(
+                    zh: "给 \(names.zh) 完成一次喂食、喂水或遛狗打卡即可",
+                    en: "Log a feeding, water, or walk check-in for \(names.en)"
+                ),
                 severity: .warning
             ))
         }
@@ -352,9 +414,13 @@ enum IslandNegativeFeedback {
                     result.append(IslandNegativeSignal(
                         iconName: "pills.fill",
                         emoji: "💊",
-                        title: "\(pet.name) 今日漏药",
-                        detail: "\(med.name) 还差 \(need - taken) 次",
-                        severity: .critical
+                        title: localized(zh: "\(pet.name) 今日漏药", en: "\(pet.name) missed medication today"),
+                        detail: localized(
+                            zh: "\(med.name) 还差 \(need - taken) 次",
+                            en: "\(med.name) has \(need - taken) dose\(need - taken == 1 ? "" : "s") left"
+                        ),
+                        severity: .critical,
+                        petId: pet.id
                     ))
                     break
                 }
@@ -372,9 +438,13 @@ enum IslandNegativeFeedback {
                 result.append(IslandNegativeSignal(
                     iconName: "fork.knife",
                     emoji: "🍗",
-                    title: "\(pet.name) 喂食超期",
-                    detail: "距离上次已 \(hours) 小时，建议先记录一次喂食",
-                    severity: .warning
+                    title: localized(zh: "\(pet.name) 喂食超期", en: "\(pet.name)'s feeding is overdue"),
+                    detail: localized(
+                        zh: "距离上次已 \(hours) 小时，建议先记录一次喂食",
+                        en: "\(hours) hour\(hours == 1 ? "" : "s") since the last feeding. Log one first."
+                    ),
+                    severity: .warning,
+                    petId: pet.id
                 ))
                 break
             }
@@ -386,9 +456,13 @@ enum IslandNegativeFeedback {
                 result.append(IslandNegativeSignal(
                     iconName: "drop.triangle.fill",
                     emoji: "🥀",
-                    title: "\(plant.name) 叶子发黄",
-                    detail: "已 \(Int(now.timeIntervalSince(last) / 86400)) 天未浇水",
-                    severity: .warning
+                    title: localized(zh: "\(plant.name) 叶子发黄", en: "\(plant.name)'s leaves are yellowing"),
+                    detail: localized(
+                        zh: "已 \(Int(now.timeIntervalSince(last) / 86400)) 天未浇水",
+                        en: "\(Int(now.timeIntervalSince(last) / 86400)) day(s) since watering"
+                    ),
+                    severity: .warning,
+                    plantId: plant.id
                 ))
                 break
             }
@@ -400,6 +474,7 @@ enum IslandNegativeFeedback {
         }
     }
 
+    @MainActor
     static func hasAnyNegativeSignal(
         pets: [Pet],
         plants: [Plant] = [],
@@ -427,6 +502,73 @@ enum IslandNegativeFeedback {
         }
 
         return false
+    }
+
+    private static func localized(zh: String, en: String) -> String {
+        AppLocalizedText(zh: zh, en: en).resolve()
+    }
+
+    private static func joinedNames(_ names: some Sequence<String>) -> (zh: String, en: String) {
+        let values = names.map { $0.isEmpty ? localized(zh: "伙伴", en: "companion") : $0 }
+        return (
+            zh: values.joined(separator: "、"),
+            en: values.joined(separator: ", ")
+        )
+    }
+
+    private static func clinicalTitle(for alert: HealthAlert) -> String {
+        switch alert.type {
+        case .vaccineExpired: "Vaccination expired"
+        case .vaccineExpiringSoon: "Vaccination expiring soon"
+        case .dewormingDue: "Deworming due"
+        case .weightGainAlert: "Weight increased noticeably"
+        case .weightLossAlert: "Weight dropped noticeably"
+        case .noCheckIn: "No care check-in"
+        case .noPotty: "Potty tracking overdue"
+        case .noWalk: "Walk overdue"
+        case .checkupOverdue: "Checkup overdue"
+        case .documentExpiringSoon: "Document expiring soon"
+        case .activeSymptom: "Active symptom needs attention"
+        case .heatCycleAlert: "Heat cycle alert"
+        case .pregnancyCountdown: "Pregnancy countdown"
+        case .drinkingWeightAlert: "Drinking and weight change"
+        case .lowActivityAlert: "Low activity"
+        }
+    }
+
+    private static func clinicalDetail(for alert: HealthAlert) -> String {
+        switch alert.type {
+        case .vaccineExpired:
+            "A vaccination record has expired. Schedule a booster soon."
+        case .vaccineExpiringSoon:
+            "A vaccination record is nearing expiry. Consider booking ahead."
+        case .dewormingDue:
+            "Deworming is due soon. Keep the preventive care plan on track."
+        case .weightGainAlert:
+            "Recent weight is trending up. Review feeding and activity."
+        case .weightLossAlert:
+            "Recent weight is trending down. Check appetite and health signs."
+        case .noCheckIn:
+            "No recent feeding or water check-in has been recorded."
+        case .noPotty:
+            "Potty tracking is overdue. Watch elimination patterns."
+        case .noWalk:
+            "Walk activity is overdue. Add a walk when possible."
+        case .checkupOverdue:
+            "A health checkup is overdue or missing."
+        case .documentExpiringSoon:
+            "A document is expiring soon. Review it before the due date."
+        case .activeSymptom:
+            "A recent symptom was marked severe. Consider contacting a vet."
+        case .heatCycleAlert:
+            "Heat-cycle care needs extra attention."
+        case .pregnancyCountdown:
+            "Pregnancy care is approaching a key date."
+        case .drinkingWeightAlert:
+            "Drinking changes and weight movement appeared together."
+        case .lowActivityAlert:
+            "Recent activity is very low. Watch comfort and mobility."
+        }
     }
 
     private static func iconName(for alert: HealthAlert) -> String {
@@ -463,9 +605,13 @@ enum IslandNegativeFeedback {
         return IslandNegativeSignal(
             iconName: "fork.knife.circle.fill",
             emoji: "🍽️",
-            title: "\(pet.name) 食欲下降",
-            detail: "近 3 天喂食量比前 3 天低约 \(Int((1 - recent / previous) * 100))%，建议观察精神和便便",
-            severity: .warning
+            title: localized(zh: "\(pet.name) 食欲下降", en: "\(pet.name)'s appetite dropped"),
+            detail: localized(
+                zh: "近 3 天喂食量比前 3 天低约 \(Int((1 - recent / previous) * 100))%，建议观察精神和便便",
+                en: "Feeding volume is about \(Int((1 - recent / previous) * 100))% lower than the previous 3 days. Watch energy and stool."
+            ),
+            severity: .warning,
+            petId: pet.id
         )
     }
 
@@ -478,9 +624,13 @@ enum IslandNegativeFeedback {
         return IslandNegativeSignal(
             iconName: "exclamationmark.triangle.fill",
             emoji: "🚽",
-            title: "\(pet.name) 便便异常",
-            detail: "近 3 天记录到 \(abnormal.count) 次软便/水便，建议留意饮食变化",
-            severity: abnormal.contains { $0.pottyType == .liquidPoop } ? .critical : .warning
+            title: localized(zh: "\(pet.name) 便便异常", en: "\(pet.name)'s stool looks unusual"),
+            detail: localized(
+                zh: "近 3 天记录到 \(abnormal.count) 次软便/水便，建议留意饮食变化",
+                en: "\(abnormal.count) soft or liquid stool record(s) in the last 3 days. Watch diet changes."
+            ),
+            severity: abnormal.contains { $0.pottyType == .liquidPoop } ? .critical : .warning,
+            petId: pet.id
         )
     }
 
@@ -494,18 +644,26 @@ enum IslandNegativeFeedback {
             return IslandNegativeSignal(
                 iconName: "drop.triangle.fill",
                 emoji: "💧",
-                title: "\(pet.name) 喝水增多",
-                detail: "近 3 天饮水量明显高于之前，建议结合体重和尿尿观察",
-                severity: .warning
+                title: localized(zh: "\(pet.name) 喝水增多", en: "\(pet.name) is drinking more"),
+                detail: localized(
+                    zh: "近 3 天饮水量明显高于之前，建议结合体重和尿尿观察",
+                    en: "Water intake is much higher over the last 3 days. Compare with weight and pee patterns."
+                ),
+                severity: .warning,
+                petId: pet.id
             )
         }
         if recent < previous * 0.45 {
             return IslandNegativeSignal(
                 iconName: "drop.triangle.fill",
                 emoji: "💧",
-                title: "\(pet.name) 喝水减少",
-                detail: "近 3 天饮水量明显偏低，建议检查水碗和精神状态",
-                severity: .warning
+                title: localized(zh: "\(pet.name) 喝水减少", en: "\(pet.name) is drinking less"),
+                detail: localized(
+                    zh: "近 3 天饮水量明显偏低，建议检查水碗和精神状态",
+                    en: "Water intake is low over the last 3 days. Check the bowl and energy level."
+                ),
+                severity: .warning,
+                petId: pet.id
             )
         }
         return nil

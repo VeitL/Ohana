@@ -51,6 +51,17 @@ enum VerticalHomeTabMountPolicy {
     }
 }
 
+enum VerticalHomeTabTransitionPolicy {
+    static let fullMotionOutgoingCleanupDelayMilliseconds: UInt64 = 700
+    static let reducedMotionOutgoingCleanupDelayMilliseconds: UInt64 = 90
+
+    static func outgoingCleanupDelayMilliseconds(for motionBudget: OhanaMotionBudget) -> UInt64 {
+        motionBudget == .full
+            ? fullMotionOutgoingCleanupDelayMilliseconds
+            : reducedMotionOutgoingCleanupDelayMilliseconds
+    }
+}
+
 struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: View, PlantsPage: View>: View {
     let selectedTab: VerticalSolidHomeTab
     let outgoingTab: VerticalSolidHomeTab?
@@ -84,8 +95,13 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     private func page(for tab: VerticalSolidHomeTab) -> some View {
         let lifecycle = lifecycle(for: tab)
 
-        if lifecycle.isPreparingForDisplay, tab != .oasis {
-            VerticalSolidHomePreparedPlaceholder()
+        if lifecycle.isPreparingForDisplay {
+            switch tab {
+            case .oasis:
+                VerticalSolidHomeOasisPreparedPreview()
+            case .home, .calendar, .plants:
+                VerticalSolidHomePreparedPlaceholder()
+            }
         } else if lifecycle.isVisible {
             switch tab {
             case .home:
@@ -144,7 +160,6 @@ struct VerticalSolidHomeDashboardPage: View {
     let onQuickActionForCard: (QuickActionItem, FocusCard, Bool) -> Void
     let onQuickActionOptionForCard: (QuickActionItem, FocusCard, String) -> Void
     let onQuickActionLimitReached: () -> Void
-    let onAddPet: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedCardId: UUID?
@@ -157,14 +172,7 @@ struct VerticalSolidHomeDashboardPage: View {
     var body: some View {
         GeometryReader { _ in
             ZStack(alignment: .top) {
-                if snapshot.cards.isEmpty {
-                    EmptyStateWelcomeCard(
-                        onAddPet: onAddPet,
-                        onAddHuman: onAddPet
-                    )
-                    .padding(.horizontal, K.cardMargin)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
+                if !snapshot.cards.isEmpty {
                     FocusHomeVerticalSolidScene(
                         cards: snapshot.cards,
                         pets: pets,
@@ -556,5 +564,105 @@ struct VerticalSolidHomePreparedPlaceholder: View {
         Color.clear
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+    }
+}
+
+struct VerticalSolidHomeOasisPreparedPreview: View {
+    var body: some View {
+        GeometryReader { proxy in
+            let stageHeight = min(540, max(360, proxy.size.height * 0.76))
+
+            VStack(spacing: 14) {
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.goPrimary.opacity(0.14),
+                                    Color.goTeal.opacity(0.12),
+                                    Color.goYellow.opacity(0.10)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
+                                .strokeBorder(Color.goPrimary.opacity(0.18), lineWidth: 1)
+                        }
+
+                    VStack(spacing: 22) {
+                        Spacer(minLength: 0)
+
+                        VerticalSolidHomeOasisPreviewTree()
+                            .frame(width: 188, height: 238)
+
+                        RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
+                            .fill(Color.goPrimary.opacity(0.18))
+                            .frame(width: 220, height: 12)
+                            .padding(.bottom, 28)
+                    }
+                    .padding(.horizontal, 18)
+                }
+                .frame(height: stageHeight)
+
+                HStack(spacing: 10) {
+                    ForEach(0 ..< 3, id: \.self) { index in
+                        RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                            .fill(index == 0 ? Color.goPrimary.opacity(0.16) : Color.ohanaControlFill.opacity(0.72))
+                            .frame(height: 52)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct VerticalSolidHomeOasisPreviewTree: View {
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Ellipse()
+                .fill(Color.arkInk.opacity(0.12))
+                .frame(width: 164, height: 24)
+                .offset(y: 7)
+
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.goYellow.opacity(0.86), Color.goPrimary.opacity(0.72)],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                )
+                .frame(width: 18, height: 150)
+                .rotationEffect(.degrees(-4))
+                .offset(y: -22)
+
+            ZStack {
+                ForEach(0 ..< 6, id: \.self) { index in
+                    Capsule()
+                        .fill(index.isMultiple(of: 2) ? Color.goPrimary.opacity(0.82) : Color.goTeal.opacity(0.72))
+                        .frame(width: 22, height: 118)
+                        .rotationEffect(.degrees(Double(index) * 42 - 105))
+                        .offset(y: -84)
+                }
+            }
+            .offset(y: -106)
+
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Color.goYellow.opacity(0.92))
+                    .frame(width: 24, height: 24)
+                Circle()
+                    .fill(Color.goYellow.opacity(0.78))
+                    .frame(width: 20, height: 20)
+            }
+            .offset(x: 22, y: -128)
+        }
     }
 }

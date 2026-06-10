@@ -321,7 +321,7 @@ final class HomeReadModelStore: ObservableObject {
         container: ModelContainer,
         input: HomeReadModelActorInput
     ) -> VerticalSolidHomeSourceState {
-        let fetches = HomeReadModelFetches(context: container.mainContext)
+        let fetches = HomeReadModelFetches(context: container.mainContext, now: Date())
         return VerticalSolidHomeSourceState(
             pets: fetches.pets(),
             humans: fetches.humans(),
@@ -380,7 +380,8 @@ actor HomeReadModelActor {
         externalRevision: HomeRevision,
         force: Bool
     ) throws -> HomeReadModelActorResult? {
-        let fetches = HomeReadModelFetches(context: modelContext)
+        let now = Date()
+        let fetches = HomeReadModelFetches(context: modelContext, now: now)
         let pets = fetches.pets()
         let humans = fetches.humans()
         try Task.checkCancellation()
@@ -428,10 +429,10 @@ actor HomeReadModelActor {
             equippedTitleRaw: input.equippedTitleRaw,
             language: input.language
         )
-        let signature = VerticalSolidHomeSnapshotBuilder.signature(for: source)
+        let signature = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: now)
         guard force || signature != previousSignature || externalRevision != currentRevision else { return nil }
 
-        let snapshot = VerticalSolidHomeSnapshotBuilder.buildForReadModelActor(from: source)
+        let snapshot = VerticalSolidHomeSnapshotBuilder.buildForReadModelActor(from: source, now: now)
         try Task.checkCancellation()
 
         let activeHumanAvatar = HomeHeaderAvatarSnapshot(human: source.activeHuman)
@@ -474,6 +475,7 @@ actor HomeReadModelActor {
 
 private nonisolated struct HomeReadModelFetches {
     let context: ModelContext
+    let now: Date
     private let calendar = Calendar.current
 
     func pets() -> [Pet] {
@@ -509,16 +511,38 @@ private nonisolated struct HomeReadModelFetches {
     }
 
     func events() -> [Event] {
-        let start = calendar.startOfDay(for: Date())
-        let end = calendar.date(byAdding: .day, value: 14, to: start) ?? Date(timeIntervalSinceNow: 14 * 24 * 60 * 60)
-        var descriptor = FetchDescriptor<Event>(
+        let start = calendar.startOfDay(for: now)
+        let end = calendar.date(byAdding: .day, value: 14, to: start) ?? start.addingTimeInterval(14 * 24 * 60 * 60)
+        var windowDescriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> { event in
                 event.startDate >= start && event.startDate <= end
             },
             sortBy: [SortDescriptor(\Event.startDate)]
         )
-        descriptor.fetchLimit = 160
-        return (try? context.fetch(descriptor)) ?? []
+        windowDescriptor.fetchLimit = 400
+        let windowEvents = (try? context.fetch(windowDescriptor)) ?? []
+
+        var recurringDescriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.recurrenceDays > 0 && event.startDate <= end
+            },
+            sortBy: [SortDescriptor(\Event.startDate, order: .reverse)]
+        )
+        recurringDescriptor.fetchLimit = 400
+        let recurringEvents = ((try? context.fetch(recurringDescriptor)) ?? [])
+            .filter { event in
+                guard let recurrenceEndDate = event.recurrenceEndDate else { return true }
+                return calendar.startOfDay(for: recurrenceEndDate) >= start
+            }
+
+        var seen: Set<UUID> = []
+        return (windowEvents + recurringEvents)
+            .filter { event in
+                guard !seen.contains(event.id) else { return false }
+                seen.insert(event.id)
+                return true
+            }
+            .sorted { $0.startDate < $1.startDate }
     }
 
     func pendingReminders() -> [Reminder] {
@@ -543,7 +567,7 @@ private nonisolated struct HomeReadModelFetches {
     }
 
     func humanMedicationLogs() -> [HumanMedicationLog] {
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: now)
         var descriptor = FetchDescriptor<HumanMedicationLog>(
             predicate: #Predicate<HumanMedicationLog> { log in
                 log.scheduledTime >= today
@@ -555,7 +579,7 @@ private nonisolated struct HomeReadModelFetches {
     }
 
     func careLogs() -> [PetCareLog] {
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: now)
         var descriptor = FetchDescriptor<PetCareLog>(
             predicate: #Predicate<PetCareLog> { log in
                 log.date >= today
@@ -567,7 +591,7 @@ private nonisolated struct HomeReadModelFetches {
     }
 
     func walkLogs() -> [PetWalkLog] {
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: now)
         var descriptor = FetchDescriptor<PetWalkLog>(
             predicate: #Predicate<PetWalkLog> { log in
                 log.startDate >= today
@@ -579,7 +603,7 @@ private nonisolated struct HomeReadModelFetches {
     }
 
     func pottyLogs() -> [PetPottyLog] {
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: now)
         var descriptor = FetchDescriptor<PetPottyLog>(
             predicate: #Predicate<PetPottyLog> { log in
                 log.date >= today
@@ -591,7 +615,7 @@ private nonisolated struct HomeReadModelFetches {
     }
 
     func humanWeightLogs() -> [HumanWeightLog] {
-        let today = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: now)
         var descriptor = FetchDescriptor<HumanWeightLog>(
             predicate: #Predicate<HumanWeightLog> { log in
                 log.date >= today

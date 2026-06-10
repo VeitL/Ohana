@@ -138,7 +138,7 @@ enum AppFeatureRouteGuard {
             GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
         case .critterCodex:
             critterCodexUnlockLevel
-        case .coconutRules, .achievements, .inventory, .checkInDetail:
+        case .coconutRules, .growthRoadmap, .achievements, .inventory, .checkInDetail:
             nil
         }
     }

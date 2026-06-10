@@ -22,7 +22,12 @@ extension MemberCardCreationContentView {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
                     compactNameInput(width: 148)
-                    compactOptionRow(options: humanGenderOptions, selection: $draft.humanGender) { humanGenderLabel($0) }
+                    compactGenderIconRow(
+                        options: humanGenderOptions,
+                        selection: $draft.humanGender,
+                        label: humanGenderLabel,
+                        icon: humanGenderIcon
+                    )
                 }
                 MemberCompactDateRow(
                     title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
@@ -33,7 +38,8 @@ extension MemberCardCreationContentView {
                     foreground: cardForeground,
                     secondaryForeground: cardSecondaryForeground,
                     fill: cardControlFill,
-                    stroke: cardControlStroke
+                    stroke: cardControlStroke,
+                    accent: cardAccent
                 )
             }
         }
@@ -48,7 +54,12 @@ extension MemberCardCreationContentView {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 10) {
                     compactNameInput(width: 148)
-                    compactOptionRow(options: petGenderOptions, selection: $draft.petGender) { petGenderLabel($0) }
+                    compactGenderIconRow(
+                        options: petGenderOptions,
+                        selection: $draft.petGender,
+                        label: petGenderLabel,
+                        icon: petGenderIcon
+                    )
                 }
                 HStack(spacing: 10) {
                     compactMenuPicker(
@@ -80,7 +91,8 @@ extension MemberCardCreationContentView {
                         foreground: cardForeground,
                         secondaryForeground: cardSecondaryForeground,
                         fill: cardControlFill,
-                        stroke: cardControlStroke
+                        stroke: cardControlStroke,
+                        accent: cardAccent
                     )
                     MemberCompactDateRow(
                         title: l.tr(zh: "到家日", en: "Home date", de: "Einzugstag"),
@@ -91,7 +103,8 @@ extension MemberCardCreationContentView {
                         foreground: cardForeground,
                         secondaryForeground: cardSecondaryForeground,
                         fill: cardControlFill,
-                        stroke: cardControlStroke
+                        stroke: cardControlStroke,
+                        accent: cardAccent
                     )
                 }
             }
@@ -346,31 +359,84 @@ extension MemberCardCreationContentView {
         }
     }
 
+    @ViewBuilder
     var themeSection: some View {
-        MemberCreationSection(title: l.tr(zh: "主题色", en: "Theme color", de: "Themenfarbe"), icon: "circle.hexagongrid.fill", foreground: cardForeground) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 8) {
-                ForEach(AddWizardThemePalette.memberOptions, id: \.hex) { option in
-                    Button {
-                        withAnimation(GoMotion.selection) {
-                            draft.themeColorHex = option.hex
-                        }
-                    } label: {
-                        Circle()
-                            .fill(Color(hex: option.hex))
-                            .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                            .overlay {
-                                if draft.normalizedThemeHex.uppercased() == option.hex.uppercased() {
-                                    Image(systemName: "checkmark").accessibilityHidden(true)
-                                        .font(OhanaFont.adaptive(size: 13, weight: .black))
-                                        .foregroundStyle(WalletPetCardTheme.prefersDarkForeground(for: option.hex) ? Color.arkInk : Color.goCardWhite)
-                                }
-                            }
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(option.label)
-                }
+        if kind == .human {
+            compactHumanThemeGrid
+        } else {
+            MemberCreationSection(title: l.tr(zh: "主题色", en: "Theme color", de: "Themenfarbe"), icon: "circle.hexagongrid.fill", foreground: cardForeground) {
+                themeGrid(options: AddWizardThemePalette.memberOptions, dotSize: 30, rowHeight: 38, spacing: 7)
             }
         }
+    }
+
+    var compactHumanThemeGrid: some View {
+        themeGrid(options: humanCompactThemeOptions, dotSize: 24, rowHeight: 34, spacing: 6)
+            .padding(.top, 2)
+    }
+
+    func themeGrid(
+        options: [(hex: String, label: String)],
+        dotSize: CGFloat,
+        rowHeight: CGFloat,
+        spacing: CGFloat
+    ) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: 6), spacing: spacing) {
+            ForEach(options, id: \.hex) { option in
+                themeSwatchButton(option: option, dotSize: dotSize, rowHeight: rowHeight)
+            }
+        }
+    }
+
+    func themeSwatchButton(
+        option: (hex: String, label: String),
+        dotSize: CGFloat,
+        rowHeight: CGFloat
+    ) -> some View {
+        let isSelected = draft.normalizedThemeHex.uppercased() == option.hex.uppercased()
+        return Button {
+            withAnimation(GoMotion.selection) {
+                draft.themeColorHex = option.hex
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color(hex: option.hex))
+                    .frame(width: dotSize, height: dotSize) // a11y: visual swatch is intentionally smaller; button row keeps the hit area.
+                    .overlay {
+                        Circle()
+                            .strokeBorder(isSelected ? cardForeground.opacity(0.76) : Color.goCardWhite.opacity(0.18), lineWidth: isSelected ? 2 : 1)
+                    }
+                if isSelected {
+                    Image(systemName: "checkmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: dotSize < 28 ? 10 : 12, weight: .black))
+                        .foregroundStyle(WalletPetCardTheme.prefersDarkForeground(for: option.hex) ? Color.arkInk : Color.goCardWhite)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: rowHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(option.label)
+    }
+
+    var humanCompactThemeOptions: [(hex: String, label: String)] {
+        let options = AddWizardThemePalette.memberOptions
+        let compactHexes = [
+            "FFFFFF", "F2F2F7", "6B7280", "111827", "F97316", "F59E0B",
+            "84CC16", "06B6D4", "60A5FA", "2563EB", "4F46E5", "7C3AED",
+            "F472B6", "DB2777", "DC2626", "A5F3FC", "DDD6FE", "D9F99D"
+        ]
+        var compactOptions = compactHexes.compactMap { hex in
+            options.first { $0.hex.uppercased() == hex }
+        }
+        let selectedHex = draft.normalizedThemeHex.uppercased()
+        if !compactOptions.contains(where: { $0.hex.uppercased() == selectedHex }),
+           let selectedOption = options.first(where: { $0.hex.uppercased() == selectedHex }) {
+            compactOptions = Array(compactOptions.prefix(17)) + [selectedOption]
+        }
+        return compactOptions
     }
 
     var privacyToggles: some View {

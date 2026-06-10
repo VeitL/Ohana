@@ -31,6 +31,10 @@ struct HumanWishlistContentView: View {
 
     private var pendingItems: [WishlistItem] { myItems.filter { !$0.isRedeemed } }
     private var redeemedItems: [WishlistItem] { myItems.filter(\.isRedeemed) }
+    private var walletBalance: Int {
+        CoconutWalletService.balance(for: human, context: modelContext)
+    }
+
     private var isPrivacyLocked: Bool {
         human.isPrivate(.wishlist, viewedBy: UUID(uuidString: activeHumanIdStr))
     }
@@ -160,7 +164,7 @@ struct HumanWishlistContentView: View {
 
                 if !redeemed {
                     let isRedeeming = redeemingItemIDs.contains(item.id)
-                    let canRedeem = human.coconutBalance >= item.cost && !isRedeeming
+                    let canRedeem = walletBalance >= item.cost && !isRedeeming
                     Button { redeem(item: item) } label: {
                         Text(isRedeeming ? "兑换中" : "兑换")
                             .font(OhanaFont.callout(.black))
@@ -339,7 +343,7 @@ struct HumanWishlistContentView: View {
     }
 
     private func redeem(item: WishlistItem) {
-        guard human.coconutBalance >= item.cost, !redeemingItemIDs.contains(item.id) else { return }
+        guard walletBalance >= item.cost, !redeemingItemIDs.contains(item.id) else { return }
         redeemingItemIDs.insert(item.id)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 

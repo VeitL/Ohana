@@ -72,6 +72,7 @@ enum AppResetService {
         try delete(CareLedgerEvent.self, in: context)
         try delete(CoconutLedgerEntry.self, in: context)
         try delete(CoconutAccount.self, in: context)
+        // Keep EconomyBudgetUsageEvent and economyV2.dailyBudget defaults through reset so same-day resets cannot mint a fresh reward budget.
         try delete(FamilyCollaborationTask.self, in: context)
         try delete(CoconutExchangeRequest.self, in: context)
         try delete(SharedCareSession.self, in: context)
@@ -202,6 +203,7 @@ enum AppResetService {
         "notif_",
         "ohana_",
         "oasis_",
+        "petBondVaultConsumed_",
         "petBondVaultUnlocked_",
         "quest_",
         "shop_",

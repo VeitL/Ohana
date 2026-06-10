@@ -55,16 +55,60 @@ extension QuestManager {
             )
             return amount
         } catch {
-            if save {
-                appendLog(CoconutLogEntry(emoji: emoji, title: title, amount: amount,
-                                          actorId: actorId, actorName: actorName))
-                coconutCount = max(0, coconutCount + amount)
-            }
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: self)
             #if DEBUG
                 OhanaLog.error("[QuestManager] coconut wallet add failed: \(error.localizedDescription)", category: "Economy")
             #endif
             return 0
         }
+    }
+
+    /// Stages a deterministic, non-budgeted grant for one concrete business fact.
+    /// Use this for special or compatibility rewards only; repeatable care rewards should use V2 awardAction.
+    @discardableResult
+    func stageSpecialCoconutReward(
+        amount: Int,
+        emoji: String = "🥥",
+        title: String,
+        actorId: String? = nil,
+        actorName: String? = nil,
+        source: CoconutWalletSource = .service,
+        sourceModelName: String,
+        sourceModelId: String,
+        metadataJSON: String = "",
+        transactionKey: String,
+        context: ModelContext,
+        occurredAt: Date = Date(),
+        postsRewardFeedback: Bool = true
+    ) throws -> Int {
+        lastEconomyRewardResult = nil
+        guard amount > 0 else { return 0 }
+        let delta = try specialCoconutDelta(
+            amount: amount,
+            emoji: emoji,
+            title: title,
+            actorId: actorId,
+            actorName: actorName,
+            source: source,
+            sourceModelName: sourceModelName,
+            sourceModelId: sourceModelId,
+            metadataJSON: metadataJSON,
+            transactionKey: transactionKey,
+            context: context,
+            occurredAt: occurredAt
+        )
+        let entries = try wallet.apply(
+            deltas: [delta],
+            context: context,
+            save: false,
+            postsRewardFeedback: postsRewardFeedback,
+            updatesProjection: true,
+            projectionManager: self
+        )
+        return entries
+            .filter(\.affectsBalance)
+            .reduce(0) { $0 + $1.delta }
     }
 
     /// 记录确定金额的椰子变动，不触发暴击、双倍券或质量加成。用于商店消费、兑换退款等经济账。
@@ -93,21 +137,109 @@ extension QuestManager {
                 projectionManager: self
             )
         } catch {
-            coconutCount = max(0, coconutCount + amount)
-            appendLog(
-                CoconutLogEntry(
-                    emoji: emoji,
-                    title: title,
-                    amount: amount,
-                    actorId: actorId,
-                    actorName: actorName
-                ),
-                postsRewardFeedback: postsRewardFeedback
-            )
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: self)
             #if DEBUG
                 OhanaLog.error("[QuestManager] coconut wallet delta failed: \(error.localizedDescription)", category: "Economy")
             #endif
         }
+    }
+
+    private func specialCoconutDelta(
+        amount: Int,
+        emoji: String,
+        title: String,
+        actorId: String?,
+        actorName: String?,
+        source: CoconutWalletSource,
+        sourceModelName: String,
+        sourceModelId: String,
+        metadataJSON: String,
+        transactionKey: String,
+        context: ModelContext,
+        occurredAt: Date
+    ) throws -> CoconutWalletDelta {
+        guard let actorId, actorId != "system", let uuid = UUID(uuidString: actorId) else {
+            return .system(
+                delta: amount,
+                entryKind: .reward,
+                source: source,
+                title: title,
+                emoji: emoji,
+                actorId: actorId ?? "system",
+                actorName: actorName ?? "System",
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: metadataJSON,
+                occurredAt: occurredAt,
+                transactionKey: transactionKey
+            )
+        }
+
+        if let human = try fetchHuman(id: uuid, context: context) {
+            return .human(
+                human,
+                delta: amount,
+                entryKind: .reward,
+                source: source,
+                title: title,
+                emoji: emoji,
+                actorId: actorId,
+                actorName: actorName ?? human.name,
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: metadataJSON,
+                occurredAt: occurredAt,
+                transactionKey: transactionKey
+            )
+        }
+        if let pet = try fetchPet(id: uuid, context: context) {
+            return .pet(
+                pet,
+                delta: amount,
+                entryKind: .reward,
+                source: source,
+                title: title,
+                emoji: emoji,
+                actorId: actorId,
+                actorName: actorName ?? pet.name,
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: metadataJSON,
+                occurredAt: occurredAt,
+                transactionKey: transactionKey
+            )
+        }
+        return .system(
+            delta: amount,
+            entryKind: .reward,
+            source: source,
+            title: title,
+            emoji: emoji,
+            actorId: actorId,
+            actorName: actorName,
+            sourceModelName: sourceModelName,
+            sourceModelId: sourceModelId,
+            metadataJSON: metadataJSON,
+            occurredAt: occurredAt,
+            transactionKey: transactionKey
+        )
+    }
+
+    private func fetchHuman(id: UUID, context: ModelContext) throws -> Human? {
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchPet(id: UUID, context: ModelContext) throws -> Pet? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 
     /// 旧版签名兼容；内部映射到新规则。
@@ -202,9 +334,6 @@ extension QuestManager {
         } catch {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: self)
-            appendLog(CoconutLogEntry(emoji: emojiStr, title: titleStr, amount: islandDelta + fallback,
-                                      actorId: aId, actorName: aName))
-            coconutCount = max(0, coconutCount + islandDelta + fallback)
             #if DEBUG
                 OhanaLog.error("[QuestManager] legacy award wallet write failed: \(error.localizedDescription)", category: "Economy")
             #endif

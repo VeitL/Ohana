@@ -15,11 +15,12 @@ import UIKit
 extension MemberCardCreationContentView {
     var creationCardArea: some View {
         ZStack {
-            MemberPortraitDraftCardSurface(snapshot: snapshot) {
-                cardControls
+            if !isJoinHandoffRunning {
+                MemberPortraitDraftCardSurface(snapshot: snapshot) {
+                    cardControls
+                }
+                .allowsHitTesting(true)
             }
-            .opacity(isJoinHandoffRunning ? 0 : 1)
-            .allowsHitTesting(!isJoinHandoffRunning)
 
             if let joinHandoffSnapshot, isJoinHandoffRunning {
                 MemberCreationJoinHandoffCard(snapshot: joinHandoffSnapshot)
@@ -81,7 +82,9 @@ extension MemberCardCreationContentView {
 
     @ViewBuilder
     var cardControls: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: cardControlsSpacing) {
+            currentStepContent
+                .frame(maxWidth: .infinity, alignment: .bottomLeading)
             MemberCreationStepIndicator(
                 steps: creationSteps,
                 currentStep: currentStep,
@@ -91,10 +94,14 @@ extension MemberCardCreationContentView {
                 secondaryForeground: cardSecondaryForeground,
                 inactiveFill: cardControlFill
             )
-            currentStepContent
+            .layoutPriority(2)
         }
         .padding(.horizontal, 18)
-        .padding(.bottom, 16)
+        .padding(.bottom, 18)
+    }
+
+    var cardControlsSpacing: CGFloat {
+        currentStep == .theme && kind == .human ? 10 : 14
     }
 
     @ViewBuilder
@@ -124,9 +131,9 @@ extension MemberCardCreationContentView {
                     .foregroundStyle(Color.goRed)
             }
             HStack(spacing: 10) {
-                if currentStepIndex > 0 {
+                if shouldShowBottomBackButton {
                     Button {
-                        retreatStep()
+                        handleBottomBack()
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "chevron.left").accessibilityHidden(true)
@@ -141,7 +148,7 @@ extension MemberCardCreationContentView {
                         .background(Color.ohanaControlFill, in: Capsule())
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    .disabled(isJoinHandoffRunning)
+                    .disabled(isJoinHandoffRunning || isSaving)
                 }
 
                 Button {
@@ -177,5 +184,18 @@ extension MemberCardCreationContentView {
 
     var creationCTA: String {
         l.tr(zh: "加入岛屿", en: "Join Island", de: "Insel beitreten")
+    }
+
+    var shouldShowBottomBackButton: Bool {
+        currentStepIndex > 0 || presentationStyle.keepsBackButtonVisible
+    }
+
+    func handleBottomBack() {
+        if currentStepIndex > 0 {
+            retreatStep()
+        } else {
+            clearMediaReturnStepStorage()
+            onCancel?()
+        }
     }
 }

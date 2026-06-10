@@ -16,6 +16,7 @@ struct ContentView: View {
     @Environment(AppServices.self) private var appServices
     @StateObject private var appRoutes = AppRouteCoordinator()
     @State private var createdEntitySignal: HomeCreatedEntitySignal?
+    @State private var rootAppearHandoffTask: Task<Void, Never>?
     @State private var onboardingJourneyEvaluationTask: Task<Void, Never>?
     @State private var coconutWalletBootstrapTask: Task<Void, Never>?
     @State private var onboardingJourneyPhase: OnboardingJourneyPhase = .preOnboarding
@@ -82,10 +83,11 @@ struct ContentView: View {
         }
         .animation(GoMotion.sheetEnter, value: onboardingJourneyPhase)
         .onAppear {
-            appServices.lifecycle.handle(.rootAppeared(scenePhase: scenePhase))
-            scheduleCoconutWalletBootstrap()
-            reconcileHumanProfileRequirement()
-            scheduleOnboardingJourneyEvaluation()
+            scheduleRootAppearHandoff()
+        }
+        .onDisappear {
+            rootAppearHandoffTask?.cancel()
+            rootAppearHandoffTask = nil
         }
         .onChange(of: hasOnboarded) { _, _ in
             reconcileHumanProfileRequirement()
@@ -190,6 +192,17 @@ struct ContentView: View {
         return amount
     }
 
+    private func scheduleRootAppearHandoff() {
+        rootAppearHandoffTask?.cancel()
+        rootAppearHandoffTask = OhanaFrameScheduler.runAfterNextFrame {
+            appServices.lifecycle.handle(.rootAppeared(scenePhase: scenePhase))
+            scheduleCoconutWalletBootstrap()
+            reconcileHumanProfileRequirement()
+            scheduleOnboardingJourneyEvaluation()
+            rootAppearHandoffTask = nil
+        }
+    }
+
     private func reconcileHumanProfileRequirement() {
         let resolution = appServices.humanRequirements.resolve(
             hasOnboarded: hasOnboarded,
@@ -222,6 +235,7 @@ struct ContentView: View {
                     context: modelContext,
                     projectionManager: appServices.questManager
                 )
+                EconomyDailyBudgetStore.pruneOldUsageEvents(context: modelContext)
             } catch {
                 #if DEBUG
                     OhanaLog.error("[ContentView] coconut wallet bootstrap failed: \(error.localizedDescription)", category: "Startup")
@@ -232,6 +246,7 @@ struct ContentView: View {
 
     private func activateRequiredHuman(_ human: Human) {
         currentActiveHumanId = human.id.uuidString
+        createdEntitySignal = HomeCreatedEntitySignal(entityID: human.id)
         scheduleOnboardingJourneyEvaluation()
     }
 

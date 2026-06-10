@@ -43,7 +43,9 @@ enum CoconutExchangeService {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         guard sender.id != receiver.id else { throw CoconutExchangeError.sameReceiver }
-        guard sender.coconutBalance >= option.coconutCost else { throw CoconutExchangeError.insufficientBalance }
+        guard CoconutWalletService.balance(for: sender, context: context) >= option.coconutCost else {
+            throw CoconutExchangeError.insufficientBalance
+        }
 
         let request = CoconutExchangeRequest(
             senderId: sender.id.uuidString,
@@ -66,33 +68,39 @@ enum CoconutExchangeService {
             save: false,
             careLedger: careLedger
         )
-        try wallet.apply(
-            deltas: [
-                .human(
-                    sender,
-                    delta: -option.coconutCost,
-                    entryKind: .spend,
-                    source: .exchange,
-                    title: "货币兑换申请",
-                    emoji: "💱",
-                    actorId: sender.id.uuidString,
-                    actorName: sender.name,
-                    subjectKind: .household,
-                    subjectId: nil,
-                    sourceModelName: "CoconutExchangeRequest",
-                    sourceModelId: request.id.uuidString,
-                    careLedgerEventId: ledger.id.uuidString,
-                    metadataJSON: "{\"exchangeId\":\"\(request.id.uuidString)\",\"status\":\"\(request.status.rawValue)\"}",
-                    transactionKey: "exchange:\(request.id.uuidString):created"
-                )
-            ],
-            context: context,
-            save: false,
-            postsRewardFeedback: true,
-            updatesProjection: true,
-            projectionManager: projectionManager
-        )
-        context.safeSave()
+        do {
+            try wallet.apply(
+                deltas: [
+                    .human(
+                        sender,
+                        delta: -option.coconutCost,
+                        entryKind: .spend,
+                        source: .exchange,
+                        title: "货币兑换申请",
+                        emoji: "💱",
+                        actorId: sender.id.uuidString,
+                        actorName: sender.name,
+                        subjectKind: .household,
+                        subjectId: nil,
+                        sourceModelName: "CoconutExchangeRequest",
+                        sourceModelId: request.id.uuidString,
+                        careLedgerEventId: ledger.id.uuidString,
+                        metadataJSON: "{\"exchangeId\":\"\(request.id.uuidString)\",\"status\":\"\(request.status.rawValue)\"}",
+                        transactionKey: "exchange:\(request.id.uuidString):created"
+                    )
+                ],
+                context: context,
+                save: false,
+                postsRewardFeedback: true,
+                updatesProjection: true,
+                projectionManager: projectionManager
+            )
+            try context.save()
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: projectionManager)
+            throw error
+        }
         return request
     }
 
@@ -119,7 +127,12 @@ enum CoconutExchangeService {
             save: false,
             careLedger: careLedger
         )
-        context.safeSave()
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 
     @MainActor
@@ -148,33 +161,39 @@ enum CoconutExchangeService {
             save: false,
             careLedger: careLedger
         )
-        try wallet.apply(
-            deltas: [
-                .human(
-                    sender,
-                    delta: request.coconutCost,
-                    entryKind: .refund,
-                    source: .exchange,
-                    title: "货币兑换取消退款",
-                    emoji: "↩️",
-                    actorId: sender.id.uuidString,
-                    actorName: sender.name,
-                    subjectKind: .household,
-                    subjectId: nil,
-                    sourceModelName: "CoconutExchangeRequest",
-                    sourceModelId: request.id.uuidString,
-                    careLedgerEventId: ledger.id.uuidString,
-                    metadataJSON: "{\"exchangeId\":\"\(request.id.uuidString)\",\"status\":\"\(request.status.rawValue)\"}",
-                    transactionKey: "exchange:\(request.id.uuidString):cancelled"
-                )
-            ],
-            context: context,
-            save: false,
-            postsRewardFeedback: true,
-            updatesProjection: true,
-            projectionManager: projectionManager
-        )
-        context.safeSave()
+        do {
+            try wallet.apply(
+                deltas: [
+                    .human(
+                        sender,
+                        delta: request.coconutCost,
+                        entryKind: .refund,
+                        source: .exchange,
+                        title: "货币兑换取消退款",
+                        emoji: "↩️",
+                        actorId: sender.id.uuidString,
+                        actorName: sender.name,
+                        subjectKind: .household,
+                        subjectId: nil,
+                        sourceModelName: "CoconutExchangeRequest",
+                        sourceModelId: request.id.uuidString,
+                        careLedgerEventId: ledger.id.uuidString,
+                        metadataJSON: "{\"exchangeId\":\"\(request.id.uuidString)\",\"status\":\"\(request.status.rawValue)\"}",
+                        transactionKey: "exchange:\(request.id.uuidString):cancelled"
+                    )
+                ],
+                context: context,
+                save: false,
+                postsRewardFeedback: true,
+                updatesProjection: true,
+                projectionManager: projectionManager
+            )
+            try context.save()
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: projectionManager)
+            throw error
+        }
     }
 
     @MainActor

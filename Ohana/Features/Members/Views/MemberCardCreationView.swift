@@ -23,9 +23,11 @@ struct MemberCardCreationContentView: View {
     let existingPets: [Pet]
     let existingHumans: [Human]
     let recoverySessionId: UUID
+    let presentationStyle: MemberCreationPresentationStyle
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.memberCreationCardFlipProgress) var memberCreationCardFlipProgress
     @Environment(AppServices.self) var appServices
     @AppStorage("appLanguage") var appLanguage = AppLanguage.code
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
@@ -75,7 +77,8 @@ struct MemberCardCreationContentView: View {
         onHumanSaved: ((Human) -> Void)? = nil,
         existingPets: [Pet],
         existingHumans: [Human],
-        recoverySessionId: UUID = UUID()
+        recoverySessionId: UUID = UUID(),
+        presentationStyle: MemberCreationPresentationStyle = .standard
     ) {
         self.kind = kind
         self.onComplete = onComplete
@@ -85,6 +88,7 @@ struct MemberCardCreationContentView: View {
         self.existingPets = existingPets
         self.existingHumans = existingHumans
         self.recoverySessionId = recoverySessionId
+        self.presentationStyle = presentationStyle
         _draft = State(initialValue: MemberCreationDraft(kind: kind))
     }
 
@@ -168,6 +172,28 @@ struct MemberCardCreationContentView: View {
 
     var stepContentSpacing: CGFloat { 18 }
 
+    var profileCardFlipProgress: CGFloat {
+        guard presentationStyle == .onboarding,
+              let memberCreationCardFlipProgress else {
+            return 1
+        }
+        return min(max(memberCreationCardFlipProgress, 0), 1)
+    }
+
+    var profileCardFlipIsActive: Bool {
+        presentationStyle == .onboarding && memberCreationCardFlipProgress != nil
+    }
+
+    var profileCardFlipOpacity: Double {
+        guard profileCardFlipIsActive else { return 1 }
+        return profileCardFlipProgress > 0.48 ? 1 : 0
+    }
+
+    var profileCardFlipAngle: Double {
+        guard profileCardFlipIsActive, !reduceMotion else { return 0 }
+        return 180 - 180 * Double(profileCardFlipProgress)
+    }
+
     var snapshot: MemberCardRenderSnapshot {
         let displayName = draft.trimmedName.isEmpty ? l.tr(zh: "新成员", en: "New member", de: "Neues Mitglied") : draft.trimmedName
         return MemberCardRenderSnapshot(
@@ -187,10 +213,18 @@ struct MemberCardCreationContentView: View {
         ZStack {
             OhanaAppBackground()
             VStack(spacing: 12) {
-                topChrome
-                    .opacity(isJoinHandoffRunning ? 0.28 : 1)
-                    .allowsHitTesting(!isJoinHandoffRunning)
+                if presentationStyle.showsTopChrome {
+                    topChrome
+                        .opacity(isJoinHandoffRunning ? 0.28 : 1)
+                        .allowsHitTesting(!isJoinHandoffRunning)
+                }
                 creationCardArea
+                    .opacity(profileCardFlipOpacity)
+                    .rotation3DEffect(
+                        .degrees(profileCardFlipAngle),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.78
+                    )
                 bottomCTA
                     .opacity(isJoinHandoffRunning ? 0 : 1)
                     .allowsHitTesting(!isJoinHandoffRunning)
@@ -216,7 +250,7 @@ struct MemberCardCreationContentView: View {
             restoreMediaReturnStepFromSceneStorage()
             configureInitialAvatarIfNeeded()
             scheduleAvatarDecode()
-            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
+            OhanaFrameScheduler.runAfterNextFrame(milliseconds: presentationStyle.cameraPreparationDelayMilliseconds) {
                 media.prepareCameraIfNeeded()
             }
         }

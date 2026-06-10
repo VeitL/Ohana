@@ -9,6 +9,17 @@ import os
 import SwiftUI
 import UIKit
 
+private struct MemberCreationCardFlipProgressKey: EnvironmentKey {
+    static let defaultValue: CGFloat? = nil
+}
+
+extension EnvironmentValues {
+    var memberCreationCardFlipProgress: CGFloat? {
+        get { self[MemberCreationCardFlipProgressKey.self] }
+        set { self[MemberCreationCardFlipProgressKey.self] = newValue }
+    }
+}
+
 enum MemberCreationPerformance {
     private nonisolated static let log = OSLog(subsystem: "HT.Ohana", category: "MemberCreationPerformance")
 
@@ -71,6 +82,23 @@ enum MemberCreationKind: String, Identifiable {
         case .pet: "pawprint.fill"
         case .human: "person.fill"
         }
+    }
+}
+
+enum MemberCreationPresentationStyle: Equatable {
+    case standard
+    case onboarding
+
+    var showsTopChrome: Bool {
+        self == .standard
+    }
+
+    var keepsBackButtonVisible: Bool {
+        self == .onboarding
+    }
+
+    var cameraPreparationDelayMilliseconds: UInt64 {
+        self == .onboarding ? 560 : 180
     }
 }
 

@@ -43,7 +43,8 @@ extension QuestManager {
             hasHumanAccount: human != nil,
             hasPetAccount: pet != nil,
             date: date,
-            forcedLuck: consumesBoost ? .golden : nil
+            forcedLuck: consumesBoost ? .golden : nil,
+            context: context
         )
         lastEconomyRewardResult = result
 
@@ -101,11 +102,29 @@ extension QuestManager {
                 updatesProjection: true,
                 projectionManager: self
             )
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: budgetKeys.household,
+                memberKey: budgetKeys.member,
+                careObjectKeys: objectKeys,
+                date: date,
+                context: context,
+                save: false,
+                writeDefaults: false
+            )
             try context.save()
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: budgetKeys.household,
+                memberKey: budgetKeys.member,
+                careObjectKeys: objectKeys,
+                date: date,
+                context: nil,
+                save: false
+            )
             if consumesBoost {
                 clearDoubleRewardBoost()
             }
-            EconomyDailyBudgetStore.commit(result, householdKey: budgetKeys.household, memberKey: budgetKeys.member, careObjectKeys: objectKeys)
             postEconomyFeedback(result, type: type, title: baseTitle, actorId: pet?.id.uuidString ?? human?.id.uuidString, actorName: pet?.name ?? human?.name)
             if case .walk = type, let humanId = human?.id.uuidString {
                 recordWalkRewardToday(finalHuman, humanId: humanId)
@@ -115,13 +134,15 @@ extension QuestManager {
                 recordCooldown(petId: pet?.id, type: type)
             }
             // TASK C: 检查 Streak 里程碑奖励
-            if let pet { streakRewards.checkAndAward(pet: pet, questManager: self) }
+            if let pet { streakRewards.checkAndAward(pet: pet, questManager: self, context: context) }
         } catch {
             context.rollback()
+            lastEconomyRewardResult = .empty
             wallet.refreshQuestProjection(context: context, manager: self)
             #if DEBUG
                 OhanaLog.error("[QuestManager] SwiftData save failed; rolled back: \(error.localizedDescription)", category: "Economy")
             #endif
+            return (0, 0)
         }
         return (finalHuman, finalPet)
     }
@@ -154,7 +175,8 @@ extension QuestManager {
             careObjectKeys: objectKeys,
             careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
             hasHumanAccount: human != nil,
-            forcedLuck: consumesBoost ? .golden : nil
+            forcedLuck: consumesBoost ? .golden : nil,
+            context: context
         )
         lastEconomyRewardResult = result
 
@@ -211,11 +233,27 @@ extension QuestManager {
                 updatesProjection: true,
                 projectionManager: self
             )
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: budgetKeys.household,
+                memberKey: budgetKeys.member,
+                careObjectKeys: objectKeys,
+                context: context,
+                save: false,
+                writeDefaults: false
+            )
             try context.save()
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: budgetKeys.household,
+                memberKey: budgetKeys.member,
+                careObjectKeys: objectKeys,
+                context: nil,
+                save: false
+            )
             if consumesBoost {
                 clearDoubleRewardBoost()
             }
-            EconomyDailyBudgetStore.commit(result, householdKey: budgetKeys.household, memberKey: budgetKeys.member, careObjectKeys: objectKeys)
             postEconomyFeedback(
                 result,
                 type: type,
@@ -227,14 +265,16 @@ extension QuestManager {
                 if !isOnCooldown(petId: pet.id, type: type) {
                     recordCooldown(petId: pet.id, type: type)
                 }
-                streakRewards.checkAndAward(pet: pet, questManager: self)
+                streakRewards.checkAndAward(pet: pet, questManager: self, context: context)
             }
         } catch {
             context.rollback()
+            lastEconomyRewardResult = .empty
             wallet.refreshQuestProjection(context: context, manager: self)
             #if DEBUG
                 OhanaLog.error("[QuestManager] shared care save failed: \(error.localizedDescription)", category: "Economy")
             #endif
+            return (0, 0)
         }
 
         return (humanTotal, petTotal)

@@ -11,6 +11,7 @@ import SwiftData
 enum PetBondVaultUnlockFailure: Equatable {
     case alreadyUnlocked
     case insufficientBalance
+    case persistenceFailed
 }
 
 struct PetBondVaultUnlockCommandResult: Equatable {
@@ -137,7 +138,10 @@ enum AchievementRewardCommandService {
                 updatesProjection: true,
                 projectionManager: questManager
             )
+            try context.save()
         } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
             #if DEBUG
                 OhanaLog.error("[AchievementRewardCommandService] wallet write failed: \(error.localizedDescription)", category: "Economy")
             #endif
@@ -152,7 +156,6 @@ enum AchievementRewardCommandService {
         }
         let updatedRaw = claimedIDs.sorted().joined(separator: ",")
         UserDefaults.standard.set(updatedRaw, forKey: "achievement_claimedRewardIDs")
-        context.safeSave()
 
         return AchievementRewardCommandResult(
             entityID: entityID,
@@ -215,6 +218,7 @@ enum BackdateCheckInCommandService {
 enum ShopPurchaseFailure: Equatable {
     case missingActiveHuman
     case insufficientBalance(missing: Int)
+    case persistenceFailed
 }
 
 struct ShopPurchaseCommandResult: Equatable {
@@ -261,13 +265,14 @@ enum ShopPurchaseCommandService {
                 transactionKey: nil
             )
         }
-        guard buyer.coconutBalance >= item.cost else {
+        let buyerBalance = CoconutWalletService.balance(for: buyer, context: context)
+        guard buyerBalance >= item.cost else {
             return ShopPurchaseCommandResult(
                 humanID: buyer.id,
                 itemID: item.id,
                 cost: item.cost,
                 didPurchase: false,
-                failure: .insufficientBalance(missing: item.cost - buyer.coconutBalance),
+                failure: .insufficientBalance(missing: item.cost - buyerBalance),
                 ledgerEventID: nil,
                 transactionKey: nil
             )
@@ -330,19 +335,27 @@ enum ShopPurchaseCommandService {
                 updatesProjection: true,
                 projectionManager: providedQuestManager ?? QuestManager()
             )
+            try context.save()
         } catch {
             context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: providedQuestManager)
+            let failure: ShopPurchaseFailure
+            if let walletError = error as? CoconutWalletError,
+               case let .insufficientBalance(_, missing) = walletError {
+                failure = .insufficientBalance(missing: missing)
+            } else {
+                failure = .persistenceFailed
+            }
             return ShopPurchaseCommandResult(
                 humanID: buyer.id,
                 itemID: item.id,
                 cost: item.cost,
                 didPurchase: false,
-                failure: .insufficientBalance(missing: item.cost),
+                failure: failure,
                 ledgerEventID: nil,
                 transactionKey: nil
             )
         }
-        context.safeSave()
 
         return ShopPurchaseCommandResult(
             humanID: buyer.id,
@@ -368,7 +381,7 @@ enum PetBondVaultUnlockCommandService {
         wallet: CoconutWalletManaging,
         careLedger: CareLedgerRecording
     ) -> PetBondVaultUnlockCommandResult {
-        guard !PetBondVaultStore.isUnlocked(item.kind, for: pet.id) else {
+        guard item.isRepeatable || !PetBondVaultStore.isUnlocked(item.kind, for: pet.id) else {
             return PetBondVaultUnlockCommandResult(
                 petID: pet.id,
                 itemID: item.id,
@@ -378,7 +391,8 @@ enum PetBondVaultUnlockCommandService {
                 ledgerEventID: nil
             )
         }
-        guard pet.coconutBalance >= item.cost else {
+        let petBalance = CoconutWalletService.balance(for: pet, context: context)
+        guard petBalance >= item.cost else {
             return PetBondVaultUnlockCommandResult(
                 petID: pet.id,
                 itemID: item.id,
@@ -389,6 +403,11 @@ enum PetBondVaultUnlockCommandService {
             )
         }
 
+        let actionType = item.isRepeatable ? "petBondVaultConsume" : "petBondVaultUnlock"
+        let metadataJSON = "{\"itemId\":\"\(item.id)\",\"economy\":\"petBondVault\",\"repeatable\":\(item.isRepeatable)}"
+        let transactionKey = item.isRepeatable
+            ? "petBondVault:consume:\(item.id):\(pet.id.uuidString):\(UUID().uuidString)"
+            : "petBondVault:\(item.id):\(pet.id.uuidString)"
         let ledger = careLedger.record(
             occurredAt: Date(),
             actorKind: .pet,
@@ -396,7 +415,7 @@ enum PetBondVaultUnlockCommandService {
             subjectKind: .pet,
             subjectId: pet.id.uuidString,
             eventKind: .coconut,
-            actionType: "petBondVaultUnlock",
+            actionType: actionType,
             amountValue: 0,
             amountUnit: "",
             note: title,
@@ -408,7 +427,7 @@ enum PetBondVaultUnlockCommandService {
             coconutDelta: -item.cost,
             rewardLogId: nil,
             privacyFieldRaw: nil,
-            metadataJSON: "{\"itemId\":\"\(item.id)\",\"economy\":\"petBondVault\"}",
+            metadataJSON: metadataJSON,
             context: context,
             save: false
         )
@@ -429,8 +448,8 @@ enum PetBondVaultUnlockCommandService {
                         sourceModelName: "PetBondVaultItem",
                         sourceModelId: item.id,
                         careLedgerEventId: ledger.id.uuidString,
-                        metadataJSON: "{\"itemId\":\"\(item.id)\",\"economy\":\"petBondVault\"}",
-                        transactionKey: "petBondVault:\(item.id):\(pet.id.uuidString)"
+                        metadataJSON: metadataJSON,
+                        transactionKey: transactionKey
                     )
                 ],
                 context: context,
@@ -439,19 +458,31 @@ enum PetBondVaultUnlockCommandService {
                 updatesProjection: true,
                 projectionManager: providedQuestManager ?? QuestManager()
             )
+            try context.save()
         } catch {
             context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: providedQuestManager)
+            let failure: PetBondVaultUnlockFailure
+            if let walletError = error as? CoconutWalletError,
+               case .insufficientBalance = walletError {
+                failure = .insufficientBalance
+            } else {
+                failure = .persistenceFailed
+            }
             return PetBondVaultUnlockCommandResult(
                 petID: pet.id,
                 itemID: item.id,
                 cost: item.cost,
                 didUnlock: false,
-                failure: .insufficientBalance,
+                failure: failure,
                 ledgerEventID: nil
             )
         }
-        PetBondVaultStore.unlock(item.kind, for: pet.id)
-        context.safeSave()
+        if item.isRepeatable {
+            PetBondVaultStore.consume(item.kind, for: pet.id)
+        } else {
+            PetBondVaultStore.unlock(item.kind, for: pet.id)
+        }
 
         return PetBondVaultUnlockCommandResult(
             petID: pet.id,

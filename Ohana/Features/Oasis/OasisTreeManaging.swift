@@ -14,6 +14,7 @@ protocol OasisTreeManaging {
     func treeLevel(forTotalEnergy totalEnergy: Int) -> TreeLevel
     func progressToNextLevel(forTotalEnergy totalEnergy: Int) -> Double
     func nextLevelThreshold(forTotalEnergy totalEnergy: Int) -> Int
+    func canUseInjectionPackage(cost: Int, date: Date) -> Bool
     func applyPurchasedEnergyBoost(cost: Int, modelContext: ModelContext) -> Bool
     func refreshPreviewEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant])
     func refreshEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant])
@@ -24,6 +25,10 @@ protocol OasisTreeManaging {
 }
 
 extension OasisTreeManaging {
+    func canUseInjectionPackage(cost: Int) -> Bool {
+        canUseInjectionPackage(cost: cost, date: Date())
+    }
+
     func dailyTreeCoconutSnapshot(maxCoconutCount: Int) -> OasisDailyTreeCoconutSnapshot {
         dailyTreeCoconutSnapshot(maxCoconutCount: maxCoconutCount, date: Date())
     }
@@ -87,6 +92,10 @@ final class SharedOasisTreeManager: OasisTreeManaging {
 
     func nextLevelThreshold(forTotalEnergy totalEnergy: Int) -> Int {
         OasisTreeManager.nextLevelThreshold(forTotalEnergy: totalEnergy)
+    }
+
+    func canUseInjectionPackage(cost: Int, date: Date = Date()) -> Bool {
+        manager.canUseInjectionPackage(cost: cost, date: date)
     }
 
     func applyPurchasedEnergyBoost(cost: Int, modelContext: ModelContext) -> Bool {

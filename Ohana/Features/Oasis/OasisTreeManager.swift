@@ -216,12 +216,46 @@ final class OasisTreeManager {
     }
 
     @discardableResult
-    func harvestDailyPassiveIncome() -> Bool {
+    @MainActor
+    func harvestDailyPassiveIncome(
+        modelContext: ModelContext,
+        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        wallet providedWallet: CoconutWalletManaging? = nil,
+        questManager providedQuestManager: QuestManager? = nil
+    ) -> Bool {
         guard canHarvestToday else { return false }
-        markDailyPassiveIncomeHarvested(date: Date())
-        questManager.addCoconuts(passiveIncomeAmount, emoji: "🌳", title: "生命之树的馈赠 +\(passiveIncomeAmount)🥥")
+        let wallet = providedWallet ?? SwiftDataCoconutWalletManager()
+        let questManager = providedQuestManager ?? QuestManager()
+        let harvestDate = Date()
+        guard OasisCritterEconomyService.awardCurrentHumanCoconuts(
+            passiveIncomeAmount,
+            emoji: "🌳",
+            title: "生命之树的馈赠 +\(passiveIncomeAmount)🥥",
+            context: modelContext,
+            postsRewardFeedback: true,
+            activeHumanSelection: activeHumanSelection,
+            wallet: wallet,
+            questManager: questManager
+        ) else {
+            modelContext.rollback()
+            wallet.refreshQuestProjection(context: modelContext, manager: questManager)
+            return false
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            wallet.refreshQuestProjection(context: modelContext, manager: questManager)
+            return false
+        }
+        markDailyPassiveIncomeHarvested(date: harvestDate)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         return true
+    }
+
+    @available(*, unavailable, message: "Use harvestDailyPassiveIncome(modelContext:) so rewards write to the wallet account in the caller transaction.")
+    func harvestDailyPassiveIncome() -> Bool {
+        false
     }
 
     func markDailyPassiveIncomeHarvested(date: Date) {
@@ -381,6 +415,12 @@ final class OasisTreeManager {
 
     // MARK: - Inject Energy（消耗椰子，增加树经验）
 
+    func canUseInjectionPackage(cost: Int = 80, date: Date = Date()) -> Bool {
+        let package = Self.injectionPackage(forRequestedCost: cost, currentLevel: treeLevel)
+        guard package.isAvailable else { return false }
+        return Self.canUseInjectionPackage(package, date: date)
+    }
+
     @discardableResult
     @MainActor
     func injectEnergy(cost: Int = 80, modelContext: ModelContext) -> Bool {
@@ -408,6 +448,8 @@ final class OasisTreeManager {
     @discardableResult
     @MainActor
     private func applyEnergyPackage(_ package: InjectionPackage, recordsCost: Bool, modelContext: ModelContext) -> Bool {
+        let previousInjectedEnergy = injectedEnergy
+        let previousUsedPeriod = OasisTreePreferenceStore.injectionUsedPeriod(for: package.limitKey)
         injectedEnergy += package.xp
         Self.markInjectionPackageUsed(package)
         careLedger.record(
@@ -434,6 +476,16 @@ final class OasisTreeManager {
             save: false
         )
 
+        do {
+            try modelContext.save()
+        } catch {
+            modelContext.rollback()
+            injectedEnergy = previousInjectedEnergy
+            OasisTreePreferenceStore.restoreInjectionUsed(limitKey: package.limitKey, previousPeriodKey: previousUsedPeriod)
+            oasisRewards.refreshCoconutProjection(context: modelContext)
+            return false
+        }
+
         // 检查是否升级；升级奖励会以“升级椰子”形式等待用户敲开。
         if checkAndRewardLevelUp(modelContext: modelContext) != nil {
             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -441,7 +493,6 @@ final class OasisTreeManager {
             // 普通注入，无奖励
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         }
-        modelContext.safeSave()
         return true
     }
 

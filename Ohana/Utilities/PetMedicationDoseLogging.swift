@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum PetMedicationDoseLogging {
+nonisolated enum PetMedicationDoseLogging {
     static let relatedEntityTypeMedication = "pet_medication"
 
     /// 某日该药应喂次数（`asNeeded` 为 0，不产生委托）
@@ -36,14 +36,17 @@ enum PetMedicationDoseLogging {
         }
     }
 
-    static func todayDoseCount(events: [Event], medicationId: UUID) -> Int {
-        let cal = Calendar.current
-        return events.count(where: { ev in
+    static func doseCount(on date: Date, events: [Event], medicationId: UUID, calendar: Calendar = .current) -> Int {
+        events.count(where: { ev in
             ev.eventType == EventType.petMedicationDose.rawValue
                 && ev.relatedEntityType == relatedEntityTypeMedication
                 && ev.relatedEntityId == medicationId.uuidString
-                && cal.isDateInToday(ev.startDate)
+                && calendar.isDate(ev.startDate, inSameDayAs: date)
         })
+    }
+
+    static func todayDoseCount(events: [Event], medicationId: UUID) -> Int {
+        doseCount(on: Date(), events: events, medicationId: medicationId)
     }
 
     @discardableResult
@@ -73,47 +76,58 @@ enum PetMedicationDoseLogging {
             event.assigneeId = hid
         }
         modelContext.insert(event)
-        modelContext.safeSave()
-        careLedger.record(
-            occurredAt: event.startDate,
-            actorKind: event.assigneeId == nil ? .unknown : .human,
-            actorId: event.assigneeId,
-            subjectKind: .pet,
-            subjectId: pet.id.uuidString,
-            eventKind: .medication,
-            actionType: "petMedicationDose",
-            amountValue: 0,
-            amountUnit: "",
-            note: event.title,
-            source: .detail,
-            sourceEventId: event.id.uuidString,
-            sourceReminderId: nil,
-            legacyModelName: "Event",
-            legacyModelId: event.id.uuidString,
-            coconutDelta: 0,
-            rewardLogId: nil,
-            privacyFieldRaw: nil,
-            metadataJSON: "{\"medicationId\":\"\(medication.id.uuidString)\"}",
-            context: modelContext,
-            save: true
-        )
 
-        if decrementRemaining {
-            PetMedicationPlanStorageKeys.decrementRemainingAmount(medicationID: medication.id)
-        }
-
-        medicationReminders.recordDose(for: medication.id)
-
-        if awardCoconut {
-            questManager.addCoconuts(1, emoji: "💊", title: "记录喂药 +1🥥")
-            _ = careLedger.recordCoconut(
-                delta: 1,
-                title: "记录喂药",
+        do {
+            var coconutDelta = 0
+            if awardCoconut {
+                coconutDelta = try questManager.stageSpecialCoconutReward(
+                    amount: 1,
+                    emoji: "💊",
+                    title: "记录喂药 +1🥥",
+                    actorId: event.assigneeId,
+                    source: .careEvent,
+                    sourceModelName: "Event",
+                    sourceModelId: event.id.uuidString,
+                    metadataJSON: "{\"kind\":\"petMedicationDose\",\"medicationId\":\"\(medication.id.uuidString)\"}",
+                    transactionKey: "petMedicationDose:\(event.id.uuidString):reward",
+                    context: modelContext,
+                    occurredAt: event.startDate
+                )
+            }
+            careLedger.record(
+                occurredAt: event.startDate,
+                actorKind: event.assigneeId == nil ? .unknown : .human,
                 actorId: event.assigneeId,
-                actorName: nil,
-                source: .economy,
-                context: modelContext
+                subjectKind: .pet,
+                subjectId: pet.id.uuidString,
+                eventKind: .medication,
+                actionType: "petMedicationDose",
+                amountValue: 0,
+                amountUnit: "",
+                note: event.title,
+                source: .detail,
+                sourceEventId: event.id.uuidString,
+                sourceReminderId: nil,
+                legacyModelName: "Event",
+                legacyModelId: event.id.uuidString,
+                coconutDelta: coconutDelta,
+                rewardLogId: nil,
+                privacyFieldRaw: nil,
+                metadataJSON: "{\"medicationId\":\"\(medication.id.uuidString)\"}",
+                context: modelContext,
+                save: false
             )
+            try modelContext.save()
+            if decrementRemaining {
+                PetMedicationPlanStorageKeys.decrementRemainingAmount(medicationID: medication.id)
+            }
+            medicationReminders.recordDose(for: medication.id)
+        } catch {
+            modelContext.rollback()
+            questManager.wallet.refreshQuestProjection(context: modelContext, manager: questManager)
+            #if DEBUG
+                OhanaLog.error("[PetMedicationDoseLogging] dose save failed: \(error.localizedDescription)", category: "Economy")
+            #endif
         }
 
         return event

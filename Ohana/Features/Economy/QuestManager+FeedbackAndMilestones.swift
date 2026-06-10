@@ -72,20 +72,36 @@ extension QuestManager {
     }
 
     /// 完成喂食任务时调用（第一次记录喂食）
-    func recordFirstMeal() {
+    func recordFirstMeal(actorId: String? = nil, actorName: String? = nil, context: ModelContext? = nil) {
         guard !isFirstMealRecorded else { return }
+        guard recordSpecialCoconutReward(
+            15,
+            emoji: "🍖",
+            title: "首次喜食打卡奖励",
+            actorId: actorId,
+            actorName: actorName,
+            rewardKey: "welcome:firstMeal",
+            context: context
+        ) else { return }
         isFirstMealRecorded = true
         persistQuestFlags()
-        addCoconuts(15, emoji: "🍖", title: "首次喜食打卡奖励")
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 
     /// 完成主题颜色设置任务时调用
-    func recordThemeColorSet() {
+    func recordThemeColorSet(actorId: String? = nil, actorName: String? = nil, context: ModelContext? = nil) {
         guard !isThemeColorSet else { return }
+        guard recordSpecialCoconutReward(
+            10,
+            emoji: "🎨",
+            title: "设置家人主题色",
+            actorId: actorId,
+            actorName: actorName,
+            rewardKey: "welcome:themeColor",
+            context: context
+        ) else { return }
         isThemeColorSet = true
         persistQuestFlags()
-        addCoconuts(10, emoji: "🎨", title: "设置家人主题色")
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -95,15 +111,29 @@ extension QuestManager {
     /// 幂等：同一天只发放一次
     /// 返回值：是否成功发放（true 表示本次触发了奖励）
     @discardableResult
-    func recordDailyStepGoal(steps: Int, goal: Int = 8000) -> Bool {
+    func recordDailyStepGoal(
+        steps: Int,
+        goal: Int = 8000,
+        actorId: String? = nil,
+        actorName: String? = nil,
+        context: ModelContext? = nil
+    ) -> Bool {
         guard steps >= goal else { return false }
         let today = Calendar.current.startOfDay(for: Date())
         let lastDate = Self.defaults.object(forKey: Keys.stepRewardDate) as? Date
         if let last = lastDate, Calendar.current.isDate(last, inSameDayAs: today) {
             return false // 今天已发放
         }
+        guard recordSpecialCoconutReward(
+            10,
+            emoji: "🚶",
+            title: "今日步数达标奖励",
+            actorId: actorId,
+            actorName: actorName,
+            rewardKey: "dailyStepGoal:\(EconomyDailyBudgetStore.dayKey(for: today))",
+            context: context
+        ) else { return false }
         Self.defaults.set(today, forKey: Keys.stepRewardDate)
-        addCoconuts(10, emoji: "🚶", title: "今日步数达标奖励")
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         return true
     }
@@ -114,17 +144,69 @@ extension QuestManager {
     /// - Parameter petWalkDistanceKm: 宠物今日遛狗距离之和
     /// 返回值：是否成功触发联动
     @discardableResult
-    func recordBondedWalk(humanDistanceKm: Double, petWalkDistanceKm: Double) -> Bool {
+    func recordBondedWalk(
+        humanDistanceKm: Double,
+        petWalkDistanceKm: Double,
+        actorId: String? = nil,
+        actorName: String? = nil,
+        context: ModelContext? = nil
+    ) -> Bool {
         guard petWalkDistanceKm > 0.1, humanDistanceKm >= petWalkDistanceKm else { return false }
         let today = Calendar.current.startOfDay(for: Date())
         let lastDate = Self.defaults.object(forKey: Keys.bondedDate) as? Date
         if let last = lastDate, Calendar.current.isDate(last, inSameDayAs: today) {
             return false // 今天已触发
         }
+        guard recordSpecialCoconutReward(
+            5,
+            emoji: "🐾",
+            title: "人宠同行奖励",
+            actorId: actorId,
+            actorName: actorName,
+            rewardKey: "bondedWalk:\(EconomyDailyBudgetStore.dayKey(for: today))",
+            context: context
+        ) else { return false }
         Self.defaults.set(today, forKey: Keys.bondedDate)
-        addCoconuts(5, emoji: "🐾", title: "人宠同行奖励")
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         return true
+    }
+
+    @discardableResult
+    private func recordSpecialCoconutReward(
+        _ amount: Int,
+        emoji: String,
+        title: String,
+        actorId: String?,
+        actorName: String?,
+        rewardKey: String,
+        context: ModelContext?
+    ) -> Bool {
+        let writeContext = context ?? ModelContext(SharedModelContainer.make())
+        do {
+            let awarded = try stageSpecialCoconutReward(
+                amount: amount,
+                emoji: emoji,
+                title: title,
+                actorId: actorId,
+                actorName: actorName,
+                source: .service,
+                sourceModelName: "QuestSpecialReward",
+                sourceModelId: rewardKey,
+                metadataJSON: "{\"kind\":\"questSpecialReward\",\"rewardKey\":\"\(rewardKey)\"}",
+                transactionKey: "questSpecial:\(rewardKey):\(actorId ?? "system")",
+                context: writeContext
+            )
+            guard awarded == amount else { return false }
+            try writeContext.save()
+            return true
+        } catch {
+            writeContext.rollback()
+            wallet.refreshQuestProjection(context: writeContext, manager: self)
+            #if DEBUG
+                OhanaLog.error("[QuestManager] special coconut reward save failed: \(error.localizedDescription)", category: "Economy")
+            #endif
+            return false
+        }
     }
 
     // MARK: - task38: 打卡 → 自动完成今日同类型 Reminder（不重复发椰子）

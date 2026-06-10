@@ -1,6 +1,32 @@
 import Foundation
 import SwiftData
 
+enum CoconutWalkRewardPolicy {
+    static let minimumRewardDistanceMeters = 20.0
+
+    static func isRewardable(distanceMeters: Double) -> Bool {
+        distanceMeters >= minimumRewardDistanceMeters
+    }
+
+    static func baseGrowthXP(for distanceMeters: Double) -> Int {
+        min(20, max(8, Int(max(0, distanceMeters) / 250)))
+    }
+
+    static func baseCoconuts(for distanceMeters: Double) -> Int {
+        min(14, max(5, Int(max(0, distanceMeters) / 350)))
+    }
+
+    static func earnedCoconuts(for distanceMeters: Double) -> Int {
+        isRewardable(distanceMeters: distanceMeters) ? baseCoconuts(for: distanceMeters) : 0
+    }
+
+    static func splitCoconuts(total: Int) -> (human: Int, pet: Int) {
+        guard total > 0 else { return (0, 0) }
+        let pet = max(1, total / 3)
+        return (total - pet, pet)
+    }
+}
+
 enum EconomyLuckTier: String, Equatable {
     case none
     case small
@@ -242,18 +268,21 @@ enum EconomyDailyBudgetStore {
     static let luckyCoconutBudget = 12
 
     private static let prefix = "economyV2.dailyBudget"
+    private static let usagePruneDayKey = "\(prefix).usagePrune.lastDay"
     private static let calendar = Calendar(identifier: .gregorian)
 
     static func snapshot(
         userKey: String,
         careObjectCount: Int,
-        date: Date = Date()
+        date: Date = Date(),
+        context: ModelContext? = nil
     ) -> EconomyDailyBudgetSnapshot {
         snapshot(
             householdKey: userKey,
             memberKey: userKey,
             careObjectCount: careObjectCount,
-            date: date
+            date: date,
+            context: context
         )
     }
 
@@ -262,27 +291,67 @@ enum EconomyDailyBudgetStore {
         memberKey: String,
         careObjectKeys: [String] = [],
         careObjectCount: Int,
-        date: Date = Date()
+        date: Date = Date(),
+        context: ModelContext? = nil
     ) -> EconomyDailyBudgetSnapshot {
         let household = normalizedUserKey(householdKey)
         let member = normalizedUserKey(memberKey)
         let objects = normalizedCareObjectKeys(careObjectKeys)
+        let day = dayKey(for: date)
         let highXP = highXPBudget(careObjectCount: careObjectCount)
         let fatigueXP = fatigueXPBudget(careObjectCount: careObjectCount)
         let highCoconuts = coconutBudget(careObjectCount: careObjectCount)
         let fatigueCoconuts = fatigueCoconutBudget(careObjectCount: careObjectCount)
+        let persisted = persistedUsage(
+            context: context,
+            householdKey: household,
+            memberKey: member,
+            careObjectKeys: objects,
+            dayKey: day
+        )
+        let defaultsCareObjectXP = usageByCareObject(
+            householdKey: household,
+            careObjectKeys: objects,
+            metric: "xp",
+            date: date
+        )
+        let defaultsCareObjectCoconuts = usageByCareObject(
+            householdKey: household,
+            careObjectKeys: objects,
+            metric: "coconut",
+            date: date
+        )
         return EconomyDailyBudgetSnapshot(
             householdKey: household,
             memberKey: member,
             careObjectKeys: objects,
-            dayKey: dayKey(for: date),
-            xpUsed: UserDefaults.standard.integer(forKey: householdStorageKey(householdKey: household, metric: "xp", date: date)),
-            coconutUsed: UserDefaults.standard.integer(forKey: householdStorageKey(householdKey: household, metric: "coconut", date: date)),
-            memberXPUsed: UserDefaults.standard.integer(forKey: memberStorageKey(householdKey: household, memberKey: member, metric: "xp", date: date)),
-            memberCoconutUsed: UserDefaults.standard.integer(forKey: memberStorageKey(householdKey: household, memberKey: member, metric: "coconut", date: date)),
-            careObjectXPUsed: usageByCareObject(householdKey: household, careObjectKeys: objects, metric: "xp", date: date),
-            careObjectCoconutUsed: usageByCareObject(householdKey: household, careObjectKeys: objects, metric: "coconut", date: date),
-            luckyCoconutUsed: UserDefaults.standard.integer(forKey: householdStorageKey(householdKey: household, metric: "lucky", date: date)),
+            dayKey: day,
+            xpUsed: max(
+                UserDefaults.standard.integer(forKey: householdStorageKey(householdKey: household, metric: "xp", date: date)),
+                persisted.householdXP
+            ),
+            coconutUsed: max(
+                UserDefaults.standard.integer(forKey: householdStorageKey(householdKey: household, metric: "coconut", date: date)),
+                persisted.householdCoconuts
+            ),
+            memberXPUsed: max(
+                UserDefaults.standard.integer(forKey: memberStorageKey(householdKey: household, memberKey: member, metric: "xp", date: date)),
+                persisted.memberXP
+            ),
+            memberCoconutUsed: max(
+                UserDefaults.standard.integer(forKey: memberStorageKey(householdKey: household, memberKey: member, metric: "coconut", date: date)),
+                persisted.memberCoconuts
+            ),
+            careObjectXPUsed: mergedCareObjectUsage(defaults: defaultsCareObjectXP, persisted: persisted.careObjectXP, keys: objects),
+            careObjectCoconutUsed: mergedCareObjectUsage(
+                defaults: defaultsCareObjectCoconuts,
+                persisted: persisted.careObjectCoconuts,
+                keys: objects
+            ),
+            luckyCoconutUsed: max(
+                UserDefaults.standard.integer(forKey: householdStorageKey(householdKey: household, metric: "lucky", date: date)),
+                persisted.luckyCoconuts
+            ),
             highXPBudget: highXP,
             fatigueXPBudget: fatigueXP,
             highCoconutBudget: highCoconuts,
@@ -298,8 +367,23 @@ enum EconomyDailyBudgetStore {
         )
     }
 
-    static func commit(_ result: EconomyRewardResult, userKey: String, date: Date = Date()) {
-        commit(result, householdKey: userKey, memberKey: userKey, date: date)
+    static func commit(
+        _ result: EconomyRewardResult,
+        userKey: String,
+        date: Date = Date(),
+        context: ModelContext? = nil,
+        save: Bool = true,
+        writeDefaults: Bool = true
+    ) {
+        commit(
+            result,
+            householdKey: userKey,
+            memberKey: userKey,
+            date: date,
+            context: context,
+            save: save,
+            writeDefaults: writeDefaults
+        )
     }
 
     static func commit(
@@ -307,22 +391,36 @@ enum EconomyDailyBudgetStore {
         householdKey: String,
         memberKey: String,
         careObjectKeys: [String] = [],
-        date: Date = Date()
+        date: Date = Date(),
+        context: ModelContext? = nil,
+        save: Bool = true,
+        writeDefaults: Bool = true
     ) {
         let household = normalizedUserKey(householdKey)
         let member = normalizedUserKey(memberKey)
         let objects = normalizedCareObjectKeys(careObjectKeys)
-        increment(householdStorageKey(householdKey: household, metric: "xp", date: date), by: result.growthXP)
-        increment(householdStorageKey(householdKey: household, metric: "coconut", date: date), by: result.totalCoconuts)
-        increment(householdStorageKey(householdKey: household, metric: "lucky", date: date), by: result.luckyCoconuts)
-        increment(memberStorageKey(householdKey: household, memberKey: member, metric: "xp", date: date), by: result.growthXP)
-        increment(memberStorageKey(householdKey: household, memberKey: member, metric: "coconut", date: date), by: result.totalCoconuts)
-        for (objectKey, amount) in distribute(result.growthXP, across: objects) {
-            increment(careObjectStorageKey(householdKey: household, careObjectKey: objectKey, metric: "xp", date: date), by: amount)
+        if writeDefaults {
+            increment(householdStorageKey(householdKey: household, metric: "xp", date: date), by: result.growthXP)
+            increment(householdStorageKey(householdKey: household, metric: "coconut", date: date), by: result.totalCoconuts)
+            increment(householdStorageKey(householdKey: household, metric: "lucky", date: date), by: result.luckyCoconuts)
+            increment(memberStorageKey(householdKey: household, memberKey: member, metric: "xp", date: date), by: result.growthXP)
+            increment(memberStorageKey(householdKey: household, memberKey: member, metric: "coconut", date: date), by: result.totalCoconuts)
+            for (objectKey, amount) in distribute(result.growthXP, across: objects) {
+                increment(careObjectStorageKey(householdKey: household, careObjectKey: objectKey, metric: "xp", date: date), by: amount)
+            }
+            for (objectKey, amount) in distribute(result.totalCoconuts, across: objects) {
+                increment(careObjectStorageKey(householdKey: household, careObjectKey: objectKey, metric: "coconut", date: date), by: amount)
+            }
         }
-        for (objectKey, amount) in distribute(result.totalCoconuts, across: objects) {
-            increment(careObjectStorageKey(householdKey: household, careObjectKey: objectKey, metric: "coconut", date: date), by: amount)
-        }
+        persistUsage(
+            result,
+            householdKey: household,
+            memberKey: member,
+            careObjectKeys: objects,
+            date: date,
+            context: context,
+            save: save
+        )
     }
 
     static func reset(userKey: String, date: Date = Date()) {
@@ -349,6 +447,42 @@ enum EconomyDailyBudgetStore {
         let defaults = UserDefaults.standard
         for (key, _) in defaults.dictionaryRepresentation() where key.hasPrefix("\(prefix).") {
             defaults.removeObject(forKey: key)
+        }
+    }
+
+    @discardableResult
+    static func pruneOldUsageEvents(
+        context: ModelContext,
+        retainingDays: Int = 45,
+        now: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) -> Int {
+        let todayKey = dayKey(for: now)
+        guard defaults.string(forKey: usagePruneDayKey) != todayKey else { return 0 }
+        let retainedDays = max(1, retainingDays)
+        let cutoffDate = calendar.date(byAdding: .day, value: -retainedDays, to: now) ?? now
+        let cutoffKey = dayKey(for: cutoffDate)
+        let descriptor = FetchDescriptor<EconomyBudgetUsageEvent>(
+            predicate: #Predicate { event in
+                event.dayKey < cutoffKey
+            }
+        )
+
+        do {
+            let oldEvents = try context.fetch(descriptor)
+            for event in oldEvents {
+                context.delete(event)
+            }
+            if !oldEvents.isEmpty {
+                try context.save()
+            }
+            defaults.set(todayKey, forKey: usagePruneDayKey)
+            return oldEvents.count
+        } catch {
+            #if DEBUG
+                OhanaLog.error("[EconomyDailyBudgetStore] prune failed: \(error.localizedDescription)", category: "Economy")
+            #endif
+            return 0
         }
     }
 
@@ -427,6 +561,138 @@ enum EconomyDailyBudgetStore {
         })
     }
 
+    private struct PersistedBudgetUsage {
+        var householdXP: Int = 0
+        var householdCoconuts: Int = 0
+        var memberXP: Int = 0
+        var memberCoconuts: Int = 0
+        var careObjectXP: [String: Int] = [:]
+        var careObjectCoconuts: [String: Int] = [:]
+        var luckyCoconuts: Int = 0
+
+        static let empty = PersistedBudgetUsage()
+    }
+
+    private static func persistedUsage(
+        context: ModelContext?,
+        householdKey: String,
+        memberKey: String,
+        careObjectKeys: [String],
+        dayKey: String
+    ) -> PersistedBudgetUsage {
+        guard let context else { return .empty }
+        let descriptor = FetchDescriptor<EconomyBudgetUsageEvent>(
+            predicate: #Predicate { event in
+                event.dayKey == dayKey && event.householdKey == householdKey
+            }
+        )
+        guard let events = try? context.fetch(descriptor), !events.isEmpty else { return .empty }
+
+        let objectKeySet = Set(careObjectKeys)
+        return events.reduce(into: PersistedBudgetUsage()) { usage, event in
+            switch event.scope {
+            case .household:
+                usage.householdXP += event.growthXPUsed
+                usage.householdCoconuts += event.coconutUsed
+                usage.luckyCoconuts += event.luckyCoconutUsed
+            case .member:
+                guard event.scopeKey == memberKey else { return }
+                usage.memberXP += event.growthXPUsed
+                usage.memberCoconuts += event.coconutUsed
+            case .careObject:
+                guard objectKeySet.contains(event.scopeKey) else { return }
+                usage.careObjectXP[event.scopeKey, default: 0] += event.growthXPUsed
+                usage.careObjectCoconuts[event.scopeKey, default: 0] += event.coconutUsed
+            }
+        }
+    }
+
+    private static func mergedCareObjectUsage(
+        defaults: [String: Int],
+        persisted: [String: Int],
+        keys: [String]
+    ) -> [String: Int] {
+        Dictionary(uniqueKeysWithValues: keys.map { key in
+            (key, max(defaults[key] ?? 0, persisted[key] ?? 0))
+        })
+    }
+
+    private static func persistUsage(
+        _ result: EconomyRewardResult,
+        householdKey: String,
+        memberKey: String,
+        careObjectKeys: [String],
+        date: Date,
+        context: ModelContext?,
+        save: Bool
+    ) {
+        guard result.growthXP > 0 || result.totalCoconuts > 0 || result.luckyCoconuts > 0,
+              let context else { return }
+
+        let day = dayKey(for: date)
+        let now = Date()
+        let metadataJSON = result.metadataJSON
+        context.insert(
+            EconomyBudgetUsageEvent(
+                dayKey: day,
+                householdKey: householdKey,
+                memberKey: memberKey,
+                scope: .household,
+                scopeKey: householdKey,
+                growthXPUsed: result.growthXP,
+                coconutUsed: result.totalCoconuts,
+                luckyCoconutUsed: result.luckyCoconuts,
+                actionKey: result.actionKey,
+                source: "economyReward",
+                metadataJSON: metadataJSON,
+                occurredAt: date,
+                createdAt: now
+            )
+        )
+        context.insert(
+            EconomyBudgetUsageEvent(
+                dayKey: day,
+                householdKey: householdKey,
+                memberKey: memberKey,
+                scope: .member,
+                scopeKey: memberKey,
+                growthXPUsed: result.growthXP,
+                coconutUsed: result.totalCoconuts,
+                actionKey: result.actionKey,
+                source: "economyReward",
+                metadataJSON: metadataJSON,
+                occurredAt: date,
+                createdAt: now
+            )
+        )
+        let objectXP = distribute(result.growthXP, across: careObjectKeys)
+        let objectCoconuts = distribute(result.totalCoconuts, across: careObjectKeys)
+        for objectKey in Set(objectXP.keys).union(objectCoconuts.keys).sorted() {
+            let xpAmount = objectXP[objectKey] ?? 0
+            let coconutAmount = objectCoconuts[objectKey] ?? 0
+            context.insert(
+                EconomyBudgetUsageEvent(
+                    dayKey: day,
+                    householdKey: householdKey,
+                    memberKey: memberKey,
+                    careObjectKey: objectKey,
+                    scope: .careObject,
+                    scopeKey: objectKey,
+                    growthXPUsed: xpAmount,
+                    coconutUsed: coconutAmount,
+                    actionKey: result.actionKey,
+                    source: "economyReward",
+                    metadataJSON: metadataJSON,
+                    occurredAt: date,
+                    createdAt: now
+                )
+            )
+        }
+        if save {
+            context.safeSave()
+        }
+    }
+
     private static func distribute(_ total: Int, across keys: [String]) -> [String: Int] {
         guard total > 0, !keys.isEmpty else { return [:] }
         let base = total / keys.count
@@ -468,7 +734,8 @@ enum CoconutEconomyPolicyV2 {
         hasHumanAccount: Bool,
         hasPetAccount: Bool,
         date: Date = Date(),
-        forcedLuck: EconomyLuckTier? = nil
+        forcedLuck: EconomyLuckTier? = nil,
+        context: ModelContext? = nil
     ) -> EconomyRewardResult {
         reward(
             base: baseReward(for: type),
@@ -481,7 +748,8 @@ enum CoconutEconomyPolicyV2 {
             hasHumanAccount: hasHumanAccount,
             hasPetAccount: hasPetAccount,
             date: date,
-            forcedLuck: forcedLuck
+            forcedLuck: forcedLuck,
+            context: context
         )
     }
 
@@ -496,7 +764,8 @@ enum CoconutEconomyPolicyV2 {
         careObjectCount: Int,
         hasHumanAccount: Bool,
         date: Date = Date(),
-        forcedLuck: EconomyLuckTier? = nil
+        forcedLuck: EconomyLuckTier? = nil,
+        context: ModelContext? = nil
     ) -> EconomyRewardResult {
         let base = baseReward(for: type)
         let petCount = max(1, targetCount)
@@ -518,7 +787,8 @@ enum CoconutEconomyPolicyV2 {
             hasHumanAccount: hasHumanAccount,
             hasPetAccount: true,
             date: date,
-            forcedLuck: forcedLuck
+            forcedLuck: forcedLuck,
+            context: context
         )
     }
 
@@ -533,7 +803,8 @@ enum CoconutEconomyPolicyV2 {
         hasHumanAccount: Bool,
         hasPetAccount: Bool,
         date: Date,
-        forcedLuck: EconomyLuckTier?
+        forcedLuck: EconomyLuckTier?,
+        context: ModelContext?
     ) -> EconomyRewardResult {
         let qualitySteps = qualityBonusSteps(for: quality)
         let qualityMultiplier = 1.0 + Double(qualitySteps) * 0.1
@@ -544,7 +815,8 @@ enum CoconutEconomyPolicyV2 {
             memberKey: memberKey ?? userKey,
             careObjectKeys: careObjectKeys,
             careObjectCount: careObjectCount,
-            date: date
+            date: date,
+            context: context
         )
         let budgetStage = isOnCooldown ? EconomyBudgetStage.cooldown : budget.budgetStage
 
@@ -646,10 +918,10 @@ enum CoconutEconomyPolicyV2 {
                 return BaseReward(actionKey: "brushing", growthXP: 10, coconuts: 5, humanShare: 3, petShare: 2)
             }
         case let .walk(distanceMeters):
-            let xp = min(20, max(8, Int(distanceMeters / 250)))
-            let coconuts = min(14, max(5, Int(distanceMeters / 350)))
-            let pet = max(1, coconuts / 3)
-            return BaseReward(actionKey: "walk", growthXP: xp, coconuts: coconuts, humanShare: coconuts - pet, petShare: pet)
+            let xp = CoconutWalkRewardPolicy.baseGrowthXP(for: distanceMeters)
+            let coconuts = CoconutWalkRewardPolicy.baseCoconuts(for: distanceMeters)
+            let split = CoconutWalkRewardPolicy.splitCoconuts(total: coconuts)
+            return BaseReward(actionKey: "walk", growthXP: xp, coconuts: coconuts, humanShare: split.human, petShare: split.pet)
         case .health:
             return BaseReward(actionKey: "health", growthXP: 16, coconuts: 10, humanShare: 8, petShare: 2)
         case .expense:

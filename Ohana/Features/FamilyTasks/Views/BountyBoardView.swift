@@ -15,6 +15,7 @@ struct BountyBoardContentView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("bountyTasks") private var tasksRaw: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
@@ -428,7 +429,8 @@ struct BountyBoardContentView: View {
             id: id,
             in: tasks,
             activeHumanId: activeHumanId,
-            currentHuman: currentHuman
+            currentHuman: currentHuman,
+            context: modelContext
         ) else { return }
         tasksRaw = raw
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()

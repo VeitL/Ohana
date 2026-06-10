@@ -47,7 +47,8 @@ extension QuestManager {
             careObjectKeys: objectKeys,
             careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
             hasHumanAccount: human != nil,
-            forcedLuck: consumesBoost ? .golden : nil
+            forcedLuck: consumesBoost ? .golden : nil,
+            context: context
         )
         lastEconomyRewardResult = result
         let petAwards = Self.distribute(result.petCoconuts, count: livePets.count)
@@ -127,16 +128,32 @@ extension QuestManager {
                 updatesProjection: true,
                 projectionManager: self
             )
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: budgetKeys.household,
+                memberKey: budgetKeys.member,
+                careObjectKeys: objectKeys,
+                context: context,
+                save: false,
+                writeDefaults: false
+            )
             try context.save()
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: budgetKeys.household,
+                memberKey: budgetKeys.member,
+                careObjectKeys: objectKeys,
+                context: nil,
+                save: false
+            )
             if consumesBoost {
                 clearDoubleRewardBoost()
             }
-            EconomyDailyBudgetStore.commit(result, householdKey: budgetKeys.household, memberKey: budgetKeys.member, careObjectKeys: objectKeys)
             for pet in livePets {
                 if !isOnCooldown(petId: pet.id, type: type) {
                     recordCooldown(petId: pet.id, type: type)
                 }
-                streakRewards.checkAndAward(pet: pet, questManager: self)
+                streakRewards.checkAndAward(pet: pet, questManager: self, context: context)
             }
             postEconomyFeedback(
                 result,
@@ -147,10 +164,12 @@ extension QuestManager {
             )
         } catch {
             context.rollback()
+            lastEconomyRewardResult = .empty
             wallet.refreshQuestProjection(context: context, manager: self)
             #if DEBUG
                 OhanaLog.error("[batchAward] save failed: \(error)", category: "Economy")
             #endif
+            return (0, 0)
         }
 
         // 震动反馈

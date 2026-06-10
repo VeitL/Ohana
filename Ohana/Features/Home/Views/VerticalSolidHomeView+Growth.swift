@@ -7,41 +7,6 @@ import SwiftData
 import SwiftUI
 
 extension VerticalSolidHomeView {
-    func openGrowthDailyLoop(
-        hasAnyMember: Bool,
-        pendingFocusCount: Int,
-        currentLevel: Int
-    ) {
-        closeVerticalFabMenu(immediate: true)
-        guard hasAnyMember else {
-            routeCoordinator.openAddEntity(.pet)
-            return
-        }
-
-        let destination: FMDest = pendingFocusCount > 0
-            ? .featureGroup(.dailyCare)
-            : AppFeatureRouteGuard.recommendedDestination(
-                for: AppFeatureRouteGuard.currentGrowthStep(currentLevel: currentLevel),
-                currentLevel: currentLevel
-            )
-        openFunctionMenu(destination: destination)
-    }
-
-    func openHeaderTreeLevelDestination(hasAnyMember: Bool) {
-        closeVerticalFabMenu(immediate: true)
-        guard hasAnyMember else {
-            OhanaFrameScheduler.runAfterNextFrame {
-                routeCoordinator.openAddEntity(.pet)
-            }
-            return
-        }
-
-        OhanaFrameScheduler.runAfterNextFrame {
-            AppPerformanceMonitor.shared.record("growth_roadmap_opened", valueMS: 0, note: "homeHeader")
-            openFunctionMenu(destination: .growthRoadmap)
-        }
-    }
-
     func openCalendarAddEvent() {
         guard !isCalendarAddEventPresented else { return }
         closeVerticalFabMenu(immediate: true)

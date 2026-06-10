@@ -18,8 +18,10 @@ struct OasisRewardCommandExecutor {
     }
 
     func currentHumanCoconutBalance(humans: [Human], currentActiveHumanId: String) -> Int {
-        humans.first { $0.id.uuidString == currentActiveHumanId }?.coconutBalance
-            ?? rewards.currentHumanBalance(context: context)
+        guard let human = humans.first(where: { $0.id.uuidString == currentActiveHumanId }) else {
+            return rewards.currentHumanBalance(context: context)
+        }
+        return CoconutWalletService.balance(for: human, context: context)
     }
 
     func makeActionSnapshot(
@@ -127,29 +129,49 @@ struct OasisRewardCommandExecutor {
 
     func awardHarvestedTreeCoconuts(_ amount: Int) {
         guard amount > 0 else { return }
-        rewards.awardCurrentHumanCoconuts(
+        guard rewards.awardCurrentHumanCoconuts(
             amount,
             emoji: "🥥",
             title: "摘下椰子 +\(amount)🥥",
             context: context,
             postsRewardFeedback: false
-        )
-        context.safeSave()
+        ) else {
+            context.rollback()
+            rewards.refreshCoconutProjection(context: context)
+            return
+        }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            rewards.refreshCoconutProjection(context: context)
+        }
     }
 
     func harvestDailyTreeCoconuts(treeManager: OasisTreeManaging) -> Bool {
         guard treeManager.canHarvestToday else { return false }
         let amount = treeManager.passiveIncomeAmount
         guard amount > 0 else { return false }
-        treeManager.markDailyPassiveIncomeHarvested(date: Date())
-        rewards.awardCurrentHumanCoconuts(
+        let harvestDate = Date()
+        guard rewards.awardCurrentHumanCoconuts(
             amount,
             emoji: "🌳",
             title: "生命之树的馈赠 +\(amount)🥥",
             context: context,
             postsRewardFeedback: false
-        )
-        context.safeSave()
+        ) else {
+            context.rollback()
+            rewards.refreshCoconutProjection(context: context)
+            return false
+        }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            rewards.refreshCoconutProjection(context: context)
+            return false
+        }
+        treeManager.markDailyPassiveIncomeHarvested(date: harvestDate)
         return true
     }
 
@@ -215,15 +237,25 @@ struct OasisRewardCommandExecutor {
         guard !checkedInDates.contains(today) else { return nil }
         var updatedDates = checkedInDates
         updatedDates.insert(today)
-        CheckInStreakStore.setCheckedInDates(updatedDates, for: currentActiveHumanId)
-        rewards.awardCurrentHumanCoconuts(
+        guard rewards.awardCurrentHumanCoconuts(
             1,
             emoji: "📅",
             title: "每日打卡奖励",
             context: context,
             postsRewardFeedback: true
-        )
-        context.safeSave()
+        ) else {
+            context.rollback()
+            rewards.refreshCoconutProjection(context: context)
+            return nil
+        }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            rewards.refreshCoconutProjection(context: context)
+            return nil
+        }
+        CheckInStreakStore.setCheckedInDates(updatedDates, for: currentActiveHumanId)
         return updatedDates
     }
 
@@ -244,14 +276,24 @@ struct OasisRewardCommandExecutor {
     }
 
     func claimMilestone(days: Int, reward: Int, emoji: String, currentActiveHumanId: String) {
-        rewards.awardCurrentHumanCoconuts(
+        guard rewards.awardCurrentHumanCoconuts(
             reward,
             emoji: emoji,
             title: "\(days)天连胜奖励",
             context: context,
             postsRewardFeedback: true
-        )
-        context.safeSave()
+        ) else {
+            context.rollback()
+            rewards.refreshCoconutProjection(context: context)
+            return
+        }
+        do {
+            try context.save()
+        } catch {
+            context.rollback()
+            rewards.refreshCoconutProjection(context: context)
+            return
+        }
         CheckInStreakStore.setLastClaimedMilestone(days, for: currentActiveHumanId)
     }
 }

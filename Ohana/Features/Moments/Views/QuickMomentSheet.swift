@@ -476,7 +476,7 @@ struct QuickMomentSheet: View {
             }
             .padding(10)
         }
-        .frame(width: min(ScreenCompat.width - 64, 320), height: 240)
+        .frame(width: max(0, min(ScreenCompat.width - 64, 320)), height: 240)
         .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)

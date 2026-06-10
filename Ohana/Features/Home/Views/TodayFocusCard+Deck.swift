@@ -15,6 +15,9 @@ extension TodayFocusCard {
         let negativeSignals: [IslandNegativeSignal]
         let cards: [TodayFocusContent]
         let identity: String
+        private static let maxNegativeCards = 2
+        private static let maxFamilyTaskCards = 3
+        private static let maxExchangeCards = 2
 
         static func make(
             snapshot: TodayFocusSnapshot,
@@ -26,16 +29,16 @@ extension TodayFocusCard {
             }
             let assignedFamilyTasks = snapshot.assignedFamilyTasks.filter {
                 !skippedFocusKeys.contains(TodayFocusCard.familyTaskSkipKey(for: $0))
-            }
+            }.prefix(maxFamilyTaskCards)
             let pendingExchangeRequests = snapshot.pendingExchangeRequests.filter {
                 !skippedFocusKeys.contains(TodayFocusCard.exchangeSkipKey(for: $0))
-            }
+            }.prefix(maxExchangeCards)
             let negativeSignals = snapshot.negativeSignals.filter {
                 !closedNegativeKeys.contains(TodayFocusCard.negativeSkipKey(for: $0))
-            }
+            }.prefix(maxNegativeCards)
 
             let cards: [TodayFocusContent] = if !negativeSignals.isEmpty {
-                negativeSignals.prefix(2).map { .negative($0) } +
+                negativeSignals.map { .negative($0) } +
                     assignedFamilyTasks.map { .familyTask($0) } +
                     pendingExchangeRequests.map { .coconutExchange($0) } +
                     pendingQuests.map { .quest($0) }
@@ -56,9 +59,9 @@ extension TodayFocusCard {
 
             return TodayFocusRenderDeck(
                 pendingQuests: pendingQuests,
-                assignedFamilyTasks: assignedFamilyTasks,
-                pendingExchangeRequests: pendingExchangeRequests,
-                negativeSignals: negativeSignals,
+                assignedFamilyTasks: Array(assignedFamilyTasks),
+                pendingExchangeRequests: Array(pendingExchangeRequests),
+                negativeSignals: Array(negativeSignals),
                 cards: cards,
                 identity: cards.map { TodayFocusCard.contentKey(for: $0) }.joined(separator: "|")
             )

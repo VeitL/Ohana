@@ -30,7 +30,11 @@ struct CoconutRulesSheet: View {
                 title: l.tr(zh: "遛狗", en: "Dog walk", de: "Gassi"),
                 desc: l.tr(zh: "带毛孩子出门溜达", en: "Take a pet outside", de: "Mit Haustier rausgehen"),
                 glowColor: Color(hex: "14B8A6"),
-                reward: l.tr(zh: "每 100m 得 1🥥", en: "1🥥 per 100m", de: "1🥥 je 100 m")
+                reward: l.tr(
+                    zh: "基础 5-14🥥 · 约每 350m 递增",
+                    en: "Base 5-14🥥 · about +1 per 350m",
+                    de: "Basis 5-14🥥 · ca. +1 je 350 m"
+                )
             ),
             RuleCard(
                 icon: "fork.knife",

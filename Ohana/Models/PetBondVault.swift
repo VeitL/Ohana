@@ -15,6 +15,7 @@ enum PetBondVaultItemKind: String, CaseIterable, Hashable {
     case storyStyle = "story_style"
     case oasisNest = "oasis_nest"
     case memorialFrame = "memorial_frame"
+    case bondTreat = "bond_treat"
 }
 
 enum PetBondVaultPreviewKind: String, Hashable {
@@ -23,6 +24,7 @@ enum PetBondVaultPreviewKind: String, Hashable {
     case storyStyleAnimation
     case oasisNest
     case memorialFrame
+    case bondTreat
 }
 
 struct PetBondVaultItem: Identifiable, Hashable {
@@ -32,6 +34,7 @@ struct PetBondVaultItem: Identifiable, Hashable {
     let cost: Int
     let icon: String
     let tintHex: String
+    let isRepeatable: Bool
 
     var id: String { kind.rawValue }
     var previewKind: PetBondVaultPreviewKind {
@@ -41,7 +44,26 @@ struct PetBondVaultItem: Identifiable, Hashable {
         case .storyStyle: .storyStyleAnimation
         case .oasisNest: .oasisNest
         case .memorialFrame: .memorialFrame
+        case .bondTreat: .bondTreat
         }
+    }
+
+    init(
+        kind: PetBondVaultItemKind,
+        title: AppLocalizedText,
+        subtitle: AppLocalizedText,
+        cost: Int,
+        icon: String,
+        tintHex: String,
+        isRepeatable: Bool = false
+    ) {
+        self.kind = kind
+        self.title = title
+        self.subtitle = subtitle
+        self.cost = cost
+        self.icon = icon
+        self.tintHex = tintHex
+        self.isRepeatable = isRepeatable
     }
 }
 
@@ -86,6 +108,19 @@ enum PetBondVaultCatalog {
             cost: 260,
             icon: "rainbow",
             tintHex: "A78BFA"
+        ),
+        PetBondVaultItem(
+            kind: .bondTreat,
+            title: AppLocalizedText(zh: "羁绊点心", en: "Bond Treat", de: "Bindungs-Snack"),
+            subtitle: AppLocalizedText(
+                zh: "可重复投喂，给成长椰子一个长期出口",
+                en: "Repeatable treat for a long-term bond coconut sink",
+                de: "Wiederholbarer Snack als langfristiger Bindungs-Kokos-Abfluss"
+            ),
+            cost: 80,
+            icon: "heart.fill",
+            tintHex: "22C55E",
+            isRepeatable: true
         )
     ]
 }
@@ -103,5 +138,13 @@ enum PetBondVaultStore {
 
     static func unlock(_ kind: PetBondVaultItemKind, for petId: UUID) {
         PetBondVaultPreferenceStore.unlock(kind, for: petId)
+    }
+
+    static func consumptionCount(_ kind: PetBondVaultItemKind, for petId: UUID) -> Int {
+        PetBondVaultPreferenceStore.consumptionCount(kind, for: petId)
+    }
+
+    static func consume(_ kind: PetBondVaultItemKind, for petId: UUID) {
+        PetBondVaultPreferenceStore.consume(kind, for: petId)
     }
 }

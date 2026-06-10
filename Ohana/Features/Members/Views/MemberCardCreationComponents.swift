@@ -136,6 +136,7 @@ struct MemberCreationStepIndicator: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(height: 42, alignment: .bottom)
     }
 }
 
@@ -149,6 +150,7 @@ struct MemberCompactDateRow: View {
     let secondaryForeground: Color
     let fill: Color
     let stroke: Color
+    let accent: Color
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
@@ -182,7 +184,8 @@ struct MemberCompactDateRow: View {
 
             Toggle(title, isOn: $isEnabled)
                 .labelsHidden()
-                .tint(foreground)
+                .tint(accent)
+                .accessibilityLabel(title)
         }
         .padding(.horizontal, 12)
         .frame(height: 48)
@@ -192,29 +195,24 @@ struct MemberCompactDateRow: View {
                 .strokeBorder(stroke, lineWidth: 1)
         }
         .animation(GoMotion.selection, value: isEnabled)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(isEnabled ? "\(title), \(formattedDate)" : title)
+        .accessibilityElement(children: .contain)
     }
 
     private var iconDatePicker: some View {
-        ZStack {
-            DatePicker("", selection: $date, in: range, displayedComponents: .date)
-                .datePickerStyle(.compact)
-                .labelsHidden()
-                .environment(\.locale, AppLanguage.effectiveLocale)
-                .tint(foreground)
-                .frame(width: 44, height: 38, alignment: .trailing)
-                .clipped()
-                .opacity(0.015)
-                .accessibilityLabel(formattedDate)
-
-            Image(systemName: "calendar").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
-                .foregroundStyle(foreground)
-                .frame(width: 44, height: 38)
-                .allowsHitTesting(false)
-        }
-        .frame(width: 44, height: 38)
+        DatePicker("", selection: $date, in: range, displayedComponents: .date)
+            .datePickerStyle(.compact)
+            .labelsHidden()
+            .environment(\.locale, AppLanguage.effectiveLocale)
+            .tint(accent)
+            .font(OhanaFont.caption(.black))
+            .foregroundStyle(foreground)
+            .frame(minWidth: 118, maxWidth: 136, minHeight: 38, alignment: .trailing)
+            .background(secondaryForeground.opacity(0.12), in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(accent.opacity(0.28), lineWidth: 1)
+            }
+            .accessibilityLabel("\(title), \(formattedDate)")
     }
 }
 
@@ -661,18 +659,17 @@ struct MemberCreationJoinHandoffModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let p = easedProgress
-        let scale = reduceMotion ? mix(1, 0.72, p) : mix(1, 0.36, p)
-        let flip = reduceMotion ? 0 : Double(mix(0, -82, p))
-        let turn = reduceMotion ? 0 : Double(mix(0, -5, p))
-        let x = reduceMotion ? CGFloat(0) : mix(0, 22, p)
-        let y = reduceMotion ? mix(0, -10, p) : mix(0, -72, p)
-        let opacity = reduceMotion ? Double(mix(1, 0.38, p)) : Double(mix(1, 0.12, p))
+        let scale = reduceMotion ? mix(1, 0.82, p) : mix(1, 0.64, p)
+        let y = reduceMotion ? mix(0, 10, p) : mix(0, 42, p)
+        let rotation = reduceMotion ? Double(0) : Double(mix(0, 7, p))
+        let flip = reduceMotion ? Double(0) : Double(mix(0, -76, p))
+        let opacity = reduceMotion ? Double(mix(1, 0.68, p)) : Double(mix(1, 0.18, p))
 
         content
+            .rotationEffect(.degrees(rotation))
+            .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0), perspective: 0.72)
             .scaleEffect(scale, anchor: .center)
-            .rotation3DEffect(.degrees(flip), axis: (x: 0.06, y: 1, z: 0), perspective: 0.78)
-            .rotationEffect(.degrees(turn))
-            .offset(x: x, y: y)
+            .offset(y: y)
             .opacity(opacity)
             .zIndex(progress > 0 ? 20 : 0)
     }
@@ -744,7 +741,6 @@ struct MemberCreationJoinHandoffCard: View {
                     RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                         .strokeBorder(Color.goCardWhite.opacity(0.24), lineWidth: 1)
                 }
-                .shadow(color: Color.arkInk.opacity(0.20), radius: 22, x: 0, y: 14) // ui-v4: allow lightweight handoff card depth
         }
     }
 

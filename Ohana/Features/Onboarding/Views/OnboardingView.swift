@@ -95,11 +95,45 @@ struct OnboardingView: View {
 
     @State private var iconPulse = false
     @State private var introPageIndex = 0
+    @State private var introDragOffset: CGFloat = 0
+    @State private var flipProgress: CGFloat = 0
+    @State private var flipTask: Task<Void, Never>?
+    @State private var isFlippingToProfile = false
+    @State private var isProfilePrepared = false
     private let introPageCount = 3
 
     private var languageCode: String { AppLanguage.normalize(appLanguage) }
     private var shouldReduceWork: Bool {
         powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
+    }
+
+    private var flipAnimation: Animation {
+        shouldReduceWork ? GoMotion.reduced : .easeInOut(duration: 0.42)
+    }
+
+    private var flipDurationMilliseconds: UInt64 { shouldReduceWork ? 120 : 420 }
+
+    private var isCardFlipActive: Bool {
+        isFlippingToProfile || isProfilePrepared
+    }
+
+    private var introSideOpacity: Double {
+        guard isCardFlipActive else { return 1 }
+        return flipProgress < 0.52 ? 1 : 0
+    }
+
+    private var profileSideOpacity: Double {
+        guard isCardFlipActive else { return 1 }
+        return flipProgress > 0.48 ? 1 : 0
+    }
+
+    private var introCardFlipAngle: Double {
+        guard isCardFlipActive, !shouldReduceWork else { return 0 }
+        return -180 * Double(flipProgress)
+    }
+
+    private var profileCardFlipProgress: CGFloat? {
+        isCardFlipActive ? flipProgress : nil
     }
 
     private func localized(zh: String, en: String, de: String) -> String {
@@ -127,98 +161,214 @@ struct OnboardingView: View {
                 finishOnboarding(playsFeedback: false)
             }
         }
+        .onDisappear {
+            flipTask?.cancel()
+        }
     }
 
     @ViewBuilder
     private var content: some View {
-        switch step {
-        case .intro:
-            introFlow
-                .transition(.asymmetric(
-                    insertion: .move(edge: .leading).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
-        case .profile:
-            humanOnboardingWizard
-                .transition(.opacity)
+        ZStack {
+            if step == .intro || isFlippingToProfile {
+                introFlow
+                    .opacity(introSideOpacity)
+                    .allowsHitTesting(step == .intro && !isFlippingToProfile)
+                    .transition(.identity)
+            }
+
+            if step == .profile || isProfilePrepared {
+                humanOnboardingWizard
+                    .opacity(profileSideOpacity)
+                    .allowsHitTesting(step == .profile && !isFlippingToProfile)
+                    .transition(.identity)
+            }
         }
     }
 
     /// 与「添加家人 → 家庭成员」相同的完整人类向导，完成后绑定为当前设备主人
     private var humanOnboardingWizard: some View {
-        NavigationStack {
-            ZStack {
-                OhanaAppBackground()
-                    .ignoresSafeArea()
-                AddHumanWizardView(
-                    onComplete: {
-                        finishOnboarding()
-                    },
-                    onHumanSaved: { human in
-                        currentActiveHumanId = human.id.uuidString
-                    }
-                )
-                .id(humanWizardSessionId)
-            }
-            .navigationTitle(localized(zh: "本人档案", en: "Your Profile", de: "Dein Profil"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        withAnimation(GoMotion.page) { step = .intro }
-                    } label: {
-                        Image(systemName: "chevron.left") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.goPrimary)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Circle())
-                    }
-                    .accessibilityLabel(localized(zh: "返回", en: "Back", de: "Zurück"))
-                }
-            }
-        }
-        .preferredColorScheme(.dark)
+        AddHumanWizardView(
+            onComplete: {
+                finishOnboarding()
+            },
+            onCancel: {
+                returnToIntro()
+            },
+            onHumanSaved: { human in
+                currentActiveHumanId = human.id.uuidString
+            },
+            presentationStyle: .onboarding
+        )
+        .id(humanWizardSessionId)
         .environment(\.colorScheme, .dark)
+        .environment(\.memberCreationCardFlipProgress, profileCardFlipProgress)
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Intro flow
 
     private var introFlow: some View {
         GeometryReader { proxy in
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    HStack {
-                        OhanaIconView(size: 38)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 54)
-
-                    Spacer(minLength: 18)
-
-                    TabView(selection: $introPageIndex) {
-                        ForEach(0 ..< introPageCount, id: \.self) { index in
-                            introPageContent(index)
-                                .tag(index)
-                                .padding(.horizontal, 20)
-                        }
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-                    .frame(height: min(max(proxy.size.height * 0.68, 440), 590))
-
-                    introPageDots
-                        .padding(.top, 12)
-
-                    Spacer(minLength: 20)
-
-                    ctaArea
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 42)
-                }
-                .frame(minHeight: proxy.size.height)
+            let cardWidth = min(proxy.size.width - 32, 390)
+            VStack(spacing: 12) {
+                onboardingIntroCard(width: cardWidth)
+                    .frame(maxWidth: 390)
+                    .frame(maxHeight: .infinity)
+                    .rotation3DEffect(
+                        .degrees(introCardFlipAngle),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.78
+                    )
+                onboardingIntroActions(width: cardWidth)
+                    .opacity(introSideOpacity)
+                    .allowsHitTesting(!isCardFlipActive && step == .intro)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
+    }
+
+    private func onboardingIntroCard(width: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            onboardingIntroHeader
+                .padding(.horizontal, 22)
+                .padding(.top, 22)
+
+            onboardingIntroPager
+                .padding(.top, 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            introPageDots
+                .padding(.horizontal, 20)
+                .padding(.bottom, 22)
+        }
+        .frame(width: width)
+        .frame(maxHeight: .infinity)
+        .background(OnboardingPalette.panelFill, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
+                .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
+        )
+        .shadow(color: OnboardingPalette.cardShadow, radius: 24, y: 16) // ui-v4: allow onboarding fixed card lift
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous))
+        .gesture(introSwipeGesture(pageWidth: width))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var onboardingIntroHeader: some View {
+        HStack(spacing: 10) {
+            OhanaIconView(size: 38)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(localized(zh: "欢迎来到 Ohana", en: "Welcome to Ohana", de: "Willkommen bei Ohana"))
+                    .font(OhanaFont.headline(.black))
+                    .foregroundStyle(OnboardingPalette.primaryText)
+                    .lineLimit(1)
+                Text(localized(zh: "左右滑动了解核心体验", en: "Swipe through the essentials", de: "Wische durch die Grundlagen"))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(OnboardingPalette.tertiaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var onboardingIntroPager: some View {
+        GeometryReader { proxy in
+            let pageWidth = proxy.size.width
+            HStack(spacing: 0) {
+                ForEach(0 ..< introPageCount, id: \.self) { index in
+                    introPageContent(index)
+                        .frame(width: pageWidth, height: proxy.size.height)
+                }
+            }
+            .offset(x: -CGFloat(introPageIndex) * pageWidth + introDragOffset)
+            .animation(GoMotion.page, value: introPageIndex)
+        }
+        .clipped()
+    }
+
+    private func onboardingIntroActions(width: CGFloat) -> some View {
+        HStack(spacing: 10) {
+            if isReplay {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onReplayFinished?()
+                } label: {
+                    Text(localized(zh: "关闭", en: "Close", de: "Schliessen"))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(OnboardingPalette.primaryText.opacity(0.72))
+                        .frame(width: 104, height: 54)
+                        .background(OnboardingPalette.mutedFill, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+
+            Button(action: advanceFromWelcome) {
+                HStack(spacing: 8) {
+                    Text(introPageIndex < introPageCount - 1
+                        ? localized(zh: "下一页", en: "Next", de: "Weiter")
+                        : localized(zh: "建立本人档案", en: "Create profile", de: "Profil erstellen"))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                    Image(systemName: introPageIndex < introPageCount - 1 ? "chevron.right" : "arrow.right")
+                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                }
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(OnboardingPalette.selectedText)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(Color.goLime, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .disabled(isFlippingToProfile)
+        }
+        .frame(width: width)
+    }
+
+    private func introSwipeGesture(pageWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .onChanged { value in
+                guard !isFlippingToProfile else { return }
+                let translation = value.translation.width
+                guard abs(translation) > abs(value.translation.height) else { return }
+                let isPullingPastStart = introPageIndex == 0 && translation > 0
+                let isPullingPastEnd = introPageIndex == introPageCount - 1 && translation < 0
+                introDragOffset = (isPullingPastStart || isPullingPastEnd) ? translation * 0.32 : translation
+            }
+            .onEnded { value in
+                guard !isFlippingToProfile else { return }
+                let translation = value.translation.width
+                let threshold = max(pageWidth * 0.18, 58)
+                if translation < -threshold {
+                    if introPageIndex < introPageCount - 1 {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        withAnimation(GoMotion.page) {
+                            introPageIndex += 1
+                            introDragOffset = 0
+                        }
+                    } else {
+                        withAnimation(GoMotion.feedback) {
+                            introDragOffset = 0
+                        }
+                        startProfileSetup()
+                    }
+                } else if translation > threshold, introPageIndex > 0 {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    withAnimation(GoMotion.page) {
+                        introPageIndex -= 1
+                        introDragOffset = 0
+                    }
+                } else {
+                    withAnimation(GoMotion.feedback) {
+                        introDragOffset = 0
+                    }
+                }
+            }
     }
 
     @ViewBuilder
@@ -305,14 +455,9 @@ struct OnboardingView: View {
                 }
             }
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, minHeight: 420)
-        .background(OnboardingPalette.panelFill, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
-                .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
-        )
-        .shadow(color: OnboardingPalette.cardShadow, radius: 20, y: 12) // ui-v4: allow onboarding primary card lift
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func onboardingHeroGlyphCluster(
@@ -404,46 +549,6 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - CTA area
-
-    private var ctaArea: some View {
-        VStack(spacing: 12) {
-            Button(action: advanceFromWelcome) {
-                HStack(spacing: 8) {
-                    Text(introPageIndex < introPageCount - 1
-                        ? localized(zh: "下一页", en: "Next", de: "Weiter")
-                        : localized(zh: "建立本人档案", en: "Create profile", de: "Profil erstellen"))
-                        .font(OhanaFont.title3(.black))
-                        .foregroundStyle(OnboardingPalette.selectedText)
-                    Image(systemName: introPageIndex < introPageCount - 1 ? "chevron.right" : "arrow.right")
-                        .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(OnboardingPalette.selectedText)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 17)
-                .background(Color.goLime, in: Capsule())
-            }
-
-            if isReplay {
-                Button(localized(zh: "关闭", en: "Close", de: "Schliessen")) {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    onReplayFinished?()
-                }
-                .font(OhanaFont.subheadline(.bold))
-                .foregroundStyle(OnboardingPalette.secondaryText)
-            } else {
-                Text(localized(
-                    zh: "本地优先 · 无需账号",
-                    en: "Local-first · No account",
-                    de: "Lokal zuerst · Kein Konto"
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(OnboardingPalette.tertiaryText)
-                .multilineTextAlignment(.center)
-            }
-        }
-    }
-
     private func advanceFromWelcome() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         guard introPageIndex >= introPageCount - 1 else {
@@ -456,8 +561,41 @@ struct OnboardingView: View {
     }
 
     private func startProfileSetup() {
+        guard !isFlippingToProfile else { return }
+        flipTask?.cancel()
         humanWizardSessionId = UUID()
-        withAnimation(GoMotion.page) { step = .profile }
+        flipProgress = 0
+        isProfilePrepared = true
+        isFlippingToProfile = true
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        flipTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 20 : 70) {
+            withAnimation(flipAnimation) {
+                flipProgress = 1
+            }
+            flipTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: flipDurationMilliseconds) {
+                step = .profile
+                isFlippingToProfile = false
+                isProfilePrepared = false
+                introDragOffset = 0
+            }
+        }
+    }
+
+    private func returnToIntro() {
+        flipTask?.cancel()
+        isProfilePrepared = true
+        isFlippingToProfile = true
+        flipTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: shouldReduceWork ? 20 : 70) {
+            withAnimation(flipAnimation) {
+                flipProgress = 0
+            }
+            flipTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: flipDurationMilliseconds) {
+                step = .intro
+                isFlippingToProfile = false
+                isProfilePrepared = false
+                introDragOffset = 0
+            }
+        }
     }
 
     private func finishOnboarding(playsFeedback: Bool = true) {

@@ -8,6 +8,7 @@ struct MemberCardCreationView: View {
     var onPetSaved: ((Pet) -> Void)?
     var onHumanSaved: ((Human) -> Void)?
     private let recoverySessionId: UUID
+    private let presentationStyle: MemberCreationPresentationStyle
 
     @Query(sort: \Pet.createdAt) private var existingPets: [Pet]
     @Query(sort: \Human.createdAt) private var existingHumans: [Human]
@@ -18,7 +19,8 @@ struct MemberCardCreationView: View {
         onCancel: (() -> Void)? = nil,
         onPetSaved: ((Pet) -> Void)? = nil,
         onHumanSaved: ((Human) -> Void)? = nil,
-        recoverySessionId: UUID = UUID()
+        recoverySessionId: UUID = UUID(),
+        presentationStyle: MemberCreationPresentationStyle = .standard
     ) {
         self.kind = kind
         self.onComplete = onComplete
@@ -26,6 +28,7 @@ struct MemberCardCreationView: View {
         self.onPetSaved = onPetSaved
         self.onHumanSaved = onHumanSaved
         self.recoverySessionId = recoverySessionId
+        self.presentationStyle = presentationStyle
     }
 
     var body: some View {
@@ -37,7 +40,8 @@ struct MemberCardCreationView: View {
             onHumanSaved: onHumanSaved,
             existingPets: existingPets,
             existingHumans: existingHumans,
-            recoverySessionId: recoverySessionId
+            recoverySessionId: recoverySessionId,
+            presentationStyle: presentationStyle
         )
     }
 }

@@ -176,7 +176,7 @@ struct HumanBasicInfoDetailContentView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: size - 8, height: size - 8, alignment: .center)
+                    .frame(width: max(0, size - 8), height: max(0, size - 8), alignment: .center)
                     .clipShape(Circle())
             } placeholder: {
                 Text(fallbackEmoji.isEmpty ? "👤" : fallbackEmoji)

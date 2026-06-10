@@ -7,6 +7,20 @@ import SwiftData
 import SwiftUI
 
 extension VerticalSolidHomeView {
+    func scheduleHomeAppearHandoff() {
+        homeAppearHandoffTask?.cancel()
+        homeAppearHandoffTask = OhanaFrameScheduler.runAfterNextFrame {
+            bindHomeAppRouteSink()
+            controller.applySnapshot(makeSnapshot(), signature: dataSignature, force: !controller.snapshot.isReady)
+            AppPerformanceMonitor.shared.record("home_first_render", valueMS: 0)
+            refreshHeaderStreak()
+            controller.startWarmup()
+            scheduleGrowthOnboardingIfNeeded()
+            scheduleGrowthUnlockFeedbackIfNeeded()
+            homeAppearHandoffTask = nil
+        }
+    }
+
     func closeVerticalFabMenu(immediate: Bool) {
         guard fabExpanded || fabMenuItemsVisible else { return }
         if immediate || !canAnimate {
@@ -37,14 +51,6 @@ extension VerticalSolidHomeView {
     static func todayFocusVisualProgress(cardHeroProgress: CGFloat) -> CGFloat {
         let visible = min(max(1 - cardHeroProgress, 0), 1)
         return visible * visible * (3 - 2 * visible)
-    }
-
-    static func growthLoopPendingCount(from snapshot: TodayFocusSnapshot) -> Int {
-        let pendingQuests = snapshot.refreshedQuests.count(where: { !$0.isCompleted })
-        return pendingQuests
-            + snapshot.assignedFamilyTasks.count
-            + snapshot.pendingExchangeRequests.count
-            + snapshot.negativeSignals.count
     }
 
     func preloadFirstScreenAvatars() async {

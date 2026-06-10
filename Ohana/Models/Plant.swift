@@ -53,22 +53,38 @@ final class Plant {
     }
 
     var daysSinceWatered: Int? {
+        daysSinceWatered(on: Date())
+    }
+
+    func daysSinceWatered(on date: Date, calendar: Calendar = .current) -> Int? {
         guard let lastWateredDate else { return nil }
-        return Calendar.current.dateComponents([.day], from: lastWateredDate, to: Date()).day
+        return calendar.dateComponents([.day], from: lastWateredDate, to: date).day
     }
 
     var daysSinceFertilized: Int? {
+        daysSinceFertilized(on: Date())
+    }
+
+    func daysSinceFertilized(on date: Date, calendar: Calendar = .current) -> Int? {
         guard let lastFertilizedDate else { return nil }
-        return Calendar.current.dateComponents([.day], from: lastFertilizedDate, to: Date()).day
+        return calendar.dateComponents([.day], from: lastFertilizedDate, to: date).day
     }
 
     var needsWatering: Bool {
-        guard let days = daysSinceWatered else { return true }
+        needsWatering(on: Date())
+    }
+
+    func needsWatering(on date: Date, calendar: Calendar = .current) -> Bool {
+        guard let days = daysSinceWatered(on: date, calendar: calendar) else { return true }
         return days >= wateringIntervalDays
     }
 
     var needsFertilizing: Bool {
-        guard let days = daysSinceFertilized else { return true }
+        needsFertilizing(on: Date())
+    }
+
+    func needsFertilizing(on date: Date, calendar: Calendar = .current) -> Bool {
+        guard let days = daysSinceFertilized(on: date, calendar: calendar) else { return true }
         return days >= fertilizingIntervalDays
     }
 }

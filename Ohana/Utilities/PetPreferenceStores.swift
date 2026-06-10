@@ -16,8 +16,22 @@ enum PetBondVaultPreferenceStore {
         defaults.set(defaults.integer(forKey: revisionKey) + 1, forKey: revisionKey)
     }
 
+    static func consumptionCount(_ kind: PetBondVaultItemKind, for petId: UUID) -> Int {
+        defaults.integer(forKey: consumptionKey(petId: petId, kind: kind))
+    }
+
+    static func consume(_ kind: PetBondVaultItemKind, for petId: UUID) {
+        let key = consumptionKey(petId: petId, kind: kind)
+        defaults.set(defaults.integer(forKey: key) + 1, forKey: key)
+        defaults.set(defaults.integer(forKey: revisionKey) + 1, forKey: revisionKey)
+    }
+
     private static func key(for petId: UUID) -> String {
         "petBondVaultUnlocked_\(petId.uuidString)"
+    }
+
+    private static func consumptionKey(petId: UUID, kind: PetBondVaultItemKind) -> String {
+        "petBondVaultConsumed_\(petId.uuidString)_\(kind.rawValue)"
     }
 }
 

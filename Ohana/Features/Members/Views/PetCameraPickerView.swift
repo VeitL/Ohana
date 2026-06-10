@@ -8,14 +8,19 @@ import SwiftUI
 import UIKit
 
 @MainActor
+func ohanaCameraHardwareAvailable() -> Bool {
+    guard UIImagePickerController.isSourceTypeAvailable(.camera) else { return false }
+    return AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) != nil ||
+        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil ||
+        AVCaptureDevice.default(for: .video) != nil
+}
+
+@MainActor
 func requestOhanaCameraAccess(
     onGranted: @escaping @MainActor () -> Void,
     onDenied: @escaping @MainActor () -> Void
 ) {
-    guard AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) != nil ||
-        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) != nil ||
-        AVCaptureDevice.default(for: .video) != nil
-    else {
+    guard ohanaCameraHardwareAvailable() else {
         onDenied()
         return
     }
@@ -92,6 +97,10 @@ final class OhanaCameraViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         MemberCreationPerformance.event("Camera Shell Appeared")
+        guard ohanaCameraHardwareAvailable() else {
+            showUnavailableState()
+            return
+        }
         showOpeningState()
         startCamera()
     }

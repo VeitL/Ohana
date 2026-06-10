@@ -28,8 +28,7 @@ struct CoconutBalanceTestContentView: View {
 
     private var currentDisplayAmount: Int {
         if let selectedHuman {
-            return walletAccounts.first { $0.ownerKind == .human && $0.ownerId == selectedHuman.id.uuidString }?.balance
-                ?? selectedHuman.coconutBalance
+            return displayAmount(for: selectedHuman)
         }
         return walletAccounts.reduce(0) { $0 + $1.balance }
     }
@@ -236,7 +235,7 @@ struct CoconutBalanceTestContentView: View {
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                         .lineLimit(1)
-                    Text("\(human.coconutBalance)🥥")
+                    Text("\(displayAmount(for: human))🥥")
                         .font(OhanaFont.caption2(.bold))
                         .foregroundStyle(selected ? Color.ohanaPrimaryActionText.opacity(0.72) : Color.ohanaSecondaryText)
                 }
@@ -321,5 +320,10 @@ struct CoconutBalanceTestContentView: View {
         }
         let trimmed = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? l.tr(zh: "成员", en: "Member", de: "Mitglied") : trimmed
+    }
+
+    private func displayAmount(for human: Human) -> Int {
+        walletAccounts.first { $0.ownerKind == .human && $0.ownerId == human.id.uuidString }?.balance
+            ?? human.coconutBalance
     }
 }

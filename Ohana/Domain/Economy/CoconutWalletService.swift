@@ -256,9 +256,19 @@ enum CoconutWalletService {
         let meaningfulDeltas = deltas.filter { $0.delta != 0 || $0.entryKind == .openingBalance || $0.entryKind == .legacyHistory }
         guard !meaningfulDeltas.isEmpty else { return [] }
 
-        let duplicateEntries = try existingEntries(for: meaningfulDeltas.map(\.transactionKey), context: context)
+        let transactionKeys = meaningfulDeltas.map(\.transactionKey).filter { !$0.isEmpty }
+        let uniqueTransactionKeys = Set(transactionKeys)
+        if uniqueTransactionKeys.count != transactionKeys.count, let duplicateKey = firstDuplicate(in: transactionKeys) {
+            throw CoconutWalletError.duplicateTransaction(duplicateKey)
+        }
+
+        let duplicateEntries = try existingEntries(for: transactionKeys, context: context)
         if !duplicateEntries.isEmpty {
-            return duplicateEntries
+            let duplicateKeys = Set(duplicateEntries.map(\.transactionKey))
+            if duplicateKeys == uniqueTransactionKeys {
+                return duplicateEntries
+            }
+            throw CoconutWalletError.duplicateTransaction(duplicateKeys.sorted().first ?? "")
         }
 
         var accountsByKey: [String: CoconutAccount] = [:]
@@ -371,6 +381,41 @@ enum CoconutWalletService {
         ((try? context.fetch(FetchDescriptor<CoconutAccount>())) ?? []).reduce(0) { $0 + $1.balance } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
+    static func balance(accountKey: String, context: ModelContext, fallback: Int = 0) -> Int {
+        var descriptor = FetchDescriptor<CoconutAccount>(
+            predicate: #Predicate<CoconutAccount> { $0.accountKey == accountKey }
+        )
+        descriptor.fetchLimit = 1
+        if let account = try? context.fetch(descriptor).first {
+            return max(0, account.balance)
+        }
+        return max(0, fallback)
+    }
+
+    static func balance(for human: Human, context: ModelContext) -> Int {
+        balance(
+            accountKey: CoconutAccountKey.human(human.id),
+            context: context,
+            fallback: human.coconutBalance
+        )
+    }
+
+    static func balance(for pet: Pet, context: ModelContext) -> Int {
+        balance(
+            accountKey: CoconutAccountKey.pet(pet.id),
+            context: context,
+            fallback: pet.coconutBalance
+        )
+    }
+
+    static func legacySystemBalance(context: ModelContext, fallback: Int = 0) -> Int {
+        balance(
+            accountKey: CoconutAccountKey.legacySystem,
+            context: context,
+            fallback: fallback
+        )
+    }
+
     static func recentLogProjection(context: ModelContext, limit: Int = 200) -> [CoconutLogEntry] {
         var descriptor = FetchDescriptor<CoconutLedgerEntry>(
             sortBy: [SortDescriptor(\CoconutLedgerEntry.occurredAt, order: .reverse)]
@@ -455,6 +500,14 @@ enum CoconutWalletService {
             existing += try context.fetch(descriptor)
         }
         return existing
+    }
+
+    private static func firstDuplicate(in transactionKeys: [String]) -> String? {
+        var seen: Set<String> = []
+        for key in transactionKeys where !seen.insert(key).inserted {
+            return key
+        }
+        return nil
     }
 
     private static func existingAccount(

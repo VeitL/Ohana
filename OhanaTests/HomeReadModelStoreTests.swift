@@ -51,6 +51,41 @@ struct HomeReadModelStoreTests {
         #expect(store.payload.source.humans.map(\.id) == [human.id])
     }
 
+    @Test func eventFetchKeepsTodayWindowWhenHistoryHasManyEndedRecurringEvents() async throws {
+        let container = try makeContainer()
+        let store = HomeReadModelStore()
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let oldStart = calendar.date(byAdding: .year, value: -4, to: today) ?? today.addingTimeInterval(-4 * 365 * 24 * 60 * 60)
+        let oldEnd = calendar.date(byAdding: .day, value: 30, to: oldStart) ?? oldStart.addingTimeInterval(30 * 24 * 60 * 60)
+        for index in 0 ..< 450 {
+            let event = Event(
+                title: "Ended recurring \(index)",
+                startDate: calendar.date(byAdding: .day, value: index, to: oldStart) ?? oldStart
+            )
+            event.recurrenceDays = 1
+            event.recurrenceEndDate = oldEnd
+            container.mainContext.insert(event)
+        }
+        let todayEvent = Event(title: "Today check", startDate: today.addingTimeInterval(9 * 60 * 60))
+        container.mainContext.insert(todayEvent)
+        try container.mainContext.save()
+
+        await store.refreshImmediately(
+            context: container.mainContext,
+            activeHumanIdRaw: "",
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            language: AppLanguage.code,
+            externalRevision: HomeRevision(),
+            force: true
+        )
+
+        #expect(store.payload.source.events.contains { $0.id == todayEvent.id })
+        #expect(!store.payload.source.events.contains { $0.title.hasPrefix("Ended recurring") })
+    }
+
     @Test func forcedRefreshPublishesAvatarPreloadSignature() async throws {
         let container = try makeContainer()
         let store = HomeReadModelStore()
@@ -166,7 +201,7 @@ struct HomeReadModelStoreTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV58.models)
+        let schema = Schema(ArkSchemaV59.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

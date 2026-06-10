@@ -48,6 +48,7 @@ extension OasisRewardView {
             ))
         }
         .buttonStyle(ScaleButtonStyle())
+        .disabled(!canInject)
         .opacity(canInject ? 1 : 0.45)
     }
 

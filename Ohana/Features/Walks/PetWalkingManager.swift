@@ -212,19 +212,17 @@ final class PetWalkingManager {
         }
 
         // N2/Phase54: 遛狗椰子奖励（距离 < 20m 不发放奖励，日志正常保存）
-        let minimumRewardDistance = 20.0
-        let earnedCoconuts = distanceMeters >= minimumRewardDistance
-            ? PetWalkLog.coconuts(for: distanceMeters)
-            : 0
-        walkLog.coconutsEarned = earnedCoconuts
-        let isTooShortForReward = distanceMeters < minimumRewardDistance
+        var earnedCoconuts = 0
+        let isTooShortForReward = !CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
         if !isTooShortForReward {
-            questManager.awardAction(
+            let reward = questManager.awardAction(
                 type: .walk(distanceMeters: distanceMeters),
                 pet: pet,
                 context: modelContext
             )
+            earnedCoconuts = reward.humanGot + reward.petGot
         }
+        walkLog.coconutsEarned = earnedCoconuts
         // 遛狗中每次便便：人+2, 宠物+5（OhanaActionType.potty(isLitter:false)）
         if poop > 0 {
             for _ in 0 ..< poop {

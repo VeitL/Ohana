@@ -89,7 +89,7 @@ extension ReadModelRevisionCenter {
             DomainMutationResult(
                 command: .settingsCoconutBalance(humanID: result.humanID, amount: result.amount),
                 affectedEntityIDs: Set(result.humanID.map { [$0] } ?? []),
-                wroteBusinessFact: true,
+                wroteBusinessFact: false,
                 note: note
             )
         )

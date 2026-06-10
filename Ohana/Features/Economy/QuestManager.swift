@@ -334,9 +334,8 @@ final class QuestManager {
         var baseRewards: (human: Int, pet: Int) {
             switch self {
             case let .walk(d):
-                let total = min(14, max(5, Int(d / 350)))
-                let pet = max(1, total / 3)
-                return (total - pet, pet)
+                let total = CoconutWalkRewardPolicy.baseCoconuts(for: d)
+                return CoconutWalkRewardPolicy.splitCoconuts(total: total)
             case let .potty(isLitter):
                 return isLitter ? (2, 1) : (1, 1)
             case .feed:

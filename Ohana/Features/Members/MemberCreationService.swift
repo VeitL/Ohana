@@ -85,9 +85,12 @@ final class MemberCreationService: MemberCreating {
         guard let human = currentHuman(in: humans) else {
             throw ServiceError.missingActiveHuman
         }
-        guard human.coconutBalance >= cost else {
-            throw ServiceError.insufficientCoconuts(missing: max(0, cost - human.coconutBalance))
+        let humanBalance = CoconutWalletService.balance(for: human, context: context)
+        guard humanBalance >= cost else {
+            throw ServiceError.insufficientCoconuts(missing: max(0, cost - humanBalance))
         }
+        let purchaseId = UUID().uuidString
+        let metadataJSON = "{\"shopItemId\":\"\(Avatar2DAccess.shopItemId)\",\"surface\":\"memberCreation\",\"purchaseId\":\"\(purchaseId)\"}"
         let title = l.tr(zh: "兑换「2.5D 头像券」", en: "Redeemed 2.5D Avatar Pass", de: "2,5D-Avatarpass eingelöst")
         let ledger = careLedger.record(
             occurredAt: Date(),
@@ -108,38 +111,44 @@ final class MemberCreationService: MemberCreating {
             coconutDelta: -cost,
             rewardLogId: nil,
             privacyFieldRaw: nil,
-            metadataJSON: "{\"shopItemId\":\"\(Avatar2DAccess.shopItemId)\",\"surface\":\"memberCreation\"}",
+            metadataJSON: metadataJSON,
             context: context,
             save: false
         )
-        try wallet.apply(
-            deltas: [
-                .human(
-                    human,
-                    delta: -cost,
-                    entryKind: .spend,
-                    source: .shop,
-                    title: title,
-                    emoji: "2.5D",
-                    actorId: human.id.uuidString,
-                    actorName: human.name,
-                    subjectKind: .system,
-                    subjectId: nil,
-                    sourceModelName: "Avatar2DAccess",
-                    sourceModelId: Avatar2DAccess.shopItemId,
-                    careLedgerEventId: ledger.id.uuidString,
-                    metadataJSON: "{\"shopItemId\":\"\(Avatar2DAccess.shopItemId)\",\"surface\":\"memberCreation\"}",
-                    transactionKey: "shop:memberCreation:\(Avatar2DAccess.shopItemId):\(human.id.uuidString)"
-                )
-            ],
-            context: context,
-            save: false,
-            postsRewardFeedback: true,
-            updatesProjection: true,
-            projectionManager: questManager
-        )
+        do {
+            try wallet.apply(
+                deltas: [
+                    .human(
+                        human,
+                        delta: -cost,
+                        entryKind: .spend,
+                        source: .shop,
+                        title: title,
+                        emoji: "2.5D",
+                        actorId: human.id.uuidString,
+                        actorName: human.name,
+                        subjectKind: .system,
+                        subjectId: nil,
+                        sourceModelName: "Avatar2DAccess",
+                        sourceModelId: Avatar2DAccess.shopItemId,
+                        careLedgerEventId: ledger.id.uuidString,
+                        metadataJSON: metadataJSON,
+                        transactionKey: "shop:memberCreation:\(Avatar2DAccess.shopItemId):\(human.id.uuidString):\(purchaseId)"
+                    )
+                ],
+                context: context,
+                save: false,
+                postsRewardFeedback: true,
+                updatesProjection: true,
+                projectionManager: questManager
+            )
+            try context.save()
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            throw error
+        }
         Avatar2DAccess.addExtraPasses(1)
-        context.safeSave()
     }
 
     func save(
@@ -229,7 +238,13 @@ final class MemberCreationService: MemberCreating {
         if shouldUse2D {
             Avatar2DAccess.consumeIfNeeded(kind: .pet, existingCount: existingCount)
         }
-        recordThemeColorIfNeeded(draft: draft, questManager: questManager)
+        recordThemeColorIfNeeded(
+            draft: draft,
+            questManager: questManager,
+            actorId: pet.id.uuidString,
+            actorName: pet.name,
+            context: context
+        )
         insertPetRelatedRecords(pet: pet, draft: draft, context: context)
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context)
         context.safeSave()
@@ -345,7 +360,13 @@ final class MemberCreationService: MemberCreating {
         if shouldUse2D {
             Avatar2DAccess.consumeIfNeeded(kind: .human, existingCount: existingCount)
         }
-        recordThemeColorIfNeeded(draft: draft, questManager: questManager)
+        recordThemeColorIfNeeded(
+            draft: draft,
+            questManager: questManager,
+            actorId: human.id.uuidString,
+            actorName: human.name,
+            context: context
+        )
         revisions.publishMemberProfileChange(
             entityID: human.id,
             kind: EntityKind.human.rawValue,
@@ -408,9 +429,15 @@ final class MemberCreationService: MemberCreating {
         }
     }
 
-    private func recordThemeColorIfNeeded(draft: MemberCreationDraft, questManager: QuestManager) {
+    private func recordThemeColorIfNeeded(
+        draft: MemberCreationDraft,
+        questManager: QuestManager,
+        actorId: String?,
+        actorName: String?,
+        context: ModelContext
+    ) {
         guard draft.normalizedThemeHex != draft.kind.fallbackThemeHex else { return }
-        questManager.recordThemeColorSet()
+        questManager.recordThemeColorSet(actorId: actorId, actorName: actorName, context: context)
     }
 
     private func publishMemberCreation(id: UUID, kind: String, revisions: DomainRevisionPublishing) {

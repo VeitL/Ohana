@@ -58,62 +58,76 @@ enum SettingsCommandService {
     static func applyCoconutBalanceTest(
         amount rawAmount: Int,
         human: Human?,
-        title: String,
+        title _: String,
         actorName: String?,
         context: ModelContext,
         wallet: CoconutWalletManaging,
         projectionManager: QuestManager
     ) -> SettingsCoconutBalanceCommandResult {
         let amount = max(0, rawAmount)
-        let current = human?.coconutBalance ?? wallet.totalBalance(context: context)
+        let accountKey = human.map { CoconutAccountKey.human($0.id) } ?? CoconutAccountKey.legacySystem
+        let existingAccount = coconutAccount(accountKey: accountKey, context: context)
+        let current = existingAccount?.balance ?? human?.coconutBalance ?? wallet.totalBalance(context: context)
         let delta = amount - current
-        if delta != 0 {
-            do {
-                let walletDelta: CoconutWalletDelta = if let human {
-                    .human(
-                        human,
-                        delta: delta,
-                        entryKind: .adjustment,
-                        source: .service,
-                        title: title,
-                        emoji: "🧪",
-                        actorId: human.id.uuidString,
-                        actorName: actorName ?? human.name,
-                        subjectKind: .human,
-                        subjectId: human.id.uuidString
-                    )
-                } else {
-                    .system(
-                        delta: delta,
-                        entryKind: .adjustment,
-                        source: .service,
-                        title: title,
-                        emoji: "🧪",
-                        actorId: "system",
-                        actorName: actorName ?? "System"
-                    )
-                }
-                try wallet.apply(
-                    deltas: [walletDelta],
-                    context: context,
-                    save: false,
-                    postsRewardFeedback: true,
-                    updatesProjection: true,
-                    projectionManager: projectionManager
-                )
-                context.safeSave()
-            } catch {
-                #if DEBUG
-                    OhanaLog.error("[SettingsCoconutBalanceCommandService] wallet adjustment failed: \(error.localizedDescription)", category: "Economy")
-                #endif
-            }
-        }
+        let displayName = actorName ?? human?.name ?? "Legacy island total"
+        // Developer overrides must not create wallet ledger entries or reward feedback.
+        upsertCoconutAccount(
+            accountKey: accountKey,
+            ownerKind: human == nil ? .system : .human,
+            ownerId: human?.id.uuidString ?? "",
+            displayName: displayName,
+            amount: amount,
+            context: context
+        )
+        human?.coconutBalance = amount
+        context.safeSave()
+        projectionManager.replaceCoconutProjection(
+            count: amount,
+            logs: projectionManager.coconutLogs
+        )
 
         return SettingsCoconutBalanceCommandResult(
             humanID: human?.id,
             amount: amount,
             legacyDelta: delta
         )
+    }
+
+    private static func coconutAccount(accountKey: String, context: ModelContext) -> CoconutAccount? {
+        var descriptor = FetchDescriptor<CoconutAccount>(
+            predicate: #Predicate<CoconutAccount> { $0.accountKey == accountKey }
+        )
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    private static func upsertCoconutAccount(
+        accountKey: String,
+        ownerKind: CoconutWalletOwnerKind,
+        ownerId: String,
+        displayName: String,
+        amount: Int,
+        context: ModelContext
+    ) {
+        let now = Date()
+        if let account = coconutAccount(accountKey: accountKey, context: context) {
+            account.ownerKindRaw = ownerKind.rawValue
+            account.ownerId = ownerId
+            account.displayName = displayName
+            account.balance = amount
+            account.updatedAt = now
+        } else {
+            context.insert(CoconutAccount(
+                accountKey: accountKey,
+                ownerKind: ownerKind,
+                ownerId: ownerId,
+                displayName: displayName,
+                balance: amount,
+                createdAt: now,
+                updatedAt: now,
+                metadataJSON: "{\"source\":\"settings.coconut.test\"}"
+            ))
+        }
     }
 }
 

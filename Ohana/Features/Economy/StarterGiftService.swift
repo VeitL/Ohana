@@ -155,6 +155,7 @@ enum StarterGiftService {
             try context.save()
         } catch {
             context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: projectionManager)
             #if DEBUG
                 OhanaLog.error("[StarterGiftService] wallet write failed: \(error.localizedDescription)", category: "Economy")
             #endif

@@ -27,13 +27,15 @@ protocol OasisRewardManaging {
 
     func currentHumanBalance(context: ModelContext) -> Int
     func canSpendCurrentHumanCoconuts(_ amount: Int, context: ModelContext) -> Bool
+    @discardableResult
     func awardCurrentHumanCoconuts(
         _ amount: Int,
         emoji: String,
         title: String,
         context: ModelContext,
         postsRewardFeedback: Bool
-    )
+    ) -> Bool
+    func refreshCoconutProjection(context: ModelContext)
 
     func lifecycleSnapshot(for critter: OasisElectronicPet, context: ModelContext) -> OasisCritterLifecycleSnapshot
     func displayDailyWish(for critter: OasisElectronicPet, snapshot: OasisCritterLifecycleSnapshot) -> OasisCritterDailyWish
@@ -105,13 +107,14 @@ final class StaticOasisRewardManager: OasisRewardManaging {
         )
     }
 
+    @discardableResult
     func awardCurrentHumanCoconuts(
         _ amount: Int,
         emoji: String,
         title: String,
         context: ModelContext,
         postsRewardFeedback: Bool
-    ) {
+    ) -> Bool {
         OasisCritterEconomyService.awardCurrentHumanCoconuts(
             amount,
             emoji: emoji,
@@ -122,6 +125,10 @@ final class StaticOasisRewardManager: OasisRewardManaging {
             wallet: wallet,
             questManager: questManager
         )
+    }
+
+    func refreshCoconutProjection(context: ModelContext) {
+        wallet.refreshQuestProjection(context: context, manager: questManager)
     }
 
     func lifecycleSnapshot(for critter: OasisElectronicPet, context: ModelContext) -> OasisCritterLifecycleSnapshot {

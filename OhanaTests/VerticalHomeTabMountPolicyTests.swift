@@ -115,6 +115,43 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!lifecycle.isLive)
     }
 
+    @Test func oasisTabUsesPreparedShellDuringIncomingTransition() {
+        let lifecycle = VerticalHomeTabMountPolicy.lifecycle(
+            for: .oasis,
+            active: .oasis,
+            outgoing: .home,
+            selected: .oasis,
+            preparing: .oasis
+        )
+
+        #expect(OasisHomeTabContentPolicy.shouldRenderPreparedShell(for: lifecycle))
+        #expect(!OasisHomeTabContentPolicy.shouldRenderTreeContent(for: lifecycle))
+        #expect(!OasisHomeTabContentPolicy.shouldRunActiveWork(for: lifecycle))
+    }
+
+    @Test func oasisTabStartsActiveWorkOnlyAfterTransitionSettles() {
+        let lifecycle = VerticalHomeTabMountPolicy.lifecycle(
+            for: .oasis,
+            active: .oasis,
+            outgoing: nil,
+            selected: .oasis
+        )
+
+        #expect(OasisHomeTabContentPolicy.shouldRenderTreeContent(for: lifecycle))
+        #expect(OasisHomeTabContentPolicy.shouldRunActiveWork(for: lifecycle))
+    }
+
+    @Test func tabOutgoingCleanupWaitsForFullMotionSpringTail() {
+        #expect(
+            VerticalHomeTabTransitionPolicy.outgoingCleanupDelayMilliseconds(for: .full)
+            >= UInt64(700)
+        )
+        #expect(
+            VerticalHomeTabTransitionPolicy.outgoingCleanupDelayMilliseconds(for: .static)
+            == VerticalHomeTabTransitionPolicy.reducedMotionOutgoingCleanupDelayMilliseconds
+        )
+    }
+
     @Test func embeddedQuickActionsStayUnmountedUntilHeroSettles() {
         #expect(!FocusHomeEmbeddedQuickActionThawPolicy.isMounted(
             progress: 0.9,
@@ -227,5 +264,40 @@ struct VerticalHomeTabMountPolicyTests {
 
         #expect(threeTabWidth > 70)
         #expect(fiveTabWidth >= 44)
+    }
+
+    @Test func bottomNavigationOasisUsesLevelText() {
+        #expect(HomeBottomNavigationTreePresentation.levelText(8) == "Lv.8")
+        #expect(HomeBottomNavigationTreePresentation.levelText(-1) == "Lv.0")
+    }
+
+    @Test func bottomNavigationTreeProgressIsClamped() {
+        #expect(HomeBottomNavigationTreePresentation.progressFill(-0.4) == CGFloat(0))
+        #expect(HomeBottomNavigationTreePresentation.progressFill(0.42) == CGFloat(0.42))
+        #expect(HomeBottomNavigationTreePresentation.progressFill(1.4) == CGFloat(1))
+        #expect(HomeBottomNavigationTreePresentation.progressFill(.nan) == CGFloat(0))
+        #expect(HomeBottomNavigationTreePresentation.progressFill(.infinity) == CGFloat(0))
+    }
+
+    @Test @MainActor func dailyTreeInjectionPackageBecomesUnavailableAfterUse() {
+        let defaults = UserDefaults.standard
+        let oldPeriod = defaults.string(forKey: OasisTreePreferenceStore.dailyInjectionDayKey)
+        defer {
+            if let oldPeriod {
+                defaults.set(oldPeriod, forKey: OasisTreePreferenceStore.dailyInjectionDayKey)
+            } else {
+                defaults.removeObject(forKey: OasisTreePreferenceStore.dailyInjectionDayKey)
+            }
+        }
+
+        let date = Date(timeIntervalSince1970: 1_765_065_600)
+        defaults.removeObject(forKey: OasisTreePreferenceStore.dailyInjectionDayKey)
+        #expect(TestOasisTreeManagerProjection.manager.canUseInjectionPackage(cost: 80, date: date))
+
+        OasisTreePreferenceStore.markInjectionUsed(
+            limitKey: OasisTreePreferenceStore.dailyInjectionDayKey,
+            periodKey: EconomyDailyBudgetStore.dayKey(for: date)
+        )
+        #expect(!TestOasisTreeManagerProjection.manager.canUseInjectionPackage(cost: 80, date: date))
     }
 }

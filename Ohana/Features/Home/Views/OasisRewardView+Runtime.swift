@@ -164,7 +164,6 @@ extension OasisRewardView {
 
     func handleOasisAppear() {
         if isOasisPrepared {
-            refreshLiveDataSnapshot()
             prepareVisibleShell()
         }
         if shouldTreatEmbeddedAsVisible {
@@ -254,6 +253,7 @@ extension OasisRewardView {
         treeVisualEnergyOverride = nil
         coconutBalanceVisualOverride = nil
         isInjecting = false
+        treeInjectionLocked = false
         treeInjectionProgress = 0
         treeInjectionBoost = 0.026
         preparedWorkTask?.cancel()
@@ -267,6 +267,8 @@ extension OasisRewardView {
         treeHarvestBuffer.commitTask = nil
         renderSnapshotTask?.cancel()
         renderSnapshotTask = nil
+        treeStageAppearTask?.cancel()
+        treeStageAppearTask = nil
         critterNestCloseTask?.cancel()
         critterNestCloseTask = nil
         critterNestOpenTask?.cancel()
@@ -324,7 +326,7 @@ extension OasisRewardView {
     func schedulePreparedVisualWork() {
         guard isOasisPrepared else { return }
         preparedWorkTask?.cancel()
-        preparedWorkTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: hideToolbar ? 24 : 0) {
+        preparedWorkTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: preparedVisualWorkDelayMilliseconds) {
             guard isOasisPrepared else {
                 preparedWorkTask = nil
                 return
@@ -333,7 +335,7 @@ extension OasisRewardView {
             commandExecutor.refreshPreviewEnergy(treeManager: treeMgr, pets: pets, humans: humans, plants: plants)
             lastLevel = treeMgr.treeLevel
             loadCheckInData()
-            rebuildOasisRenderSnapshots()
+            rebuildOasisRenderSnapshots(refreshLiveData: false)
             markVisibleStatePrepared()
             preparedWorkTask = nil
         }
@@ -346,7 +348,7 @@ extension OasisRewardView {
         lastLevel = treeMgr.treeLevel
         loadCheckInData()
         scheduleTodayCheckIn()
-        rebuildOasisRenderSnapshots()
+        rebuildOasisRenderSnapshots(refreshLiveData: false)
         markVisibleStatePrepared()
     }
 
@@ -373,8 +375,15 @@ extension OasisRewardView {
         }
     }
 
-    func rebuildOasisRenderSnapshots() {
-        refreshLiveDataSnapshot()
+    var preparedVisualWorkDelayMilliseconds: UInt64 {
+        guard hideToolbar else { return 0 }
+        return isEmbeddedActive ? 48 : 520
+    }
+
+    func rebuildOasisRenderSnapshots(refreshLiveData: Bool = true) {
+        if refreshLiveData {
+            refreshLiveDataSnapshot()
+        }
         refreshTreeHarvestSnapshot()
         let nextActionSnapshot = commandExecutor.makeActionSnapshot(
             humans: humans,

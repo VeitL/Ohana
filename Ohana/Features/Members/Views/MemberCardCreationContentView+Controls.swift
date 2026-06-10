@@ -60,6 +60,56 @@ extension MemberCardCreationContentView {
         .frame(maxWidth: .infinity)
     }
 
+    func compactGenderIconRow(
+        options: [String],
+        selection: Binding<String>,
+        label: @escaping (String) -> String,
+        icon: @escaping (String) -> String
+    ) -> some View {
+        HStack(spacing: 6) {
+            ForEach(options, id: \.self) { option in
+                let isSelected = selection.wrappedValue == option
+                Button {
+                    withAnimation(GoMotion.selection) {
+                        selection.wrappedValue = option
+                    }
+                    UISelectionFeedbackGenerator().selectionChanged()
+                } label: {
+                    Text(icon(option))
+                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+                        .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(cardControlStroke, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(label(option))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    func petGenderIcon(_ gender: String) -> String {
+        switch gender {
+        case "boy", "male", "男": "♂"
+        case "girl", "female", "女": "♀"
+        default: "?"
+        }
+    }
+
+    func humanGenderIcon(_ gender: String) -> String {
+        switch HumanProfileOptions.normalizedGender(gender) {
+        case "男": "♂"
+        case "女": "♀"
+        default: "?"
+        }
+    }
+
     func compactHumanMetricInput(
         title: String,
         text: Binding<String>,

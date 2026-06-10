@@ -41,11 +41,21 @@ struct OasisRewardRuntimeModifier: ViewModifier {
     let onEmbeddedActiveChanged: (Bool) -> Void
     let onApplyMakeup: (String) -> Void
     let onOpenSheet: (OasisSheetRoute) -> Void
+    @State private var appearHandoffTask: Task<Void, Never>?
+    @State private var injectHandoffTask: Task<Void, Never>?
 
     func body(content: Content) -> some View {
         content
-            .onAppear(perform: onAppearAction)
-            .onDisappear(perform: onDisappearAction)
+            .onAppear {
+                scheduleAppearHandoff()
+            }
+            .onDisappear {
+                appearHandoffTask?.cancel()
+                appearHandoffTask = nil
+                injectHandoffTask?.cancel()
+                injectHandoffTask = nil
+                onDisappearAction()
+            }
             .onChange(of: shouldRunAmbientMotion) { _, shouldAnimate in
                 onAmbientMotionChanged(shouldAnimate)
             }
@@ -61,10 +71,28 @@ struct OasisRewardRuntimeModifier: ViewModifier {
             .onChange(of: activeHumanCoconutBalance) { _, _ in onRefreshRenderSnapshots() }
             .onChange(of: rulesTrigger) { _, _ in onOpenSheet(.coconutRules) }
             .onChange(of: inventoryTrigger) { _, _ in onOpenSheet(.inventory) }
-            .onChange(of: injectEnergyTrigger) { _, _ in onInjectTreeEnergy() }
+            .onChange(of: injectEnergyTrigger) { _, _ in
+                scheduleInjectHandoff()
+            }
             .onChange(of: isEmbeddedPrepared) { _, isPrepared in onEmbeddedPreparedChanged(isPrepared) }
             .onChange(of: isEmbeddedVisible) { _, isVisible in onEmbeddedVisibleChanged(isVisible) }
             .onChange(of: isEmbeddedActive) { _, isActive in onEmbeddedActiveChanged(isActive) }
+    }
+
+    private func scheduleAppearHandoff() {
+        appearHandoffTask?.cancel()
+        appearHandoffTask = OhanaFrameScheduler.runAfterNextFrame {
+            onAppearAction()
+            appearHandoffTask = nil
+        }
+    }
+
+    private func scheduleInjectHandoff() {
+        injectHandoffTask?.cancel()
+        injectHandoffTask = OhanaFrameScheduler.runAfterNextFrame {
+            onInjectTreeEnergy()
+            injectHandoffTask = nil
+        }
     }
 
     var makeupConfirmationModifier: some ViewModifier {
@@ -152,6 +180,7 @@ struct OasisRewardView: View {
     var matAccent: Color { Color(hex: "FF5A00") }
     @State var lastLevel: TreeLevel = .lv1
     @State var isInjecting: Bool = false
+    @State var treeInjectionLocked = false
     @State var treeInjectionProgress: CGFloat = 0
     @State var treeInjectionBoost: CGFloat = 0.026
     @State var injectionPulseToken = 0
@@ -188,6 +217,7 @@ struct OasisRewardView: View {
     @State var critterPulseCleanupTask: Task<Void, Never>?
     @State var critterOutcomeCleanupTask: Task<Void, Never>?
     @State var rescueBusyCleanupTask: Task<Void, Never>?
+    @State var treeStageAppearTask: Task<Void, Never>?
     @State var treeHarvestBuffer = OasisTreeHarvestBuffer()
     @AppStorage("appLanguage") var appLanguage = AppLanguage.code
 
@@ -240,7 +270,7 @@ struct OasisRewardView: View {
             lockedLevel(requiredLevel: gachaUnlockLevel)
         case .critterCodex:
             lockedLevel(requiredLevel: critterUnlockLevel)
-        case .coconutRules, .achievements, .inventory, .checkInDetail:
+        case .coconutRules, .growthRoadmap, .achievements, .inventory, .checkInDetail:
             nil
         }
     }
@@ -297,6 +327,14 @@ struct OasisRewardView: View {
     }
 
     var canInjectTreeEnergy: Bool {
+        !treeInjectionLocked && hasAvailableTreeInjection
+    }
+
+    var hasAvailableTreeInjection: Bool {
+        hasEnoughCoconutsForTreeInjection && treeMgr.canUseInjectionPackage(cost: 80)
+    }
+
+    var hasEnoughCoconutsForTreeInjection: Bool {
         actionSnapshot.canInjectCoconuts ?? (activeHumanCoconutBalance >= 80)
     }
 
@@ -309,7 +347,8 @@ struct OasisRewardView: View {
     }
 
     var shouldRunAmbientMotion: Bool {
-        workloadPolicy.shouldAnimate(isVisible: isVisible && isVisibleStatePrepared)
+        let isMotionEligible = !hideToolbar || isEmbeddedActive
+        return workloadPolicy.shouldAnimate(isVisible: isVisible && isVisibleStatePrepared && isMotionEligible)
     }
 
     var interactionMotionBudget: OhanaMotionBudget {

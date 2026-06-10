@@ -12,6 +12,7 @@ extension AchievementWallContentView {
         let takenMedicationCount = medicationLogs(for: human).count(where: { $0.status == .taken })
         let expenseCount = expenses(for: human).count
         let accountDays = Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0
+        let coconutBalance = CoconutWalletService.balance(for: human, context: modelContext)
 
         return [
             Achievement(
@@ -100,7 +101,7 @@ extension AchievementWallContentView {
                 title: "椰子小金库",
                 description: "个人椰子余额达到 500",
                 color: Color.goYellow,
-                isUnlocked: human.coconutBalance >= 500
+                isUnlocked: coconutBalance >= 500
             ),
             Achievement(
                 id: "human_coconut_elite",
@@ -108,7 +109,7 @@ extension AchievementWallContentView {
                 title: "椰子金库",
                 description: "个人椰子余额达到 2000",
                 color: Color.goLime,
-                isUnlocked: human.coconutBalance >= 2000
+                isUnlocked: coconutBalance >= 2000
             ),
             Achievement(
                 id: "human_old_friend",

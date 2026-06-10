@@ -38,6 +38,7 @@ struct TodayFocusCard: View {
     @State var selectedFocusIndex = 0
     @State var skippedFocusKeys: Set<String>
     @State var closedNegativeKeys: Set<String>
+    @State var hiddenFocusDayToken: Int
     @State var hiddenFocusVersion = 0
     @State var renderDeck: TodayFocusRenderDeck
     @State var frozenFrontContent: TodayFocusContent?
@@ -64,8 +65,9 @@ struct TodayFocusCard: View {
         freezesToFrontCard: Bool = false,
         allowsAmbientMotion: Bool = false
     ) {
-        let skippedFocusKeys = TodayFocusCard.loadSkippedFocusKeys()
-        let closedNegativeKeys = TodayFocusCard.loadClosedNegativeKeys()
+        let hiddenFocusDayToken = snapshot.dayToken == 0 ? TodayFocusCard.currentHiddenFocusDayToken() : snapshot.dayToken
+        let skippedFocusKeys = TodayFocusCard.loadSkippedFocusKeys(dayToken: hiddenFocusDayToken)
+        let closedNegativeKeys = TodayFocusCard.loadClosedNegativeKeys(dayToken: hiddenFocusDayToken)
         self.snapshot = snapshot
         self.presentation = presentation
         self.onOpenQuest = onOpenQuest
@@ -79,6 +81,7 @@ struct TodayFocusCard: View {
         self.allowsAmbientMotion = allowsAmbientMotion
         _skippedFocusKeys = State(initialValue: skippedFocusKeys)
         _closedNegativeKeys = State(initialValue: closedNegativeKeys)
+        _hiddenFocusDayToken = State(initialValue: hiddenFocusDayToken)
         _renderDeck = State(initialValue: TodayFocusRenderDeck.make(
             snapshot: snapshot,
             skippedFocusKeys: skippedFocusKeys,
@@ -121,6 +124,10 @@ struct TodayFocusCard: View {
 
     var focusCards: [TodayFocusContent] {
         renderDeck.cards
+    }
+
+    var hasNoHiddenFocusCards: Bool {
+        skippedFocusKeys.isEmpty && closedNegativeKeys.isEmpty
     }
 
     var content: TodayFocusContent {
@@ -172,6 +179,7 @@ struct TodayFocusCard: View {
             }
         }
         .onAppear {
+            reloadHiddenFocusKeysIfNeeded(for: snapshot.dayToken)
             rebuildRenderDeck(disablesAnimations: true)
             if freezesToFrontCard {
                 frozenFrontContent = content
@@ -198,6 +206,7 @@ struct TodayFocusCard: View {
             }
         }
         .onChange(of: renderDeckDependencyKey) { _, _ in
+            reloadHiddenFocusKeysIfNeeded(for: snapshot.dayToken)
             rebuildRenderDeck(disablesAnimations: true)
         }
         .onChange(of: focusCardCountChangeKey) { _, count in

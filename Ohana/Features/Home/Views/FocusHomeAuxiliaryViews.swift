@@ -118,6 +118,7 @@ nonisolated struct TodayFocusExchangeRequestSnapshot: Identifiable, Equatable, S
 }
 
 nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
+    let dayToken: Int
     let pets: [TodayFocusPetSnapshot]
     let plants: [TodayFocusPlantSnapshot]
     let humans: [TodayFocusHumanSnapshot]
@@ -127,6 +128,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
     let negativeSignals: [IslandNegativeSignal]
 
     static let empty = TodayFocusSnapshot(
+        dayToken: 0,
         pets: [],
         plants: [],
         humans: [],
@@ -135,6 +137,10 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         pendingExchangeRequests: [],
         negativeSignals: []
     )
+
+    static func dayToken(for date: Date, calendar: Calendar = .current) -> Int {
+        Int(calendar.startOfDay(for: date).timeIntervalSince1970)
+    }
 
     @MainActor
     static func make(
@@ -151,25 +157,28 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         familyTasks: [FamilyCollaborationTask],
         exchangeRequests: [CoconutExchangeRequest],
         todayFocus: TodayFocusManaging,
-        healthAlerts: PetHealthAlerting
+        healthAlerts: PetHealthAlerting,
+        now: Date = Date()
     ) -> TodayFocusSnapshot {
         let quests = IslandQuestEngine.todayQuests(
             pets: pets,
             reminders: reminders,
             plants: plants,
             events: events,
-            humans: humans
+            humans: humans,
+            now: now
         )
         let refreshedQuests = todayFocus.refreshedQuests(
             quests,
             pets: pets,
             humans: humans,
+            events: events,
             careLogs: careLogs,
             walkLogs: walkLogs,
             pottyLogs: pottyLogs,
             humanWeightLogs: humanWeightLogs,
             calendar: .current,
-            now: Date()
+            now: now
         )
         let assignedTasks: [FamilyCollaborationTask] = if activeHumanId.isEmpty {
             []
@@ -200,7 +209,8 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
                 pets: pets,
                 plants: plants,
                 healthAlerts: healthAlerts
-            )
+            ),
+            dayToken: dayToken(for: now)
         )
     }
 
@@ -217,8 +227,9 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         humanWeightLogs: [HumanWeightLog],
         familyTasks: [FamilyCollaborationTask],
         exchangeRequests: [CoconutExchangeRequest],
-        questManager: QuestManager,
-        clinicalAlerts: [HealthAlert]
+        questProgress: TodayFocusQuestProgress,
+        clinicalAlerts: [HealthAlert],
+        now: Date = Date()
     ) -> TodayFocusSnapshot {
         let quests = IslandQuestEngine.todayQuests(
             pets: pets,
@@ -226,19 +237,21 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             plants: plants,
             events: events,
             humans: humans,
-            questManager: questManager
+            now: now,
+            questProgress: questProgress
         )
         let refreshedQuests = TodayFocusQuestRefresher().refreshedQuests(
             quests,
             pets: pets,
             humans: humans,
+            events: events,
             careLogs: careLogs,
             walkLogs: walkLogs,
             pottyLogs: pottyLogs,
             humanWeightLogs: humanWeightLogs,
             calendar: .current,
-            now: Date(),
-            questManager: questManager
+            now: now,
+            questProgress: questProgress
         )
         let assignedTasks: [FamilyCollaborationTask] = if activeHumanId.isEmpty {
             []
@@ -269,7 +282,8 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
                 pets: pets,
                 plants: plants,
                 clinicalAlerts: clinicalAlerts
-            )
+            ),
+            dayToken: dayToken(for: now)
         )
     }
 
@@ -280,9 +294,11 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         refreshedQuests: [IslandQuest],
         assignedTasks: [FamilyCollaborationTask],
         pendingExchanges: [CoconutExchangeRequest],
-        negativeSignals: [IslandNegativeSignal]
+        negativeSignals: [IslandNegativeSignal],
+        dayToken: Int
     ) -> TodayFocusSnapshot {
         TodayFocusSnapshot(
+            dayToken: dayToken,
             pets: pets.map(TodayFocusPetSnapshot.init),
             plants: plants.map(TodayFocusPlantSnapshot.init),
             humans: humans.map(TodayFocusHumanSnapshot.init),
@@ -359,6 +375,7 @@ struct TodayFocusQuestCardHost: View {
     }
 
     private struct SnapshotRefreshKey: Equatable, Sendable {
+        let dayToken: Int
         let language: String
         let pets: Int
         let plants: Int
@@ -369,8 +386,9 @@ struct TodayFocusQuestCardHost: View {
         let negativeSignals: Int
 
         init(snapshot: TodayFocusSnapshot) {
+            dayToken = snapshot.dayToken
             language = AppLanguage.code
-            pets = Self.token(snapshot.pets.prefix(12)) { pet in
+            pets = Self.token(snapshot.pets) { pet in
                 Self.combine(
                     pet.id.hashValue,
                     pet.name.hashValue,
@@ -379,7 +397,7 @@ struct TodayFocusQuestCardHost: View {
                     pet.hasPassedAway ? 1 : 0
                 )
             }
-            plants = Self.token(snapshot.plants.prefix(12)) { plant in
+            plants = Self.token(snapshot.plants) { plant in
                 Self.combine(
                     plant.id.hashValue,
                     plant.name.hashValue,
@@ -389,7 +407,7 @@ struct TodayFocusQuestCardHost: View {
                     Self.timestampValue(plant.lastFertilizedDate)
                 )
             }
-            humans = Self.token(snapshot.humans.prefix(12)) { human in
+            humans = Self.token(snapshot.humans) { human in
                 Self.combine(
                     human.id.hashValue,
                     human.name.hashValue,
@@ -406,28 +424,44 @@ struct TodayFocusQuestCardHost: View {
                     quest.targetPlantId?.hashValue ?? 0
                 )
             }
-            familyTasks = Self.token(snapshot.assignedFamilyTasks.prefix(12)) { task in
+            familyTasks = Self.token(snapshot.assignedFamilyTasks) { task in
                 Self.combine(
                     task.id.hashValue,
+                    task.title.hashValue,
                     task.statusRaw.hashValue,
+                    task.createdByName.hashValue,
                     (task.assignedToId ?? "").hashValue,
+                    (task.assignedToName ?? "").hashValue,
                     (task.claimedById ?? "").hashValue,
+                    (task.claimedByName ?? "").hashValue,
+                    (task.completedByName ?? "").hashValue,
+                    task.rewardCoconuts,
+                    Self.timestampValue(task.dueAt),
                     Self.timestampValue(task.updatedAt)
                 )
             }
-            exchangeRequests = Self.token(snapshot.pendingExchangeRequests.prefix(12)) { request in
+            exchangeRequests = Self.token(snapshot.pendingExchangeRequests) { request in
                 Self.combine(
                     request.id.hashValue,
+                    request.senderName.hashValue,
                     request.statusRaw.hashValue,
                     request.receiverId.hashValue,
+                    request.currencyCode.hashValue,
+                    Int(request.localAmount * 100),
+                    request.coconutCost,
                     Self.timestampValue(request.updatedAt)
                 )
             }
             negativeSignals = Self.token(snapshot.negativeSignals) { signal in
                 Self.combine(
+                    signal.id.hashValue,
                     signal.title.hashValue,
                     signal.detail.hashValue,
-                    signal.petId?.hashValue ?? 0
+                    signal.iconName.hashValue,
+                    signal.severity.identityToken.hashValue,
+                    signal.petId?.hashValue ?? 0,
+                    signal.plantId?.hashValue ?? 0,
+                    signal.healthAlertType?.rawValue.hashValue ?? 0
                 )
             }
         }
@@ -500,7 +534,7 @@ struct WalkLaunchBurst: View {
             HStack(spacing: 8) {
                 Image(systemName: "figure.walk.motion") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 20, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                Text("开始巡岛")
+                Text(AppLocalizedText(zh: "开始巡岛", en: "Start walk", de: "Spaziergang starten").resolve())
                     .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(Color.ohanaPrimaryActionText)

@@ -325,16 +325,32 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Focus Owner")
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        let weightLog = HumanWeightLog(date: date, weight: 68, human: human)
         context.insert(human)
+        context.insert(weightLog)
         try context.save()
 
         let userKey = human.id.uuidString
-        let date = dateForTest(year: 2026, month: 6, day: 9)
+        let visibleQuests = [
+            IslandQuest(
+                id: "q_human_weight_\(human.id.uuidString)",
+                emoji: "✅",
+                title: "体重",
+                subtitle: "",
+                isCompleted: true,
+                targetPetId: nil,
+                targetPlantId: nil
+            )
+        ]
         let oldActiveHuman = UserDefaults.standard.string(forKey: "currentActiveHumanId")
         let manager = TestQuestManagerProjection.manager
         let oldCount = manager.coconutCount
         let oldLogs = manager.coconutLogs
         let oldLastReward = manager.lastEconomyRewardResult
+        let oldPetWizard = manager.isPetWizardCompleted
+        let oldFirstMeal = manager.isFirstMealRecorded
+        let oldThemeColor = manager.isThemeColorSet
         defer {
             if let oldActiveHuman {
                 UserDefaults.standard.set(oldActiveHuman, forKey: "currentActiveHumanId")
@@ -344,9 +360,16 @@ struct OhanaTests {
             manager.coconutCount = oldCount
             manager.coconutLogs = oldLogs
             manager.lastEconomyRewardResult = oldLastReward
+            manager.isPetWizardCompleted = oldPetWizard
+            manager.isFirstMealRecorded = oldFirstMeal
+            manager.isThemeColorSet = oldThemeColor
             manager.persistQuestFlags()
         }
 
+        manager.isPetWizardCompleted = true
+        manager.isFirstMealRecorded = true
+        manager.isThemeColorSet = true
+        manager.persistQuestFlags()
         UserDefaults.standard.set(userKey, forKey: "currentActiveHumanId")
         EconomyDailyBudgetStore.reset(householdKey: CoconutEconomyPolicyV2.householdBudgetKey(), memberKey: userKey, date: date)
         TodayFocusEconomyService.resetDailyCompletionMarker(userKey: userKey, date: date)
@@ -354,11 +377,13 @@ struct OhanaTests {
         let first = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
             context: context,
             executorId: userKey,
+            visibleQuests: visibleQuests,
             now: date
         )
         let second = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
             context: context,
             executorId: userKey,
+            visibleQuests: visibleQuests,
             now: date
         )
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
@@ -375,6 +400,184 @@ struct OhanaTests {
         } ?? 0
         #expect(focusLedger != nil)
         #expect(focusLedgerGrowthXP == awardedXP)
+    }
+
+    @MainActor
+    @Test func todayFocusDailyCompletionRequiresVisibleQuestsCompleted() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Focus Owner")
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let userKey = human.id.uuidString
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        let visibleQuests = [
+            IslandQuest(
+                id: "q_feed_\(pet.id.uuidString)",
+                emoji: "🍽️",
+                title: "喂食",
+                subtitle: "今天还缺喂食",
+                isCompleted: false,
+                targetPetId: pet.id,
+                targetPlantId: nil
+            )
+        ]
+        TodayFocusEconomyService.resetDailyCompletionMarker(userKey: userKey, date: date)
+
+        let reward = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
+            context: context,
+            executorId: userKey,
+            visibleQuests: visibleQuests,
+            now: date
+        )
+
+        #expect(reward == nil)
+    }
+
+    @MainActor
+    @Test func todayFocusDailyCompletionWaitsForVisibleNonQuestCards() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Focus Owner")
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        let weightLog = HumanWeightLog(date: date, weight: 68, human: human)
+        context.insert(human)
+        context.insert(weightLog)
+        try context.save()
+
+        let userKey = human.id.uuidString
+        let visibleQuests = [
+            IslandQuest(
+                id: "q_human_weight_\(human.id.uuidString)",
+                emoji: "✅",
+                title: "Weight",
+                subtitle: "",
+                isCompleted: true,
+                targetPetId: nil,
+                targetPlantId: nil
+            )
+        ]
+        let familyTask = FamilyCollaborationTask(
+            title: "Review groceries",
+            kind: .householdTask,
+            status: .active,
+            createdById: "other",
+            createdByName: "Other",
+            assignedToId: userKey,
+            assignedToName: human.name
+        )
+        let visibleSnapshot = TodayFocusSnapshot(
+            dayToken: TodayFocusSnapshot.dayToken(for: date),
+            pets: [],
+            plants: [],
+            humans: [TodayFocusHumanSnapshot(human: human)],
+            refreshedQuests: visibleQuests,
+            assignedFamilyTasks: [TodayFocusFamilyTaskSnapshot(task: familyTask)],
+            pendingExchangeRequests: [],
+            negativeSignals: []
+        )
+        let manager = TestQuestManagerProjection.manager
+        let oldPetWizard = manager.isPetWizardCompleted
+        let oldFirstMeal = manager.isFirstMealRecorded
+        let oldThemeColor = manager.isThemeColorSet
+        defer {
+            manager.isPetWizardCompleted = oldPetWizard
+            manager.isFirstMealRecorded = oldFirstMeal
+            manager.isThemeColorSet = oldThemeColor
+            manager.persistQuestFlags()
+        }
+
+        manager.isPetWizardCompleted = true
+        manager.isFirstMealRecorded = true
+        manager.isThemeColorSet = true
+        manager.persistQuestFlags()
+        EconomyDailyBudgetStore.reset(householdKey: CoconutEconomyPolicyV2.householdBudgetKey(), memberKey: userKey, date: date)
+        TodayFocusEconomyService.resetDailyCompletionMarker(userKey: userKey, date: date)
+
+        let reward = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
+            context: context,
+            executorId: userKey,
+            visibleQuests: visibleQuests,
+            visibleSnapshot: visibleSnapshot,
+            now: date
+        )
+
+        #expect(reward == nil)
+    }
+
+    @Test func todayFocusClearHiddenStateRestoresSkippedAndClosedSignals() async throws {
+        let suiteName = "todayFocus.hidden.restore.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+
+        TodayFocusHiddenStateStore.save(
+            skippedFocusKeys: ["quest:q_feed"],
+            closedNegativeKeys: ["negative:pet:warning"],
+            date: date,
+            defaults: defaults
+        )
+        TodayFocusHiddenStateStore.clearHiddenFocusKeys(date: date, defaults: defaults)
+
+        #expect(TodayFocusHiddenStateStore.loadSkippedFocusKeys(date: date, defaults: defaults).isEmpty)
+        #expect(TodayFocusHiddenStateStore.loadClosedNegativeKeys(date: date, defaults: defaults).isEmpty)
+    }
+
+    @MainActor
+    @Test func todayFocusDailyCompletionWaitsForRegeneratedQuestDeck() async throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Focus Owner")
+        let pet = Pet(name: "Momo", species: "猫")
+        let date = dateForTest(year: 2026, month: 6, day: 9)
+        let feedLog = PetCareLog(date: date, type: .feeding, amountGrams: 20, pet: pet)
+        context.insert(human)
+        context.insert(pet)
+        context.insert(feedLog)
+        try context.save()
+
+        let userKey = human.id.uuidString
+        let visibleQuests = [
+            IslandQuest(
+                id: "q_feed_\(pet.id.uuidString)",
+                emoji: "🍽️",
+                title: "喂食",
+                subtitle: "今天还缺喂食",
+                isCompleted: false,
+                targetPetId: pet.id,
+                targetPlantId: nil
+            )
+        ]
+        let manager = TestQuestManagerProjection.manager
+        let oldPetWizard = manager.isPetWizardCompleted
+        let oldFirstMeal = manager.isFirstMealRecorded
+        let oldThemeColor = manager.isThemeColorSet
+        defer {
+            manager.isPetWizardCompleted = oldPetWizard
+            manager.isFirstMealRecorded = oldFirstMeal
+            manager.isThemeColorSet = oldThemeColor
+            manager.persistQuestFlags()
+        }
+
+        manager.isPetWizardCompleted = true
+        manager.isFirstMealRecorded = true
+        manager.isThemeColorSet = true
+        manager.persistQuestFlags()
+        TodayFocusEconomyService.resetDailyCompletionMarker(userKey: userKey, date: date)
+
+        let reward = TodayFocusEconomyService.awardDailyCompletionIfNeeded(
+            context: context,
+            executorId: userKey,
+            visibleQuests: visibleQuests,
+            now: date
+        )
+
+        #expect(reward == nil)
     }
 
     @MainActor
@@ -2878,25 +3081,47 @@ struct OhanaTests {
         #expect(refreshed.first?.isCompleted == true)
         #expect(refreshed.first?.emoji == "✅")
 
+        func renderCards(
+            quests: [IslandQuest] = [],
+            pets: [TodayFocusPetSnapshot] = [],
+            plants: [TodayFocusPlantSnapshot] = [],
+            humans: [TodayFocusHumanSnapshot] = []
+        ) -> [TodayFocusContent] {
+            TodayFocusCard.TodayFocusRenderDeck.make(
+                snapshot: TodayFocusSnapshot(
+                    dayToken: TodayFocusSnapshot.dayToken(for: Date()),
+                    pets: pets,
+                    plants: plants,
+                    humans: humans,
+                    refreshedQuests: quests,
+                    assignedFamilyTasks: [],
+                    pendingExchangeRequests: [],
+                    negativeSignals: []
+                ),
+                skippedFocusKeys: [],
+                closedNegativeKeys: []
+            ).cards
+        }
+
         let pending = IslandQuest(id: "q_custom", emoji: "!", title: "待办", subtitle: "优先", isCompleted: false, targetPetId: nil, targetPlantId: nil)
-        if case let .quest(selected) = TodayFocusService.decide(pets: [], plants: [], quests: [pending], careLogs: [], walkLogs: [], pottyLogs: [], memory: nil) {
+        if case let .quest(selected) = renderCards(quests: [pending]).first {
             #expect(selected.id == "q_custom")
         } else {
             Issue.record("未完成委托应优先成为 Today Focus")
         }
 
         let done = IslandQuest(id: "q_done", emoji: "✅", title: "已完成", subtitle: "", isCompleted: true, targetPetId: nil, targetPlantId: nil)
-        if case .celebrate = TodayFocusService.decide(pets: [], plants: [], quests: [done], careLogs: [], walkLogs: [], pottyLogs: [], memory: nil) {
+        if case .celebrate = renderCards(quests: [done]).first {
         } else {
             Issue.record("全部完成后应进入庆祝态")
         }
 
-        if case .welcome = TodayFocusService.decide(pets: [], plants: [], quests: [], careLogs: [], walkLogs: [], pottyLogs: [], memory: nil) {
+        if case .welcome = renderCards().first {
         } else {
             Issue.record("没有任务和历史时应进入欢迎态")
         }
 
-        if case .celebrate = TodayFocusService.decide(pets: [pet], plants: [], quests: [], careLogs: [], walkLogs: [], pottyLogs: [], memory: nil) {
+        if case .celebrate = renderCards(pets: [TodayFocusPetSnapshot(pet: pet)]).first {
         } else {
             Issue.record("有成员但没有任务时应显示恭喜提示")
         }
@@ -2933,7 +3158,7 @@ struct OhanaTests {
         try context.save()
 
         let signals = IslandNegativeFeedback.signals(pets: [pet], healthAlerts: EmptyPetHealthAlerts())
-        #expect(!signals.contains { $0.title == "今日还未打卡" })
+        #expect(!signals.contains { $0.iconName == "cloud.fill" })
     }
 
     @MainActor
@@ -2959,6 +3184,253 @@ struct OhanaTests {
         let quests = IslandQuestEngine.todayQuests(pets: [momo, lilo], reminders: [])
 
         #expect(!quests.contains { $0.id.hasPrefix("q_play_") })
+    }
+
+    @MainActor
+    @Test func islandQuestEngineUsesPerPetCarePlanIds() async throws {
+        let momo = Pet(name: "Momo", species: "狗")
+        let lilo = Pet(name: "Lilo", species: "狗")
+        let momoWalk = Event(
+            title: "遛狗",
+            startDate: Date(),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: momo.id.uuidString
+        )
+        let liloWalk = Event(
+            title: "遛狗",
+            startDate: Date(),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: lilo.id.uuidString
+        )
+
+        let quests = IslandQuestEngine.todayQuests(pets: [momo, lilo], reminders: [], events: [momoWalk, liloWalk])
+        let ids = quests.map(\.id)
+
+        #expect(ids.contains { $0.hasPrefix("q_walk_\(momo.id.uuidString)_") && IslandQuestEngine.carePlanEventId(fromQuestId: $0) == momoWalk.id })
+        #expect(ids.contains { $0.hasPrefix("q_walk_\(lilo.id.uuidString)_") && IslandQuestEngine.carePlanEventId(fromQuestId: $0) == liloWalk.id })
+    }
+
+    @MainActor
+    @Test func islandQuestEngineUsesEventScopedCarePlanCompletion() async throws {
+        let date = dateForTest(year: 2026, month: 6, day: 9, hour: 8)
+        let pet = Pet(name: "Momo", species: "狗")
+        let breakfast = Event(
+            title: "喂食",
+            startDate: date,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let dinner = Event(
+            title: "喂食",
+            startDate: dateForTest(year: 2026, month: 6, day: 9, hour: 18),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+
+        let initial = IslandQuestEngine.todayQuests(
+            pets: [pet],
+            reminders: [],
+            events: [breakfast, dinner],
+            now: date
+        )
+        let feedIds = initial.map(\.id).filter { $0.hasPrefix("q_feed_\(pet.id.uuidString)_") }
+        #expect(Set(feedIds.compactMap { IslandQuestEngine.carePlanEventId(fromQuestId: $0) }) == Set([breakfast.id, dinner.id]))
+
+        breakfast.setOccurrenceMarkedComplete(true, on: date)
+        let remaining = IslandQuestEngine.todayQuests(
+            pets: [pet],
+            reminders: [],
+            events: [breakfast, dinner],
+            now: date
+        )
+        let remainingEventIds = Set(remaining.map(\.id).compactMap { IslandQuestEngine.carePlanEventId(fromQuestId: $0) })
+
+        #expect(!remainingEventIds.contains(breakfast.id))
+        #expect(remainingEventIds.contains(dinner.id))
+    }
+
+    @MainActor
+    @Test func islandQuestEngineIncludesRecurringCarePlanAfterStartDate() async throws {
+        let start = dateForTest(year: 2026, month: 6, day: 1, hour: 8)
+        let today = dateForTest(year: 2026, month: 6, day: 10, hour: 8)
+        let pet = Pet(name: "Momo", species: "狗")
+        let walk = Event(
+            title: "遛狗",
+            startDate: start,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        walk.recurrenceDays = 1
+
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [pet],
+            reminders: [],
+            events: [walk],
+            now: today
+        )
+
+        #expect(quests.contains { $0.id.hasPrefix("q_walk_\(pet.id.uuidString)_") })
+    }
+
+    @MainActor
+    @Test func todayFocusCompletesEventScopedWalkFromWalkLog() async throws {
+        let date = dateForTest(year: 2026, month: 6, day: 10, hour: 8)
+        let pet = Pet(name: "Momo", species: "狗")
+        let walk = Event(
+            title: "遛狗",
+            startDate: date,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let quest = IslandQuest(
+            id: "q_walk_\(pet.id.uuidString)_\(walk.id.uuidString)",
+            emoji: "🚶",
+            title: "遛狗",
+            subtitle: "",
+            isCompleted: false,
+            targetPetId: pet.id,
+            targetPlantId: nil
+        )
+        let walkLog = PetWalkLog(startDate: date, pet: pet)
+
+        let refreshed = TodayFocusService.refreshedQuests(
+            [quest],
+            pets: [pet],
+            events: [walk],
+            careLogs: [],
+            walkLogs: [walkLog],
+            pottyLogs: [],
+            calendar: .current,
+            now: date
+        )
+
+        #expect(refreshed.first?.isCompleted == true)
+    }
+
+    @MainActor
+    @Test func todayFocusRenderDeckKeyChangesWhenRenderedCopyChanges() async throws {
+        let questA = IslandQuest(
+            id: "q_test",
+            emoji: "✅",
+            title: "Check Momo",
+            subtitle: "First",
+            isCompleted: false,
+            targetPetId: nil,
+            targetPlantId: nil
+        )
+        let questB = IslandQuest(
+            id: "q_test",
+            emoji: "✅",
+            title: "Check Lilo",
+            subtitle: "Second",
+            isCompleted: false,
+            targetPetId: nil,
+            targetPlantId: nil
+        )
+        let snapshotA = TodayFocusSnapshot(
+            dayToken: TodayFocusSnapshot.dayToken(for: Date()),
+            pets: [],
+            plants: [],
+            humans: [],
+            refreshedQuests: [questA],
+            assignedFamilyTasks: [],
+            pendingExchangeRequests: [],
+            negativeSignals: []
+        )
+        let snapshotB = TodayFocusSnapshot(
+            dayToken: TodayFocusSnapshot.dayToken(for: Date()),
+            pets: [],
+            plants: [],
+            humans: [],
+            refreshedQuests: [questB],
+            assignedFamilyTasks: [],
+            pendingExchangeRequests: [],
+            negativeSignals: []
+        )
+
+        #expect(TodayFocusCard.snapshotDeckDependencyKey(snapshotA) != TodayFocusCard.snapshotDeckDependencyKey(snapshotB))
+    }
+
+    @MainActor
+    @Test func homeSnapshotSignatureTracksRecurringOccurrenceCompletion() async throws {
+        let date = dateForTest(year: 2026, month: 6, day: 10, hour: 8)
+        let pet = Pet(name: "Momo", species: "狗")
+        let walk = Event(
+            title: "遛狗",
+            startDate: date,
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        walk.recurrenceDays = 1
+        let source = VerticalSolidHomeSourceState(
+            pets: [pet],
+            humans: [],
+            plants: [],
+            electronicPets: [],
+            events: [walk],
+            pendingReminders: [],
+            humanMedications: [],
+            humanMedicationLogs: [],
+            careLogs: [],
+            walkLogs: [],
+            pottyLogs: [],
+            humanWeightLogs: [],
+            familyTasks: [],
+            exchangeRequests: [],
+            activeHumanIdRaw: "",
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            petBondVaultRevision: 0,
+            equippedTitleRaw: "",
+            language: "en"
+        )
+        let before = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: date)
+
+        walk.setOccurrenceMarkedComplete(true, on: date)
+        let after = VerticalSolidHomeSnapshotBuilder.signature(for: source, now: date)
+
+        #expect(before != after)
+    }
+
+    @MainActor
+    @Test func todayFocusNegativeSkipKeyTracksSignalRevisionAndPlantIdentity() async throws {
+        let petId = UUID()
+        let first = IslandNegativeSignal(
+            iconName: "scalemass.fill",
+            emoji: "⚖️",
+            title: "Momo weight",
+            detail: "warning",
+            severity: .warning,
+            petId: petId,
+            healthAlertType: .weightLossAlert
+        )
+        let escalated = IslandNegativeSignal(
+            iconName: "scalemass.fill",
+            emoji: "⚖️",
+            title: "Momo weight",
+            detail: "critical",
+            severity: .critical,
+            petId: petId,
+            healthAlertType: .weightLossAlert
+        )
+
+        #expect(TodayFocusCard.negativeSkipKey(for: first) != TodayFocusCard.negativeSkipKey(for: escalated))
+
+        let plant = Plant(name: "Fern")
+        plant.lastWateredDate = Date(timeIntervalSinceNow: -9 * 86400)
+        let plantSignal = IslandNegativeFeedback.signals(pets: [], plants: [plant], clinicalAlerts: [])
+            .first { $0.plantId == plant.id }
+
+        #expect(plantSignal?.plantId == plant.id)
+        #expect(plantSignal.map { TodayFocusCard.negativeSkipKey(for: $0).contains("plant:\(plant.id.uuidString)") } == true)
     }
 
     @Test func humanMedicationScheduleMetadataRoundTripsAndHidesNotes() async throws {
@@ -3169,7 +3641,7 @@ struct OhanaTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV58.models)
+        let schema = Schema(ArkSchemaV59.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

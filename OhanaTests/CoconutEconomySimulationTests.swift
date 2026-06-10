@@ -3,6 +3,14 @@ import Testing
 @testable import Ohana
 
 struct CoconutEconomySimulationTests {
+    @Test func walkCoconutRewardUsesSharedV2Formula() {
+        #expect(CoconutWalkRewardPolicy.earnedCoconuts(for: 10) == 0)
+        #expect(PetWalkLog.coconuts(for: 10) == 0)
+        #expect(CoconutWalkRewardPolicy.earnedCoconuts(for: 3000) == 8)
+        #expect(PetWalkLog.coconuts(for: 3000) == 8)
+        #expect(CoconutWalkRewardPolicy.baseCoconuts(for: 6000) == 14)
+    }
+
     @Test func economyCohortsStayInside30_60_90DayPacing() {
         let light = EconomyCohortSimulator(preset: .lightOnePet).run(days: 90)
         let normal = EconomyCohortSimulator(preset: .normalOnePet).run(days: 90)
@@ -549,10 +557,10 @@ private struct EconomySimulationBudgetStore {
                 return EconomySimulationBaseReward(growthXP: 10, coconuts: 5, humanShare: 3, petShare: 2)
             }
         case let .walk(distanceMeters):
-            let xp = min(20, max(8, Int(distanceMeters / 250)))
-            let coconuts = min(14, max(5, Int(distanceMeters / 350)))
-            let pet = max(1, coconuts / 3)
-            return EconomySimulationBaseReward(growthXP: xp, coconuts: coconuts, humanShare: coconuts - pet, petShare: pet)
+            let xp = CoconutWalkRewardPolicy.baseGrowthXP(for: distanceMeters)
+            let coconuts = CoconutWalkRewardPolicy.baseCoconuts(for: distanceMeters)
+            let split = CoconutWalkRewardPolicy.splitCoconuts(total: coconuts)
+            return EconomySimulationBaseReward(growthXP: xp, coconuts: coconuts, humanShare: split.human, petShare: split.pet)
         case .health:
             return EconomySimulationBaseReward(growthXP: 16, coconuts: 10, humanShare: 8, petShare: 2)
         case .expense:

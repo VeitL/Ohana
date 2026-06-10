@@ -193,7 +193,9 @@ final class VerticalSolidHomeController: ObservableObject {
     }
 
     private var outgoingCleanupDelayMilliseconds: UInt64 {
-        AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true) == .full ? 460 : 90
+        VerticalHomeTabTransitionPolicy.outgoingCleanupDelayMilliseconds(
+            for: AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true)
+        )
     }
 
     private func prepare(_ tab: VerticalSolidHomeTab) {

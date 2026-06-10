@@ -14,6 +14,7 @@ struct OasisRewardPresentationModifier: ViewModifier {
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     func body(content: Content) -> some View {
         content
@@ -43,6 +44,14 @@ struct OasisRewardPresentationModifier: ViewModifier {
         case .coconutRules:
             CoconutRulesSheet()
                 .ohanaSheetPagePresentation() // ui-v4: allow rules reference sheet
+        case .growthRoadmap:
+            GrowthUnlockRoadmapView(
+                currentLevel: currentFeatureLevel,
+                progressToNextLevel: appServices.oasisTree.progressToNextLevel,
+                appLanguage: appLanguage,
+                onClose: { sheetRoute = nil }
+            )
+            .ohanaSheetPagePresentation() // ui-v4: allow long growth roadmap overview
         case .achievements:
             if let pet = pets.first {
                 AchievementWallView(

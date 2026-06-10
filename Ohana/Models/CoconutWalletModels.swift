@@ -39,6 +39,12 @@ enum CoconutWalletSource: String, Codable, CaseIterable {
     case service
 }
 
+enum EconomyBudgetUsageScope: String, Codable, CaseIterable {
+    case household
+    case member
+    case careObject
+}
+
 enum CoconutAccountKey {
     static let legacySystem = "system:legacy"
 
@@ -225,5 +231,68 @@ final class CoconutLedgerEntry {
             economyReason: sourceRaw,
             budgetStage: entryKindRaw
         )
+    }
+}
+
+@Model
+final class EconomyBudgetUsageEvent {
+    #Index<EconomyBudgetUsageEvent>(
+        [\.dayKey, \.householdKey],
+        [\.dayKey, \.scopeRaw, \.scopeKey],
+        [\.createdAt]
+    )
+
+    var id: UUID
+    var dayKey: String
+    var householdKey: String
+    var memberKey: String
+    var careObjectKey: String
+    var scopeRaw: String
+    var scopeKey: String
+    var growthXPUsed: Int
+    var coconutUsed: Int
+    var luckyCoconutUsed: Int
+    var actionKey: String
+    var source: String
+    var metadataJSON: String
+    var occurredAt: Date
+    var createdAt: Date
+
+    init(
+        id: UUID = UUID(),
+        dayKey: String,
+        householdKey: String,
+        memberKey: String,
+        careObjectKey: String = "",
+        scope: EconomyBudgetUsageScope,
+        scopeKey: String,
+        growthXPUsed: Int,
+        coconutUsed: Int,
+        luckyCoconutUsed: Int = 0,
+        actionKey: String,
+        source: String,
+        metadataJSON: String = "",
+        occurredAt: Date = Date(),
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.dayKey = dayKey
+        self.householdKey = householdKey
+        self.memberKey = memberKey
+        self.careObjectKey = careObjectKey
+        self.scopeRaw = scope.rawValue
+        self.scopeKey = scopeKey
+        self.growthXPUsed = growthXPUsed
+        self.coconutUsed = coconutUsed
+        self.luckyCoconutUsed = luckyCoconutUsed
+        self.actionKey = actionKey
+        self.source = source
+        self.metadataJSON = metadataJSON
+        self.occurredAt = occurredAt
+        self.createdAt = createdAt
+    }
+
+    var scope: EconomyBudgetUsageScope {
+        EconomyBudgetUsageScope(rawValue: scopeRaw) ?? .household
     }
 }

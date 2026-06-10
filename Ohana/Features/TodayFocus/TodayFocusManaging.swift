@@ -7,6 +7,7 @@ protocol TodayFocusManaging {
         _ quests: [IslandQuest],
         pets: [Pet],
         humans: [Human],
+        events: [Event],
         careLogs: [PetCareLog],
         walkLogs: [PetWalkLog],
         pottyLogs: [PetPottyLog],
@@ -17,8 +18,13 @@ protocol TodayFocusManaging {
 
     func quest(_ quest: IslandQuest, matchesCompletedEntity entityId: UUID) -> Bool
     func completeEvent(_ event: Event, on date: Date, context: ModelContext) -> TodayFocusEventCompletionCommandResult
-    func awardDailyCompletionIfNeeded(context: ModelContext, executorId: String?) -> EconomyRewardResult?
-    func ensureTodayCheckIn(activeHumanId: String, rewardTitle: String)
+    func awardDailyCompletionIfNeeded(
+        context: ModelContext,
+        executorId: String?,
+        visibleQuests: [IslandQuest],
+        visibleSnapshot: TodayFocusSnapshot?
+    ) -> EconomyRewardResult?
+    func ensureTodayCheckIn(activeHumanId: String, rewardTitle: String, context: ModelContext)
     func currentStreak(activeHumanId: String) -> Int
 }
 
@@ -51,6 +57,7 @@ final class StaticTodayFocusManager: TodayFocusManaging {
         _ quests: [IslandQuest],
         pets: [Pet],
         humans: [Human],
+        events: [Event],
         careLogs: [PetCareLog],
         walkLogs: [PetWalkLog],
         pottyLogs: [PetPottyLog],
@@ -62,6 +69,7 @@ final class StaticTodayFocusManager: TodayFocusManaging {
             quests,
             pets: pets,
             humans: humans,
+            events: events,
             careLogs: careLogs,
             walkLogs: walkLogs,
             pottyLogs: pottyLogs,
@@ -80,22 +88,30 @@ final class StaticTodayFocusManager: TodayFocusManaging {
         TodayFocusCommandService.completeEvent(event, on: date, context: context)
     }
 
-    func awardDailyCompletionIfNeeded(context: ModelContext, executorId: String?) -> EconomyRewardResult? {
+    func awardDailyCompletionIfNeeded(
+        context: ModelContext,
+        executorId: String?,
+        visibleQuests: [IslandQuest],
+        visibleSnapshot: TodayFocusSnapshot?
+    ) -> EconomyRewardResult? {
         TodayFocusEconomyService.awardDailyCompletionIfNeeded(
             context: context,
             executorId: executorId,
+            visibleQuests: visibleQuests,
+            visibleSnapshot: visibleSnapshot,
             questManager: questManager,
             careLedger: careLedger,
             revisions: revisions
         )
     }
 
-    func ensureTodayCheckIn(activeHumanId: String, rewardTitle: String) {
+    func ensureTodayCheckIn(activeHumanId: String, rewardTitle: String, context: ModelContext) {
         FocusHomeDailyCheckInService.ensureTodayCheckIn(
             activeHumanId: activeHumanId,
             rewardTitle: rewardTitle,
             questManager: questManager,
-            revisions: revisions
+            revisions: revisions,
+            context: context
         )
     }
 

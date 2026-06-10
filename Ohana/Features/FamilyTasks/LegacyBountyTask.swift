@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftData
 
 enum LegacyBountyTaskPreferenceStore {
     nonisolated static let tasksKey = "bountyTasks"
@@ -128,7 +129,8 @@ struct LegacyBountyCommandExecutor {
         id: UUID,
         in tasks: [BountyTask],
         activeHumanId: String,
-        currentHuman: Human?
+        currentHuman: Human?,
+        context: ModelContext
     ) -> String? {
         var current = tasks
         guard let idx = current.firstIndex(where: { $0.id == id }) else { return nil }
@@ -140,13 +142,30 @@ struct LegacyBountyCommandExecutor {
         task.assigneeName = currentHuman?.name
         current[idx] = task
 
-        questManager.addCoconuts(
-            task.reward,
-            emoji: "📋",
-            title: "完成家庭任务",
-            actorId: activeHumanId.isEmpty ? nil : activeHumanId,
-            actorName: currentHuman?.name
-        )
+        do {
+            _ = try questManager.stageSpecialCoconutReward(
+                amount: task.reward,
+                emoji: "📋",
+                title: "完成家庭任务",
+                actorId: activeHumanId.isEmpty ? nil : activeHumanId,
+                actorName: currentHuman?.name,
+                source: .familyTask,
+                sourceModelName: "LegacyBountyTask",
+                sourceModelId: task.id.uuidString,
+                metadataJSON: "{\"kind\":\"legacyBounty\",\"taskId\":\"\(task.id.uuidString)\"}",
+                transactionKey: "legacyBounty:\(task.id.uuidString):complete:\(activeHumanId)",
+                context: context,
+                occurredAt: task.completedAt ?? Date()
+            )
+            try context.save()
+        } catch {
+            context.rollback()
+            questManager.wallet.refreshQuestProjection(context: context, manager: questManager)
+            #if DEBUG
+                OhanaLog.error("[LegacyBountyCommandExecutor] bounty reward save failed: \(error.localizedDescription)", category: "Economy")
+            #endif
+            return nil
+        }
 
         return persist(
             current,

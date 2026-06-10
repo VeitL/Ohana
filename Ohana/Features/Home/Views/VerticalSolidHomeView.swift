@@ -78,6 +78,7 @@ struct VerticalSolidHomeView: View {
     @State var growthLoopSyncTask: Task<Void, Never>?
     @State var growthLoopPulseDismissTask: Task<Void, Never>?
     @State var snapshotRefreshGate = HomeSnapshotRefreshGate()
+    @State var homeAppearHandoffTask: Task<Void, Never>?
 
     init(
         onOpenPet: @escaping (UUID, PetDetailTab) -> Void,
@@ -113,9 +114,6 @@ struct VerticalSolidHomeView: View {
         self.onPresentStreakDetail = onPresentStreakDetail
         self.onPresentWalk = onPresentWalk
         self.payload = payload
-        AvatarPipelineRegistry.current.seedPreviewEntries(
-            payload.avatarPreloadPayloads
-        )
         _controller = StateObject(
             wrappedValue: VerticalSolidHomeController(
                 initialSnapshot: payload.snapshot,
@@ -144,7 +142,7 @@ struct VerticalSolidHomeView: View {
     }
 
     var dataSignature: String {
-        payload.signature
+        "\(payload.signature)#revision:\(payload.revision.value)"
     }
 
     var sourceState: VerticalSolidHomeSourceState {
@@ -247,13 +245,13 @@ struct VerticalSolidHomeView: View {
             let headerContentHeight: CGFloat = 30
             let focusTopGap: CGFloat = 2
             let todayFocusHeight = min(128, max(118, proxy.size.height * 0.145))
-            let growthLoopHeight = min(86, max(78, proxy.size.height * 0.092))
-            let focusHeight = todayFocusHeight + 7 + growthLoopHeight
+            let focusHeight = todayFocusHeight
             let contentTopGap: CGFloat = 4
             let compactContentGap: CGFloat = 8
             let isHomeTabVisible = controller.selectedTab == .home
             let cardHeroProgress = min(max(homeCardHeroProgress, 0), 1)
             let todayFocusVisualProgress = Self.todayFocusVisualProgress(cardHeroProgress: cardHeroProgress)
+            let shouldMountTodayFocusChrome = isHomeTabVisible && todayFocusVisualProgress > 0.001
             let isTodayFocusInteractive = isHomeTabVisible &&
                 !isHomeCardExpandedOrTransitioning &&
                 !isHomeCardHeroAnimating &&
@@ -264,8 +262,6 @@ struct VerticalSolidHomeView: View {
             let topChromeHeight = compactTopChromeHeight
             let bottomHeight = max(84, safeBottom + 70)
             let contentHeight = max(300, proxy.size.height - topChromeHeight - bottomHeight)
-            let growthPendingCount = Self.growthLoopPendingCount(from: controller.snapshot.todayFocus)
-            let hasAnyMember = !pets.isEmpty || !humans.isEmpty
 
             ZStack(alignment: .top) {
                 OhanaAppBackground()
@@ -302,8 +298,7 @@ struct VerticalSolidHomeView: View {
                         onOpenCard: openCard,
                         onQuickActionForCard: openQuickActionItem,
                         onQuickActionOptionForCard: openQuickActionOption,
-                        onQuickActionLimitReached: { routeCoordinator.showQuickActionLimit() },
-                        onAddPet: { routeCoordinator.openAddEntity(.pet) }
+                        onQuickActionLimitReached: { routeCoordinator.showQuickActionLimit() }
                     )
                 } calendar: { lifecycle in
                     CalendarRouteContainer(
@@ -341,7 +336,7 @@ struct VerticalSolidHomeView: View {
                 .frame(width: proxy.size.width, height: contentHeight)
                 .position(x: proxy.size.width / 2, y: topChromeHeight + contentHeight / 2)
 
-                if controller.selectedTab == .home && controller.preparedTabs.contains(.home) {
+                if controller.preparedTabs.contains(.home), shouldMountTodayFocusChrome {
                     VerticalSolidHomeTodayFocusChrome(
                         snapshot: controller.snapshot.todayFocus,
                         isLive: isTodayFocusInteractive,
@@ -363,32 +358,6 @@ struct VerticalSolidHomeView: View {
                     .accessibilityHidden(!isHomeTabVisible || todayFocusVisualProgress < 0.5)
                     .animation(canAnimate ? GoMotion.page : GoMotion.reduced, value: controller.selectedTab)
                     .zIndex(8)
-
-                    GrowthDailyLoopStrip(
-                        currentLevel: treeManager.treeLevel.rawValue,
-                        progressToNextLevel: treeManager.progressToNextLevel,
-                        pendingFocusCount: growthPendingCount,
-                        hasAnyMember: hasAnyMember,
-                        appLanguage: appLanguage,
-                        onPrimaryAction: {
-                            openGrowthDailyLoop(
-                                hasAnyMember: hasAnyMember,
-                                pendingFocusCount: growthPendingCount,
-                                currentLevel: treeManager.treeLevel.rawValue
-                            )
-                        }
-                    )
-                    .padding(.horizontal, 12)
-                    .frame(width: proxy.size.width, height: growthLoopHeight, alignment: .top)
-                    .position(
-                        x: proxy.size.width / 2 + todayFocusHorizontalOffset,
-                        y: safeTop + headerTopGap + headerContentHeight + focusTopGap + todayFocusHeight + 7 + growthLoopHeight / 2
-                    )
-                    .opacity(Double(todayFocusVisualProgress))
-                    .allowsHitTesting(isTodayFocusInteractive)
-                    .accessibilityHidden(!isHomeTabVisible || todayFocusVisualProgress < 0.5)
-                    .animation(canAnimate ? GoMotion.page : GoMotion.reduced, value: controller.selectedTab)
-                    .zIndex(8)
                 }
 
                 FocusHomeHeaderView(
@@ -396,18 +365,12 @@ struct VerticalSolidHomeView: View {
                     topGap: headerTopGap,
                     contentHeight: headerContentHeight,
                     streak: headerStreak,
-                    treeLevel: treeManager.treeLevel.rawValue,
-                    treeProgress: treeManager.progressToNextLevel,
-                    appLanguage: appLanguage,
                     coconutBalance: headerCoconutBalance,
                     coconutDeltaContext: headerCoconutDeltaContext,
                     activeHumanDisplayName: activeHuman?.name ?? controller.snapshot.activeName,
                     activeHumanAvatarImage: activeHumanAvatarImage,
                     activeHumanAvatarEmoji: activeHuman?.avatarEmoji,
                     onStreak: { routeCoordinator.openStreakDetail() },
-                    onTreeLevel: {
-                        openHeaderTreeLevelDestination(hasAnyMember: hasAnyMember)
-                    },
                     onCoconut: openHeaderCoconutDestination,
                     onCrew: { routeCoordinator.openCrewRoster() },
                     onAccountSwitcher: { routeCoordinator.openAccountSwitcher() },
@@ -425,6 +388,8 @@ struct VerticalSolidHomeView: View {
                     homeShortcuts: HomeFabShortcutCatalog.primaryShortcuts,
                     expandedShortcuts: expandedBottomBarShortcuts,
                     safeBottom: safeBottom,
+                    treeLevel: treeManager.treeLevel.rawValue,
+                    treeProgress: treeManager.progressToNextLevel,
                     canAnimate: canAnimate,
                     localization: l,
                     onSelect: selectTab,
@@ -491,16 +456,13 @@ struct VerticalSolidHomeView: View {
         .ignoresSafeArea(.container, edges: [.top, .bottom])
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
-            bindHomeAppRouteSink()
-            controller.applySnapshot(makeSnapshot(), signature: dataSignature, force: !controller.snapshot.isReady)
-            AppPerformanceMonitor.shared.record("home_first_render", valueMS: 0)
-            refreshHeaderStreak()
-            controller.startWarmup()
-            scheduleGrowthOnboardingIfNeeded()
-            scheduleGrowthUnlockFeedbackIfNeeded()
+            scheduleHomeAppearHandoff()
         }
         .onChange(of: dataSignature) { _, _ in
             requestHomeSnapshotRefresh()
+        }
+        .onChange(of: controller.snapshot.todayFocus.refreshedQuests) { previous, current in
+            awardTodayFocusDailyCompletionIfCleared(previousQuests: previous, currentQuests: current)
         }
         .onChange(of: isHomeCardHeroAnimating) { _, isAnimating in
             flushDeferredHomeSnapshotRefreshIfNeeded(isAnimating: isAnimating)
@@ -509,6 +471,8 @@ struct VerticalSolidHomeView: View {
             await preloadFirstScreenAvatars()
         }
         .onDisappear {
+            homeAppearHandoffTask?.cancel()
+            homeAppearHandoffTask = nil
             clearArrivalState()
             expensePreviewStore.cancel()
             calendarAddEventPresentationTask?.cancel()

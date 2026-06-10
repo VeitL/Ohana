@@ -431,6 +431,7 @@ struct GrowthUnlockRoadmapView: View {
 
     @Environment(AppServices.self) private var appServices
     @State private var ruleStatus: GrowthUnlockStatus?
+    @State private var appearHandoffTask: Task<Void, Never>?
 
     private var l: L10n { L10n(appLanguage) }
     private var currentStep: GrowthUnlockStep {
@@ -461,8 +462,16 @@ struct GrowthUnlockRoadmapView: View {
             }
         }
         .onAppear {
-            appServices.onboardingJourney.markRoadmapPromptSeen()
-            AppPerformanceMonitor.shared.record("growth_roadmap_opened", valueMS: 0)
+            appearHandoffTask?.cancel()
+            appearHandoffTask = OhanaFrameScheduler.runAfterNextFrame {
+                appServices.onboardingJourney.markRoadmapPromptSeen()
+                AppPerformanceMonitor.shared.record("growth_roadmap_opened", valueMS: 0)
+                appearHandoffTask = nil
+            }
+        }
+        .onDisappear {
+            appearHandoffTask?.cancel()
+            appearHandoffTask = nil
         }
         .sheet(item: $ruleStatus) { status in
             GrowthUnlockRulesSheet(

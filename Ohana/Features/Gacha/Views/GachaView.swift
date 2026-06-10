@@ -63,7 +63,10 @@ struct GachaView: View {
         humans.first { $0.id.uuidString == activeHumanId }
     }
 
-    private var currentCoconutBalance: Int { currentHuman?.coconutBalance ?? 0 }
+    private var currentCoconutBalance: Int {
+        guard let currentHuman else { return 0 }
+        return CoconutWalletService.balance(for: currentHuman, context: modelContext)
+    }
     private var currentHumanLogs: [GachaDrawLog] {
         drawLogs.filter { $0.ownerHumanId == currentHuman?.id.uuidString && $0.seriesId == series.id }
     }
@@ -110,8 +113,10 @@ struct GachaView: View {
     }
 
     private var canDraw: Bool {
-        guard let currentHuman else { return false }
-        return currentHuman.coconutBalance >= appServices.gacha.costPerDraw && !isDrawing && selectedSeriesUnlocked
+        currentHuman != nil &&
+            currentCoconutBalance >= appServices.gacha.costPerDraw &&
+            !isDrawing &&
+            selectedSeriesUnlocked
     }
 
     private var shouldAnimateReveal: Bool {
@@ -446,7 +451,7 @@ struct GachaView: View {
         if currentHuman == nil {
             return l.tr(zh: "先切换本人账户", en: "Choose your account", de: "Konto wählen")
         }
-        if let currentHuman, currentHuman.coconutBalance < appServices.gacha.costPerDraw {
+        if currentHuman != nil, currentCoconutBalance < appServices.gacha.costPerDraw {
             return l.tr(zh: "椰子不足", en: "Not enough coconuts", de: "Nicht genug Kokos")
         }
         if !selectedSeriesUnlocked {

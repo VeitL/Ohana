@@ -266,10 +266,10 @@ extension TodayFocusCard {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .todayFocusReadableShadow(strength: 1.08)
-                Text(negativeStatusText(for: s))
+                Text(s.detail.isEmpty ? negativeStatusText(for: s) : s.detail)
                     .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(accent)
-                    .lineLimit(1)
+                    .foregroundStyle(s.detail.isEmpty ? accent : Color.ohanaPrimaryText.opacity(0.62))
+                    .lineLimit(2)
                     .todayFocusReadableShadow(strength: 0.82)
             }
 
@@ -294,6 +294,8 @@ extension TodayFocusCard {
         }
         .padding(14)
         .background(cardBackground(accent))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(s.title). \(s.detail.isEmpty ? negativeStatusText(for: s) : s.detail)")
     }
 
     func negativeActionTitle(for signal: IslandNegativeSignal) -> String {
@@ -366,7 +368,7 @@ extension TodayFocusCard {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(skippedFocusKeys.isEmpty
+                Text(hasNoHiddenFocusCards
                     ? l.tr(zh: "今日清空", en: "All clear", de: "Alles klar")
                     : l.tr(zh: "已暂时跳过", en: "Skipped today", de: "Heute übersprungen"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
@@ -378,13 +380,13 @@ extension TodayFocusCard {
             Spacer(minLength: 6)
 
             Button {
-                if skippedFocusKeys.isEmpty {
+                if hasNoHiddenFocusCards {
                     onTapOasis()
                 } else {
                     restoreSkippedFocusCards()
                 }
             } label: {
-                Text(skippedFocusKeys.isEmpty
+                Text(hasNoHiddenFocusCards
                     ? l.tr(zh: "绿洲", en: "Oasis", de: "Oase")
                     : l.tr(zh: "恢复", en: "Restore", de: "Zurück"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
@@ -458,7 +460,11 @@ extension TodayFocusCard {
             }
         }
         .frame(maxWidth: .infinity)
-        .accessibilityLabel("今日任务 \(min(selected + 1, count)) / \(count)")
+        .accessibilityLabel(l.tr(
+            zh: "今日任务 \(min(selected + 1, count)) / \(count)",
+            en: "Today Focus \(min(selected + 1, count)) of \(count)",
+            de: "Today Focus \(min(selected + 1, count)) von \(count)"
+        ))
     }
 
     func indexedStatus(current: Int?, total: Int, zh: String, en: String, de: String) -> String {

@@ -593,7 +593,7 @@ struct CrewRosterProfilePanel: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: size - 6, height: size - 6)
+                        .frame(width: max(0, size - 6), height: max(0, size - 6))
                         .clipShape(Circle())
                 } else {
                     Text(selectedHumanAvatarFallback)

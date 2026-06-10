@@ -39,9 +39,9 @@ final class PetWalkLog {
         self.moodRating = 0
     }
 
-    /// 每 500m 奖励 1 椰子，最少 1 个
+    /// Mirrors CoconutEconomyPolicyV2 walk reward display storage.
     static func coconuts(for distanceMeters: Double) -> Int {
-        max(1, Int(distanceMeters / 500))
+        CoconutWalkRewardPolicy.earnedCoconuts(for: distanceMeters)
     }
 
     var durationSeconds: TimeInterval {
