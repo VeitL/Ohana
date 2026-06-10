@@ -16,13 +16,16 @@ import MetricKit
 #if canImport(MetricKit)
 
 @MainActor
-final class MetricKitObserver: NSObject {
-    static let shared = MetricKitObserver()
+protocol MetricKitObserving {
+    func start()
+}
 
+@MainActor
+final class MetricKitObserver: NSObject, MetricKitObserving {
     private let store = MetricDiagnosticsStore()
     private var didStart = false
 
-    private override init() {
+    override init() {
         super.init()
     }
 
@@ -210,9 +213,13 @@ nonisolated private func averageDurationMS(_ histogram: MXHistogram<UnitDuration
 #else
 
 @MainActor
-final class MetricKitObserver {
-    static let shared = MetricKitObserver()
-    private init() {}
+protocol MetricKitObserving {
+    func start()
+}
+
+@MainActor
+final class MetricKitObserver: MetricKitObserving {
+    init() {}
     func start() {}
 }
 

@@ -152,7 +152,7 @@ struct HomeRouteCoordinatorTests {
             appSheets.append(route)
         }
 
-        coordinator.openFunctionMenu(destination: .featureGroup(.dailyCare))
+        coordinator.openFunctionMenu(destination: .featureGroup(.dailyCare), currentLevel: 1)
 
         #expect(appSheets == [.functionMenu(destination: .featureGroup(.dailyCare))])
         #expect(coordinator.modal == nil)
@@ -166,7 +166,7 @@ struct HomeRouteCoordinatorTests {
             appSheets.append(route)
         }
 
-        coordinator.openFunctionMenu(destination: .plantsDashboard)
+        coordinator.openFunctionMenu(destination: .plantsDashboard, currentLevel: 1)
 
         #expect(appSheets == [.functionMenu(destination: nil)])
         #expect(coordinator.modal == nil)
@@ -259,7 +259,7 @@ struct HomeRouteCoordinatorTests {
     @Test func functionMenuFallsBackToLocalModalWithoutAppSheetSink() {
         let coordinator = HomeRouteCoordinator()
 
-        coordinator.openFunctionMenu(destination: .featureGroup(.dailyCare))
+        coordinator.openFunctionMenu(destination: .featureGroup(.dailyCare), currentLevel: 1)
 
         guard case let .functionMenu(destination) = coordinator.modal else {
             Issue.record("Expected function menu to remain local without app sheet sink")

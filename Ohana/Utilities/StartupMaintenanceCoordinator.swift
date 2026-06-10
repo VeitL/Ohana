@@ -49,7 +49,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
 
             await runStep("member_theme_and_auto_feeder", delayMilliseconds: 16_000) {
                 MemberThemeColorMaintenanceService.normalizeReservedColors(context: context)
-                FamilyWeeklyReportService.shared.scheduleWeeklyReminder()
+                FamilyWeeklyReportService().scheduleWeeklyReminder()
                 self.materializeAutoFeederLogsIfNeeded(context: context)
             }
 

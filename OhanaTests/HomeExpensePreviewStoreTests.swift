@@ -280,8 +280,8 @@ struct SharedPetActionRecorderTests {
             startDate: Date(timeIntervalSince1970: 5_100)
         )
 
-        let backup = try DataBackupManager.shared.buildBackup(context: context)
-        let data = try DataBackupManager.shared.encode(backup)
+        let backup = try TestDataBackupManagerProjection.manager.buildBackup(context: context)
+        let data = try TestDataBackupManagerProjection.manager.encode(backup)
         let decoded = try JSONDecoder().decode(OhanaBackup.self, from: data)
 
         #expect(decoded.sharedCareSessions?.contains { $0.totalExpenseAmount == 30 && $0.expenseCategoryRaw == ExpenseCategory.food.rawValue } == true)
@@ -301,9 +301,9 @@ struct SharedPetActionRecorderTests {
         let oldCooldown = defaults.object(forKey: "quest_cooldownLogs")
         let oldBoost = defaults.object(forKey: "shop_boostDoubleActive")
         let oldFirstMeal = defaults.object(forKey: "quest_isFirstMealRecorded")
-        let oldCoconutCount = QuestManager.shared.coconutCount
-        let oldCoconutLogs = QuestManager.shared.coconutLogs
-        let oldLastReward = QuestManager.shared.lastEconomyRewardResult
+        let oldCoconutCount = TestQuestManagerProjection.manager.coconutCount
+        let oldCoconutLogs = TestQuestManagerProjection.manager.coconutLogs
+        let oldLastReward = TestQuestManagerProjection.manager.lastEconomyRewardResult
         let oldEconomyValues = defaults.dictionaryRepresentation()
             .filter { $0.key.hasPrefix("economyV2.dailyBudget.") }
 
@@ -315,9 +315,9 @@ struct SharedPetActionRecorderTests {
         } else {
             defaults.removeObject(forKey: "currentActiveHumanId")
         }
-        QuestManager.shared.coconutCount = 0
-        QuestManager.shared.coconutLogs = []
-        QuestManager.shared.lastEconomyRewardResult = nil
+        TestQuestManagerProjection.manager.coconutCount = 0
+        TestQuestManagerProjection.manager.coconutLogs = []
+        TestQuestManagerProjection.manager.lastEconomyRewardResult = nil
 
         let dayKey = EconomyDailyBudgetStore.dayKey()
         defaults.set(EconomyDailyBudgetStore.luckyCoconutBudget, forKey: "economyV2.dailyBudget.household.household.local.\(dayKey).lucky")
@@ -347,10 +347,10 @@ struct SharedPetActionRecorderTests {
             } else {
                 defaults.removeObject(forKey: "quest_isFirstMealRecorded")
             }
-            QuestManager.shared.coconutCount = oldCoconutCount
-            QuestManager.shared.coconutLogs = oldCoconutLogs
-            QuestManager.shared.lastEconomyRewardResult = oldLastReward
-            QuestManager.shared.flushToDefaults()
+            TestQuestManagerProjection.manager.coconutCount = oldCoconutCount
+            TestQuestManagerProjection.manager.coconutLogs = oldCoconutLogs
+            TestQuestManagerProjection.manager.lastEconomyRewardResult = oldLastReward
+            TestQuestManagerProjection.manager.persistQuestFlags()
         }
     }
 }

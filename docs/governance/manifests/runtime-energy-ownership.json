@@ -50,12 +50,12 @@
       "policyGate": "scripts/audit-runtime-guardrails.sh --all restricts CLLocationManager and background location to the centralized location files.",
       "evidence": "Runtime guardrails pass full repo; route cosmetic effects are AppWorkloadPolicy gated.",
       "paths": [
-        "Ohana/Models/LocationManager.swift",
-        "Ohana/Models/PetWalkingManager.swift",
-        "Ohana/Views/Home/WalkTrackingCard.swift",
-        "Ohana/Views/Home/WalkInProgressPill.swift",
-        "Ohana/Views/Components/RainbowWalkEffects.swift",
-        "Ohana/Views/Details/WalkDetailView.swift"
+        "Ohana/Features/Walks/LocationManager.swift",
+        "Ohana/Features/Walks/PetWalkingManager.swift",
+        "Ohana/Features/Home/Views/WalkTrackingCard.swift",
+        "Ohana/Features/Home/Views/WalkInProgressPill.swift",
+        "Ohana/Features/Walks/Views/RainbowWalkEffects.swift",
+        "Ohana/Features/Walks/Views/WalkDetailView.swift"
       ]
     },
     {
@@ -75,13 +75,13 @@
       "policyGate": "scripts/audit-smoothness-risk.sh --all and scripts/audit-runtime-guardrails.sh --all block new unowned loops.",
       "evidence": "Round 3 Oasis host/live snapshot repair; Today Focus and streak particles are policy gated.",
       "paths": [
-        "Ohana/Views/Home/OasisHomeTabHost.swift",
-        "Ohana/Views/Home/OasisRewardView.swift",
-        "Ohana/Views/Home/OasisRewardSnapshots.swift",
-        "Ohana/Views/Home/TodayFocusCard.swift",
-        "Ohana/Views/Home/StreakFlameParticles.swift",
-        "Ohana/Views/Home/BeautifulCoconutTree.swift",
-        "Ohana/Views/Home/FocusHomeVerticalSolidScene.swift"
+        "Ohana/Features/Home/Views/OasisHomeTabHost.swift",
+        "Ohana/Features/Home/Views/OasisRewardView.swift",
+        "Ohana/Features/Home/Views/OasisRewardSnapshots.swift",
+        "Ohana/Features/Home/Views/TodayFocusCard.swift",
+        "Ohana/Features/Home/Views/StreakFlameParticles.swift",
+        "Ohana/Features/Home/Views/BeautifulCoconutTree.swift",
+        "Ohana/Features/Home/Views/FocusHomeVerticalSolidScene.swift"
       ]
     },
     {
@@ -123,10 +123,10 @@
       "evidence": "Calendar add-event, settings sheets, and Oasis host use cancellable OhanaFrameScheduler tasks.",
       "paths": [
         "Ohana/Utilities/AppRuntimePolicy.swift",
-        "Ohana/Views/CalendarView.swift",
-        "Ohana/Views/Home/FocusHomeRouteSheetModifier.swift",
-        "Ohana/Views/Home/OasisHomeTabHost.swift",
-        "Ohana/Views/SettingsView.swift"
+        "Ohana/Features/Calendar/Views/CalendarView.swift",
+        "Ohana/Features/Home/Views/FocusHomeRouteSheetModifier.swift",
+        "Ohana/Features/Home/Views/OasisHomeTabHost.swift",
+        "Ohana/Features/Settings/Views/SettingsView.swift"
       ]
     },
     {

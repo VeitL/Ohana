@@ -28,44 +28,6 @@ struct IslandToastView: View {
     }
 }
 
-// MARK: - 管理器（维护 Toast 状态）
-@MainActor
-@Observable
-final class IslandToastManager {
-    static let shared = IslandToastManager()
-
-    var isShowing = false
-    var message = ""
-
-    private var dismissTask: Task<Void, Never>?
-
-    private init() {}
-
-    func show(_ msg: String) {
-        dismissTask?.cancel()
-        message = msg
-        withAnimation { isShowing = true }
-        dismissTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(2.5))
-            guard !Task.isCancelled else { return }
-            withAnimation { isShowing = false }
-        }
-    }
-
-    /// 根据打卡进度生成合适的文案
-    func showQuestProgress(completed: Int, total: Int) {
-        let msg: String
-        if completed == total {
-            msg = "🎉 今日委托全部完成！岛屿能量 MAX"
-        } else if completed % 3 == 0 && completed > 0 {
-            msg = "🔥 连击 \(completed) 个！继续！"
-        } else {
-            msg = "✨ 已完成 \(completed)/\(total) · +椰子入账"
-        }
-        show(msg)
-    }
-}
-
 // MARK: - ViewModifier 方便挂载
 struct IslandToastModifier: ViewModifier {
     var manager: IslandToastManager
@@ -79,8 +41,16 @@ struct IslandToastModifier: ViewModifier {
     }
 }
 
+struct IslandToastEnvironmentModifier: ViewModifier {
+    @Environment(AppServices.self) private var appServices
+
+    func body(content: Content) -> some View {
+        content.modifier(IslandToastModifier(manager: appServices.islandToasts))
+    }
+}
+
 extension View {
     func islandToastOverlay() -> some View {
-        modifier(IslandToastModifier(manager: IslandToastManager.shared))
+        modifier(IslandToastEnvironmentModifier())
     }
 }

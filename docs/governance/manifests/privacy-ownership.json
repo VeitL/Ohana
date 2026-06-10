@@ -27,7 +27,8 @@
       ],
       "paths": [
         "Ohana/PrivacyInfo.xcprivacy",
-        "Ohana/Models/DataBackupManager.swift",
+        "Ohana/Domain/Services/DataBackupManager.swift",
+        "Ohana/Domain/Services/DataBackupDTOs.swift",
         "Ohana/Utilities/AppResetService.swift",
         "scripts/audit-release-data-safety.sh"
       ]
@@ -51,9 +52,9 @@
         "DataBackupManager.exportJSON excludes PIN hash/salt/lockout fields"
       ],
       "paths": [
-        "Ohana/Models/PrivacyService.swift",
-        "Ohana/Views/Components/HumanAccountPrivacyViews.swift",
-        "Ohana/Views/Components/HumanPrivacyToggleButton.swift",
+        "Ohana/Features/Privacy/PrivacyService.swift",
+        "Ohana/Features/Privacy/Views/HumanAccountPrivacyViews.swift",
+        "Ohana/Features/Privacy/Views/HumanPrivacyToggleButton.swift",
         "scripts/audit-release-data-safety.sh"
       ]
     }

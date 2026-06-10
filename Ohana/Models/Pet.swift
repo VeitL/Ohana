@@ -414,7 +414,7 @@ final class Pet {
 
     /// 删除该宠物下所有活动类 SwiftData 记录，并移除 `relatedEntityId` 匹配的日历 `Event`（级联其 `Reminder`）。
     /// 保留基础档案字段与 `documents` / `insurances`。删除 Event 前会取消关联的本地通知。
-    /// 同步重置连续打卡、清理该宠物的任务冷却与椰子收支明细（仅 `actorId` 匹配的条目）。
+    /// 同步重置连续打卡。跨领域投影清理由调用方的 domain service 负责。
     func clearAllActivityRecords(in context: ModelContext) {
         let petIdStr = id.uuidString
         if let events = try? context.fetch(FetchDescriptor<Event>()) {
@@ -440,7 +440,6 @@ final class Pet {
 
         currentStreak = 0
         lastCheckInDate = nil
-        QuestManager.shared.clearPerPetAuxiliaryState(forPetId: id)
         context.safeSave()
     }
 }

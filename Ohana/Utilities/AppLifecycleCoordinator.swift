@@ -29,6 +29,11 @@ enum AppLifecycleCommand: Equatable {
     case scheduleReminderRefill
 }
 
+@MainActor
+protocol AppLifecycleHandling {
+    func handle(_ event: AppLifecycleEvent)
+}
+
 struct AppLifecycleReducer {
     private(set) var appliedPhase: ScenePhase?
 
@@ -75,7 +80,7 @@ struct AppLifecycleReducer {
 }
 
 @MainActor
-final class AppLifecycleCoordinator {
+final class AppLifecycleCoordinator: AppLifecycleHandling {
     struct Dependencies {
         var allowSystemAutoLock: () -> Void
         var updateWorkloadPhase: (ScenePhase) -> Void
@@ -86,35 +91,35 @@ final class AppLifecycleCoordinator {
         var pauseWalkForTermination: () -> Void
         var scheduleReminderRefill: () -> Void
 
-        static let live = Dependencies(
-            allowSystemAutoLock: {
-                UIApplication.shared.isIdleTimerDisabled = false
-            },
-            updateWorkloadPhase: { phase in
-                AppWorkloadPolicy.shared.updateScenePhase(phase)
-            },
-            refreshWorkload: { reason in
-                AppWorkloadPolicy.shared.refresh(reason: reason)
-            },
-            handleWalkBackground: {
-                PetWalkingManager.shared.handleAppBackgroundTransition()
-            },
-            handleWalkInactive: {
-                PetWalkingManager.shared.handleAppInactiveTransition()
-            },
-            handleWalkForeground: {
-                PetWalkingManager.shared.handleAppForegroundTransition()
-            },
-            pauseWalkForTermination: {
-                PetWalkingManager.shared.pauseForAppBackground()
-            },
-            scheduleReminderRefill: {
-                BackgroundTaskCoordinator.scheduleReminderRefill()
-            }
-        )
+        static func live(walkingManager: PetWalkingManager) -> Dependencies {
+            Dependencies(
+                allowSystemAutoLock: {
+                    UIApplication.shared.isIdleTimerDisabled = false
+                },
+                updateWorkloadPhase: { phase in
+                    AppWorkloadPolicy.shared.updateScenePhase(phase)
+                },
+                refreshWorkload: { reason in
+                    AppWorkloadPolicy.shared.refresh(reason: reason)
+                },
+                handleWalkBackground: {
+                    walkingManager.handleAppBackgroundTransition()
+                },
+                handleWalkInactive: {
+                    walkingManager.handleAppInactiveTransition()
+                },
+                handleWalkForeground: {
+                    walkingManager.handleAppForegroundTransition()
+                },
+                pauseWalkForTermination: {
+                    walkingManager.pauseForAppBackground()
+                },
+                scheduleReminderRefill: {
+                    BackgroundTaskCoordinator.scheduleReminderRefill()
+                }
+            )
+        }
     }
-
-    static let shared = AppLifecycleCoordinator(dependencies: .live)
 
     private var reducer = AppLifecycleReducer()
     private let dependencies: Dependencies

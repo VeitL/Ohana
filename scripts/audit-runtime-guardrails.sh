@@ -122,25 +122,25 @@ scan \
   "location-manager" \
   'CLLocationManager\s*\(' \
   "Location manager creation must stay centralized so background indicators and battery behavior remain predictable." \
-  "Ohana/Models/LocationManager.swift"
+  "Ohana/Features/Walks/LocationManager.swift"
 
 scan \
   "background-location" \
   'allowsBackgroundLocationUpdates\s*=\s*true' \
   "Background location may only be enabled for a running dog walk." \
-  "Ohana/Models/LocationManager.swift"
+  "Ohana/Features/Walks/LocationManager.swift"
 
 scan \
   "always-location-request" \
   'requestAlwaysAuthorization\s*\(' \
   "Always location prompts must stay behind the running-walk flow." \
-  "Ohana/Models/LocationManager.swift"
+  "Ohana/Features/Walks/LocationManager.swift"
 
 scan \
   "idle-timer" \
   'isIdleTimerDisabled\s*=\s*true' \
   "The app should not keep the display awake globally; only explicit active flows may opt in." \
-  "Ohana/Models/PetWalkingManager.swift"
+  "Ohana/Features/Walks/PetWalkingManager.swift"
 
 scan \
   "raw-timer-publisher" \

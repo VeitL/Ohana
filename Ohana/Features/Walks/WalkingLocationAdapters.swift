@@ -1,0 +1,168 @@
+import CoreLocation
+import Foundation
+import SwiftData
+
+@MainActor
+protocol PetWalkingManaging: AnyObject {
+    var currentPet: Pet? { get set }
+    var phase: WalkPhase { get set }
+    var elapsedTime: TimeInterval { get set }
+    var poopCount: Int { get set }
+    var showSummary: Bool { get set }
+    var isWalkCardExpandedSurfaceVisible: Bool { get set }
+    var lastCompletedPetId: UUID? { get }
+    var lastCompletedWalk: PetWalkLog? { get }
+    var lastCompletedRouteCoordinates: [CLLocationCoordinate2D] { get }
+    var activePoopMarkers: [WalkPoopMarker] { get }
+    var lastCompletedPoopMarkers: [WalkPoopMarker] { get }
+
+    func start(pet: Pet)
+    func pause()
+    func resume()
+    func stop(modelContext: ModelContext)
+    func addPoop(type: PottyType)
+    func reset()
+}
+
+extension PetWalkingManaging {
+    func addPoop() {
+        addPoop(type: .perfectPoop)
+    }
+}
+
+@MainActor
+final class SharedPetWalkingManager: PetWalkingManaging {
+    private let manager: PetWalkingManager
+
+    init() {
+        manager = PetWalkingManager(locationManager: LocationManager())
+    }
+
+    init(manager: PetWalkingManager) {
+        self.manager = manager
+    }
+
+    var currentPet: Pet? {
+        get { manager.currentPet }
+        set { manager.currentPet = newValue }
+    }
+
+    var phase: WalkPhase {
+        get { manager.phase }
+        set { manager.phase = newValue }
+    }
+
+    var elapsedTime: TimeInterval {
+        get { manager.elapsedTime }
+        set { manager.elapsedTime = newValue }
+    }
+
+    var poopCount: Int {
+        get { manager.poopCount }
+        set { manager.poopCount = newValue }
+    }
+
+    var showSummary: Bool {
+        get { manager.showSummary }
+        set { manager.showSummary = newValue }
+    }
+
+    var isWalkCardExpandedSurfaceVisible: Bool {
+        get { manager.isWalkCardExpandedSurfaceVisible }
+        set { manager.isWalkCardExpandedSurfaceVisible = newValue }
+    }
+
+    var lastCompletedPetId: UUID? {
+        manager.lastCompletedPetId
+    }
+
+    var lastCompletedWalk: PetWalkLog? {
+        manager.lastCompletedWalk
+    }
+
+    var lastCompletedRouteCoordinates: [CLLocationCoordinate2D] {
+        manager.lastCompletedRouteCoordinates
+    }
+
+    var activePoopMarkers: [WalkPoopMarker] {
+        manager.activePoopMarkers
+    }
+
+    var lastCompletedPoopMarkers: [WalkPoopMarker] {
+        manager.lastCompletedPoopMarkers
+    }
+
+    func start(pet: Pet) {
+        manager.start(pet: pet)
+    }
+
+    func pause() {
+        manager.pause()
+    }
+
+    func resume() {
+        manager.resume()
+    }
+
+    func stop(modelContext: ModelContext) {
+        manager.stop(modelContext: modelContext)
+    }
+
+    func addPoop(type: PottyType = .perfectPoop) {
+        manager.addPoop(type: type)
+    }
+
+    func reset() {
+        manager.reset()
+    }
+}
+
+@MainActor
+protocol LocationProviding: AnyObject {
+    var authorizationStatus: CLAuthorizationStatus { get }
+    var collectedLocations: [CLLocation] { get }
+    var totalDistance: Double { get }
+
+    func requestOneShotLocation(
+        accuracy: CLLocationAccuracy,
+        completion: @escaping (Result<CLLocation, Error>) -> Void
+    )
+}
+
+extension LocationProviding {
+    func requestOneShotLocation(completion: @escaping (Result<CLLocation, Error>) -> Void) {
+        requestOneShotLocation(accuracy: kCLLocationAccuracyHundredMeters, completion: completion)
+    }
+}
+
+@MainActor
+final class SharedLocationProvider: LocationProviding {
+    private let manager: LocationManager
+
+    init() {
+        manager = LocationManager()
+    }
+
+    init(manager: LocationManager) {
+        self.manager = manager
+    }
+
+    var authorizationStatus: CLAuthorizationStatus {
+        manager.authorizationStatus
+    }
+
+    var collectedLocations: [CLLocation] {
+        manager.collectedLocations
+    }
+
+    var totalDistance: Double {
+        manager.totalDistance
+    }
+
+    func requestOneShotLocation(
+        accuracy: CLLocationAccuracy,
+        completion: @escaping (Result<CLLocation, Error>) -> Void
+    ) {
+        manager.requestOneShotLocation(accuracy: accuracy, completion: completion)
+    }
+}

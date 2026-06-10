@@ -13,418 +13,200 @@ import SwiftData
 @Observable
 final class AppServices {
     let careEvents: CareEventRecording
+    let activeHumanSelection: ActiveHumanSelecting
     let coconutWallet: CoconutWalletManaging
+    let coconutExchange: CoconutExchangeManaging
+    let careLedger: CareLedgerRecording
+    let questManager: QuestManager
     let familyTasks: FamilyTaskManaging
+    let gacha: GachaDrawing
+    let memberCreation: MemberCreating
+    let oasisRewards: OasisRewardManaging
+    let privacy: HumanPrivacyManaging
+    let passcodes: HumanPasscodeManaging
+    let appIcons: AppIconManaging
+    let shopInventory: ShopInventoryManaging
+    let islandToasts: IslandToastManager
+    let metricKit: MetricKitObserving
+    let backups: DataBackupManaging
+    let appReset: AppResetting
+    let medicationReminders: MedicationReminderManaging
+    let userNotifications: UserNotificationManaging
+    let notificationRoutes: NotificationRoutePublishing
+    let reminderActions: ReminderActionHandling
+    let reminderScheduling: ReminderSchedulingManaging
+    let reminderCompletion: ReminderCompleting
+    let onboardingJourney: OnboardingJourneyCoordinating
+    let humanRequirements: HumanRequirementResolving
+    let todayFocus: TodayFocusManaging
+    let oasisTree: OasisTreeManaging
+    let healthAlerts: PetHealthAlerting
+    let walking: PetWalkingManaging
+    let location: LocationProviding
+    let careLedgerStats: CareLedgerStatsReading
     let domainRevisions: DomainRevisionPublishing
+    let lifecycle: AppLifecycleHandling
 
     convenience init() {
-        self.init(
-            careEvents: StaticCareEventRecorder(),
-            coconutWallet: SwiftDataCoconutWalletManager(),
-            familyTasks: StaticFamilyTaskManager(),
-            domainRevisions: SharedDomainRevisionPublisher()
+        let activeHumanSelection = UserDefaultsActiveHumanSelection()
+        let notificationRouteCenter = OhanaNotificationRouteCenter()
+        let notificationManager = NotificationManager(routeCenter: notificationRouteCenter)
+        let locationManager = LocationManager()
+        let revisionCenter = ReadModelRevisionCenter()
+        let avatarPipeline = AvatarPipeline()
+        let coconutWallet = SwiftDataCoconutWalletManager()
+        let domainRevisions = SharedDomainRevisionPublisher(center: revisionCenter)
+        let questManager = QuestManager(wallet: coconutWallet, revisions: domainRevisions)
+        let walkingManager = PetWalkingManager(locationManager: locationManager, questManager: questManager)
+        let careLedger = CareLedgerService()
+        let oasisRewardManager = StaticOasisRewardManager(
+            activeHumanSelection: activeHumanSelection,
+            wallet: coconutWallet,
+            questManager: questManager
         )
+        let oasisTreeManager = OasisTreeManager(
+            questManager: questManager,
+            careLedger: careLedger,
+            oasisRewards: oasisRewardManager
+        )
+        let careEventEconomy = StaticCareEventEconomyAwarder(
+            questManager: questManager,
+            oasisRewards: oasisRewardManager
+        )
+        let familyTasks = StaticFamilyTaskManager(wallet: coconutWallet, careLedger: careLedger, questManager: questManager)
+        let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
+        let quickActionReminderCompletion = QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion)
+        AppWorkloadPolicy.shared.hasRunningWalkProvider = { walkingManager.hasActiveLocationWalk }
+        self.init(
+            careEvents: CareEventService(
+                dependencies: CareEventServiceDependencies(
+                    questManager: questManager,
+                    economy: careEventEconomy,
+                    careLedger: careLedger,
+                    reminderCompletion: reminderCompletion,
+                    quickActionReminderCompletion: quickActionReminderCompletion,
+                    familyTasks: familyTasks,
+                    revisions: domainRevisions
+                )
+            ),
+            activeHumanSelection: activeHumanSelection,
+            coconutWallet: coconutWallet,
+            coconutExchange: StaticCoconutExchangeManager(wallet: coconutWallet, careLedger: careLedger, questManager: questManager),
+            careLedger: careLedger,
+            questManager: questManager,
+            familyTasks: familyTasks,
+            gacha: StaticGachaDrawer(wallet: coconutWallet, careLedger: careLedger, questManager: questManager),
+            memberCreation: MemberCreationService(
+                activeHumanSelection: activeHumanSelection,
+                wallet: coconutWallet,
+                careLedger: careLedger,
+                revisions: domainRevisions,
+                questManager: questManager
+            ),
+            oasisRewards: oasisRewardManager,
+            privacy: StaticHumanPrivacyManager(),
+            passcodes: StaticHumanPasscodeManager(),
+            appIcons: SystemAppIconManager(),
+            shopInventory: UserDefaultsShopInventoryManager(),
+            islandToasts: IslandToastManager(),
+            metricKit: MetricKitObserver(),
+            backups: SharedDataBackupManagerAdapter(questManager: questManager),
+            appReset: StaticAppResetter(questManager: questManager),
+            medicationReminders: SharedMedicationReminderManager(careLedger: careLedger),
+            userNotifications: SharedUserNotificationManager(manager: notificationManager),
+            notificationRoutes: SharedNotificationRoutePublisher(center: notificationRouteCenter),
+            reminderActions: LiveReminderActionHandler(),
+            reminderScheduling: ReminderSchedulingManager(careLedger: careLedger),
+            reminderCompletion: reminderCompletion,
+            onboardingJourney: LiveOnboardingJourneyCoordinator(),
+            humanRequirements: LiveHumanRequirementResolver(),
+            todayFocus: StaticTodayFocusManager(
+                questManager: questManager,
+                careLedger: careLedger,
+                revisions: domainRevisions
+            ),
+            oasisTree: SharedOasisTreeManager(manager: oasisTreeManager),
+            healthAlerts: SharedPetHealthAlertEngine(),
+            walking: SharedPetWalkingManager(manager: walkingManager),
+            location: SharedLocationProvider(manager: locationManager),
+            careLedgerStats: CareLedgerStatsReader(),
+            domainRevisions: domainRevisions,
+            lifecycle: AppLifecycleCoordinator(dependencies: .live(walkingManager: walkingManager))
+        )
+        OasisTreeManagerRegistry.current = oasisTreeManager
+        AvatarPipelineRegistry.current = avatarPipeline
+        OhanaNotifications.current = notificationManager
     }
 
     init(
         careEvents: CareEventRecording,
+        activeHumanSelection: ActiveHumanSelecting,
         coconutWallet: CoconutWalletManaging,
+        coconutExchange: CoconutExchangeManaging,
+        careLedger: CareLedgerRecording,
+        questManager: QuestManager,
         familyTasks: FamilyTaskManaging,
-        domainRevisions: DomainRevisionPublishing
+        gacha: GachaDrawing,
+        memberCreation: MemberCreating,
+        oasisRewards: OasisRewardManaging,
+        privacy: HumanPrivacyManaging,
+        passcodes: HumanPasscodeManaging,
+        appIcons: AppIconManaging,
+        shopInventory: ShopInventoryManaging,
+        islandToasts: IslandToastManager,
+        metricKit: MetricKitObserving,
+        backups: DataBackupManaging,
+        appReset: AppResetting,
+        medicationReminders: MedicationReminderManaging,
+        userNotifications: UserNotificationManaging,
+        notificationRoutes: NotificationRoutePublishing,
+        reminderActions: ReminderActionHandling,
+        reminderScheduling: ReminderSchedulingManaging,
+        reminderCompletion: ReminderCompleting,
+        onboardingJourney: OnboardingJourneyCoordinating,
+        humanRequirements: HumanRequirementResolving,
+        todayFocus: TodayFocusManaging,
+        oasisTree: OasisTreeManaging,
+        healthAlerts: PetHealthAlerting,
+        walking: PetWalkingManaging,
+        location: LocationProviding,
+        careLedgerStats: CareLedgerStatsReading,
+        domainRevisions: DomainRevisionPublishing,
+        lifecycle: AppLifecycleHandling
     ) {
         self.careEvents = careEvents
+        self.activeHumanSelection = activeHumanSelection
         self.coconutWallet = coconutWallet
+        self.coconutExchange = coconutExchange
+        self.careLedger = careLedger
+        self.questManager = questManager
         self.familyTasks = familyTasks
+        self.gacha = gacha
+        self.memberCreation = memberCreation
+        self.oasisRewards = oasisRewards
+        self.privacy = privacy
+        self.passcodes = passcodes
+        self.appIcons = appIcons
+        self.shopInventory = shopInventory
+        self.islandToasts = islandToasts
+        self.metricKit = metricKit
+        self.backups = backups
+        self.appReset = appReset
+        self.medicationReminders = medicationReminders
+        self.userNotifications = userNotifications
+        self.notificationRoutes = notificationRoutes
+        self.reminderActions = reminderActions
+        self.reminderScheduling = reminderScheduling
+        self.reminderCompletion = reminderCompletion
+        self.onboardingJourney = onboardingJourney
+        self.humanRequirements = humanRequirements
+        self.todayFocus = todayFocus
+        self.oasisTree = oasisTree
+        self.healthAlerts = healthAlerts
+        self.walking = walking
+        self.location = location
+        self.careLedgerStats = careLedgerStats
         self.domainRevisions = domainRevisions
-    }
-}
-
-@MainActor
-protocol CareEventRecording {
-    @discardableResult
-    func recordManualFeed(
-        pet: Pet,
-        amountGrams: Double,
-        context: ModelContext,
-        executorId: String?,
-        quality: QuestManager.QualityBonus,
-        date: Date,
-        foodKind: FeedFoodKind
-    ) -> (humanGot: Int, petGot: Int)
-
-    @discardableResult
-    func completePlannedFeed(
-        pet: Pet,
-        reminder: Reminder,
-        context: ModelContext,
-        quality: QuestManager.QualityBonus,
-        executorId: String?,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int)?
-
-    @discardableResult
-    func completePlannedWater(
-        pet: Pet,
-        reminder: Reminder,
-        amountMl: Double,
-        context: ModelContext,
-        executorId: String?
-    ) -> (humanGot: Int, petGot: Int)?
-
-    @discardableResult
-    func recordCare(
-        pet: Pet,
-        type: CareType,
-        amountMl: Double,
-        context: ModelContext,
-        executorId: String?,
-        reward: QuestManager.OhanaActionType,
-        quality: QuestManager.QualityBonus,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int)
-
-    @discardableResult
-    func recordPotty(
-        pet: Pet,
-        type: PottyType,
-        context: ModelContext,
-        executorId: String?,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int)
-
-    @discardableResult
-    func recordHygiene(
-        pet: Pet,
-        type: HygieneType,
-        context: ModelContext,
-        executorId: String?,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int)
-
-    @discardableResult
-    func recordHealth(
-        pet: Pet,
-        type: HealthLogType,
-        note: String,
-        context: ModelContext,
-        executorId: String?,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int)
-}
-
-@MainActor
-final class StaticCareEventRecorder: CareEventRecording {
-    func recordManualFeed(
-        pet: Pet,
-        amountGrams: Double,
-        context: ModelContext,
-        executorId: String?,
-        quality: QuestManager.QualityBonus,
-        date: Date,
-        foodKind: FeedFoodKind
-    ) -> (humanGot: Int, petGot: Int) {
-        CareEventService.recordManualFeed(
-            pet: pet,
-            amountGrams: amountGrams,
-            context: context,
-            executorId: executorId,
-            quality: quality,
-            date: date,
-            foodKind: foodKind
-        )
-    }
-
-    func completePlannedFeed(
-        pet: Pet,
-        reminder: Reminder,
-        context: ModelContext,
-        quality: QuestManager.QualityBonus,
-        executorId: String?,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int)? {
-        CareEventService.completePlannedFeed(
-            pet: pet,
-            reminder: reminder,
-            context: context,
-            quality: quality,
-            executorId: executorId,
-            date: date
-        )
-    }
-
-    func completePlannedWater(
-        pet: Pet,
-        reminder: Reminder,
-        amountMl: Double,
-        context: ModelContext,
-        executorId: String?
-    ) -> (humanGot: Int, petGot: Int)? {
-        CareEventService.completePlannedWater(
-            pet: pet,
-            reminder: reminder,
-            amountMl: amountMl,
-            context: context,
-            executorId: executorId
-        )
-    }
-
-    func recordCare(
-        pet: Pet,
-        type: CareType,
-        amountMl: Double,
-        context: ModelContext,
-        executorId: String?,
-        reward: QuestManager.OhanaActionType,
-        quality: QuestManager.QualityBonus,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int) {
-        CareEventService.recordCare(
-            pet: pet,
-            type: type,
-            amountMl: amountMl,
-            context: context,
-            executorId: executorId,
-            reward: reward,
-            quality: quality,
-            date: date
-        )
-    }
-
-    func recordPotty(
-        pet: Pet,
-        type: PottyType,
-        context: ModelContext,
-        executorId: String?,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int) {
-        CareEventService.recordPotty(
-            pet: pet,
-            type: type,
-            context: context,
-            executorId: executorId,
-            date: date
-        )
-    }
-
-    func recordHygiene(
-        pet: Pet,
-        type: HygieneType,
-        context: ModelContext,
-        executorId: String?,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int) {
-        CareEventService.recordHygiene(
-            pet: pet,
-            type: type,
-            context: context,
-            executorId: executorId,
-            date: date
-        )
-    }
-
-    func recordHealth(
-        pet: Pet,
-        type: HealthLogType,
-        note: String,
-        context: ModelContext,
-        executorId: String?,
-        date: Date
-    ) -> (humanGot: Int, petGot: Int) {
-        CareEventService.recordHealth(
-            pet: pet,
-            type: type,
-            note: note,
-            context: context,
-            executorId: executorId,
-            date: date
-        )
-    }
-}
-
-@MainActor
-protocol CoconutWalletManaging {
-    @discardableResult
-    func apply(
-        deltas: [CoconutWalletDelta],
-        context: ModelContext,
-        save: Bool,
-        postsRewardFeedback: Bool,
-        updatesProjection: Bool,
-        projectionManager: QuestManager?
-    ) throws -> [CoconutLedgerEntry]
-}
-
-@MainActor
-final class SwiftDataCoconutWalletManager: CoconutWalletManaging {
-    func apply(
-        deltas: [CoconutWalletDelta],
-        context: ModelContext,
-        save: Bool,
-        postsRewardFeedback: Bool,
-        updatesProjection: Bool,
-        projectionManager: QuestManager?
-    ) throws -> [CoconutLedgerEntry] {
-        try CoconutWalletService.apply(
-            deltas: deltas,
-            context: context,
-            save: save,
-            postsRewardFeedback: postsRewardFeedback,
-            updatesProjection: updatesProjection,
-            projectionManager: projectionManager
-        )
-    }
-}
-
-@MainActor
-protocol FamilyTaskManaging {
-    func migrateLegacyBountiesIfNeeded(context: ModelContext)
-    func assignReminder(
-        _ reminder: Reminder,
-        to human: Human,
-        by creator: Human?,
-        rewardCoconuts: Int,
-        note: String,
-        context: ModelContext
-    ) -> FamilyCollaborationTask?
-    func createHouseholdTask(
-        title: String,
-        note: String,
-        assignedTo human: Human?,
-        by creator: Human?,
-        rewardCoconuts: Int,
-        dueAt: Date?,
-        emoji: String,
-        context: ModelContext
-    ) -> FamilyCollaborationTask?
-    func updateTask(
-        _ task: FamilyCollaborationTask,
-        title: String,
-        note: String,
-        assignedTo human: Human?,
-        rewardCoconuts: Int,
-        dueAt: Date?,
-        emoji: String,
-        context: ModelContext
-    )
-    func delete(_ task: FamilyCollaborationTask, context: ModelContext)
-    func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext)
-    func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext)
-    func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext)
-    func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext)
-    func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext)
-    func syncReopenedReminder(_ reminder: Reminder, context: ModelContext)
-}
-
-@MainActor
-final class StaticFamilyTaskManager: FamilyTaskManaging {
-    func migrateLegacyBountiesIfNeeded(context: ModelContext) {
-        FamilyTaskService.migrateLegacyBountiesIfNeeded(context: context)
-    }
-
-    func assignReminder(
-        _ reminder: Reminder,
-        to human: Human,
-        by creator: Human?,
-        rewardCoconuts: Int,
-        note: String,
-        context: ModelContext
-    ) -> FamilyCollaborationTask? {
-        FamilyTaskService.assignReminder(
-            reminder,
-            to: human,
-            by: creator,
-            rewardCoconuts: rewardCoconuts,
-            note: note,
-            context: context
-        )
-    }
-
-    func createHouseholdTask(
-        title: String,
-        note: String,
-        assignedTo human: Human?,
-        by creator: Human?,
-        rewardCoconuts: Int,
-        dueAt: Date?,
-        emoji: String,
-        context: ModelContext
-    ) -> FamilyCollaborationTask? {
-        FamilyTaskService.createHouseholdTask(
-            title: title,
-            note: note,
-            assignedTo: human,
-            by: creator,
-            rewardCoconuts: rewardCoconuts,
-            dueAt: dueAt,
-            emoji: emoji,
-            context: context
-        )
-    }
-
-    func updateTask(
-        _ task: FamilyCollaborationTask,
-        title: String,
-        note: String,
-        assignedTo human: Human?,
-        rewardCoconuts: Int,
-        dueAt: Date?,
-        emoji: String,
-        context: ModelContext
-    ) {
-        FamilyTaskService.updateTask(
-            task,
-            title: title,
-            note: note,
-            assignedTo: human,
-            rewardCoconuts: rewardCoconuts,
-            dueAt: dueAt,
-            emoji: emoji,
-            context: context
-        )
-    }
-
-    func delete(_ task: FamilyCollaborationTask, context: ModelContext) {
-        FamilyTaskService.delete(task, context: context)
-    }
-
-    func rejectCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) {
-        FamilyTaskService.rejectCompletion(task, by: reviewer, context: context)
-    }
-
-    func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) {
-        FamilyTaskService.confirmCompletion(task, by: reviewer, context: context)
-    }
-
-    func complete(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) {
-        FamilyTaskService.complete(task, by: human, context: context)
-    }
-
-    func claim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) {
-        FamilyTaskService.claim(task, by: human, context: context)
-    }
-
-    func syncCompletedReminder(_ reminder: Reminder, completedBy humanId: String?, context: ModelContext) {
-        FamilyTaskService.syncCompletedReminder(reminder, completedBy: humanId, context: context)
-    }
-
-    func syncReopenedReminder(_ reminder: Reminder, context: ModelContext) {
-        FamilyTaskService.syncReopenedReminder(reminder, context: context)
-    }
-}
-
-@MainActor
-protocol DomainRevisionPublishing {
-    func publish(_ result: DomainMutationResult)
-    func publishFailure(command: DomainCommand, error: Error)
-}
-
-@MainActor
-final class SharedDomainRevisionPublisher: DomainRevisionPublishing {
-    func publish(_ result: DomainMutationResult) {
-        ReadModelRevisionCenter.shared.publish(result)
-    }
-
-    func publishFailure(command: DomainCommand, error: Error) {
-        ReadModelRevisionCenter.shared.publishFailure(command: command, error: error)
+        self.lifecycle = lifecycle
     }
 }

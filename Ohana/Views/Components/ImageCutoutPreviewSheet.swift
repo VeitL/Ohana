@@ -232,7 +232,7 @@ struct ImageCutoutPreviewSheet: View {
     private func runCutout() async {
         isProcessing = true
         cutoutFailed = false
-        if let result = try? await ImageCutoutService.shared.removeBackground(from: image) {
+        if let result = try? await ImageSubjectCutoutProcessor.removeBackground(from: image) {
             cutoutImage = result
         } else {
             cutoutFailed = true

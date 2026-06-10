@@ -10,7 +10,7 @@ import Foundation
 enum CheckInStreakStore {
     static let legacyCheckedInKey = "oasis_checkedIn_dates"
     static let legacyMakeupDatesKey = "oasis_makeup_dates"
-    static let makeupPackKey = "inventory_backdate_1day_count"
+    nonisolated static let makeupPackKey = "inventory_backdate_1day_count"
     private static let legacyMigrationMarkerKey = "oasis_checkin_legacy_migrated_to_human_id"
     private static let legacyMilestoneKey = "checkIn_lastClaimedMilestone"
 

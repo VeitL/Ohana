@@ -18,11 +18,26 @@ done
 
 echo
 echo "== Registered language resources =="
+localization_sources=(
+  "Ohana/Shared/LocalizationSettings.swift"
+  "Ohana/Shared/Localization.swift"
+  "Ohana/Models/Localization.swift"
+)
 lprojs=()
 while IFS= read -r lproj; do
   lprojs+=("$lproj")
-done < <(perl -ne 'print "$1\n" if /lprojName:\s*"([^"]+)"/' Ohana/Models/Localization.swift | sort -u)
-for lproj in "${lprojs[@]}"; do
+done < <(
+  for source in "${localization_sources[@]}"; do
+    [[ -f "$source" ]] || continue
+    perl -ne 'print "$1\n" if /lprojName:\s*"([^"]+)"/' "$source"
+  done | sort -u
+)
+if [[ ${#lprojs[@]} -eq 0 ]]; then
+  while IFS= read -r lproj; do
+    lprojs+=("$lproj")
+  done < <(find Ohana -maxdepth 1 -name '*.lproj' -type d -exec basename {} .lproj \; | sort -u)
+fi
+for lproj in "${lprojs[@]:-}"; do
   file="Ohana/${lproj}.lproj/Localizable.strings"
   if [[ -f "$file" ]]; then
     echo "ok  $file"

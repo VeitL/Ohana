@@ -1,0 +1,699 @@
+//
+//  AppRouteDestinationContainers.swift
+//  Ohana
+//
+//  Typed route composition for global destinations.
+//
+
+import SwiftUI
+
+struct AppRouteDestination: View {
+    let route: AppRoute
+    let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+
+    init(
+        route: AppRoute,
+        onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    ) {
+        self.route = route
+        self.onPresentCoconutLog = onPresentCoconutLog
+    }
+
+    var body: some View {
+        switch route {
+        case let .petProfile(id, initialTab):
+            AppPetRouteContainer(id: id, initialTab: initialTab)
+        case let .humanProfile(id):
+            AppHumanRouteContainer(
+                id: id,
+                onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
+            )
+        case let .plantProfile(id):
+            if AppFeatureRouteGuard.allowsAppRoute(route) {
+                AppPlantRouteContainer(id: id)
+            } else {
+                HiddenRouteInterceptView(note: route.id)
+            }
+        }
+    }
+}
+
+struct AppRoutePresentationHost: ViewModifier {
+    @ObservedObject var coordinator: AppRouteCoordinator
+    let onRequiredHumanSaved: (Human) -> Void
+    let onAddEntityDismissed: () -> Void
+    let onPetSavedFromAddEntity: (Pet) -> Void
+    let onHumanSavedFromAddEntity: (Human) -> Void
+    let onFirstSuccessMomentCompleted: (Pet) -> Void
+    let onHumanDoseTaken: (UUID) -> Void
+
+    @State private var lastSheetRoute: AppSheetRoute?
+
+    func body(content: Content) -> some View {
+        content
+            .fullScreenCover(item: $coordinator.fullScreen) { route in
+                AppDeferredRouteContent(
+                    routeID: route.id,
+                    policy: AppPresentationPolicyProvider.policy(for: route)
+                ) {
+                    AppFullScreenRouteDestination(
+                        route: route,
+                        onRequiredHumanSaved: onRequiredHumanSaved,
+                        onDismiss: { coordinator.dismissFullScreen(route) },
+                        onPresentCoconutLog: { subject in
+                            coordinator.presentCoconutLog(subject)
+                        }
+                    )
+                }
+            }
+            .sheet(item: $coordinator.sheet, onDismiss: handleSheetDismissed) { route in
+                AppDeferredRouteContent(
+                    routeID: route.id,
+                    policy: AppPresentationPolicyProvider.policy(for: route)
+                ) {
+                    AppSheetRouteDestination(
+                        route: route,
+                        coordinator: coordinator,
+                        onDismiss: { coordinator.dismissSheet(route) },
+                        onPetSavedFromAddEntity: onPetSavedFromAddEntity,
+                        onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
+                        onCalendarEventDestination: handleCalendarEventDestination,
+                        onHumanDoseTaken: onHumanDoseTaken
+                    )
+                }
+                .appRouteSheetPresentation(for: route)
+                .onAppear {
+                    lastSheetRoute = route
+                }
+            }
+            .overlay {
+                if let route = coordinator.overlay {
+                    AppDeferredRouteContent(
+                        routeID: route.id,
+                        policy: AppPresentationPolicyProvider.policy(for: route)
+                    ) {
+                        AppOverlayRouteDestination(
+                            route: route,
+                            onDismiss: { coordinator.dismissOverlay(route) },
+                            onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
+                            onOpenPet: { id, tab in coordinator.openPet(id, initialTab: tab) },
+                            onOpenHuman: { id in coordinator.openHuman(id) },
+                            onPresentCoconutLog: { subject in
+                                coordinator.presentCoconutLog(subject)
+                            }
+                        )
+                    }
+                    .ignoresSafeArea()
+                    .zIndex(140)
+                }
+            }
+    }
+
+    private func handleSheetDismissed() {
+        defer { lastSheetRoute = nil }
+        if case .addEntity = lastSheetRoute {
+            onAddEntityDismissed()
+        }
+    }
+
+    private func handleCalendarEventDestination(_ destination: FocusHomeReminderDestination) {
+        coordinator.dismissSheet()
+        OhanaFrameScheduler.runAfterNextFrame {
+            openCalendarEventDestinationAfterDismiss(destination)
+        }
+    }
+
+    private func openCalendarEventDestinationAfterDismiss(_ destination: FocusHomeReminderDestination) {
+        switch destination {
+        case let .petQuick(key, pet):
+            openPetQuickKey(key, pet: pet)
+        case let .petFeature(feature, pet):
+            openPetFeature(feature, pet: pet)
+        case let .petHealth(pet, section):
+            coordinator.presentSheet(.petHealth(pet.id, initialSection: section))
+        case let .humanQuick(key, human):
+            openHumanQuickKey(key, human: human)
+        case let .humanDetail(human):
+            coordinator.openHuman(human.id)
+        case .plant:
+            AppFeatureRouteGuard.recordIntercept("calendarPlant")
+            coordinator.presentFunctionMenu(destination: .growthRoadmap)
+        case let .functionMenu(destination):
+            coordinator.presentFunctionMenu(destination: destination)
+        case let .calendar(entityID, humanID):
+            coordinator.presentCalendar(entityID: entityID, humanID: humanID)
+        }
+    }
+
+    private func openPetQuickKey(_ key: String, pet: Pet) {
+        switch key {
+        case "feed":
+            coordinator.presentSheet(.petFeed(pet.id, opensManualSheet: false))
+        case "water", "waterChange", "filterClean":
+            coordinator.presentSheet(.petWater(pet.id))
+        case "potty":
+            coordinator.presentSheet(.petPotty(pet.id))
+        case "litter":
+            coordinator.presentSheet(.petLitter(pet.id))
+        case "walk":
+            coordinator.presentSheet(.petWalkSummary(pet.id))
+        case "play":
+            coordinator.presentSheet(.petPlay(pet.id))
+        case "health":
+            coordinator.presentSheet(.petHealth(pet.id, initialSection: nil))
+        case "medication":
+            coordinator.presentSheet(.petMedication(pet.id))
+        case "groom", "cageCleaning", "freeFlight", "misting", "substrateChange":
+            coordinator.presentSheet(.petHygiene(pet.id))
+        case "weight":
+            coordinator.presentSheet(.petWeight(pet.id))
+        case "expense":
+            coordinator.presentSheet(.petExpense(pet.id))
+        case "moment":
+            coordinator.presentQuickMoment(petID: pet.id)
+        default:
+            coordinator.presentSheet(.petAllFeatures(pet.id))
+        }
+    }
+
+    private func openPetFeature(_ feature: PetFeature, pet: Pet) {
+        switch feature {
+        case .health:
+            coordinator.presentSheet(.petHealth(pet.id, initialSection: nil))
+        case .medications:
+            coordinator.presentSheet(.petMedication(pet.id))
+        case .food:
+            coordinator.presentSheet(.petFood(pet.id))
+        case .hygiene:
+            coordinator.presentSheet(.petHygiene(pet.id))
+        case .walks:
+            coordinator.presentSheet(.petWalkSummary(pet.id))
+        case .potty:
+            coordinator.presentSheet(.petPotty(pet.id))
+        case .basicInfo:
+            coordinator.presentSheet(.petBasicInfo(pet.id))
+        case .moments:
+            coordinator.presentSheet(.petMomentHistory(pet.id))
+        case .weight:
+            coordinator.presentSheet(.petWeight(pet.id))
+        case .expense:
+            coordinator.presentSheet(.petExpense(pet.id))
+        case .retention:
+            coordinator.presentSheet(.petRetention(pet.id))
+        case .documents:
+            coordinator.presentSheet(.petDocuments(pet.id))
+        case .achievements:
+            coordinator.presentSheet(.petAchievements(pet.id))
+        }
+    }
+
+    private func openHumanQuickKey(_ key: String, human: Human) {
+        switch key {
+        case "humanWeight":
+            coordinator.presentSheet(.humanWeight(human.id))
+        case "humanWorkout":
+            coordinator.presentSheet(.humanWorkout(human.id))
+        case "humanMedication":
+            coordinator.presentSheet(.humanMedication(human.id))
+        case "humanExpense":
+            coordinator.presentSheet(.humanExpense(human.id))
+        case "humanNote":
+            coordinator.presentSheet(.humanNote(human.id))
+        default:
+            coordinator.presentSheet(.humanAllFeatures(human.id))
+        }
+    }
+}
+
+extension View {
+    func appRoutePresentationHost(
+        coordinator: AppRouteCoordinator,
+        onRequiredHumanSaved: @escaping (Human) -> Void,
+        onAddEntityDismissed: @escaping () -> Void = {},
+        onPetSavedFromAddEntity: @escaping (Pet) -> Void = { _ in },
+        onHumanSavedFromAddEntity: @escaping (Human) -> Void = { _ in },
+        onFirstSuccessMomentCompleted: @escaping (Pet) -> Void = { _ in },
+        onHumanDoseTaken: @escaping (UUID) -> Void = { _ in }
+    ) -> some View {
+        modifier(
+            AppRoutePresentationHost(
+                coordinator: coordinator,
+                onRequiredHumanSaved: onRequiredHumanSaved,
+                onAddEntityDismissed: onAddEntityDismissed,
+                onPetSavedFromAddEntity: onPetSavedFromAddEntity,
+                onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
+                onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
+                onHumanDoseTaken: onHumanDoseTaken
+            )
+        )
+    }
+}
+
+private struct AppFullScreenRouteDestination: View {
+    let route: AppFullScreenRoute
+    let onRequiredHumanSaved: (Human) -> Void
+    let onDismiss: () -> Void
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
+
+    var body: some View {
+        switch route {
+        case .oasisReward:
+            OasisRewardView(onPresentCoconutLog: onPresentCoconutLog)
+        case .requiredHumanProfile:
+            RequiredHumanProfileView { human in
+                onRequiredHumanSaved(human)
+                onDismiss()
+            }
+            .interactiveDismissDisabled(true)
+        case let .walk(petID):
+            AppWalkRouteContainer(id: petID, onDismiss: onDismiss)
+        }
+    }
+}
+
+private struct AppSheetRouteDestination: View {
+    let route: AppSheetRoute
+    @ObservedObject var coordinator: AppRouteCoordinator
+    let onDismiss: () -> Void
+    let onPetSavedFromAddEntity: (Pet) -> Void
+    let onHumanSavedFromAddEntity: (Human) -> Void
+    let onCalendarEventDestination: (FocusHomeReminderDestination) -> Void
+    let onHumanDoseTaken: (UUID) -> Void
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+
+    private var l: L10n { L10n(appLanguage) }
+
+    var body: some View {
+        switch route {
+        case .accountSwitcher:
+            AppAccountSwitcherRouteContainer(onSwitched: onDismiss)
+                .ohanaCompactSheetPresentation(detents: [.medium, .large])
+        case let .addEntity(type):
+            AddEntityDestinationView(
+                type: type,
+                onComplete: onDismiss,
+                onPetSaved: onPetSavedFromAddEntity,
+                onHumanSaved: onHumanSavedFromAddEntity
+            )
+            .ohanaSheetPagePresentation()
+        case let .calendar(entityID, humanID):
+            CalendarRouteContainer(
+                preselectedPetId: entityID,
+                preselectedHumanId: humanID,
+                onOpenEventDestination: onCalendarEventDestination,
+                onPresentCoconutLog: { subject in
+                    coordinator.presentCoconutLog(subject)
+                }
+            )
+            .ohanaSheetPagePresentation()
+        case let .coconutLog(subject):
+            CoconutLogView(
+                subject: subject,
+                onClose: onDismiss,
+                historyContentDelayMilliseconds: 80
+            )
+            .ohanaSheetPagePresentation()
+        case let .coconutShop(category):
+            if AppFeatureRouteGuard.allowsSheetRoute(route, currentLevel: currentFeatureLevel) {
+                CoconutShopRouteContainer(initialCategory: category)
+                    .ohanaSheetPagePresentation()
+            } else {
+                HiddenRouteInterceptView(
+                    note: AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: currentFeatureLevel)
+                )
+                .onAppear(perform: onDismiss)
+            }
+        case let .crewRoster(mode):
+            NavigationStack {
+                CrewRosterOverlayRouteContainer(
+                    initialMode: mode,
+                    onSelectPet: { pet in
+                        onDismiss()
+                        coordinator.openPet(pet.id, initialTab: .overview)
+                    },
+                    onSelectHuman: { human in
+                        onDismiss()
+                        coordinator.openHuman(human.id)
+                    },
+                    onClose: onDismiss,
+                    onPresentCoconutLog: { subject in
+                        coordinator.presentCoconutLog(subject)
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(action: onDismiss) {
+                            Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark.circle.fill")
+                                .labelStyle(.iconOnly)
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                        }
+                    }
+                }
+            }
+            .ohanaSheetPagePresentation()
+        case let .functionMenu(destination):
+            FunctionMenuSheet(initialDestination: destination)
+                .ohanaSheetPagePresentation()
+        case let .petAllFeatures(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .allFeatures,
+                onMissing: onDismiss,
+                onOpenFeatureDestination: openPetAllFeatureDestination
+            )
+            .ohanaSheetPagePresentation()
+        case let .petBasicInfo(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .basicInfo,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petFood(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .food,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petWeight(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .weight,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petExpense(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .expense,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petFeed(id, opensManualSheet):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .feed(opensManualSheet),
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petWater(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .water,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petPotty(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .potty,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petLitter(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .litter,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petPlay(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .play,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petHygiene(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .hygiene,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petWalkSummary(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .walkSummary,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petHealth(id, initialSection):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .health(initialSection),
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petMedication(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .medication,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petMomentHistory(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .momentHistory,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petDocuments(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .documents,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petAchievements(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .achievements,
+                onMissing: onDismiss,
+                onPresentCoconutLog: { subject in
+                    coordinator.presentCoconutLog(subject)
+                }
+            )
+            .ohanaSheetPagePresentation()
+        case let .petRetention(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .retention,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .petBondVault(id):
+            AppPetDetailSheetRouteContainer(
+                id: id,
+                destination: .bondVault,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanAllFeatures(id):
+            HumanAllFeaturesRouteContainer(
+                id: id,
+                onMissing: onDismiss,
+                onOpenDestination: openHumanAllFeatureDestination
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanBasicInfo(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .basicInfo,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanMedication(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .medication,
+                onMissing: onDismiss,
+                onHumanDoseTaken: onHumanDoseTaken
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanWeight(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .weight,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanWorkout(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .workout,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanWorkoutDashboard(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .workoutDashboard,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanMetrics(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .metrics,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanReport(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .report,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanExpense(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .expense,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanWishlist(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .wishlist,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case let .humanNote(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .note,
+                onMissing: onDismiss
+            )
+            .ohanaSheetPagePresentation()
+        case .requiredAccountSwitch:
+            AppAccountSwitcherRouteContainer(onSwitched: onDismiss)
+                .interactiveDismissDisabled(true)
+        case .settings:
+            AppSettingsSheetRouteContainer(onClose: onDismiss)
+                .ohanaSheetPagePresentation()
+        case .streakDetail:
+            AppStreakDetailRouteContainer(
+                onClose: onDismiss,
+                onPresentCoconutLog: { subject in
+                    coordinator.presentCoconutLog(subject)
+                },
+                onPresentCoconutShop: { category in
+                    coordinator.presentCoconutShop(category: category)
+                }
+            )
+                .ohanaSheetPagePresentation()
+        }
+    }
+
+    private var currentFeatureLevel: Int {
+        OasisTreeManagerRegistry.current.treeLevel.rawValue
+    }
+
+    private func openPetAllFeatureDestination(_ petID: UUID, destination: PetAllFeatureDestination) {
+        let route: AppSheetRoute
+        switch destination {
+        case .health:
+            route = .petHealth(petID, initialSection: nil)
+        case .medications:
+            route = .petMedication(petID)
+        case .food:
+            route = .petFood(petID)
+        case .hygiene:
+            route = .petHygiene(petID)
+        case .walks:
+            route = .petWalkSummary(petID)
+        case .potty:
+            route = .petPotty(petID)
+        case .basicInfo:
+            route = .petBasicInfo(petID)
+        case .documents:
+            route = .petDocuments(petID)
+        case .moments, .timeline:
+            route = .petMomentHistory(petID)
+        case .achievements:
+            route = .petAchievements(petID)
+        case .retention:
+            route = .petRetention(petID)
+        case .weight:
+            route = .petWeight(petID)
+        case .expense:
+            route = .petExpense(petID)
+        case .bondVault:
+            route = .petBondVault(petID)
+        }
+        presentFeatureRouteAfterTap(route)
+    }
+
+    private func openHumanAllFeatureDestination(_ humanID: UUID, destination: HumanAllFeatureDestination) {
+        let route: AppSheetRoute
+        switch destination {
+        case .basicInfo:
+            route = .humanBasicInfo(humanID)
+        case .weight:
+            route = .humanWeight(humanID)
+        case .workout:
+            route = .humanWorkoutDashboard(humanID)
+        case .metrics:
+            route = .humanMetrics(humanID)
+        case .medication:
+            route = .humanMedication(humanID)
+        case .report:
+            route = .humanReport(humanID)
+        case .expense:
+            route = .humanExpense(humanID)
+        case .wishlist:
+            route = .humanWishlist(humanID)
+        case .notes:
+            route = .humanNote(humanID)
+        }
+        presentFeatureRouteAfterTap(route)
+    }
+
+    private func presentFeatureRouteAfterTap(_ route: AppSheetRoute) {
+        OhanaFrameScheduler.runAfterNextFrame {
+            coordinator.presentSheet(route)
+        }
+    }
+}
+
+private struct AppOverlayRouteDestination: View {
+    let route: AppOverlayRoute
+    let onDismiss: () -> Void
+    let onFirstSuccessMomentCompleted: (Pet) -> Void
+    let onOpenPet: (UUID, PetDetailTab) -> Void
+    let onOpenHuman: (UUID) -> Void
+    let onPresentCoconutLog: (CoconutLogSubject?) -> Void
+
+    var body: some View {
+        switch route {
+        case let .quickMoment(_, petID):
+            OhanaInlinePageRouteHost(routeID: route.id, onClose: onDismiss) { requestClose in
+                AppQuickMomentOverlayRouteContainer(
+                    id: petID,
+                    onSaved: onFirstSuccessMomentCompleted,
+                    onDismiss: requestClose
+                )
+            }
+        }
+    }
+}
+
+private struct HiddenRouteInterceptView: View {
+    let note: String
+
+    var body: some View {
+        Color.clear
+            .onAppear {
+                AppFeatureRouteGuard.recordIntercept(note)
+            }
+    }
+}

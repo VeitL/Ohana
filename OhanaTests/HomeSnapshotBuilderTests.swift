@@ -1,7 +1,9 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Ohana
 
+@MainActor
 struct HomeSnapshotBuilderTests {
     @Test func snapshotOrdersVisiblePetsHumansAndCrittersByCreationDate() throws {
         let olderPet = Pet(name: "Momo", species: "猫")
@@ -118,12 +120,12 @@ struct HomeSnapshotBuilderTests {
         let now = Date(timeIntervalSince1970: 20_000)
         let pet = Pet(name: "Momo", species: "猫")
 
-        let first = VerticalSolidHomeSnapshotBuilder.build(
+        let first = makeVerticalSnapshot(
             from: makeVerticalSource(pets: [pet]),
             now: now
         )
         pet.name = "Nori"
-        let second = VerticalSolidHomeSnapshotBuilder.build(
+        let second = makeVerticalSnapshot(
             from: makeVerticalSource(pets: [pet]),
             now: now
         )
@@ -138,7 +140,7 @@ struct HomeSnapshotBuilderTests {
         let hiddenPet = Pet(name: "Hidden", species: "狗")
         hiddenPet.avatarImageData = Data([8, 7, 6, 5])
 
-        let snapshot = VerticalSolidHomeSnapshotBuilder.build(
+        let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(
                 pets: [visiblePet, hiddenPet],
                 hiddenPetIDsRaw: hiddenPet.id.uuidString
@@ -157,7 +159,7 @@ struct HomeSnapshotBuilderTests {
         let pet = Pet(name: "Momo", species: "猫")
         pet.avatarImageData = avatarData
 
-        let snapshot = VerticalSolidHomeSnapshotBuilder.build(
+        let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(pets: [pet])
         )
         let card = try #require(snapshot.cards.first)
@@ -173,7 +175,7 @@ struct HomeSnapshotBuilderTests {
         hiddenPet.cardStyleRaw = "popout"
         hiddenPet.cardPopoutImageData = Data([2, 4, 6, 8])
 
-        let snapshot = VerticalSolidHomeSnapshotBuilder.build(
+        let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(
                 pets: [visiblePet, hiddenPet],
                 hiddenPetIDsRaw: hiddenPet.id.uuidString
@@ -193,7 +195,7 @@ struct HomeSnapshotBuilderTests {
         pet.cardStyleRaw = "popout"
         pet.cardPopoutImageData = popoutData
 
-        let snapshot = VerticalSolidHomeSnapshotBuilder.build(
+        let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(pets: [pet])
         )
         let card = try #require(snapshot.cards.first)
@@ -218,7 +220,7 @@ struct HomeSnapshotBuilderTests {
         PetBondVaultStore.unlock(.cardBorder, for: pet.id)
         PetBondVaultStore.unlock(.nameplate, for: pet.id)
 
-        let snapshot = VerticalSolidHomeSnapshotBuilder.build(
+        let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(
                 pets: [pet],
                 petBondVaultRevision: UserDefaults.standard.integer(forKey: PetBondVaultStore.revisionKey)
@@ -233,7 +235,7 @@ struct HomeSnapshotBuilderTests {
     @Test func verticalSnapshotActiveHumanCarriesEquippedTitleBadge() throws {
         let human = Human(name: "Owner")
 
-        let snapshot = VerticalSolidHomeSnapshotBuilder.build(
+        let snapshot = makeVerticalSnapshot(
             from: makeVerticalSource(
                 humans: [human],
                 activeHumanIdRaw: human.id.uuidString,
@@ -299,5 +301,103 @@ struct HomeSnapshotBuilderTests {
             equippedTitleRaw: equippedTitleRaw,
             language: AppLanguage.code
         )
+    }
+
+    private func makeVerticalSnapshot(
+        from source: VerticalSolidHomeSourceState,
+        now: Date = Date()
+    ) -> VerticalSolidHomeSnapshot {
+        VerticalSolidHomeSnapshotBuilder.build(
+            from: source,
+            now: now,
+            privacy: TestHumanPrivacyManager(),
+            todayFocus: TestTodayFocusManager(),
+            healthAlerts: TestPetHealthAlertEngine()
+        )
+    }
+}
+
+@MainActor
+private final class TestHumanPrivacyManager: HumanPrivacyManaging {
+    func field(forHumanAction actionType: String) -> HumanPrivateField? {
+        nil
+    }
+
+    func isLocked(_ field: HumanPrivateField, for human: Human, viewedBy viewerId: UUID?) -> Bool {
+        false
+    }
+
+    func unlockedHumans(for field: HumanPrivateField, from humans: [Human], viewedBy viewerId: UUID?) -> [Human] {
+        humans
+    }
+
+    func publicHumans(for field: HumanPrivateField, from humans: [Human]) -> [Human] {
+        humans
+    }
+
+    func isPubliclyHidden(_ field: HumanPrivateField, for human: Human) -> Bool {
+        false
+    }
+
+    func isPubliclyHidden(_ field: HumanPrivateField, humanId: String?, in humans: [Human]) -> Bool {
+        false
+    }
+
+    func isLocked(_ field: HumanPrivateField, humanId: String?, in humans: [Human], viewedBy viewerId: UUID?) -> Bool {
+        false
+    }
+
+    func isHumanQuickActionLocked(_ item: QuickActionItem, human: Human?, viewedBy viewerId: UUID?) -> Bool {
+        false
+    }
+
+    func badgeText(for field: HumanPrivateField, human: Human, viewedBy viewerId: UUID?) -> String {
+        ""
+    }
+
+    func lockedMessage(for field: HumanPrivateField) -> String {
+        ""
+    }
+}
+
+@MainActor
+private final class TestTodayFocusManager: TodayFocusManaging {
+    func refreshedQuests(
+        _ quests: [IslandQuest],
+        pets: [Pet],
+        humans: [Human],
+        careLogs: [PetCareLog],
+        walkLogs: [PetWalkLog],
+        pottyLogs: [PetPottyLog],
+        humanWeightLogs: [HumanWeightLog],
+        calendar: Calendar,
+        now: Date
+    ) -> [IslandQuest] {
+        quests
+    }
+
+    func quest(_ quest: IslandQuest, matchesCompletedEntity entityId: UUID) -> Bool {
+        false
+    }
+
+    func completeEvent(_ event: Event, on date: Date, context: ModelContext) -> TodayFocusEventCompletionCommandResult {
+        TodayFocusEventCompletionCommandResult(eventID: event.id, isCompleted: true, didChange: true)
+    }
+
+    func awardDailyCompletionIfNeeded(context: ModelContext, executorId: String?) -> EconomyRewardResult? {
+        nil
+    }
+
+    func ensureTodayCheckIn(activeHumanId: String, rewardTitle: String) {}
+
+    func currentStreak(activeHumanId: String) -> Int {
+        0
+    }
+}
+
+@MainActor
+private final class TestPetHealthAlertEngine: PetHealthAlerting {
+    func scanAlerts(pets: [Pet]) -> [HealthAlert] {
+        []
     }
 }

@@ -41,10 +41,8 @@ enum WaterCareCycleStatusCalculator {
         calendar: Calendar = .current
     ) -> WaterCareCycleStatus? {
         let key = pet.id.uuidString
-        let defaults = UserDefaults.standard
-        let interval = max(defaults.integer(forKey: "waterInterval_\(key)") == 0 ? 3 : defaults.integer(forKey: "waterInterval_\(key)"), 1)
-        let anchorTimestamp = defaults.double(forKey: "waterChangeCycleAnchor_\(key)")
-        let anchorDate = anchorTimestamp > 0 ? Date(timeIntervalSince1970: anchorTimestamp) : nil
+        let settings = WaterCareSettingsStore.snapshot(petKey: key, now: now, calendar: calendar)
+        let anchorDate = settings.createdWaterChangeAnchor ? nil : settings.waterChangeAnchorDate
         let latestLogDate = latestCareLogDate(for: pet, type: .waterChange)
 
         guard let baseDate = latestLogDate ?? anchorDate else {
@@ -53,7 +51,7 @@ enum WaterCareCycleStatusCalculator {
 
         return WaterCareCycleStatus(
             elapsedDays: elapsedDays(from: baseDate, to: now, calendar: calendar),
-            intervalDays: interval
+            intervalDays: settings.waterIntervalDays
         )
     }
 
@@ -63,15 +61,13 @@ enum WaterCareCycleStatusCalculator {
         calendar: Calendar = .current
     ) -> WaterCareCycleStatus? {
         let key = pet.id.uuidString
-        let defaults = UserDefaults.standard
-        let interval = max(defaults.integer(forKey: "filterCleanInterval_\(key)") == 0 ? 14 : defaults.integer(forKey: "filterCleanInterval_\(key)"), 1)
         guard let latestLogDate = latestCareLogDate(for: pet, type: .filterClean) else {
             return nil
         }
 
         return WaterCareCycleStatus(
             elapsedDays: elapsedDays(from: latestLogDate, to: now, calendar: calendar),
-            intervalDays: interval
+            intervalDays: WaterCareSettingsStore.filterCleanIntervalDays(petKey: key)
         )
     }
 
@@ -81,15 +77,13 @@ enum WaterCareCycleStatusCalculator {
         calendar: Calendar = .current
     ) -> WaterCareCycleStatus? {
         let key = pet.id.uuidString
-        let defaults = UserDefaults.standard
-        let interval = max(defaults.integer(forKey: "filterReplaceInterval_\(key)") == 0 ? 90 : defaults.integer(forKey: "filterReplaceInterval_\(key)"), 1)
         guard let latestLogDate = latestCareLogDate(for: pet, type: .filterClean) else {
             return nil
         }
 
         return WaterCareCycleStatus(
             elapsedDays: elapsedDays(from: latestLogDate, to: now, calendar: calendar),
-            intervalDays: interval
+            intervalDays: WaterCareSettingsStore.filterReplaceIntervalDays(petKey: key)
         )
     }
 

@@ -28,12 +28,12 @@ struct StarterGiftServiceTests {
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
         let defaults = try makeDefaults(suiteName: suiteName)
-        let oldCount = QuestManager.shared.coconutCount
-        let oldLogs = QuestManager.shared.coconutLogs
+        let oldCount = TestQuestManagerProjection.manager.coconutCount
+        let oldLogs = TestQuestManagerProjection.manager.coconutLogs
         defer {
-            QuestManager.shared.coconutCount = oldCount
-            QuestManager.shared.coconutLogs = oldLogs
-            QuestManager.shared.flushToDefaults()
+            TestQuestManagerProjection.manager.coconutCount = oldCount
+            TestQuestManagerProjection.manager.coconutLogs = oldLogs
+            TestQuestManagerProjection.manager.persistQuestFlags()
             defaults.removePersistentDomain(forName: suiteName)
         }
 
@@ -42,18 +42,19 @@ struct StarterGiftServiceTests {
         let human = Human(name: "Guan")
         context.insert(human)
         context.safeSave()
-        QuestManager.shared.coconutCount = 0
-        QuestManager.shared.coconutLogs = []
+        TestQuestManagerProjection.manager.coconutCount = 0
+        TestQuestManagerProjection.manager.coconutLogs = []
 
         let result = StarterGiftService.prepareOrClaim(
             activeHumanID: human.id.uuidString,
             context: context,
-            defaults: defaults
+            defaults: defaults,
+            projectionManager: TestQuestManagerProjection.manager
         )
 
         #expect(result == .claimed(humanID: human.id, amount: StarterGiftService.giftAmount))
         #expect(human.coconutBalance == StarterGiftService.giftAmount)
-        #expect(QuestManager.shared.coconutCount == StarterGiftService.giftAmount)
+        #expect(TestQuestManagerProjection.manager.coconutCount == StarterGiftService.giftAmount)
         #expect(defaults.bool(forKey: StarterGiftService.Key.claimed))
         #expect(!defaults.bool(forKey: StarterGiftService.Key.pending))
 

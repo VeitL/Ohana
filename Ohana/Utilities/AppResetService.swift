@@ -15,13 +15,32 @@ enum AppResetService {
         context: ModelContext,
         defaults: UserDefaults = .standard
     ) throws {
-        try reset(context: context, defaults: defaults, options: Options())
+        try reset(
+            context: context,
+            defaults: defaults,
+            options: Options(),
+            questManager: QuestManager()
+        )
     }
 
     static func reset(
         context: ModelContext,
         defaults: UserDefaults = .standard,
         options: Options
+    ) throws {
+        try reset(
+            context: context,
+            defaults: defaults,
+            options: options,
+            questManager: QuestManager()
+        )
+    }
+
+    static func reset(
+        context: ModelContext,
+        defaults: UserDefaults = .standard,
+        options: Options,
+        questManager: QuestManager
     ) throws {
         let preservedDefaults = preservedDefaultValues(in: defaults, options: options)
         try deleteAllPersistentModels(in: context)
@@ -36,7 +55,7 @@ enum AppResetService {
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         }
         if options.resetSharedRuntimeState {
-            resetSharedRuntimeState()
+            resetSharedRuntimeState(questManager: questManager)
         }
 
         defaults.set(false, forKey: "ohana_has_onboarded")
@@ -132,12 +151,13 @@ enum AppResetService {
         }
     }
 
-    private static func resetSharedRuntimeState() {
-        QuestManager.shared.coconutCount = 0
-        QuestManager.shared.coconutLogs = []
-        QuestManager.shared.isPetWizardCompleted = false
-        QuestManager.shared.isFirstMealRecorded = false
-        QuestManager.shared.isThemeColorSet = false
+    private static func resetSharedRuntimeState(questManager: QuestManager) {
+        questManager.coconutCount = 0
+        questManager.coconutLogs = []
+        questManager.lastEconomyRewardResult = nil
+        questManager.isPetWizardCompleted = false
+        questManager.isFirstMealRecorded = false
+        questManager.isThemeColorSet = false
         AppWorkloadPolicy.shared.refresh(reason: "appReset")
     }
 

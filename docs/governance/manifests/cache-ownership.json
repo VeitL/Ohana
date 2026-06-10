@@ -17,9 +17,9 @@
       "expiry": "Route-scoped; refresh when visible, after explicit command completion, or when revision tokens change.",
       "recovery": "Render empty or placeholder snapshots, then refresh after the first frame.",
       "paths": [
-        "Ohana/Views/Home/HomeReadModelStore.swift",
-        "Ohana/Views/Home/HomeSnapshotBuilder.swift",
-        "Ohana/Views/Home/VerticalSolidHomeSnapshotBuilder.swift",
+        "Ohana/Features/Home/Views/HomeReadModelStore.swift",
+        "Ohana/Features/Home/Views/HomeSnapshotBuilder.swift",
+        "Ohana/Features/Home/Views/VerticalSolidHomeSnapshotBuilder.swift",
         "OhanaTests/HomeReadModelStoreTests.swift"
       ]
     },
@@ -32,10 +32,10 @@
       "expiry": "Visible feeding route or home presenter lifetime; avoid broad recompute on unrelated taps.",
       "recovery": "Keep previous snapshot stable during visible transitions and refresh in route-scoped work.",
       "paths": [
-        "Ohana/Views/Components/QuickFeedOverviewSnapshotStore.swift",
-        "Ohana/Views/Components/QuickFeedPlanCalendarSnapshotStore.swift",
-        "Ohana/Views/Components/QuickFeedStockSnapshotStore.swift",
-        "Ohana/Views/Components/QuickFeedTreatSnapshotStore.swift",
+        "Ohana/Features/Feeding/Views/QuickFeedOverviewSnapshotStore.swift",
+        "Ohana/Features/Feeding/Views/QuickFeedPlanCalendarSnapshotStore.swift",
+        "Ohana/Features/Feeding/Views/QuickFeedStockSnapshotStore.swift",
+        "Ohana/Features/Feeding/Views/QuickFeedTreatSnapshotStore.swift",
         "OhanaTests/QuickFeedOverviewSnapshotStoreTests.swift"
       ]
     },

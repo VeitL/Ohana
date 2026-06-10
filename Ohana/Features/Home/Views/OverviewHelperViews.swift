@@ -1,0 +1,669 @@
+//
+//  OverviewHelperViews.swift
+//  Ohana
+//
+//  首页辅助视图组件
+//
+
+import SwiftUI
+import SwiftData
+
+// MARK: - Floating Dock Nav（iOS 26 Liquid Glass + GlassEffectContainer morphing）
+struct FloatingDockNav: View {
+    @Binding var selectedTab: Int
+    let onHome: () -> Void
+    let onPlant: () -> Void
+    let onCalendar: () -> Void
+    let onOasis: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = "zh"
+    @Namespace private var dockNamespace
+
+    private var items: [(String, String, Int)] {
+        let l = L10n(appLanguage)
+        return [
+            ("house.fill", l.tabHome, 0),
+            ("camera.macro", l.tabPlant, 1),
+            ("calendar", l.tabCalendar, 2),
+            ("leaf.fill", l.tabOasis, 3),
+        ]
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(items, id: \.2) { item in
+                let idx = item.2
+                let isSelected = selectedTab == idx
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(GoMotion.feedback) {
+                        selectedTab = idx
+                    }
+                    switch idx {
+                    case 0: onHome()
+                    case 1: onPlant()
+                    case 2: onCalendar()
+                    default: onOasis()
+                    }
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: item.0)
+                            .font(.system(size: isSelected ? 22 : 20, weight: .bold))
+                            .foregroundStyle(isSelected ? Color.goPrimary : Color.ohanaSecondaryText)
+                            .scaleEffect(isSelected ? 1.1 : 1.0)
+                            .animation(GoMotion.feedback, value: selectedTab)
+                        Circle()
+                            .fill(isSelected ? Color.goPrimary : Color.clear)
+                            .frame(width: 4, height: 4) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(ScaleButtonStyle())
+            }
+        }
+        .padding(.horizontal, 8)
+        .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .padding(.horizontal, 32)
+    }
+}
+
+// MARK: - Compact Task Row
+struct CompactTaskRow: View {
+    let reminder: Reminder
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @State private var isDone = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(reminder.event?.emoji ?? "📌")
+                .font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 8))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(reminder.event?.title ?? "提醒")
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(isDone ? Color.ohanaTertiaryText : Color.ohanaPrimaryText)
+                    .strikethrough(isDone)
+                HStack(spacing: 4) {
+                    if let petName = reminder.event?.relatedEntityId {
+                        Text("🐾 \(petName.prefix(8))")
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.ohanaTertiaryText)
+                    }
+                    Text(reminder.scheduledAt, style: .time)
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                }
+            }
+            Spacer()
+            Button {
+                withAnimation(GoMotion.feedback) { isDone.toggle() }
+                let activeHumanId = appServices.activeHumanSelection.currentHumanId
+                if isDone {
+                    commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
+                        ReminderCommandExecutor(context: modelContext, services: appServices).completeWithCoconutReward(
+                            reminder,
+                            by: activeHumanId,
+                            amount: 2,
+                            title: reminder.event?.title ?? "完成待办",
+                            note: "overview.reminder.complete.reward"
+                        )
+                    }
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                } else {
+                    commandQueue.enqueue(.reminderCompletion(reminderID: reminder.id)) {
+                        ReminderCommandExecutor(context: modelContext, services: appServices).reopen(
+                            reminder,
+                            by: activeHumanId,
+                            note: "overview.reminder.reopen"
+                        )
+                    }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .strokeBorder(isDone ? Color.goTeal : Color.ohanaGlassStroke, lineWidth: 2)
+                        .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                    if isDone {
+                        Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.goTeal)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.ohanaControlFill.opacity(isDone ? 0.55 : 1.0), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .animation(GoMotion.feedback, value: isDone)
+    }
+}
+
+// MARK: - Swipeable Reminder Card
+struct SwipeableReminderCard: View {
+    let reminder: Reminder
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+
+    @State private var dragX: CGFloat = 0
+    @State private var isDismissed = false
+
+    private var tiltAngle: Angle {
+        .degrees(Double(max(-300, min(300, dragX))) / 300.0 * 8.0)
+    }
+    private var actionColor: Color {
+        if dragX > 40 { return Color.goTeal }
+        if dragX < -40 { return Color.goOrange }
+        return .clear
+    }
+
+    var body: some View {
+        ZStack {
+            HStack {
+                if dragX > 40 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 18, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        Text("Done")
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    }
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .padding(.leading, 20)
+                    Spacer()
+                } else if dragX < -40 {
+                    Spacer()
+                    HStack(spacing: 6) {
+                        Text("Skip")
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        Image(systemName: "minus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 18, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    }
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .padding(.trailing, 20)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(actionColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .opacity(min(1.0, Double(abs(dragX)) / 60.0))
+
+            HStack(spacing: 12) {
+                Text(reminder.event?.emoji ?? "📌")
+                    .font(OhanaFont.adaptive(size: 22)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(reminder.event?.title ?? "提醒")
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(reminder.scheduledAt, style: .time)
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                Spacer()
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.ohanaTertiaryText)
+            }
+            .padding(14)
+            .goCard(color: Color.ohanaCardSurface, cornerRadius: 16)
+            .offset(x: dragX)
+            .rotationEffect(tiltAngle, anchor: UnitPoint(x: 0.5, y: 1.0))
+            .gesture(
+                DragGesture(minimumDistance: 10)
+                    .onChanged { val in
+                        withAnimation(GoMotion.feedback) {
+                            dragX = val.translation.width
+                        }
+                    }
+                    .onEnded { val in
+                        let threshold: CGFloat = 90
+                        if val.translation.width > threshold {
+                            withAnimation(GoMotion.page) {
+                                dragX = 400
+                            }
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                completeReminder()
+                            }
+                        } else if val.translation.width < -threshold {
+                            withAnimation(GoMotion.page) {
+                                dragX = -400
+                            }
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                dismissReminder()
+                            }
+                        } else {
+                            withAnimation(GoMotion.feedback) {
+                                dragX = 0
+                            }
+                        }
+                    }
+            )
+        }
+        .opacity(isDismissed ? 0 : 1)
+        .frame(maxHeight: isDismissed ? 0 : .infinity)
+        .animation(GoMotion.page, value: isDismissed)
+    }
+
+    private func completeReminder() {
+        isDismissed = true
+        let activeHumanId = appServices.activeHumanSelection.currentHumanId
+        commandQueue.enqueue(
+            .reminderCompletion(reminderID: reminder.id),
+            delayMilliseconds: 350
+        ) {
+            ReminderCommandExecutor(context: modelContext, services: appServices).complete(
+                reminder,
+                by: activeHumanId,
+                note: "overview.upcoming.reminder.complete"
+            )
+        }
+    }
+
+    private func dismissReminder() {
+        isDismissed = true
+        let activeHumanId = appServices.activeHumanSelection.currentHumanId
+        commandQueue.enqueue(
+            .reminderCompletion(reminderID: reminder.id),
+            delayMilliseconds: 350
+        ) {
+            ReminderCommandExecutor(context: modelContext, services: appServices).skip(
+                reminder,
+                by: activeHumanId,
+                note: "overview.upcoming.reminder.skip"
+            )
+        }
+    }
+}
+
+// MARK: - Plant Garden Card
+struct PlantGardenCard: View {
+    let plant: Plant
+    let onTap: () -> Void
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @State private var isWatering = false
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(plant.needsWatering ? Color.goPrimary.opacity(0.2) : Color.ohanaControlFill)
+                        .frame(width: 60, height: 60)
+                    Text(plant.avatarEmoji)
+                        .font(OhanaFont.adaptive(size: 32)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .scaleEffect(isWatering ? 1.2 : 1.0)
+                        .animation(GoMotion.fab, value: isWatering)
+                }
+
+                Text(plant.name)
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
+
+                if plant.needsWatering {
+                    Button {
+                        waterPlant()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            Text("Water")
+                                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        }
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.goPrimary, in: Capsule())
+                    }
+                } else if let days = plant.daysSinceWatered {
+                    Text("\(days)d ago")
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                } else {
+                    Text("No record")
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaTertiaryText)
+                }
+            }
+            .frame(width: 92)
+            .padding(.vertical, 12)
+            .goTranslucentCard(cornerRadius: 18)
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func waterPlant() {
+        isWatering = true
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let executorId = appServices.activeHumanSelection.currentHumanId
+        commandQueue.enqueue(.plantCare(plantID: plant.id, action: PlantCareType.watering.rawValue)) {
+            PlantCareCommandExecutor(context: modelContext, services: appServices).recordCare(
+                .watering,
+                plant: plant,
+                executorId: executorId,
+                note: "overview.plantCare"
+            )
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            isWatering = false
+        }
+    }
+}
+
+// MARK: - Home Section Manage Sheet
+struct HomeSectionManageSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @AppStorage("home_section_order") private var sectionOrderRaw: String = "quickActions,batchCheckIn,memoryDrop,islandStats"
+    @AppStorage("home_section_hidden") private var hiddenRaw: String = ""
+
+    @State private var sections: [HomeSectionEntry] = []
+    @State private var editMode: EditMode = .active
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(Color.ohanaCardSurface)
+                .ignoresSafeArea()
+
+            Color.ohanaCardSurface.opacity(0.55).ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("首页模块管理")
+                            .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                        Text("拖拽排序，切换显示/隐藏")
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
+                    Spacer()
+                    Button("完成") {
+                        saveState()
+                        dismiss()
+                    }
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.goPrimary)
+                    .padding(.horizontal, 16).padding(.vertical, 8)
+                    .background(Color.goPrimary.opacity(0.12), in: Capsule())
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 28)
+                .padding(.bottom, 20)
+
+                List {
+                    ForEach($sections) { $section in
+                        HStack(spacing: 14) {
+                            Image(systemName: "line.3.horizontal") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(Color.ohanaTertiaryText)
+                                .frame(width: 24)
+                            Image(systemName: section.icon)
+                                .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(Color(hex: section.colorHex))
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(section.title)
+                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                Text(section.subtitle)
+                                    .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .foregroundStyle(Color.ohanaSecondaryText)
+                            }
+                            Spacer()
+                            Toggle("", isOn: $section.isVisible)
+                                .tint(Color.goPrimary)
+                                .labelsHidden()
+                                .onChange(of: section.isVisible) { _, _ in saveState() }
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 4)
+                        .listRowBackground(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(Color.goDarkBlue.opacity(0.6))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
+                                )
+                                .padding(.vertical, 3)
+                        )
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    }
+                    .onMove { from, to in
+                        sections.move(fromOffsets: from, toOffset: to)
+                        saveState()
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .environment(\.editMode, $editMode)
+            }
+        }
+        .onAppear { loadState() }
+    }
+
+    private func loadState() {
+        var order = sectionOrderRaw.split(separator: ",").map(String.init)
+        // Migrate legacy IDs → new split IDs
+        let legacyGroup = ["quickAccess", "todayTasks", "todayActions"]
+        if order.contains(where: { legacyGroup.contains($0) }) {
+            let insertIdx = order.firstIndex(where: { legacyGroup.contains($0) }) ?? 0
+            order.removeAll { legacyGroup.contains($0) }
+            if !order.contains("batchCheckIn") { order.insert("batchCheckIn", at: min(insertIdx + 1, order.count)) }
+            if !order.contains("quickActions") { order.insert("quickActions",  at: min(insertIdx,     order.count)) }
+            sectionOrderRaw = order.joined(separator: ",")
+        }
+        // Also drop old batchCheckIn if it was already there separately (dedup)
+        var seen = Set<String>()
+        order = order.filter { seen.insert($0).inserted }
+        let hidden = Set(hiddenRaw.split(separator: ",").map(String.init))
+        let allSections = HomeSectionEntry.defaults
+        var sorted: [HomeSectionEntry] = order.compactMap { id in allSections.first(where: { $0.id == id }) }
+        for s in allSections where !sorted.contains(where: { $0.id == s.id }) { sorted.append(s) }
+        sections = sorted.map { var s = $0; s.isVisible = !hidden.contains(s.id) && !hidden.contains("todayActions"); return s }
+    }
+
+    private func saveState() {
+        sectionOrderRaw = sections.map(\.id).joined(separator: ",")
+        hiddenRaw = sections.filter { !$0.isVisible }.map(\.id).joined(separator: ",")
+    }
+}
+
+// MARK: - HomeSectionEntry
+struct HomeSectionEntry: Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let icon: String
+    let colorHex: String
+    var isVisible: Bool = true
+
+    static let defaults: [HomeSectionEntry] = [
+        HomeSectionEntry(id: "islandHeader",    title: "岛屿天气胶囊",  subtitle: "首页顶部 60pt 天气/情绪/负反馈汇总",       icon: "cloud.sun.fill",         colorHex: "FFD93D"),
+        HomeSectionEntry(id: "familyStripMini", title: "家庭活动胶囊",  subtitle: "宠物卡下方 Mini 家人活动条，点击展开",     icon: "person.2.fill",          colorHex: "8E6DFF"),
+        HomeSectionEntry(id: "todayFocus",      title: "今日聚焦",     subtitle: "智能推送当前最该做的事情（单卡）",          icon: "sparkles",               colorHex: "FF8C42"),
+        HomeSectionEntry(id: "quickActions",    title: "快捷操作",     subtitle: "按宠物物种自定义的快捷打卡卡片网格",        icon: "bolt.fill",              colorHex: "FF8C42"),
+        HomeSectionEntry(id: "batchCheckIn",    title: "一键打卡",     subtitle: "多宠物同时喂食/喂水，一键全员打卡",         icon: "checkmark.circle.fill",  colorHex: "34C759"),
+        HomeSectionEntry(id: "memoryDrop",      title: "记忆碎片",     subtitle: "折叠到更多区 · 回忆片段",                icon: "heart.text.square.fill", colorHex: "FF6B9D"),
+        HomeSectionEntry(id: "islandStats",     title: "岛屿统计",     subtitle: "折叠到更多区 · 体重/步数/花费/粮仓",      icon: "chart.bar.fill",         colorHex: "00D4AA"),
+    ]
+}
+
+// MARK: - Bento Stat Card
+struct BentoStatCard: View {
+    let icon: String
+    let title: String
+    let value: String
+    let unit: String
+    let trend: String?
+    let trendUp: Bool?
+    let accentColor: Color
+    var showMiniBar: Int = 0
+    var barMax: Int = 14
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(accentColor)
+                Text(title)
+                    .font(OhanaFont.footnote(.bold))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+                    .lineLimit(1)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value)
+                    .font(OhanaFont.metric(size: 32))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .ohanaNumericMotion(value)
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+                }
+            }
+            if showMiniBar > 0 || barMax > 0 && showMiniBar >= 0 {
+                HStack(spacing: 3) {
+                    ForEach(0..<min(7, barMax), id: \.self) { i in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(i < showMiniBar ? accentColor : accentColor.opacity(0.18))
+                            .frame(width: 6, height: i < showMiniBar ? 14 : 8)
+                    }
+                }
+            }
+            if let t = trend {
+                HStack(spacing: 3) {
+                    Image(systemName: (trendUp ?? true) ? "arrow.up.right" : "arrow.down.right")
+                        .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    Text(t)
+                        .font(OhanaFont.caption2(.bold))
+                }
+                .foregroundStyle((trendUp ?? true) ? Color.goTeal : Color.goOrange)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(height: 130)
+        .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+}
+
+// MARK: - AllPetsFoodOverviewSheet
+struct AllPetsFoodOverviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let pets: [Pet]
+    @State private var selectedPet: Pet? = nil
+
+    init(pets: [Pet] = []) {
+        self.pets = pets
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                OhanaAppBackground()
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        ForEach(pets) { pet in
+                            petFoodRow(pet)
+                        }
+                        if pets.isEmpty {
+                            VStack(spacing: 12) {
+                                Text("🐾").font(OhanaFont.adaptive(size: 48)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                Text("还没有宠物")
+                                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .foregroundStyle(Color.ohanaSecondaryText)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 60)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 32)
+                }
+            }
+            .navigationTitle("粮仓总览")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                            .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
+                }
+            }
+        }
+        .sheet(item: $selectedPet) { pet in
+            PetFoodManagementView(pet: pet)
+        }
+    }
+
+    @ViewBuilder
+    private func petFoodRow(_ pet: Pet) -> some View {
+        let days = pet.remainingFoodDays
+        let grams = pet.remainingFoodGrams
+        let accent: Color = days <= 0 ? .goRed : days <= 7 ? .goOrange : .goTeal
+        let progress = min(1.0, Double(days) / 30.0)
+
+        Button { selectedPet = pet } label: {
+            HStack(spacing: 14) {
+                PetAvatarPortraitView(
+                    imageData: pet.avatarImageData,
+                    fallbackText: pet.species == "cat" ? "🐱" : pet.species == "dog" ? "🐶" : "🐾",
+                    themeColor: Color(hex: pet.safeThemeColorHex),
+                    size: 48,
+                    backgroundOpacity: 0.18
+                )
+                .overlay(Circle().stroke(accent.opacity(0.5), lineWidth: 1.5))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(pet.name)
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(days > 0 ? "余粮 \(grams)g · 可用 \(days) 天" : "余粮不足，请补充")
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(accent)
+                }
+
+                Spacer()
+
+                ZStack {
+                    Circle()
+                        .stroke(Color.ohanaGlassStroke, lineWidth: 3)
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Text("\(days)")
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(accent)
+                }
+                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
+
+                Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+            .padding(14)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.ohanaGlassStroke, lineWidth: 0.5))
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+}

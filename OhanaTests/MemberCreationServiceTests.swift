@@ -11,7 +11,7 @@ struct MemberCreationServiceTests {
         let container = try makeContainer()
         let context = container.mainContext
 
-        let result = try MemberCreationService.save(
+        let result = try saveMember(
             draft: petDraft(name: "Momo", source: .avatar2D),
             existingPets: [],
             existingHumans: [],
@@ -34,7 +34,7 @@ struct MemberCreationServiceTests {
         context.insert(existing)
         try context.save()
 
-        let result = try MemberCreationService.save(
+        let result = try saveMember(
             draft: humanDraft(name: "Nico", source: .avatar2D),
             existingPets: [],
             existingHumans: [existing],
@@ -55,7 +55,7 @@ struct MemberCreationServiceTests {
         try context.save()
 
         do {
-            _ = try MemberCreationService.save(
+            _ = try saveMember(
                 draft: humanDraft(name: "Nico", source: .avatar2D),
                 existingPets: [],
                 existingHumans: [existing],
@@ -78,12 +78,12 @@ struct MemberCreationServiceTests {
         let container = try makeContainer()
         let context = container.mainContext
         let payer = Human(name: "Ava")
-        payer.coconutBalance = MemberCreationService.avatarPassCost + 200
+        payer.coconutBalance = avatarPassCost + 200
         context.insert(payer)
         try context.save()
         UserDefaults.standard.set(payer.id.uuidString, forKey: "currentActiveHumanId")
 
-        try MemberCreationService.purchaseAvatarPassForCurrentDraft(
+        try purchaseAvatarPass(
             humans: [payer],
             context: context,
             l: L10n("en")
@@ -94,9 +94,9 @@ struct MemberCreationServiceTests {
         let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(ledgers.count == 1)
         #expect(ledgers.first?.actionType == "memberCreationAvatarPassPurchase")
-        #expect(ledgers.first?.coconutDelta == -MemberCreationService.avatarPassCost)
+        #expect(ledgers.first?.coconutDelta == -avatarPassCost)
 
-        _ = try MemberCreationService.save(
+        _ = try saveMember(
             draft: humanDraft(name: "Nico", source: .avatar2D),
             existingPets: [],
             existingHumans: [payer],
@@ -112,11 +112,11 @@ struct MemberCreationServiceTests {
         let container = try makeContainer()
         let context = container.mainContext
         let payer = Human(name: "Ava")
-        payer.coconutBalance = MemberCreationService.avatarPassCost
+        payer.coconutBalance = avatarPassCost
         context.insert(payer)
         try context.save()
 
-        try MemberCreationService.purchaseAvatarPassForCurrentDraft(
+        try purchaseAvatarPass(
             humans: [payer],
             context: context,
             l: L10n("en")
@@ -131,12 +131,12 @@ struct MemberCreationServiceTests {
         let container = try makeContainer()
         let context = container.mainContext
         let payer = Human(name: "Ava")
-        payer.coconutBalance = MemberCreationService.avatarPassCost - 1
+        payer.coconutBalance = avatarPassCost - 1
         context.insert(payer)
         try context.save()
 
         do {
-            try MemberCreationService.purchaseAvatarPassForCurrentDraft(
+            try purchaseAvatarPass(
                 humans: [payer],
                 context: context,
                 l: L10n("en")
@@ -150,7 +150,7 @@ struct MemberCreationServiceTests {
             }
         }
 
-        #expect(payer.coconutBalance == MemberCreationService.avatarPassCost - 1)
+        #expect(payer.coconutBalance == avatarPassCost - 1)
         #expect(Avatar2DAccess.extraPassCount == 0)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
@@ -164,7 +164,7 @@ struct MemberCreationServiceTests {
         context.insert(existing)
         try context.save()
 
-        _ = try MemberCreationService.save(
+        _ = try saveMember(
             draft: petDraft(name: "Kiki", source: .customImage),
             existingPets: [existing],
             existingHumans: [],
@@ -187,7 +187,7 @@ struct MemberCreationServiceTests {
         var draft = humanDraft(name: "Nico", source: .placeholder)
         draft.avatarImageData = nil
 
-        let result = try MemberCreationService.save(
+        let result = try saveMember(
             draft: draft,
             existingPets: [],
             existingHumans: [existing],
@@ -205,7 +205,7 @@ struct MemberCreationServiceTests {
         let container = try makeContainer()
         let context = container.mainContext
 
-        let first = try MemberCreationService.save(
+        let first = try saveMember(
             draft: humanDraft(name: "Ava", source: .placeholder),
             existingPets: [],
             existingHumans: [],
@@ -215,7 +215,7 @@ struct MemberCreationServiceTests {
 
         #expect(first?.role == "owner")
 
-        let second = try MemberCreationService.save(
+        let second = try saveMember(
             draft: humanDraft(name: "Nico", source: .placeholder),
             existingPets: [],
             existingHumans: first.map { [$0] } ?? [],
@@ -241,7 +241,7 @@ struct MemberCreationServiceTests {
         draft.role = "owner"
         draft.usesExplicitHumanRole = true
 
-        let result = try MemberCreationService.save(
+        let result = try saveMember(
             draft: draft,
             existingPets: [],
             existingHumans: [existing],
@@ -292,7 +292,7 @@ struct MemberCreationServiceTests {
         humans.forEach { context.insert($0) }
         try context.save()
 
-        let result = try MemberCreationService.save(
+        let result = try saveMember(
             draft: humanDraft(name: "Extra Human", source: .placeholder),
             existingPets: [],
             existingHumans: humans,
@@ -311,7 +311,7 @@ struct MemberCreationServiceTests {
         humans.forEach { context.insert($0) }
         try context.save()
 
-        let result = try MemberCreationService.save(
+        let result = try saveMember(
             draft: petDraft(name: "Extra Pet", source: .placeholder),
             existingPets: [],
             existingHumans: humans,
@@ -331,7 +331,8 @@ struct MemberCreationServiceTests {
         let context = container.mainContext
         let birthday = makeDate(year: 2025, month: 6, day: 8)
         let homeDate = makeDate(year: 2026, month: 1, day: 10)
-        let beforeRevision = ReadModelRevisionCenter.shared.homeRevision.value
+        let revisionCenter = ReadModelRevisionCenter()
+        let beforeRevision = revisionCenter.homeRevision.value
         var draft = petDraft(name: "Momo", source: .placeholder)
         draft.avatarImageData = nil
         draft.hasBirthday = true
@@ -340,18 +341,19 @@ struct MemberCreationServiceTests {
         draft.homeDate = homeDate
         draft.themeColorHex = "00AAFF"
 
-        let result = try MemberCreationService.save(
+        let result = try saveMember(
             draft: draft,
             existingPets: [],
             existingHumans: [],
             context: context,
-            countryCode: "CN"
+            countryCode: "CN",
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter)
         )
         let pet = try #require(result.pet)
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         let milestones = try context.fetch(FetchDescriptor<PetMilestone>())
-        let mutation = try #require(ReadModelRevisionCenter.shared.lastMutation)
+        let mutation = try #require(revisionCenter.lastMutation)
         let birthdayEvent = try #require(events.first { $0.eventType == EventType.birthday.rawValue })
         let anniversaryEvent = try #require(events.first { $0.eventType == EventType.anniversary.rawValue })
 
@@ -365,13 +367,14 @@ struct MemberCreationServiceTests {
         #expect(anniversaryEvent.recurrenceDays == 365)
         #expect(milestones.count == 6)
         #expect(milestones.allSatisfy { $0.pet?.id == pet.id })
-        #expect(QuestManager.shared.isThemeColorSet == true)
-        #expect(ReadModelRevisionCenter.shared.homeRevision.value == beforeRevision + 1)
+        #expect(TestQuestManagerProjection.manager.isThemeColorSet == true)
+        #expect(revisionCenter.homeRevision.value == beforeRevision + 2)
         #expect(mutation.command == .memberCreation(entityID: pet.id, kind: "pet"))
         #expect(mutation.affectedEntityIDs == [pet.id])
     }
 
     private var avatarData: Data { Data([0x89, 0x50, 0x4E, 0x47]) }
+    private var avatarPassCost: Int { makeMemberCreationService().avatarPassCost }
 
     private func petDraft(name: String, source: MemberAvatarSource) -> MemberCreationDraft {
         var draft = MemberCreationDraft(kind: .pet)
@@ -403,6 +406,47 @@ struct MemberCreationServiceTests {
         }
     }
 
+    private func saveMember(
+        draft: MemberCreationDraft,
+        existingPets: [Pet],
+        existingHumans: [Human],
+        context: ModelContext,
+        countryCode: String,
+        revisions: DomainRevisionPublishing? = nil
+    ) throws -> MemberCreationService.SaveResult {
+        try makeMemberCreationService(revisions: revisions).save(
+            draft: draft,
+            existingPets: existingPets,
+            existingHumans: existingHumans,
+            context: context,
+            countryCode: countryCode
+        )
+    }
+
+    private func purchaseAvatarPass(
+        humans: [Human],
+        context: ModelContext,
+        l: L10n
+    ) throws {
+        try makeMemberCreationService().purchaseAvatarPassForCurrentDraft(
+            humans: humans,
+            context: context,
+            l: l
+        )
+    }
+
+    private func makeMemberCreationService(
+        revisions: DomainRevisionPublishing? = nil
+    ) -> MemberCreationService {
+        MemberCreationService(
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService(),
+            revisions: revisions ?? SharedDomainRevisionPublisher(),
+            questManager: TestQuestManagerProjection.manager
+        )
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV58.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
@@ -427,11 +471,11 @@ struct MemberCreationServiceTests {
             HomeCardVisibility.hiddenPetIDsKey,
         ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
 
-        QuestManager.shared.coconutCount = 0
-        QuestManager.shared.coconutLogs = []
-        QuestManager.shared.isPetWizardCompleted = true
-        QuestManager.shared.isFirstMealRecorded = false
-        QuestManager.shared.isThemeColorSet = false
-        QuestManager.shared.flushToDefaults()
+        TestQuestManagerProjection.manager.coconutCount = 0
+        TestQuestManagerProjection.manager.coconutLogs = []
+        TestQuestManagerProjection.manager.isPetWizardCompleted = true
+        TestQuestManagerProjection.manager.isFirstMealRecorded = false
+        TestQuestManagerProjection.manager.isThemeColorSet = false
+        TestQuestManagerProjection.manager.persistQuestFlags()
     }
 }

@@ -23,7 +23,9 @@ enum ReminderActionCoordinator {
     static func handle(
         userInfo: [AnyHashable: Any]?,
         currentActiveHumanId: String,
-        context: ModelContext
+        context: ModelContext,
+        careEvents providedCareEvents: CareEventRecording? = nil,
+        reminderCompletion providedReminderCompletion: ReminderCompleting? = nil
     ) -> ReminderActionDispatchResult {
         guard let action = userInfo?["action"] as? String else {
             return .ignoredAction
@@ -33,14 +35,16 @@ enum ReminderActionCoordinator {
         }
 
         let executorId = currentActiveHumanId.isEmpty ? nil : currentActiveHumanId
+        let careEvents = providedCareEvents ?? CareEventService()
+        let reminderCompletion = providedReminderCompletion ?? ReminderCompletionService()
         switch action {
         case "COMPLETE":
-            return complete(reminder, executorId: executorId, context: context)
+            return complete(reminder, executorId: executorId, context: context, careEvents: careEvents, reminderCompletion: reminderCompletion)
         case "SKIP":
-            ReminderCompletionService.skip(reminder, by: executorId, context: context)
+            reminderCompletion.skip(reminder, by: executorId, context: context)
             return .skipped
         case "SNOOZE":
-            ReminderCompletionService.snoozeOneDay(reminder, by: executorId, context: context)
+            reminderCompletion.snoozeOneDay(reminder, by: executorId, context: context, reschedule: true)
             return .snoozed
         default:
             return .ignoredAction
@@ -51,23 +55,27 @@ enum ReminderActionCoordinator {
     private static func complete(
         _ reminder: Reminder,
         executorId: String?,
-        context: ModelContext
+        context: ModelContext,
+        careEvents: CareEventRecording,
+        reminderCompletion: ReminderCompleting
     ) -> ReminderActionDispatchResult {
         if let event = reminder.event,
            event.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue {
             guard let pet = pet(for: event, context: context) else {
                 return .missingPet
             }
-            _ = CareEventService.completePlannedFeed(
+            _ = careEvents.completePlannedFeed(
                 pet: pet,
                 reminder: reminder,
                 context: context,
-                executorId: executorId
+                quality: .precise,
+                executorId: executorId,
+                date: Date()
             )
             return .completed
         }
 
-        ReminderCompletionService.complete(reminder, by: executorId, context: context)
+        reminderCompletion.complete(reminder, by: executorId, context: context)
         return .completed
     }
 
@@ -131,5 +139,36 @@ enum ReminderActionCoordinator {
         )
         descriptor.fetchLimit = 1
         return (try? context.fetch(descriptor))?.first
+    }
+}
+
+@MainActor
+protocol ReminderActionHandling {
+    @discardableResult
+    func handle(
+        userInfo: [AnyHashable: Any]?,
+        currentActiveHumanId: String,
+        context: ModelContext,
+        careEvents: CareEventRecording,
+        reminderCompletion: ReminderCompleting
+    ) -> ReminderActionDispatchResult
+}
+
+struct LiveReminderActionHandler: ReminderActionHandling {
+    @discardableResult
+    func handle(
+        userInfo: [AnyHashable: Any]?,
+        currentActiveHumanId: String,
+        context: ModelContext,
+        careEvents: CareEventRecording,
+        reminderCompletion: ReminderCompleting
+    ) -> ReminderActionDispatchResult {
+        ReminderActionCoordinator.handle(
+            userInfo: userInfo,
+            currentActiveHumanId: currentActiveHumanId,
+            context: context,
+            careEvents: careEvents,
+            reminderCompletion: reminderCompletion
+        )
     }
 }

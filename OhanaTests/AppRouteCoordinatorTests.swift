@@ -3,6 +3,7 @@ import Foundation
 import Testing
 
 @MainActor
+@Suite(.serialized)
 struct AppRouteCoordinatorTests {
     @Test func profileRoutesCarryOnlyStableIdentifiers() {
         let coordinator = AppRouteCoordinator()
@@ -96,12 +97,15 @@ struct AppRouteCoordinatorTests {
 
     @Test func coconutShopUsesGlobalSheetRoute() {
         let coordinator = AppRouteCoordinator()
-        let treeManager = OasisTreeManager.shared
+        let treeManager = TestOasisTreeManagerProjection.manager
+        let oldTreeManager = OasisTreeManagerRegistry.current
         let oldIslandEnergy = treeManager.islandEnergy
         let oldInjectedEnergy = treeManager.injectedEnergy
+        OasisTreeManagerRegistry.current = treeManager
         defer {
             treeManager.islandEnergy = oldIslandEnergy
             treeManager.injectedEnergy = oldInjectedEnergy
+            OasisTreeManagerRegistry.current = oldTreeManager
         }
         treeManager.islandEnergy = 0
         treeManager.injectedEnergy = 800
@@ -117,12 +121,15 @@ struct AppRouteCoordinatorTests {
 
     @Test func lockedCoconutShopRedirectsToGrowthRoadmap() {
         let coordinator = AppRouteCoordinator()
-        let treeManager = OasisTreeManager.shared
+        let treeManager = TestOasisTreeManagerProjection.manager
+        let oldTreeManager = OasisTreeManagerRegistry.current
         let oldIslandEnergy = treeManager.islandEnergy
         let oldInjectedEnergy = treeManager.injectedEnergy
+        OasisTreeManagerRegistry.current = treeManager
         defer {
             treeManager.islandEnergy = oldIslandEnergy
             treeManager.injectedEnergy = oldInjectedEnergy
+            OasisTreeManagerRegistry.current = oldTreeManager
         }
         treeManager.islandEnergy = 0
         treeManager.injectedEnergy = 0

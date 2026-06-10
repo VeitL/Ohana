@@ -64,3 +64,29 @@ enum HumanRequirementCoordinator {
         return ((try? context.fetch(descriptor))?.first) != nil
     }
 }
+
+@MainActor
+protocol HumanRequirementResolving {
+    func resolve(
+        hasOnboarded: Bool,
+        currentActiveHumanId: String,
+        isAccountSwitchPresented: Bool,
+        context: ModelContext
+    ) -> HumanRequirementResolution
+}
+
+struct LiveHumanRequirementResolver: HumanRequirementResolving {
+    func resolve(
+        hasOnboarded: Bool,
+        currentActiveHumanId: String,
+        isAccountSwitchPresented: Bool,
+        context: ModelContext
+    ) -> HumanRequirementResolution {
+        HumanRequirementCoordinator.resolve(
+            hasOnboarded: hasOnboarded,
+            currentActiveHumanId: currentActiveHumanId,
+            isAccountSwitchPresented: isAccountSwitchPresented,
+            context: context
+        )
+    }
+}

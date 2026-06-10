@@ -1,0 +1,491 @@
+//
+//  MemberCardCreationContentView+Steps.swift
+//  Ohana
+//
+
+import AVFoundation
+import Combine
+import ImageIO
+import os
+import PhotosUI
+import SwiftData
+import SwiftUI
+import UIKit
+
+extension MemberCardCreationContentView {
+    var humanBasicInfoStep: some View {
+        MemberCreationSection(
+            title: l.tr(zh: "必要信息", en: "Essentials", de: "Wichtiges"),
+            icon: "person.crop.rectangle.fill",
+            foreground: cardForeground
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    compactNameInput(width: 148)
+                    compactOptionRow(options: humanGenderOptions, selection: $draft.humanGender) { humanGenderLabel($0) }
+                }
+                MemberCompactDateRow(
+                    title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
+                    icon: "birthday.cake.fill",
+                    isEnabled: $draft.hasBirthday,
+                    date: $draft.birthday,
+                    range: birthdayRange,
+                    foreground: cardForeground,
+                    secondaryForeground: cardSecondaryForeground,
+                    fill: cardControlFill,
+                    stroke: cardControlStroke
+                )
+            }
+        }
+    }
+
+    var petBasicInfoStep: some View {
+        MemberCreationSection(
+            title: l.tr(zh: "必要信息", en: "Essentials", de: "Wichtiges"),
+            icon: "pawprint.fill",
+            foreground: cardForeground
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    compactNameInput(width: 148)
+                    compactOptionRow(options: petGenderOptions, selection: $draft.petGender) { petGenderLabel($0) }
+                }
+                HStack(spacing: 10) {
+                    compactMenuPicker(
+                        title: l.tr(zh: "物种", en: "Species", de: "Art"),
+                        value: speciesLabel(draft.species)
+                    ) {
+                        ForEach(speciesOptions, id: \.self) { species in
+                            Button(speciesLabel(species)) {
+                                draft.species = species
+                                draft.breed = ""
+                                draft.customBreed = ""
+                                draft.isCustomBreed = false
+                                clampPetAppearance()
+                            }
+                        }
+                    }
+                    compactBreedPicker
+                }
+                if draft.isCustomBreed {
+                    flatTextField(l.tr(zh: "自定义品种", en: "Custom breed", de: "Eigene Rasse"), text: $draft.customBreed)
+                }
+                VStack(alignment: .leading, spacing: 7) {
+                    MemberCompactDateRow(
+                        title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
+                        icon: "birthday.cake.fill",
+                        isEnabled: $draft.hasBirthday,
+                        date: $draft.birthday,
+                        range: birthdayRange,
+                        foreground: cardForeground,
+                        secondaryForeground: cardSecondaryForeground,
+                        fill: cardControlFill,
+                        stroke: cardControlStroke
+                    )
+                    MemberCompactDateRow(
+                        title: l.tr(zh: "到家日", en: "Home date", de: "Einzugstag"),
+                        icon: "house.fill",
+                        isEnabled: $draft.hasHomeDate,
+                        date: $draft.homeDate,
+                        range: birthdayRange,
+                        foreground: cardForeground,
+                        secondaryForeground: cardSecondaryForeground,
+                        fill: cardControlFill,
+                        stroke: cardControlStroke
+                    )
+                }
+            }
+        }
+    }
+
+    var compactBreedPicker: some View {
+        compactMenuPicker(
+            title: l.tr(zh: "品种", en: "Breed", de: "Rasse"),
+            value: draft.resolvedBreed.isEmpty ? l.tr(zh: "选择", en: "Choose", de: "Wählen") : draft.resolvedBreed
+        ) {
+            ForEach(petBreedOptions.prefix(40), id: \.name) { breed in
+                Button(breed.name) {
+                    draft.isCustomBreed = breed.name == "其他"
+                    draft.breed = breed.name == "其他" ? "" : breed.name
+                    clampPetAppearance()
+                }
+            }
+        }
+    }
+
+    var petProfileSection: some View {
+        MemberCreationSection(
+            title: l.tr(zh: "毛色与性格", en: "Coat & vibe", de: "Fell & Charakter"),
+            icon: "list.bullet.clipboard.fill",
+            foreground: cardForeground
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                compactMenuPicker(
+                    title: l.tr(zh: "毛色", en: "Coat", de: "Fell"),
+                    value: draft.coatColor.isEmpty ? l.tr(zh: "自动", en: "Auto", de: "Auto") : draft.coatColor
+                ) {
+                    ForEach(petCoatOptions, id: \.self) { option in
+                        Button(option) {
+                            draft.coatColor = option
+                            clampPetAppearance()
+                        }
+                    }
+                }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 7)], spacing: 7) {
+                    ForEach(Array(PetPersonalityTag.allTags.prefix(8).map(\.id)), id: \.self) { id in
+                        let isSelected = draft.personalityTagIds.contains(id)
+                        Button {
+                            withAnimation(GoMotion.selection) {
+                                if draft.personalityTagIds.contains(id) {
+                                    draft.personalityTagIds.removeAll { $0 == id }
+                                } else {
+                                    if draft.personalityTagIds.count >= 3 {
+                                        draft.personalityTagIds.removeFirst()
+                                    }
+                                    draft.personalityTagIds.append(id)
+                                }
+                            }
+                            UISelectionFeedbackGenerator().selectionChanged()
+                        } label: {
+                            Text(personalityLabel(id))
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.62)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 34)
+                                .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
+                                .overlay {
+                                    Capsule()
+                                        .strokeBorder(cardControlStroke, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                }
+            }
+        }
+    }
+
+    var avatarSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Label(l.tr(zh: "头像", en: "Avatar", de: "Avatar"), systemImage: "sparkles")
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(cardForeground)
+                Spacer()
+                avatar2DToggleButton
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    mediaButton(title: l.tr(zh: "相册", en: "Photos", de: "Fotos"), icon: "photo.on.rectangle") {
+                        openPhotoLibraryAfterFirstFrame()
+                    }
+                    mediaButton(title: isPreparingCamera ? l.tr(zh: "打开中", en: "Opening", de: "Öffnet") : l.tr(zh: "相机", en: "Camera", de: "Kamera"), icon: "camera.fill") {
+                        openCameraAfterFirstFrame()
+                    }
+                }
+                if let hint = avatarHintText {
+                    Text(hint)
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(cardSecondaryForeground)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    var avatar2DToggleButton: some View {
+        let isOn = draft.avatarSource == .avatar2D
+        return Button {
+            toggle2DAvatar()
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "wand.and.stars").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                Text("2.5D")
+                    .font(OhanaFont.caption(.black))
+                Circle()
+                    .fill(isOn ? cardSelectedForeground : cardForeground)
+                    .frame(width: 8, height: 8) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+            }
+            .foregroundStyle(isOn ? cardSelectedForeground : cardForeground)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(isOn ? cardSelectedFill : cardControlFill, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(cardControlStroke, lineWidth: 1)
+            }
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel(l.tr(zh: "2.5D 头像开关", en: "2.5D avatar switch", de: "2,5D-Avatar-Schalter"))
+    }
+
+    var avatarHintText: String? {
+        if draft.avatarSource == .avatar2D {
+            return canUseFree2D
+                ? l.tr(zh: "已使用首位免费智能 2.5D。", en: "Using the first free smart 2.5D avatar.", de: "Der erste kostenlose smarte 2,5D-Avatar ist aktiv.")
+                : l.tr(zh: "保存时将消耗 1 张头像券。", en: "Saving will use 1 avatar pass.", de: "Beim Speichern wird 1 Avatarpass verwendet.")
+        }
+        if !canUseFree2D, avatarPassCount > 0 {
+            return l.tr(zh: "你有 \(avatarPassCount) 张头像券，可手动开启 2.5D。", en: "You have \(avatarPassCount) avatar pass; turn on 2.5D when you want it.", de: "Du hast \(avatarPassCount) Avatarpass; aktiviere 2,5D bei Bedarf.")
+        }
+        if !canUseFree2D {
+            return l.tr(zh: "2.5D 头像券 \(avatarPassCost) 椰子。", en: "A 2.5D avatar pass costs \(avatarPassCost) coconuts.", de: "Ein 2,5D-Avatarpass kostet \(avatarPassCost) Kokosnüsse.")
+        }
+        return nil
+    }
+
+    var petVibeSection: some View {
+        MemberCreationSection(
+            title: l.tr(zh: "性格", en: "Vibe", de: "Charakter"),
+            icon: "heart.fill",
+            foreground: cardForeground
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                compactTogglePill(
+                    title: l.tr(zh: "已绝育", en: "Neutered", de: "Kastriert"),
+                    icon: "checkmark.seal.fill",
+                    isOn: $draft.isNeutered
+                )
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 7)], spacing: 7) {
+                    ForEach(Array(PetPersonalityTag.allTags.prefix(8).map(\.id)), id: \.self) { id in
+                        let isSelected = draft.personalityTagIds.contains(id)
+                        Button {
+                            withAnimation(GoMotion.selection) {
+                                if draft.personalityTagIds.contains(id) {
+                                    draft.personalityTagIds.removeAll { $0 == id }
+                                } else {
+                                    if draft.personalityTagIds.count >= 3 {
+                                        draft.personalityTagIds.removeFirst()
+                                    }
+                                    draft.personalityTagIds.append(id)
+                                }
+                            }
+                            UISelectionFeedbackGenerator().selectionChanged()
+                        } label: {
+                            Text(personalityLabel(id))
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.62)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 34)
+                                .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
+                                .overlay {
+                                    Capsule()
+                                        .strokeBorder(cardControlStroke, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                }
+            }
+        }
+    }
+
+    var humanRegionSection: some View {
+        MemberCreationSection(title: l.tr(zh: "地区", en: "Region", de: "Region"), icon: "location.fill", foreground: cardForeground) {
+            VStack(alignment: .leading, spacing: 10) {
+                menuPicker(title: l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), value: draft.nationality.isEmpty ? l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt") : draft.nationality) {
+                    ForEach(PetBreedDatabase.countries, id: \.self) { country in
+                        Button(country) { draft.nationality = country }
+                    }
+                }
+                menuPicker(title: l.tr(zh: "现居国家", en: "Residence", de: "Wohnort"), value: draft.residenceCountry.isEmpty ? l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt") : draft.residenceCountry) {
+                    ForEach(PetBreedDatabase.countries, id: \.self) { country in
+                        Button(country) {
+                            draft.residenceCountry = country
+                            draft.residenceCity = ""
+                            usesCustomResidenceCity = false
+                        }
+                    }
+                }
+                MemberCompactCityPicker(
+                    country: draft.residenceCountry,
+                    city: $draft.residenceCity,
+                    usesCustomCity: $usesCustomResidenceCity
+                )
+            }
+        }
+    }
+
+    var humanWellbeingSection: some View {
+        MemberCreationSection(title: l.tr(zh: "个性与身体", en: "Personality & body", de: "Persönlichkeit & Körper"), icon: "person.text.rectangle.fill", foreground: cardForeground) {
+            VStack(alignment: .leading, spacing: 12) {
+                compactOptionRow(options: bloodTypes, selection: $draft.bloodType) { bloodTypeLabel($0) }
+                MemberCompactMBTIBar(
+                    energy: $mbtiEnergy,
+                    information: $mbtiInformation,
+                    decision: $mbtiDecision,
+                    lifestyle: $mbtiLifestyle,
+                    foreground: cardForeground
+                ) {
+                    updateDraftMBTI()
+                }
+                HStack(spacing: 10) {
+                    compactHumanMetricInput(
+                        title: l.tr(zh: "身高", en: "Height", de: "Größe"),
+                        text: $draft.heightText,
+                        placeholder: "170",
+                        unit: "cm",
+                        maxFractionDigits: 0
+                    )
+                    compactHumanMetricInput(
+                        title: l.tr(zh: "体重", en: "Weight", de: "Gewicht"),
+                        text: $draft.weightText,
+                        placeholder: "60",
+                        unit: "kg",
+                        maxFractionDigits: 1
+                    )
+                }
+                privacyPillGrid
+            }
+        }
+    }
+
+    var themeSection: some View {
+        MemberCreationSection(title: l.tr(zh: "主题色", en: "Theme color", de: "Themenfarbe"), icon: "circle.hexagongrid.fill", foreground: cardForeground) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 8) {
+                ForEach(AddWizardThemePalette.memberOptions, id: \.hex) { option in
+                    Button {
+                        withAnimation(GoMotion.selection) {
+                            draft.themeColorHex = option.hex
+                        }
+                    } label: {
+                        Circle()
+                            .fill(Color(hex: option.hex))
+                            .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                            .overlay {
+                                if draft.normalizedThemeHex.uppercased() == option.hex.uppercased() {
+                                    Image(systemName: "checkmark").accessibilityHidden(true)
+                                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                                        .foregroundStyle(WalletPetCardTheme.prefersDarkForeground(for: option.hex) ? Color.arkInk : Color.goCardWhite)
+                                }
+                            }
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(option.label)
+                }
+            }
+        }
+    }
+
+    var privacyToggles: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(l.tr(zh: "体重隐私", en: "Private weight", de: "Gewicht privat"), isOn: $draft.privateWeight)
+            Toggle(l.tr(zh: "运动隐私", en: "Private workouts", de: "Training privat"), isOn: $draft.privateWorkout)
+            Toggle(l.tr(zh: "用药隐私", en: "Private medication", de: "Medikation privat"), isOn: $draft.privateMedication)
+            Toggle(l.tr(zh: "愿望隐私", en: "Private wishlist", de: "Wunschliste privat"), isOn: $draft.privateWishlist)
+            Toggle(l.tr(zh: "消费隐私", en: "Private expenses", de: "Ausgaben privat"), isOn: $draft.privateExpense)
+        }
+        .font(OhanaFont.caption(.bold))
+        .foregroundStyle(cardForeground)
+        .tint(Color.goPrimary)
+    }
+
+    var birthdayRange: ClosedRange<Date> {
+        let end = Date()
+        let start = Calendar.current.date(byAdding: .year, value: -120, to: end) ?? end
+        return start ... end
+    }
+
+    var avatarCandidates: [Avatar2DCandidate] {
+        Avatar2DCandidateProvider.candidates(for: draft, l: l)
+    }
+
+    var avatarRefreshSignature: String {
+        [
+            draft.kind.rawValue,
+            draft.species,
+            draft.resolvedBreed,
+            draft.petGender,
+            draft.coatColor,
+            draft.eyeColor,
+            draft.humanGender,
+            "\(draft.hasBirthday)",
+            "\(draft.birthday.timeIntervalSince1970.rounded())",
+        ].joined(separator: "|")
+    }
+
+    var cardSubtitle: String {
+        switch kind {
+        case .pet:
+            return [speciesLabel(draft.species), draft.resolvedBreed, draft.petGender == "unknown" ? "" : petGenderLabel(draft.petGender)]
+                .filter { !$0.isEmpty }
+                .joined(separator: " · ")
+        case .human:
+            return [humanGenderLabel(draft.humanGender), draft.mbti.uppercased()]
+                .filter { !$0.isEmpty }
+                .joined(separator: " · ")
+        }
+    }
+
+    var avatarStatusText: String {
+        ""
+    }
+
+    var petFallbackSymbol: String {
+        switch draft.species {
+        case "狗": return "dog.fill"
+        case "猫": return "cat.fill"
+        case "鸟": return "bird.fill"
+        case "鱼": return "fish.fill"
+        default: return "pawprint.fill"
+        }
+    }
+
+    var speciesOptions: [String] {
+        ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
+    }
+
+    var petGenderOptions: [String] {
+        ["unknown", "boy", "girl"]
+    }
+
+    var humanGenderOptions: [String] {
+        ["男", "女", "非二元"]
+    }
+
+    var humanRoleOptions: [String] {
+        ["owner", "member"]
+    }
+
+    var bloodTypes: [String] {
+        ["", "A", "B", "AB", "O"]
+    }
+
+    var petBreedOptions: [BreedInfo] {
+        PetBreedDatabase.breeds(for: draft.species)
+    }
+
+    var petCoatOptions: [String] {
+        let options = PetAvatarAssetCatalog.coatColors(species: draft.species, breed: draft.resolvedBreed)
+            ?? PetBreedDatabase.genericCoatColors
+        return options.map(\.name)
+    }
+
+    var petEyeOptions: [String] {
+        let options = PetAvatarAssetCatalog.eyeColors(species: draft.species, breed: draft.resolvedBreed, coatColor: draft.coatColor)
+            ?? PetBreedDatabase.genericEyeColors
+        return options.map(\.name)
+    }
+
+    var personalitySelection: Binding<String> {
+        Binding(
+            get: { draft.personalityTagIds.first ?? "" },
+            set: { id in
+                if draft.personalityTagIds.contains(id) {
+                    draft.personalityTagIds.removeAll { $0 == id }
+                } else {
+                    if draft.personalityTagIds.count >= 3 {
+                        draft.personalityTagIds.removeFirst()
+                    }
+                    draft.personalityTagIds.append(id)
+                }
+            }
+        )
+    }
+}

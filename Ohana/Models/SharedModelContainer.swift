@@ -908,7 +908,7 @@ struct SharedModelContainer {
                 migrationPlan: ArkMigrationPlan.self,
                 configurations: [defaultConfig]
             )
-            UserDefaults.standard.removeObject(forKey: "ohana_db_fallback_active")
+            DatabaseFallbackPreferenceStore.clearFallbackActive()
             #if DEBUG
             print("✅ SwiftData: 主存储已打开（含 migrationPlan）")
             #endif
@@ -925,7 +925,7 @@ struct SharedModelContainer {
                 for: schema,
                 configurations: [defaultConfig]
             )
-            UserDefaults.standard.removeObject(forKey: "ohana_db_fallback_active")
+            DatabaseFallbackPreferenceStore.clearFallbackActive()
             #if DEBUG
             print("✅ SwiftData: 默认库已打开（无 migrationPlan）")
             #endif
@@ -944,7 +944,7 @@ struct SharedModelContainer {
         )
         do {
             let container = try ModelContainer(for: schema, configurations: [diskFallback])
-            UserDefaults.standard.removeObject(forKey: "ohana_db_fallback_active")
+            DatabaseFallbackPreferenceStore.clearFallbackActive()
             #if DEBUG
             print("⚠️ SwiftData: 已使用备用磁盘库 `ohana_disk_fallback`（主 default 无法打开时）")
             #endif
@@ -955,7 +955,7 @@ struct SharedModelContainer {
             #endif
         }
 
-        UserDefaults.standard.set(true, forKey: "ohana_db_fallback_active")
+        DatabaseFallbackPreferenceStore.markFallbackActive()
         #if DEBUG
         print("🚨 SwiftData: 磁盘全部失败，最后使用内存库（**退出 App 后数据不保留**）")
         #endif

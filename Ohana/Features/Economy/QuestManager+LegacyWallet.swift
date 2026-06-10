@@ -1,0 +1,210 @@
+//
+//  QuestManager+LegacyWallet.swift
+//  Ohana
+//
+
+import Foundation
+import SwiftData
+import UIKit
+
+extension QuestManager {
+    // MARK: - 旧版兼容方法（addCoconuts / awardAction with allHumans）
+    // 这些方法仍保留，内部调用不再触发个人账户分润，仅用于无上下文场景（如首日登录奖励）
+
+    /// 仅更新全岛总库（用于无实体关联的全局奖励）
+    func addCoconuts(_ amount: Int, emoji: String = "🥥", title: String = "打卡奖励", reason: String? = nil,
+                      actorId: String? = nil, actorName: String? = nil) {
+        let finalTitle = reason ?? title
+        let context = ModelContext(SharedModelContainer.make())
+        addCoconuts(
+            amount,
+            emoji: emoji,
+            title: finalTitle,
+            actorId: actorId,
+            actorName: actorName,
+            context: context,
+            save: true
+        )
+    }
+
+    @discardableResult
+    func addCoconuts(
+        _ amount: Int,
+        emoji: String = "🥥",
+        title: String = "打卡奖励",
+        actorId: String? = nil,
+        actorName: String? = nil,
+        context: ModelContext,
+        save: Bool
+    ) -> Int {
+        lastEconomyRewardResult = nil
+        guard amount != 0 else { return 0 }
+        do {
+            try wallet.applyActorDelta(
+                amount: amount,
+                emoji: emoji,
+                title: title,
+                actorId: actorId,
+                actorName: actorName,
+                entryKind: amount > 0 ? .reward : .spend,
+                source: .service,
+                context: context,
+                save: save,
+                postsRewardFeedback: true,
+                projectionManager: self
+            )
+            return amount
+        } catch {
+            if save {
+                appendLog(CoconutLogEntry(emoji: emoji, title: title, amount: amount,
+                                          actorId: actorId, actorName: actorName))
+                coconutCount = max(0, coconutCount + amount)
+            }
+            #if DEBUG
+            print("❌ [QuestManager] coconut wallet add failed: \(error.localizedDescription)")
+            #endif
+            return 0
+        }
+    }
+
+    /// 记录确定金额的椰子变动，不触发暴击、双倍券或质量加成。用于商店消费、兑换退款等经济账。
+    func recordCoconutDelta(
+        _ amount: Int,
+        emoji: String = "🥥",
+        title: String,
+        actorId: String? = nil,
+        actorName: String? = nil,
+        postsRewardFeedback: Bool = true
+    ) {
+        guard amount != 0 else { return }
+        let context = ModelContext(SharedModelContainer.make())
+        do {
+            try wallet.applyActorDelta(
+                amount: amount,
+                emoji: emoji,
+                title: title,
+                actorId: actorId,
+                actorName: actorName,
+                entryKind: amount > 0 ? .refund : .spend,
+                source: .service,
+                context: context,
+                save: true,
+                postsRewardFeedback: postsRewardFeedback,
+                projectionManager: self
+            )
+        } catch {
+            coconutCount = max(0, coconutCount + amount)
+            appendLog(
+                CoconutLogEntry(
+                    emoji: emoji,
+                    title: title,
+                    amount: amount,
+                    actorId: actorId,
+                    actorName: actorName
+                ),
+                postsRewardFeedback: postsRewardFeedback
+            )
+            #if DEBUG
+            print("❌ [QuestManager] coconut wallet delta failed: \(error.localizedDescription)")
+            #endif
+        }
+    }
+
+    /// 旧版签名兼容；内部映射到新规则。
+    func awardAction(
+        type: ActionType,
+        amount: Int,
+        pet: Pet? = nil,
+        humanId: String? = nil,
+        allHumans: [Human] = []
+    ) {
+        let human: Human? = humanId.flatMap { hid in allHumans.first { $0.id.uuidString == hid } }
+        let aId   = human?.id.uuidString ?? pet?.id.uuidString
+        let aName = human?.name ?? pet?.name
+
+        // 映射旧规则：全岛总库只加「实际到账」部分
+        let humanGet: Int
+        let petGet: Int
+        switch type {
+        case .walk, .feed, .water:
+            humanGet = amount; petGet = amount
+        case .litter:
+            humanGet = amount; petGet = 0
+        case .potty, .general:
+            humanGet = 0; petGet = 0
+        }
+
+        let islandDelta = (petGet > 0 && pet != nil ? petGet : 0)
+                        + (humanGet > 0 && human != nil ? humanGet : 0)
+        let fallback    = (islandDelta == 0) ? amount : 0  // potty/general 无实体时保底给全岛
+
+        let titleStr: String
+        let emojiStr = type.emoji
+        switch type {
+        case .walk:    titleStr = "\(pet?.name ?? "") 遛狗奖励"
+        case .feed:    titleStr = "\(pet?.name ?? "") 喂食奖励"
+        case .litter:  titleStr = "\(pet?.name ?? "") 铲屎奖励"
+        case .potty:   titleStr = "\(pet?.name ?? "") 便便打卡"
+        case .water:   titleStr = "\(pet?.name ?? "") 喂水奖励"
+        case .general: titleStr = "打卡奖励"
+        }
+        let context = ModelContext(SharedModelContainer.make())
+        do {
+            if let pet, petGet > 0 {
+                try wallet.applyActorDelta(
+                    amount: petGet,
+                    emoji: emojiStr,
+                    title: titleStr,
+                    actorId: pet.id.uuidString,
+                    actorName: pet.name,
+                    entryKind: .reward,
+                    source: .service,
+                    context: context,
+                    save: false,
+                    postsRewardFeedback: true,
+                    projectionManager: self
+                )
+            }
+            if let human, humanGet > 0 {
+                try wallet.applyActorDelta(
+                    amount: humanGet,
+                    emoji: emojiStr,
+                    title: titleStr,
+                    actorId: human.id.uuidString,
+                    actorName: human.name,
+                    entryKind: .reward,
+                    source: .service,
+                    context: context,
+                    save: false,
+                    postsRewardFeedback: true,
+                    projectionManager: self
+                )
+            }
+            if fallback != 0 {
+                try wallet.applyActorDelta(
+                    amount: fallback,
+                    emoji: emojiStr,
+                    title: titleStr,
+                    actorId: aId,
+                    actorName: aName,
+                    entryKind: .reward,
+                    source: .service,
+                    context: context,
+                    save: false,
+                    postsRewardFeedback: true,
+                    projectionManager: self
+                )
+            }
+            try context.save()
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: self)
+            appendLog(CoconutLogEntry(emoji: emojiStr, title: titleStr, amount: islandDelta + fallback,
+                                      actorId: aId, actorName: aName))
+            coconutCount = max(0, coconutCount + islandDelta + fallback)
+            #if DEBUG
+            print("❌ [QuestManager] legacy award wallet write failed: \(error.localizedDescription)")
+            #endif
+        }
+    }
+}

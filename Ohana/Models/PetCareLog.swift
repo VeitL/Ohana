@@ -153,12 +153,8 @@ enum HomeFeedRecordMode: String {
     case manual
     case planned
 
-    private static func storageKey(petId: UUID) -> String {
-        "feedRecordMode_\(petId.uuidString)"
-    }
-
     static func storedRaw(for petId: UUID) -> String {
-        UserDefaults.standard.string(forKey: storageKey(petId: petId)) ?? Self.manual.rawValue
+        HomeFeedRecordModePreferenceStore.storedRaw(for: petId, fallback: Self.manual.rawValue)
     }
 
     static func isPlanned(for petId: UUID) -> Bool {
@@ -166,7 +162,7 @@ enum HomeFeedRecordMode: String {
     }
 
     static func set(_ petId: UUID, mode: HomeFeedRecordMode) {
-        UserDefaults.standard.set(mode.rawValue, forKey: storageKey(petId: petId))
+        HomeFeedRecordModePreferenceStore.set(petId, rawValue: mode.rawValue)
     }
 }
 

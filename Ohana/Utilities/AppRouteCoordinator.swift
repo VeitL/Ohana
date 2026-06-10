@@ -203,6 +203,11 @@ enum AppRouteNotificationOutcome: Equatable {
     case reconcileHumanRequirement
 }
 
+struct AppRoutePublishedEvent: Identifiable, Equatable {
+    let id = UUID()
+    let event: AppRouteNotificationEvent
+}
+
 @MainActor
 final class AppRouteCoordinator: ObservableObject {
     @Published var path: [AppRoute] = []
@@ -394,7 +399,7 @@ final class AppRouteCoordinator: ObservableObject {
 
 private extension AppRouteCoordinator {
     var currentFeatureLevel: Int {
-        OasisTreeManager.shared.treeLevel.rawValue
+        OasisTreeManagerRegistry.current.treeLevel.rawValue
     }
 }
 

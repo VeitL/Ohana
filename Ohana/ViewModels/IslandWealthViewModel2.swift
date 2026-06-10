@@ -132,11 +132,10 @@ final class IslandWealthScreenModel {
 
     // MARK: - 图表数据（按时间桶聚合 log，仅用于趋势图）
     private var visibleLogs: [CoconutLogEntry] {
-        let walletLogs = walletLedgerEntries
+        walletLedgerEntries
             .filter { $0.delta != 0 }
             .map { $0.asCoconutLogEntry() }
-        let sourceLogs = walletLogs.isEmpty ? QuestManager.shared.coconutLogs : walletLogs
-        return sourceLogs.filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+            .filter { !hiddenHumanIds.contains($0.actorId ?? "") }
     }
 
     private var logs: [CoconutLogEntry] {

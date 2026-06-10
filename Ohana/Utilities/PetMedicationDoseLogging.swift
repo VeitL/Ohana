@@ -53,8 +53,14 @@ enum PetMedicationDoseLogging {
         pet: Pet,
         modelContext: ModelContext,
         decrementRemaining: Bool = true,
-        awardCoconut: Bool = false
+        awardCoconut: Bool = false,
+        questManager: QuestManager,
+        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> Event {
+        let careLedger = providedCareLedger ?? CareLedgerService()
+        let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
         let event = Event(
             title: "💊 \(pet.name) 服用 \(medication.name)",
             startDate: Date(),
@@ -63,12 +69,12 @@ enum PetMedicationDoseLogging {
             relatedEntityType: relatedEntityTypeMedication,
             relatedEntityId: medication.id.uuidString
         )
-        if let hid = UserDefaults.standard.string(forKey: "currentActiveHumanId"), !hid.isEmpty {
+        if let hid = activeHumanSelection.currentHumanId {
             event.assigneeId = hid
         }
         modelContext.insert(event)
         modelContext.safeSave()
-        CareLedgerService.record(
+        careLedger.record(
             occurredAt: event.startDate,
             actorKind: event.assigneeId == nil ? .unknown : .human,
             actorId: event.assigneeId,
@@ -76,28 +82,31 @@ enum PetMedicationDoseLogging {
             subjectId: pet.id.uuidString,
             eventKind: .medication,
             actionType: "petMedicationDose",
+            amountValue: 0,
+            amountUnit: "",
             note: event.title,
             source: .detail,
             sourceEventId: event.id.uuidString,
+            sourceReminderId: nil,
             legacyModelName: "Event",
             legacyModelId: event.id.uuidString,
+            coconutDelta: 0,
+            rewardLogId: nil,
+            privacyFieldRaw: nil,
             metadataJSON: "{\"medicationId\":\"\(medication.id.uuidString)\"}",
-            context: modelContext
+            context: modelContext,
+            save: true
         )
 
         if decrementRemaining {
-            let key = "medication_remaining_\(medication.id.uuidString)"
-            let cur = UserDefaults.standard.double(forKey: key)
-            if cur > 0 {
-                UserDefaults.standard.set(max(0, cur - 1), forKey: key)
-            }
+            PetMedicationPlanStorageKeys.decrementRemainingAmount(medicationID: medication.id)
         }
 
-        MedicationReminderService.recordDose(for: medication.id)
+        medicationReminders.recordDose(for: medication.id)
 
         if awardCoconut {
-            QuestManager.shared.addCoconuts(1, emoji: "💊", title: "记录喂药 +1🥥")
-            CareLedgerService.recordCoconut(
+            questManager.addCoconuts(1, emoji: "💊", title: "记录喂药 +1🥥")
+            _ = careLedger.recordCoconut(
                 delta: 1,
                 title: "记录喂药",
                 actorId: event.assigneeId,

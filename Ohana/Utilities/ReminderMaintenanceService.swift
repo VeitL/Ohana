@@ -27,13 +27,17 @@ enum ReminderMaintenanceService {
     }
 
     @MainActor
-    static func runPendingReminderMaintenance(context: ModelContext) async -> ReminderMaintenanceRunResult {
+    static func runPendingReminderMaintenance(
+        context: ModelContext,
+        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
+    ) async -> ReminderMaintenanceRunResult {
+        let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager()
         let reminders = pendingReminders(context: context)
         guard !Task.isCancelled else {
             return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: false)
         }
 
-        await ReminderSchedulingService.refillMissingPendingNotifications(
+        await reminderScheduling.refillMissingPendingNotifications(
             reminders: reminders,
             context: context
         )
@@ -41,7 +45,7 @@ enum ReminderMaintenanceService {
             return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: false)
         }
 
-        ReminderSchedulingService.compensate(reminders: reminders, context: context)
+        reminderScheduling.compensate(reminders: reminders, context: context)
         try? context.save()
         return ReminderMaintenanceRunResult(pendingCount: reminders.count, completed: true)
     }

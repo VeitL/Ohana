@@ -11,8 +11,8 @@
 //  lets unit tests substitute an in-memory fake, so reminder/care write paths
 //  become testable without touching the real UNUserNotificationCenter.
 //
-//  The live implementation is still NotificationManager.shared, so production
-//  behavior is unchanged.
+//  AppServices installs the production NotificationManager instance at startup;
+//  tests can still override the scheduler directly.
 //
 
 import Foundation
@@ -35,14 +35,18 @@ protocol ReminderNotificationScheduling: Sendable {
 
 extension NotificationManager: ReminderNotificationScheduling {}
 
-/// Injectable accessor for the notification scheduler. Defaults to the live
-/// `NotificationManager.shared`; tests can override `current` with a fake and
-/// restore it via `useLive()`.
+/// Injectable accessor for the notification scheduler. Defaults to a live
+/// instance until AppServices installs the app-owned scheduler; tests can
+/// override `current` with a fake and restore it via `useLive()`.
 enum OhanaNotifications {
-    nonisolated(unsafe) static var current: ReminderNotificationScheduling = NotificationManager.shared
+    nonisolated(unsafe) static var current: ReminderNotificationScheduling = makeLiveScheduler()
 
     /// Restores the live notification scheduler. Call in test teardown.
     static func useLive() {
-        current = NotificationManager.shared
+        current = makeLiveScheduler()
+    }
+
+    private static func makeLiveScheduler() -> ReminderNotificationScheduling {
+        NotificationManager(routeCenter: OhanaNotificationRouteCenter())
     }
 }

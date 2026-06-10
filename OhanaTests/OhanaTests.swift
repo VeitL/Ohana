@@ -314,9 +314,9 @@ struct OhanaTests {
         ))
         try context.save()
 
-        OasisTreeManager.shared.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
+        TestOasisTreeManagerProjection.manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
 
-        #expect(OasisTreeManager.shared.islandEnergy == 120)
+        #expect(TestOasisTreeManagerProjection.manager.islandEnergy == 120)
         #expect(OasisTreeManager.treeLevel(forTotalEnergy: 120) == .lv2)
     }
 
@@ -331,7 +331,7 @@ struct OhanaTests {
         let userKey = human.id.uuidString
         let date = dateForTest(year: 2026, month: 6, day: 9)
         let oldActiveHuman = UserDefaults.standard.string(forKey: "currentActiveHumanId")
-        let manager = QuestManager.shared
+        let manager = TestQuestManagerProjection.manager
         let oldCount = manager.coconutCount
         let oldLogs = manager.coconutLogs
         let oldLastReward = manager.lastEconomyRewardResult
@@ -344,7 +344,7 @@ struct OhanaTests {
             manager.coconutCount = oldCount
             manager.coconutLogs = oldLogs
             manager.lastEconomyRewardResult = oldLastReward
-            manager.flushToDefaults()
+            manager.persistQuestFlags()
         }
 
         UserDefaults.standard.set(userKey, forKey: "currentActiveHumanId")
@@ -447,14 +447,14 @@ struct OhanaTests {
         sourceContext.insert(human)
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(container: source)
+        let url = try await TestDataBackupManagerProjection.manager.exportJSON(container: source)
         let exported = try String(contentsOf: url, encoding: .utf8)
         #expect(!exported.contains("pinHash"))
         #expect(!exported.contains("pinSalt"))
         #expect(!exported.contains(human.pinHash))
 
         let target = try makeInMemoryContainer()
-        try await DataBackupManager.shared.importJSON(from: url, context: target.mainContext)
+        try await TestDataBackupManagerProjection.manager.importJSON(from: url, context: target.mainContext)
         let restored = try target.mainContext.fetch(FetchDescriptor<Human>()).first
         #expect(restored?.name == "Backup Owner")
         #expect(restored.map { !HumanPasscodeService.hasPasscode($0) } ?? false)
@@ -636,16 +636,16 @@ struct OhanaTests {
     @Test func plannedFeedCatchUpWithinSixHoursDoesNotAwardCoconuts() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
-        let previousCoconutCount = QuestManager.shared.coconutCount
-        let previousFirstMeal = QuestManager.shared.isFirstMealRecorded
-        let previousLogs = QuestManager.shared.coconutLogs
-        QuestManager.shared.coconutCount = 0
-        QuestManager.shared.isFirstMealRecorded = false
-        QuestManager.shared.coconutLogs = []
+        let previousCoconutCount = TestQuestManagerProjection.manager.coconutCount
+        let previousFirstMeal = TestQuestManagerProjection.manager.isFirstMealRecorded
+        let previousLogs = TestQuestManagerProjection.manager.coconutLogs
+        TestQuestManagerProjection.manager.coconutCount = 0
+        TestQuestManagerProjection.manager.isFirstMealRecorded = false
+        TestQuestManagerProjection.manager.coconutLogs = []
         defer {
-            QuestManager.shared.coconutCount = previousCoconutCount
-            QuestManager.shared.isFirstMealRecorded = previousFirstMeal
-            QuestManager.shared.coconutLogs = previousLogs
+            TestQuestManagerProjection.manager.coconutCount = previousCoconutCount
+            TestQuestManagerProjection.manager.isFirstMealRecorded = previousFirstMeal
+            TestQuestManagerProjection.manager.coconutLogs = previousLogs
         }
 
         let pet = Pet(name: "Momo", species: "猫")
@@ -675,8 +675,8 @@ struct OhanaTests {
         let ledger = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(reward?.humanGot == 0)
         #expect(reward?.petGot == 0)
-        #expect(QuestManager.shared.coconutCount == 0)
-        #expect(!QuestManager.shared.isFirstMealRecorded)
+        #expect(TestQuestManagerProjection.manager.coconutCount == 0)
+        #expect(!TestQuestManagerProjection.manager.isFirstMealRecorded)
         #expect(pet.coconutBalance == 0)
         #expect(ledger.contains { $0.eventKindEnum == .care && $0.sourceReminderId == reminder.id.uuidString && $0.coconutDelta == 0 })
         #expect(reminder.statusEnum == .completed)
@@ -868,10 +868,10 @@ struct OhanaTests {
         )
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(container: source)
+        let url = try await TestDataBackupManagerProjection.manager.exportJSON(container: source)
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
-        try await DataBackupManager.shared.importJSON(from: url, context: targetContext)
+        try await TestDataBackupManagerProjection.manager.importJSON(from: url, context: targetContext)
 
         let restoredHumans = try targetContext.fetch(FetchDescriptor<Human>())
         let restored = try #require(restoredHumans.first)
@@ -917,10 +917,10 @@ struct OhanaTests {
         )
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(container: source)
+        let url = try await TestDataBackupManagerProjection.manager.exportJSON(container: source)
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
-        try await DataBackupManager.shared.importJSON(from: url, context: targetContext)
+        try await TestDataBackupManagerProjection.manager.importJSON(from: url, context: targetContext)
 
         let restoredEvents = try targetContext.fetch(FetchDescriptor<Event>())
         let restoredReminders = try targetContext.fetch(FetchDescriptor<Reminder>())
@@ -955,10 +955,10 @@ struct OhanaTests {
         sourceContext.insert(record)
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(container: source)
+        let url = try await TestDataBackupManagerProjection.manager.exportJSON(container: source)
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
-        try await DataBackupManager.shared.importJSON(from: url, context: targetContext)
+        try await TestDataBackupManagerProjection.manager.importJSON(from: url, context: targetContext)
 
         let restored = try #require(try targetContext.fetch(FetchDescriptor<PetFoodRecord>()).first)
         #expect(restored.purchaseDate == purchaseDate)
@@ -1004,10 +1004,10 @@ struct OhanaTests {
         sourceContext.insert(HeatCycleLog(status: .estrus, note: "normal", isMated: true, pet: pet))
         try sourceContext.save()
 
-        let url = try await DataBackupManager.shared.exportJSON(container: source)
+        let url = try await TestDataBackupManagerProjection.manager.exportJSON(container: source)
         let target = try makeInMemoryContainer()
         let targetContext = target.mainContext
-        try await DataBackupManager.shared.importJSON(from: url, context: targetContext)
+        try await TestDataBackupManagerProjection.manager.importJSON(from: url, context: targetContext)
 
         #expect(try targetContext.fetch(FetchDescriptor<PetPhotoLog>()).first?.imageData == Data([9, 8, 7]))
         #expect(try targetContext.fetch(FetchDescriptor<PetDocument>()).first?.attachments.first?.data == Data([1, 1, 2]))
@@ -2932,7 +2932,7 @@ struct OhanaTests {
         context.insert(PetCareLog(type: .watering, amountMl: 250, pet: pet))
         try context.save()
 
-        let signals = IslandNegativeFeedback.signals(pets: [pet])
+        let signals = IslandNegativeFeedback.signals(pets: [pet], healthAlerts: EmptyPetHealthAlerts())
         #expect(!signals.contains { $0.title == "今日还未打卡" })
     }
 

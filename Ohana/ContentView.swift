@@ -8,10 +8,12 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import Combine
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     @StateObject private var appRoutes = AppRouteCoordinator()
     @State private var createdEntitySignal: HomeCreatedEntitySignal?
     @State private var onboardingJourneyEvaluationTask: Task<Void, Never>?
@@ -80,7 +82,7 @@ struct ContentView: View {
         }
         .animation(GoMotion.sheetEnter, value: onboardingJourneyPhase)
         .onAppear {
-            AppLifecycleCoordinator.shared.handle(.rootAppeared(scenePhase: scenePhase))
+            appServices.lifecycle.handle(.rootAppeared(scenePhase: scenePhase))
             scheduleCoconutWalletBootstrap()
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluation()
@@ -89,18 +91,9 @@ struct ContentView: View {
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluation()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .ohanaReturnHomeAfterHumanDeletion)) { notification in
-            let outcome = appRoutes.handleNotificationEvent(
-                .humanDeleted(
-                    requiresReplacementHuman: (notification.userInfo?["requiresReplacementHuman"] as? Bool) == true,
-                    requiresAccountSwitch: (notification.userInfo?["requiresAccountSwitch"] as? Bool) == true
-                )
-            )
-            handleRouteNotificationOutcome(outcome)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .ohanaReminderRouteRequested)) { _ in
+        .onReceive(appServices.notificationRoutes.routeEvents) { published in
             handleRouteNotificationOutcome(
-                appRoutes.handleNotificationEvent(.reminderRouteRequested)
+                appRoutes.handleNotificationEvent(published.event)
             )
         }
         .appRoutePresentationHost(
@@ -116,11 +109,11 @@ struct ContentView: View {
                 scheduleOnboardingJourneyEvaluation()
             },
             onFirstSuccessMomentCompleted: { _ in
-                OnboardingJourneyCoordinator.markFirstCareCompleted()
+                appServices.onboardingJourney.markFirstCareCompleted()
                 scheduleOnboardingJourneyEvaluation()
             },
             onHumanDoseTaken: { _ in
-                OnboardingJourneyCoordinator.markFirstCareCompleted()
+                appServices.onboardingJourney.markFirstCareCompleted()
                 scheduleOnboardingJourneyEvaluation()
             }
         )
@@ -132,7 +125,7 @@ struct ContentView: View {
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
-            AppLifecycleCoordinator.shared.handle(.scenePhaseChanged(newPhase))
+            appServices.lifecycle.handle(.scenePhaseChanged(newPhase))
             if newPhase == .active {
                 reconcileHumanProfileRequirement()
             }
@@ -198,7 +191,7 @@ struct ContentView: View {
     }
 
     private func reconcileHumanProfileRequirement() {
-        let resolution = HumanRequirementCoordinator.resolve(
+        let resolution = appServices.humanRequirements.resolve(
             hasOnboarded: hasOnboarded,
             currentActiveHumanId: currentActiveHumanId,
             isAccountSwitchPresented: appRoutes.sheet == .requiredAccountSwitch,
@@ -225,7 +218,10 @@ struct ContentView: View {
         coconutWalletBootstrapTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
             defer { coconutWalletBootstrapTask = nil }
             do {
-                try CoconutEconomyBootstrapService.bootstrapIfNeeded(context: modelContext)
+                try appServices.coconutWallet.bootstrapIfNeeded(
+                    context: modelContext,
+                    projectionManager: appServices.questManager
+                )
             } catch {
                 #if DEBUG
                 print("❌ [ContentView] coconut wallet bootstrap failed: \(error.localizedDescription)")
@@ -242,10 +238,11 @@ struct ContentView: View {
     private func scheduleOnboardingJourneyEvaluation() {
         onboardingJourneyEvaluationTask?.cancel()
         onboardingJourneyEvaluationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 480) {
-            let evaluation = OnboardingJourneyCoordinator.evaluate(
+            let evaluation = appServices.onboardingJourney.evaluate(
                 hasOnboarded: hasOnboarded,
                 activeHumanID: currentActiveHumanId.isEmpty ? nil : currentActiveHumanId,
-                context: modelContext
+                context: modelContext,
+                projectionManager: appServices.questManager
             )
             onboardingJourneyPhase = evaluation.phase
             onboardingJourneyEvaluationTask = nil
@@ -253,7 +250,7 @@ struct ContentView: View {
     }
 
     private func completeStarterGiftCeremony() {
-        OnboardingJourneyCoordinator.markStarterCeremonySeen()
+        appServices.onboardingJourney.markStarterCeremonySeen()
         withAnimation(GoMotion.sheetEnter) {
             onboardingJourneyPhase = .complete
         }
@@ -280,10 +277,6 @@ struct ContentView: View {
         )
     }
 
-}
-
-extension Notification.Name {
-    static let ohanaReturnHomeAfterHumanDeletion = Notification.Name("ohanaReturnHomeAfterHumanDeletion")
 }
 
 #Preview {

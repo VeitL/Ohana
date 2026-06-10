@@ -19,14 +19,8 @@ struct CustomPersonalityTagRecord: Codable, Identifiable, Equatable {
 }
 
 enum CustomPersonalityTagStore {
-    private static let key = "ohana_custom_personality_tags_v1"
-
     static func load() -> [CustomPersonalityTagRecord] {
-        guard let data = UserDefaults.standard.string(forKey: key)?.data(using: .utf8),
-              let arr = try? JSONDecoder().decode([CustomPersonalityTagRecord].self, from: data) else {
-            return []
-        }
-        return arr
+        CustomPersonalityTagPreferenceStore.load()
     }
 
     static func title(forId id: String, isEnglish: Bool) -> String? {

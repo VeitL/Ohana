@@ -1,0 +1,375 @@
+//
+//  MemberInteractionCommands.swift
+//  Ohana
+//
+//  Domain write boundaries for member lifecycle, visibility, walks, and member-scoped executors.
+//
+
+import Foundation
+import SwiftData
+
+enum MemberLifecycleCommandService {
+    @discardableResult
+    @MainActor
+    static func markPetPassedAway(
+        _ pet: Pet,
+        date: Date,
+        context: ModelContext
+    ) -> MemberLifecycleCommandResult {
+        RainbowBridgeService().markPassedAway(pet: pet, date: date, context: context)
+        return MemberLifecycleCommandResult(
+            entityID: pet.id,
+            kind: EntityKind.pet.rawValue,
+            action: "passed.mark"
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func undoPetPassedAway(
+        _ pet: Pet,
+        context: ModelContext
+    ) -> MemberLifecycleCommandResult {
+        RainbowBridgeService().undoPassedAway(pet: pet, context: context)
+        return MemberLifecycleCommandResult(
+            entityID: pet.id,
+            kind: EntityKind.pet.rawValue,
+            action: "passed.undo"
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func clearPetActivityRecords(
+        _ pet: Pet,
+        context: ModelContext,
+        questManager: QuestManager? = nil
+    ) -> MemberLifecycleCommandResult {
+        pet.clearAllActivityRecords(in: context)
+        let manager = questManager ?? QuestManager()
+        manager.clearPerPetAuxiliaryState(forPetId: pet.id)
+        return MemberLifecycleCommandResult(
+            entityID: pet.id,
+            kind: EntityKind.pet.rawValue,
+            action: "records.clear"
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func markHumanPassedAway(
+        _ human: Human,
+        date: Date,
+        context: ModelContext
+    ) -> MemberLifecycleCommandResult {
+        human.passedAwayDate = date
+        context.safeSave()
+        return MemberLifecycleCommandResult(
+            entityID: human.id,
+            kind: EntityKind.human.rawValue,
+            action: "passed.mark"
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func undoHumanPassedAway(
+        _ human: Human,
+        context: ModelContext
+    ) -> MemberLifecycleCommandResult {
+        human.passedAwayDate = nil
+        context.safeSave()
+        return MemberLifecycleCommandResult(
+            entityID: human.id,
+            kind: EntityKind.human.rawValue,
+            action: "passed.undo"
+        )
+    }
+}
+
+enum MemberHomeVisibilityCommandService {
+    @discardableResult
+    @MainActor
+    static func setHumanHomeVisibility(
+        _ human: Human,
+        visible: Bool,
+        context: ModelContext
+    ) -> MemberHomeVisibilityCommandResult {
+        human.shouldShowOnHome = visible
+        context.safeSave()
+        return MemberHomeVisibilityCommandResult(
+            entityID: human.id,
+            kind: EntityKind.human.rawValue,
+            visible: visible
+        )
+    }
+}
+
+enum PetWalkCommandService {
+    @discardableResult
+    @MainActor
+    static func saveWeeklyGoal(
+        _ goalKm: Double,
+        for pet: Pet,
+        context: ModelContext
+    ) -> PetWalkGoalCommandResult {
+        pet.weeklyWalkGoalKm = max(0, goalKm)
+        context.safeSave()
+        return PetWalkGoalCommandResult(petID: pet.id, goalKm: pet.weeklyWalkGoalKm)
+    }
+
+    @discardableResult
+    @MainActor
+    static func saveSummary(
+        for walk: PetWalkLog,
+        pet: Pet,
+        moodRating: Int,
+        notes: String,
+        context: ModelContext
+    ) -> PetWalkSummaryCommandResult {
+        let normalizedRating = min(5, max(0, moodRating))
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        walk.moodRating = normalizedRating
+        walk.behaviorNotes = trimmedNotes.isEmpty ? nil : trimmedNotes
+        context.safeSave()
+        return PetWalkSummaryCommandResult(
+            petID: pet.id,
+            walkID: walk.id,
+            moodRating: normalizedRating,
+            hasNotes: !trimmedNotes.isEmpty
+        )
+    }
+}
+
+@MainActor
+struct PetWalkCommandExecutor {
+    let context: ModelContext
+    let revisions: DomainRevisionPublishing
+
+    init(context: ModelContext) {
+        self.init(context: context, revisions: SharedDomainRevisionPublisher())
+    }
+
+    init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
+        self.init(context: context, revisions: SharedDomainRevisionPublisher(center: revisionCenter))
+    }
+
+    init(context: ModelContext, services: AppServices) {
+        self.init(context: context, revisions: services.domainRevisions)
+    }
+
+    init(context: ModelContext, revisions: DomainRevisionPublishing) {
+        self.context = context
+        self.revisions = revisions
+    }
+
+    @discardableResult
+    func saveWeeklyGoal(
+        _ goalKm: Double,
+        for pet: Pet,
+        note: String
+    ) -> PetWalkGoalCommandResult {
+        let result = PetWalkCommandService.saveWeeklyGoal(goalKm, for: pet, context: context)
+        revisions.publishPetWalkGoal(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func saveSummary(
+        for walk: PetWalkLog,
+        pet: Pet,
+        moodRating: Int,
+        notes: String,
+        note: String
+    ) -> PetWalkSummaryCommandResult {
+        let result = PetWalkCommandService.saveSummary(
+            for: walk,
+            pet: pet,
+            moodRating: moodRating,
+            notes: notes,
+            context: context
+        )
+        revisions.publishPetWalkSummary(result, note: note)
+        return result
+    }
+}
+
+@MainActor
+struct PlantCareCommandExecutor {
+    let context: ModelContext
+    let revisions: DomainRevisionPublishing
+
+    init(context: ModelContext) {
+        self.init(context: context, revisions: SharedDomainRevisionPublisher())
+    }
+
+    init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
+        self.init(context: context, revisions: SharedDomainRevisionPublisher(center: revisionCenter))
+    }
+
+    init(context: ModelContext, services: AppServices) {
+        self.init(context: context, revisions: services.domainRevisions)
+    }
+
+    init(context: ModelContext, revisions: DomainRevisionPublishing) {
+        self.context = context
+        self.revisions = revisions
+    }
+
+    @discardableResult
+    func recordCare(
+        _ type: PlantCareType,
+        plant: Plant,
+        executorId: String?,
+        note: String
+    ) -> PlantCareCommandResult {
+        let result = PlantCareCommandService.recordCare(
+            type,
+            plant: plant,
+            executorId: executorId,
+            context: context
+        )
+        revisions.publishPlantCare(result, note: note)
+        return result
+    }
+}
+
+@MainActor
+struct MemberCommandExecutor {
+    let context: ModelContext
+    let revisions: DomainRevisionPublishing
+    let questManager: QuestManager
+
+    init(context: ModelContext) {
+        self.init(context: context, revisions: SharedDomainRevisionPublisher(), questManager: QuestManager())
+    }
+
+    init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
+        self.init(
+            context: context,
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            questManager: QuestManager()
+        )
+    }
+
+    init(context: ModelContext, services: AppServices) {
+        self.init(context: context, revisions: services.domainRevisions, questManager: services.questManager)
+    }
+
+    init(context: ModelContext, revisions: DomainRevisionPublishing, questManager: QuestManager) {
+        self.context = context
+        self.revisions = revisions
+        self.questManager = questManager
+    }
+
+    @discardableResult
+    func updatePetProfile(_ pet: Pet, input: PetProfileCommandInput, note: String) -> MemberProfileCommandResult {
+        let result = MemberProfileCommandService.updatePet(pet, input: input, context: context)
+        revisions.publishMemberProfile(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func updateHumanProfile(_ human: Human, input: HumanProfileCommandInput, note: String) -> MemberProfileCommandResult {
+        let result = MemberProfileCommandService.updateHuman(human, input: input, context: context)
+        revisions.publishMemberProfile(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func updatePlantProfile(_ plant: Plant, input: PlantProfileCommandInput, note: String) -> MemberProfileCommandResult {
+        let result = MemberProfileCommandService.updatePlant(plant, input: input, context: context)
+        revisions.publishMemberProfile(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func setHumanHomeVisibility(
+        _ human: Human,
+        visible: Bool,
+        note: String
+    ) -> MemberHomeVisibilityCommandResult {
+        let result = MemberHomeVisibilityCommandService.setHumanHomeVisibility(human, visible: visible, context: context)
+        revisions.publishMemberHomeVisibility(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func publishPetHomeVisibility(
+        petID: UUID,
+        visible: Bool,
+        note: String
+    ) -> MemberHomeVisibilityCommandResult {
+        let result = MemberHomeVisibilityCommandResult(
+            entityID: petID,
+            kind: EntityKind.pet.rawValue,
+            visible: visible
+        )
+        revisions.publishMemberHomeVisibility(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func markPetPassedAway(_ pet: Pet, date: Date, note: String) -> MemberLifecycleCommandResult {
+        let result = MemberLifecycleCommandService.markPetPassedAway(pet, date: date, context: context)
+        revisions.publishMemberLifecycle(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func undoPetPassedAway(_ pet: Pet, note: String) -> MemberLifecycleCommandResult {
+        let result = MemberLifecycleCommandService.undoPetPassedAway(pet, context: context)
+        revisions.publishMemberLifecycle(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func clearPetActivityRecords(_ pet: Pet, note: String) -> MemberLifecycleCommandResult {
+        let result = MemberLifecycleCommandService.clearPetActivityRecords(
+            pet,
+            context: context,
+            questManager: questManager
+        )
+        revisions.publishMemberLifecycle(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func markHumanPassedAway(_ human: Human, date: Date, note: String) -> MemberLifecycleCommandResult {
+        let result = MemberLifecycleCommandService.markHumanPassedAway(human, date: date, context: context)
+        revisions.publishMemberLifecycle(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func undoHumanPassedAway(_ human: Human, note: String) -> MemberLifecycleCommandResult {
+        let result = MemberLifecycleCommandService.undoHumanPassedAway(human, context: context)
+        revisions.publishMemberLifecycle(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func deletePet(_ pet: Pet, note: String) -> MemberDeletionCommandResult {
+        let result = MemberDeletionCommandService.deletePet(pet, context: context)
+        revisions.publishMemberDeletion(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func deleteHuman(
+        _ human: Human,
+        activeHumanID: String,
+        note: String
+    ) -> MemberDeletionCommandResult {
+        let result = MemberDeletionCommandService.deleteHuman(human, activeHumanID: activeHumanID, context: context)
+        revisions.publishMemberDeletion(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func deletePlant(_ plant: Plant, note: String) -> MemberDeletionCommandResult {
+        let result = MemberDeletionCommandService.deletePlant(plant, context: context)
+        revisions.publishMemberDeletion(result, note: note)
+        return result
+    }
+}

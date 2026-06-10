@@ -4,11 +4,14 @@
 
 ## 分层边界
 
-- `Views/` 只负责界面组合、局部交互状态和路由，不直接承担跨页面业务规则。
-- `Models/` 放 SwiftData 模型、领域服务和持久化相关业务，例如 `CareEventService`、`FamilyTaskService`、`CoconutEconomyService`。
-- `Utilities/` 放跨模块基础设施，例如运行时能耗策略、定位封装、颜色、输入格式、日历同步。
-- `ViewModels/` 只在单个页面需要复杂只读聚合时使用；不要把 SwiftData 写入逻辑藏在 ViewModel 里。
-- 新功能优先复用已有服务；只有当同一规则被两个以上入口使用时，才抽成新 service。
+- `App/` owns the app shell, route containers, lifecycle coordinators, startup bootstrap, and `AppServices` dependency container. App startup must stay skinny and must not eagerly initialize feature dashboards.
+- `Models/` contains SwiftData `@Model` types, schema/version declarations, and tiny model-only value helpers. Domain services, managers, command executors, catalogs, databases, localization, and infrastructure adapters must not live directly under `Models/`.
+- `Domain/` contains cross-feature protocols, domain services, command envelopes, event/revision publishing, and persistence-facing services that do not import SwiftUI. Domain services own invariants and write boundaries.
+- `Features/<Feature>/` owns vertical feature modules: commands/executors, data containers, screen models, route-local snapshot builders, and feature views. A feature may depend on `Domain`, `Shared`, `Models`, and `Utilities`, but must not reach into another feature's internal view implementation.
+- `Shared/` contains reusable UI, localization, and shared presentation helpers. Shared render components do not access `ModelContext`, execute commands, or own navigation.
+- `Utilities/` contains cross-module infrastructure such as runtime/energy policy, image processing, calendar sync, route helpers, preference stores, and observability.
+- `ViewModels/` is retained only for legacy shared read models while features migrate to feature-local `XxxScreenModel` / snapshot-store files. SwiftData writes must not be hidden in a ViewModel.
+- New business behavior enters through an injected service/protocol from `AppServices` or a feature command executor. A View may create a typed command value or call an injected service, but it must not call static `XxxService` write APIs directly.
 
 ## 依赖方向
 
@@ -33,9 +36,11 @@ Allowed dependency examples:
 - View -> shared UI component.
 - View -> feature-local coordinator.
 - View -> render state.
+- Route/Data container -> narrow `@Query`.
 - Feature coordinator -> route value.
 - Snapshot builder -> domain service / SwiftData read.
-- Domain service -> SwiftData write.
+- Feature command executor -> injected domain service/protocol.
+- Domain service -> SwiftData write and care/economy/ledger side effects.
 - Runtime-aware component -> `AppWorkloadPolicy`.
 
 Forbidden dependency examples:
@@ -45,7 +50,21 @@ Forbidden dependency examples:
 - Reusable component -> `ModelContext`.
 - Feature A View -> Feature B internal View.
 - View body -> broad repository query.
+- View -> `UserDefaults.standard`.
+- View -> static `XxxService` / `XxxManager` write entry point.
+- SwiftData model -> service/manager infrastructure.
+- Domain service -> `NotificationCenter.default.post` string bus.
+- Coconut balance write outside `CoconutWalletService` or backup import projection.
 - Startup path -> feature-specific heavy service.
+
+## Persistence and Read Paths
+
+- Coconut economy has a single durable source of truth: `CoconutAccount` and immutable `CoconutLedgerEntry` in SwiftData. `Human.coconutBalance`, `Pet.coconutBalance`, and any legacy QuestManager projection are compatibility caches only.
+- Legacy `quest_coconutCount` and `quest_coconutLogs` may be read only by the wallet bootstrap/import compatibility path. QuestManager must not write those keys.
+- A domain write must persist the business fact, care ledger event, wallet account/ledger entry, compatibility cache, and read-model revision in one service boundary and one `ModelContext.save()` when the caller owns the transaction.
+- `CareLedgerEvent` remains the business/care event ledger; wallet balance history belongs to `CoconutLedgerEntry`.
+- `@Query` belongs only in route/data containers. Reusable rows, cards, popups, motion scenes, and section views receive value snapshots or screen-model state.
+- Cross-page refresh uses typed domain revisions from `DomainRevisionPublishing` / `ReadModelRevisionCenter`, not `NotificationCenter.default.post`.
 
 ## 后台与定位
 

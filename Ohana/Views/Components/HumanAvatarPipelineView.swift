@@ -8,7 +8,7 @@ struct HumanAvatarPipelineView: View {
     var backgroundOpacity: Double = 0.22
     var clipsToCircle: Bool = true
 
-    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
+    @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
 
     private var signature: String? {
         human.avatarImageData.map { FocusWalletAvatarCache.signature(for: $0) }
@@ -43,14 +43,14 @@ struct HumanAvatarPipelineView: View {
         .contentShape(Circle())
         .task(id: signature) {
             guard let data = human.avatarImageData else { return }
-            AvatarPipeline.shared.preload(
+            AvatarPipelineRegistry.current.preload(
                 payloads: [FocusWalletAvatarCache.Payload(id: human.id, data: data)],
                 key: pipelineKey,
                 delayMilliseconds: 24
             )
         }
         .onDisappear {
-            AvatarPipeline.shared.cancel(key: pipelineKey)
+            AvatarPipelineRegistry.current.cancel(key: pipelineKey)
         }
     }
 }

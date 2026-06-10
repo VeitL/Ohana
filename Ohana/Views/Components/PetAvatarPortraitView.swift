@@ -129,7 +129,7 @@ private struct PetAvatarPortraitCachedCircleImage: View {
     let transparentScale: CGFloat
     let transparentYOffset: CGFloat
 
-    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
+    @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
 
     private var signature: String {
         FocusWalletAvatarCache.signature(for: imageData)
@@ -156,14 +156,14 @@ private struct PetAvatarPortraitCachedCircleImage: View {
         } else {
             PetAvatarPortraitFallbackText(text: fallbackText, size: size)
                 .task(id: signature) {
-                    AvatarPipeline.shared.preload(
+                    AvatarPipelineRegistry.current.preload(
                         payloads: [FocusWalletAvatarCache.Payload(id: resolvedCacheID, data: imageData)],
                         key: pipelineKey,
                         delayMilliseconds: 24
                     )
                 }
                 .onDisappear {
-                    AvatarPipeline.shared.cancel(key: pipelineKey)
+                    AvatarPipelineRegistry.current.cancel(key: pipelineKey)
                 }
         }
     }
@@ -177,7 +177,7 @@ private struct PetAvatarPortraitCachedRoundedImage: View {
     let transparentScale: CGFloat
     let transparentYOffset: CGFloat
 
-    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
+    @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
 
     private var signature: String {
         FocusWalletAvatarCache.signature(for: imageData)
@@ -204,14 +204,14 @@ private struct PetAvatarPortraitCachedRoundedImage: View {
         } else {
             PetAvatarPortraitFallbackText(text: fallbackText, size: size, scale: 0.52)
                 .task(id: signature) {
-                    AvatarPipeline.shared.preload(
+                    AvatarPipelineRegistry.current.preload(
                         payloads: [FocusWalletAvatarCache.Payload(id: resolvedCacheID, data: imageData)],
                         key: pipelineKey,
                         delayMilliseconds: 24
                     )
                 }
                 .onDisappear {
-                    AvatarPipeline.shared.cancel(key: pipelineKey)
+                    AvatarPipelineRegistry.current.cancel(key: pipelineKey)
                 }
         }
     }
@@ -280,7 +280,7 @@ enum PetAvatarTransparencyCache {
             return cached.boolValue
         }
 
-        let value = ImageCutoutService.isTransparentPNG(data)
+        let value = ImageSubjectCutoutProcessor.isTransparentPNG(data)
         cache.setObject(NSNumber(value: value), forKey: key)
         return value
     }

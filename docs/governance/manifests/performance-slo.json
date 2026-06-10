@@ -24,10 +24,10 @@
         "flow.home.card_collapse"
       ],
       "paths": [
-        "Ohana/Views/Home/VerticalSolidHomeView.swift",
-        "Ohana/Views/Home/FocusHomeWalletController.swift",
-        "Ohana/Views/Home/FocusHomeSnapshotController.swift",
-        "Ohana/Views/Home/WalletHeroMotion.swift",
+        "Ohana/Features/Home/Views/VerticalSolidHomeView.swift",
+        "Ohana/Features/Home/Views/FocusHomeWalletController.swift",
+        "Ohana/Features/Home/Views/FocusHomeSnapshotController.swift",
+        "Ohana/Features/Home/Views/WalletHeroMotion.swift",
         "OhanaTests/VerticalSolidHomeControllerTests.swift"
       ]
     },
@@ -46,8 +46,8 @@
         "flow.home.tab_switch"
       ],
       "paths": [
-        "Ohana/Views/Home/VerticalSolidHomeController.swift",
-        "Ohana/Views/Home/VerticalSolidHomeComponents.swift",
+        "Ohana/Features/Home/Views/VerticalSolidHomeController.swift",
+        "Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift",
         "OhanaTests/VerticalHomeTabMountPolicyTests.swift",
         "OhanaTests/VerticalSolidHomeControllerTests.swift"
       ]
@@ -67,9 +67,9 @@
         "flow.quick_care.command"
       ],
       "paths": [
-        "Ohana/Models/HomeCommandExecutor.swift",
-        "Ohana/Models/CareEventService.swift",
-        "Ohana/Models/CareLedgerService.swift",
+        "Ohana/Features/Home/HomeCommandExecutor.swift",
+        "Ohana/Domain/Services/CareEventService.swift",
+        "Ohana/Domain/Services/CareLedgerService.swift",
         "OhanaTests/HomeCommandExecutorTests.swift"
       ]
     },
@@ -112,7 +112,7 @@
         "flow.calendar.filter"
       ],
       "paths": [
-        "Ohana/Views/CalendarView.swift"
+        "Ohana/Features/Calendar/Views/CalendarView.swift"
       ]
     },
     {
@@ -130,8 +130,8 @@
         "flow.calendar.add_event_sheet"
       ],
       "paths": [
-        "Ohana/Views/CalendarView.swift",
-        "Ohana/Views/Forms/AddEventView.swift"
+        "Ohana/Features/Calendar/Views/CalendarView.swift",
+        "Ohana/Features/Calendar/Views/AddEventView.swift"
       ]
     },
     {
@@ -149,8 +149,8 @@
         "flow.oasis.open"
       ],
       "paths": [
-        "Ohana/Views/Home/OasisHomeTabHost.swift",
-        "Ohana/Views/Home/OasisRewardView.swift"
+        "Ohana/Features/Home/Views/OasisHomeTabHost.swift",
+        "Ohana/Features/Home/Views/OasisRewardView.swift"
       ]
     },
     {
@@ -168,8 +168,9 @@
         "flow.backup.export"
       ],
       "paths": [
-        "Ohana/Models/DataBackupManager.swift",
-        "Ohana/Views/SettingsView.swift",
+        "Ohana/Domain/Services/DataBackupManager.swift",
+        "Ohana/Domain/Services/DataBackupDTOs.swift",
+        "Ohana/Features/Settings/Views/SettingsView.swift",
         "scripts/audit-release-data-safety.sh"
       ]
     }

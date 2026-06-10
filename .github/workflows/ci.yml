@@ -44,6 +44,8 @@ jobs:
       # Whole-repo hard gates for mature-app invariants.
       - name: Runtime guardrails audit (whole repo, strict)
         run: scripts/audit-runtime-guardrails.sh --all
+      - name: Architecture boundaries audit (whole repo, strict)
+        run: scripts/audit-architecture-boundaries.sh --all
       - name: Localization coverage audit
         run: scripts/audit-localization-coverage.sh
       - name: Release data-safety audit

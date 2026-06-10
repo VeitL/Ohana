@@ -430,6 +430,7 @@ struct SynergyFlashCard: View {
     @State private var engine = SynergyEngine()
     @State private var currentIndex: Int = 0
     @State private var timer: Timer? = nil
+    @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     private var activeHumanId: UUID? {
@@ -438,9 +439,9 @@ struct SynergyFlashCard: View {
 
     private var visibleBriefHumans: [Human] {
         humans.filter {
-            !PrivacyService.isLocked(.expense, for: $0, viewedBy: activeHumanId) &&
-            !PrivacyService.isLocked(.wishlist, for: $0, viewedBy: activeHumanId) &&
-            !PrivacyService.isLocked(.workout, for: $0, viewedBy: activeHumanId)
+            !appServices.privacy.isLocked(.expense, for: $0, viewedBy: activeHumanId) &&
+                !appServices.privacy.isLocked(.wishlist, for: $0, viewedBy: activeHumanId) &&
+                !appServices.privacy.isLocked(.workout, for: $0, viewedBy: activeHumanId)
         }
     }
 
@@ -546,6 +547,7 @@ struct CoconutWealthRankingCard: View {
     let pets: [Pet]
     let humans: [Human]
     var onTap: (() -> Void)? = nil
+    @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     private var activeHumanId: UUID? {
@@ -553,7 +555,7 @@ struct CoconutWealthRankingCard: View {
     }
 
     private var visibleWealthHumans: [Human] {
-        PrivacyService.unlockedHumans(for: .wishlist, from: humans, viewedBy: activeHumanId)
+        appServices.privacy.unlockedHumans(for: .wishlist, from: humans, viewedBy: activeHumanId)
     }
 
     // 当前查看者可见的全岛总资产；隐私成员的个人椰子余额不计入展示。

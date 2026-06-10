@@ -66,6 +66,8 @@ final class AppWorkloadPolicy: ObservableObject {
     @Published private(set) var isUserPowerSavingMode = UserDefaults.standard.bool(forKey: AppPerformanceMode.powerSavingKey)
     @Published private(set) var lastReductionReason = "foreground"
 
+    var hasRunningWalkProvider: @MainActor () -> Bool = { false }
+
     private var cancellables: Set<AnyCancellable> = []
 
     private init() {
@@ -93,7 +95,7 @@ final class AppWorkloadPolicy: ObservableObject {
     }
 
     var hasRunningWalk: Bool {
-        PetWalkingManager.shared.hasActiveLocationWalk
+        hasRunningWalkProvider()
     }
 
     func updateScenePhase(_ phase: ScenePhase) {

@@ -27,17 +27,18 @@ struct OhanaApp: App {
         let initStartedAt = CFAbsoluteTimeGetCurrent()
         AppCountry.ensureInitialized()
         BackgroundTaskCoordinator.registerTasks()
-        _ = NotificationManager.shared
         let containerStartedAt = CFAbsoluteTimeGetCurrent()
         modelContainer = SharedModelContainer.make()
-        appServices = AppServices()
+        let services = AppServices()
+        appServices = services
+        let metricKit = services.metricKit
         let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1_000
         let containerDurationMS = (CFAbsoluteTimeGetCurrent() - containerStartedAt) * 1_000
         Task { @MainActor in
             AppPerformanceMonitor.shared.record("SwiftData container ready", valueMS: containerDurationMS, note: "Eager before RootView")
             AppPerformanceMonitor.shared.record("App init", valueMS: initDurationMS, note: "BGTask + eager container")
             AppPerformanceMonitor.shared.record("进程到 App init 完成", startedAt: ohanaProcessStartTime)
-            MetricKitObserver.shared.start()
+            metricKit.start()
         }
     }
     
@@ -62,16 +63,16 @@ struct OhanaApp: App {
             .onChange(of: appCurrency) { _, _ in }
             .onChange(of: appMeasurementSystem) { _, _ in }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-                AppLifecycleCoordinator.shared.handle(.didEnterBackground)
+                appServices.lifecycle.handle(.didEnterBackground)
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-                AppLifecycleCoordinator.shared.handle(.willResignActive)
+                appServices.lifecycle.handle(.willResignActive)
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                AppLifecycleCoordinator.shared.handle(.didBecomeActive)
+                appServices.lifecycle.handle(.didBecomeActive)
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
-                AppLifecycleCoordinator.shared.handle(.willTerminate)
+                appServices.lifecycle.handle(.willTerminate)
             }
         }
     }

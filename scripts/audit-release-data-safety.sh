@@ -9,7 +9,14 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 2
 fi
 
-data_backup="Ohana/Models/DataBackupManager.swift"
+data_backup="Ohana/Domain/Services/DataBackupManager.swift"
+data_backup_dtos="Ohana/Domain/Services/DataBackupDTOs.swift"
+data_backup_files=(
+  "Ohana/Domain/Services/DataBackupManager.swift"
+  "Ohana/Domain/Services/DataBackupManager+Encode.swift"
+  "Ohana/Domain/Services/DataBackupManager+Decode.swift"
+  "Ohana/Domain/Services/DataBackupDTOs.swift"
+)
 shared_container="Ohana/Models/SharedModelContainer.swift"
 
 failures=()
@@ -19,6 +26,14 @@ require_pattern() {
   local pattern="$2"
   local message="$3"
   if ! rg -q --pcre2 "$pattern" "$file"; then
+    failures+=("$message")
+  fi
+}
+
+require_backup_pattern() {
+  local pattern="$1"
+  local message="$2"
+  if ! rg -q --pcre2 "$pattern" "${data_backup_files[@]}"; then
     failures+=("$message")
   fi
 }
@@ -47,43 +62,69 @@ reject_pattern() {
   fi
 }
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV56\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV56 model set."
+reject_backup_pattern() {
+  local pattern="$1"
+  local message="$2"
+  if rg -q --pcre2 "$pattern" "${data_backup_files[@]}"; then
+    failures+=("$message")
+  fi
+}
 
-require_pattern "$data_backup" 'var schemaVersion: Int = 22' \
-  "OhanaBackup.schemaVersion should be 22 after adding human metric backups."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV58\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV58 model set."
 
-require_pattern "$data_backup" 'guard backup\.schemaVersion <= 22' \
-  "DataBackupManager import guard should allow backup schemaVersion 22."
+require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 23' \
+  "OhanaBackup.schemaVersion should be 23 after adding V58 wallet backups."
 
-require_section_pattern "$data_backup" 'struct HumanBackup' 'struct EventBackup' 'var passedAwayDate: String\?' \
+require_pattern "$data_backup" 'guard backup\.schemaVersion <= 23' \
+  "DataBackupManager import guard should allow backup schemaVersion 23."
+
+require_section_pattern "$data_backup_dtos" 'struct HumanBackup' 'struct EventBackup' 'var passedAwayDate: String\?' \
   "HumanBackup should include passedAwayDate so human memorial state survives backup/restore."
 
-require_pattern "$data_backup" 'passedAwayDate: d\(h\.passedAwayDate\)' \
+require_backup_pattern 'passedAwayDate: d\(h\.passedAwayDate\)' \
   "encodeHuman should export Human.passedAwayDate."
 
-require_pattern "$data_backup" 'h\.passedAwayDate = parseDate\(dto\.passedAwayDate\)' \
+require_backup_pattern 'h\.passedAwayDate = parseDate\(dto\.passedAwayDate\)' \
   "decodeHuman should restore Human.passedAwayDate."
 
-require_pattern "$data_backup" 'struct HumanHealthMetricLogBackup: Codable' \
+require_pattern "$data_backup_dtos" 'struct HumanHealthMetricLogBackup: Codable' \
   "DataBackupManager should define HumanHealthMetricLogBackup."
 
-require_pattern "$data_backup" 'var humanHealthMetricLogs: \[HumanHealthMetricLogBackup\]\?' \
+require_pattern "$data_backup_dtos" 'var humanHealthMetricLogs: \[HumanHealthMetricLogBackup\]\?' \
   "OhanaBackup should include humanHealthMetricLogs."
 
-require_pattern "$data_backup" 'FetchDescriptor<HumanHealthMetricLog>' \
+require_backup_pattern 'FetchDescriptor<HumanHealthMetricLog>' \
   "DataBackupManager should fetch HumanHealthMetricLog during backup/import."
 
-require_pattern "$data_backup" 'humanHealthMetricLogs: humanHealthMetricLogs\.map\(encodeHumanHealthMetricLog\)' \
+require_backup_pattern 'humanHealthMetricLogs: humanHealthMetricLogs\.map\(encodeHumanHealthMetricLog\)' \
   "buildBackup should encode human health metric logs."
 
-require_pattern "$data_backup" 'decodeHumanHealthMetricLog\(dto, humans: humanById\)' \
+require_backup_pattern 'decodeHumanHealthMetricLog\(dto, humans: humanById\)' \
   "applyBackup should decode human health metric logs with human relationships."
 
-reject_pattern "$data_backup" '\b(pinHash|pinSalt|pinFailedAttempts|pinLockedUntil)\s*:' \
+require_pattern "$data_backup_dtos" 'var coconutAccounts: \[CoconutAccountBackup\]\?' \
+  "OhanaBackup should include V58 CoconutAccount backups."
+
+require_pattern "$data_backup_dtos" 'var coconutLedgerEntries: \[CoconutLedgerEntryBackup\]\?' \
+  "OhanaBackup should include V58 CoconutLedgerEntry backups."
+
+require_backup_pattern 'coconutAccounts: coconutAccounts\.map\(encodeCoconutAccount\)' \
+  "buildBackup should export V58 CoconutAccount rows."
+
+require_backup_pattern 'coconutLedgerEntries: coconutLedgerEntries\.map\(encodeCoconutLedgerEntry\)' \
+  "buildBackup should export V58 CoconutLedgerEntry rows."
+
+require_backup_pattern 'decodeCoconutAccount\(dto\)' \
+  "applyBackup should import V58 CoconutAccount rows."
+
+require_backup_pattern 'decodeCoconutLedgerEntry\(dto\)' \
+  "applyBackup should import V58 CoconutLedgerEntry rows."
+
+reject_backup_pattern '\b(pinHash|pinSalt|pinFailedAttempts|pinLockedUntil)\s*:' \
   "Backups must not encode PIN hash/salt/lockout fields."
 
-reject_pattern "$data_backup" '\bh\.pin(Hash|Salt|FailedAttempts|LockedUntil)\b|\bdto\.pin(Hash|Salt|FailedAttempts|LockedUntil)\b' \
+reject_backup_pattern '\bh\.pin(Hash|Salt|FailedAttempts|LockedUntil)\b|\bdto\.pin(Hash|Salt|FailedAttempts|LockedUntil)\b' \
   "DataBackupManager must not read or restore Human PIN hash/salt/lockout fields."
 
 if [[ ${#failures[@]} -eq 0 ]]; then

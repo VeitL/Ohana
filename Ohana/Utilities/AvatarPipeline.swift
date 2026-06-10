@@ -11,12 +11,10 @@ import UIKit
 
 @MainActor
 final class AvatarPipeline: ObservableObject {
-    static let shared = AvatarPipeline()
-
     @Published private(set) var revision = 0
     private var decodeTasks: [String: Task<Void, Never>] = [:]
 
-    private init() {}
+    init() {}
 
     @discardableResult
     func seedPreviewEntries(_ payloads: [FocusWalletAvatarCache.Payload]) -> Bool {
@@ -65,5 +63,15 @@ final class AvatarPipeline: ObservableObject {
 
     private func advanceRevision() {
         revision &+= 1
+    }
+}
+
+@MainActor
+enum AvatarPipelineRegistry {
+    private static var currentPipeline = AvatarPipeline()
+
+    static var current: AvatarPipeline {
+        get { currentPipeline }
+        set { currentPipeline = newValue }
     }
 }

@@ -17,7 +17,7 @@ struct ExecutorPickerBar: View {
     var compact: Bool = false
 
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
-    @ObservedObject private var avatarPipeline = AvatarPipeline.shared
+    @ObservedObject private var avatarPipeline = AvatarPipelineRegistry.current
     @State private var showingExecutorSwitcher = false
     @State private var avatarSignature = ""
     @State private var avatarCacheKey = "executor-picker-avatar-empty"

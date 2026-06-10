@@ -19,6 +19,7 @@ struct SwipeableEventRow: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(AppServices.self) private var appServices
     @AppStorage(AppPerformanceMode.powerSavingKey) private var powerSavingMode = false
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
 
@@ -402,7 +403,12 @@ struct SwipeableEventRow: View {
             let eventID = event.id
             let executorId = activeHumanIdRaw.isEmpty ? nil : activeHumanIdRaw
             commandQueue.enqueue(.todayFocus(entityID: eventID, action: "eventCompleteReward"), delayMilliseconds: 70) {
-                let result = EventCompletionCommandExecutor(context: modelContext).awardCompletionIfEligible(
+                let result = EventCompletionCommandExecutor(
+                    context: modelContext,
+                    wallet: appServices.coconutWallet,
+                    careLedger: appServices.careLedger,
+                    revisions: appServices.domainRevisions
+                ).awardCompletionIfEligible(
                     event: event,
                     occurrenceDate: occurrenceDate,
                     executorId: executorId,
@@ -438,7 +444,7 @@ struct SwipeableEventRow: View {
         isTriggerred = true
         withAnimation(GoMotion.page) { offsetX = 800 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            CalendarCommandExecutor(context: modelContext).delete(
+            CalendarCommandExecutor(context: modelContext, services: appServices).delete(
                 event: event,
                 occurrenceDate: occurrenceDate,
                 scope: .wholeEvent,
@@ -451,7 +457,7 @@ struct SwipeableEventRow: View {
     }
 
     private func deleteEvent(scope: CalendarEventDeletionScope) {
-        CalendarCommandExecutor(context: modelContext).delete(
+        CalendarCommandExecutor(context: modelContext, services: appServices).delete(
             event: event,
             occurrenceDate: occurrenceDate,
             scope: scope,
@@ -499,6 +505,7 @@ private struct EventDetailSheet: View {
     let onComplete: () -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     @State private var showDeleteConfirm = false
 
     var body: some View {
@@ -598,7 +605,7 @@ private struct EventDetailSheet: View {
                         .buttonStyle(ScaleButtonStyle())
                         .confirmationDialog("确认删除", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                             Button("删除此事项", role: .destructive) {
-                                CalendarCommandExecutor(context: modelContext).delete(
+                                CalendarCommandExecutor(context: modelContext, services: appServices).delete(
                                     event: event,
                                     occurrenceDate: occurrenceDate,
                                     scope: .wholeEvent,

@@ -11,9 +11,7 @@ import Vision
 
 @MainActor
 final class ImageCutoutService {
-
-    static let shared = ImageCutoutService()
-    private init() {}
+    init() {}
 
     // MARK: - 主入口
     /// 将图片主体前景抠出，背景替换为透明，返回 PNG 格式的 UIImage
