@@ -124,7 +124,7 @@
       "paths": [
         "Ohana/App/AppRuntimePolicy.swift",
         "Ohana/Features/Calendar/Views/CalendarView.swift",
-        "Ohana/Features/Home/Views/FocusHomeRouteSheetModifier.swift",
+        "Ohana/Features/Home/FocusHomeRouteSheetModifier.swift",
         "Ohana/Features/Oasis/Views/OasisHomeTabHost.swift",
         "Ohana/Features/Settings/Views/SettingsView.swift"
       ]
