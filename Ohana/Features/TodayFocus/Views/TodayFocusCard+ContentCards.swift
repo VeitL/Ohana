@@ -152,22 +152,18 @@ extension TodayFocusCard {
     @ViewBuilder
     func questMetaRow(_ quest: IslandQuest) -> some View {
         if IslandQuestEngine.isOasisBuildQuest(quest.id) {
-            let tokens = refreshedQuests
+            let tokens = Array(refreshedQuests
                 .filter { IslandQuestEngine.isOasisBuildQuest($0.id) }
-                .prefix(TodayFocusLimits.maxOasisBuildTokens)
-            HStack(spacing: 5) {
-                ForEach(Array(tokens), id: \.id) { token in
-                    HStack(spacing: 4) {
-                        Text(token.emoji)
-                            .font(OhanaFont.adaptive(size: 10))
-                        Image(systemName: token.isCompleted ? "checkmark" : "circle.fill")
-                            .font(.system(size: token.isCompleted ? 8 : 5, weight: .black))
-                    }
-                    .foregroundStyle(token.isCompleted ? Color.goPrimary : Color.ohanaSecondaryText)
-                    .frame(width: 36, height: 20) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(Color.ohanaControlFill, in: Capsule())
-                }
-            }
+                .prefix(TodayFocusLimits.maxOasisBuildTokens))
+            let completed = tokens.filter(\.isCompleted).count
+            compactMetaChip(
+                text: l.tr(
+                    zh: "\(completed)/\(tokens.count) 入门",
+                    en: "\(completed)/\(tokens.count) setup",
+                    de: "\(completed)/\(tokens.count) Start"
+                ),
+                tint: Color.goPrimary
+            )
             .accessibilityLabel(l.tr(zh: "岛屿建设任务", en: "Oasis build quests", de: "Oase-Aufgaben"))
         } else if let name = questTargetName(quest) {
             compactMetaChip(text: name, tint: Color.goPrimary)
