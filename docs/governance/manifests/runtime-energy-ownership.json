@@ -79,7 +79,7 @@
         "Ohana/Features/Oasis/Views/OasisRewardView.swift",
         "Ohana/Features/Oasis/OasisRewardSnapshots.swift",
         "Ohana/Features/TodayFocus/Views/TodayFocusCard.swift",
-        "Ohana/Features/Home/Views/StreakFlameParticles.swift",
+        "Ohana/Features/DailyStreak/Views/StreakFlameParticles.swift",
         "Ohana/Features/Oasis/Views/BeautifulCoconutTree.swift",
         "Ohana/Features/Home/Views/FocusHomeVerticalSolidScene.swift"
       ]

@@ -27,7 +27,7 @@
         "Ohana/Features/Home/Views/VerticalSolidHomeView.swift",
         "Ohana/Features/Home/FocusHomeWalletController.swift",
         "Ohana/Features/Home/FocusHomeSnapshotController.swift",
-        "Ohana/Features/Home/Views/WalletHeroMotion.swift",
+        "Ohana/Shared/Components/WalletCards/WalletHeroMotion.swift",
         "OhanaTests/VerticalSolidHomeControllerTests.swift"
       ]
     },
