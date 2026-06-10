@@ -84,12 +84,13 @@ nonisolated enum IslandQuestEngine {
         TodayFocusDailyPreferenceCleanupStore.cleanupIfNeeded(date: now, calendar: cal)
         var quests: [IslandQuest] = []
         let activePets = pets.filter { !$0.hasPassedAway }
+        let maxQuests = TodayFocusLimits.maxGeneratedQuests
 
         // ── 用药委托（最高优先级）：今日未达频次的活跃疗程
         for pet in activePets {
-            guard quests.count < 3 else { break }
+            guard quests.count < maxQuests else { break }
             for med in pet.medications where med.isActive(on: now) {
-                guard quests.count < 3 else { break }
+                guard quests.count < maxQuests else { break }
                 let need = PetMedicationDoseLogging.requiredDoses(on: now, for: med)
                 guard need > 0 else { continue }
                 let done = PetMedicationDoseLogging.doseCount(on: now, events: events, medicationId: med.id, calendar: cal)
@@ -115,7 +116,7 @@ nonisolated enum IslandQuestEngine {
 
         // ── 物种/品种默认护理计划：添加宠物后写入 Event，这里只取今天到期且尚未完成的项目。
         for quest in carePlanQuests(from: events, pets: activePets, humans: humans, calendar: cal, now: now) {
-            guard quests.count < 3 else { break }
+            guard quests.count < maxQuests else { break }
             if !quests.contains(where: { $0.id == quest.id }) {
                 quests.append(quest)
             }
@@ -123,12 +124,12 @@ nonisolated enum IslandQuestEngine {
 
         if activePets.isEmpty {
             for quest in oasisBuildQuests(activePets: activePets, humans: humans, questProgress: questProgress) {
-                guard quests.count < 3 else { break }
+                guard quests.count < maxQuests else { break }
                 quests.append(quest)
             }
         }
 
-        if quests.count < 3,
+        if quests.count < maxQuests,
            let human = preferredHumanForWeight(from: humans, calendar: cal, now: now) {
             quests.append(IslandQuest(
                 id: "q_human_weight_\(human.id.uuidString)",
@@ -149,7 +150,7 @@ nonisolated enum IslandQuestEngine {
             pet.careLogs.contains { $0.careType == .play && cal.isDate($0.date, inSameDayAs: now) }
                 || pet.walkLogs.contains { cal.isDate($0.startDate, inSameDayAs: now) }
         }
-        if quests.count < 3,
+        if quests.count < maxQuests,
            !hasAnyPlayEquivalentToday,
            let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "play", isAlreadyDone: { _ in false }) {
             quests.append(IslandQuest(
@@ -167,7 +168,7 @@ nonisolated enum IslandQuestEngine {
             ))
         }
 
-        if quests.count < 3,
+        if quests.count < maxQuests,
            let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "weight", calendar: cal, now: now, isAlreadyDone: { p in
                p.weightLogs.contains { cal.isDate($0.date, inSameDayAs: now) }
            }) {
@@ -186,7 +187,7 @@ nonisolated enum IslandQuestEngine {
             ))
         }
 
-        if quests.count < 3,
+        if quests.count < maxQuests,
            let pet = PetPersonalityBehavior.preferredPet(from: activePets, actionType: "moment", calendar: cal, now: now, isAlreadyDone: { p in
                p.photoLogs.contains { cal.isDate($0.date, inSameDayAs: now) }
            }) {
@@ -207,13 +208,13 @@ nonisolated enum IslandQuestEngine {
 
         if !activePets.isEmpty {
             for quest in oasisBuildQuests(activePets: activePets, humans: humans, questProgress: questProgress) {
-                guard quests.count < 3 else { break }
+                guard quests.count < maxQuests else { break }
                 quests.append(quest)
             }
         }
 
         // ── 植物浇水（需要浇水的植物）
-        if quests.count < 3, let thirstyPlant = plants.first(where: { $0.needsWatering(on: now, calendar: cal) }) {
+        if quests.count < maxQuests, let thirstyPlant = plants.first(where: { $0.needsWatering(on: now, calendar: cal) }) {
             quests.append(IslandQuest(
                 id: "q_water_plant_\(thirstyPlant.id.uuidString)",
                 emoji: "💧",
@@ -226,7 +227,7 @@ nonisolated enum IslandQuestEngine {
         }
 
         // ── 植物施肥（需要施肥的植物）
-        if quests.count < 3, let hungryPlant = plants.first(where: { $0.needsFertilizing(on: now, calendar: cal) }) {
+        if quests.count < maxQuests, let hungryPlant = plants.first(where: { $0.needsFertilizing(on: now, calendar: cal) }) {
             quests.append(IslandQuest(
                 id: "q_fertilize_plant_\(hungryPlant.id.uuidString)",
                 emoji: "🌿",
@@ -240,7 +241,7 @@ nonisolated enum IslandQuestEngine {
 
         // ── 今日提醒（仅在有真实提醒时显示）
         let todayReminders = reminders.filter { cal.isDate($0.scheduledAt, inSameDayAs: now) }
-        if quests.count < 3, !todayReminders.isEmpty {
+        if quests.count < maxQuests, !todayReminders.isEmpty {
             let allDone = todayReminders.allSatisfy(\.isCompleted)
             let pending = todayReminders.count(where: { !$0.isCompleted })
             quests.append(IslandQuest(
@@ -258,7 +259,7 @@ nonisolated enum IslandQuestEngine {
             ))
         }
 
-        return Array(quests.prefix(3))
+        return Array(quests.prefix(maxQuests))
     }
 
     @MainActor

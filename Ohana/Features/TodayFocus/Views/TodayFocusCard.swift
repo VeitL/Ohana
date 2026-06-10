@@ -6,7 +6,7 @@
 //  首页 Today Focus 水平滑动卡组：
 //  按优先级智能选出"今天最该做的 1 件事"，单卡呈现 + 微动效。
 //
-//  优先级：异常趋势/医疗风险 > 未完成委托 > 记忆碎片 > 全部完成庆祝 > 岛屿探访
+//  优先级：异常趋势/医疗风险 > 协作任务 > 收款确认 > 未完成委托 > 全部完成庆祝 > 岛屿探访
 //
 //  v3 render snapshot：父级 Host/Store 准备首屏数据，卡片只负责绘制。
 //
@@ -18,6 +18,18 @@ enum TodayFocusCardPresentation {
     case compactStack
 }
 
+enum TodayFocusCardLayout {
+    static let frontHeight: CGFloat = 46
+    static let compactStackHeight: CGFloat = 58
+    static let legacySwitchHeight: CGFloat = 52
+    static let backCardSpacing: CGFloat = 4
+    static let contentHorizontalPadding: CGFloat = 10
+    static let contentVerticalPadding: CGFloat = 6
+    static let homeChromeMinHeight: CGFloat = 58
+    static let homeChromeMaxHeight: CGFloat = 62
+    static let homeChromeHeightRatio: CGFloat = 0.07
+}
+
 // MARK: - TodayFocusCard
 
 struct TodayFocusCard: View {
@@ -26,7 +38,6 @@ struct TodayFocusCard: View {
     var onOpenQuest: (IslandQuest) -> Void = { _ in }
     var onCompleteQuest: (IslandQuest) -> Void = { _ in }
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void = { _ in }
-    var onTapMemory: () -> Void = {}
     var onTapOasis: () -> Void = {}
     var onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void = { _ in }
     var onOpenExchange: (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
@@ -59,7 +70,6 @@ struct TodayFocusCard: View {
         onOpenQuest: @escaping (IslandQuest) -> Void = { _ in },
         onCompleteQuest: @escaping (IslandQuest) -> Void = { _ in },
         onTapNegativeSignal: @escaping (IslandNegativeSignal) -> Void = { _ in },
-        onTapMemory: @escaping () -> Void = {},
         onTapOasis: @escaping () -> Void = {},
         onTapFamilyTask: @escaping (TodayFocusFamilyTaskSnapshot) -> Void = { _ in },
         onOpenExchange: @escaping (TodayFocusExchangeRequestSnapshot) -> Void = { _ in },
@@ -75,7 +85,6 @@ struct TodayFocusCard: View {
         self.onOpenQuest = onOpenQuest
         self.onCompleteQuest = onCompleteQuest
         self.onTapNegativeSignal = onTapNegativeSignal
-        self.onTapMemory = onTapMemory
         self.onTapOasis = onTapOasis
         self.onTapFamilyTask = onTapFamilyTask
         self.onOpenExchange = onOpenExchange
@@ -165,7 +174,7 @@ struct TodayFocusCard: View {
                 en: "to confirm",
                 de: "offen"
             )
-        case .negative, .memory, .celebrate, .welcome:
+        case .negative, .celebrate, .welcome:
             content.statusText
         }
     }

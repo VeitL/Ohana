@@ -160,7 +160,7 @@ enum OasisUpgradeRewardCatalog {
                 rewardKind: .fragments,
                 rewardCatalogId: "level_\(level)_critter_fragments",
                 guaranteedCritterId: fragmentTargetCritterId(for: level),
-                coconutAmount: level * 6,
+                coconutAmount: level == 3 ? 22 : level * 6,
                 treeEnergyAmount: 0,
                 fragmentAmount: amount,
                 decorUnlockId: nil,

@@ -54,8 +54,8 @@ extension TodayFocusCard {
 
     var compactBody: some View {
         card(showsPageIndicator: false)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
             .transaction { transaction in
                 if freezesToFrontCard {
                     transaction.animation = nil

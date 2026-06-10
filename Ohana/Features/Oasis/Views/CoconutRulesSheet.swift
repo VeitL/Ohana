@@ -79,6 +79,27 @@ struct CoconutRulesSheet: View {
                 reward: l.tr(zh: "走服务预算", en: "Service budget", de: "Service-Budget")
             ),
             RuleCard(
+                icon: "calendar.badge.checkmark",
+                title: l.tr(zh: "日历任务", en: "Calendar tasks", de: "Kalenderaufgaben"),
+                desc: l.tr(zh: "完成可执行事件", en: "Finish actionable events", de: "Erledige ausführbare Termine"),
+                glowColor: Color(hex: "38BDF8"),
+                reward: l.tr(zh: "5🥥 · 走每日预算", en: "5🥥 · daily budget", de: "5🥥 · Tagesbudget")
+            ),
+            RuleCard(
+                icon: "trophy.fill",
+                title: l.tr(zh: "成就徽章", en: "Achievement badges", de: "Erfolgsabzeichen"),
+                desc: l.tr(zh: "达成后手动领取", en: "Claim after unlocking", de: "Nach Freischaltung abholen"),
+                glowColor: Color(hex: "FACC15"),
+                reward: l.tr(zh: "10🥥/徽章 · 一次性", en: "10🥥/badge · one-time", de: "10🥥/Abzeichen · einmalig")
+            ),
+            RuleCard(
+                icon: "flame.fill",
+                title: l.tr(zh: "连击里程碑", en: "Streak milestones", de: "Serien-Meilensteine"),
+                desc: l.tr(zh: "7/30/100/365 天连胜", en: "7/30/100/365-day streaks", de: "7/30/100/365-Tage-Serien"),
+                glowColor: Color(hex: "FB7185"),
+                reward: l.tr(zh: "特殊奖励 · 不占预算", en: "Special reward · no budget cap", de: "Sonderlohn · ohne Budgetlimit")
+            ),
+            RuleCard(
                 icon: "tree.fill",
                 title: l.tr(zh: "每日掉落", en: "Daily drop", de: "Täglicher Drop"),
                 desc: l.tr(zh: "生命之树被动收益", en: "Life Tree passive income", de: "Passives Einkommen des Baums"),

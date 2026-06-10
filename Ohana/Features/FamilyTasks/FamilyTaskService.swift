@@ -514,13 +514,20 @@ enum FamilyTaskService {
 
     @MainActor
     static func activeTask(forReminderId reminderId: String, context: ModelContext) -> FamilyCollaborationTask? {
-        let descriptor = FetchDescriptor<FamilyCollaborationTask>(
+        let activeStatus = FamilyCollaborationTaskStatus.active.rawValue
+        let claimedStatus = FamilyCollaborationTaskStatus.claimed.rawValue
+        let pendingReviewStatus = FamilyCollaborationTaskStatus.pendingReview.rawValue
+        var descriptor = FetchDescriptor<FamilyCollaborationTask>(
             predicate: #Predicate<FamilyCollaborationTask> { task in
-                task.relatedReminderId == reminderId
+                task.relatedReminderId == reminderId &&
+                    (task.statusRaw == activeStatus ||
+                        task.statusRaw == claimedStatus ||
+                        task.statusRaw == pendingReviewStatus)
             },
             sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
         )
-        return (try? context.fetch(descriptor))?.first(where: isReminderSyncActiveTask)
+        descriptor.fetchLimit = 1
+        return (try? context.fetch(descriptor))?.first
     }
 
     private static func isReminderSyncActiveTask(_ task: FamilyCollaborationTask) -> Bool {

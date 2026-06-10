@@ -435,7 +435,6 @@ struct VerticalSolidHomeTodayFocusChrome: View {
             onOpenQuest: onOpenQuest,
             onCompleteQuest: onCompleteQuest,
             onTapNegativeSignal: onTapNegativeSignal,
-            onTapMemory: onOpenOasis,
             onTapOasis: onOpenOasis,
             onTapFamilyTask: onTapFamilyTask,
             onOpenExchange: onOpenExchange,

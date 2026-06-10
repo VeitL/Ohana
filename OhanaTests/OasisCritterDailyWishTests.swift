@@ -8,6 +8,10 @@ struct OasisCritterDailyWishTests {
         let levelFive = OasisUpgradeRewardCatalog.rule(for: 5)
         #expect(levelFive.rewardKind != .electronicPet)
 
+        let levelTwo = OasisUpgradeRewardCatalog.rule(for: 2)
+        let levelThree = OasisUpgradeRewardCatalog.rule(for: 3)
+        #expect(levelThree.coconutAmount > levelTwo.coconutAmount)
+
         let levelTen = OasisUpgradeRewardCatalog.rule(for: 10)
         #expect(levelTen.rewardKind == .electronicPet)
         #expect(levelTen.guaranteedCritterId == OasisUpgradeRewardCatalog.firstCritterId)

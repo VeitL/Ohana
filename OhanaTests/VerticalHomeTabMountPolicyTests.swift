@@ -270,10 +270,10 @@ struct VerticalHomeTabMountPolicyTests {
         ))
     }
 
-    @Test func bottomNavigationKeepsSelectedLabelThroughFourTabs() {
+    @Test func bottomNavigationUsesIconOnlyDensityForFourTabs() {
         let metrics = HomeBottomNavigationLayoutPolicy.metrics(tabCount: 4)
 
-        #expect(metrics.showsSelectedLabel)
+        #expect(!metrics.showsSelectedLabel)
         #expect(metrics.actionHitSize >= 52)
         #expect(metrics.barHeight >= metrics.actionHitSize)
     }

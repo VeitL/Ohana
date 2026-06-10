@@ -24,7 +24,6 @@ protocol TodayFocusManaging {
         visibleQuests: [IslandQuest],
         visibleSnapshot: TodayFocusSnapshot?
     ) -> EconomyRewardResult?
-    func ensureTodayCheckIn(activeHumanId: String, rewardTitle: String, context: ModelContext)
     func currentStreak(activeHumanId: String) -> Int
 }
 
@@ -102,16 +101,6 @@ final class StaticTodayFocusManager: TodayFocusManaging {
             questManager: questManager,
             careLedger: careLedger,
             revisions: revisions
-        )
-    }
-
-    func ensureTodayCheckIn(activeHumanId: String, rewardTitle: String, context: ModelContext) {
-        FocusHomeDailyCheckInService.ensureTodayCheckIn(
-            activeHumanId: activeHumanId,
-            rewardTitle: rewardTitle,
-            questManager: questManager,
-            revisions: revisions,
-            context: context
         )
     }
 

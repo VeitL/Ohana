@@ -16,12 +16,13 @@ nonisolated protocol ShopInventoryManaging {
     func consumableSnapshot() -> ShopConsumableInventorySnapshot
 }
 
-final nonisolated class UserDefaultsShopInventoryManager: ShopInventoryManaging {
-    private enum Keys {
-        static let doubleRewardBoost = "shop_boostDoubleActive"
-        static let streakShieldExpiry = "shop_streakShieldExpiry"
-    }
+nonisolated enum ShopInventoryDefaultsKeys {
+    static let avatar2DExtraPassInventory = "inventory_avatar2d_extra_count"
+    static let doubleRewardBoost = "shop_boostDoubleActive"
+    static let streakShieldExpiry = "shop_streakShieldExpiry"
+}
 
+final nonisolated class UserDefaultsShopInventoryManager: ShopInventoryManaging {
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -29,19 +30,19 @@ final nonisolated class UserDefaultsShopInventoryManager: ShopInventoryManaging 
     }
 
     func activateDoubleRewardBoost() {
-        defaults.set(true, forKey: Keys.doubleRewardBoost)
+        defaults.set(true, forKey: ShopInventoryDefaultsKeys.doubleRewardBoost)
     }
 
     func isDoubleRewardBoostActive() -> Bool {
-        defaults.bool(forKey: Keys.doubleRewardBoost)
+        defaults.bool(forKey: ShopInventoryDefaultsKeys.doubleRewardBoost)
     }
 
     func clearDoubleRewardBoost() {
-        defaults.removeObject(forKey: Keys.doubleRewardBoost)
+        defaults.removeObject(forKey: ShopInventoryDefaultsKeys.doubleRewardBoost)
     }
 
     func activateStreakShield(until expiry: Date) {
-        defaults.set(expiry, forKey: Keys.streakShieldExpiry)
+        defaults.set(expiry, forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
     }
 
     func addBackdatePasses(_ count: Int) {
@@ -61,8 +62,8 @@ final nonisolated class UserDefaultsShopInventoryManager: ShopInventoryManaging 
     func consumableSnapshot() -> ShopConsumableInventorySnapshot {
         ShopConsumableInventorySnapshot(
             backdatePassCount: defaults.integer(forKey: CheckInStreakStore.makeupPackKey),
-            isDoubleRewardBoostActive: defaults.bool(forKey: Keys.doubleRewardBoost),
-            streakShieldExpiry: defaults.object(forKey: Keys.streakShieldExpiry) as? Date
+            isDoubleRewardBoostActive: defaults.bool(forKey: ShopInventoryDefaultsKeys.doubleRewardBoost),
+            streakShieldExpiry: defaults.object(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry) as? Date
         )
     }
 }

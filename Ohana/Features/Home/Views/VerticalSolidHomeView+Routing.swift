@@ -60,6 +60,17 @@ extension VerticalSolidHomeView {
         scheduleHomeSnapshotRefresh(request)
     }
 
+    func requestTodayFocusRefreshIfDayChanged(
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) {
+        let currentDayToken = TodayFocusSnapshot.dayToken(for: now, calendar: calendar)
+        guard controller.snapshot.todayFocus.dayToken != currentDayToken else {
+            return
+        }
+        requestHomeSnapshotRefresh()
+    }
+
     func flushDeferredHomeSnapshotRefreshIfNeeded(isAnimating: Bool) {
         guard let request = snapshotRefreshGate.heroAnimationDidChange(isAnimating: isAnimating) else {
             return

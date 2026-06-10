@@ -553,8 +553,6 @@ private final class DenseFixtureTodayFocusManager: TodayFocusManaging {
         nil
     }
 
-    func ensureTodayCheckIn(activeHumanId _: String, rewardTitle _: String, context _: ModelContext) {}
-
     func currentStreak(activeHumanId _: String) -> Int {
         0
     }

@@ -142,7 +142,7 @@ struct VerticalSolidHomeView: View {
     }
 
     var dataSignature: String {
-        "\(payload.signature)#revision:\(payload.revision.value)"
+        "\(payload.signature)#revision:\(payload.revision.value)#today:\(payload.snapshot.todayFocus.dayToken)"
     }
 
     var sourceState: VerticalSolidHomeSourceState {
@@ -244,7 +244,10 @@ struct VerticalSolidHomeView: View {
             let headerTopGap: CGFloat = 8
             let headerContentHeight: CGFloat = 30
             let focusTopGap: CGFloat = 2
-            let todayFocusHeight = min(88, max(80, proxy.size.height * 0.10))
+            let todayFocusHeight = min(
+                TodayFocusCardLayout.homeChromeMaxHeight,
+                max(TodayFocusCardLayout.homeChromeMinHeight, proxy.size.height * TodayFocusCardLayout.homeChromeHeightRatio)
+            )
             let focusHeight = todayFocusHeight
             let contentTopGap: CGFloat = 4
             let compactContentGap: CGFloat = 8
@@ -502,7 +505,9 @@ struct VerticalSolidHomeView: View {
             controller.cancel()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active {
+            if phase == .active {
+                requestTodayFocusRefreshIfDayChanged()
+            } else {
                 clearArrivalState()
             }
         }

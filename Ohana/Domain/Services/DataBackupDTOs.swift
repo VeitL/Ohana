@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - 顶层备份结构
 nonisolated struct OhanaBackup: Codable {
-    var schemaVersion: Int = 23
+    var schemaVersion: Int = 24
     var exportedAt: String
     // 核心实体
     var pets: [PetBackup]
@@ -69,6 +69,14 @@ nonisolated struct AppStateBackup: Codable {
     var selectedAppIcon: String?
     var gachaHistoryJSON: String
     var celebratedMilestoneDays: String
+    var shopConsumableInventory: ShopConsumableInventoryBackup?
+}
+
+nonisolated struct ShopConsumableInventoryBackup: Codable {
+    var backdatePassCount: Int
+    var avatar2DExtraPassCount: Int
+    var doubleRewardBoostActive: Bool
+    var streakShieldExpiry: String?
 }
 
 // MARK: - 实体 Backup DTOs

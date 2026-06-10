@@ -7,12 +7,20 @@
 
 import Foundation
 
+nonisolated enum TodayFocusLimits {
+    static let maxGeneratedQuests = 3
+    static let maxOasisBuildTokens = 3
+    static let maxNegativeCards = 2
+    static let maxFamilyTaskCards = 3
+    static let maxExchangeCards = 2
+    static let maxVisibleBackCards = 2
+}
+
 nonisolated enum TodayFocusContent {
     case quest(IslandQuest)
     case familyTask(TodayFocusFamilyTaskSnapshot)
     case coconutExchange(TodayFocusExchangeRequestSnapshot)
     case negative(IslandNegativeSignal)
-    case memory(MemoryFragment)
     case celebrate(pets: [TodayFocusPetSnapshot])
     case welcome
 
@@ -28,8 +36,6 @@ nonisolated enum TodayFocusContent {
             signal.severity == .critical
                 ? AppLocalizedText(zh: "紧急", en: "Urgent").resolve()
                 : AppLocalizedText(zh: "需要关注", en: "Needs attention").resolve()
-        case .memory:
-            AppLocalizedText(zh: "轻量回顾", en: "Memory").resolve()
         case .celebrate:
             AppLocalizedText(zh: "今日已清空", en: "All clear").resolve()
         case .welcome:
@@ -116,6 +122,7 @@ nonisolated enum TodayFocusService {
     }
 
     static func quest(_ quest: IslandQuest, matchesCompletedEntity entityId: UUID) -> Bool {
+        // This is only a refresh trigger match. The reward gate re-checks the latest visible snapshot.
         if quest.targetPetId == entityId || quest.targetPlantId == entityId {
             return true
         }

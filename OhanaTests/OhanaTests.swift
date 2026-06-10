@@ -709,6 +709,38 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func backupRestoresPaidConsumableInventory() async throws {
+        let suiteName = "OhanaTests.BackupInventory.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let manager = DataBackupManager(defaults: defaults)
+
+        let expiry = Date(timeIntervalSince1970: 1_800_000_000)
+        defaults.set(3, forKey: CheckInStreakStore.makeupPackKey)
+        defaults.set(2, forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory)
+        defaults.set(true, forKey: ShopInventoryDefaultsKeys.doubleRewardBoost)
+        defaults.set(expiry, forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
+
+        let source = try makeInMemoryContainer()
+        let encoded = try manager.encode(manager.buildBackup(context: source.mainContext))
+        let backup = try JSONDecoder().decode(OhanaBackup.self, from: encoded)
+        #expect(backup.appState.shopConsumableInventory?.doubleRewardBoostActive == true)
+
+        defaults.set(99, forKey: CheckInStreakStore.makeupPackKey)
+        defaults.set(99, forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory)
+        defaults.set(false, forKey: ShopInventoryDefaultsKeys.doubleRewardBoost)
+        defaults.removeObject(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
+
+        let target = try makeInMemoryContainer()
+        try manager.applyBackup(backup, context: target.mainContext, projectionManager: nil)
+
+        #expect(defaults.integer(forKey: CheckInStreakStore.makeupPackKey) == 3)
+        #expect(defaults.integer(forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory) == 2)
+        #expect(defaults.bool(forKey: ShopInventoryDefaultsKeys.doubleRewardBoost))
+        #expect(defaults.object(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry) as? Date == expiry)
+    }
+
+    @MainActor
     @Test func reminderCompletionServiceCompletesAndSkips() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext

@@ -18,7 +18,11 @@ import SwiftData
 // main context (see @MainActor on importJSON) so SwiftData @Query-backed UI
 // refreshes immediately after a restore.
 final nonisolated class DataBackupManager: @unchecked Sendable {
-    init() {}
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
 
     let iso = ISO8601DateFormatter()
 
@@ -118,7 +122,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 
-        guard backup.schemaVersion <= 23 else {
+        guard backup.schemaVersion <= 24 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -171,7 +175,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         let gachaOwnedItems = try context.fetch(FetchDescriptor<GachaOwnedItem>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let gachaDrawLogs = try context.fetch(FetchDescriptor<GachaDrawLog>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
 
-        let ud = UserDefaults.standard
+        let ud = defaults
         let coconutLogProjection = coconutLedgerEntries
             .sorted { $0.occurredAt > $1.occurredAt }
             .prefix(200)
@@ -191,7 +195,13 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             purchasedShopItems: ud.string(forKey: "purchasedShopItems") ?? "",
             selectedAppIcon: ud.string(forKey: AppIconCatalog.selectedIconKey),
             gachaHistoryJSON: ud.string(forKey: "gachaHistory") ?? "[]",
-            celebratedMilestoneDays: ud.string(forKey: "celebratedMilestoneDays") ?? ""
+            celebratedMilestoneDays: ud.string(forKey: "celebratedMilestoneDays") ?? "",
+            shopConsumableInventory: ShopConsumableInventoryBackup(
+                backdatePassCount: ud.integer(forKey: CheckInStreakStore.makeupPackKey),
+                avatar2DExtraPassCount: ud.integer(forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory),
+                doubleRewardBoostActive: ud.bool(forKey: ShopInventoryDefaultsKeys.doubleRewardBoost),
+                streakShieldExpiry: d(ud.object(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry) as? Date)
+            )
         )
 
         return OhanaBackup(
@@ -437,7 +447,7 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         try context.save()
 
         // 恢复 UserDefaults appState
-        let ud = UserDefaults.standard
+        let ud = defaults
         let s = backup.appState
         let isLegacyCoconutBackup = backup.coconutAccounts?.isEmpty != false
         if !s.bountyTasksJSON.isEmpty { ud.set(s.bountyTasksJSON, forKey: "bountyTasks") }
@@ -447,6 +457,16 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
         }
         if !s.gachaHistoryJSON.isEmpty { ud.set(s.gachaHistoryJSON, forKey: "gachaHistory") }
         if !s.celebratedMilestoneDays.isEmpty { ud.set(s.celebratedMilestoneDays, forKey: "celebratedMilestoneDays") }
+        if let inventory = s.shopConsumableInventory {
+            ud.set(max(0, inventory.backdatePassCount), forKey: CheckInStreakStore.makeupPackKey)
+            ud.set(max(0, inventory.avatar2DExtraPassCount), forKey: ShopInventoryDefaultsKeys.avatar2DExtraPassInventory)
+            ud.set(inventory.doubleRewardBoostActive, forKey: ShopInventoryDefaultsKeys.doubleRewardBoost)
+            if let expiry = parseDate(inventory.streakShieldExpiry) {
+                ud.set(expiry, forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
+            } else {
+                ud.removeObject(forKey: ShopInventoryDefaultsKeys.streakShieldExpiry)
+            }
+        }
         if isLegacyCoconutBackup {
             try? CoconutEconomyBootstrapService.bootstrapIfNeeded(
                 context: context,

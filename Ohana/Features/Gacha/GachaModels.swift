@@ -563,6 +563,35 @@ enum GachaDrawService {
         })
     }
 
+    @MainActor
+    private static func dailyDrawLogs(
+        for humanId: String,
+        context: ModelContext,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [GachaDrawLog] {
+        let start = calendar.startOfDay(for: now)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
+        let ownerId = humanId
+        let descriptor = FetchDescriptor<GachaDrawLog>(
+            predicate: #Predicate<GachaDrawLog> { log in
+                log.ownerHumanId == ownerId && log.drawDate >= start && log.drawDate < end
+            }
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    @MainActor
+    private static func ownedItems(for humanId: String, context: ModelContext) -> [GachaOwnedItem] {
+        let ownerId = humanId
+        let descriptor = FetchDescriptor<GachaOwnedItem>(
+            predicate: #Predicate<GachaOwnedItem> { item in
+                item.ownerHumanId == ownerId
+            }
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
     static func collectionProgress(
         humanId: String,
         seriesId: String,
@@ -616,14 +645,14 @@ enum GachaDrawService {
             throw GachaDrawError.invalidSeries
         }
 
-        let logs = (try? context.fetch(FetchDescriptor<GachaDrawLog>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let logs = dailyDrawLogs(for: human.id.uuidString, context: context, now: now)
         let usedToday = dailyDrawCount(for: human.id.uuidString, in: logs, now: now)
         let humanBalance = CoconutWalletService.balance(for: human, context: context)
         guard humanBalance >= costPerDraw else {
             throw GachaDrawError.insufficientBalance(missing: costPerDraw - humanBalance)
         }
 
-        let ownedItems = (try? context.fetch(FetchDescriptor<GachaOwnedItem>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let ownedItems = ownedItems(for: human.id.uuidString, context: context)
         guard isSeriesUnlocked(seriesId: series.id, humanId: human.id.uuidString, ownedItems: ownedItems) else {
             throw GachaDrawError.lockedSeries
         }

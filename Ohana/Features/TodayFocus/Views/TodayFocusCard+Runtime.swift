@@ -64,7 +64,6 @@ extension TodayFocusCard {
         case let .familyTask(task): familyTaskSkipKey(for: task)
         case let .coconutExchange(request): exchangeSkipKey(for: request)
         case let .negative(s): negativeSkipKey(for: s)
-        case let .memory(m): "memory:\(m.headline)"
         case .celebrate: "celebrate"
         case .welcome: "welcome"
         }
@@ -171,46 +170,6 @@ extension TodayFocusCard {
         return timestamp(date)
     }
 
-    func skipButton(for content: TodayFocusContent, accent: Color) -> some View {
-        let isNegative: Bool = {
-            if case .negative = content { return true }
-            return false
-        }()
-        return Button {
-            skipFocusCard(content)
-        } label: {
-            Text(isNegative ? l.tr(zh: "关闭", en: "Close", de: "Schließen") : l.tr(zh: "跳过", en: "Skip", de: "Überspringen"))
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.58))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.ohanaControlFill, in: Capsule())
-                .overlay(Capsule().strokeBorder(accent.opacity(0.18), lineWidth: 0.8))
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(isNegative ? l.tr(zh: "关闭这条提醒", en: "Close this alert", de: "Hinweis schließen") : l.tr(zh: "跳过这张卡", en: "Skip this card", de: "Karte überspringen"))
-    }
-
-    func skipFocusCard(_ content: TodayFocusContent) {
-        let key = contentKey(content)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        withAnimation(GoMotion.hero) {
-            switch content {
-            case .negative:
-                _ = closedNegativeKeys.insert(key)
-            default:
-                _ = skippedFocusKeys.insert(key)
-            }
-            hiddenFocusVersion += 1
-        }
-        rebuildRenderDeck(disablesAnimations: false)
-        persistHiddenFocusKeys()
-        let nextCount = focusCards.count
-        if selectedFocusIndex >= nextCount {
-            selectedFocusIndex = max(0, nextCount - 1)
-        }
-    }
-
     func restoreSkippedFocusCards() {
         withAnimation(GoMotion.hero) {
             skippedFocusKeys.removeAll()
@@ -221,14 +180,6 @@ extension TodayFocusCard {
         rebuildRenderDeck(disablesAnimations: false)
         TodayFocusHiddenStateStore.clearHiddenFocusKeys(date: Self.hiddenFocusDate(for: hiddenFocusDayToken))
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-    }
-
-    func persistHiddenFocusKeys() {
-        TodayFocusHiddenStateStore.save(
-            skippedFocusKeys: skippedFocusKeys,
-            closedNegativeKeys: closedNegativeKeys,
-            date: Self.hiddenFocusDate(for: hiddenFocusDayToken)
-        )
     }
 
     func reloadHiddenFocusKeysIfNeeded(for snapshotDayToken: Int) {

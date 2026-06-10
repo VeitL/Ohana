@@ -145,6 +145,9 @@ struct VerticalSolidHomeDataContainer: View {
             observedHomeRevision = appServices.domainRevisions.homeRevision
             refreshCurrentDayToken()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            refreshCurrentDayToken()
+        }
         .task(id: currentDayToken) {
             await updateDayTokenAfterNextMidnight()
         }
