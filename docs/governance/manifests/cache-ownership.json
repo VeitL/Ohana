@@ -17,9 +17,9 @@
       "expiry": "Route-scoped; refresh when visible, after explicit command completion, or when revision tokens change.",
       "recovery": "Render empty or placeholder snapshots, then refresh after the first frame.",
       "paths": [
-        "Ohana/Features/Home/Views/HomeReadModelStore.swift",
-        "Ohana/Features/Home/Views/HomeSnapshotBuilder.swift",
-        "Ohana/Features/Home/Views/VerticalSolidHomeSnapshotBuilder.swift",
+        "Ohana/Features/Home/HomeReadModelStore.swift",
+        "Ohana/Features/Home/HomeSnapshotBuilder.swift",
+        "Ohana/Features/Home/VerticalSolidHomeSnapshotBuilder.swift",
         "OhanaTests/HomeReadModelStoreTests.swift"
       ]
     },

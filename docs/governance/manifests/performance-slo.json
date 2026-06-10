@@ -25,8 +25,8 @@
       ],
       "paths": [
         "Ohana/Features/Home/Views/VerticalSolidHomeView.swift",
-        "Ohana/Features/Home/Views/FocusHomeWalletController.swift",
-        "Ohana/Features/Home/Views/FocusHomeSnapshotController.swift",
+        "Ohana/Features/Home/FocusHomeWalletController.swift",
+        "Ohana/Features/Home/FocusHomeSnapshotController.swift",
         "Ohana/Features/Home/Views/WalletHeroMotion.swift",
         "OhanaTests/VerticalSolidHomeControllerTests.swift"
       ]
@@ -46,7 +46,7 @@
         "flow.home.tab_switch"
       ],
       "paths": [
-        "Ohana/Features/Home/Views/VerticalSolidHomeController.swift",
+        "Ohana/Features/Home/VerticalSolidHomeController.swift",
         "Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift",
         "OhanaTests/VerticalHomeTabMountPolicyTests.swift",
         "OhanaTests/VerticalSolidHomeControllerTests.swift"
@@ -111,7 +111,7 @@
       ],
       "paths": [
         "Ohana/Features/Home/Views/VerticalSolidHomeView.swift",
-        "Ohana/Features/Home/Views/HomeReadModelStore.swift",
+        "Ohana/Features/Home/HomeReadModelStore.swift",
         "OhanaTests/HomeReadModelStoreTests.swift"
       ]
     },
@@ -189,8 +189,8 @@
         "flow.oasis.open"
       ],
       "paths": [
-        "Ohana/Features/Home/Views/OasisHomeTabHost.swift",
-        "Ohana/Features/Home/Views/OasisRewardView.swift"
+        "Ohana/Features/Oasis/Views/OasisHomeTabHost.swift",
+        "Ohana/Features/Oasis/Views/OasisRewardView.swift"
       ]
     },
     {

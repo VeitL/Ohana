@@ -75,12 +75,12 @@
       "policyGate": "scripts/audit-smoothness-risk.sh --all and scripts/audit-runtime-guardrails.sh --all block new unowned loops.",
       "evidence": "Round 3 Oasis host/live snapshot repair; Today Focus and streak particles are policy gated.",
       "paths": [
-        "Ohana/Features/Home/Views/OasisHomeTabHost.swift",
-        "Ohana/Features/Home/Views/OasisRewardView.swift",
-        "Ohana/Features/Home/Views/OasisRewardSnapshots.swift",
-        "Ohana/Features/Home/Views/TodayFocusCard.swift",
+        "Ohana/Features/Oasis/Views/OasisHomeTabHost.swift",
+        "Ohana/Features/Oasis/Views/OasisRewardView.swift",
+        "Ohana/Features/Oasis/OasisRewardSnapshots.swift",
+        "Ohana/Features/TodayFocus/Views/TodayFocusCard.swift",
         "Ohana/Features/Home/Views/StreakFlameParticles.swift",
-        "Ohana/Features/Home/Views/BeautifulCoconutTree.swift",
+        "Ohana/Features/Oasis/Views/BeautifulCoconutTree.swift",
         "Ohana/Features/Home/Views/FocusHomeVerticalSolidScene.swift"
       ]
     },
@@ -125,7 +125,7 @@
         "Ohana/App/AppRuntimePolicy.swift",
         "Ohana/Features/Calendar/Views/CalendarView.swift",
         "Ohana/Features/Home/Views/FocusHomeRouteSheetModifier.swift",
-        "Ohana/Features/Home/Views/OasisHomeTabHost.swift",
+        "Ohana/Features/Oasis/Views/OasisHomeTabHost.swift",
         "Ohana/Features/Settings/Views/SettingsView.swift"
       ]
     },
