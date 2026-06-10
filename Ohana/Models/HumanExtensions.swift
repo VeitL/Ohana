@@ -18,7 +18,7 @@ extension Human {
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
 
         // 规则 A："💩 无情铲屎机"（过去 30 天 Litter 记录数 > 10）
-        let allCareLogs: [PetCareLog] = allPets.flatMap { $0.careLogs }
+        let allCareLogs: [PetCareLog] = allPets.flatMap(\.careLogs)
         let recentLitter = allCareLogs.filter { log in
             log.executorId == myId && log.careType == .litter && log.date >= thirtyDaysAgo
         }
@@ -27,7 +27,7 @@ extension Human {
         }
 
         // 规则 B："💸 榜一大哥"（累计 Expense 金额全家最高）
-        let allExpenseLogs: [PetExpenseLog] = allPets.flatMap { $0.expenseLogs }
+        let allExpenseLogs: [PetExpenseLog] = allPets.flatMap(\.expenseLogs)
         let myExpense = allExpenseLogs
             .filter { $0.executorId == myId }
             .reduce(0.0) { acc, log in acc + log.amount }
@@ -36,12 +36,12 @@ extension Human {
             return allExpenseLogs.filter { $0.executorId == oid }.reduce(0.0) { acc, log in acc + log.amount }
         }
         let maxOtherExpense = otherExpenses.max() ?? 0
-        if myExpense > 0 && myExpense >= maxOtherExpense {
+        if myExpense > 0, myExpense >= maxOtherExpense {
             badges.append(HumanBadge(emoji: "💸", title: "榜一大哥", color: "F59E0B"))
         }
 
         // 规则 C："🥾 追风少年"（Walk 记录数 > 5）
-        let allWalkLogs: [PetWalkLog] = allPets.flatMap { $0.walkLogs }
+        let allWalkLogs: [PetWalkLog] = allPets.flatMap(\.walkLogs)
         let myWalks = allWalkLogs.filter { $0.executorId == myId }
         if myWalks.count > 5 {
             badges.append(HumanBadge(emoji: "🥾", title: "追风少年", color: "00D4AA"))
@@ -61,5 +61,5 @@ struct HumanBadge: Identifiable {
     let id = UUID()
     let emoji: String
     let title: String
-    let color: String   // hex
+    let color: String // hex
 }

@@ -5,16 +5,16 @@
 //  新开 / 编辑用药疗程（不改 PetMedication 字段定义）
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct AddPetMedicationSheet: View {
     let pet: Pet
     /// 传入则进入编辑模式
-    var existing: PetMedication? = nil
+    var existing: PetMedication?
     var isInlinePopup: Bool = false
-    var onClose: (() -> Void)? = nil
-    var onSaved: (() -> Void)? = nil
+    var onClose: (() -> Void)?
+    var onSaved: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -54,6 +54,7 @@ struct AddPetMedicationSheet: View {
     private var commonMedicationNames: [String] {
         PetMedicationQuickCatalog.names(for: appCountry)
     }
+
     private var frequencyOptions: [(PetMedicationFrequency, String)] {
         [
             (.daily, l.tr(zh: "每天1次", en: "Once daily", de: "1x täglich")),
@@ -162,7 +163,7 @@ struct AddPetMedicationSheet: View {
                     .font(OhanaFont.adaptive(size: 20, weight: .black))
                     .foregroundStyle(chromeAccent)
                     .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(existing == nil ? l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen") : l.tr(zh: "编辑药物", en: "Edit medication", de: "Medikament bearbeiten"))
@@ -196,15 +197,15 @@ struct AddPetMedicationSheet: View {
                 .padding(.top, 8)
                 .padding(.bottom, 16)
         }
-        .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-        .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+        .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
     }
 
     @ViewBuilder
     private var medicationFields: some View {
         labeledField(l.tr(zh: "药品名称 *", en: "Medication name *", de: "Medikament *")) {
             VStack(alignment: .leading, spacing: 12) {
-                GoDraftTextField(
+                GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     "例：阿莫西林、肠胃宝…",
                     text: $name,
                     capitalization: .words,
@@ -246,7 +247,7 @@ struct AddPetMedicationSheet: View {
                     valueFont: .system(size: 18, weight: .black, design: .rounded),
                     valueAlignment: .center,
                     fill: Color.ohanaControlFill,
-                    cornerRadius: 16,
+                    cornerRadius: OhanaRadius.control,
                     horizontalPadding: 10,
                     verticalPadding: 8,
                     usesMiniKeypad: true
@@ -286,7 +287,7 @@ struct AddPetMedicationSheet: View {
         if scheduledDoseCount > 0 {
             labeledField(scheduledDoseCount > 1 ? l.tr(zh: "每次服药时间", en: "Dose times", de: "Einnahmezeiten") : l.tr(zh: "服药时间", en: "Dose time", de: "Einnahmezeit")) {
                 VStack(spacing: 10) {
-                    ForEach(0..<doseMinutes.count, id: \.self) { index in
+                    ForEach(0 ..< doseMinutes.count, id: \.self) { index in
                         doseTimeRow(index: index)
                     }
                 }
@@ -361,7 +362,7 @@ struct AddPetMedicationSheet: View {
                         unitFont: .system(size: 12, weight: .black, design: .rounded),
                         valueAlignment: .leading,
                         fill: Color.ohanaControlFill,
-                        cornerRadius: 12,
+                        cornerRadius: OhanaRadius.chip,
                         horizontalPadding: 10,
                         verticalPadding: 8,
                         usesMiniKeypad: true
@@ -392,13 +393,13 @@ struct AddPetMedicationSheet: View {
         }
 
         labeledField(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)")) {
-            GoDraftTextField(
+            GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 "兽医叮嘱、注意事项…",
                 text: $notes,
                 axis: .vertical
             )
             .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
-            .lineLimit(3...6)
+            .lineLimit(3 ... 6)
         }
     }
 
@@ -411,7 +412,7 @@ struct AddPetMedicationSheet: View {
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(canSave && !isSaving ? chromeAccent : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(canSave && !isSaving ? chromeAccent : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!canSave || isSaving)
@@ -425,7 +426,7 @@ struct AddPetMedicationSheet: View {
             content()
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
     }
 
@@ -582,7 +583,7 @@ struct AddPetMedicationSheet: View {
                 .tint(chromeAccent)
         }
         .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func parseDosage(_ raw: String) {
@@ -602,7 +603,7 @@ struct AddPetMedicationSheet: View {
             return (nil, full)
         }
         let innerStart = full.index(full.startIndex, offsetBy: prefix.count)
-        let tag = String(full[innerStart..<range.lowerBound])
+        let tag = String(full[innerStart ..< range.lowerBound])
         let rest = String(full[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
         let note = rest.hasPrefix("\n") ? String(rest.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines) : rest
         return (tag.isEmpty ? nil : tag, note)
@@ -723,15 +724,15 @@ private enum PetMedicationQuickCatalog {
     static func names(for countryCode: String) -> [String] {
         switch AppCountry.normalize(countryCode) {
         case "US", "GB":
-            return ["Amoxicillin", "Metronidazole", "Gabapentin", "Apoquel", "Simparica", "Revolution"]
+            ["Amoxicillin", "Metronidazole", "Gabapentin", "Apoquel", "Simparica", "Revolution"]
         case "DE":
-            return ["Amoxicillin", "Metronidazol", "Gabapentin", "Apoquel", "Milbemax", "Advocate"]
+            ["Amoxicillin", "Metronidazol", "Gabapentin", "Apoquel", "Milbemax", "Advocate"]
         case "JP":
-            return ["アモキシシリン", "メトロニダゾール", "ガバペンチン", "ネクスガード", "レボリューション", "ミルベマックス"]
+            ["アモキシシリン", "メトロニダゾール", "ガバペンチン", "ネクスガード", "レボリューション", "ミルベマックス"]
         case "HK", "TW":
-            return ["阿莫西林", "甲硝唑", "加巴喷丁", "益生菌", "全能貓", "寵愛"]
+            ["阿莫西林", "甲硝唑", "加巴喷丁", "益生菌", "全能貓", "寵愛"]
         default:
-            return ["阿莫西林", "甲硝唑", "加巴喷丁", "益生菌", "拜有利", "大宠爱"]
+            ["阿莫西林", "甲硝唑", "加巴喷丁", "益生菌", "拜有利", "大宠爱"]
         }
     }
 }

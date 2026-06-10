@@ -15,8 +15,8 @@ enum OasisUpgradeRewardService {
     static let maxCritterAppearanceStage = 5
     static let critterXPPerLevel = 300
 
-    static let lifecycleDay: TimeInterval = 86_400
-    static let lifecycleCareTick: TimeInterval = 21_600
+    static let lifecycleDay: TimeInterval = 86400
+    static let lifecycleCareTick: TimeInterval = 21600
     static let needsCareThreshold = 45
     static let atRiskThreshold = 20
     static let sickHealthThreshold = 45

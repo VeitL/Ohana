@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension FamilyCollaborationDashboardView {
     var overviewHeader: some View {
@@ -15,10 +15,10 @@ extension FamilyCollaborationDashboardView {
                         .font(OhanaFont.title2(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(openFocusCount == 0
-                         ? l.tr(zh: "全家照护节奏很稳。", en: "The family rhythm is steady.", de: "Der Familienrhythmus ist stabil.")
-                         : l.tr(zh: "还有 \(openFocusCount) 个协作点。", en: "\(openFocusCount) care points remain.", de: "\(openFocusCount) Pflegepunkte offen."))
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+                        ? l.tr(zh: "全家照护节奏很稳。", en: "The family rhythm is steady.", de: "Der Familienrhythmus ist stabil.")
+                        : l.tr(zh: "还有 \(openFocusCount) 个协作点。", en: "\(openFocusCount) care points remain.", de: "\(openFocusCount) Pflegepunkte offen."))
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text("\(Int(boardProgress * 100))%")
@@ -141,7 +141,7 @@ extension FamilyCollaborationDashboardView {
         Button(action: action) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         .fill(tint.opacity(0.16))
                     Image(systemName: icon)
                         .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -178,7 +178,7 @@ extension FamilyCollaborationDashboardView {
                     .background(Color.goPrimary, in: Capsule())
             }
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -308,7 +308,7 @@ extension FamilyCollaborationDashboardView {
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -336,7 +336,7 @@ extension FamilyCollaborationDashboardView {
                     Spacer()
                 }
                 .padding(12)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
 

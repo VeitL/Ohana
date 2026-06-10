@@ -30,88 +30,88 @@ struct BreedInfo: Identifiable, Hashable {
     let coatColors: [CoatColor]
     let eyeColors: [EyeColor]
     let suggestedThemeHex: String
-    
+
     static func == (lhs: BreedInfo, rhs: BreedInfo) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 // MARK: - Pet Breed Database
 enum PetBreedDatabase {
-    
+
     // MARK: - Common Colors
     static let genericCoatColors: [CoatColor] = [
-        CoatColor(name: "黑色",     hex: "1A1A1A"),
-        CoatColor(name: "白色",     hex: "F5F5F0"),
-        CoatColor(name: "灰色",     hex: "9E9E9E"),
-        CoatColor(name: "深灰色",   hex: "5C5C5C"),
-        CoatColor(name: "浅灰色",   hex: "CFCFCF"),
-        CoatColor(name: "棕色",     hex: "7B4F2E"),
-        CoatColor(name: "深棕色",   hex: "4A2A10"),
-        CoatColor(name: "红棕色",   hex: "8B3A1A"),
-        CoatColor(name: "金黄色",   hex: "D4A017"),
-        CoatColor(name: "奶油色",   hex: "F5E6C8"),
-        CoatColor(name: "红色",     hex: "B5451B"),
-        CoatColor(name: "橙色",     hex: "C8622A"),
-        CoatColor(name: "黄色",     hex: "E8D44D"),
-        CoatColor(name: "橙黄色",   hex: "FFB300"),
-        CoatColor(name: "杏色",     hex: "E8C49A"),
-        CoatColor(name: "蓝色",     hex: "3B6FB8"),
-        CoatColor(name: "绿色",     hex: "3D8C4A"),
-        CoatColor(name: "蓝灰色",   hex: "7A9AAF"),
-        CoatColor(name: "银色",     hex: "C0C0C0"),
+        CoatColor(name: "黑色", hex: "1A1A1A"),
+        CoatColor(name: "白色", hex: "F5F5F0"),
+        CoatColor(name: "灰色", hex: "9E9E9E"),
+        CoatColor(name: "深灰色", hex: "5C5C5C"),
+        CoatColor(name: "浅灰色", hex: "CFCFCF"),
+        CoatColor(name: "棕色", hex: "7B4F2E"),
+        CoatColor(name: "深棕色", hex: "4A2A10"),
+        CoatColor(name: "红棕色", hex: "8B3A1A"),
+        CoatColor(name: "金黄色", hex: "D4A017"),
+        CoatColor(name: "奶油色", hex: "F5E6C8"),
+        CoatColor(name: "红色", hex: "B5451B"),
+        CoatColor(name: "橙色", hex: "C8622A"),
+        CoatColor(name: "黄色", hex: "E8D44D"),
+        CoatColor(name: "橙黄色", hex: "FFB300"),
+        CoatColor(name: "杏色", hex: "E8C49A"),
+        CoatColor(name: "蓝色", hex: "3B6FB8"),
+        CoatColor(name: "绿色", hex: "3D8C4A"),
+        CoatColor(name: "蓝灰色", hex: "7A9AAF"),
+        CoatColor(name: "银色", hex: "C0C0C0"),
         CoatColor(name: "巧克力色", hex: "4A2C1A"),
-        CoatColor(name: "虎斑色",   hex: "7A5C3A"),
-        CoatColor(name: "花斑色",   hex: "C8B4A0"),
+        CoatColor(name: "虎斑色", hex: "7A5C3A"),
+        CoatColor(name: "花斑色", hex: "C8B4A0"),
         // 兔/鸟/仓鼠等「coats([...])」引用名，须在此表内才有正确色块（否则退化为灰色占位）
-        CoatColor(name: "黑白",     hex: "2C2C2C"),
-        CoatColor(name: "蓝白",     hex: "8FA8BE"),
-        CoatColor(name: "棕白",     hex: "9A846E"),
-        CoatColor(name: "灰白",     hex: "C5C5C5"),
-        CoatColor(name: "花斑",     hex: "C8B4A0"),
-        CoatColor(name: "多色",     hex: "C4A882"),
-        CoatColor(name: "灰棕色",   hex: "8D7B68"),
-        CoatColor(name: "珍珠色",   hex: "E8DDD4"),
+        CoatColor(name: "黑白", hex: "2C2C2C"),
+        CoatColor(name: "蓝白", hex: "8FA8BE"),
+        CoatColor(name: "棕白", hex: "9A846E"),
+        CoatColor(name: "灰白", hex: "C5C5C5"),
+        CoatColor(name: "花斑", hex: "C8B4A0"),
+        CoatColor(name: "多色", hex: "C4A882"),
+        CoatColor(name: "灰棕色", hex: "8D7B68"),
+        CoatColor(name: "珍珠色", hex: "E8DDD4"),
         CoatColor(name: "蓝宝石色", hex: "6B8CBC"),
         CoatColor(name: "白色（冬季）", hex: "F0F0EE"),
-        CoatColor(name: "沙棕色",   hex: "C4A574"),
-        CoatColor(name: "肉桂色",   hex: "C9A66B"),
-        CoatColor(name: "米色",     hex: "E5D9C8"),
-        CoatColor(name: "盐椒色",   hex: "8B8B82"),
+        CoatColor(name: "沙棕色", hex: "C4A574"),
+        CoatColor(name: "肉桂色", hex: "C9A66B"),
+        CoatColor(name: "米色", hex: "E5D9C8"),
+        CoatColor(name: "盐椒色", hex: "8B8B82"),
         CoatColor(name: "白腹深刺", hex: "3A3632"),
-        CoatColor(name: "黄化",     hex: "FFE566"),
-        CoatColor(name: "白面",     hex: "ECEAE4"),
+        CoatColor(name: "黄化", hex: "FFE566"),
+        CoatColor(name: "白面", hex: "ECEAE4"),
         CoatColor(name: "橙色脸颊灰色", hex: "9E9E9E"),
-        CoatColor(name: "其他",     hex: "BDBDBD"),
+        CoatColor(name: "其他", hex: "BDBDBD")
     ]
 
     // 奶牛色专用（黑白双色，底色白，重点黑）
     static let cowPatternCoatColors: [CoatColor] = [
         CoatColor(name: "奶牛白底", hex: "F5F5F0"),
-        CoatColor(name: "奶牛黑斑", hex: "1A1A1A"),
+        CoatColor(name: "奶牛黑斑", hex: "1A1A1A")
     ]
 
     static let genericEyeColors: [EyeColor] = [
-        EyeColor(name: "棕色",   hex: "6B3A2A"),
+        EyeColor(name: "棕色", hex: "6B3A2A"),
         EyeColor(name: "深棕色", hex: "3D1F0D"),
         EyeColor(name: "琥珀色", hex: "C68B1A"),
-        EyeColor(name: "金色",   hex: "D4A017"),
-        EyeColor(name: "黄色",   hex: "C8A800"),
-        EyeColor(name: "绿色",   hex: "3D7A30"),
+        EyeColor(name: "金色", hex: "D4A017"),
+        EyeColor(name: "黄色", hex: "C8A800"),
+        EyeColor(name: "绿色", hex: "3D7A30"),
         EyeColor(name: "翠绿色", hex: "1A8C3A"),
         EyeColor(name: "蓝绿色", hex: "2A7A6A"),
-        EyeColor(name: "蓝色",   hex: "2A5C9A"),
+        EyeColor(name: "蓝色", hex: "2A5C9A"),
         EyeColor(name: "浅蓝色", hex: "5A9ACA"),
         EyeColor(name: "冰蓝色", hex: "9EC8E8"),
-        EyeColor(name: "铜色",   hex: "A05A1A"),
-        EyeColor(name: "橙色",   hex: "C06010"),
-        EyeColor(name: "榛色",   hex: "7A5A2A"),
-        EyeColor(name: "黑色",   hex: "1C1C1C"),
-        EyeColor(name: "异瞳",   hex: "7A3A7A"),
-        EyeColor(name: "红色",   hex: "CC2200"),
+        EyeColor(name: "铜色", hex: "A05A1A"),
+        EyeColor(name: "橙色", hex: "C06010"),
+        EyeColor(name: "榛色", hex: "7A5A2A"),
+        EyeColor(name: "黑色", hex: "1C1C1C"),
+        EyeColor(name: "异瞳", hex: "7A3A7A"),
+        EyeColor(name: "红色", hex: "CC2200"),
         EyeColor(name: "粉色（白化）", hex: "E8A8C8"),
         EyeColor(name: "红色（白化）", hex: "FF5533"),
         EyeColor(name: "铜绿色", hex: "6B8C3A"),
-        EyeColor(name: "其他",   hex: "BDBDBD"),
+        EyeColor(name: "其他", hex: "BDBDBD")
     ]
 
     /// 在品种允许的瞳色集合内，按当前已选毛色做常见表型上的二次收敛（重点色猫多为蓝眼表型、白化/红眼与白毛、部分白兔等）；无法收窄时退回品种全集。
@@ -138,7 +138,7 @@ enum PetBreedDatabase {
 
         return base
     }
-    
+
     // MARK: - Dog Breeds (A-Z)
     static let dogBreeds: [BreedInfo] = [
         BreedInfo(name: "阿富汗猎犬",
@@ -252,7 +252,7 @@ enum PetBreedDatabase {
         BreedInfo(name: "中华田园犬",
                   coatColors: [CoatColor(name: "黄色", hex: "D4A017"), CoatColor(name: "黑色", hex: "1A1A1A"), CoatColor(name: "白色", hex: "F5F5F0"), CoatColor(name: "花斑", hex: "C8B4A0")],
                   eyeColors: [EyeColor(name: "棕色", hex: "6B3A2A"), EyeColor(name: "黄色", hex: "C8A800")], suggestedThemeHex: "FF8F00"),
-        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E")
     ]
 
     // MARK: - Cat Breeds (A-Z)
@@ -304,17 +304,17 @@ enum PetBreedDatabase {
                   eyeColors: [EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "蓝色", hex: "2A5C9A")], suggestedThemeHex: "FF8F00"),
         BreedInfo(name: "德文卷毛猫",
                   coatColors: [
-                    CoatColor(name: "黑色", hex: "1A1A1A"), CoatColor(name: "白色", hex: "F5F5F0"),
-                    CoatColor(name: "蓝灰色", hex: "7A9AAF"), CoatColor(name: "奶油色", hex: "F5E6C8"),
-                    CoatColor(name: "棕虎斑", hex: "7A5C3A"), CoatColor(name: "黑白", hex: "2C2C2C"),
-                    CoatColor(name: "海豹重点色", hex: "4A2A10"), CoatColor(name: "蓝重点色", hex: "7A9AAF"),
-                    CoatColor(name: "巧克力重点色", hex: "4A2C1A"), CoatColor(name: "火焰重点色", hex: "E36A2E")
+                      CoatColor(name: "黑色", hex: "1A1A1A"), CoatColor(name: "白色", hex: "F5F5F0"),
+                      CoatColor(name: "蓝灰色", hex: "7A9AAF"), CoatColor(name: "奶油色", hex: "F5E6C8"),
+                      CoatColor(name: "棕虎斑", hex: "7A5C3A"), CoatColor(name: "黑白", hex: "2C2C2C"),
+                      CoatColor(name: "海豹重点色", hex: "4A2A10"), CoatColor(name: "蓝重点色", hex: "7A9AAF"),
+                      CoatColor(name: "巧克力重点色", hex: "4A2C1A"), CoatColor(name: "火焰重点色", hex: "E36A2E")
                   ],
                   eyeColors: [
-                    EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "翠绿色", hex: "1A8C3A"),
-                    EyeColor(name: "琥珀色", hex: "C68B1A"), EyeColor(name: "铜色", hex: "A05A1A"),
-                    EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "蓝色", hex: "2A5C9A"),
-                    EyeColor(name: "异瞳", hex: "7A3A7A")
+                      EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "翠绿色", hex: "1A8C3A"),
+                      EyeColor(name: "琥珀色", hex: "C68B1A"), EyeColor(name: "铜色", hex: "A05A1A"),
+                      EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "蓝色", hex: "2A5C9A"),
+                      EyeColor(name: "异瞳", hex: "7A3A7A")
                   ], suggestedThemeHex: "9E9E9E"),
         BreedInfo(name: "俄罗斯蓝猫",
                   coatColors: [CoatColor(name: "蓝灰色", hex: "7A9AAF")],
@@ -337,84 +337,84 @@ enum PetBreedDatabase {
         BreedInfo(name: "索马里猫",
                   coatColors: [CoatColor(name: "黄褐色", hex: "C8822A"), CoatColor(name: "红色", hex: "B5451B"), CoatColor(name: "蓝色", hex: "7A9AAF"), CoatColor(name: "栗色", hex: "7B4F2E")],
                   eyeColors: [EyeColor(name: "金色", hex: "D4A017"), EyeColor(name: "绿色", hex: "3D7A30"), EyeColor(name: "琥珀色", hex: "C68B1A")], suggestedThemeHex: "FF8F00"),
-        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E")
     ]
-    
+
     // MARK: - Rabbit Breeds (A-Z)
     static let rabbitBreeds: [BreedInfo] = [
-        BreedInfo(name: "安哥拉兔", coatColors: coats(["白色","黑色","蓝色","奶油色"]), eyeColors: eyes(["棕色","蓝色"]), suggestedThemeHex: "FAFAFA"),
-        BreedInfo(name: "垂耳兔", coatColors: coats(["白色","黑色","灰色","棕色","花斑"]), eyeColors: eyes(["棕色","蓝色","粉色（白化）"]), suggestedThemeHex: "FFCCBC"),
-        BreedInfo(name: "荷兰兔", coatColors: coats(["黑白","蓝白","棕白","灰白"]), eyeColors: eyes(["棕色"]), suggestedThemeHex: "9E9E9E"),
-        BreedInfo(name: "狮子兔", coatColors: coats(["白色","黑色","棕色","灰色","多色"]), eyeColors: eyes(["棕色","蓝色"]), suggestedThemeHex: "FFC107"),
-        BreedInfo(name: "新西兰兔", coatColors: coats(["白色","黑色","红色"]), eyeColors: eyes(["粉色（白化）","棕色"]), suggestedThemeHex: "FAFAFA"),
-        BreedInfo(name: "中华田园兔", coatColors: coats(["灰色","白色","棕色"]), eyeColors: eyes(["棕色","红色（白化）"]), suggestedThemeHex: "BDBDBD"),
-        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "安哥拉兔", coatColors: coats(["白色", "黑色", "蓝色", "奶油色"]), eyeColors: eyes(["棕色", "蓝色"]), suggestedThemeHex: "FAFAFA"),
+        BreedInfo(name: "垂耳兔", coatColors: coats(["白色", "黑色", "灰色", "棕色", "花斑"]), eyeColors: eyes(["棕色", "蓝色", "粉色（白化）"]), suggestedThemeHex: "FFCCBC"),
+        BreedInfo(name: "荷兰兔", coatColors: coats(["黑白", "蓝白", "棕白", "灰白"]), eyeColors: eyes(["棕色"]), suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "狮子兔", coatColors: coats(["白色", "黑色", "棕色", "灰色", "多色"]), eyeColors: eyes(["棕色", "蓝色"]), suggestedThemeHex: "FFC107"),
+        BreedInfo(name: "新西兰兔", coatColors: coats(["白色", "黑色", "红色"]), eyeColors: eyes(["粉色（白化）", "棕色"]), suggestedThemeHex: "FAFAFA"),
+        BreedInfo(name: "中华田园兔", coatColors: coats(["灰色", "白色", "棕色"]), eyeColors: eyes(["棕色", "红色（白化）"]), suggestedThemeHex: "BDBDBD"),
+        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E")
     ]
-    
+
     // MARK: - Hamster Breeds
     static let hamsterBreeds: [BreedInfo] = [
-        BreedInfo(name: "叙利亚仓鼠（金熊）", coatColors: coats(["金黄色","奶油色","白色","黑色","花斑"]), eyeColors: eyes(["黑色","红色（白化）"]), suggestedThemeHex: "FFC107"),
-        BreedInfo(name: "侏儒坎贝尔仓鼠", coatColors: coats(["灰棕色","白色","珍珠色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "9E9E9E"),
-        BreedInfo(name: "侏儒冬白仓鼠", coatColors: coats(["灰色","白色（冬季）","珍珠色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FAFAFA"),
-        BreedInfo(name: "加卡利亚仓鼠", coatColors: coats(["灰棕色","蓝宝石色","珍珠色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "90A4AE"),
+        BreedInfo(name: "叙利亚仓鼠（金熊）", coatColors: coats(["金黄色", "奶油色", "白色", "黑色", "花斑"]), eyeColors: eyes(["黑色", "红色（白化）"]), suggestedThemeHex: "FFC107"),
+        BreedInfo(name: "侏儒坎贝尔仓鼠", coatColors: coats(["灰棕色", "白色", "珍珠色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "侏儒冬白仓鼠", coatColors: coats(["灰色", "白色（冬季）", "珍珠色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FAFAFA"),
+        BreedInfo(name: "加卡利亚仓鼠", coatColors: coats(["灰棕色", "蓝宝石色", "珍珠色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "90A4AE"),
         BreedInfo(name: "罗伯罗夫斯基仓鼠", coatColors: coats(["沙棕色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FF8F00"),
-        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E")
     ]
-    
+
     // MARK: - Bird Breeds
     static let birdBreeds: [BreedInfo] = [
-        BreedInfo(name: "虎皮鹦鹉", coatColors: coats(["绿色","蓝色","黄色","白色","灰色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "66BB6A"),
-        BreedInfo(name: "玄凤鹦鹉", coatColors: coats(["灰色","黄化","白面","白色"]), eyeColors: eyes(["黑色","红色（白化）"]), suggestedThemeHex: "9E9E9E"),
-        BreedInfo(name: "牡丹鹦鹉", coatColors: coats(["绿色","蓝色","黄色","白色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "66BB6A"),
-        BreedInfo(name: "和尚鹦鹉", coatColors: coats(["绿色","蓝色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "66BB6A"),
+        BreedInfo(name: "虎皮鹦鹉", coatColors: coats(["绿色", "蓝色", "黄色", "白色", "灰色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "66BB6A"),
+        BreedInfo(name: "玄凤鹦鹉", coatColors: coats(["灰色", "黄化", "白面", "白色"]), eyeColors: eyes(["黑色", "红色（白化）"]), suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "牡丹鹦鹉", coatColors: coats(["绿色", "蓝色", "黄色", "白色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "66BB6A"),
+        BreedInfo(name: "和尚鹦鹉", coatColors: coats(["绿色", "蓝色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "66BB6A"),
         BreedInfo(name: "太阳锥尾鹦鹉", coatColors: coats(["橙黄色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FF8F00"),
-        BreedInfo(name: "金刚鹦鹉", coatColors: coats(["红色","蓝色","绿色","黄色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FF7043"),
-        BreedInfo(name: "文鸟", coatColors: coats(["白色","灰色","奶油色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FAFAFA"),
+        BreedInfo(name: "金刚鹦鹉", coatColors: coats(["红色", "蓝色", "绿色", "黄色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FF7043"),
+        BreedInfo(name: "文鸟", coatColors: coats(["白色", "灰色", "奶油色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FAFAFA"),
         BreedInfo(name: "珍珠鸟", coatColors: coats(["橙色脸颊灰色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "9E9E9E"),
-        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E")
     ]
-    
+
     // MARK: - Other Pets
     static let otherBreeds: [BreedInfo] = [
         BreedInfo(name: "荷兰猪", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "FF8F00"),
-        BreedInfo(name: "龙猫", coatColors: coats(["灰色","白色","米色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "9E9E9E"),
-        BreedInfo(name: "刺猬", coatColors: coats(["白腹深刺","盐椒色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "9E9E9E"),
-        BreedInfo(name: "雪貂", coatColors: coats(["奶油色","黑色","白色","肉桂色"]), eyeColors: eyes(["黑色","红色（白化）"]), suggestedThemeHex: "FFCCBC"),
-        BreedInfo(name: "乌龟", coatColors: coats(["绿色","棕色"]), eyeColors: eyes(["棕色"]), suggestedThemeHex: "66BB6A"),
-        BreedInfo(name: "金鱼", coatColors: coats(["红色","橙色","白色","黑色","花斑"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FF7043"),
-        BreedInfo(name: "锦鲤", coatColors: coats(["红白","黄色","黑色","花斑"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FF7043"),
-        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "龙猫", coatColors: coats(["灰色", "白色", "米色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "刺猬", coatColors: coats(["白腹深刺", "盐椒色"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "9E9E9E"),
+        BreedInfo(name: "雪貂", coatColors: coats(["奶油色", "黑色", "白色", "肉桂色"]), eyeColors: eyes(["黑色", "红色（白化）"]), suggestedThemeHex: "FFCCBC"),
+        BreedInfo(name: "乌龟", coatColors: coats(["绿色", "棕色"]), eyeColors: eyes(["棕色"]), suggestedThemeHex: "66BB6A"),
+        BreedInfo(name: "金鱼", coatColors: coats(["红色", "橙色", "白色", "黑色", "花斑"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FF7043"),
+        BreedInfo(name: "锦鲤", coatColors: coats(["红白", "黄色", "黑色", "花斑"]), eyeColors: eyes(["黑色"]), suggestedThemeHex: "FF7043"),
+        BreedInfo(name: "其他", coatColors: genericCoatColors, eyeColors: genericEyeColors, suggestedThemeHex: "9E9E9E")
     ]
-    
+
     // MARK: - Lookup
     static func breeds(for species: String) -> [BreedInfo] {
-        let raw: [BreedInfo]
-        switch species {
-        case "狗": raw = dogBreeds
-        case "猫": raw = catBreeds
-        case "兔子": raw = rabbitBreeds
-        case "仓鼠": raw = hamsterBreeds
-        case "鸟": raw = birdBreeds
-        default: raw = otherBreeds
+        let raw: [BreedInfo] = switch species {
+        case "狗": dogBreeds
+        case "猫": catBreeds
+        case "兔子": rabbitBreeds
+        case "仓鼠": hamsterBreeds
+        case "鸟": birdBreeds
+        default: otherBreeds
         }
         // 「其他」固定排在最后
         let others = raw.filter { $0.name == "其他" }
         let sorted = raw.filter { $0.name != "其他" }.sorted { $0.name < $1.name }
         return sorted + others
     }
-    
+
     // MARK: - Private helpers
     private static func coats(_ names: [String]) -> [CoatColor] {
         names.map { n in
             genericCoatColors.first { $0.name == n } ?? CoatColor(name: n, hex: "BDBDBD")
         }
     }
+
     private static func eyes(_ names: [String]) -> [EyeColor] {
         names.map { n in
             genericEyeColors.first { $0.name == n } ?? EyeColor(name: n, hex: "BDBDBD")
         }
     }
-    
+
     // MARK: - Country/City Data
     static let countries: [String] = [
         "中国", "美国", "英国", "法国", "德国", "日本", "韩国", "澳大利亚", "加拿大",
@@ -426,7 +426,7 @@ enum PetBreedDatabase {
         "墨西哥", "南非", "埃及", "摩洛哥", "肯尼亚",
         "其他"
     ]
-    
+
     static let citiesByCountry: [String: [String]] = [
         "中国": ["北京", "上海", "广州", "深圳", "成都", "杭州", "武汉", "南京", "重庆", "西安", "苏州", "长沙", "天津", "青岛", "宁波", "郑州", "厦门", "济南", "合肥", "福州", "昆明", "大连", "哈尔滨", "沈阳", "贵阳", "南昌", "长春", "石家庄", "太原", "兰州", "乌鲁木齐", "海口", "三亚", "香港", "澳门", "台北", "其他"],
         "美国": ["纽约", "洛杉矶", "芝加哥", "旧金山", "西雅图", "波士顿", "华盛顿", "迈阿密", "奥兰多", "休斯敦", "达拉斯", "奥斯汀", "亚特兰大", "费城", "凤凰城", "圣迭戈", "拉斯维加斯", "波特兰", "丹佛", "圣何塞", "其他"],
@@ -481,9 +481,9 @@ enum PetBreedDatabase {
         "南非": ["约翰内斯堡", "开普敦", "德班", "比勒陀利亚", "伊丽莎白港", "斯泰伦博斯", "其他"],
         "埃及": ["开罗", "亚历山大", "吉萨", "卢克索", "阿斯旺", "沙姆沙伊赫", "赫尔格达", "其他"],
         "摩洛哥": ["卡萨布兰卡", "马拉喀什", "拉巴特", "非斯", "丹吉尔", "阿加迪尔", "其他"],
-        "肯尼亚": ["内罗毕", "蒙巴萨", "基苏木", "纳库鲁", "埃尔多雷特", "马林迪", "其他"],
+        "肯尼亚": ["内罗毕", "蒙巴萨", "基苏木", "纳库鲁", "埃尔多雷特", "马林迪", "其他"]
     ]
-    
+
     static func cities(for country: String) -> [String] {
         citiesByCountry[country] ?? ["其他"]
     }
@@ -523,7 +523,7 @@ enum PetBreedDatabase {
         "腊肠犬": ["脊椎问题高发，减少跳跃上下楼梯", "注意体重控制", "每周梳毛1次（短毛型）"],
         "雪纳瑞": ["胡须需定期清洁，避免食物残留", "每8-12周专业美容一次", "容易形成结石，多喝水"],
         "马尔济斯": ["丝状长毛需每日梳理或定期剪短", "泪痕问题，每日清洁眼周", "体型娇小，注意低血糖风险"],
-        "中华田园犬": ["适应性强，日常护理简单", "每周梳毛1次，注意耳朵清洁", "性格忠诚，需充足运动和社会化"],
+        "中华田园犬": ["适应性强，日常护理简单", "每周梳毛1次，注意耳朵清洁", "性格忠诚，需充足运动和社会化"]
     ]
 
     /// 查找品种护理贴士（模糊匹配）

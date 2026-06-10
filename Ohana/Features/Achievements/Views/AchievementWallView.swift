@@ -5,14 +5,14 @@
 //  成就徽章墙 — V4 游戏化进度与领取
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 struct AchievementWallContentView: View {
     let pet: Pet
     var allPets: [Pet] = []
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     let electronicPets: [OasisElectronicPet]
     let critterFragments: [OasisCritterFragmentBalance]
     let critterActionLogs: [OasisCritterActionLog]
@@ -51,8 +51,8 @@ struct AchievementWallContentView: View {
 
         var id: String {
             switch self {
-            case .pet(let id): return "pet:\(id.uuidString)"
-            case .human(let id): return "human:\(id.uuidString)"
+            case let .pet(id): "pet:\(id.uuidString)"
+            case let .human(id): "human:\(id.uuidString)"
             }
         }
     }
@@ -65,10 +65,10 @@ struct AchievementWallContentView: View {
 
         func title(_ l: L10n) -> String {
             switch self {
-            case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
-            case .claimable: return l.tr(zh: "可领取", en: "Claim", de: "Abholen")
-            case .unlocked: return l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet")
-            case .inProgress: return l.tr(zh: "进行中", en: "Progress", de: "In Arbeit")
+            case .all: l.tr(zh: "全部", en: "All", de: "Alle")
+            case .claimable: l.tr(zh: "可领取", en: "Claim", de: "Abholen")
+            case .unlocked: l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet")
+            case .inProgress: l.tr(zh: "进行中", en: "Progress", de: "In Arbeit")
             }
         }
     }
@@ -223,14 +223,14 @@ struct AchievementWallContentView: View {
     }
 
     var activePet: Pet {
-        if case .pet(let id) = activeSubject {
+        if case let .pet(id) = activeSubject {
             return pets.first(where: { $0.id == id }) ?? pet
         }
         return pet
     }
 
     var activeHuman: Human? {
-        guard case .human(let id) = activeSubject else { return nil }
+        guard case let .human(id) = activeSubject else { return nil }
         return humans.first(where: { $0.id == id })
     }
 
@@ -293,10 +293,10 @@ struct AchievementWallContentView: View {
         achievements
             .filter { badge in
                 switch selectedFilter {
-                case .all: return true
-                case .claimable: return badge.isUnlocked && !isRewardClaimed(badge)
-                case .unlocked: return badge.isUnlocked
-                case .inProgress: return !badge.isUnlocked
+                case .all: true
+                case .claimable: badge.isUnlocked && !isRewardClaimed(badge)
+                case .unlocked: badge.isUnlocked
+                case .inProgress: !badge.isUnlocked
                 }
             }
             .sorted { lhs, rhs in

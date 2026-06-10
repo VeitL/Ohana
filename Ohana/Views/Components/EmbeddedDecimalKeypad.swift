@@ -15,7 +15,7 @@ struct EmbeddedDecimalKeypad: View {
     var isEnabled: Bool = true
     var isMini: Bool = false
     var showsSubmitButton: Bool = true
-    var onSubmit: (() -> Void)? = nil
+    var onSubmit: (() -> Void)?
 
     private let keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "decimal", "0", "delete"]
 
@@ -112,7 +112,7 @@ struct EmbeddedDecimalKeypad: View {
             }
         case "decimal":
             guard maxFractionDigits > 0 else { return }
-            if !text.contains(".") && !text.contains(",") {
+            if !text.contains("."), !text.contains(",") {
                 text = text.isEmpty ? "0\(decimalSeparator)" : text + decimalSeparator
             }
         default:

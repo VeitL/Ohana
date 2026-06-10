@@ -5,8 +5,8 @@
 //  GO UI：由 `AddEntityView` 提供 `GoIslandWizardBackdrop`，本页使用岛景上的玻璃卡与青柠强调。
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct AddPlantView: View {
     let onComplete: () -> Void
@@ -45,10 +45,10 @@ struct AddPlantView: View {
                                     avatarEmoji == emoji
                                         ? Color.goLime.opacity(0.22)
                                         : Color.ohanaControlFill.opacity(0.68),
-                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                                 )
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                                         .strokeBorder(
                                             avatarEmoji == emoji ? Color.goLime.opacity(0.55) : Color.ohanaCardSurface.opacity(0.16),
                                             lineWidth: avatarEmoji == emoji ? 1.5 : 1
@@ -71,13 +71,13 @@ struct AddPlantView: View {
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .textCase(.uppercase)
                             .tracking(0.6)
-                        Stepper("每 \(wateringInterval) 天", value: $wateringInterval, in: 1...90)
+                        Stepper("每 \(wateringInterval) 天", value: $wateringInterval, in: 1 ... 90)
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .tint(Color.goLime)
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .goTranslucentCard(cornerRadius: 18)
+                    .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("施肥周期")
@@ -85,13 +85,13 @@ struct AddPlantView: View {
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .textCase(.uppercase)
                             .tracking(0.6)
-                        Stepper("每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1...365)
+                        Stepper("每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1 ... 365)
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .tint(Color.goLime)
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .goTranslucentCard(cornerRadius: 18)
+                    .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
                 }
                 .padding(.horizontal, 20)
 
@@ -128,20 +128,20 @@ struct AddPlantView: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
-            TextField(placeholder, text: text)
+            TextField(placeholder, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .textFieldStyle(.plain)
                 .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(14)
-                .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .strokeBorder(Color.ohanaCardSurface.opacity(0.18), lineWidth: 1)
                 )
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .goTranslucentCard(cornerRadius: 18)
+        .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
     }
 
     private func savePlant() {

@@ -19,37 +19,37 @@ struct WeeklyReportCard: View {
     private var shouldPulseShare: Bool {
         workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
     }
-    
+
     private var weekStart: Date {
         Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
     }
-    
+
     private var weekEnd: Date {
         Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.end ?? Date()
     }
-    
+
     private var weekWalks: [PetWalkLog] {
         pet.walkLogs.filter { $0.startDate >= weekStart && $0.startDate < weekEnd }
     }
-    
+
     private var weekPotties: [PetPottyLog] {
         pet.pottyLogs.filter { $0.date >= weekStart && $0.date < weekEnd }
     }
-    
+
     private var weekExpenses: Double {
         pet.expenseLogs
             .filter { $0.date >= weekStart && $0.date < weekEnd }
             .reduce(0) { $0 + $1.amount }
     }
-    
+
     private var totalWalkDistance: Double {
         weekWalks.reduce(0) { $0 + $1.distanceMeters }
     }
-    
+
     private var totalWalkDuration: TimeInterval {
         weekWalks.reduce(0) { $0 + TimeInterval($1.durationSeconds) }
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -94,7 +94,7 @@ struct WeeklyReportCard: View {
                 }
                 .disabled(isRendering)
             }
-            
+
             // 统计网格
             LazyVGrid(columns: [
                 GridItem(.flexible(), spacing: 10),
@@ -108,23 +108,23 @@ struct WeeklyReportCard: View {
                 statBubble(emoji: "💰", value: AppCurrency.format(weekExpenses, fractionDigits: 0), label: "花费")
                 statBubble(emoji: "⚖️", value: latestWeight, label: "体重")
             }
-            
+
             // 7天活跃热力图
             VStack(alignment: .leading, spacing: 6) {
                 Text("活跃天数")
                     .font(OhanaFont.adaptive(size: 12, weight: .medium))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                
+
                 HStack(spacing: 4) {
-                    ForEach(0..<7, id: \.self) { dayOffset in
+                    ForEach(0 ..< 7, id: \.self) { dayOffset in
                         let date = Calendar.current.date(byAdding: .day, value: dayOffset, to: weekStart) ?? Date()
                         let hasActivity = hasActivityOn(date)
-                        
+
                         VStack(spacing: 2) {
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: OhanaRadius.micro)
                                 .fill(hasActivity ? Color.purple.opacity(0.6) : Color.gray.opacity(0.15))
                                 .frame(height: 24)
-                            
+
                             Text(date, format: .dateTime.weekday(.narrow))
                                 .font(OhanaFont.adaptive(size: 9, weight: .medium))
                                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -135,14 +135,14 @@ struct WeeklyReportCard: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
         .sheet(isPresented: $isSharing) {
             if let img = shareImage {
                 ShareSheet(image: img)
             }
         }
     }
-    
+
     private func statBubble(emoji: String, value: String, label: String) -> some View {
         VStack(spacing: 4) {
             Text(emoji)
@@ -158,16 +158,16 @@ struct WeeklyReportCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(Color.ohanaCardSurface.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.ohanaCardSurface.opacity(0.3), in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
     }
-    
+
     private var distanceFormatted: String {
         if totalWalkDistance >= 1000 {
             return String(format: "%.1fkm", totalWalkDistance / 1000)
         }
         return String(format: "%.0fm", totalWalkDistance)
     }
-    
+
     private var durationFormatted: String {
         let minutes = Int(totalWalkDuration / 60)
         if minutes >= 60 {
@@ -175,14 +175,14 @@ struct WeeklyReportCard: View {
         }
         return "\(minutes)min"
     }
-    
+
     private var latestWeight: String {
         if let w = pet.weightLogs.sorted(by: { $0.date > $1.date }).first {
             return String(format: "%.1fkg", w.weight)
         }
         return "--"
     }
-    
+
     private func hasActivityOn(_ date: Date) -> Bool {
         let cal = Calendar.current
         let hasWalk = weekWalks.contains { cal.isDate($0.startDate, inSameDayAs: date) }
@@ -246,10 +246,10 @@ struct WeeklyReportCard: View {
                 }
                 Spacer()
                 // 活跃天数大字
-                let activeDays = (0..<7).filter { i in
+                let activeDays = (0 ..< 7).count(where: { i in
                     let d = Calendar.current.date(byAdding: .day, value: i, to: weekStart) ?? Date()
                     return hasActivityOn(d)
-                }.count
+                })
                 VStack(spacing: 2) {
                     Text("\(activeDays)")
                         .font(OhanaFont.adaptive(size: 36, weight: .black, design: .rounded))
@@ -275,11 +275,11 @@ struct WeeklyReportCard: View {
 
             // 热力图
             HStack(spacing: 4) {
-                ForEach(0..<7, id: \.self) { i in
+                ForEach(0 ..< 7, id: \.self) { i in
                     let d = Calendar.current.date(byAdding: .day, value: i, to: weekStart) ?? Date()
                     let active = hasActivityOn(d)
                     VStack(spacing: 3) {
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: OhanaRadius.micro)
                             .fill(active ? Color.goPrimary.opacity(0.7) : Color.primary.opacity(0.08))
                             .frame(height: 20)
                         Text(d, format: .dateTime.weekday(.narrow))
@@ -308,10 +308,10 @@ struct WeeklyReportCard: View {
                 colors: [Color(hex: "2A1F6B"), Color(hex: "1A0E4B")],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.goPrimary.opacity(0.25), lineWidth: 1.5)
         )
     }
@@ -329,6 +329,6 @@ struct WeeklyReportCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
     }
 }

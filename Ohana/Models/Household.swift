@@ -5,9 +5,9 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 @Model
 final class Household {

@@ -53,14 +53,13 @@ struct FeedPlanDraft: Equatable {
 
     static func suggestedTimes(for count: Int, on date: Date = Date(), calendar: Calendar = .current) -> [Date] {
         let clamped = min(max(count, 1), 6)
-        let hours: [Int]
-        switch clamped {
-        case 1: hours = [8]
-        case 2: hours = [8, 18]
-        case 3: hours = [8, 13, 19]
-        case 4: hours = [7, 12, 17, 21]
-        case 5: hours = [7, 11, 15, 19, 22]
-        default: hours = [7, 10, 13, 16, 19, 22]
+        let hours: [Int] = switch clamped {
+        case 1: [8]
+        case 2: [8, 18]
+        case 3: [8, 13, 19]
+        case 4: [7, 12, 17, 21]
+        case 5: [7, 11, 15, 19, 22]
+        default: [7, 10, 13, 16, 19, 22]
         }
         return hours.map {
             calendar.date(bySettingHour: $0, minute: 0, second: 0, of: date) ?? date

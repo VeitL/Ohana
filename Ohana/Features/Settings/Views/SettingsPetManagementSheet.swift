@@ -38,7 +38,7 @@ struct SettingsPetManagementSheet: View {
             .toolbar(.hidden, for: .navigationBar)
         }
         .alert("删除 \(petToDelete?.name ?? "")", isPresented: $showingDeletePetAlert) {
-            TextField("输入宠物名字确认", text: $deleteConfirmName)
+            TextField("输入宠物名字确认", text: $deleteConfirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             Button("取消", role: .cancel) {
                 petToDelete = nil
                 deleteConfirmName = ""
@@ -88,7 +88,7 @@ struct SettingsPetManagementSheet: View {
     private var petList: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.hairline, style: .continuous)
                     .fill(Color.goPrimary)
                     .frame(width: 3, height: 14) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text("成员")
@@ -110,10 +110,10 @@ struct SettingsPetManagementSheet: View {
             .padding(14)
             .background(
                 reduceTransparency ? Color.ohanaCardSurfaceElevated : Color.ohanaCardSurface,
-                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
         }
@@ -122,7 +122,7 @@ struct SettingsPetManagementSheet: View {
     private func petRow(_ pet: Pet) -> some View {
         HStack(spacing: 10) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                     .fill(Color.ohanaControlFill)
                     .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text(pet.avatarEmoji)

@@ -5,9 +5,9 @@
 //  3D 破框卡片素材管理。破框主体独立于普通头像，只影响卡片特效。
 //
 
-import SwiftUI
-import SwiftData
 import PhotosUI
+import SwiftData
+import SwiftUI
 
 enum PetPopoutCardSource: String, Codable {
     case photoCutout
@@ -42,6 +42,7 @@ struct EquipPopoutCardSheet: View {
     private var currentPreviewSignature: String {
         currentPreviewData.map { FocusWalletAvatarCache.signature(for: $0) } ?? "empty"
     }
+
     private var isPopoutActive: Bool { pet.cardStyleRaw == "popout" }
 
     var body: some View {
@@ -120,7 +121,7 @@ struct EquipPopoutCardSheet: View {
 
     private var popoutPreview: some View {
         ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
@@ -225,8 +226,8 @@ struct EquipPopoutCardSheet: View {
                 Image(systemName: isPopoutActive ? "checkmark.seal.fill" : "wand.and.stars")
                     .foregroundStyle(isPopoutActive ? Color.goPrimary : Color.goPurple)
                 Text(isPopoutActive
-                     ? l.tr(zh: "破框素材已保存，不会改变普通头像。", en: "Popout asset saved. Regular avatar is unchanged.", de: "Popout-Motiv gespeichert. Normaler Avatar bleibt unverändert.")
-                     : l.tr(zh: "先选择素材，再启用破框卡片。", en: "Pick a subject, then enable popout.", de: "Wähle ein Motiv und aktiviere Popout."))
+                    ? l.tr(zh: "破框素材已保存，不会改变普通头像。", en: "Popout asset saved. Regular avatar is unchanged.", de: "Popout-Motiv gespeichert. Normaler Avatar bleibt unverändert.")
+                    : l.tr(zh: "先选择素材，再启用破框卡片。", en: "Pick a subject, then enable popout.", de: "Wähle ein Motiv und aktiviere Popout."))
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -238,7 +239,7 @@ struct EquipPopoutCardSheet: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var actionButtons: some View {
@@ -313,7 +314,7 @@ struct EquipPopoutCardSheet: View {
                 return
             }
 
-            let cutout = (try? await ImageSubjectCutoutProcessor.removeBackground(from: image)) ?? image
+            let cutout = await (try? ImageSubjectCutoutProcessor.removeBackground(from: image)) ?? image
             let trimmed = ImageSubjectCutoutProcessor.trimmedTransparentSubjectImage(from: cutout) ?? cutout
             let downsampled = AddPetWizardView.downsample(trimmed, maxDim: 1024)
             guard let data = downsampled.pngData() else {

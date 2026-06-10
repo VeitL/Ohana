@@ -50,5 +50,4 @@ struct QuickFeedHomeSnapshot {
             calendar: calendar
         ))
     }
-
 }

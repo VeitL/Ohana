@@ -61,13 +61,13 @@ extension PetMedicationFrequency {
     /// 每日应服次数（asNeeded / custom = 0 表示按需，不自动调度）
     nonisolated var dosesPerDay: Int {
         switch self {
-        case .daily:             return 1
-        case .twiceDaily:        return 2
-        case .threeTimesDaily:   return 3
-        case .everyOtherDay:     return 1  // 隔天算作1次
-        case .weekly:            return 1  // 每周
-        case .asNeeded:          return 0
-        case .custom:            return 0
+        case .daily: 1
+        case .twiceDaily: 2
+        case .threeTimesDaily: 3
+        case .everyOtherDay: 1 // 隔天算作1次
+        case .weekly: 1 // 每周
+        case .asNeeded: 0
+        case .custom: 0
         }
     }
 }
@@ -75,12 +75,12 @@ extension PetMedicationFrequency {
 extension MedicationFrequency {
     nonisolated var dosesPerDay: Int {
         switch self {
-        case .daily: return 1
-        case .twiceDaily: return 2
-        case .threeTimesDaily: return 3
-        case .weekly: return 1
-        case .asNeeded: return 0
-        case .custom: return 0
+        case .daily: 1
+        case .twiceDaily: 2
+        case .threeTimesDaily: 3
+        case .weekly: 1
+        case .asNeeded: 0
+        case .custom: 0
         }
     }
 }
@@ -98,13 +98,13 @@ final class MedicationReminderService {
     // MARK: - 调度单个宠物的用药通知（覆盖替换）
 
     func scheduleMedicationReminders(for pet: Pet, context: ModelContext? = nil) {
-        let meds = pet.medications.filter { $0.isActiveToday }
+        let meds = pet.medications.filter(\.isActiveToday)
 
         // 先移除该宠物旧的用药通知
         let prefix = "medreminder_\(pet.id.uuidString)"
         center.getPendingNotificationRequests { requests in
             let ids = requests
-                .map { $0.identifier }
+                .map(\.identifier)
                 .filter { $0.hasPrefix(prefix) }
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
 
@@ -135,7 +135,7 @@ final class MedicationReminderService {
         var scheduled = 0
         let maxNotifications = 14 * dosesPerDay // 14天窗口
 
-        outerLoop: for day in 0..<14 {
+        outerLoop: for day in 0 ..< 14 {
             guard let dayDate = calendar.date(byAdding: .day, value: day, to: baseTime) else { continue }
 
             // 检查 everyOtherDay：只有奇数天调度（从startDate算起）
@@ -144,7 +144,7 @@ final class MedicationReminderService {
                 if daysSinceStart % 2 != 0 { continue }
             }
 
-            for doseIdx in 0..<dosesPerDay {
+            for doseIdx in 0 ..< dosesPerDay {
                 let minute = doseMinutes.indices.contains(doseIdx) ? doseMinutes[doseIdx] : 8 * 60
                 let fireDate = dayDate.addingTimeInterval(Double(minute) * 60)
                 guard fireDate > now else { continue }
@@ -228,7 +228,7 @@ final class MedicationReminderService {
     func cancelMedicationReminders(for petId: UUID) {
         let prefix = "medreminder_\(petId.uuidString)"
         center.getPendingNotificationRequests { requests in
-            let ids = requests.map { $0.identifier }.filter { $0.hasPrefix(prefix) }
+            let ids = requests.map(\.identifier).filter { $0.hasPrefix(prefix) }
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
         }
     }
@@ -239,7 +239,7 @@ final class MedicationReminderService {
         let prefix = "humanmedreminder_\(human.id.uuidString)"
         center.getPendingNotificationRequests { requests in
             let ids = requests
-                .map { $0.identifier }
+                .map(\.identifier)
                 .filter { $0.hasPrefix(prefix) }
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
 
@@ -297,7 +297,7 @@ final class MedicationReminderService {
         }
     }
 
-    nonisolated private func recordMedicationScheduleResult(
+    private nonisolated func recordMedicationScheduleResult(
         contextBox: MedicationReminderContextBox,
         subjectKind: CareLedgerSubjectKind,
         subjectId: String,
@@ -341,7 +341,7 @@ final class MedicationReminderService {
     func cancelHumanMedicationReminders(for humanId: UUID) {
         let prefix = "humanmedreminder_\(humanId.uuidString)"
         center.getPendingNotificationRequests { requests in
-            let ids = requests.map { $0.identifier }.filter { $0.hasPrefix(prefix) }
+            let ids = requests.map(\.identifier).filter { $0.hasPrefix(prefix) }
             self.center.removePendingNotificationRequests(withIdentifiers: ids)
         }
     }

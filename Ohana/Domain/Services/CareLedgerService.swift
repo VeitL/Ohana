@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-nonisolated final class CareLedgerService {
+final nonisolated class CareLedgerService {
     init() {}
 
     /// Isolation-agnostic: only performs ModelContext writes, so it is safe to

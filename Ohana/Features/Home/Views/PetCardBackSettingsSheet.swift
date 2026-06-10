@@ -5,8 +5,8 @@
 //  卡片背面齿轮按钮打开的设置菜单
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetCardBackSettingsSheet: View {
     let pet: Pet
@@ -63,7 +63,7 @@ struct PetCardBackSettingsSheet: View {
                 Text("将清空护理、体重、花费、便便、健康、散步、喂食、清洁、里程碑、用药与相册记录，并移除日历中该宠物的计划与提醒；保留名字与证件/保险档案。此操作不可撤销。")
             }
             .alert("删除 \(pet.name)", isPresented: $showDeleteConfirm) {
-                TextField("输入宠物名确认", text: $deleteNameInput)
+                TextField("输入宠物名确认", text: $deleteNameInput) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 Button("取消", role: .cancel) { deleteNameInput = "" }
                 Button("删除", role: .destructive) {
                     deletePetIfConfirmed()

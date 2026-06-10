@@ -19,24 +19,24 @@ enum QuickActionPickerCatalog {
 
     private static var all: [Option] {
         [
-        Option(id: "walk", label: "遛狗", icon: "figure.walk", colorHex: "14B8A6"),
-        Option(id: "feed", label: "喂食", icon: "fork.knife", colorHex: "FFDD44"),
-        Option(id: "water", label: "喂水", icon: "drop.fill", colorHex: "00D4AA"),
-        Option(id: "potty", label: "便便", icon: "allergens", colorHex: "FF8C42"),
-        Option(id: "litter", label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF"),
-        Option(id: "waterChange", label: "换水", icon: "arrow.2.circlepath", colorHex: "4ECDC4"),
-        Option(id: "filterClean", label: "清滤材", icon: "sparkles", colorHex: "A78BFA"),
-        Option(id: "groom", label: "护理", icon: "scissors", colorHex: "FF8C42"),
-        Option(id: "health", label: "健康", icon: "heart.fill", colorHex: "FF4757"),
-        Option(id: "medication", label: "用药", icon: "pill.fill", colorHex: "A855F7"),
-        Option(id: "expense", label: "花费", icon: AppCurrency.systemIconName, colorHex: "A78BFA"),
-        Option(id: "weight", label: "体重", icon: "scalemass.fill", colorHex: "80FFEA"),
-        Option(id: "play", label: "陪玩", icon: "tennisball.fill", colorHex: "FF6B6B"),
-        Option(id: "moment", label: "记录", icon: "camera.circle.fill", colorHex: "FF6B9D"),
-        Option(id: "cageCleaning", label: "清鸟笼", icon: "basket.fill", colorHex: "FFD166"),
-        Option(id: "freeFlight", label: "放飞", icon: "bird.fill", colorHex: "06D6A0"),
-        Option(id: "misting", label: "喷水", icon: "cloud.drizzle.fill", colorHex: "118AB2"),
-        Option(id: "substrateChange", label: "换垫材", icon: "leaf.fill", colorHex: "07DB8B"),
+            Option(id: "walk", label: "遛狗", icon: "figure.walk", colorHex: "14B8A6"),
+            Option(id: "feed", label: "喂食", icon: "fork.knife", colorHex: "FFDD44"),
+            Option(id: "water", label: "喂水", icon: "drop.fill", colorHex: "00D4AA"),
+            Option(id: "potty", label: "便便", icon: "allergens", colorHex: "FF8C42"),
+            Option(id: "litter", label: "铲屎", icon: "trash.fill", colorHex: "5B6AFF"),
+            Option(id: "waterChange", label: "换水", icon: "arrow.2.circlepath", colorHex: "4ECDC4"),
+            Option(id: "filterClean", label: "清滤材", icon: "sparkles", colorHex: "A78BFA"),
+            Option(id: "groom", label: "护理", icon: "scissors", colorHex: "FF8C42"),
+            Option(id: "health", label: "健康", icon: "heart.fill", colorHex: "FF4757"),
+            Option(id: "medication", label: "用药", icon: "pill.fill", colorHex: "A855F7"),
+            Option(id: "expense", label: "花费", icon: AppCurrency.systemIconName, colorHex: "A78BFA"),
+            Option(id: "weight", label: "体重", icon: "scalemass.fill", colorHex: "80FFEA"),
+            Option(id: "play", label: "陪玩", icon: "tennisball.fill", colorHex: "FF6B6B"),
+            Option(id: "moment", label: "记录", icon: "camera.circle.fill", colorHex: "FF6B9D"),
+            Option(id: "cageCleaning", label: "清鸟笼", icon: "basket.fill", colorHex: "FFD166"),
+            Option(id: "freeFlight", label: "放飞", icon: "bird.fill", colorHex: "06D6A0"),
+            Option(id: "misting", label: "喷水", icon: "cloud.drizzle.fill", colorHex: "118AB2"),
+            Option(id: "substrateChange", label: "换垫材", icon: "leaf.fill", colorHex: "07DB8B")
         ]
     }
 
@@ -89,7 +89,7 @@ struct QuickActionItem: Identifiable, Codable, Hashable {
     var petId: UUID?
     var entityId: UUID?
     var entityKindRaw: String?
-    var actionType: String   // "walk","health","groom","potty","feed","calendar","add","waterPlant","fertilizePlant"
+    var actionType: String // "walk","health","groom","potty","feed","calendar","add","waterPlant","fertilizePlant"
 
     var entityKind: EntityKind? {
         get { entityKindRaw.flatMap { EntityKind(rawValue: $0) } }
@@ -101,9 +101,14 @@ struct QuickActionItem: Identifiable, Codable, Hashable {
     init(id: String = UUID().uuidString, label: String, icon: String,
          colorHex: String, petId: UUID? = nil, actionType: String,
          entityId: UUID? = nil, entityKind: EntityKind? = nil) {
-        self.id = id; self.label = label; self.icon = icon
-        self.colorHex = colorHex; self.petId = petId; self.actionType = actionType
-        self.entityId = entityId; self.entityKindRaw = entityKind?.rawValue
+        self.id = id
+        self.label = label
+        self.icon = icon
+        self.colorHex = colorHex
+        self.petId = petId
+        self.actionType = actionType
+        self.entityId = entityId
+        self.entityKindRaw = entityKind?.rawValue
     }
 }
 
@@ -226,7 +231,7 @@ enum QuickActionLimit {
     static let message = "快捷操作区最多只能添加 8 个。更多功能可以在「全部功能」里查看和使用。"
 
     static func count(for pet: Pet, in items: [QuickActionItem]) -> Int {
-        items.filter { $0.petId == pet.id && $0.entityKind != .human }.count
+        items.count(where: { $0.petId == pet.id && $0.entityKind != .human })
     }
 }
 

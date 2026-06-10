@@ -6,16 +6,16 @@
 //  巡岛王者 + 劳模铲屎官 + 极简里程条 + 成员里程榜
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Time Range
 
 enum ExploreTimeRange: String, CaseIterable, Identifiable {
-    case week  = "周"
+    case week = "周"
     case month = "月"
-    case year  = "年"
-    case all   = "全部"
+    case year = "年"
+    case all = "全部"
     var id: String { rawValue }
 }
 
@@ -45,7 +45,7 @@ struct IslandExplorationDashboardContentView: View {
     let humans: [Human]
     let allWalkLogs: [PetWalkLog]
 
-    @Environment(\.dismiss)       private var dismiss
+    @Environment(\.dismiss) private var dismiss
 
     @State private var timeRange: ExploreTimeRange = .month
     @State private var animationProgress: Double = 0.0
@@ -58,14 +58,12 @@ struct IslandExplorationDashboardContentView: View {
     private var filteredLogs: [PetWalkLog] {
         let now = Date()
         let cal = Calendar.current
-        let cutoff: Date? = {
-            switch timeRange {
-            case .week:  return cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: now))
-            case .month: return cal.dateInterval(of: .month, for: now)?.start
-            case .year:  return cal.dateInterval(of: .year,  for: now)?.start
-            case .all:   return nil
-            }
-        }()
+        let cutoff: Date? = switch timeRange {
+        case .week: cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: now))
+        case .month: cal.dateInterval(of: .month, for: now)?.start
+        case .year: cal.dateInterval(of: .year, for: now)?.start
+        case .all: nil
+        }
         return allWalkLogs.filter {
             guard let c = cutoff else { return true }
             return $0.startDate >= c
@@ -81,7 +79,7 @@ struct IslandExplorationDashboardContentView: View {
     private var petSummaries: [PetWalkSummary] {
         pets.compactMap { pet -> PetWalkSummary? in
             let m = filteredLogs.filter { $0.pet?.id == pet.id }
-                                .reduce(0.0) { $0 + $1.distanceMeters }
+                .reduce(0.0) { $0 + $1.distanceMeters }
             guard m > 0 else { return nil }
             return PetWalkSummary(id: pet.id, name: pet.name,
                                   emoji: pet.avatarEmoji,
@@ -98,6 +96,7 @@ struct IslandExplorationDashboardContentView: View {
         let human: Human
         let totalMeters: Double
     }
+
     private var topHuman: HumanWalkStats? {
         var dict: [String: (Human, Double)] = [:]
         for log in filteredLogs {
@@ -154,12 +153,12 @@ struct IslandExplorationDashboardContentView: View {
     private var funSubtitle: String {
         let km = totalMeters / 1000
         switch km {
-        case ..<1:   return "才刚出发，岛屿等你去探索 🌿"
-        case ..<10:  return "≈ 绕操场走了好几圈 🏃"
-        case ..<42:  return "≈ 相当于城市漫步一整天 🏙️"
+        case ..<1: return "才刚出发，岛屿等你去探索 🌿"
+        case ..<10: return "≈ 绕操场走了好几圈 🏃"
+        case ..<42: return "≈ 相当于城市漫步一整天 🏙️"
         case ..<100: return "≈ 完成了一个全程马拉松 🏃"
         case ..<500: return "≈ 徒步跨越了一座城市 🗺️"
-        default:     return "≈ 几乎走了整个沿海线 🌊"
+        default: return "≈ 几乎走了整个沿海线 🌊"
         }
     }
 
@@ -326,8 +325,8 @@ struct IslandExplorationDashboardContentView: View {
                                 .fill(Color.goPrimary.mix(with: .black, by: 0.3))
                                 .frame(width: 44, height: 44)
                             Text(h.human.avatarEmoji).font(OhanaFont.adaptive(size: 24))
-                            
-                            if h.human.id.uuidString == activeHumanId && equippedTitle == "title_pioneer" {
+
+                            if h.human.id.uuidString == activeHumanId, equippedTitle == "title_pioneer" {
                                 Text("🚀")
                                     .font(OhanaFont.adaptive(size: 14))
                                     .padding(4)
@@ -354,10 +353,10 @@ struct IslandExplorationDashboardContentView: View {
     }
 
     @ViewBuilder
-    private func bentoHalfCard<Content: View>(
+    private func bentoHalfCard(
         title: String,
         accentColor: Color,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(spacing: 10) {
             Text(title)
@@ -372,9 +371,9 @@ struct IslandExplorationDashboardContentView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 130)
-        .background(accentColor.opacity(0.05), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(accentColor.opacity(0.05), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                 .strokeBorder(accentColor.opacity(0.2), lineWidth: 1)
         )
     }
@@ -427,8 +426,8 @@ struct IslandExplorationDashboardContentView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.ohanaDivider, lineWidth: 1))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.input).strokeBorder(Color.ohanaDivider, lineWidth: 1))
     }
 
     // MARK: - 模块D：成员贡献榜
@@ -496,7 +495,7 @@ struct IslandExplorationDashboardContentView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.ohanaDivider, lineWidth: 1))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.input).strokeBorder(Color.ohanaDivider, lineWidth: 1))
     }
 }

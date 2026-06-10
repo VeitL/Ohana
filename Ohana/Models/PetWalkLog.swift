@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 @Model
 final class PetWalkLog {
@@ -15,14 +15,14 @@ final class PetWalkLog {
     var endDate: Date?
     var distanceMeters: Double
     var coconutsEarned: Int
-    var executorId: String?  // ArkSchemaV11: 执行该动作的 Human.id.uuidString
+    var executorId: String? // ArkSchemaV11: 执行该动作的 Human.id.uuidString
     var sharedSessionId: String = ""
     @Attribute(.externalStorage) var mapSnapshotData: Data?
     @Attribute(.externalStorage) var routeLocationsData: Data?
     var pet: Pet?
     // P1: 遛狗行为备注
-    var behaviorNotes: String?   // 如"今天很兴奋，追了一只猫"
-    var moodRating: Int = 0      // 1-5颗星，0 = 未评价
+    var behaviorNotes: String? // 如"今天很兴奋，追了一只猫"
+    var moodRating: Int = 0 // 1-5颗星，0 = 未评价
 
     init(startDate: Date = Date(), pet: Pet? = nil, executorId: String? = nil, sharedSessionId: String = "") {
         self.id = UUID()
@@ -43,12 +43,12 @@ final class PetWalkLog {
     static func coconuts(for distanceMeters: Double) -> Int {
         max(1, Int(distanceMeters / 500))
     }
-    
+
     var durationSeconds: TimeInterval {
         guard let endDate else { return 0 }
         return endDate.timeIntervalSince(startDate)
     }
-    
+
     var durationText: String {
         let total = Int(durationSeconds)
         let hours = total / 3600
@@ -58,7 +58,7 @@ final class PetWalkLog {
         }
         return "\(minutes)分钟"
     }
-    
+
     var distanceText: String {
         AppMeasurementSystem.formatDistanceMeters(distanceMeters)
     }

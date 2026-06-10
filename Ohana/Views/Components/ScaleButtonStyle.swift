@@ -1,6 +1,6 @@
 import SwiftUI
 #if os(iOS)
-import UIKit
+    import UIKit
 #endif
 
 struct ScaleButtonStyle: ButtonStyle {
@@ -69,8 +69,8 @@ struct OhanaButtonPressFeedbackModifier: ViewModifier {
 
     private func triggerPressHaptic() {
         #if os(iOS)
-        guard triggersHaptic else { return }
-        OhanaFeedback.soft()
+            guard triggersHaptic else { return }
+            OhanaFeedback.soft()
         #endif
     }
 }

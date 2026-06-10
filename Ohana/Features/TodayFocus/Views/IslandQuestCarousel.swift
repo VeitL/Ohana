@@ -5,8 +5,8 @@
 //  首页横滑岛屿委托：单卡分页 + 自定义指示器 + 跳过 / 完成（逻辑由父视图复用 Bento 同款打卡）
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Carousel
 struct IslandQuestCarousel: View {
@@ -15,7 +15,7 @@ struct IslandQuestCarousel: View {
     let todayQuests: [IslandQuest]
     let onComplete: (IslandQuest) -> Void
     let onSkip: (IslandQuest) -> Void
-    var onQuestProgress: ((Int, Int) -> Void)? = nil
+    var onQuestProgress: ((Int, Int) -> Void)?
 
     @State private var skippedIds: Set<String> = []
     /// 使用 Int 页码驱动 `TabView`，避免 `Binding<String>` + 动态 `ForEach` 在部分系统上触发无限布局循环导致卡死。
@@ -40,9 +40,9 @@ struct IslandQuestCarousel: View {
 
     var body: some View {
         Group {
-            if allDone && coconutClaimed {
+            if allDone, coconutClaimed {
                 collapsedCompletedRow
-            } else if visibleQuests.isEmpty && allDone {
+            } else if visibleQuests.isEmpty, allDone {
                 coconutCalloutBlock
             } else if visibleQuests.isEmpty {
                 emptyNonAllDonePlaceholder
@@ -75,7 +75,7 @@ struct IslandQuestCarousel: View {
             }
         }
         .onChange(of: completedCount) { _, newVal in
-            if newVal > lastCompletedCount && lastCompletedCount >= 0 {
+            if newVal > lastCompletedCount, lastCompletedCount >= 0 {
                 onQuestProgress?(newVal, todayQuests.count)
             }
             lastCompletedCount = newVal
@@ -149,7 +149,7 @@ struct IslandQuestCarousel: View {
                 .foregroundStyle(Color.goPrimary)
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .padding(.horizontal, 16)
     }
 
@@ -180,7 +180,7 @@ struct IslandQuestCarousel: View {
                 .padding(.horizontal, 14).padding(.vertical, 12)
                 .background(
                     coconutClaimed ? Color.primary.opacity(0.06) : Color.goPrimary,
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                 )
             }
             .buttonStyle(ScaleButtonStyle())
@@ -198,7 +198,7 @@ struct IslandQuestCarousel: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 160)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .padding(.horizontal, 16)
     }
 }
@@ -251,7 +251,7 @@ private struct IslandQuestCarouselCard: View {
         HStack(alignment: .top, spacing: 0) {
             stripColor
                 .frame(width: 4)
-                .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.hairline, style: .continuous))
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 10) {
@@ -305,7 +305,7 @@ private struct IslandQuestCarouselCard: View {
             .padding(12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .transition(.opacity.combined(with: .scale(scale: 0.96)))
     }
 

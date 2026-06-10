@@ -108,4 +108,3 @@ private struct HomeCoconutLogInlineContent: View {
         )
     }
 }
-

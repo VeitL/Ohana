@@ -104,7 +104,7 @@ enum FocusHomeReminderDeepLinkRouter {
         for event: Event,
         pets: [Pet],
         humans: [Human],
-        plants: [Plant],
+        plants _: [Plant],
         humanMedications: [HumanMedication]
     ) -> FocusHomeReminderDestination {
         let entityType = event.relatedEntityType.lowercased()
@@ -142,7 +142,7 @@ enum FocusHomeReminderDeepLinkRouter {
         for payload: OhanaReminderRoutePayload,
         pets: [Pet],
         humans: [Human],
-        plants: [Plant]
+        plants _: [Plant]
     ) -> FocusHomeReminderDestination? {
         let entityType = payload.relatedEntityType?.lowercased() ?? ""
         guard let id = payload.relatedEntityId else { return nil }

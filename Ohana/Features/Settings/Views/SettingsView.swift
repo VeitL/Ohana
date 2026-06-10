@@ -5,12 +5,12 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
-    var onClose: (() -> Void)? = nil
+    var onClose: (() -> Void)?
     let homePets: [Pet]?
     let homeHumans: [Human]?
     let homeElectronicPets: [OasisElectronicPet]?
@@ -64,20 +64,20 @@ struct SettingsView: View {
 
     var preferredScheme: ColorScheme? {
         switch appThemePreference {
-        case "light": return .light
-        case "dark":  return .dark
-        default:      return nil
+        case "light": .light
+        case "dark": .dark
+        default: nil
         }
     }
 
     var primaryText: Color {
         Color.ohanaPrimaryText
     }
-    
+
     var secondaryText: Color {
         Color.ohanaSecondaryText
     }
-    
+
     var tertiaryText: Color {
         Color.ohanaTertiaryText
     }
@@ -85,29 +85,32 @@ struct SettingsView: View {
     var dividerLine: Color {
         Color.ohanaDivider
     }
-    
+
     var accentColor: Color { Color.goPrimary }
     var l: L10n { L10n(appLanguage) }
     var selectedCountry: AppCountry.Option {
         AppCountry.option(for: appCountry)
     }
+
     var selectedMeasurementSystem: AppMeasurementSystem.Option {
         AppMeasurementSystem.option(for: appMeasurementSystem)
     }
+
     var selectedCurrency: AppCurrency.Option {
         AppCurrency.supported.first { $0.code == AppCurrency.normalize(appCurrency) } ?? AppCurrency.supported[0]
     }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 OhanaStaticAppBackground()
-                
+
                 ScrollView {
                     LazyVStack(spacing: 14) {
                         settingsHeader
 
                         settingsDataSections
-                        
+
                         // 国家 / 语言 / 单位 / 货币
                         settingsSection(title: l.preferences) {
                             HStack(spacing: 12) {
@@ -217,7 +220,7 @@ struct SettingsView: View {
                             }
                             .foregroundStyle(primaryText)
                             .frame(minHeight: 44)
-                            
+
                             // 外观主题
                             HStack {
                                 settingsIcon("circle.lefthalf.filled", color: accentColor)
@@ -256,7 +259,7 @@ struct SettingsView: View {
                                 showingOnboardingReplay = true
                             }
                         }
-                        
+
                         // 通知
                         settingsSection(title: l.notifications) {
                             settingsRow(icon: "bell.badge", title: l.notificationPermission, subtitle: l.manageNotification) {
@@ -285,7 +288,7 @@ struct SettingsView: View {
                                 title: "打卡提醒", key: "notif_checkin_enabled"
                             )
                         }
-                        
+
                         // ── 备份与恢复
                         backupSection
 
@@ -305,7 +308,7 @@ struct SettingsView: View {
                                 settingsRow(icon: "envelope", title: "联系开发者", subtitle: "") {}
                             }
                         }
-                        
+
                         // 开发者工具
                         settingsSection(title: "开发者工具") {
                             NavigationLink {
@@ -564,7 +567,7 @@ struct SettingsView: View {
                         } message: {
                             Text(appResetErrorMessage ?? l.tr(zh: "未知错误", en: "Unknown error", de: "Unbekannter Fehler"))
                         }
-                        
+
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 16)
@@ -612,7 +615,7 @@ struct SettingsView: View {
                 homeHumans: homeHumans,
                 homeElectronicPets: homeElectronicPets
             )
-                .ohanaCompactSheetPresentation(detents: [.medium, .large])
+            .ohanaCompactSheetPresentation(detents: [.medium, .large])
         }
         .sheet(isPresented: $showingBackgroundPicker) {
             AppBackgroundPickerSheet()
@@ -631,7 +634,6 @@ struct SettingsView: View {
         }
     }
 }
-
 
 #Preview {
     SettingsView()

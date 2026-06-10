@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension OasisCritterCodexView {
@@ -20,7 +20,7 @@ extension OasisCritterCodexView {
         .frame(minWidth: 52)
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     func interactionOutcomeBanner(_ outcome: OasisCritterInteractionOutcome) -> some View {
@@ -46,7 +46,7 @@ extension OasisCritterCodexView {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .transition(.opacity.combined(with: .scale(scale: 0.96)))
     }
 
@@ -61,12 +61,12 @@ extension OasisCritterCodexView {
                     Text(cost)
                         .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .opacity(0.62)
-                    }
+                }
             }
             .foregroundStyle(highlighted ? Color.arkInk : Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .frame(height: 66)
-            .background(enabled ? (highlighted ? Color.goYellow : Color.goPrimary) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(enabled ? (highlighted ? Color.goYellow : Color.goPrimary) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
             .opacity(enabled ? 1 : 0.52)
         }
         .buttonStyle(ScaleButtonStyle())
@@ -133,7 +133,7 @@ extension OasisCritterCodexView {
         pulse(catalogId: critter.catalogId)
         scheduleCritterCommand {
             do {
-                feedback(for: critter.catalogId, success: try commandExecutor.upgradeLevel(critter))
+                try feedback(for: critter.catalogId, success: commandExecutor.upgradeLevel(critter))
                 scheduleRenderSnapshotRefresh(milliseconds: 30)
             } catch {
                 feedback(for: critter.catalogId, success: false)
@@ -203,7 +203,7 @@ extension OasisCritterCodexView {
 
     func clearInteractionOutcomeLater(_ outcome: OasisCritterInteractionOutcome) {
         outcomeCleanupTask?.cancel()
-        outcomeCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3_400) {
+        outcomeCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3400) {
             guard lastInteractionOutcome == outcome else { return }
             withAnimation(GoMotion.reduced) {
                 lastInteractionOutcome = nil
@@ -214,41 +214,41 @@ extension OasisCritterCodexView {
 
     func rarityColor(_ rarity: OasisElectronicPetRarity) -> Color {
         switch rarity {
-        case .common: return Color.goTeal
-        case .rare: return Color(hex: "7C6CFF")
-        case .epic: return Color(hex: "B45CFF")
-        case .legendary: return Color.goOrange
+        case .common: Color.goTeal
+        case .rare: Color(hex: "7C6CFF")
+        case .epic: Color(hex: "B45CFF")
+        case .legendary: Color.goOrange
         }
     }
 
     func actionIcon(_ action: OasisCritterAction) -> String {
         switch action {
-        case .feed: return "fork.knife"
-        case .play: return "sparkles"
-        case .rest: return "moon.fill"
-        case .rescue: return "cross.case.fill"
-        case .levelUpgrade: return "arrow.up.forward.circle.fill"
-        case .starUpgrade: return "star.fill"
-        case .unlock: return "lock.open.fill"
-        case .fragmentAwaken: return "sparkles"
-        case .feature: return "house.fill"
-        case .careEcho: return "heart.fill"
-        case .death: return "leaf.fill"
+        case .feed: "fork.knife"
+        case .play: "sparkles"
+        case .rest: "moon.fill"
+        case .rescue: "cross.case.fill"
+        case .levelUpgrade: "arrow.up.forward.circle.fill"
+        case .starUpgrade: "star.fill"
+        case .unlock: "lock.open.fill"
+        case .fragmentAwaken: "sparkles"
+        case .feature: "house.fill"
+        case .careEcho: "heart.fill"
+        case .death: "leaf.fill"
         }
     }
 
     func critterAuraTint(for state: OasisCritterLifeState) -> Color {
         switch state {
         case .healthy:
-            return Color.goPrimary
+            Color.goPrimary
         case .dead:
-            return Color.ohanaTertiaryText
+            Color.ohanaTertiaryText
         case .needsCare, .atRisk, .sick, .critical:
-            return Color.goRed
+            Color.goRed
         }
     }
 
     func critterInteractionCostText(_ cost: Int) -> String {
-        return cost == 0 ? l.tr(zh: "免费", en: "Free", de: "Gratis") : "\(cost)🥥"
+        cost == 0 ? l.tr(zh: "免费", en: "Free", de: "Gratis") : "\(cost)🥥"
     }
 }

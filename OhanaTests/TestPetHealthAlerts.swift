@@ -3,7 +3,7 @@ import Foundation
 
 @MainActor
 final class EmptyPetHealthAlerts: PetHealthAlerting {
-    func scanAlerts(pets: [Pet]) -> [HealthAlert] {
+    func scanAlerts(pets _: [Pet]) -> [HealthAlert] {
         []
     }
 }

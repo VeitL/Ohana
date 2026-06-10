@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension CoconutShopView {
     var cashExchangeSection: some View {
@@ -14,7 +14,7 @@ extension CoconutShopView {
             } label: {
                 HStack(spacing: 14) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                             .fill(Color.goYellow.opacity(colorScheme == .dark ? 0.2 : 0.16))
                         Image(systemName: "banknote.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.adaptive(size: 25, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -48,7 +48,7 @@ extension CoconutShopView {
                         )
                 }
                 .padding(14)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
 
@@ -68,7 +68,7 @@ extension CoconutShopView {
                 )
             }
 
-            if incomingPendingExchanges.isEmpty && outgoingPendingExchanges.isEmpty {
+            if incomingPendingExchanges.isEmpty, outgoingPendingExchanges.isEmpty {
                 Text(l.tr(
                     zh: "暂无待处理兑换。兑换是家庭内部的线下兑现记录，确认收到后才完成。",
                     en: "No pending exchanges. Exchanges are offline family notes and finish after the receiver confirms.",
@@ -78,7 +78,7 @@ extension CoconutShopView {
                 .foregroundStyle(secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(18)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             }
         }
     }
@@ -138,6 +138,6 @@ extension CoconutShopView {
             }
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 }

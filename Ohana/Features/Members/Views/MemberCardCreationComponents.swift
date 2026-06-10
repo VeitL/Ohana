@@ -24,7 +24,7 @@ struct MemberNameInputField: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> UITextField {
-        let textField = UITextField(frame: .zero)
+        let textField = UITextField(frame: .zero) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         textField.delegate = context.coordinator
         textField.addTarget(context.coordinator, action: #selector(Coordinator.textChanged(_:)), for: .editingChanged)
         textField.autocapitalizationType = .words
@@ -49,7 +49,7 @@ struct MemberNameInputField: UIViewRepresentable {
             string: placeholder,
             attributes: [
                 .foregroundColor: UIColor(placeholderForeground),
-                .font: UIFont.systemFont(ofSize: 17, weight: .bold),
+                .font: UIFont.systemFont(ofSize: 17, weight: .bold)
             ]
         )
     }
@@ -332,7 +332,7 @@ struct MemberCompactCityPicker: View {
             .buttonStyle(ScaleButtonStyle())
 
             if usesCustomCity {
-                TextField(l.tr(zh: "自定义城市", en: "Custom city", de: "Eigene Stadt"), text: $city)
+                TextField(l.tr(zh: "自定义城市", en: "Custom city", de: "Eigene Stadt"), text: $city) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .textInputAutocapitalization(.words)
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -403,7 +403,7 @@ struct MemberDateInputBlock: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
 
             if isEnabled {
                 Button {
@@ -430,7 +430,7 @@ struct MemberDateInputBlock: View {
                     }
                     .padding(.horizontal, 14)
                     .frame(minHeight: 64)
-                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
 
@@ -441,7 +441,7 @@ struct MemberDateInputBlock: View {
                         .environment(\.locale, AppLanguage.effectiveLocale)
                         .tint(Color.goPrimary)
                         .padding(12)
-                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
                         .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
                 }
             }
@@ -475,7 +475,7 @@ struct MemberMBTIChoiceGrid: View {
     private var dimensionColumns: [GridItem] {
         [
             GridItem(.flexible(minimum: 138), spacing: 8),
-            GridItem(.flexible(minimum: 138), spacing: 8),
+            GridItem(.flexible(minimum: 138), spacing: 8)
         ]
     }
 
@@ -526,7 +526,7 @@ struct MemberMBTIChoiceGrid: View {
         second: (String, String),
         selection: Binding<String>
     ) -> some View {
-        return VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 7) {
             Text(title)
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -538,7 +538,7 @@ struct MemberMBTIChoiceGrid: View {
             }
         }
         .padding(10)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func mbtiOption(_ letter: String, label: String, selection: Binding<String>) -> some View {
@@ -603,7 +603,7 @@ struct MemberCityPicker: View {
             }
 
             if usesCustomCity {
-                TextField(l.tr(zh: "自定义城市", en: "Custom city", de: "Eigene Stadt"), text: $city)
+                TextField(l.tr(zh: "自定义城市", en: "Custom city", de: "Eigene Stadt"), text: $city) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .textInputAutocapitalization(.words)
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -705,7 +705,7 @@ struct MemberCreationJoinHandoffCard: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                 .fill(cardGradient)
                 .overlay(alignment: .topLeading) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -741,7 +741,7 @@ struct MemberCreationJoinHandoffCard: View {
                     .padding(18)
                 }
                 .overlay {
-                    RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                         .strokeBorder(Color.goCardWhite.opacity(0.24), lineWidth: 1)
                 }
                 .shadow(color: Color.arkInk.opacity(0.20), radius: 22, x: 0, y: 14) // ui-v4: allow lightweight handoff card depth
@@ -753,7 +753,7 @@ struct MemberCreationJoinHandoffCard: View {
             colors: [
                 accent.mix(with: .white, by: 0.14),
                 accent,
-                accent.mix(with: .black, by: 0.34),
+                accent.mix(with: .black, by: 0.34)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing

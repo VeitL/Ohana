@@ -70,7 +70,7 @@ struct GrowthLockedFeatureView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private var roadmap: some View {
@@ -90,7 +90,7 @@ struct GrowthLockedFeatureView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private var levelText: String {
@@ -106,9 +106,9 @@ struct GrowthLockedFeatureView: View {
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }
@@ -204,7 +204,7 @@ struct GrowthUnlockRulesSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private var methodCard: some View {
@@ -239,7 +239,7 @@ struct GrowthUnlockRulesSheet: View {
             )
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private var roadmapCard: some View {
@@ -259,7 +259,7 @@ struct GrowthUnlockRulesSheet: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func ruleLine(icon: String, text: String) -> some View {
@@ -294,9 +294,9 @@ struct GrowthUnlockRulesSheet: View {
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }
@@ -324,11 +324,11 @@ struct GrowthUnlockRuleInfoButton: View {
     private var accessibilityLabel: String {
         switch appLanguage {
         case "en":
-            return "Show unlock rules for \(status.step.title(language: appLanguage))"
+            "Show unlock rules for \(status.step.title(language: appLanguage))"
         case "de":
-            return "Freischaltregeln fuer \(status.step.title(language: appLanguage)) anzeigen"
+            "Freischaltregeln fuer \(status.step.title(language: appLanguage)) anzeigen"
         default:
-            return "查看\(status.step.title(language: appLanguage))解锁规则"
+            "查看\(status.step.title(language: appLanguage))解锁规则"
         }
     }
 }
@@ -416,9 +416,9 @@ struct GrowthUnlockProgressCard: View {
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }
@@ -543,7 +543,7 @@ struct GrowthUnlockRoadmapView: View {
         }
         .frame(minHeight: 76)
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var roadmapCard: some View {
@@ -580,14 +580,14 @@ struct GrowthUnlockRoadmapView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }

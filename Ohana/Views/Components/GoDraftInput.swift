@@ -38,8 +38,8 @@ struct GoDraftTextField: View {
     var submitLabel: SubmitLabel = .done
     var capitalization: TextInputAutocapitalization = .sentences
     var disablesAutocorrection = true
-    var autoFocusDelay: Double? = nil
-    var onCommit: ((String) -> Void)? = nil
+    var autoFocusDelay: Double?
+    var onCommit: ((String) -> Void)?
 
     @State private var draftText: String
     @State private var commitTask: Task<Void, Never>? = nil
@@ -71,7 +71,7 @@ struct GoDraftTextField: View {
     }
 
     var body: some View {
-        TextField(placeholder, text: $draftText, axis: axis)
+        TextField(placeholder, text: $draftText, axis: axis) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             .focused($isFocused)
             .keyboardType(keyboardType)
             .submitLabel(submitLabel)
@@ -134,7 +134,7 @@ struct GoDraftTextEditor: View {
     @Binding var text: String
     var minHeight: CGFloat = 80
     var commitDelayNanoseconds: UInt64 = 220_000_000
-    var onCommit: ((String) -> Void)? = nil
+    var onCommit: ((String) -> Void)?
 
     @State private var draftText: String
     @State private var commitTask: Task<Void, Never>? = nil

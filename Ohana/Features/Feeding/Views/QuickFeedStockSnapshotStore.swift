@@ -93,7 +93,7 @@ struct QuickFeedStockSnapshot {
             dryStock: dryStock,
             wetStock: wetStock,
             totalGramsByRecordID: totals,
-            activeCount: [dryActive, wetActive].compactMap { $0 }.count,
+            activeCount: [dryActive, wetActive].compactMap(\.self).count,
             pendingCount: dryPending.count + wetPending.count
         )
     }
@@ -177,10 +177,10 @@ struct QuickFeedStockSnapshotRevision: Equatable {
         )
     }
 
-    private static func revisionHash<S: Sequence, Element>(
-        _ values: S,
+    private static func revisionHash<Element>(
+        _ values: some Sequence<Element>,
         combine: (inout Hasher, Element) -> Void
-    ) -> Int where S.Element == Element {
+    ) -> Int {
         var hasher = Hasher()
         var count = 0
         for value in values {

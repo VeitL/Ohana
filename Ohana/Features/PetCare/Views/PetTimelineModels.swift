@@ -37,12 +37,12 @@ enum PetTimelineDisplayMode: String, CaseIterable, Identifiable {
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .highlights: return l.tr(zh: "高光", en: "Highlights", de: "Highlights")
-        case .memories: return l.tr(zh: "回忆", en: "Memories", de: "Erinnerungen")
-        case .health: return l.tr(zh: "健康", en: "Health", de: "Gesundheit")
-        case .care: return l.tr(zh: "照护", en: "Care", de: "Pflege")
-        case .expense: return l.tr(zh: "花费", en: "Costs", de: "Kosten")
-        case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
+        case .highlights: l.tr(zh: "高光", en: "Highlights", de: "Highlights")
+        case .memories: l.tr(zh: "回忆", en: "Memories", de: "Erinnerungen")
+        case .health: l.tr(zh: "健康", en: "Health", de: "Gesundheit")
+        case .care: l.tr(zh: "照护", en: "Care", de: "Pflege")
+        case .expense: l.tr(zh: "花费", en: "Costs", de: "Kosten")
+        case .all: l.tr(zh: "全部", en: "All", de: "Alle")
         }
     }
 }
@@ -71,35 +71,35 @@ enum PetTimelineItemsBuilder {
 
         for w in pet.walkLogs {
             list.append(UnifiedLogItem(id: w.id, date: w.startDate, type: "walk",
-                title: "巡岛 · \(w.distanceText)", subtitle: w.durationText,
-                iconName: "figure.walk", color: .goPrimary))
+                                       title: "巡岛 · \(w.distanceText)", subtitle: w.durationText,
+                                       iconName: "figure.walk", color: .goPrimary))
         }
         for p in pet.pottyLogs {
             list.append(UnifiedLogItem(id: p.id, date: p.date, type: "potty",
-                title: "噗噗 · \(p.pottyType.emoji)\(p.pottyType.rawValue)", subtitle: "",
-                iconName: "drop.fill", color: .goOrange))
+                                       title: "噗噗 · \(p.pottyType.emoji)\(p.pottyType.rawValue)", subtitle: "",
+                                       iconName: "drop.fill", color: .goOrange))
         }
         for h in pet.healthLogs {
             list.append(UnifiedLogItem(id: h.id, date: h.date, type: "health",
-                title: "\(h.healthLogType.emoji) \(h.type)",
-                subtitle: h.note.isEmpty ? (h.vetName.isEmpty ? "" : h.vetName) : h.note,
-                iconName: "heart.text.clipboard", color: .goTeal))
+                                       title: "\(h.healthLogType.emoji) \(h.type)",
+                                       subtitle: h.note.isEmpty ? (h.vetName.isEmpty ? "" : h.vetName) : h.note,
+                                       iconName: "heart.text.clipboard", color: .goTeal))
         }
         for e in pet.expenseLogs {
             list.append(UnifiedLogItem(id: e.id, date: e.date, type: "expense",
-                title: "\(AppCurrency.format(e.amount, fractionDigits: 0)) · \(e.note.isEmpty ? e.category : e.note)",
-                subtitle: e.category,
-                iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow))
+                                       title: "\(AppCurrency.format(e.amount, fractionDigits: 0)) · \(e.note.isEmpty ? e.category : e.note)",
+                                       subtitle: e.category,
+                                       iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow))
         }
         for w in pet.weightLogs {
             list.append(UnifiedLogItem(id: w.id, date: w.date, type: "weight",
-                title: String(format: "体重 %.1f kg", w.weight), subtitle: "",
-                iconName: "scalemass.fill", color: .goTeal))
+                                       title: String(format: "体重 %.1f kg", w.weight), subtitle: "",
+                                       iconName: "scalemass.fill", color: .goTeal))
         }
         for c in pet.careLogs {
             list.append(UnifiedLogItem(id: c.id, date: c.date, type: "care",
-                title: "护理 · \(c.careType.emoji)\(c.careType.rawValue)", subtitle: c.note,
-                iconName: "sparkles", color: .goPurple))
+                                       title: "护理 · \(c.careType.emoji)\(c.careType.rawValue)", subtitle: c.note,
+                                       iconName: "sparkles", color: .goPurple))
         }
 
         let sorted = list.sorted { $0.date > $1.date }
@@ -147,35 +147,34 @@ enum PetTimelineItemsBuilder {
         let moments = memoryItems(for: pet, l: l, now: now)
         let generated = generatedMeaningfulMoments(for: pet, l: l, now: now)
 
-        let all: [UnifiedLogItem]
-        switch mode {
+        let all: [UnifiedLogItem] = switch mode {
         case .highlights:
-            all = (generated + moments + base.filter(isImportant)).map { item in
+            (generated + moments + base.filter(isImportant)).map { item in
                 var copy = item
                 copy.style = .story
                 copy.isHighlight = true
                 return copy
             }
         case .memories:
-            all = (generated + moments).map { item in
+            (generated + moments).map { item in
                 var copy = item
                 copy.style = .story
                 copy.isHighlight = true
                 return copy
             }
         case .health:
-            all = base.filter { $0.type == "health" || $0.type == "weight" }.map { item in
+            base.filter { $0.type == "health" || $0.type == "weight" }.map { item in
                 var copy = item
                 copy.style = isImportant(item) ? .story : .rail
                 copy.isHighlight = isImportant(item)
                 return copy
             }
         case .care:
-            all = base.filter { ["walk", "potty", "care"].contains($0.type) }
+            base.filter { ["walk", "potty", "care"].contains($0.type) }
         case .expense:
-            all = base.filter { $0.type == "expense" }
+            base.filter { $0.type == "expense" }
         case .all:
-            all = (generated + moments + base).map { item in
+            (generated + moments + base).map { item in
                 var copy = item
                 copy.style = (item.type == "moment" || item.type == "milestone") ? .story : .rail
                 copy.isHighlight = copy.style == .story || isImportant(item)
@@ -195,13 +194,12 @@ enum PetTimelineItemsBuilder {
             let first = group[0]
             let note = first.note.trimmingCharacters(in: .whitespacesAndNewlines)
             let hasImage = group.contains { renderableImageData($0.imageData) }
-            let title: String
-            if hasImage {
-                title = group.count > 1
+            let title: String = if hasImage {
+                group.count > 1
                     ? l.tr(zh: "\(group.count) 张照片", en: "\(group.count) photos", de: "\(group.count) Fotos")
                     : l.tr(zh: "照片时刻", en: "Photo moment", de: "Foto-Moment")
             } else {
-                title = l.tr(zh: "文字时刻", en: "Note moment", de: "Notiz-Moment")
+                l.tr(zh: "文字时刻", en: "Note moment", de: "Notiz-Moment")
             }
             return UnifiedLogItem(
                 id: first.id,
@@ -268,7 +266,7 @@ enum PetTimelineItemsBuilder {
            let birthYear = calendar.dateComponents([.year], from: birthday).year,
            let currentYear = calendar.dateComponents([.year], from: today).year {
             let birthdayComponents = calendar.dateComponents([.month, .day], from: birthday)
-            for year in birthYear...currentYear {
+            for year in birthYear ... currentYear {
                 let age = year - birthYear
                 guard age > 0 else { continue }
                 var components = DateComponents()
@@ -343,18 +341,18 @@ enum PetTimelineItemsBuilder {
         )
     }
 
-    nonisolated private static func isImportant(_ item: UnifiedLogItem) -> Bool {
+    private nonisolated static func isImportant(_ item: UnifiedLogItem) -> Bool {
         switch item.type {
         case "health":
-            return item.title.contains("手术") || item.title.contains("急") || item.title.contains("vaccine") || item.title.contains("疫苗") || item.title.contains("体检")
+            item.title.contains("手术") || item.title.contains("急") || item.title.contains("vaccine") || item.title.contains("疫苗") || item.title.contains("体检")
         case "weight":
-            return true
+            true
         case "walk":
-            return item.title.contains("km") || item.title.contains("公里")
+            item.title.contains("km") || item.title.contains("公里")
         case "milestone", "moment":
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 
@@ -395,7 +393,7 @@ enum PetTimelineItemsBuilder {
         let calendar = Calendar.current
         return milestones.contains { milestone in
             calendar.isDate(milestone.date, inSameDayAs: date) &&
-            milestoneCategory(for: milestone) == category
+                milestoneCategory(for: milestone) == category
         }
     }
 
@@ -424,49 +422,49 @@ enum PetTimelineItemsBuilder {
     private static func togetherTitle(_ days: Int, l: L10n) -> String {
         switch days {
         case 365:
-            return l.tr(zh: "相伴一年", en: "One Year Together", de: "Ein Jahr zusammen")
+            l.tr(zh: "相伴一年", en: "One Year Together", de: "Ein Jahr zusammen")
         case 730:
-            return l.tr(zh: "相伴两年", en: "Two Years Together", de: "Zwei Jahre zusammen")
+            l.tr(zh: "相伴两年", en: "Two Years Together", de: "Zwei Jahre zusammen")
         case 1095:
-            return l.tr(zh: "相伴三年", en: "Three Years Together", de: "Drei Jahre zusammen")
+            l.tr(zh: "相伴三年", en: "Three Years Together", de: "Drei Jahre zusammen")
         case 1825:
-            return l.tr(zh: "相伴五年", en: "Five Years Together", de: "Fünf Jahre zusammen")
+            l.tr(zh: "相伴五年", en: "Five Years Together", de: "Fünf Jahre zusammen")
         default:
-            return l.tr(zh: "共度 \(days) 天", en: "\(days) Days Together", de: "\(days) Tage zusammen")
+            l.tr(zh: "共度 \(days) 天", en: "\(days) Days Together", de: "\(days) Tage zusammen")
         }
     }
 
     private static func remembranceTitle(_ days: Int, l: L10n) -> String {
         switch days {
         case 365:
-            return l.tr(zh: "思念一年", en: "One Year Remembered", de: "Ein Jahr Erinnerung")
+            l.tr(zh: "思念一年", en: "One Year Remembered", de: "Ein Jahr Erinnerung")
         case 730:
-            return l.tr(zh: "思念两年", en: "Two Years Remembered", de: "Zwei Jahre Erinnerung")
+            l.tr(zh: "思念两年", en: "Two Years Remembered", de: "Zwei Jahre Erinnerung")
         case 1095:
-            return l.tr(zh: "思念三年", en: "Three Years Remembered", de: "Drei Jahre Erinnerung")
+            l.tr(zh: "思念三年", en: "Three Years Remembered", de: "Drei Jahre Erinnerung")
         case 1825:
-            return l.tr(zh: "思念五年", en: "Five Years Remembered", de: "Fünf Jahre Erinnerung")
+            l.tr(zh: "思念五年", en: "Five Years Remembered", de: "Fünf Jahre Erinnerung")
         default:
-            return l.tr(zh: "思念 \(days) 天", en: "\(days) Days Remembered", de: "\(days) Tage Erinnerung")
+            l.tr(zh: "思念 \(days) 天", en: "\(days) Days Remembered", de: "\(days) Tage Erinnerung")
         }
     }
 
     private static func deterministicUUIDSeed(_ seed: String) -> String {
-        var hash = UInt64(1469598103934665603)
+        var hash = UInt64(1_469_598_103_934_665_603)
         for byte in seed.utf8 {
             hash ^= UInt64(byte)
-            hash &*= 1099511628211
+            hash &*= 1_099_511_628_211
         }
         let a = UInt32(truncatingIfNeeded: hash)
         let b = UInt16(truncatingIfNeeded: hash >> 32)
         let c = UInt16(truncatingIfNeeded: hash >> 48)
         let d = UInt16(truncatingIfNeeded: hash ^ 0xA11CE)
-        let e = UInt64(truncatingIfNeeded: hash ^ 0x0F0F0F0F0F0F0F0F)
-        return String(format: "%08X-%04X-%04X-%04X-%012llX", a, b, c, d, e & 0x0000FFFFFFFFFFFF)
+        let e = UInt64(truncatingIfNeeded: hash ^ 0x0F0F_0F0F_0F0F_0F0F)
+        return String(format: "%08X-%04X-%04X-%04X-%012llX", a, b, c, d, e & 0x0000_FFFF_FFFF_FFFF)
     }
 }
 
-private extension Array where Element == UnifiedLogItem {
+private extension [UnifiedLogItem] {
     func deduplicatedByDayTitle() -> [UnifiedLogItem] {
         var seen = Set<String>()
         return filter { item in

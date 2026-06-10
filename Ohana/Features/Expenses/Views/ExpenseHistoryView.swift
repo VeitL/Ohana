@@ -5,13 +5,13 @@
 //  花费历史页 (C8b) - 上部图表 + 下部前置layer记录列表
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct ExpenseHistoryContentView: View {
     let pet: Pet
     let allHumans: [Human]
-    var onRemove: (() -> Void)? = nil
+    var onRemove: (() -> Void)?
     var showsCloseButton: Bool = true
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -41,13 +41,13 @@ struct ExpenseHistoryContentView: View {
         return pet.expenseLogs.filter { log in
             switch selectedRange {
             case .week:
-                return cal.isDate(log.date, equalTo: now, toGranularity: .weekOfYear)
+                cal.isDate(log.date, equalTo: now, toGranularity: .weekOfYear)
             case .month:
-                return cal.isDate(log.date, equalTo: now, toGranularity: .month)
+                cal.isDate(log.date, equalTo: now, toGranularity: .month)
             case .year:
-                return cal.isDate(log.date, equalTo: now, toGranularity: .year)
+                cal.isDate(log.date, equalTo: now, toGranularity: .year)
             case .all:
-                return true
+                true
             }
         }.sorted { $0.date > $1.date }
     }
@@ -77,10 +77,12 @@ struct ExpenseHistoryContentView: View {
     private var rangeTotal: Double {
         filteredLogs.filter { $0.amount > 0 }.reduce(0) { $0 + $1.amount }
     }
+
     /// 报销合计（绝对值）
     private var rangeTotalReimbursed: Double {
         filteredLogs.filter { $0.amount < 0 }.reduce(0) { $0 + abs($1.amount) }
     }
+
     /// 医疗净自费 = 医疗支出 - 报销到账
     private var medicalNetCost: Double {
         let spent = filteredLogs.filter {
@@ -99,7 +101,7 @@ struct ExpenseHistoryContentView: View {
     }
 
     private var last6MonthsData: [(String, Double)] {
-        (0..<6).map { offset in
+        (0 ..< 6).map { offset in
             guard let month = Calendar.current.date(byAdding: .month, value: -(5 - offset), to: Date()) else { return ("", 0) }
             let total = pet.expenseLogs.filter {
                 Calendar.current.isDate($0.date, equalTo: month, toGranularity: .month)
@@ -220,47 +222,47 @@ struct ExpenseHistoryContentView: View {
                     .padding(.vertical, 30)
             } else {
                 VStack(alignment: .leading, spacing: 9) {
-                        ForEach(categoryBreakdown.prefix(4), id: \.0) { cat, amount in
-                            let pct = rangeTotal > 0 ? Int(amount / rangeTotal * 100) : 0
-                            VStack(alignment: .leading, spacing: 5) {
-                                HStack(spacing: 6) {
-                                    Text(cat.emoji).font(OhanaFont.adaptive(size: 13)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    Text(cat.rawValue)
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
-                                    Spacer()
-                                    Text("\(pct)%")
-                                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                                    Text(AppCurrency.format(amount, fractionDigits: 0))
-                                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(Color.goYellow)
-                                }
-                                GeometryReader { proxy in
-                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                        .fill(Color.ohanaControlFill.opacity(0.55))
-                                        .overlay(alignment: .leading) {
-                                            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                                .fill(Color.goYellow)
-                                                .frame(width: max(5, proxy.size.width * CGFloat(max(0, min(1, amount / max(rangeTotal, 1))))))
-                                        }
-                                }
-                                .frame(height: 6)
-                            }
-                        }
-                        // 报销净节省行
-                        if rangeTotalReimbursed > 0 {
+                    ForEach(categoryBreakdown.prefix(4), id: \.0) { cat, amount in
+                        let pct = rangeTotal > 0 ? Int(amount / rangeTotal * 100) : 0
+                        VStack(alignment: .leading, spacing: 5) {
                             HStack(spacing: 6) {
-                                Text("🛡️").font(OhanaFont.adaptive(size: 13)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                Text("保险报销")
+                                Text(cat.emoji).font(OhanaFont.adaptive(size: 13)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                Text(cat.rawValue)
                                     .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    .foregroundStyle(Color(hex: "4ECDC4"))
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                                 Spacer()
-                                Text(AppCurrency.format(-rangeTotalReimbursed, fractionDigits: 0))
+                                Text("\(pct)%")
+                                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+                                Text(AppCurrency.format(amount, fractionDigits: 0))
                                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    .foregroundStyle(Color(hex: "4ECDC4"))
+                                    .foregroundStyle(Color.goYellow)
                             }
+                            GeometryReader { proxy in
+                                RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
+                                    .fill(Color.ohanaControlFill.opacity(0.55))
+                                    .overlay(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
+                                            .fill(Color.goYellow)
+                                            .frame(width: max(5, proxy.size.width * CGFloat(max(0, min(1, amount / max(rangeTotal, 1))))))
+                                    }
+                            }
+                            .frame(height: 6)
                         }
+                    }
+                    // 报销净节省行
+                    if rangeTotalReimbursed > 0 {
+                        HStack(spacing: 6) {
+                            Text("🛡️").font(OhanaFont.adaptive(size: 13)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            Text("保险报销")
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(Color(hex: "4ECDC4"))
+                            Spacer()
+                            Text(AppCurrency.format(-rangeTotalReimbursed, fractionDigits: 0))
+                                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(Color(hex: "4ECDC4"))
+                        }
+                    }
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 12)
@@ -273,7 +275,7 @@ struct ExpenseHistoryContentView: View {
     // MARK: - Record List Layer
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                 .fill(Color.ohanaCardSurface)
                 .ignoresSafeArea(edges: .bottom)
 
@@ -329,7 +331,7 @@ struct ExpenseHistoryContentView: View {
                     .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("快速记账")
                         .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -371,7 +373,7 @@ struct ExpenseHistoryContentView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
                 EmbeddedDecimalKeypad(
                     text: $newAmount,
@@ -386,12 +388,12 @@ struct ExpenseHistoryContentView: View {
             inlineExpenseCategoryStrip
             inlineExpenseMetadataRows
 
-            TextField("备注（可选）", text: $newNote)
+            TextField("备注（可选）", text: $newNote) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 .textInputAutocapitalization(.never)
                 .submitLabel(.done)
 
@@ -410,7 +412,7 @@ struct ExpenseHistoryContentView: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var inlineExpenseCategoryStrip: some View {
@@ -485,7 +487,7 @@ struct ExpenseHistoryContentView: View {
             }
         }
         .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func expenseRow(log: PetExpenseLog) -> some View {
@@ -568,7 +570,7 @@ struct ExpenseHistoryContentView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .goSelectableSurface(isSelected: isReimbursement, tint: accentColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goSelectableSurface(isSelected: isReimbursement, tint: accentColor, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func payer(for log: PetExpenseLog) -> Human? {

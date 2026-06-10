@@ -54,9 +54,8 @@ struct QuickFeedPlanCalendarSnapshot {
         ).compactMapValues { $0.first }
 
         let monthInterval = calendar.dateInterval(of: .month, for: displayedMonth)
-        let monthSummaries: [FeedPlanCalendarDaySummary]
-        if let monthInterval {
-            monthSummaries = makeMonthSummaries(
+        let monthSummaries: [FeedPlanCalendarDaySummary] = if let monthInterval {
+            makeMonthSummaries(
                 monthInterval: monthInterval,
                 events: events,
                 activeMode: activeMode,
@@ -66,7 +65,7 @@ struct QuickFeedPlanCalendarSnapshot {
                 calendar: calendar
             )
         } else {
-            monthSummaries = []
+            []
         }
 
         let selectedStart = calendar.startOfDay(for: selectedDate)
@@ -180,11 +179,11 @@ struct QuickFeedPlanCalendarSnapshot {
     ) -> [Event] {
         switch activeMode {
         case .manual:
-            return []
+            []
         case .manualReminder:
-            return manualEvents
+            manualEvents
         case .autoFeeder:
-            return autoEvents
+            autoEvents
         }
     }
 
@@ -298,10 +297,10 @@ struct QuickFeedPlanCalendarSnapshotRevision: Equatable {
         }
     }
 
-    private static func revisionHash<S: Sequence, Element>(
-        _ values: S,
+    private static func revisionHash<Element>(
+        _ values: some Sequence<Element>,
         combine: (inout Hasher, Element) -> Void
-    ) -> Int where S.Element == Element {
+    ) -> Int {
         var hasher = Hasher()
         var count = 0
         for value in values {

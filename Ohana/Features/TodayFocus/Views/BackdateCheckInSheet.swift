@@ -6,12 +6,12 @@
 //  选择宠物 + 打卡类型 + 目标日期，发放椰子并写入历史
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct BackdateCheckInContentSheet: View {
     let pets: [Pet]
-    let backdateDays: Int   // 可补几天内
+    let backdateDays: Int // 可补几天内
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -25,24 +25,25 @@ struct BackdateCheckInContentSheet: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     enum CheckInActionType: String, CaseIterable {
-        case feed  = "喂食 🍗"
+        case feed = "喂食 🍗"
         case water = "喂水 💧"
         case potty = "便便 💩"
-        case walk  = "散步 🦮"
+        case walk = "散步 🦮"
 
         var commandKey: String {
             switch self {
-            case .feed: return "feed"
-            case .water: return "water"
-            case .potty: return "potty"
-            case .walk: return "walk"
+            case .feed: "feed"
+            case .water: "water"
+            case .potty: "potty"
+            case .walk: "walk"
             }
         }
+
         var emoji: String { String(rawValue.suffix(2)) }
     }
 
     private var availableDates: [Date] {
-        (1...max(1, backdateDays)).map { days in
+        (1 ... max(1, backdateDays)).map { days in
             Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
         }
     }
@@ -105,7 +106,7 @@ struct BackdateCheckInContentSheet: View {
                 sectionTitle("补录日期")
                     .padding(.horizontal, 24)
                 HStack(spacing: 10) {
-                    ForEach(0..<availableDates.count, id: \.self) { i in
+                    ForEach(0 ..< availableDates.count, id: \.self) { i in
                         let days = i + 1
                         let date = availableDates[i]
                         Button {
@@ -142,7 +143,7 @@ struct BackdateCheckInContentSheet: View {
                     .padding(.vertical, 16)
                     .background(
                         selectedPet != nil ? Color.goPrimary : Color.ohanaControlFill,
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     )
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -212,8 +213,8 @@ struct BackdateCheckInContentSheet: View {
             }
         }
         .padding(.horizontal, 20).padding(.vertical, 14)
-        .background(Color.goPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+        .background(Color.goPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
             .strokeBorder(Color.goPrimary.opacity(0.3), lineWidth: 1))
         .padding(.horizontal, 24)
     }
@@ -245,7 +246,7 @@ struct BackdateCheckInContentSheet: View {
                 .padding(.vertical, 12)
                 .background(
                     selectedAction == action ? Color.goPrimary : Color.ohanaControlFill,
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                 )
         }
         .buttonStyle(ScaleButtonStyle())

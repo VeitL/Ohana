@@ -13,7 +13,7 @@ extension DomainCommand {
         command("weight", "delete", [
             "entityID": entityID.uuidString,
             "entityKind": entityKind,
-            "recordID": recordID.uuidString,
+            "recordID": recordID.uuidString
         ])
     }
 
@@ -29,7 +29,7 @@ extension DomainCommand {
         command("expenses", "delete", [
             "entityID": entityID.uuidString,
             "entityKind": entityKind,
-            "recordID": recordID.uuidString,
+            "recordID": recordID.uuidString
         ])
     }
 
@@ -52,7 +52,7 @@ extension DomainCommand {
     static func humanMedicationPlan(humanID: UUID, medicationID: UUID?) -> DomainCommand {
         command("humanMedication", "plan", [
             "humanID": humanID.uuidString,
-            "medicationID": medicationID?.uuidString ?? "new",
+            "medicationID": medicationID?.uuidString ?? "new"
         ])
     }
 
@@ -60,14 +60,14 @@ extension DomainCommand {
         command("humanMedication", "planActivation", [
             "humanID": humanID.uuidString,
             "medicationID": medicationID.uuidString,
-            "isActive": String(isActive),
+            "isActive": String(isActive)
         ])
     }
 
     static func humanMedicationPlanDelete(humanID: UUID, medicationID: UUID) -> DomainCommand {
         command("humanMedication", "planDelete", [
             "humanID": humanID.uuidString,
-            "medicationID": medicationID.uuidString,
+            "medicationID": medicationID.uuidString
         ])
     }
 
@@ -81,7 +81,7 @@ extension DomainCommand {
             "humanID": humanID.uuidString,
             "medicationID": medicationID.uuidString,
             "scheduledMinute": String(scheduledMinute),
-            "status": status,
+            "status": status
         ])
     }
 
@@ -93,7 +93,7 @@ extension DomainCommand {
         command("humanHealth", "metricDelete", [
             "humanID": humanID.uuidString,
             "metricKey": metricKey,
-            "logID": logID.uuidString,
+            "logID": logID.uuidString
         ])
     }
 
@@ -101,7 +101,7 @@ extension DomainCommand {
         command("humanHealth", "report", [
             "humanID": humanID.uuidString,
             "reportID": reportID?.uuidString ?? "new",
-            "action": action,
+            "action": action
         ])
     }
 

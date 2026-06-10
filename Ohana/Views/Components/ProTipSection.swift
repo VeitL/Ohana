@@ -15,11 +15,11 @@ struct ProTipSection: View {
 
     // MARK: - 配色方案（深浅模式自适应）
     private var cardBg: Color {
-        colorScheme == .light 
-            ? Color(hex: "FFF8F0")  // 浅暖白
-            : Color(hex: "2A2520")  // 深暖灰
+        colorScheme == .light
+            ? Color(hex: "FFF8F0") // 浅暖白
+            : Color(hex: "2A2520") // 深暖灰
     }
-    
+
     private var cardBorder: Color {
         Color.goPrimary.opacity(colorScheme == .light ? 0.42 : 0.55)
     }
@@ -49,13 +49,13 @@ struct ProTipSection: View {
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(highlightColor)
                 }
-                
+
                 Text(l.petProTipTitle)
                     .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(titleColor)
-                
+
                 Spacer()
-                
+
                 // 新功能标签
                 Text("NEW")
                     .font(OhanaFont.adaptive(size: 10, weight: .bold))
@@ -64,7 +64,7 @@ struct ProTipSection: View {
                     .padding(.vertical, 3)
                     .background(Color.goPrimary, in: Capsule())
             }
-            
+
             // MARK: 步骤说明
             VStack(alignment: .leading, spacing: 8) {
                 StepRow(
@@ -94,10 +94,10 @@ struct ProTipSection: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .fill(cardBg)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                         .strokeBorder(cardBorder, lineWidth: 1.5)
                 )
         )
@@ -111,14 +111,14 @@ private struct StepRow: View {
     let highlightText: String
     let suffix: String
     let highlightColor: Color
-    
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 20))
                 .foregroundStyle(highlightColor)
                 .frame(width: 24)
-            
+
             HStack(spacing: 0) {
                 Text(text)
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
@@ -129,7 +129,7 @@ private struct StepRow: View {
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
             }
             .font(OhanaFont.adaptive(size: 14, weight: .medium))
-            
+
             Spacer()
         }
     }

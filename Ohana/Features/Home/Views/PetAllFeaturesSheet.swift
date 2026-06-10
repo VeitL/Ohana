@@ -5,8 +5,8 @@
 //  Single-pet V4 feature hub.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 enum PetAllFeatureDestination: Hashable {
     case health
@@ -29,21 +29,21 @@ enum PetAllFeatureDestination: Hashable {
 extension PetAllFeatureDestination: Identifiable {
     var id: String {
         switch self {
-        case .health: return "health"
-        case .medications: return "medications"
-        case .food: return "food"
-        case .hygiene: return "hygiene"
-        case .walks: return "walks"
-        case .potty: return "potty"
-        case .basicInfo: return "basicInfo"
-        case .documents: return "documents"
-        case .moments: return "moments"
-        case .timeline: return "timeline"
-        case .achievements: return "achievements"
-        case .retention: return "retention"
-        case .weight: return "weight"
-        case .expense: return "expense"
-        case .bondVault: return "bondVault"
+        case .health: "health"
+        case .medications: "medications"
+        case .food: "food"
+        case .hygiene: "hygiene"
+        case .walks: "walks"
+        case .potty: "potty"
+        case .basicInfo: "basicInfo"
+        case .documents: "documents"
+        case .moments: "moments"
+        case .timeline: "timeline"
+        case .achievements: "achievements"
+        case .retention: "retention"
+        case .weight: "weight"
+        case .expense: "expense"
+        case .bondVault: "bondVault"
         }
     }
 }
@@ -65,13 +65,14 @@ struct PetAllFeaturesSheet: View {
     private var l: L10n { L10n() }
     private var isDog: Bool {
         pet.species.localizedCaseInsensitiveContains("狗") ||
-        pet.species.localizedCaseInsensitiveContains("dog")
+            pet.species.localizedCaseInsensitiveContains("dog")
     }
+
     private var archiveSnapshot: ArchiveMemorySnapshot { ArchiveMemorySnapshot(pet: pet) }
     private var protectionDocumentCount: Int {
-        pet.documents.filter { doc in
+        pet.documents.count(where: { doc in
             doc.documentCategory != .vaccine && doc.documentCategory != .insurance
-        }.count
+        })
     }
 
     var body: some View {
@@ -156,7 +157,7 @@ struct PetAllFeaturesSheet: View {
             item(
                 id: "hygiene",
                 title: l.tr(zh: "清洁护理", en: "Care", de: "Pflege"),
-                value: "\(pet.careLogs.filter { $0.careType != .feeding }.count)",
+                value: "\(pet.careLogs.count(where: { $0.careType != .feeding }))",
                 subtitle: hygieneSub,
                 icon: "bubbles.and.sparkles.fill",
                 tint: Color.goTeal,
@@ -304,60 +305,70 @@ struct PetAllFeaturesSheet: View {
         return l.tr(zh: "宠物成员", en: "Pet member", de: "Tiermitglied")
     }
 
-    private var healthSub: String  {
+    private var healthSub: String {
         pet.healthLogs.isEmpty
             ? l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge")
             : l.tr(zh: "\(pet.healthLogs.count)条记录", en: "\(pet.healthLogs.count) records", de: "\(pet.healthLogs.count) Einträge")
     }
-    private var weightSub: String  {
+
+    private var weightSub: String {
         pet.weightLogs.isEmpty
             ? l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge")
             : l.tr(zh: "\(pet.weightLogs.count)条记录", en: "\(pet.weightLogs.count) records", de: "\(pet.weightLogs.count) Einträge")
     }
+
     private var medSub: String {
-        let count = pet.medications.filter { $0.isActiveToday }.count
+        let count = pet.medications.count(where: { $0.isActiveToday })
         return count > 0
             ? l.tr(zh: "当前\(count)种药物", en: "\(count) active meds", de: "\(count) aktive Medikamente")
             : l.tr(zh: "暂无用药", en: "No medication", de: "Keine Medikamente")
     }
+
     private var foodSub: String {
-        let count = pet.careLogs.filter { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) }.count
+        let count = pet.careLogs.count(where: { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) })
         return count > 0
             ? l.tr(zh: "今日喂食\(count)次", en: "\(count) feeds today", de: "\(count) Fütterungen heute")
             : l.tr(zh: "今日未喂食", en: "No feed today", de: "Heute kein Futter")
     }
+
     private var hygieneSub: String {
-        let count = pet.careLogs.filter { $0.careType != .feeding }.count
+        let count = pet.careLogs.count(where: { $0.careType != .feeding })
         return count > 0
             ? l.tr(zh: "\(count)条护理记录", en: "\(count) care logs", de: "\(count) Pflegeeinträge")
             : l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge")
     }
+
     private var walkSub: String {
         pet.walkLogs.isEmpty
             ? l.tr(zh: "暂无记录", en: "No walks yet", de: "Noch keine Gassi-Runden")
             : l.tr(zh: "\(pet.walkLogs.count)次遛狗", en: "\(pet.walkLogs.count) walks", de: "\(pet.walkLogs.count) Runden")
     }
+
     private var pottySub: String {
-        let count = pet.pottyLogs.filter { Calendar.current.isDateInToday($0.date) }.count
+        let count = pet.pottyLogs.count(where: { Calendar.current.isDateInToday($0.date) })
         return count > 0
             ? l.tr(zh: "今日\(count)次", en: "\(count) today", de: "\(count) heute")
             : l.tr(zh: "今日暂无记录", en: "No logs today", de: "Heute keine Einträge")
     }
+
     private var expenseSub: String {
         pet.expenseLogs.isEmpty
             ? l.tr(zh: "暂无记录", en: "No expenses", de: "Keine Ausgaben")
             : l.tr(zh: "\(pet.expenseLogs.count)条花费记录", en: "\(pet.expenseLogs.count) expense logs", de: "\(pet.expenseLogs.count) Ausgaben")
     }
+
     private var momentsSub: String {
         pet.photoLogs.isEmpty
             ? l.tr(zh: "暂无时刻", en: "No moments", de: "Keine Momente")
             : l.tr(zh: "\(pet.photoLogs.count)个时刻", en: "\(pet.photoLogs.count) moments", de: "\(pet.photoLogs.count) Momente")
     }
+
     private var basicInfoSub: String {
         if !pet.breed.isEmpty { return l.tr(zh: "品种已设置", en: "Breed set", de: "Rasse gesetzt") }
         if !pet.species.isEmpty { return l.tr(zh: "补充品种/日期", en: "Add breed or dates", de: "Rasse oder Daten ergänzen") }
         return l.tr(zh: "完善基本信息", en: "Complete profile", de: "Profil ergänzen")
     }
+
     private var documentsSub: String {
         let documentCount = protectionDocumentCount
         let insuranceCount = pet.insurances.count
@@ -366,11 +377,13 @@ struct PetAllFeaturesSheet: View {
         }
         return l.tr(zh: "证件/保险资料", en: "Documents and coverage", de: "Dokumente und Schutz")
     }
+
     private var timelineSub: String {
         timelineCount > 0
             ? l.tr(zh: "\(timelineCount)条记录", en: "\(timelineCount) logs", de: "\(timelineCount) Einträge")
             : l.tr(zh: "暂无记录", en: "No logs", de: "Keine Einträge")
     }
+
     private var achievementsSub: String {
         pet.milestones.isEmpty
             ? l.tr(zh: "暂无成就", en: "No awards", de: "Keine Erfolge")
@@ -378,15 +391,18 @@ struct PetAllFeaturesSheet: View {
     }
 
     private var todayFeedMetric: String {
-        "\(pet.careLogs.filter { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) }.count)"
+        "\(pet.careLogs.count(where: { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) }))"
     }
+
     private var todayPottyMetric: String {
-        "\(pet.pottyLogs.filter { Calendar.current.isDateInToday($0.date) }.count)"
+        "\(pet.pottyLogs.count(where: { Calendar.current.isDateInToday($0.date) }))"
     }
+
     private var latestWeightText: String {
         guard let latest = pet.weightLogs.max(by: { $0.date < $1.date }) else { return "--" }
         return String(format: "%.1f", latest.weightInKg)
     }
+
     private var weekWalkText: String {
         let start = Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date()
         let km = pet.walkLogs
@@ -394,18 +410,22 @@ struct PetAllFeaturesSheet: View {
             .reduce(0.0) { $0 + $1.distanceMeters } / 1000
         return km >= 10 ? String(format: "%.0fkm", km) : String(format: "%.1fkm", km)
     }
+
     private var expenseMetric: String {
         AppCurrency.formatCompact(pet.expenseLogs.reduce(0.0) { $0 + $1.amount })
     }
+
     private var timelineCount: Int {
         pet.photoLogs.count + pet.milestones.count + pet.healthLogs.count + pet.weightLogs.count
     }
+
     private var todayCareCount: Int {
         let calendar = Calendar.current
-        return pet.careLogs.filter { calendar.isDateInToday($0.date) }.count
-        + pet.pottyLogs.filter { calendar.isDateInToday($0.date) }.count
-        + pet.walkLogs.filter { calendar.isDateInToday($0.startDate) }.count
+        return pet.careLogs.count(where: { calendar.isDateInToday($0.date) })
+            + pet.pottyLogs.count(where: { calendar.isDateInToday($0.date) })
+            + pet.walkLogs.count(where: { calendar.isDateInToday($0.startDate) })
     }
+
     private var archiveScore: Int { archiveSnapshot.score }
 }
 
@@ -425,11 +445,11 @@ struct ArchiveMemoryNextStep {
 
     var destination: PetAllFeatureDestination {
         switch kind {
-        case .basicInfo: return .basicInfo
-        case .documents: return .documents
-        case .moments: return .moments
-        case .weight: return .weight
-        case .retention: return .retention
+        case .basicInfo: .basicInfo
+        case .documents: .documents
+        case .moments: .moments
+        case .weight: .weight
+        case .retention: .retention
         }
     }
 }
@@ -448,7 +468,7 @@ struct ArchiveMemorySnapshot {
         let hasContinuity = pet.currentStreak > 0 || !pet.milestones.isEmpty
         let checks = [hasBasicProfile, hasHealthOrWeight, hasMemory, hasProtection, hasContinuity]
 
-        self.score = checks.filter { $0 }.count
+        self.score = checks.count(where: { $0 })
         self.total = checks.count
         self.nextStep = Self.nextStep(
             hasBasicProfile: hasBasicProfile,
@@ -460,10 +480,10 @@ struct ArchiveMemorySnapshot {
 
     private static func hasBasicProfile(_ pet: Pet) -> Bool {
         !pet.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !pet.species.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !pet.breed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        pet.birthday != nil &&
-        pet.homeDate != nil
+            !pet.species.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !pet.breed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            pet.birthday != nil &&
+            pet.homeDate != nil
     }
 
     private static func nextStep(

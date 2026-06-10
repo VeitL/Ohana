@@ -12,9 +12,9 @@ struct StreakFlameParticles: View {
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
 
     private let particles: [Particle] = [
-        Particle(emoji: "✨", delay: 0.0, dx: 4,  dyMax: -10),
+        Particle(emoji: "✨", delay: 0.0, dx: 4, dyMax: -10),
         Particle(emoji: "🔥", delay: 0.4, dx: -6, dyMax: -12),
-        Particle(emoji: "✨", delay: 0.8, dx: 8,  dyMax: -8),
+        Particle(emoji: "✨", delay: 0.8, dx: 8, dyMax: -8)
     ]
 
     private struct Particle {

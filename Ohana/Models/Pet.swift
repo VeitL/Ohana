@@ -5,19 +5,19 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 // MARK: - Food Tracking Mode (ArkSchemaV10)
 enum FoodTrackingMode: String, Codable, CaseIterable {
-    case casual  // 佛系：记录大概能吃多久，不扣克数
+    case casual // 佛系：记录大概能吃多久，不扣克数
     case precise // 精准：精确克数库存倒计时
 
     var displayName: String {
         switch self {
-        case .casual:  return "佛系估算"
-        case .precise: return "精准倒数"
+        case .casual: "佛系估算"
+        case .precise: "精准倒数"
         }
     }
 }
@@ -27,67 +27,67 @@ enum PetThemeColor: String, Codable, CaseIterable {
     // 16 non-primary, distinct, high-contrast colors
     case crimson, vermilion, orange, amber, yellow, brown, rust, burgundy
     case magenta, pink, purple, indigo, violet, navy, blue, skyBlue
-    
+
     var color: Color {
         switch self {
-        case .crimson:   return Color.petThemeCrimson
-        case .vermilion: return Color.petThemeVermilion
-        case .orange:    return Color.petThemeOrange
-        case .amber:     return Color.petThemeAmber
-        case .yellow:    return Color.petThemeYellow
-        case .brown:     return Color.petThemeBrown
-        case .rust:      return Color.petThemeRust
-        case .burgundy:  return Color.petThemeBurgundy
-        case .magenta:   return Color.petThemeMagenta
-        case .pink:      return Color.petThemePink
-        case .purple:    return Color.petThemePurple
-        case .indigo:    return Color.petThemeIndigo
-        case .violet:    return Color.petThemeViolet
-        case .navy:      return Color.petThemeNavy
-        case .blue:      return Color.petThemeBlue
-        case .skyBlue:   return Color.petThemeSkyBlue
+        case .crimson: Color.petThemeCrimson
+        case .vermilion: Color.petThemeVermilion
+        case .orange: Color.petThemeOrange
+        case .amber: Color.petThemeAmber
+        case .yellow: Color.petThemeYellow
+        case .brown: Color.petThemeBrown
+        case .rust: Color.petThemeRust
+        case .burgundy: Color.petThemeBurgundy
+        case .magenta: Color.petThemeMagenta
+        case .pink: Color.petThemePink
+        case .purple: Color.petThemePurple
+        case .indigo: Color.petThemeIndigo
+        case .violet: Color.petThemeViolet
+        case .navy: Color.petThemeNavy
+        case .blue: Color.petThemeBlue
+        case .skyBlue: Color.petThemeSkyBlue
         }
     }
-    
+
     var hexValue: String {
         switch self {
-        case .crimson:   return "FF5252"
-        case .vermilion: return "FF793F"
-        case .orange:    return "FF9F43"
-        case .amber:     return "FDCB6E"
-        case .yellow:    return "FFEAA7"
-        case .brown:     return "A1887F"
-        case .rust:      return "E67E22"
-        case .burgundy:  return "B33771"
-        case .magenta:   return "FF66CC"
-        case .pink:      return "FD79A8"
-        case .purple:    return "D980FA"
-        case .indigo:    return "575FCF"
-        case .violet:    return "686DE0"
-        case .navy:      return "273C75"
-        case .blue:      return "94A3B8"
-        case .skyBlue:   return "F472B6"
+        case .crimson: "FF5252"
+        case .vermilion: "FF793F"
+        case .orange: "FF9F43"
+        case .amber: "FDCB6E"
+        case .yellow: "FFEAA7"
+        case .brown: "A1887F"
+        case .rust: "E67E22"
+        case .burgundy: "B33771"
+        case .magenta: "FF66CC"
+        case .pink: "FD79A8"
+        case .purple: "D980FA"
+        case .indigo: "575FCF"
+        case .violet: "686DE0"
+        case .navy: "273C75"
+        case .blue: "94A3B8"
+        case .skyBlue: "F472B6"
         }
     }
 
     var deepColor: Color {
         switch self {
-        case .crimson:   return Color(hex: "C23616")
-        case .vermilion: return Color(hex: "E15F41")
-        case .orange:    return Color(hex: "E67E22")
-        case .amber:     return Color(hex: "F39C12")
-        case .yellow:    return Color(hex: "F1C40F")
-        case .brown:     return Color(hex: "8D6E63")
-        case .rust:      return Color(hex: "D35400")
-        case .burgundy:  return Color(hex: "833471")
-        case .magenta:   return Color(hex: "C71585")
-        case .pink:      return Color(hex: "E84393")
-        case .purple:    return Color(hex: "8A2BE2")
-        case .indigo:    return Color(hex: "3C40C6")
-        case .violet:    return Color(hex: "4834D4")
-        case .navy:      return Color(hex: "192A56")
-        case .blue:      return Color(hex: "475569")
-        case .skyBlue:   return Color(hex: "BE185D")
+        case .crimson: Color(hex: "C23616")
+        case .vermilion: Color(hex: "E15F41")
+        case .orange: Color(hex: "E67E22")
+        case .amber: Color(hex: "F39C12")
+        case .yellow: Color(hex: "F1C40F")
+        case .brown: Color(hex: "8D6E63")
+        case .rust: Color(hex: "D35400")
+        case .burgundy: Color(hex: "833471")
+        case .magenta: Color(hex: "C71585")
+        case .pink: Color(hex: "E84393")
+        case .purple: Color(hex: "8A2BE2")
+        case .indigo: Color(hex: "3C40C6")
+        case .violet: Color(hex: "4834D4")
+        case .navy: Color(hex: "192A56")
+        case .blue: Color(hex: "475569")
+        case .skyBlue: Color(hex: "BE185D")
         }
     }
 }
@@ -105,7 +105,7 @@ final class Pet {
     var avatarEmoji: String
     @Attribute(.externalStorage) var avatarImageData: Data?
     var microchipID: String
-    var vetContact: String      // 向后兼容：存电话号码
+    var vetContact: String // 向后兼容：存电话号码
     // ArkSchemaV24 兽医联系人结构化
     var vetClinicName: String
     var vetDoctorName: String
@@ -138,14 +138,14 @@ final class Pet {
     var lastCheckInDate: Date?
     // ArkSchemaV10 双轨制粮食追踪
     var foodTrackingModeRaw: String
-    var casualOpenDate: Date?      // 佛系：开包日期
-    var casualDurationDays: Int    // 佛系：预估能吃多少天（30/60/90/180）
-    var foodReminderEnabled: Bool  // 粮仓：是否提醒补粮
+    var casualOpenDate: Date? // 佛系：开包日期
+    var casualDurationDays: Int // 佛系：预估能吃多少天（30/60/90/180）
+    var foodReminderEnabled: Bool // 粮仓：是否提醒补粮
     var foodReminderAdvanceDays: Int // 粮仓：断粮前几天提醒
     // ArkSchemaV11 独立椰子账户
-    var coconutBalance: Int        // 该宠物的椰子余额
+    var coconutBalance: Int // 该宠物的椰子余额
     // ArkSchemaV14 生命周期 — Rainbow Bridge
-    var passedAwayDate: Date?      // 离世日期；nil = 在世
+    var passedAwayDate: Date? // 离世日期；nil = 在世
     // P2: 卡片风格（"classic" | "minimal"）
     var cardStyleRaw: String
     // ArkSchemaV51：3D 破框卡片专用主体图，独立于全局头像
@@ -172,7 +172,7 @@ final class Pet {
     @Relationship(deleteRule: .cascade) var photoLogs: [PetPhotoLog]
     @Relationship(deleteRule: .cascade) var symptomLogs: [SymptomLog]
     @Relationship(deleteRule: .cascade) var heatCycleLogs: [HeatCycleLog]
-    
+
     init(
         name: String = "",
         species: String = "狗",
@@ -252,9 +252,9 @@ final class Pet {
         self.symptomLogs = []
         self.heatCycleLogs = []
     }
-    
+
     // MARK: - Computed Properties
-    
+
     var themeColor: PetThemeColor {
         PetThemeColor.allCases.first { $0.rawValue == themeColorHex.lowercased() } ?? .orange
     }
@@ -262,7 +262,7 @@ final class Pet {
     var safeThemeColorHex: String {
         OhanaThemeColorPolicy.normalizedMemberThemeHex(themeColorHex, fallback: OhanaThemeColorPolicy.petFallbackHex)
     }
-    
+
     var daysTogether: Int {
         guard let homeDate else { return 0 }
         return Calendar.current.dateComponents([.day], from: homeDate, to: Date()).day ?? 0
@@ -275,18 +275,18 @@ final class Pet {
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
     }
-    
+
     /// 日历筛选条、添加宠物物种等：SF Symbol 纯色剪影
     static func speciesSilhouetteSymbol(forSpecies species: String) -> String {
         switch species {
-        case "狗": return "dog.fill"
-        case "猫": return "cat.fill"
-        case "兔子": return "hare.fill"
-        case "鱼": return "fish.fill"
-        case "爬宠": return "lizard.fill"
-        case "仓鼠": return "circle.fill"
-        case "鸟": return "bird.fill"
-        default: return "pawprint.fill"
+        case "狗": "dog.fill"
+        case "猫": "cat.fill"
+        case "兔子": "hare.fill"
+        case "鱼": "fish.fill"
+        case "爬宠": "lizard.fill"
+        case "仓鼠": "circle.fill"
+        case "鸟": "bird.fill"
+        default: "pawprint.fill"
         }
     }
 
@@ -303,7 +303,7 @@ final class Pet {
             return "\(months)个月"
         }
     }
-    
+
     var humanEquivalentAge: Int {
         guard let birthday else { return 0 }
         let years = Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0
@@ -322,7 +322,7 @@ final class Pet {
             return years
         }
     }
-    
+
     var foodTrackingMode: FoodTrackingMode {
         get { FoodTrackingMode(rawValue: foodTrackingModeRaw) ?? .casual }
         set { foodTrackingModeRaw = newValue.rawValue }
@@ -355,38 +355,38 @@ final class Pet {
     var foodConsumedSinceRestock: Double {
         FeedStockCalculator.mainConsumedSinceRestock(for: self)
     }
-    
+
     var remainingFoodDays: Int {
         FeedStockCalculator.snapshot(for: self).remainingDays
     }
-    
+
     var remainingFoodPercent: Double {
         guard restockWeight > 0 else { return 0 }
         return min(1.0, remainingFoodGrams / (restockWeight * 1000))
     }
-    
+
     var estimatedRunOutDate: Date? {
         FeedStockCalculator.snapshot(for: self).runOutDate
     }
-    
+
     var genderSymbol: String {
         switch gender {
-        case "male": return "♂"
-        case "female": return "♀"
-        default: return "⚧"
+        case "male": "♂"
+        case "female": "♀"
+        default: "⚧"
         }
     }
-    
+
     var speciesEmoji: String {
         switch species {
-        case "狗": return "🐕"
-        case "猫": return "🐈"
-        case "鱼": return "🐟"
-        case "兔子": return "🐇"
-        case "爬宠": return "🦎"
-        case "仓鼠": return "🐹"
-        case "鸟": return "🦜"
-        default: return "🐾"
+        case "狗": "🐕"
+        case "猫": "🐈"
+        case "鱼": "🐟"
+        case "兔子": "🐇"
+        case "爬宠": "🦎"
+        case "仓鼠": "🐹"
+        case "鸟": "🦜"
+        default: "🐾"
         }
     }
 
@@ -417,7 +417,7 @@ final class Pet {
     /// 同步重置连续打卡。跨领域投影清理由调用方的 domain service 负责。
     func clearAllActivityRecords(in context: ModelContext) {
         let petIdStr = id.uuidString
-        if let events = try? context.fetch(FetchDescriptor<Event>()) {
+        if let events = try? context.fetch(FetchDescriptor<Event>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             for event in events where event.relatedEntityId == petIdStr {
                 for reminder in event.reminders {
                     OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
@@ -426,17 +426,39 @@ final class Pet {
             }
         }
 
-        for log in Array(careLogs) { context.delete(log) }
-        for log in Array(pottyLogs) { context.delete(log) }
-        for log in Array(weightLogs) { context.delete(log) }
-        for log in Array(expenseLogs) { context.delete(log) }
-        for log in Array(hygieneLogs) { context.delete(log) }
-        for log in Array(walkLogs) { context.delete(log) }
-        for log in Array(healthLogs) { context.delete(log) }
-        for log in Array(foodRecords) { context.delete(log) }
-        for log in Array(milestones) { context.delete(log) }
-        for log in Array(medications) { context.delete(log) }
-        for log in Array(photoLogs) { context.delete(log) }
+        for log in Array(careLogs) {
+            context.delete(log)
+        }
+        for log in Array(pottyLogs) {
+            context.delete(log)
+        }
+        for log in Array(weightLogs) {
+            context.delete(log)
+        }
+        for log in Array(expenseLogs) {
+            context.delete(log)
+        }
+        for log in Array(hygieneLogs) {
+            context.delete(log)
+        }
+        for log in Array(walkLogs) {
+            context.delete(log)
+        }
+        for log in Array(healthLogs) {
+            context.delete(log)
+        }
+        for log in Array(foodRecords) {
+            context.delete(log)
+        }
+        for log in Array(milestones) {
+            context.delete(log)
+        }
+        for log in Array(medications) {
+            context.delete(log)
+        }
+        for log in Array(photoLogs) {
+            context.delete(log)
+        }
 
         currentStreak = 0
         lastCheckInDate = nil

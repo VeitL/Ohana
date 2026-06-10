@@ -5,8 +5,8 @@
 //  Cross-pet medication pillbox overview for GO home FAB and feature groups.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct MedicationPetSummary: Identifiable {
     let id: UUID
@@ -18,7 +18,7 @@ private struct MedicationPetSummary: Identifiable {
 
 struct IslandMedicationDashboardContentView: View {
     var standalone: Bool = true
-    var onOpenPet: ((Pet) -> Void)? = nil
+    var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
 
     @Environment(\.dismiss) private var dismiss
@@ -39,16 +39,16 @@ struct IslandMedicationDashboardContentView: View {
 
     private var summaries: [MedicationPetSummary] {
         selectedPets.map { pet in
-            let meds = pet.medications.filter { $0.isActiveToday }.sorted { $0.createdAt > $1.createdAt }
+            let meds = pet.medications.filter(\.isActiveToday).sorted { $0.createdAt > $1.createdAt }
             let due = meds.reduce(0) { $0 + max(0, $1.frequency.dosesPerDay) }
             let taken = meds.reduce(0) { $0 + min(appServices.medicationReminders.dosesTakenToday(for: $1.id), max(0, $1.frequency.dosesPerDay)) }
-            let _ = doseRefreshToken
+            _ = doseRefreshToken
             return MedicationPetSummary(id: pet.id, pet: pet, activeMeds: meds, dueDoses: due, takenDoses: taken)
         }
     }
 
     private var activeMeds: [PetMedication] {
-        selectedPets.flatMap(\.medications).filter { $0.isActiveToday }
+        selectedPets.flatMap(\.medications).filter(\.isActiveToday)
     }
 
     private var dueDoses: Int {
@@ -56,7 +56,7 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     private var takenDoses: Int {
-        let _ = doseRefreshToken
+        _ = doseRefreshToken
         return activeMeds.reduce(0) { total, med in
             total + min(appServices.medicationReminders.dosesTakenToday(for: med.id), max(0, med.frequency.dosesPerDay))
         }
@@ -68,10 +68,10 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     private var endingSoonCount: Int {
-        activeMeds.filter { med in
+        activeMeds.count(where: { med in
             guard let days = med.daysRemaining else { return false }
             return days <= 7
-        }.count
+        })
     }
 
     var body: some View {
@@ -187,10 +187,10 @@ struct IslandMedicationDashboardContentView: View {
         .padding(18)
         .background(
             LinearGradient(colors: [Color(hex: "FF5A00").opacity(0.26), Color.goCardWhite.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color(hex: "FF5A00").opacity(0.22), lineWidth: 1)
         }
     }
@@ -212,7 +212,7 @@ struct IslandMedicationDashboardContentView: View {
             }
         }
         .padding(16)
-        .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func pillCell(_ med: PetMedication) -> some View {
@@ -220,7 +220,7 @@ struct IslandMedicationDashboardContentView: View {
         let taken = min(appServices.medicationReminders.dosesTakenToday(for: med.id), max(need, 1))
         let done = need > 0 && taken >= need
         let pet = med.pet
-        let _ = doseRefreshToken
+        _ = doseRefreshToken
         return VStack(spacing: 8) {
             ZStack {
                 Capsule()
@@ -248,7 +248,7 @@ struct IslandMedicationDashboardContentView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity)
-        .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private var medicationRows: some View {
@@ -277,7 +277,7 @@ struct IslandMedicationDashboardContentView: View {
                             .foregroundStyle(Color.goCardWhite.opacity(0.3))
                     }
                     .padding(14)
-                    .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -285,7 +285,7 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     @ViewBuilder
-    private func selectorChip<A: View>(title: String, avatar: () -> A, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    private func selectorChip(title: String, avatar: () -> some View, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 avatar()

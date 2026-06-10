@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 @Model
 final class PetMilestone {

@@ -5,8 +5,8 @@
 //  Electronic pet collection, milestone motivation, and lightweight care UI.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 struct OasisCritterIllustration: View {
@@ -76,19 +76,18 @@ struct OasisCritterIllustration: View {
     }
 
     var lumoEvolutionStageName: String {
-        if let critter, critter.lifeState == .dead && critter.deathReason == .oldAge {
+        if let critter, critter.lifeState == .dead, critter.deathReason == .oldAge {
             return "Elder"
         }
-        let stage: Int
-        if let appearanceStageOverride {
-            stage = max(1, min(OasisCritterPresentationRules.maxAppearanceStage, appearanceStageOverride))
+        let stage: Int = if let appearanceStageOverride {
+            max(1, min(OasisCritterPresentationRules.maxAppearanceStage, appearanceStageOverride))
         } else if let critter {
-            stage = max(
+            max(
                 max(1, min(OasisCritterPresentationRules.maxAppearanceStage, critter.appearanceStage)),
                 OasisCritterPresentationRules.appearanceStage(forLevel: critter.level)
             )
         } else {
-            stage = 1
+            1
         }
         switch stage {
         case 1:
@@ -171,7 +170,7 @@ struct OasisCritterIllustration: View {
                 )
                 .frame(width: size * 0.58, height: size * 0.58)
 
-            ForEach(0..<4, id: \.self) { index in
+            ForEach(0 ..< 4, id: \.self) { index in
                 Capsule()
                     .fill(
                         LinearGradient(
@@ -228,9 +227,9 @@ enum OasisCritterViewMode: Equatable {
 
 struct OasisCritterCodexView: View {
     var mode: OasisCritterViewMode = .codex
-    var initialCatalogId: String? = nil
+    var initialCatalogId: String?
     var isPopup: Bool = false
-    var onClose: (() -> Void)? = nil
+    var onClose: (() -> Void)?
     let humans: [Human]
     let electronicPets: [OasisElectronicPet]
     let fragments: [OasisCritterFragmentBalance]
@@ -286,16 +285,18 @@ struct OasisCritterCodexView: View {
             shopInventory: appServices.shopInventory
         )
     }
+
     var activeHuman: Human? {
         humans.first { $0.id.uuidString == currentActiveHumanId }
     }
+
     var currentCoconutBalance: Int {
         activeHuman?.coconutBalance ?? humans.reduce(0) { $0 + $1.coconutBalance }
     }
 
     var body: some View {
         Group {
-            if mode == .nest && isPopup {
+            if mode == .nest, isPopup {
                 nestPopupBody
             } else {
                 pageBody

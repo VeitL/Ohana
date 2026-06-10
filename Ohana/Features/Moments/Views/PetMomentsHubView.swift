@@ -6,9 +6,9 @@
 //  archive history, and photos.
 //
 
-import SwiftUI
-import SwiftData
 import PhotosUI
+import SwiftData
+import SwiftUI
 
 private enum PetMomentsTab: String, CaseIterable, Identifiable {
     case highlights
@@ -19,17 +19,17 @@ private enum PetMomentsTab: String, CaseIterable, Identifiable {
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .highlights: return l.tr(zh: "高光", en: "Highlights", de: "Highlights")
-        case .timeline: return l.tr(zh: "时光", en: "Diary", de: "Tagebuch")
-        case .photos: return l.tr(zh: "相册", en: "Album", de: "Album")
+        case .highlights: l.tr(zh: "高光", en: "Highlights", de: "Highlights")
+        case .timeline: l.tr(zh: "时光", en: "Diary", de: "Tagebuch")
+        case .photos: l.tr(zh: "相册", en: "Album", de: "Album")
         }
     }
 
     var icon: String {
         switch self {
-        case .highlights: return "sparkles"
-        case .timeline: return "clock.arrow.circlepath"
-        case .photos: return "photo.on.rectangle"
+        case .highlights: "sparkles"
+        case .timeline: "clock.arrow.circlepath"
+        case .photos: "photo.on.rectangle"
         }
     }
 }
@@ -45,21 +45,21 @@ private enum PetMomentsArchiveFilter: String, CaseIterable, Identifiable {
 
     var mode: PetTimelineDisplayMode {
         switch self {
-        case .memories: return .memories
-        case .all: return .all
-        case .health: return .health
-        case .care: return .care
-        case .expense: return .expense
+        case .memories: .memories
+        case .all: .all
+        case .health: .health
+        case .care: .care
+        case .expense: .expense
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .memories: return l.tr(zh: "记录", en: "Notes", de: "Notizen")
-        case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
-        case .health: return l.tr(zh: "健康", en: "Health", de: "Gesundheit")
-        case .care: return l.tr(zh: "照护", en: "Care", de: "Pflege")
-        case .expense: return l.tr(zh: "花费", en: "Costs", de: "Kosten")
+        case .memories: l.tr(zh: "记录", en: "Notes", de: "Notizen")
+        case .all: l.tr(zh: "全部", en: "All", de: "Alle")
+        case .health: l.tr(zh: "健康", en: "Health", de: "Gesundheit")
+        case .care: l.tr(zh: "照护", en: "Care", de: "Pflege")
+        case .expense: l.tr(zh: "花费", en: "Costs", de: "Kosten")
         }
     }
 }
@@ -97,11 +97,11 @@ struct PetMomentsHubView: View {
     private var currentSections: [PetTimelineArchiveSection] {
         switch tab {
         case .highlights:
-            return PetTimelineItemsBuilder.archiveSections(for: pet, mode: .highlights, l: l)
+            PetTimelineItemsBuilder.archiveSections(for: pet, mode: .highlights, l: l)
         case .timeline:
-            return PetTimelineItemsBuilder.archiveSections(for: pet, mode: archiveFilter.mode, l: l)
+            PetTimelineItemsBuilder.archiveSections(for: pet, mode: archiveFilter.mode, l: l)
         case .photos:
-            return []
+            []
         }
     }
 
@@ -222,7 +222,7 @@ struct PetMomentsHubView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 11)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .animation(GoMotion.stateChange, value: value)
     }
 
@@ -346,9 +346,9 @@ struct PetMomentsHubView: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
         .padding(.horizontal, 16)
@@ -403,9 +403,9 @@ struct PetMomentsHubView: View {
                     .resizable()
                     .scaledToFill()
                     .frame(height: 182)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             } placeholder: {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.ohanaCardSurface)
                     .frame(height: 182)
             }
@@ -418,9 +418,9 @@ struct PetMomentsHubView: View {
                             .scaledToFill()
                             .frame(maxWidth: .infinity)
                             .frame(height: 150)
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     } placeholder: {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                             .fill(Color.ohanaCardSurface)
                             .frame(maxWidth: .infinity)
                             .frame(height: 150)
@@ -474,22 +474,22 @@ struct PetMomentsHubView: View {
     private var emptyTitle: String {
         switch tab {
         case .highlights:
-            return l.tr(zh: "还没有高光", en: "No highlights yet", de: "Noch keine Highlights")
+            l.tr(zh: "还没有高光", en: "No highlights yet", de: "Noch keine Highlights")
         case .timeline:
-            return l.tr(zh: "还没有时光记录", en: "No moments yet", de: "Noch keine Momente")
+            l.tr(zh: "还没有时光记录", en: "No moments yet", de: "Noch keine Momente")
         case .photos:
-            return l.tr(zh: "还没有照片", en: "No photos yet", de: "Noch keine Fotos")
+            l.tr(zh: "还没有照片", en: "No photos yet", de: "Noch keine Fotos")
         }
     }
 
     private var emptySubtitle: String {
         switch tab {
         case .highlights:
-            return l.tr(zh: "生日、相伴日和重要记录会自动出现在这里。", en: "Birthdays, together-days, and key records appear here.", de: "Geburtstage, gemeinsame Tage und wichtige Einträge erscheinen hier.")
+            l.tr(zh: "生日、相伴日和重要记录会自动出现在这里。", en: "Birthdays, together-days, and key records appear here.", de: "Geburtstage, gemeinsame Tage und wichtige Einträge erscheinen hier.")
         case .timeline:
-            return l.tr(zh: "写一句话、拍一张照片，慢慢就会变成 \(pet.name) 的故事。", en: "A line or a photo becomes \(pet.name)'s story over time.", de: "Ein Satz oder Foto wird mit der Zeit zu \(pet.name)s Geschichte.")
+            l.tr(zh: "写一句话、拍一张照片，慢慢就会变成 \(pet.name) 的故事。", en: "A line or a photo becomes \(pet.name)'s story over time.", de: "Ein Satz oder Foto wird mit der Zeit zu \(pet.name)s Geschichte.")
         case .photos:
-            return l.tr(zh: "添加照片后会组成 \(pet.name) 的相册。", en: "Add photos to build \(pet.name)'s album.", de: "Füge Fotos hinzu, um \(pet.name)s Album aufzubauen.")
+            l.tr(zh: "添加照片后会组成 \(pet.name) 的相册。", en: "Add photos to build \(pet.name)'s album.", de: "Füge Fotos hinzu, um \(pet.name)s Album aufzubauen.")
         }
     }
 
@@ -533,5 +533,4 @@ struct PetMomentsHubView: View {
         .frame(height: 54)
         .background(Color.goPrimary, in: Capsule())
     }
-
 }

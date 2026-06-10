@@ -6,18 +6,18 @@
 //  每个图表卡片：透明背景 + 折线/柱状图 + 右上角快速添加按钮 + 点击进入详情
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Main Dashboard（Island Stats 横滚风格）
 
 struct PetChartDashboard: View {
     let pet: Pet
-    let onWeight:  () -> Void
-    let onWalk:    () -> Void
-    let onPotty:   () -> Void
+    let onWeight: () -> Void
+    let onWalk: () -> Void
+    let onPotty: () -> Void
     let onExpense: () -> Void
-    let onFood:    () -> Void
+    let onFood: () -> Void
     @Binding var showingAddWeight: Bool
     @Binding var quickWeightInput: String
     let modelContext: ModelContext
@@ -67,7 +67,7 @@ struct PetChartDashboard: View {
                 .onTapGesture { onExpense() }
 
                 // 5. 狗额外显示余粮
-                if pet.species == "狗" && pet.dailyPortionGrams > 0 {
+                if pet.species == "狗", pet.dailyPortionGrams > 0 {
                     chartDivider(height: cardHeight)
                     dashCard(width: cardWidth) {
                         foodCardContent
@@ -80,7 +80,7 @@ struct PetChartDashboard: View {
     }
 
     // 无背景无边框卡片容器
-    private func dashCard<C: View>(width: CGFloat, @ViewBuilder content: () -> C) -> some View {
+    private func dashCard(width: CGFloat, @ViewBuilder content: () -> some View) -> some View {
         content()
             .frame(width: width, height: cardHeight, alignment: .topLeading)
             .padding(.horizontal, 14)
@@ -128,7 +128,7 @@ struct PetChartDashboard: View {
                         step: 0.1,
                         valueFont: .system(size: 14, weight: .bold, design: .rounded),
                         unitFont: .system(size: 11, weight: .black, design: .rounded),
-                        cornerRadius: 12,
+                        cornerRadius: OhanaRadius.chip,
                         horizontalPadding: 8,
                         verticalPadding: 5
                     )
@@ -149,7 +149,8 @@ struct PetChartDashboard: View {
                                 )
                             }
                         }
-                        quickWeightInput = ""; showingAddWeight = false
+                        quickWeightInput = ""
+                        showingAddWeight = false
                     } label: {
                         Text("存").font(OhanaFont.adaptive(size: 12, weight: .black)).foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 10).padding(.vertical, 5).background(Color.goPrimary, in: Capsule())
@@ -200,7 +201,7 @@ struct PetChartDashboard: View {
 
     // ── 噗噗 ─────────────────────────────────────────────────────
     private var pottyCardContent: some View {
-        let todayCount = pet.pottyLogs.filter { Calendar.current.isDateInToday($0.date) }.count
+        let todayCount = pet.pottyLogs.count(where: { Calendar.current.isDateInToday($0.date) })
         let week = last7DaysPotty()
         return VStack(alignment: .leading, spacing: 10) {
             cardHeader(icon: "drop.fill", title: "噗噗", accent: .goOrange) {
@@ -275,7 +276,7 @@ struct PetChartDashboard: View {
 
     // ── 卡片头部 ─────────────────────────────────────────────────
     @ViewBuilder
-    private func cardHeader<T: View>(icon: String, title: String, accent: Color, @ViewBuilder trailing: () -> T = { EmptyView() }) -> some View {
+    private func cardHeader(icon: String, title: String, accent: Color, @ViewBuilder trailing: () -> some View = { EmptyView() }) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon).font(OhanaFont.adaptive(size: 12, weight: .bold)).foregroundStyle(accent)
             Text(title).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
@@ -292,7 +293,7 @@ struct PetChartDashboard: View {
     // ── 数据计算辅助 ────────────────────────────────────────────
     private func last6MonthExpense() -> [Double] {
         let cal = Calendar.current
-        return (0..<6).reversed().map { offset in
+        return (0 ..< 6).reversed().map { offset in
             let date = cal.date(byAdding: .month, value: -offset, to: Date())!
             return pet.expenseLogs.filter {
                 cal.isDate($0.date, equalTo: date, toGranularity: .month)
@@ -302,17 +303,17 @@ struct PetChartDashboard: View {
 
     private func last7DaysWalk() -> [Int] {
         let cal = Calendar.current
-        return (0..<7).reversed().map { offset in
+        return (0 ..< 7).reversed().map { offset in
             let date = cal.date(byAdding: .day, value: -offset, to: Date())!
-            return pet.walkLogs.filter { cal.isDate($0.startDate, inSameDayAs: date) }.count
+            return pet.walkLogs.count(where: { cal.isDate($0.startDate, inSameDayAs: date) })
         }
     }
 
     private func last7DaysPotty() -> [Int] {
         let cal = Calendar.current
-        return (0..<7).reversed().map { offset in
+        return (0 ..< 7).reversed().map { offset in
             let date = cal.date(byAdding: .day, value: -offset, to: Date())!
-            return pet.pottyLogs.filter { cal.isDate($0.date, inSameDayAs: date) }.count
+            return pet.pottyLogs.count(where: { cal.isDate($0.date, inSameDayAs: date) })
         }
     }
 }

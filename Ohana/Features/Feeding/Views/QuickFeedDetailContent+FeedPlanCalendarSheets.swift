@@ -8,7 +8,7 @@ extension QuickFeedDetailContent {
                 .font(OhanaFont.adaptive(size: 17, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "当前打卡设置", en: "Current log setting", de: "Aktuelle Einstellung"))
                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
@@ -33,7 +33,7 @@ extension QuickFeedDetailContent {
             .accessibilityLabel(l.tr(zh: "修改打卡设置", en: "Edit log setting", de: "Einstellung ändern"))
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 18)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
     }
 
     var manualFeedSettingSummaryText: String {
@@ -61,7 +61,7 @@ extension QuickFeedDetailContent {
                         .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                        .feedFlatBlockSurface(cornerRadius: 14)
+                        .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
                 }
                 .buttonStyle(ScaleButtonStyle())
 
@@ -92,7 +92,7 @@ extension QuickFeedDetailContent {
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .padding(.horizontal, 12)
                         .frame(height: 36)
-                        .feedFlatBlockSurface(cornerRadius: 14)
+                        .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 Button {
@@ -102,7 +102,7 @@ extension QuickFeedDetailContent {
                         .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                        .feedFlatBlockSurface(cornerRadius: 14)
+                        .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -142,7 +142,7 @@ extension QuickFeedDetailContent {
         let year = calendar.component(.year, from: draftStore.feedPlanCalendarMonth)
         let selectedMonth = calendar.component(.month, from: draftStore.feedPlanCalendarMonth)
         let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
 
         return VStack(spacing: 12) {
             HStack(spacing: 10) {
@@ -153,7 +153,7 @@ extension QuickFeedDetailContent {
                         .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 36, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                        .feedFlatBlockSurface(cornerRadius: 13)
+                        .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
                 }
                 .buttonStyle(ScaleButtonStyle())
 
@@ -169,7 +169,7 @@ extension QuickFeedDetailContent {
                         .font(OhanaFont.adaptive(size: 12, weight: .black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 36, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                        .feedFlatBlockSurface(cornerRadius: 13)
+                        .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -256,11 +256,9 @@ extension QuickFeedDetailContent {
     }
 
     func feedPlanMonthTitle(_ month: Int, year: Int) -> String {
-        if appLanguage == "zh" {
-            return "\(month)月"
-        }
         guard let date = feedPlanDate(year: year, month: month, day: 1) else { return "\(month)" }
-        return date.formatted(.dateTime.month(.abbreviated))
+        let monthName = date.formatted(.dateTime.month(.abbreviated))
+        return L10n(appLanguage).tr(zh: "\(month)月", en: monthName, de: monthName)
     }
 
     func feedPlanPlainYearText(_ year: Int) -> String {
@@ -296,7 +294,7 @@ extension QuickFeedDetailContent {
                 .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(status.tint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(status.tint, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(status.title)
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
@@ -321,7 +319,7 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 18)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
     }
 
     @ViewBuilder

@@ -5,9 +5,9 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import Testing
 import Foundation
 import SwiftData
+import Testing
 @testable import Ohana
 
 struct OhanaTests {
@@ -101,7 +101,7 @@ struct OhanaTests {
         let date = dateForTest(year: 2026, month: 6, day: 9)
         EconomyDailyBudgetStore.reset(userKey: userKey, date: date)
 
-        for _ in 0..<11 {
+        for _ in 0 ..< 11 {
             let result = CoconutEconomyPolicyV2.reward(
                 for: .feed,
                 quality: .none,
@@ -134,7 +134,7 @@ struct OhanaTests {
         #expect(fatigue.reason == "dailyBudgetFatigue")
 
         EconomyDailyBudgetStore.commit(fatigue, userKey: userKey, date: date)
-        for _ in 0..<12 {
+        for _ in 0 ..< 12 {
             let result = CoconutEconomyPolicyV2.reward(
                 for: .feed,
                 quality: .none,
@@ -201,7 +201,7 @@ struct OhanaTests {
         EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: memberA, date: date)
         EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: memberB, date: date)
 
-        for _ in 0..<8 {
+        for _ in 0 ..< 8 {
             let result = CoconutEconomyPolicyV2.reward(
                 for: .health,
                 quality: .none,
@@ -246,7 +246,7 @@ struct OhanaTests {
         EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: memberA, careObjectKeys: [petA, petB], date: date)
         EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: memberB, careObjectKeys: [petA, petB], date: date)
 
-        for _ in 0..<4 {
+        for _ in 0 ..< 4 {
             let result = CoconutEconomyPolicyV2.reward(
                 for: .health,
                 quality: .none,
@@ -365,8 +365,8 @@ struct OhanaTests {
 
         let awardedXP = first?.growthXP ?? 0
         let awardedCoconuts = first?.totalCoconuts ?? 0
-        #expect((18...33).contains(awardedXP))
-        #expect((8...16).contains(awardedCoconuts))
+        #expect((18 ... 33).contains(awardedXP))
+        #expect((8 ... 16).contains(awardedCoconuts))
         #expect(second == nil)
         #expect(human.coconutBalance == awardedCoconuts)
         let focusLedger = ledger.first { $0.actionType == "todayFocusDailyCompletion" }
@@ -412,7 +412,7 @@ struct OhanaTests {
         #expect(human.pinHash != "1234")
         #expect(!human.pinSalt.isEmpty)
 
-        if case .incorrect(let remaining) = HumanPasscodeService.verify("0000", for: human, now: now) {
+        if case let .incorrect(remaining) = HumanPasscodeService.verify("0000", for: human, now: now) {
             #expect(remaining == 4)
         } else {
             Issue.record("Expected first incorrect passcode")
@@ -421,7 +421,7 @@ struct OhanaTests {
         _ = HumanPasscodeService.verify("0000", for: human, now: now)
         _ = HumanPasscodeService.verify("0000", for: human, now: now)
         _ = HumanPasscodeService.verify("0000", for: human, now: now)
-        if case .locked(let until) = HumanPasscodeService.verify("0000", for: human, now: now) {
+        if case let .locked(until) = HumanPasscodeService.verify("0000", for: human, now: now) {
             #expect(until.timeIntervalSince(now) == HumanPasscodeService.lockoutDuration)
         } else {
             Issue.record("Expected lockout after five failures")
@@ -541,7 +541,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let event = Event(title: "重复提醒", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
-        let rawScheduledAt = Date().addingTimeInterval(3_600)
+        let rawScheduledAt = Date().addingTimeInterval(3600)
         let scheduledAt = Date(timeIntervalSince1970: floor(rawScheduledAt.timeIntervalSince1970 / 60) * 60)
         let first = Reminder(event: event, scheduledAt: scheduledAt)
         let duplicate = Reminder(event: event, scheduledAt: scheduledAt.addingTimeInterval(10))
@@ -568,8 +568,8 @@ struct OhanaTests {
         let petId = UUID().uuidString
         let foodEvent = Event(title: "早餐", eventType: EventType.foodChange.rawValue, relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: petId)
         let taskEvent = Event(title: "清洁", eventType: EventType.grooming.rawValue, relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: petId)
-        let foodReminder = Reminder(event: foodEvent, scheduledAt: Date().addingTimeInterval(-3_600))
-        let taskReminder = Reminder(event: taskEvent, scheduledAt: Date().addingTimeInterval(-3_600))
+        let foodReminder = Reminder(event: foodEvent, scheduledAt: Date().addingTimeInterval(-3600))
+        let taskReminder = Reminder(event: taskEvent, scheduledAt: Date().addingTimeInterval(-3600))
         context.insert(foodEvent)
         context.insert(taskEvent)
         context.insert(foodReminder)
@@ -589,7 +589,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let event = Event(title: "服药", relatedEntityType: EntityKind.human.rawValue, relatedEntityId: UUID().uuidString)
-        let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3_600))
+        let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
         context.insert(event)
         context.insert(reminder)
 
@@ -726,8 +726,8 @@ struct OhanaTests {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let pet = Pet(name: "Momo", species: "猫")
         context.insert(pet)
-        context.insert(PetCareLog(date: now.addingTimeInterval(-3_600), type: .feeding, amountGrams: 30, note: PetCareLog.manualFeedNoteMarker, pet: pet))
-        context.insert(PetCareLog(date: now.addingTimeInterval(-1_800), type: .feeding, amountGrams: 40, note: PetCareLog.manualFeedNoteMarker, pet: pet))
+        context.insert(PetCareLog(date: now.addingTimeInterval(-3600), type: .feeding, amountGrams: 30, note: PetCareLog.manualFeedNoteMarker, pet: pet))
+        context.insert(PetCareLog(date: now.addingTimeInterval(-1800), type: .feeding, amountGrams: 40, note: PetCareLog.manualFeedNoteMarker, pet: pet))
         try context.save()
 
         let state = FeedTodayState(pet: pet, allEvents: [], manualGoalCount: 3, now: now, calendar: calendar)
@@ -905,7 +905,7 @@ struct OhanaTests {
         let sourceContext = source.mainContext
         let petId = UUID().uuidString
         let event = Event(title: "晚餐", eventType: EventType.foodChange.rawValue, relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: petId)
-        let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3_600))
+        let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
         sourceContext.insert(event)
         sourceContext.insert(reminder)
         CareLedgerService.recordReminderState(
@@ -987,7 +987,7 @@ struct OhanaTests {
         sourceContext.insert(document)
         sourceContext.insert(attachment)
 
-        let insurance = PetInsurance(companyName: "SafePet", policyNumber: "P1", productName: "Care", annualPremium: 120, coverageAmount: 1_000, pet: pet)
+        let insurance = PetInsurance(companyName: "SafePet", policyNumber: "P1", productName: "Care", annualPremium: 120, coverageAmount: 1000, pet: pet)
         let claim = InsuranceClaim(totalExpense: 200, claimedAmount: 100, approvedAmount: 80, status: .approved, note: "claim", insurance: insurance)
         sourceContext.insert(insurance)
         sourceContext.insert(claim)
@@ -1024,13 +1024,13 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
 
-        let orphan = Reminder(scheduledAt: Date().addingTimeInterval(3_600))
+        let orphan = Reminder(scheduledAt: Date().addingTimeInterval(3600))
         context.insert(orphan)
         let missingResult = await ReminderSchedulingService.scheduleIfNeeded(reminder: orphan, context: context)
         #expect(missingResult == .missingEvent)
 
         let event = Event(title: "喂水", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
-        let duplicate = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3_600))
+        let duplicate = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
         context.insert(event)
         context.insert(duplicate)
         let duplicateResult = await ReminderSchedulingService.scheduleIfNeeded(
@@ -1085,7 +1085,7 @@ struct OhanaTests {
     @Test func quickActionLimitCountsOnlyTargetPetItems() async throws {
         let pet = Pet(name: "Momo", species: "猫")
         let otherPet = Pet(name: "Nori", species: "狗")
-        let petItems = (0..<8).map { index in
+        let petItems = (0 ..< 8).map { index in
             QuickActionItem(label: "动作\(index)", icon: "pawprint", colorHex: "C8FF00", petId: pet.id, actionType: "action\(index)")
         }
         let humanItem = QuickActionItem(label: "体重", icon: "scalemass", colorHex: "80FFEA", petId: pet.id, actionType: "humanWeight", entityId: UUID(), entityKind: .human)
@@ -1223,7 +1223,7 @@ struct OhanaTests {
         )
 
         let events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
-        #expect(events.filter { $0.relatedEntityType == WaterPlanWriter.entityType }.count == 3)
+        #expect(events.count(where: { $0.relatedEntityType == WaterPlanWriter.entityType }) == 3)
         #expect(!events.contains { $0.title == "Momo 补充饮水" })
         #expect(reminders.count >= 3)
         #expect(events.filter { $0.relatedEntityType == WaterPlanWriter.entityType }.allSatisfy { $0.recurrenceDays == 1 && $0.eventType == EventType.daily.rawValue })
@@ -1370,7 +1370,7 @@ struct OhanaTests {
         let context = container.mainContext
         let pet = Pet(name: "Bubbles", species: "金鱼")
         context.insert(pet)
-        context.insert(PetCareLog(date: Date().addingTimeInterval(-5 * 86_400), type: .filterClean, pet: pet))
+        context.insert(PetCareLog(date: Date().addingTimeInterval(-5 * 86400), type: .filterClean, pet: pet))
         try context.save()
 
         let petKey = pet.id.uuidString
@@ -1489,7 +1489,7 @@ struct OhanaTests {
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context, startDate: startDate)
 
         events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
-        #expect(events.filter { $0.title == "Bubbles 换水" }.count == 1)
+        #expect(events.count(where: { $0.title == "Bubbles 换水" }) == 1)
         #expect(events.first { $0.title == "Bubbles 换水" }?.recurrenceDays == 10)
         #expect(!events.contains { $0.title == "Bubbles 过滤检查" })
         #expect(events.contains { $0.title == "Bubbles 清洗滤芯" && $0.recurrenceDays == 21 })
@@ -1536,7 +1536,7 @@ struct OhanaTests {
 
         events = try context.fetch(FetchDescriptor<Event>()).filter { $0.relatedEntityId == petKey }
         #expect(!events.contains { $0.title == "Momo 喂食" && $0.feedRuleKindRaw.isEmpty })
-        #expect(events.filter { $0.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue }.count == 2)
+        #expect(events.count(where: { $0.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue }) == 2)
     }
 
     @MainActor
@@ -1544,7 +1544,7 @@ struct OhanaTests {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "猫")
-        let restock = Date().addingTimeInterval(-86_400)
+        let restock = Date().addingTimeInterval(-86400)
         pet.foodTrackingMode = .precise
         pet.restockDate = restock
         pet.restockWeight = 1
@@ -1664,7 +1664,7 @@ struct OhanaTests {
         let stoppedSnapshot = FeedStockCalculator.snapshot(for: pet, foodKind: .dry, events: [autoEvent], careLogs: logs, now: secondNow, calendar: calendar)
 
         #expect(insertedAfterManual == 0)
-        #expect(logs.filter { FeedLogMetadata.source(for: $0) == .autoMain }.count == 1)
+        #expect(logs.count(where: { FeedLogMetadata.source(for: $0) == .autoMain }) == 1)
         #expect(stoppedSnapshot.consumedGrams == 50)
         #expect(stoppedSnapshot.remainingGrams == 950)
     }
@@ -1831,7 +1831,7 @@ struct OhanaTests {
         )
         _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoDraft, allEvents: [], context: context, now: now, calendar: calendar)
         var events = try context.fetch(FetchDescriptor<Event>())
-        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.count == 1)
+        #expect(events.count(where: { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }) == 1)
 
         let manualDraft = FeedPlanDraft(
             kind: .manualReminder,
@@ -1844,8 +1844,8 @@ struct OhanaTests {
         )
         _ = FeedingPlanWriter.replacePlan(pet: pet, draft: manualDraft, allEvents: events, context: context, now: now, calendar: calendar)
         events = try context.fetch(FetchDescriptor<Event>())
-        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.count == 1)
-        #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.count == 2)
+        #expect(events.count(where: { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }) == 1)
+        #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }) == 2)
 
         let manualEvent = try #require(events.first { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) })
         let autoEvent = try #require(events.first { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) })
@@ -1876,8 +1876,8 @@ struct OhanaTests {
         )
         _ = FeedingPlanWriter.replacePlan(pet: pet, draft: autoAgainDraft, allEvents: events, context: context, now: now, calendar: calendar)
         events = try context.fetch(FetchDescriptor<Event>())
-        #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.count == 2)
-        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.count == 1)
+        #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }) == 2)
+        #expect(events.count(where: { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }) == 1)
     }
 
     @MainActor
@@ -2090,7 +2090,7 @@ struct OhanaTests {
             Issue.record("Expected an existing manual plan to activate")
         }
         #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.isEmpty)
-        #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.count == 1)
+        #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }) == 1)
         #expect(FeedOperatingMode.resolved(pet: pet, allEvents: events, now: now, calendar: calendar) == .manualReminder)
     }
 
@@ -2114,7 +2114,7 @@ struct OhanaTests {
         )
         _ = SaveFeedPlanCommand.run(pet: pet, targets: [], kind: .autoFeeder, draft: autoDraft, allEvents: [], context: context)
         var events = try context.fetch(FetchDescriptor<Event>())
-        #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.count == 1)
+        #expect(events.count(where: { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }) == 1)
         #expect(FeedOperatingMode.resolved(pet: pet, allEvents: events, now: now, calendar: calendar) == .autoFeeder)
 
         let manualDraft = FeedPlanDraft(
@@ -2129,7 +2129,7 @@ struct OhanaTests {
 
         events = try context.fetch(FetchDescriptor<Event>())
         #expect(events.filter { FeedRuleMetadata.isAutoFeederEvent($0, pet: pet) }.isEmpty)
-        #expect(events.filter { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }.count == 1)
+        #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }) == 1)
         #expect(FeedOperatingMode.resolved(pet: pet, allEvents: events, now: now, calendar: calendar) == .manualReminder)
     }
 
@@ -2225,7 +2225,7 @@ struct OhanaTests {
         #expect(events.allSatisfy { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) })
         #expect(events.allSatisfy { $0.recurrenceDays == 1 })
         #expect(events.allSatisfy { FeedRuleMetadata.amountGrams(from: $0) == 50 })
-        #expect(reminders.filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }.count == 3)
+        #expect(reminders.count(where: { calendar.isDate($0.scheduledAt, inSameDayAs: now) }) == 3)
         #expect(result.reminders.count >= 3)
     }
 
@@ -2879,7 +2879,7 @@ struct OhanaTests {
         #expect(refreshed.first?.emoji == "✅")
 
         let pending = IslandQuest(id: "q_custom", emoji: "!", title: "待办", subtitle: "优先", isCompleted: false, targetPetId: nil, targetPlantId: nil)
-        if case .quest(let selected) = TodayFocusService.decide(pets: [], plants: [], quests: [pending], careLogs: [], walkLogs: [], pottyLogs: [], memory: nil) {
+        if case let .quest(selected) = TodayFocusService.decide(pets: [], plants: [], quests: [pending], careLogs: [], walkLogs: [], pottyLogs: [], memory: nil) {
             #expect(selected.id == "q_custom")
         } else {
             Issue.record("未完成委托应优先成为 Today Focus")

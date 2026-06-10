@@ -10,7 +10,7 @@ enum MemberThemeColorMaintenanceService {
     static func normalizeReservedColors(context: ModelContext) {
         var didChange = false
 
-        let pets = (try? context.fetch(FetchDescriptor<Pet>())) ?? []
+        let pets = (try? context.fetch(FetchDescriptor<Pet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         for pet in pets {
             let normalized = OhanaThemeColorPolicy.normalizedMemberThemeHex(
                 pet.themeColorHex,
@@ -22,7 +22,7 @@ enum MemberThemeColorMaintenanceService {
             }
         }
 
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? []
+        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         for human in humans {
             let normalized = OhanaThemeColorPolicy.normalizedMemberThemeHex(
                 human.themeColorHex,

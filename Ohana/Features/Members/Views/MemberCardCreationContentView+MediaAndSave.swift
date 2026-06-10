@@ -305,7 +305,7 @@ extension MemberCardCreationContentView {
             return
         }
         let snapshot = data
-        decodeTask = Task.detached(priority: .userInitiated) {
+        decodeTask = Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
             let decodeID = MemberCreationPerformance.begin("Avatar Preview Decode")
             let image = UIImage(data: snapshot) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
             let transparent = image.map { ImageSubjectCutoutProcessor.imageHasTransparentPixels($0) } ?? false

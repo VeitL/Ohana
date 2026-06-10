@@ -5,8 +5,8 @@
 //  首页宠物状态一览卡：当前顶牌宠物的今日核心指标
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetWellnessCard: View {
     let pet: Pet
@@ -18,16 +18,19 @@ struct PetWellnessCard: View {
     // MARK: - Today's stats
 
     private var todayFeedCount: Int {
-        pet.careLogs.filter { $0.careType == .feeding && cal.isDateInToday($0.date) }.count
+        pet.careLogs.count(where: { $0.careType == .feeding && cal.isDateInToday($0.date) })
     }
+
     private var todayWaterCount: Int {
-        pet.careLogs.filter { $0.careType == .watering && cal.isDateInToday($0.date) }.count
+        pet.careLogs.count(where: { $0.careType == .watering && cal.isDateInToday($0.date) })
     }
+
     private var todayWalkCount: Int {
-        pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count
+        pet.walkLogs.count(where: { cal.isDateInToday($0.startDate) })
     }
+
     private var todayPottyCount: Int {
-        pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
+        pet.pottyLogs.count(where: { cal.isDateInToday($0.date) })
     }
 
     private var foodDaysLeft: Int? {
@@ -42,7 +45,7 @@ struct PetWellnessCard: View {
         appServices.healthAlerts.scanAlerts(pets: [pet])
             .filter { $0.severity >= .warning }
             .prefix(2)
-            .map { $0 }
+            .map(\.self)
     }
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
@@ -55,10 +58,10 @@ struct PetWellnessCard: View {
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .fill(Color.ohanaCardSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                         .stroke(themeColor.opacity(0.2), lineWidth: 1)
                 )
         )
@@ -119,7 +122,7 @@ struct PetWellnessCard: View {
         }
     }
 
-    private func wellnessPill(emoji: String, label: String, count: Int) -> some View {
+    private func wellnessPill(emoji: String, label _: String, count: Int) -> some View {
         let done = count > 0
         return HStack(spacing: 3) {
             Text(emoji)
@@ -208,20 +211,20 @@ struct FamilyWellnessCard: View {
 
     private var totalCheckins: Int {
         livePets.reduce(0) { acc, pet in
-            let feeds = pet.careLogs.filter { $0.careType == .feeding && cal.isDateInToday($0.date) }.count
-            let walks = pet.walkLogs.filter { cal.isDateInToday($0.startDate) }.count
-            let potty = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
+            let feeds = pet.careLogs.count(where: { $0.careType == .feeding && cal.isDateInToday($0.date) })
+            let walks = pet.walkLogs.count(where: { cal.isDateInToday($0.startDate) })
+            let potty = pet.pottyLogs.count(where: { cal.isDateInToday($0.date) })
             return acc + feeds + walks + potty
         }
     }
 
     private var needsWateringCount: Int {
-        plants.filter { $0.needsWatering }.count
+        plants.count(where: { $0.needsWatering })
     }
 
     private var urgentAlertCount: Int {
         appServices.healthAlerts.scanAlerts(pets: livePets)
-            .filter { $0.severity >= .warning }.count
+            .count(where: { $0.severity >= .warning })
     }
 
     var body: some View {
@@ -238,7 +241,7 @@ struct FamilyWellnessCard: View {
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .fill(Color.ohanaCardSurface)
         )
         .padding(.horizontal, 16)

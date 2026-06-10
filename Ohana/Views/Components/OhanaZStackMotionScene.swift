@@ -19,15 +19,15 @@ enum OhanaMotionSceneRole {
     var animation: Animation {
         switch self {
         case .hero:
-            return GoMotion.heroExpand
+            GoMotion.heroExpand
         case .sheet:
-            return GoMotion.sheetEnter
+            GoMotion.sheetEnter
         case .menu:
-            return GoMotion.fab
+            GoMotion.fab
         case .reward:
-            return GoMotion.rewardPop
+            GoMotion.rewardPop
         case .chart:
-            return GoMotion.stateChange
+            GoMotion.stateChange
         }
     }
 
@@ -119,4 +119,3 @@ extension View {
             .allowsHitTesting(hitTesting)
     }
 }
-

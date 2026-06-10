@@ -3,9 +3,9 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
 import MapKit
+import SwiftData
+import SwiftUI
 
 extension WalkTrackingCard {
     // MARK: - Action Buttons

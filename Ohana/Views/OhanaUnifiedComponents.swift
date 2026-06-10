@@ -11,7 +11,7 @@ import SwiftUI
 
 public struct OhanaStandardCardModifier: ViewModifier {
     var cornerRadius: CGFloat
-    
+
     public func body(content: Content) -> some View {
         content
             .background(
@@ -26,7 +26,7 @@ public struct OhanaStandardCardModifier: ViewModifier {
 }
 
 public extension View {
-    func ohanaStandardCard(isDarkMode: Bool, cornerRadius: CGFloat = 20) -> some View {
+    func ohanaStandardCard(isDarkMode _: Bool, cornerRadius: CGFloat = 20) -> some View {
         modifier(OhanaStandardCardModifier(cornerRadius: cornerRadius))
     }
 }
@@ -34,7 +34,7 @@ public extension View {
 // 自动读取 colorScheme 的版本
 public struct AutoOhanaStandardCardModifier: ViewModifier {
     var cornerRadius: CGFloat
-    
+
     public func body(content: Content) -> some View {
         content.modifier(OhanaStandardCardModifier(cornerRadius: cornerRadius))
     }
@@ -143,13 +143,13 @@ public struct OhanaIconButton: View {
     let icon: String
     let color: Color
     let action: () -> Void
-    
+
     public init(icon: String, color: Color, action: @escaping () -> Void) {
         self.icon = icon
         self.color = color
         self.action = action
     }
-    
+
     public var body: some View {
         Button(action: action) {
             Image(systemName: icon)
@@ -158,7 +158,7 @@ public struct OhanaIconButton: View {
                 .frame(width: 44, height: 44)
                 .background(
                     Color.ohanaControlFill,
-                    in: RoundedRectangle(cornerRadius: 14)
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.row)
                 )
         }
         .buttonStyle(ScaleButtonStyle())
@@ -171,14 +171,14 @@ public struct OhanaAlertBanner: View {
     let message: String
     let bg: Color
     let fg: Color
-    
+
     public init(icon: String, message: String, bg: Color, fg: Color) {
         self.icon = icon
         self.message = message
         self.bg = bg
         self.fg = fg
     }
-    
+
     public var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon).font(OhanaFont.callout(.bold)).foregroundStyle(fg)
@@ -197,7 +197,7 @@ public struct OhanaChip: View {
     let selected: Bool
     var isDarkMode: Bool
     let action: (() -> Void)?
-    
+
     public init(label: String, color: Color, selected: Bool, isDarkMode: Bool, action: (() -> Void)? = nil) {
         self.label = label
         self.color = color
@@ -205,7 +205,7 @@ public struct OhanaChip: View {
         self.isDarkMode = isDarkMode
         self.action = action
     }
-    
+
     public var body: some View {
         let chipContent = HStack(spacing: 6) {
             Circle().fill(color).frame(width: 6, height: 6) // a11y: allow decorative color swatch; hidden from accessibility below
@@ -216,10 +216,10 @@ public struct OhanaChip: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(
             selected ? color.opacity(0.14) : Color.ohanaControlFill,
-            in: RoundedRectangle(cornerRadius: 10)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.badge)
         )
-        
-        if let action = action {
+
+        if let action {
             Button(action: action) { chipContent }
                 .buttonStyle(ScaleButtonStyle())
         } else {
@@ -235,7 +235,7 @@ public struct OhanaQACard: View {
     let icon: String
     let color: Color
     var isDarkMode: Bool
-    
+
     public init(title: String, value: String, icon: String, color: Color, isDarkMode: Bool) {
         self.title = title
         self.value = value
@@ -243,7 +243,7 @@ public struct OhanaQACard: View {
         self.color = color
         self.isDarkMode = isDarkMode
     }
-    
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Image(systemName: icon).font(OhanaFont.title(.bold)).foregroundStyle(Color.ohanaFunctionalIcon)

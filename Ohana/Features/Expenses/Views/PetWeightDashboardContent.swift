@@ -13,7 +13,7 @@ struct PetWeightDashboardContent: View {
     var showsCloseButton = true
     var onClose: () -> Void
     var onAdd: () -> Void
-    var onRemove: (() -> Void)? = nil
+    var onRemove: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -27,25 +27,25 @@ struct PetWeightDashboardContent: View {
 
         func title(_ l: L10n) -> String {
             switch self {
-            case .days7: return l.tr(zh: "7天", en: "7D", de: "7T")
-            case .days30: return l.tr(zh: "30天", en: "30D", de: "30T")
-            case .days90: return l.tr(zh: "90天", en: "90D", de: "90T")
-            case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
+            case .days7: l.tr(zh: "7天", en: "7D", de: "7T")
+            case .days30: l.tr(zh: "30天", en: "30D", de: "30T")
+            case .days90: l.tr(zh: "90天", en: "90D", de: "90T")
+            case .all: l.tr(zh: "全部", en: "All", de: "Alle")
             }
         }
 
         func startDate(now: Date = Date(), calendar: Calendar = .current) -> Date? {
             switch self {
-            case .days7: return calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
-            case .days30: return calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
-            case .days90: return calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
-            case .all: return nil
+            case .days7: calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
+            case .days30: calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
+            case .days90: calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
+            case .all: nil
             }
         }
 
         func xDomain(now: Date = Date(), calendar: Calendar = .current) -> ClosedRange<Date>? {
             guard let start = startDate(now: now, calendar: calendar) else { return nil }
-            return start...now
+            return start ... now
         }
     }
 
@@ -214,7 +214,7 @@ struct PetWeightDashboardContent: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func formatWeightDelta(_ kilograms: Double) -> String {
@@ -234,7 +234,6 @@ struct PetWeightDashboardContent: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
-
 }

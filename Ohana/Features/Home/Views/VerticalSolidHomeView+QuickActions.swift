@@ -222,7 +222,7 @@ extension VerticalSolidHomeView {
                     label: l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"),
                     icon: "ellipsis.circle.fill",
                     action: .allFeatures
-                ),
+                )
             ]
         }
         return FocusHomeFabShortcutPolicy.petShortcuts(

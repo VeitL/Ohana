@@ -42,10 +42,10 @@ struct OasisCheckInCalendarCard: View {
                 Color.goDeepNavy
                 Color.goPrimary.opacity(0.1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.goPrimary.opacity(0.15), lineWidth: 1)
         )
     }
@@ -240,7 +240,7 @@ struct OasisCheckInCalendarCard: View {
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
-                        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -269,11 +269,11 @@ struct OasisCheckInCalendarCard: View {
         let daysInMonth = calendar.range(of: .day, in: .month, for: firstOfMonth)?.count ?? 30
         var cells: [CalendarCell] = []
 
-        for _ in 0..<weekdayOfFirst {
+        for _ in 0 ..< weekdayOfFirst {
             cells.append(CalendarCell(dateStr: "", day: 0, isToday: false, isChecked: false, isMakeup: false, isFuture: false))
         }
 
-        for day in 1...daysInMonth {
+        for day in 1 ... daysInMonth {
             var dayComponents = DateComponents()
             dayComponents.year = components.year
             dayComponents.month = components.month
@@ -300,7 +300,7 @@ struct OasisCheckInCalendarCard: View {
             Color.clear.frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
         } else {
             Button {
-                if !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0 {
+                if !cell.isChecked, !cell.isToday, !cell.isFuture, makeupPackCount > 0 {
                     onRequestMakeup(cell.dateStr)
                 }
             } label: {
@@ -334,25 +334,25 @@ struct OasisCheckInCalendarCard: View {
     }
 
     private func cellFillColor(_ cell: CalendarCell) -> Color {
-        if cell.isChecked && cell.isMakeup {
-            return Color.goYellow.opacity(0.85)
+        if cell.isChecked, cell.isMakeup {
+            Color.goYellow.opacity(0.85)
         } else if cell.isChecked {
-            return Color.goPrimary
+            Color.goPrimary
         } else if cell.isToday {
-            return Color.goPrimary.opacity(0.22)
+            Color.goPrimary.opacity(0.22)
         } else {
-            return Color.ohanaControlFill
+            Color.ohanaControlFill
         }
     }
 
     private var weekdaySymbols: [String] {
         switch localization.lang {
         case "en":
-            return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+            ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
         case "de":
-            return ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"]
+            ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"]
         default:
-            return ["日", "一", "二", "三", "四", "五", "六"]
+            ["日", "一", "二", "三", "四", "五", "六"]
         }
     }
 
@@ -366,11 +366,11 @@ struct OasisCheckInCalendarCard: View {
     private var locale: Locale {
         switch localization.lang {
         case "de":
-            return Locale(identifier: "de_DE")
+            Locale(identifier: "de_DE")
         case "en":
-            return Locale(identifier: "en_US")
+            Locale(identifier: "en_US")
         default:
-            return Locale(identifier: "zh_CN")
+            Locale(identifier: "zh_CN")
         }
     }
 }

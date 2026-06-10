@@ -16,34 +16,34 @@ enum EntityType: String, CaseIterable, Hashable, Identifiable {
 
     var icon: String {
         switch self {
-        case .pet: return "pawprint.fill"
-        case .human: return "person.fill"
-        case .plant: return "leaf.fill"
+        case .pet: "pawprint.fill"
+        case .human: "person.fill"
+        case .plant: "leaf.fill"
         }
     }
 
     var emoji: String {
         switch self {
-        case .pet: return "🐾"
-        case .human: return "👤"
-        case .plant: return "🌱"
+        case .pet: "🐾"
+        case .human: "👤"
+        case .plant: "🌱"
         }
     }
 
     var color: Color {
         switch self {
-        case .pet: return Color.goPrimary
-        case .human: return Color(hex: "7DA2FF")
-        case .plant: return Color.goTeal
+        case .pet: Color.goPrimary
+        case .human: Color(hex: "7DA2FF")
+        case .plant: Color.goTeal
         }
     }
 
     var isAvailable: Bool {
         switch self {
         case .plant:
-            return false
+            false
         case .pet, .human:
-            return true
+            true
         }
     }
 }
@@ -51,8 +51,8 @@ enum EntityType: String, CaseIterable, Hashable, Identifiable {
 struct AddEntityDestinationView: View {
     let type: EntityType
     let onComplete: () -> Void
-    var onPetSaved: ((Pet) -> Void)? = nil
-    var onHumanSaved: ((Human) -> Void)? = nil
+    var onPetSaved: ((Pet) -> Void)?
+    var onHumanSaved: ((Human) -> Void)?
 
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
     @AppStorage("appLanguage") private var appLanguage = "zh"
@@ -79,8 +79,8 @@ struct AddEntityDestinationView: View {
             ZStack {
                 OhanaAppBackground()
                 VStack(spacing: 12) {
-                    Image(systemName: "leaf")
-                        .font(.system(size: 30, weight: .semibold))
+                    Image(systemName: "leaf") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
+                        .font(.system(size: 30, weight: .semibold)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(l.tr(
                         zh: "植物模块暂不开放",

@@ -6,19 +6,19 @@
 //  @Observable compatibility projection for quest flags and wallet feedback.
 //
 
-import SwiftUI
 import Observation
 import SwiftData
+import SwiftUI
 
 // MARK: - CoconutLogEntry
 struct CoconutLogEntry: Codable, Identifiable {
     let id: UUID
     let emoji: String
     let title: String
-    let amount: Int      // 正数=获取，负数=消耗
+    let amount: Int // 正数=获取，负数=消耗
     let date: Date
-    var actorId:   String?  // N10: Human.id.uuidString 或 Pet.id.uuidString
-    var actorName: String?  // N10: 显示名
+    var actorId: String? // N10: Human.id.uuidString 或 Pet.id.uuidString
+    var actorName: String? // N10: 显示名
     var growthXP: Int?
     var economyReason: String?
     var budgetStage: String?
@@ -149,12 +149,12 @@ final class QuestManager {
     // MARK: - Constants
     static let defaults = UserDefaults.standard
     enum Keys {
-        static let petWizard      = "quest_isPetWizardCompleted"
-        static let firstMeal      = "quest_isFirstMealRecorded"
-        static let themeColor     = "quest_isThemeColorSet"
+        static let petWizard = "quest_isPetWizardCompleted"
+        static let firstMeal = "quest_isFirstMealRecorded"
+        static let themeColor = "quest_isThemeColorSet"
         static let stepRewardDate = "quest_stepRewardLastDate"
-        static let bondedDate     = "quest_bondedWalkLastDate"
-        static let cooldownLogs   = "quest_cooldownLogs"
+        static let bondedDate = "quest_bondedWalkLastDate"
+        static let cooldownLogs = "quest_cooldownLogs"
     }
 
     // MARK: - 冷却规则
@@ -162,39 +162,38 @@ final class QuestManager {
     /// 返回该动作的冷却秒数（nil = 无冷却）
     static func cooldownDuration(for type: OhanaActionType) -> TimeInterval? {
         switch type {
-        case .feed:              return 4 * 3600
-        case .water:             return 4 * 3600
-        case .potty:             return 2 * 3600
-        case .care(let t):
+        case .feed: 4 * 3600
+        case .water: 4 * 3600
+        case .potty: 2 * 3600
+        case let .care(t):
             switch t {
-            case .bath, .teeth, .nails, .brushing, .ears: return 24 * 3600
+            case .bath, .teeth, .nails, .brushing, .ears: 24 * 3600
             }
-        case .walk:              return nil   // GPS 距离门槛控制
-        case .health:            return nil
-        case .expense:           return nil
-        case .weight:            return nil
-        case .milestone:         return nil
-        case .dailyFocusCompletion: return nil
-        case .general:           return 2 * 3600
+        case .walk: nil // GPS 距离门槛控制
+        case .health: nil
+        case .expense: nil
+        case .weight: nil
+        case .milestone: nil
+        case .dailyFocusCompletion: nil
+        case .general: 2 * 3600
         }
     }
 
     /// 冷却 key："petId_actionKey"
     func cooldownKey(petId: UUID?, type: OhanaActionType) -> String {
         let pid = petId?.uuidString ?? "global"
-        let aKey: String
-        switch type {
-        case .feed:              aKey = "feed"
-        case .water:             aKey = "water"
-        case .potty(let l):      aKey = l ? "litter" : "potty"
-        case .care(let t):       aKey = "care_\(t)"
-        case .walk:              aKey = "walk"
-        case .health:            aKey = "health"
-        case .expense:           aKey = "expense"
-        case .weight:            aKey = "weight"
-        case .milestone:         aKey = "milestone"
-        case .dailyFocusCompletion: aKey = "dailyFocusCompletion"
-        case .general(_, _, _, let t): aKey = "general_\(t.prefix(10))"
+        let aKey: String = switch type {
+        case .feed: "feed"
+        case .water: "water"
+        case let .potty(l): l ? "litter" : "potty"
+        case let .care(t): "care_\(t)"
+        case .walk: "walk"
+        case .health: "health"
+        case .expense: "expense"
+        case .weight: "weight"
+        case .milestone: "milestone"
+        case .dailyFocusCompletion: "dailyFocusCompletion"
+        case let .general(_, _, _, t): "general_\(t.prefix(10))"
         }
         return "\(pid)_\(aKey)"
     }
@@ -265,7 +264,7 @@ final class QuestManager {
         let desc = FetchDescriptor<Human>()
         let human = (try? context.fetch(desc))?.first { $0.id.uuidString == humanId }
         if human == nil {
-            print("⚠️ [QuestManager] humanId=\(humanId) 在 context 中找不到，跳过人类分润")
+            OhanaLog.warning("[QuestManager] humanId=\(humanId) not found in context; skipping human share", category: "Economy")
         }
         return human
     }
@@ -312,7 +311,7 @@ final class QuestManager {
     }
 
     var completedCount: Int {
-        [isPetWizardCompleted, isFirstMealRecorded, isThemeColorSet].filter { $0 }.count
+        [isPetWizardCompleted, isFirstMealRecorded, isThemeColorSet].count(where: { $0 })
     }
 
     var totalQuestCount: Int { 3 }
@@ -334,23 +333,23 @@ final class QuestManager {
         /// V2 基础椰子奖励预估（真实发放由 CoconutEconomyPolicyV2 统一计算）。
         var baseRewards: (human: Int, pet: Int) {
             switch self {
-            case .walk(let d):
+            case let .walk(d):
                 let total = min(14, max(5, Int(d / 350)))
                 let pet = max(1, total / 3)
                 return (total - pet, pet)
-            case .potty(let isLitter):
+            case let .potty(isLitter):
                 return isLitter ? (2, 1) : (1, 1)
             case .feed:
                 return (2, 1)
             case .water:
                 return (2, 1)
-            case .care(let t):
+            case let .care(t):
                 switch t {
-                case .bath:     return (6, 2)
-                case .teeth:    return (4, 2)
-                case .nails:    return (4, 2)
+                case .bath: return (6, 2)
+                case .teeth: return (4, 2)
+                case .nails: return (4, 2)
                 case .brushing: return (3, 2)
-                case .ears:     return (4, 2)
+                case .ears: return (4, 2)
                 }
             case .health:
                 return (8, 2)
@@ -362,60 +361,59 @@ final class QuestManager {
                 return (2, 1)
             case .dailyFocusCompletion:
                 return (8, 0)
-            case .general(let h, let p, _, _):
+            case let .general(h, p, _, _):
                 return (h, p)
             }
         }
 
         var emoji: String {
             switch self {
-            case .walk:    return "🦮"
-            case .potty(let l): return l ? "🧹" : "💩"
-            case .feed:    return "🍗"
-            case .water:   return "💧"
-            case .care(let t):
+            case .walk: "🦮"
+            case let .potty(l): l ? "🧹" : "💩"
+            case .feed: "🍗"
+            case .water: "💧"
+            case let .care(t):
                 switch t {
-                case .bath:     return "🛁"
-                case .teeth:    return "🦷"
-                case .nails:    return "✂️"
-                case .brushing: return "🪮"
-                case .ears:     return "👂"
+                case .bath: "🛁"
+                case .teeth: "🦷"
+                case .nails: "✂️"
+                case .brushing: "🪮"
+                case .ears: "👂"
                 }
-            case .health:  return "💉"
-            case .expense: return "💰"
-            case .weight:  return "⚖️"
-            case .milestone: return "🏆"
-            case .dailyFocusCompletion: return "🎯"
-            case .general(_, _, let e, _): return e
+            case .health: "💉"
+            case .expense: "💰"
+            case .weight: "⚖️"
+            case .milestone: "🏆"
+            case .dailyFocusCompletion: "🎯"
+            case let .general(_, _, e, _): e
             }
         }
 
         func title(pet: Pet?) -> String {
             let n = pet?.name ?? ""
             switch self {
-            case .walk:    return "\(n) 遛狗奖励"
-            case .potty(let isLitter):
+            case .walk: return "\(n) 遛狗奖励"
+            case let .potty(isLitter):
                 return isLitter
                     ? L10n().tr(zh: "\(n) 铲砂奖励", en: "\(n) scoop reward", de: "\(n) Klo-Bonus")
                     : L10n().tr(zh: "\(n) 噗噗打卡", en: "\(n) poop check-in", de: "\(n) Häufchen-Check-in")
-            case .feed:    return "\(n) 喂食奖励"
-            case .water:   return "\(n) 喂水奖励"
-            case .care(let t):
-                let label: String
-                switch t {
-                case .bath:     label = "洗澡"
-                case .teeth:    label = "刷牙"
-                case .nails:    label = "剪甲"
-                case .brushing: label = "梳毛"
-                case .ears:     label = "清耳"
+            case .feed: return "\(n) 喂食奖励"
+            case .water: return "\(n) 喂水奖励"
+            case let .care(t):
+                let label = switch t {
+                case .bath: "洗澡"
+                case .teeth: "刷牙"
+                case .nails: "剪甲"
+                case .brushing: "梳毛"
+                case .ears: "清耳"
                 }
                 return "\(n) \(label)奖励"
-            case .health:  return "\(n) 健康打卡奖励"
+            case .health: return "\(n) 健康打卡奖励"
             case .expense: return "记账奖励"
-            case .weight:  return "\(n) 体重记录奖励"
+            case .weight: return "\(n) 体重记录奖励"
             case .milestone: return "\(n) 里程碑达成"
             case .dailyFocusCompletion: return "Today Focus 全完成"
-            case .general(_, _, _, let t): return t
+            case let .general(_, _, _, t): return t
             }
         }
     }
@@ -425,12 +423,12 @@ final class QuestManager {
         case walk, feed, litter, potty, water, general
         var emoji: String {
             switch self {
-            case .walk:    return "🦮"
-            case .feed:    return "🍗"
-            case .litter:  return "🧹"
-            case .potty:   return "�"
-            case .water:   return "💧"
-            case .general: return "🥥"
+            case .walk: "🦮"
+            case .feed: "🍗"
+            case .litter: "🧹"
+            case .potty: "�"
+            case .water: "💧"
+            case .general: "🥥"
             }
         }
     }
@@ -438,48 +436,48 @@ final class QuestManager {
     // MARK: - 质量加成（精准模式、拍照、备注等越完整，成长 XP 越高）
     /// V2 中质量主要增加成长 XP；椰子最多额外 +1，避免用照片/备注放大软货币通胀。
     enum QualityBonus {
-        case none                  // XP ×1.0
-        case precise               // XP ×1.1 精准录入（如准确克数、GPS、重量）
-        case withNote              // XP ×1.1 填写了备注
-        case withPhoto             // XP ×1.1 附带照片
-        case preciseAndNote        // XP ×1.2
-        case preciseAndPhoto       // XP ×1.2
-        case preciseNotePhoto      // XP ×1.3 三项全齐
+        case none // XP ×1.0
+        case precise // XP ×1.1 精准录入（如准确克数、GPS、重量）
+        case withNote // XP ×1.1 填写了备注
+        case withPhoto // XP ×1.1 附带照片
+        case preciseAndNote // XP ×1.2
+        case preciseAndPhoto // XP ×1.2
+        case preciseNotePhoto // XP ×1.3 三项全齐
 
         var multiplier: Double {
             switch self {
-            case .none:              return 1.0
-            case .precise:           return 1.1
-            case .withNote:          return 1.1
-            case .withPhoto:         return 1.1
-            case .preciseAndNote:    return 1.2
-            case .preciseAndPhoto:   return 1.2
-            case .preciseNotePhoto:  return 1.3
+            case .none: 1.0
+            case .precise: 1.1
+            case .withNote: 1.1
+            case .withPhoto: 1.1
+            case .preciseAndNote: 1.2
+            case .preciseAndPhoto: 1.2
+            case .preciseNotePhoto: 1.3
             }
         }
 
         var badgeLabel: String? {
             switch self {
-            case .none:              return nil
-            case .precise:           return "🎯 精准XP+10%"
-            case .withNote:          return "📝 备注XP+10%"
-            case .withPhoto:         return "📷 照片XP+10%"
-            case .preciseAndNote:    return "🎯📝 XP+20%"
-            case .preciseAndPhoto:   return "🎯📷 XP+20%"
-            case .preciseNotePhoto:  return "✨ 完整记录XP+30%"
+            case .none: nil
+            case .precise: "🎯 精准XP+10%"
+            case .withNote: "📝 备注XP+10%"
+            case .withPhoto: "📷 照片XP+10%"
+            case .preciseAndNote: "🎯📝 XP+20%"
+            case .preciseAndPhoto: "🎯📷 XP+20%"
+            case .preciseNotePhoto: "✨ 完整记录XP+30%"
             }
         }
 
         /// 根据 3 个维度布尔值智能组合
         static func compose(precise: Bool, hasNote: Bool, hasPhoto: Bool) -> QualityBonus {
             switch (precise, hasNote, hasPhoto) {
-            case (true,  true,  true):  return .preciseNotePhoto
-            case (true,  false, true):  return .preciseAndPhoto
-            case (true,  true,  false): return .preciseAndNote
-            case (false, false, true):  return .withPhoto
-            case (false, true,  false): return .withNote
-            case (true,  false, false): return .precise
-            default:                    return .none
+            case (true, true, true): .preciseNotePhoto
+            case (true, false, true): .preciseAndPhoto
+            case (true, true, false): .preciseAndNote
+            case (false, false, true): .withPhoto
+            case (false, true, false): .withNote
+            case (true, false, false): .precise
+            default: .none
             }
         }
     }

@@ -5,13 +5,13 @@
 //  快捷操作「记录」：快速记录当下 Moment，可附带照片，保存到宠物相册（PetPhotoLog）。
 //
 
-import SwiftUI
-import SwiftData
-import PhotosUI
+import Combine
 import CoreLocation
 import MapKit
+import PhotosUI
+import SwiftData
+import SwiftUI
 import UIKit
-import Combine
 
 private struct QuickMomentContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -23,9 +23,9 @@ private struct QuickMomentContentHeightKey: PreferenceKey {
 
 struct QuickMomentSheet: View {
     let pet: Pet?
-    var onRemove: (() -> Void)? = nil
-    var onSaved: (() -> Void)? = nil
-    var onClose: (() -> Void)? = nil
+    var onRemove: (() -> Void)?
+    var onSaved: (() -> Void)?
+    var onClose: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -112,8 +112,8 @@ struct QuickMomentSheet: View {
 
                     saveButton
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow short popup liftedAlert shadow token
                 .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow short popup liftedAlert shadow token
                 .padding(.horizontal, 6)
@@ -255,7 +255,7 @@ struct QuickMomentSheet: View {
                     fallbackText: pet.avatarEmoji,
                     themeColor: momentAccent,
                     size: 58,
-                    cornerRadius: 18,
+                    cornerRadius: OhanaRadius.controlLarge,
                     backgroundOpacity: 0.15
                 )
 
@@ -376,20 +376,20 @@ struct QuickMomentSheet: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
 
             if showLocationInput {
-                TextField(l.tr(zh: "输入地点", en: "Enter place", de: "Ort eingeben"), text: $manualPlace)
+                TextField(l.tr(zh: "输入地点", en: "Enter place", de: "Ort eingeben"), text: $manualPlace) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.callout(.semibold))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                             .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
@@ -437,15 +437,15 @@ struct QuickMomentSheet: View {
                 }
 
                 Text(selectedPhotos.isEmpty
-                     ? l.tr(zh: "可以只写文字，不一定要加照片", en: "Text only is fine too", de: "Nur Text ist auch okay")
-                     : l.tr(zh: "已添加 \(selectedPhotos.count)/\(maxDraftPhotos) 张", en: "\(selectedPhotos.count)/\(maxDraftPhotos) photos added", de: "\(selectedPhotos.count)/\(maxDraftPhotos) Fotos hinzugefügt"))
+                    ? l.tr(zh: "可以只写文字，不一定要加照片", en: "Text only is fine too", de: "Nur Text ist auch okay")
+                    : l.tr(zh: "已添加 \(selectedPhotos.count)/\(maxDraftPhotos) 张", en: "\(selectedPhotos.count)/\(maxDraftPhotos) photos added", de: "\(selectedPhotos.count)/\(maxDraftPhotos) Fotos hinzugefügt"))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
         }
@@ -454,7 +454,7 @@ struct QuickMomentSheet: View {
 
     private func draftPhotoCard(_ photo: MomentDraftPhoto) -> some View {
         ZStack(alignment: .topTrailing) {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .fill(Color.ohanaCardSurface)
                 .overlay {
                     Image(uiImage: photo.image)
@@ -477,9 +477,9 @@ struct QuickMomentSheet: View {
             .padding(10)
         }
         .frame(width: min(ScreenCompat.width - 64, 320), height: 240)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -543,9 +543,9 @@ struct QuickMomentSheet: View {
                     .padding(.horizontal, 12)
                     .scrollContentBackground(.hidden)
             }
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
 
@@ -578,8 +578,8 @@ struct QuickMomentSheet: View {
                         .font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 Text(isSaving
-                     ? l.tr(zh: "保存中…", en: "Saving…", de: "Speichern…")
-                     : (canSave
+                    ? l.tr(zh: "保存中…", en: "Saving…", de: "Speichern…")
+                    : (canSave
                         ? l.tr(zh: "保存这一刻", en: "Save Moment", de: "Moment speichern")
                         : l.tr(zh: "写点什么或添加照片", en: "Add text or a photo", de: "Text oder Foto hinzufügen")))
                     .font(OhanaFont.body(.black))
@@ -709,7 +709,7 @@ private final class MomentLocationModel: ObservableObject {
             guard let self else { return }
             DispatchQueue.main.async {
                 switch result {
-                case .success(let location):
+                case let .success(location):
                     self.latitude = location.coordinate.latitude
                     self.longitude = location.coordinate.longitude
                     self.reverseGeocode(location)

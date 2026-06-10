@@ -5,8 +5,8 @@
 //  Pet medication cockpit using V4 interaction rules.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetMedicationContentView: View {
     let pet: Pet
@@ -26,11 +26,11 @@ struct PetMedicationContentView: View {
     private var l: L10n { L10n(appLanguage) }
     private var chromeAccent: Color { colorScheme == .dark ? Color.goPrimary : Color.goBlue }
     private var medicationEvents: [Event] {
-        let ids = Set(pet.medications.map { $0.id.uuidString })
+        let ids = Set(pet.medications.map(\.id.uuidString))
         return allEvents.filter {
             $0.eventType == EventType.petMedicationDose.rawValue &&
-            $0.relatedEntityType == PetMedicationDoseLogging.relatedEntityTypeMedication &&
-            ids.contains($0.relatedEntityId)
+                $0.relatedEntityType == PetMedicationDoseLogging.relatedEntityTypeMedication &&
+                ids.contains($0.relatedEntityId)
         }
     }
 
@@ -47,12 +47,12 @@ struct PetMedicationContentView: View {
     }
 
     private var todayRequired: Int {
-        let _ = doseRefreshToken
+        _ = doseRefreshToken
         return activeMeds.reduce(0) { $0 + PetMedicationDoseLogging.requiredDoses(on: Date(), for: $1) }
     }
 
     private var todayDone: Int {
-        let _ = doseRefreshToken
+        _ = doseRefreshToken
         return activeMeds.reduce(0) {
             $0 + min(
                 PetMedicationDoseLogging.todayDoseCount(events: medicationEvents, medicationId: $1.id),
@@ -146,7 +146,7 @@ struct PetMedicationContentView: View {
                 }
             }
             .overlay(alignment: .bottomTrailing) {
-                if !pet.hasPassedAway && !showingAddSheet {
+                if !pet.hasPassedAway, !showingAddSheet {
                     addMedicationFab
                         .padding(.trailing, 20)
                         .padding(.bottom, 24)
@@ -272,16 +272,16 @@ struct PetMedicationContentView: View {
     private var rhythmDays: [Date] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        return (-13...0).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
+        return (-13 ... 0).compactMap { cal.date(byAdding: .day, value: $0, to: today) }
     }
 
     private var medicationRhythmStrip: some View {
         let days = rhythmDays
-        let completedDays = days.filter { day in
+        let completedDays = days.count(where: { day in
             let stats = medicationDayStats(for: day)
             return stats.required > 0 && stats.done >= stats.required
-        }.count
-        let plannedDays = days.filter { medicationDayStats(for: $0).required > 0 }.count
+        })
+        let plannedDays = days.count(where: { medicationDayStats(for: $0).required > 0 })
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .lastTextBaseline, spacing: 8) {
@@ -322,10 +322,10 @@ struct PetMedicationContentView: View {
 
         return VStack(spacing: 5) {
             ZStack(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.tiny, style: .continuous)
                     .fill(Color.ohanaControlFill)
                     .frame(width: 14, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.tiny, style: .continuous)
                     .fill(tint)
                     .frame(width: 14, height: max(stats.required == 0 ? 4 : 6, 34 * progress))
                     .animation(GoMotion.stateChange, value: progress)
@@ -343,10 +343,10 @@ struct PetMedicationContentView: View {
             total + PetMedicationDoseLogging.requiredDoses(on: day, for: medication)
         }
         let done = pet.medications.reduce(0) { total, medication in
-            let count = medicationEvents.filter { event in
+            let count = medicationEvents.count(where: { event in
                 event.relatedEntityId == medication.id.uuidString &&
                     Calendar.current.isDate(event.startDate, inSameDayAs: day)
-            }.count
+            })
             return total + min(count, max(0, PetMedicationDoseLogging.requiredDoses(on: day, for: medication)))
         }
         return (required, done)
@@ -421,7 +421,7 @@ struct PetMedicationContentView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var todayPanelSubtitle: String {
@@ -485,7 +485,7 @@ struct PetMedicationContentView: View {
                 statusPill(for: med, remaining: remaining, required: required)
             }
 
-            if med.isActiveToday && required > 0 {
+            if med.isActiveToday, required > 0 {
                 ProgressView(value: Double(min(done, required)) / Double(required))
                     .tint(remaining == 0 ? Color.goTeal : tint)
                     .scaleEffect(x: 1, y: 1.25, anchor: .center)
@@ -504,7 +504,7 @@ struct PetMedicationContentView: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
 
-                if !pet.hasPassedAway && med.isActiveToday {
+                if !pet.hasPassedAway, med.isActiveToday {
                     Button {
                         recordDose(for: med)
                     } label: {
@@ -520,7 +520,7 @@ struct PetMedicationContentView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .onTapGesture {
             selectedMedication = med
         }
@@ -550,7 +550,7 @@ struct PetMedicationContentView: View {
                 .font(OhanaFont.adaptive(size: 30, weight: .black))
                 .foregroundStyle(chromeAccent)
                 .frame(width: 58, height: 58)
-                .background(chromeAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(chromeAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
             Text(l.tr(zh: "还没有用药计划", en: "No medication yet", de: "Noch keine Medikamente"))
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -560,7 +560,7 @@ struct PetMedicationContentView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(18)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private func medicationSubtitle(for med: PetMedication) -> String {
@@ -572,19 +572,19 @@ struct PetMedicationContentView: View {
     private func localizedFrequency(_ frequency: PetMedicationFrequency) -> String {
         switch frequency {
         case .daily:
-            return l.tr(zh: "每天", en: "Daily", de: "Täglich")
+            l.tr(zh: "每天", en: "Daily", de: "Täglich")
         case .twiceDaily:
-            return l.tr(zh: "每天两次", en: "Twice daily", de: "Zweimal täglich")
+            l.tr(zh: "每天两次", en: "Twice daily", de: "Zweimal täglich")
         case .threeTimesDaily:
-            return l.tr(zh: "每天三次", en: "Three times daily", de: "Dreimal täglich")
+            l.tr(zh: "每天三次", en: "Three times daily", de: "Dreimal täglich")
         case .everyOtherDay:
-            return l.tr(zh: "隔天", en: "Every other day", de: "Alle zwei Tage")
+            l.tr(zh: "隔天", en: "Every other day", de: "Alle zwei Tage")
         case .weekly:
-            return l.tr(zh: "每周", en: "Weekly", de: "Wöchentlich")
+            l.tr(zh: "每周", en: "Weekly", de: "Wöchentlich")
         case .asNeeded:
-            return l.tr(zh: "按需", en: "As needed", de: "Nach Bedarf")
+            l.tr(zh: "按需", en: "As needed", de: "Nach Bedarf")
         case .custom:
-            return l.tr(zh: "自定义", en: "Custom", de: "Benutzerdefiniert")
+            l.tr(zh: "自定义", en: "Custom", de: "Benutzerdefiniert")
         }
     }
 

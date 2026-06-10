@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 // MARK: - Ohana 图鉴主视图
@@ -20,14 +20,14 @@ struct CrewRosterOverlay: View {
     var familyTasks: [FamilyCollaborationTask] = []
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
-    var onAddEntity: ((EntityType) -> Void)? = nil
-    var onClose: (() -> Void)? = nil
+    var onAddEntity: ((EntityType) -> Void)?
+    var onClose: (() -> Void)?
     var hideToolbar: Bool = false
     var searchTrigger: Bool = false
     var addMemberTrigger: Bool = false
     var safeTopInset: CGFloat = 0
     var safeBottomInset: CGFloat = 0
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -60,9 +60,9 @@ struct CrewRosterOverlay: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var isMaterial: Bool { false }
-    private var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
+    private var matBg: Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
-    private var matAccent:  Color { Color(hex: "FF5A00") }
+    private var matAccent: Color { Color(hex: "FF5A00") }
     private var l: L10n { L10n(appLanguage) }
 
     private var filteredPets: [Pet] { Array(pets) }
@@ -74,9 +74,11 @@ struct CrewRosterOverlay: View {
     private var resolvedInitialMode: CrewRosterMode {
         showsFamilyCollaboration ? initialMode : .members
     }
+
     private var activeHumanCoconutBalance: Int {
         activeHuman?.coconutBalance ?? 0
     }
+
     private var activeHuman: Human? {
         humans.first { $0.id.uuidString == activeHumanIdStr }
     }
@@ -100,7 +102,7 @@ struct CrewRosterOverlay: View {
                             }
                             .padding(.top, 4)
                         }
-                    } else if showsFamilyCollaboration && selectedRosterMode == .collaboration {
+                    } else if showsFamilyCollaboration, selectedRosterMode == .collaboration {
                         FamilyCollaborationDashboardHost(
                             pets: activePets,
                             humans: humans,
@@ -125,7 +127,7 @@ struct CrewRosterOverlay: View {
                     }
                 }
 
-                if memberAddMenuExpanded && selectedRosterMode == .members {
+                if memberAddMenuExpanded, selectedRosterMode == .members {
                     Color.black.opacity(0.001) // ui-v4: allow transparent tap shield for expanded FAB menu
                         .ignoresSafeArea()
                         .onTapGesture {
@@ -140,7 +142,6 @@ struct CrewRosterOverlay: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .transition(.scale(scale: 0.86, anchor: .center).combined(with: .opacity))
                 }
-
             }
             .toolbar(.hidden, for: .navigationBar)
             .crewRosterPresentations(
@@ -168,7 +169,7 @@ struct CrewRosterOverlay: View {
             .onChange(of: showsFamilyCollaboration) { _, canCollaborate in
                 if !canCollaborate {
                     selectedRosterMode = .members
-                } else if selectedRosterMode == .members && initialMode == .collaboration {
+                } else if selectedRosterMode == .members, initialMode == .collaboration {
                     selectedRosterMode = .collaboration
                 }
                 collaborationEditorPresented = false
@@ -261,17 +262,17 @@ struct CrewRosterOverlay: View {
                 .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(isCollaboration
-                     ? l.tr(zh: "家庭协作", en: "Family Care", de: "Familienpflege")
-                     : l.tr(zh: "Ohana 成员", en: "Ohana Members", de: "Ohana Mitglieder"))
+                    ? l.tr(zh: "家庭协作", en: "Family Care", de: "Familienpflege")
+                    : l.tr(zh: "Ohana 成员", en: "Ohana Members", de: "Ohana Mitglieder"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(isCollaboration
-                     ? l.tr(zh: "任务、悬赏和今日分工", en: "Tasks, bounties, and today's handoff", de: "Aufgaben, Prämien und heutige Übergabe")
-                     : l.tr(zh: "成员和首页显示", en: "Members and home cards", de: "Mitglieder und Startkarten"))
+                    ? l.tr(zh: "任务、悬赏和今日分工", en: "Tasks, bounties, and today's handoff", de: "Aufgaben, Prämien und heutige Übergabe")
+                    : l.tr(zh: "成员和首页显示", en: "Members and home cards", de: "Mitglieder und Startkarten"))
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
@@ -364,7 +365,7 @@ struct CrewRosterOverlay: View {
 
     private var rosterFloatingActionOverlay: some View {
         VStack(alignment: .trailing, spacing: 14) {
-            if selectedRosterMode == .members && memberAddMenuExpanded {
+            if selectedRosterMode == .members, memberAddMenuExpanded {
                 ForEach(Array(memberAddMenuItems.enumerated()), id: \.element) { index, type in
                     memberAddActionRow(type)
                         .ohanaStaggeredMenuItem(isVisible: memberAddMenuItemsVisible, index: index, total: memberAddMenuItems.count)
@@ -375,7 +376,7 @@ struct CrewRosterOverlay: View {
 
             Button {
                 OhanaFeedback.medium()
-                if showsFamilyCollaboration && selectedRosterMode == .collaboration {
+                if showsFamilyCollaboration, selectedRosterMode == .collaboration {
                     withAnimation(GoMotion.page) {
                         collaborationCreateTaskTrigger &+= 1
                     }
@@ -421,7 +422,7 @@ struct CrewRosterOverlay: View {
             memberAddMenuItemsVisible = false
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            if memberAddMenuExpanded && !memberAddMenuItemsVisible {
+            if memberAddMenuExpanded, !memberAddMenuItemsVisible {
                 withAnimation(GoMotion.fab) {
                     memberAddMenuExpanded = false
                 }
@@ -434,7 +435,7 @@ struct CrewRosterOverlay: View {
     }
 
     private var fabAccessibilityLabel: String {
-        if showsFamilyCollaboration && selectedRosterMode == .collaboration {
+        if showsFamilyCollaboration, selectedRosterMode == .collaboration {
             return l.tr(zh: "发布协作任务", en: "Post collaboration task", de: "Aufgabe erstellen")
         }
         return memberAddMenuExpanded
@@ -485,9 +486,9 @@ struct CrewRosterOverlay: View {
 
     private func addEntityTitle(for type: EntityType) -> String {
         switch type {
-        case .pet: return l.addEntityPetTitle
-        case .human: return l.addEntityHumanTitle
-        case .plant: return l.addEntityPlantTitle
+        case .pet: l.addEntityPetTitle
+        case .human: l.addEntityHumanTitle
+        case .plant: l.addEntityPlantTitle
         }
     }
 
@@ -709,8 +710,8 @@ struct CrewRosterOverlay: View {
     }
 
     private func effectiveHomeVisibilityCount() -> Int {
-        let petCount = pets.filter { !$0.hasPassedAway && effectivePetHomeVisibility($0) }.count
-        let humanCount = humans.filter { effectiveHumanHomeVisibility($0) }.count
+        let petCount = pets.count(where: { !$0.hasPassedAway && effectivePetHomeVisibility($0) })
+        let humanCount = humans.count(where: { effectiveHumanHomeVisibility($0) })
         return petCount + humanCount
     }
 
@@ -864,5 +865,4 @@ struct CrewRosterOverlay: View {
         .padding(.top, 80)
         .padding(.horizontal, 32)
     }
-
 }

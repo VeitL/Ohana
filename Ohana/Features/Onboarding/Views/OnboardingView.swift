@@ -123,7 +123,7 @@ struct OnboardingView: View {
             } else {
                 withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) { iconPulse = true } // ui-v4: allow gated onboarding icon pulse; smoothness: allow reduce-work gated onboarding pulse.
             }
-            if !isReplay && !currentActiveHumanId.isEmpty && !hasOnboarded {
+            if !isReplay, !currentActiveHumanId.isEmpty, !hasOnboarded {
                 finishOnboarding(playsFeedback: false)
             }
         }
@@ -198,7 +198,7 @@ struct OnboardingView: View {
                     Spacer(minLength: 18)
 
                     TabView(selection: $introPageIndex) {
-                        ForEach(0..<introPageCount, id: \.self) { index in
+                        ForEach(0 ..< introPageCount, id: \.self) { index in
                             introPageContent(index)
                                 .tag(index)
                                 .padding(.horizontal, 20)
@@ -307,9 +307,9 @@ struct OnboardingView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, minHeight: 420)
-        .background(OnboardingPalette.panelFill, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .background(OnboardingPalette.panelFill, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                 .strokeBorder(OnboardingPalette.panelStroke, lineWidth: 1)
         )
         .shadow(color: OnboardingPalette.cardShadow, radius: 20, y: 12) // ui-v4: allow onboarding primary card lift
@@ -368,11 +368,11 @@ struct OnboardingView: View {
     private func heroGlyphOffset(index: Int, width: CGFloat, height: CGFloat) -> CGSize {
         switch index {
         case 0:
-            return CGSize(width: -width * 0.28, height: -height * 0.18)
+            CGSize(width: -width * 0.28, height: -height * 0.18)
         case 1:
-            return CGSize(width: width * 0.3, height: -height * 0.04)
+            CGSize(width: width * 0.3, height: -height * 0.04)
         default:
-            return CGSize(width: -width * 0.06, height: height * 0.27)
+            CGSize(width: -width * 0.06, height: height * 0.27)
         }
     }
 
@@ -395,7 +395,7 @@ struct OnboardingView: View {
 
     private var introPageDots: some View {
         HStack(spacing: 7) {
-            ForEach(0..<introPageCount, id: \.self) { index in
+            ForEach(0 ..< introPageCount, id: \.self) { index in
                 Capsule()
                     .fill(index == introPageIndex ? Color.goLime : OnboardingPalette.mutedFill)
                     .frame(width: index == introPageIndex ? 24 : 7, height: 7)
@@ -411,7 +411,7 @@ struct OnboardingView: View {
             Button(action: advanceFromWelcome) {
                 HStack(spacing: 8) {
                     Text(introPageIndex < introPageCount - 1
-                         ? localized(zh: "下一页", en: "Next", de: "Weiter")
+                        ? localized(zh: "下一页", en: "Next", de: "Weiter")
                         : localized(zh: "建立本人档案", en: "Create profile", de: "Profil erstellen"))
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(OnboardingPalette.selectedText)

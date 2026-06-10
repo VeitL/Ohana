@@ -9,15 +9,15 @@ import SwiftUI
 /// that sit directly on top of the `UltimateGlassCard`.
 public struct InnerPillConfig {
     public var isDark: Bool
-    
+
     public init(isDark: Bool) {
         self.isDark = isDark
     }
-    
+
     public var bg: Color {
         isDark ? .white.opacity(0.1) : .black.opacity(0.04)
     }
-    
+
     public var text: Color {
         // Slate 600 map -> roughly #475569
         isDark ? .white.opacity(0.8) : Color(hex: "475569")
@@ -28,12 +28,12 @@ public struct InnerPillConfig {
 public struct InnerGlassTag: View {
     public var text: String
     public var isDark: Bool
-    
+
     public init(text: String, isDark: Bool) {
         self.text = text
         self.isDark = isDark
     }
-    
+
     public var body: some View {
         Text(text)
             .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
@@ -72,7 +72,7 @@ public struct UltimateGlassCard<Content: View>: View {
     public var body: some View {
         content()
             .background { cardBackground }
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .onChange(of: colorScheme) { _, newScheme in
                 if !useExplicitMode { colorSchemeState = newScheme }
             }
@@ -93,7 +93,7 @@ public struct UltimateGlassCard<Content: View>: View {
     // MARK: Dark Mode
     @ViewBuilder
     private var darkBackground: some View {
-        let r = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        let r = RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         r.fill(Color.white.opacity(0.075)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             .overlay {
                 r.strokeBorder(Color.white.opacity(0.11), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
@@ -104,12 +104,11 @@ public struct UltimateGlassCard<Content: View>: View {
     // MARK: Light Mode
     @ViewBuilder
     private var lightBackground: some View {
-        let r = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        let r = RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         r.fill(Color.white.opacity(0.86)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             .overlay {
                 r.strokeBorder(Color.black.opacity(0.06), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             }
             .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 3) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
     }
-
 }

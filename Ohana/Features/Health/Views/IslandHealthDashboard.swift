@@ -5,8 +5,8 @@
 //  Cross-pet health archive dashboard.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private enum HealthDashboardRange: Hashable, CaseIterable {
     case days7
@@ -16,23 +16,23 @@ private enum HealthDashboardRange: Hashable, CaseIterable {
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .days7: return l.tr(zh: "7天", en: "7D", de: "7T")
-        case .days30: return l.tr(zh: "30天", en: "30D", de: "30T")
-        case .days90: return l.tr(zh: "90天", en: "90D", de: "90T")
-        case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
+        case .days7: l.tr(zh: "7天", en: "7D", de: "7T")
+        case .days30: l.tr(zh: "30天", en: "30D", de: "30T")
+        case .days90: l.tr(zh: "90天", en: "90D", de: "90T")
+        case .all: l.tr(zh: "全部", en: "All", de: "Alle")
         }
     }
 
     func startDate(now: Date = Date(), calendar: Calendar = .current) -> Date? {
         switch self {
         case .days7:
-            return calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
+            calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
         case .days30:
-            return calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
+            calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
         case .days90:
-            return calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
+            calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
         case .all:
-            return nil
+            nil
         }
     }
 }
@@ -60,7 +60,7 @@ private struct HealthPetSummary: Identifiable {
 
 struct IslandHealthDashboardContentView: View {
     var standalone: Bool = true
-    var onOpenPet: ((Pet) -> Void)? = nil
+    var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
 
     @Environment(\.dismiss) private var dismiss
@@ -93,19 +93,19 @@ struct IslandHealthDashboardContentView: View {
 
     private var overdueCount: Int {
         selectedPets.reduce(0) { total, pet in
-            total + dueItems(for: pet).filter { item in
+            total + dueItems(for: pet).count(where: { item in
                 let days = Calendar.current.dateComponents([.day], from: Date(), to: item.date).day ?? 0
                 return days < 0
-            }.count
+            })
         }
     }
 
     private var dueSoonCount: Int {
         selectedPets.reduce(0) { total, pet in
-            total + dueItems(for: pet).filter { item in
+            total + dueItems(for: pet).count(where: { item in
                 let days = Calendar.current.dateComponents([.day], from: Date(), to: item.date).day ?? 0
                 return days >= 0 && days <= 30
-            }.count
+            })
         }
     }
 
@@ -133,16 +133,16 @@ struct IslandHealthDashboardContentView: View {
         let nowStart = calendar.startOfDay(for: Date())
         let start = calendar.startOfDay(for: chartStartDate)
         let dayCount = max(0, calendar.dateComponents([.day], from: start, to: nowStart).day ?? 0)
-        return (0...dayCount).compactMap { offset in
+        return (0 ... dayCount).compactMap { offset in
             guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
-            let count = filteredLogs.filter { calendar.isDate($0.date, inSameDayAs: day) }.count
+            let count = filteredLogs.count(where: { calendar.isDate($0.date, inSameDayAs: day) })
             return HealthDayPoint(date: day, count: count)
         }
     }
 
     private var typeBreakdown: [(type: HealthLogType, count: Int)] {
         HealthLogType.allCases
-            .map { type in (type, periodLogs.filter { $0.type == type.rawValue }.count) }
+            .map { type in (type, periodLogs.count(where: { $0.type == type.rawValue })) }
             .filter { $0.count > 0 }
             .sorted { $0.count > $1.count }
     }
@@ -156,8 +156,8 @@ struct IslandHealthDashboardContentView: View {
                 id: pet.id,
                 pet: pet,
                 totalCount: pet.healthLogs.count,
-                periodCount: pet.healthLogs.filter { $0.date >= cutoff }.count,
-                latestTitle: latest.map { $0.healthLogType.rawValue } ?? l.tr(zh: "暂无健康记录", en: "No health logs", de: "Keine Gesundheitsdaten"),
+                periodCount: pet.healthLogs.count(where: { $0.date >= cutoff }),
+                latestTitle: latest.map(\.healthLogType.rawValue) ?? l.tr(zh: "暂无健康记录", en: "No health logs", de: "Keine Gesundheitsdaten"),
                 latestDate: latest?.date,
                 riskText: risk.text,
                 riskColor: risk.color,
@@ -326,7 +326,7 @@ struct IslandHealthDashboardContentView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var healthBadgeStrip: some View {
@@ -468,9 +468,9 @@ struct IslandHealthDashboardContentView: View {
     }
 
     @ViewBuilder
-    private func selectorChip<A: View>(
+    private func selectorChip(
         title: String,
-        avatar: () -> A,
+        avatar: () -> some View,
         isSelected: Bool,
         action: @escaping () -> Void
     ) -> some View {
@@ -559,14 +559,13 @@ struct IslandHealthDashboardContentView: View {
             guard let last = pet.healthLogs.filter({ $0.type == type.rawValue }).max(by: { $0.date < $1.date }) else {
                 return nil
             }
-            let next: Date?
-            switch type {
+            let next: Date? = switch type {
             case .vaccine, .checkup:
-                next = Calendar.current.date(byAdding: .year, value: 1, to: last.date)
+                Calendar.current.date(byAdding: .year, value: 1, to: last.date)
             case .medication, .dewormingInternal, .dewormingExternal:
-                next = Calendar.current.date(byAdding: .month, value: 3, to: last.date)
+                Calendar.current.date(byAdding: .month, value: 3, to: last.date)
             default:
-                next = nil
+                nil
             }
             guard let next else { return nil }
             return (type, next)

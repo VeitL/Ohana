@@ -284,7 +284,7 @@ enum FeedHomePerformance {
     static func measure<T>(_ name: String, _ body: () -> T) -> T {
         let startedAt = CFAbsoluteTimeGetCurrent()
         let result = body()
-        let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000
+        let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000
         logger.debug("\(name, privacy: .public) \(String(format: "%.1f", elapsed), privacy: .public)ms")
         return result
     }

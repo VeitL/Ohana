@@ -3,10 +3,10 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
 import PhotosUI
+import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 extension AddExpenseSheet {
@@ -18,7 +18,7 @@ extension AddExpenseSheet {
     }
 
     var bottomSaveTitle: String {
-        return l.quickExpenseSave
+        l.quickExpenseSave
     }
 
     func configureInitialPayer() {
@@ -49,13 +49,13 @@ extension AddExpenseSheet {
 
     func defaultAmounts(for category: ExpenseCategory) -> [Double] {
         switch category {
-        case .food: return [20, 50, 100]
-        case .treats: return [10, 20, 50]
-        case .medical: return [100, 300, 800]
-        case .grooming: return [80, 150, 300]
-        case .toys: return [20, 50, 100]
-        case .insurancePremium: return [60, 120, 300]
-        case .other: return [20, 100, 300]
+        case .food: [20, 50, 100]
+        case .treats: [10, 20, 50]
+        case .medical: [100, 300, 800]
+        case .grooming: [80, 150, 300]
+        case .toys: [20, 50, 100]
+        case .insurancePremium: [60, 120, 300]
+        case .other: [20, 100, 300]
         }
     }
 
@@ -141,7 +141,7 @@ extension AddExpenseSheet {
     }
 
     func handleReceiptFileImport(_ result: Result<URL, Error>) {
-        guard case .success(let url) = result else { return }
+        guard case let .success(url) = result else { return }
         inputFocused = false
 
         guard let data = SecurityScopedFileDataReader.read(url) else { return }
@@ -160,11 +160,11 @@ extension AddExpenseSheet {
     func receiptDocumentCategory() -> DocumentCategory {
         switch selectedCategory {
         case .medical:
-            return .medical
+            .medical
         case .insurancePremium:
-            return .insurance
+            .insurance
         default:
-            return .other
+            .other
         }
     }
 

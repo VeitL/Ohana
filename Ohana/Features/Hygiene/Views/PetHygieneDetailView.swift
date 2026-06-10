@@ -6,8 +6,8 @@
 //  深色背景 + ScrollView 卡片 + 极简月频条
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Chart Data Point for Hygiene
 private struct HygieneChartPoint: Identifiable {
@@ -33,6 +33,7 @@ struct PetHygieneDetailContentView: View {
     private var themeColor: Color {
         Color(hex: pet.safeThemeColorHex)
     }
+
     private var isDark: Bool { colorScheme == .dark }
     private var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
 
@@ -71,14 +72,14 @@ struct PetHygieneDetailContentView: View {
 
     private func recurrenceLabel(_ days: Int) -> String {
         switch days {
-        case 0: return "不重复"
-        case 1: return "每天"
-        case 2: return "每 2 天"
-        case 3: return "每 3 天"
-        case 7: return "每周"
-        case 14: return "每两周"
-        case 30: return "每月"
-        default: return "每 \(days) 天"
+        case 0: "不重复"
+        case 1: "每天"
+        case 2: "每 2 天"
+        case 3: "每 3 天"
+        case 7: "每周"
+        case 14: "每两周"
+        case 30: "每月"
+        default: "每 \(days) 天"
         }
     }
 
@@ -86,11 +87,11 @@ struct PetHygieneDetailContentView: View {
     private func monthStripPoints(_ type: HygieneType) -> [HygieneChartPoint] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        return (0..<28).reversed().map { offset in
+        return (0 ..< 28).reversed().map { offset in
             let d = cal.date(byAdding: .day, value: -offset, to: today)!
-            let count = pet.hygieneLogs.filter {
+            let count = pet.hygieneLogs.count(where: {
                 $0.type == type.rawValue && cal.isDate($0.date, inSameDayAs: d)
-            }.count
+            })
             return HygieneChartPoint(day: d, count: count, label: "")
         }
     }
@@ -106,7 +107,7 @@ struct PetHygieneDetailContentView: View {
             HStack(spacing: 2) {
                 ForEach(pts) { pt in
                     let h = min(maxH, 4 + CGFloat(min(pt.count, 4)) * 4)
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.hairline, style: .continuous)
                         .fill(themeColor.opacity(pt.count > 0 ? 0.72 : 0.12))
                         .frame(width: 5, height: h)
                 }
@@ -118,7 +119,7 @@ struct PetHygieneDetailContentView: View {
     private var monthlyTotalCount: Int {
         let cal = Calendar.current
         let now = Date()
-        return pet.hygieneLogs.filter { cal.isDate($0.date, equalTo: now, toGranularity: .month) }.count
+        return pet.hygieneLogs.count(where: { cal.isDate($0.date, equalTo: now, toGranularity: .month) })
     }
 
     private var currentStrike: Int {
@@ -151,8 +152,9 @@ struct PetHygieneDetailContentView: View {
     }
 
     private var completedTodayCount: Int {
-        HygieneType.allCases.filter { isDoneToday($0) }.count
+        HygieneType.allCases.count(where: { isDoneToday($0) })
     }
+
     @State private var hygieneCycleRefresh = 0
     @State private var showSingleUseNotice = false
     @State private var singleUseNoticeMessage = ""
@@ -185,8 +187,8 @@ struct PetHygieneDetailContentView: View {
             HygieneTodoSheet(pet: pet, type: hygieneType, accent: themeColor) {
                 hygieneCycleRefresh += 1
             }
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.hidden)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.hidden)
         }
         .alert("今天已经完成了", isPresented: $showSingleUseNotice) {
             Button("知道了", role: .cancel) {}
@@ -295,7 +297,7 @@ struct PetHygieneDetailContentView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     // MARK: - 是否今天已完成
@@ -307,7 +309,7 @@ struct PetHygieneDetailContentView: View {
 
     // MARK: - 护理类型卡片（重构）
     private func hygieneTypeCard(_ type: HygieneType) -> some View {
-        let _ = hygieneCycleRefresh
+        _ = hygieneCycleRefresh
         let logs = pet.hygieneLogs.filter { $0.type == type.rawValue }.sorted { $0.date > $1.date }
         let color = statusColor(type)
         let days = daysSince(type)
@@ -408,9 +410,9 @@ struct PetHygieneDetailContentView: View {
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(themeColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(themeColor.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                         .strokeBorder(themeColor.opacity(0.22), lineWidth: 0.5)
                 )
             }
@@ -453,9 +455,9 @@ struct PetHygieneDetailContentView: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         )
     }

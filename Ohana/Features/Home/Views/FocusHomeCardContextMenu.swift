@@ -22,7 +22,7 @@ struct FocusHomeCardContextMenu: View {
     private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext, services: appServices) }
 
     var body: some View {
-        if card.isReal && !card.isDummy && !card.isHuman,
+        if card.isReal, !card.isDummy, !card.isHuman,
            let pet = pets.first(where: { $0.id == card.id && !$0.hasPassedAway }) {
             Button {
                 quickFeed(pet)

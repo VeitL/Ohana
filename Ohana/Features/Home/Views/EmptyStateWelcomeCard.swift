@@ -5,7 +5,7 @@
 import SwiftUI
 
 struct EmptyStateWelcomeCard: View {
-    var onAddPet:   () -> Void
+    var onAddPet: () -> Void
     var onAddHuman: () -> Void
 
     var body: some View {
@@ -64,10 +64,10 @@ struct EmptyStateWelcomeCard: View {
                 colors: [Color(hex: "FFE4EA"), Color(hex: "F8D8DF")],
                 startPoint: .top, endPoint: .bottom
             ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .stroke(Color.ohanaGlassStroke.opacity(0.55), lineWidth: 1)
         )
     }

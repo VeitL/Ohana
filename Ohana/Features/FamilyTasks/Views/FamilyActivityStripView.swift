@@ -40,8 +40,8 @@ struct FamilyActivityStripView: View {
         let id = UUID()
         let date: Date
         let executorId: String?
-        let iconName: String      // SF Symbol
-        let accent: Color         // 徽章底色
+        let iconName: String // SF Symbol
+        let accent: Color // 徽章底色
         let dedupKey: String
     }
 
@@ -185,11 +185,11 @@ struct FamilyActivityStripView: View {
 
     private func compactDescription(uniqueCount: Int, actionCount: Int) -> String {
         if uniqueCount == 0 {
-            return l.tr(zh: "今天 \(actionCount) 次记录", en: "\(actionCount) records today", de: "\(actionCount) Einträge heute")
+            l.tr(zh: "今天 \(actionCount) 次记录", en: "\(actionCount) records today", de: "\(actionCount) Einträge heute")
         } else if uniqueCount == 1 {
-            return l.tr(zh: "今天已照顾 \(pet.name) \(actionCount) 次", en: "\(pet.name) cared for \(actionCount)x today", de: "\(pet.name) heute \(actionCount)x versorgt")
+            l.tr(zh: "今天已照顾 \(pet.name) \(actionCount) 次", en: "\(pet.name) cared for \(actionCount)x today", de: "\(pet.name) heute \(actionCount)x versorgt")
         } else {
-            return l.tr(zh: "全家今日一起照顾 \(pet.name) \(actionCount) 次", en: "Family cared for \(pet.name) \(actionCount)x today", de: "Familie hat \(pet.name) heute \(actionCount)x versorgt")
+            l.tr(zh: "全家今日一起照顾 \(pet.name) \(actionCount) 次", en: "Family cared for \(pet.name) \(actionCount)x today", de: "Familie hat \(pet.name) heute \(actionCount)x versorgt")
         }
     }
 

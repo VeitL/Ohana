@@ -120,10 +120,10 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     let safeBottom: CGFloat
     let selectedCardId: UUID?
     var preparedHeroSnapshots: [UUID: FocusHomeVerticalSolidHeroSnapshot] = [:]
-    var heroSnapshot: FocusHomeVerticalSolidHeroSnapshot? = nil
+    var heroSnapshot: FocusHomeVerticalSolidHeroSnapshot?
     let progress: CGFloat
     var heroDirection: Int = 0
-    var arrivingCardId: UUID? = nil
+    var arrivingCardId: UUID?
     let reduceMotion: Bool
     let localization: L10n
     let allowsAmbientFloat: Bool
@@ -159,8 +159,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         }
 
         if let heroSnapshot,
-           heroSnapshot.card.id == selectedCardId
-        {
+           heroSnapshot.card.id == selectedCardId {
             return heroSnapshot
         }
 
@@ -260,7 +259,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         [
             arrivingCardId?.uuidString ?? "",
             cards.map(\.id.uuidString).joined(separator: "|"),
-            isVisible ? "visible" : "hidden",
+            isVisible ? "visible" : "hidden"
         ].joined(separator: "#")
     }
 
@@ -366,7 +365,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
                     allowsLiveAvatarFallback: selectedCardId == nil && motionSnapshot == nil
                 )
 
-                if embedsQuickActionsInCard && isExpandedSurface && isExpandedCollapseReady && walkTrackingPet == nil {
+                if embedsQuickActionsInCard, isExpandedSurface, isExpandedCollapseReady, walkTrackingPet == nil {
                     embeddedCardCollapseHitLayer(for: renderCard, frame: frame)
                         .zIndex(10)
                 }
@@ -576,7 +575,7 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         for snapshot: FocusHomeVerticalSolidHeroSnapshot?,
         stableFrame: CGRect
     ) -> CGRect {
-        return snapshot?.collapsedFrame ?? stableFrame
+        snapshot?.collapsedFrame ?? stableFrame
     }
 
     private func zIndex(for index: Int, isSelected: Bool) -> Double {
@@ -668,41 +667,41 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
     private func collapsedOffsets(count: Int) -> [CGSize] {
         switch min(max(count, 1), 6) {
         case 1:
-            return [CGSize(width: 0, height: 0)]
+            [CGSize(width: 0, height: 0)]
         case 2:
-            return [
+            [
                 CGSize(width: -0.58, height: -0.05),
-                CGSize(width: 0.58, height: 0.05),
+                CGSize(width: 0.58, height: 0.05)
             ]
         case 3:
-            return [
+            [
                 CGSize(width: -0.62, height: -0.58),
                 CGSize(width: 0.62, height: -0.54),
-                CGSize(width: 0, height: 0.62),
+                CGSize(width: 0, height: 0.62)
             ]
         case 4:
-            return [
+            [
                 CGSize(width: -0.62, height: -0.62),
                 CGSize(width: 0.62, height: -0.62),
                 CGSize(width: -0.62, height: 0.62),
-                CGSize(width: 0.62, height: 0.62),
+                CGSize(width: 0.62, height: 0.62)
             ]
         case 5:
-            return [
+            [
                 CGSize(width: -0.84, height: -0.98),
                 CGSize(width: 0.78, height: -0.86),
                 CGSize(width: -0.88, height: 0.34),
                 CGSize(width: 0.88, height: 0.42),
-                CGSize(width: -0.06, height: 1.02),
+                CGSize(width: -0.06, height: 1.02)
             ]
         default:
-            return [
+            [
                 CGSize(width: -0.92, height: -1.12),
                 CGSize(width: 0.72, height: -0.88),
                 CGSize(width: -1.03, height: -0.02),
                 CGSize(width: 0.92, height: 0.28),
                 CGSize(width: -0.54, height: 1.18),
-                CGSize(width: 0.98, height: 0.92),
+                CGSize(width: 0.98, height: 0.92)
             ]
         }
     }

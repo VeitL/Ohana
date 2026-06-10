@@ -19,54 +19,54 @@ enum CoconutGachaRevealPhase: String, CaseIterable, Identifiable {
     var showsSplitShell: Bool {
         switch self {
         case .idle, .charging:
-            return false
+            false
         case .crack, .reveal, .settled:
-            return true
+            true
         }
     }
 
     var showsPrize: Bool {
         switch self {
         case .idle, .charging, .crack:
-            return false
+            false
         case .reveal, .settled:
-            return true
+            true
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
         case .idle:
-            return l.tr(zh: "准备敲开", en: "Ready to crack", de: "Bereit zum Öffnen")
+            l.tr(zh: "准备敲开", en: "Ready to crack", de: "Bereit zum Öffnen")
         case .charging:
-            return l.tr(zh: "蓄力中", en: "Charging", de: "Lädt auf")
+            l.tr(zh: "蓄力中", en: "Charging", de: "Lädt auf")
         case .crack:
-            return l.tr(zh: "咔嚓", en: "Crack", de: "Knack")
+            l.tr(zh: "咔嚓", en: "Crack", de: "Knack")
         case .reveal:
-            return l.tr(zh: "发现奖励", en: "Prize found", de: "Gewinn gefunden")
+            l.tr(zh: "发现奖励", en: "Prize found", de: "Gewinn gefunden")
         case .settled:
-            return l.tr(zh: "已收下", en: "Collected", de: "Eingesammelt")
+            l.tr(zh: "已收下", en: "Collected", de: "Eingesammelt")
         }
     }
 
     func subtitle(_ l: L10n, isCollectible: Bool = false) -> String {
         switch self {
         case .idle:
-            return l.tr(zh: "可能是款式，也可能是一句小话", en: "A collectible, a tiny reward, or a little note", de: "Eine Figur, eine kleine Belohnung oder eine Notiz")
+            l.tr(zh: "可能是款式，也可能是一句小话", en: "A collectible, a tiny reward, or a little note", de: "Eine Figur, eine kleine Belohnung oder eine Notiz")
         case .charging:
-            return isCollectible
+            isCollectible
                 ? l.tr(zh: "盲盒里有一张小卡醒来了", en: "A little card wakes inside the box", de: "Eine kleine Karte erwacht in der Box")
                 : l.tr(zh: "轻轻摇一摇，听见里面的惊喜", en: "A gentle shake wakes the surprise inside", de: "Ein sanftes Schütteln weckt die Überraschung")
         case .crack:
-            return isCollectible
+            isCollectible
                 ? l.tr(zh: "盒子打开了", en: "The box opens", de: "Die Box öffnet sich")
                 : l.tr(zh: "椰壳裂开了", en: "The shell is opening", de: "Die Schale öffnet sich")
         case .reveal:
-            return isCollectible
+            isCollectible
                 ? l.tr(zh: "剪影卡翻到了眼前", en: "The silhouette card lands up close", de: "Die Silhouettenkarte landet ganz nah")
                 : l.tr(zh: "小结果跳出来啦", en: "A little result pops out", de: "Ein kleines Ergebnis springt heraus")
         case .settled:
-            return isCollectible
+            isCollectible
                 ? l.tr(zh: "已经放进收藏夹", en: "Added to the collection", de: "Zur Sammlung hinzugefügt")
                 : l.tr(zh: "这次结果已经收下", en: "This opening is settled", de: "Dieses Öffnen ist abgeschlossen")
         }
@@ -90,36 +90,36 @@ enum GachaCollectibleRevealPhase: String, CaseIterable, Identifiable {
     var holdsCollectionUpdate: Bool {
         switch self {
         case .idle, .cardPopped, .flipping, .revealed, .secretBurst, .toyAppearing, .toyReady, .cardGone, .flying:
-            return true
+            true
         case .settled:
-            return false
+            false
         }
     }
 
     var showsCard: Bool {
         switch self {
         case .cardPopped, .flipping, .revealed, .secretBurst, .toyAppearing, .toyReady:
-            return true
+            true
         case .idle, .cardGone, .flying, .settled:
-            return false
+            false
         }
     }
 
     var showsRealAsset: Bool {
         switch self {
         case .secretBurst, .toyAppearing, .toyReady, .cardGone, .flying, .settled:
-            return true
+            true
         case .idle, .cardPopped, .flipping, .revealed:
-            return false
+            false
         }
     }
 
     var showsFloatingToy: Bool {
         switch self {
         case .cardGone, .flying:
-            return true
+            true
         case .idle, .cardPopped, .flipping, .revealed, .secretBurst, .toyAppearing, .toyReady, .settled:
-            return false
+            false
         }
     }
 }
@@ -130,11 +130,11 @@ struct CoconutGachaRevealView: View {
     let rarity: GachaRarity?
     let trigger: Int
     var instantCoconutDelta: Int = 0
-    var collectibleItem: GachaItemEntry? = nil
+    var collectibleItem: GachaItemEntry?
     var revealCardPhase: GachaCollectibleRevealPhase = .idle
     var isNewCollectible: Bool = false
-    var onCollectibleCardTap: (() -> Void)? = nil
-    var onCollectibleKeepTap: (() -> Void)? = nil
+    var onCollectibleCardTap: (() -> Void)?
+    var onCollectibleKeepTap: (() -> Void)?
 
     @AppStorage("appLanguage") private var appLanguage: String = "zh"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -145,6 +145,7 @@ struct CoconutGachaRevealView: View {
     private var shouldAnimate: Bool {
         !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
     }
+
     private var isCollectibleReveal: Bool { collectibleItem != nil }
     private var isCoconutGrandBundle: Bool { instantCoconutDelta >= 500 }
     private var stageHeight: CGFloat { isCollectibleReveal ? 304 : 178 }
@@ -174,7 +175,6 @@ struct CoconutGachaRevealView: View {
                     break
                 }
             }
-
         }
         .animation(shouldAnimate ? GoMotion.stateChange : GoMotion.reduced, value: phase)
     }
@@ -195,7 +195,7 @@ struct CoconutGachaRevealView: View {
                 )
                 .frame(width: isCollectibleReveal ? 320 : 266, height: isCollectibleReveal ? 320 : 266)
 
-            RoundedRectangle(cornerRadius: 38, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetLarge, style: .continuous)
                 .fill(Color.ohanaControlFill.opacity(0.42))
                 .frame(width: isCollectibleReveal ? 230 : 208, height: 76)
                 .offset(y: isCollectibleReveal ? 100 : 64)
@@ -227,7 +227,7 @@ struct CoconutGachaRevealView: View {
                 .scaleEffect(phase == .crack && shouldAnimate ? 0.94 : 1)
                 .offset(y: phase == .crack ? 12 : 10)
                 .shadow(color: Color.arkInk.opacity(0.18), radius: 16, x: 0, y: 10) // ui-v4: allow generated coconut asset depth
-            .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
         } else {
             GachaAssetImage(assetName: "GachaFluffyCoconutClosed", fallbackSymbol: "🥥")
                 .frame(width: 158, height: 210)
@@ -289,7 +289,7 @@ struct CoconutGachaRevealView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(Color.ohanaCardSurface.opacity(0.82), in: Capsule())
-                    .ohanaShine(trigger: trigger, cornerRadius: 14, isEnabled: shouldAnimate && phase == .reveal)
+                    .ohanaShine(trigger: trigger, cornerRadius: OhanaRadius.row, isEnabled: shouldAnimate && phase == .reveal)
             }
             .offset(y: phase == .settled ? -18 : -24)
             .transition(.ohanaPop)

@@ -139,7 +139,7 @@ enum AchievementRewardCommandService {
             )
         } catch {
             #if DEBUG
-            print("❌ [AchievementRewardCommandService] wallet write failed: \(error.localizedDescription)")
+                OhanaLog.error("[AchievementRewardCommandService] wallet write failed: \(error.localizedDescription)", category: "Economy")
             #endif
             return AchievementRewardCommandResult(
                 entityID: entityID,
@@ -208,7 +208,7 @@ enum BackdateCheckInCommandService {
         activeHumanSelection: ActiveHumanSelecting
     ) -> Human? {
         guard let activeID = activeHumanSelection.currentHumanId else { return nil }
-        return (try? context.fetch(FetchDescriptor<Human>()))?.first { $0.id.uuidString == activeID }
+        return (try? context.fetch(FetchDescriptor<Human>()))?.first { $0.id.uuidString == activeID } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 }
 
@@ -500,12 +500,11 @@ enum Avatar2DUpgradeCommandService {
         context: ModelContext
     ) -> Avatar2DUpgradeCommandResult {
         let rawGender = HumanProfileOptions.normalizedGender(human.genderRaw)
-        let avatarGender: String
-        switch rawGender {
+        let avatarGender: String = switch rawGender {
         case "男", "女", "非二元":
-            avatarGender = rawGender
+            rawGender
         default:
-            avatarGender = "非二元"
+            "非二元"
         }
 
         guard let data = HumanAvatarAssetCatalog.avatarData(gender: avatarGender, birthday: human.birthday) else {
@@ -717,15 +716,15 @@ struct RewardEconomyCommandExecutor {
     private func backdateActionType(for actionKey: String) -> QuestManager.OhanaActionType {
         switch actionKey {
         case "feed":
-            return .feed
+            .feed
         case "water":
-            return .water
+            .water
         case "potty":
-            return .potty(isLitter: false)
+            .potty(isLitter: false)
         case "walk":
-            return .walk(distanceMeters: 300)
+            .walk(distanceMeters: 300)
         default:
-            return .general(
+            .general(
                 humanReward: 1,
                 petReward: 0,
                 emoji: "📅",

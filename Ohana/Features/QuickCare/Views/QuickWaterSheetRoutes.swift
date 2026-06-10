@@ -22,24 +22,24 @@ enum QuickWaterActiveSheet: String, Identifiable {
     var usesInlineOverlay: Bool {
         switch self {
         case .waterSettings, .waterAmount, .waterPlan, .filterSettings:
-            return true
+            true
         case .history, .waterOverview, .waterChangeOverview, .filterOverview:
-            return false
+            false
         }
     }
 
     var inlineHeight: CGFloat {
         switch self {
         case .waterAmount:
-            return 430
+            430
         case .waterPlan:
-            return 486
+            486
         case .waterSettings:
-            return 420
+            420
         case .filterSettings:
-            return 460
+            460
         case .history, .waterOverview, .waterChangeOverview, .filterOverview:
-            return 720
+            720
         }
     }
 }

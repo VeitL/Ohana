@@ -178,8 +178,8 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
         var descriptor = FetchDescriptor<Reminder>(
             predicate: #Predicate<Reminder> { reminder in
                 reminder.scheduledAt >= catchUpStart &&
-                reminder.scheduledAt < end &&
-                (reminder.status == pending || reminder.status == failed)
+                    reminder.scheduledAt < end &&
+                    (reminder.status == pending || reminder.status == failed)
             },
             sortBy: [SortDescriptor(\.scheduledAt)]
         )
@@ -279,11 +279,10 @@ extension CareEventService {
 
     @MainActor
     static func stockOwnerPet(for targets: [Pet], preferred: Pet, foodKind: FeedFoodKind, context: ModelContext) -> Pet {
-        let records = (try? context.fetch(FetchDescriptor<PetFoodRecord>())) ?? []
+        let records = (try? context.fetch(FetchDescriptor<PetFoodRecord>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         if FeedStockCalculator.activeStockRecord(for: preferred, foodKind: foodKind, foodRecords: records) != nil {
             return preferred
         }
         return targets.first { FeedStockCalculator.activeStockRecord(for: $0, foodKind: foodKind, foodRecords: records) != nil } ?? preferred
     }
-
 }

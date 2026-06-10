@@ -47,11 +47,11 @@ struct QuickFeedOverviewSnapshot {
         let feedModeLogs = mainLogs.filter { log in
             switch activeMode {
             case .manual:
-                return FeedLogMetadata.source(for: log) == .manualMain
+                FeedLogMetadata.source(for: log) == .manualMain
             case .manualReminder:
-                return FeedLogMetadata.source(for: log) == .manualReminder
+                FeedLogMetadata.source(for: log) == .manualReminder
             case .autoFeeder:
-                return FeedLogMetadata.source(for: log) == .autoMain
+                FeedLogMetadata.source(for: log) == .autoMain
             }
         }
         let allPlanReminders = manualPlanEvents
@@ -224,10 +224,10 @@ struct QuickFeedOverviewSnapshotRevision: Equatable {
         )
     }
 
-    private static func revisionHash<S: Sequence, Element>(
-        _ values: S,
+    private static func revisionHash<Element>(
+        _ values: some Sequence<Element>,
         combine: (inout Hasher, Element) -> Void
-    ) -> Int where S.Element == Element {
+    ) -> Int {
         var hasher = Hasher()
         var count = 0
         for value in values {

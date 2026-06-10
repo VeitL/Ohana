@@ -14,9 +14,9 @@ enum PetDetailTab: String, CaseIterable {
 
     var icon: String {
         switch self {
-        case .overview: return "pawprint.fill"
-        case .health: return "heart.text.clipboard"
-        case .records: return "list.clipboard"
+        case .overview: "pawprint.fill"
+        case .health: "heart.text.clipboard"
+        case .records: "list.clipboard"
         }
     }
 }

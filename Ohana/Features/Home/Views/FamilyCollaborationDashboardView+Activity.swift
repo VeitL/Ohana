@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension FamilyCollaborationDashboardView {
     var petCareStatusSection: some View {
@@ -25,7 +25,7 @@ extension FamilyCollaborationDashboardView {
         collaborationSection(
             title: l.tr(zh: "今日动态", en: "Today activity", de: "Aktivität heute"),
             icon: "waveform.path.ecg",
-            count: latestActivity.filter { Calendar.current.isDateInToday($0.date) }.count
+            count: latestActivity.count(where: { Calendar.current.isDateInToday($0.date) })
         ) {
             if latestActivity.isEmpty {
                 compactEmpty(
@@ -42,12 +42,12 @@ extension FamilyCollaborationDashboardView {
         }
     }
 
-    func collaborationSection<Content: View, Trailing: View>(
+    func collaborationSection(
         title: String,
         icon: String,
         count: Int,
-        @ViewBuilder trailing: () -> Trailing,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder trailing: () -> some View,
+        @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -71,11 +71,11 @@ extension FamilyCollaborationDashboardView {
         }
     }
 
-    func collaborationSection<Content: View>(
+    func collaborationSection(
         title: String,
         icon: String,
         count: Int,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: () -> some View
     ) -> some View {
         collaborationSection(title: title, icon: icon, count: count, trailing: { EmptyView() }, content: content)
     }
@@ -107,7 +107,7 @@ extension FamilyCollaborationDashboardView {
                 .monospacedDigit()
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     func petCareGapRow(_ pet: Pet) -> some View {
@@ -149,7 +149,7 @@ extension FamilyCollaborationDashboardView {
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -169,8 +169,8 @@ extension FamilyCollaborationDashboardView {
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(missing.isEmpty
-                             ? l.tr(zh: "今日已稳", en: "Covered today", de: "Heute erledigt")
-                             : missing.prefix(2).joined(separator: " · "))
+                            ? l.tr(zh: "今日已稳", en: "Covered today", de: "Heute erledigt")
+                            : missing.prefix(2).joined(separator: " · "))
                             .font(OhanaFont.caption2(.bold))
                             .foregroundStyle(missing.isEmpty ? Color.goTeal : Color.goYellow)
                             .lineLimit(1)
@@ -183,7 +183,7 @@ extension FamilyCollaborationDashboardView {
                     .scaleEffect(x: 1, y: 1.3, anchor: .center)
             }
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -220,7 +220,7 @@ extension FamilyCollaborationDashboardView {
             Spacer()
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     func smallAction(title: String, color: Color, action: @escaping () -> Void) -> some View {
@@ -274,27 +274,26 @@ extension FamilyCollaborationDashboardView {
         let isCat = pet.species.contains("猫") || species.contains("cat")
         let isFish = pet.species.contains("鱼") || species.contains("fish")
 
-        let expected: [(String, Bool)]
-        if isFish {
-            expected = [
+        let expected: [(String, Bool)] = if isFish {
+            [
                 (careTitle(.feeding), careDone(.feeding)),
                 (careTitle(.waterChange), careDone(.waterChange)),
                 (careTitle(.filterClean), careDone(.filterClean))
             ]
         } else if isDog {
-            expected = [
+            [
                 (careTitle(.feeding), careDone(.feeding)),
                 (careTitle(.watering), careDone(.watering)),
                 (l.tr(zh: "遛狗", en: "Walk", de: "Gassi"), pet.walkLogs.contains { cal.isDateInToday($0.startDate) })
             ]
         } else if isCat {
-            expected = [
+            [
                 (careTitle(.feeding), careDone(.feeding)),
                 (careTitle(.watering), careDone(.watering)),
                 (l.tr(zh: "厕所", en: "Toilet", de: "Toilette"), pottyDone())
             ]
         } else {
-            expected = [
+            [
                 (careTitle(.feeding), careDone(.feeding)),
                 (careTitle(.watering), careDone(.watering)),
                 (careTitle(.play), careDone(.play))
@@ -319,16 +318,16 @@ extension FamilyCollaborationDashboardView {
 
     func careTitle(_ type: CareType) -> String {
         switch type {
-        case .feeding: return l.tr(zh: "喂食", en: "Feed", de: "Füttern")
-        case .watering: return l.tr(zh: "饮水", en: "Water", de: "Wasser")
-        case .litter: return l.tr(zh: "铲砂", en: "Scoop", de: "Klo reinigen")
-        case .waterChange: return l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
-        case .filterClean: return l.tr(zh: "滤芯", en: "Filter", de: "Filter")
-        case .cageCleaning: return l.tr(zh: "清笼", en: "Clean cage", de: "Käfig reinigen")
-        case .freeFlight: return l.tr(zh: "放飞", en: "Free flight", de: "Freiflug")
-        case .misting: return l.tr(zh: "保湿", en: "Mist", de: "Befeuchten")
-        case .substrateChange: return l.tr(zh: "换垫材", en: "Substrate", de: "Substrat")
-        case .play: return l.tr(zh: "陪玩", en: "Play", de: "Spielen")
+        case .feeding: l.tr(zh: "喂食", en: "Feed", de: "Füttern")
+        case .watering: l.tr(zh: "饮水", en: "Water", de: "Wasser")
+        case .litter: l.tr(zh: "铲砂", en: "Scoop", de: "Klo reinigen")
+        case .waterChange: l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
+        case .filterClean: l.tr(zh: "滤芯", en: "Filter", de: "Filter")
+        case .cageCleaning: l.tr(zh: "清笼", en: "Clean cage", de: "Käfig reinigen")
+        case .freeFlight: l.tr(zh: "放飞", en: "Free flight", de: "Freiflug")
+        case .misting: l.tr(zh: "保湿", en: "Mist", de: "Befeuchten")
+        case .substrateChange: l.tr(zh: "换垫材", en: "Substrate", de: "Substrat")
+        case .play: l.tr(zh: "陪玩", en: "Play", de: "Spielen")
         }
     }
 

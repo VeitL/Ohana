@@ -74,7 +74,7 @@ extension QuickFeedDetailContent {
                             planMealGramEditor(index: index, tint: tint)
                         }
                         .padding(10)
-                        .feedFlatBlockSurface(cornerRadius: 16)
+                        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
                     }
                 }
 
@@ -130,7 +130,7 @@ extension QuickFeedDetailContent {
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
-                        .feedFlatBlockSurface(cornerRadius: 16)
+                        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(draftStore.isSavingFeedPlan)
@@ -144,7 +144,7 @@ extension QuickFeedDetailContent {
             LinearGradient(
                 colors: [
                     Color.ohanaCardSurface.opacity(0.70),
-                    Color.ohanaCardSurface.opacity(0.98),
+                    Color.ohanaCardSurface.opacity(0.98)
                 ],
                 startPoint: .top,
                 endPoint: .bottom

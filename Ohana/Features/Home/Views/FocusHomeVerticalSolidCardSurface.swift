@@ -17,7 +17,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
     var allowsLiveAvatarFallback: Bool = true
 
     private var accent: Color {
-        return card.themeColorHex.isEmpty ? card.color : Color(hex: card.themeColorHex)
+        card.themeColorHex.isEmpty ? card.color : Color(hex: card.themeColorHex)
     }
 
     private var visualProgress: CGFloat {
@@ -100,7 +100,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
             colors: [
                 accent.mix(with: .white, by: lerp(0.10, 0.12, visualProgress)),
                 accent,
-                accent.mix(with: .black, by: lerp(0.30, 0.34, visualProgress)),
+                accent.mix(with: .black, by: lerp(0.30, 0.34, visualProgress))
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -112,7 +112,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
             colors: [
                 Color.goCardWhite.opacity(lerp(0.20, 0.28, visualProgress)),
                 accent.mix(with: .white, by: 0.12).opacity(lerp(0.42, 0.58, visualProgress)),
-                Color.arkInk.opacity(lerp(0.12, 0.18, visualProgress)),
+                Color.arkInk.opacity(lerp(0.12, 0.18, visualProgress))
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -257,8 +257,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
 
             if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !hint.isEmpty
-            {
+               !hint.isEmpty {
                 Text(hint)
                     .font(.system(size: lerp(8.5, 10.5, p), weight: .bold, design: .rounded))
                     .foregroundStyle(cardSecondaryText(opacity: 0.82))
@@ -330,8 +329,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                 .shadow(color: Color.arkInk.opacity(0.55), radius: 5, x: 0, y: 2) // ui-v4: allow readability shadow on image card text
 
             if let hint = card.personalityHint?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !hint.isEmpty
-            {
+               !hint.isEmpty {
                 Text(hint)
                     .font(.system(size: lerp(8.5, 10.5, p), weight: .bold, design: .rounded))
                     .foregroundStyle(cardSecondaryText(opacity: 0.82))
@@ -386,7 +384,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
             colors: [
                 Color.arkInk.opacity(0),
                 Color.arkInk.opacity(0.36 * Double(reveal)),
-                Color.arkInk.opacity(0.78 * Double(reveal)),
+                Color.arkInk.opacity(0.78 * Double(reveal))
             ],
             startPoint: .top,
             endPoint: .bottom

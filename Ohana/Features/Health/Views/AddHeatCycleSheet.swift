@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct AddHeatCycleSheet: View {
     let pet: Pet
@@ -36,9 +36,9 @@ struct AddHeatCycleSheet: View {
                         }
                     }
                     .tint(themeColor)
-                    
+
                     DatePicker("开始时间", selection: $startDate, displayedComponents: .date)
-                    
+
                     Toggle("已知结束时间", isOn: $hasEndDate).tint(themeColor)
                     if hasEndDate {
                         DatePicker("结束时间", selection: $endDate, displayedComponents: .date)

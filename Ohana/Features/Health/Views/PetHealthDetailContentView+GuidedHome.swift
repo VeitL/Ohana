@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension PetHealthDetailContentView {
     // MARK: - Guided Health Home
@@ -111,7 +111,7 @@ extension PetHealthDetailContentView {
             healthFabItemsVisible = false
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            if isHealthFabExpanded && !healthFabItemsVisible {
+            if isHealthFabExpanded, !healthFabItemsVisible {
                 withAnimation(GoMotion.fab) {
                     isHealthFabExpanded = false
                 }
@@ -282,7 +282,7 @@ extension PetHealthDetailContentView {
             }
         }
         .padding(14)
-        .goIslandModuleCard(cornerRadius: 20)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.input)
     }
 
     var healthDashboardCards: some View {
@@ -346,7 +346,7 @@ extension PetHealthDetailContentView {
     ) -> some View {
         HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(tint.opacity(isDark ? 0.20 : 0.13))
                     .frame(width: 58, height: 58)
                 Image(systemName: icon)
@@ -397,8 +397,8 @@ extension PetHealthDetailContentView {
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 130, alignment: .leading)
-        .goIslandModuleCard(cornerRadius: 24)
-        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .onTapGesture(perform: cardAction)
     }
 }

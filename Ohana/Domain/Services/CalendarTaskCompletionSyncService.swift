@@ -306,9 +306,9 @@ enum CalendarTaskCompletionSyncService {
     private static func hygieneType(for event: Event) -> HygieneType? {
         let text = normalizedText(for: event)
         guard event.eventType == EventType.grooming.rawValue
-                || text.contains("洗") || text.contains("澡") || text.contains("刷牙")
-                || text.contains("剪") || text.contains("梳") || text.contains("清耳")
-                || text.contains("groom") || text.contains("bath") else { return nil }
+            || text.contains("洗") || text.contains("澡") || text.contains("刷牙")
+            || text.contains("剪") || text.contains("梳") || text.contains("清耳")
+            || text.contains("groom") || text.contains("bath") else { return nil }
         if text.contains("刷牙") || text.contains("teeth") { return .teeth }
         if text.contains("剪") || text.contains("nail") { return .nails }
         if text.contains("耳") || text.contains("ear") { return .ears }

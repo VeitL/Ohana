@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension PetHealthDetailContentView {
     var sheetHealthPlusDestination: Binding<HealthPlusDestination?> {
@@ -81,17 +81,17 @@ extension PetHealthDetailContentView {
 
     func healthRecordInitialType(for destination: HealthPlusDestination) -> HealthLogType {
         switch destination {
-        case .guided(let mode):
-            return mode == .preventive ? .vaccine : .surgery
-        case .direct(let type):
-            return type
+        case let .guided(mode):
+            mode == .preventive ? .vaccine : .surgery
+        case let .direct(type):
+            type
         default:
-            return .general
+            .general
         }
     }
 
     func healthRecordEntryMode(for destination: HealthPlusDestination) -> HealthRecordEntryMode? {
-        if case .guided(let mode) = destination { return mode }
+        if case let .guided(mode) = destination { return mode }
         return nil
     }
 

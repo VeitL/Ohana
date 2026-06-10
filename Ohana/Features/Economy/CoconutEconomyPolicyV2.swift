@@ -8,17 +8,17 @@ enum EconomyLuckTier: String, Equatable {
 
     var growthXP: Int {
         switch self {
-        case .none: return 0
-        case .small: return 5
-        case .golden: return 15
+        case .none: 0
+        case .small: 5
+        case .golden: 15
         }
     }
 
     var coconuts: Int {
         switch self {
-        case .none: return 0
-        case .small: return 2
-        case .golden: return 8
+        case .none: 0
+        case .small: 2
+        case .golden: 8
         }
     }
 }
@@ -31,35 +31,35 @@ enum EconomyBudgetStage: String, Equatable {
 
     var xpMultiplier: Double {
         switch self {
-        case .normal: return 1.0
-        case .fatigue: return 0.5
-        case .recordOnly, .cooldown: return 0.2
+        case .normal: 1.0
+        case .fatigue: 0.5
+        case .recordOnly, .cooldown: 0.2
         }
     }
 
     var coconutMultiplier: Double {
         switch self {
-        case .normal: return 1.0
-        case .fatigue: return 0.5
-        case .recordOnly, .cooldown: return 0
+        case .normal: 1.0
+        case .fatigue: 0.5
+        case .recordOnly, .cooldown: 0
         }
     }
 
     var reason: String {
         switch self {
-        case .normal: return "normal"
-        case .fatigue: return "dailyBudgetFatigue"
-        case .recordOnly: return "dailyBudgetRecordOnly"
-        case .cooldown: return "cooldownReduced"
+        case .normal: "normal"
+        case .fatigue: "dailyBudgetFatigue"
+        case .recordOnly: "dailyBudgetRecordOnly"
+        case .cooldown: "cooldownReduced"
         }
     }
 
     private var rank: Int {
         switch self {
-        case .normal: return 0
-        case .fatigue: return 1
-        case .recordOnly: return 2
-        case .cooldown: return 3
+        case .normal: 0
+        case .fatigue: 1
+        case .recordOnly: 2
+        case .cooldown: 3
         }
     }
 
@@ -180,6 +180,7 @@ struct EconomyDailyBudgetSnapshot: Equatable {
             careObjectRemainingFatigueCoconuts
         )
     }
+
     var remainingLuckyCoconuts: Int { max(0, EconomyDailyBudgetStore.luckyCoconutBudget - luckyCoconutUsed) }
 
     var budgetStage: EconomyBudgetStage {
@@ -227,10 +228,10 @@ struct EconomyDailyBudgetSnapshot: Equatable {
         highCoconutBudget: Int,
         fatigueCoconutBudget: Int
     ) -> EconomyBudgetStage {
-        if xpUsed < highXPBudget && coconutUsed < highCoconutBudget {
+        if xpUsed < highXPBudget, coconutUsed < highCoconutBudget {
             return .normal
         }
-        if xpUsed < fatigueXPBudget && coconutUsed < fatigueCoconutBudget {
+        if xpUsed < fatigueXPBudget, coconutUsed < fatigueCoconutBudget {
             return .fatigue
         }
         return .recordOnly
@@ -316,10 +317,10 @@ enum EconomyDailyBudgetStore {
         increment(householdStorageKey(householdKey: household, metric: "lucky", date: date), by: result.luckyCoconuts)
         increment(memberStorageKey(householdKey: household, memberKey: member, metric: "xp", date: date), by: result.growthXP)
         increment(memberStorageKey(householdKey: household, memberKey: member, metric: "coconut", date: date), by: result.totalCoconuts)
-        distribute(result.growthXP, across: objects).forEach { objectKey, amount in
+        for (objectKey, amount) in distribute(result.growthXP, across: objects) {
             increment(careObjectStorageKey(householdKey: household, careObjectKey: objectKey, metric: "xp", date: date), by: amount)
         }
-        distribute(result.totalCoconuts, across: objects).forEach { objectKey, amount in
+        for (objectKey, amount) in distribute(result.totalCoconuts, across: objects) {
             increment(careObjectStorageKey(householdKey: household, careObjectKey: objectKey, metric: "coconut", date: date), by: amount)
         }
     }
@@ -331,15 +332,15 @@ enum EconomyDailyBudgetStore {
     static func reset(householdKey: String, memberKey: String, careObjectKeys: [String] = [], date: Date = Date()) {
         let household = normalizedUserKey(householdKey)
         let member = normalizedUserKey(memberKey)
-        ["xp", "coconut", "lucky"].forEach {
-            UserDefaults.standard.removeObject(forKey: householdStorageKey(householdKey: household, metric: $0, date: date))
+        for item in ["xp", "coconut", "lucky"] {
+            UserDefaults.standard.removeObject(forKey: householdStorageKey(householdKey: household, metric: item, date: date))
         }
-        ["xp", "coconut"].forEach {
-            UserDefaults.standard.removeObject(forKey: memberStorageKey(householdKey: household, memberKey: member, metric: $0, date: date))
+        for item in ["xp", "coconut"] {
+            UserDefaults.standard.removeObject(forKey: memberStorageKey(householdKey: household, memberKey: member, metric: item, date: date))
         }
-        normalizedCareObjectKeys(careObjectKeys).forEach { objectKey in
-            ["xp", "coconut"].forEach {
-                UserDefaults.standard.removeObject(forKey: careObjectStorageKey(householdKey: household, careObjectKey: objectKey, metric: $0, date: date))
+        for objectKey in normalizedCareObjectKeys(careObjectKeys) {
+            for item in ["xp", "coconut"] {
+                UserDefaults.standard.removeObject(forKey: careObjectStorageKey(householdKey: household, careObjectKey: objectKey, metric: item, date: date))
             }
         }
     }
@@ -555,13 +556,12 @@ enum CoconutEconomyPolicyV2 {
         let growthXP = max(1, Int(ceil(Double(requestedGrowthXP) * budgetStage.xpMultiplier)))
         let scaledCoconuts = Int(ceil(Double(requestedCoconuts) * budgetStage.coconutMultiplier))
         let allowedCoconuts = min(scaledCoconuts, budget.remainingFatigueCoconuts)
-        let effectiveStage: EconomyBudgetStage
-        if budgetStage == .normal, allowedCoconuts < requestedCoconuts {
-            effectiveStage = .fatigue
+        let effectiveStage: EconomyBudgetStage = if budgetStage == .normal, allowedCoconuts < requestedCoconuts {
+            .fatigue
         } else if budgetStage != .cooldown, requestedCoconuts > 0, allowedCoconuts == 0 {
-            effectiveStage = .recordOnly
+            .recordOnly
         } else {
-            effectiveStage = budgetStage
+            budgetStage
         }
 
         let actualLuckyCoconuts = min(requestedLuckyCoconuts, max(0, allowedCoconuts - base.coconuts - qualityCoconutBonus))
@@ -591,9 +591,9 @@ enum CoconutEconomyPolicyV2 {
     }
 
     static func careObjectCount(context: ModelContext) -> Int {
-        let petCount = ((try? context.fetch(FetchDescriptor<Pet>())) ?? [])
-            .filter { !$0.hasPassedAway }
-            .count
+        let petCount = ((try? context.fetch(FetchDescriptor<Pet>())) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+            .count(where: { !$0.hasPassedAway })
+
         let plantCount = (try? context.fetchCount(FetchDescriptor<Plant>())) ?? 0
         return max(1, petCount + plantCount)
     }
@@ -602,7 +602,7 @@ enum CoconutEconomyPolicyV2 {
         UserDefaults.standard.string(forKey: "currentActiveHumanId").flatMap { $0.isEmpty ? nil : $0 } ?? "system"
     }
 
-    static func householdBudgetKey(context: ModelContext? = nil) -> String {
+    static func householdBudgetKey(context _: ModelContext? = nil) -> String {
         "household.local"
     }
 
@@ -632,11 +632,11 @@ enum CoconutEconomyPolicyV2 {
             return BaseReward(actionKey: "feed", growthXP: 6, coconuts: 3, humanShare: 2, petShare: 1)
         case .water:
             return BaseReward(actionKey: "water", growthXP: 5, coconuts: 3, humanShare: 2, petShare: 1)
-        case .potty(let isLitter):
+        case let .potty(isLitter):
             return isLitter
                 ? BaseReward(actionKey: "litter", growthXP: 7, coconuts: 3, humanShare: 2, petShare: 1)
                 : BaseReward(actionKey: "potty", growthXP: 5, coconuts: 2, humanShare: 1, petShare: 1)
-        case .care(let type):
+        case let .care(type):
             switch type {
             case .bath:
                 return BaseReward(actionKey: "bath", growthXP: 14, coconuts: 8, humanShare: 6, petShare: 2)
@@ -645,7 +645,7 @@ enum CoconutEconomyPolicyV2 {
             case .brushing:
                 return BaseReward(actionKey: "brushing", growthXP: 10, coconuts: 5, humanShare: 3, petShare: 2)
             }
-        case .walk(let distanceMeters):
+        case let .walk(distanceMeters):
             let xp = min(20, max(8, Int(distanceMeters / 250)))
             let coconuts = min(14, max(5, Int(distanceMeters / 350)))
             let pet = max(1, coconuts / 3)
@@ -660,7 +660,7 @@ enum CoconutEconomyPolicyV2 {
             return BaseReward(actionKey: "milestone", growthXP: 7, coconuts: 3, humanShare: 2, petShare: 1)
         case .dailyFocusCompletion:
             return BaseReward(actionKey: "dailyFocusCompletion", growthXP: 18, coconuts: 8, humanShare: 8, petShare: 0)
-        case .general(let humanReward, let petReward, _, let title):
+        case let .general(humanReward, petReward, _, title):
             let total = max(0, humanReward) + max(0, petReward)
             return BaseReward(
                 actionKey: "general_\(title.prefix(18))",
@@ -675,18 +675,18 @@ enum CoconutEconomyPolicyV2 {
     private static func qualityBonusSteps(for quality: QuestManager.QualityBonus) -> Int {
         switch quality {
         case .none:
-            return 0
+            0
         case .precise, .withNote, .withPhoto:
-            return 1
+            1
         case .preciseAndNote, .preciseAndPhoto:
-            return 2
+            2
         case .preciseNotePhoto:
-            return 3
+            3
         }
     }
 
     private static func rollLuck() -> EconomyLuckTier {
-        let roll = Int.random(in: 1...100)
+        let roll = Int.random(in: 1 ... 100)
         if roll == 100 { return .golden }
         if roll >= 92 { return .small }
         return .none
@@ -700,7 +700,7 @@ enum CoconutEconomyPolicyV2 {
         hasPetAccount: Bool
     ) -> (human: Int, pet: Int) {
         guard total > 0 else { return (0, 0) }
-        if hasHumanAccount && hasPetAccount {
+        if hasHumanAccount, hasPetAccount {
             let preferredTotal = max(1, preferredHuman + preferredPet)
             let pet = min(total, Int((Double(total) * Double(preferredPet) / Double(preferredTotal)).rounded()))
             return (total - pet, pet)

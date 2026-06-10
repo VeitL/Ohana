@@ -11,7 +11,7 @@ import SwiftUI
 struct OasisHomeTabHost: View {
     let lifecycle: VerticalSolidHomePageLifecycle
     let injectEnergyTrigger: Int
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @State private var showsLiveContent = false
     @State private var forwardedInjectEnergyTrigger = 0
@@ -53,7 +53,7 @@ struct OasisHomeTabHost: View {
                 .allowsHitTesting(lifecycle.isLive)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .padding(.horizontal, 10)
         .padding(.top, 4)
         .onAppear {
@@ -264,14 +264,14 @@ private struct OasisHomeTabPreview: View {
 
     private var previewStage: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                 .fill(Color.ohanaCardSurface)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                         .fill(treeLevel.glowColor.opacity(0.16))
                 }
                 .overlay {
-                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                         .strokeBorder(Color.ohanaGlassStroke.opacity(0.7), lineWidth: 0.8)
                 }
 
@@ -376,6 +376,6 @@ private struct OasisHomeTabPreview: View {
         }
         .padding(12)
         .frame(minHeight: 64)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 }

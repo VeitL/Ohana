@@ -3,10 +3,10 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
-import PhotosUI
 import Foundation
+import PhotosUI
+import SwiftData
+import SwiftUI
 
 extension PetBasicInfoDetailView {
     @ViewBuilder
@@ -44,8 +44,8 @@ extension PetBasicInfoDetailView {
                     .buttonStyle(ScaleButtonStyle())
                 }
                 .padding(14)
-                .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .strokeBorder(Color.purple.opacity(0.2), lineWidth: 1))
             }
             .alert("撤销离世标记", isPresented: $showingUndoPassingAlert) {
@@ -78,8 +78,8 @@ extension PetBasicInfoDetailView {
                     .foregroundStyle(Color.purple.opacity(0.8))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .background(Color.purple.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .strokeBorder(Color.purple.opacity(0.25), lineWidth: 1))
                 }
                 .buttonStyle(ScaleButtonStyle())

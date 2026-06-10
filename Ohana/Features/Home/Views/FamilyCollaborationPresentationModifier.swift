@@ -49,11 +49,11 @@ struct FamilyCollaborationPresentationModifier<MoreContent: View>: ViewModifier 
 }
 
 extension View {
-    func familyCollaborationPresentations<MoreContent: View>(
+    func familyCollaborationPresentations(
         sheetRoute: Binding<FamilyCollaborationSheetRoute?>,
         title: String,
         doneTitle: String,
-        @ViewBuilder moreContent: @escaping () -> MoreContent
+        @ViewBuilder moreContent: @escaping () -> some View
     ) -> some View {
         modifier(
             FamilyCollaborationPresentationModifier(

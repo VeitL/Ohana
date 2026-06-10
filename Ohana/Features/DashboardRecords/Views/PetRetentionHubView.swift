@@ -41,8 +41,8 @@ struct PetRetentionHubView: View {
     private var protectionCount: Int { pet.documents.count + pet.insurances.count }
 
     private var expiringProtectionCount: Int {
-        let expiringDocs = pet.documents.filter { $0.isExpired || $0.isExpiringSoon }.count
-        let expiringInsurances = pet.insurances.filter { $0.daysUntilRenewal <= 30 }.count
+        let expiringDocs = pet.documents.count(where: { $0.isExpired || $0.isExpiringSoon })
+        let expiringInsurances = pet.insurances.count(where: { $0.daysUntilRenewal <= 30 })
         return expiringDocs + expiringInsurances
     }
 
@@ -59,7 +59,7 @@ struct PetRetentionHubView: View {
     private var recentMemoryText: String {
         let latestPhoto = pet.photoLogs.sorted { $0.date > $1.date }.first?.date
         let latestMilestone = pet.milestones.sorted { $0.date > $1.date }.first?.date
-        guard let latest = [latestPhoto, latestMilestone].compactMap({ $0 }).max() else {
+        guard let latest = [latestPhoto, latestMilestone].compactMap(\.self).max() else {
             return l.tr(zh: "还没有回忆", en: "No memories yet", de: "Noch keine Erinnerungen")
         }
         return latest.formatted(.relative(presentation: .named))
@@ -195,7 +195,7 @@ struct PetRetentionHubView: View {
                     .font(OhanaFont.adaptive(size: 18, weight: .black))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(archiveSnapshot.nextStep.title)
@@ -212,9 +212,9 @@ struct PetRetentionHubView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
         }
@@ -298,9 +298,9 @@ struct PetRetentionHubView: View {
                     }
                 }
                 .padding(14)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                         .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
                 }
             }
@@ -348,13 +348,13 @@ struct PetRetentionHubView: View {
             .padding(.horizontal, 2)
     }
 
-    private func archiveNavigationCard<Destination: View>(
+    private func archiveNavigationCard(
         icon: String,
         accent: Color,
         title: String,
         value: String,
         subtitle: String,
-        destination: Destination
+        destination: some View
     ) -> some View {
         NavigationLink(destination: destination) {
             HStack(spacing: 12) {
@@ -384,21 +384,21 @@ struct PetRetentionHubView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
         }
         .buttonStyle(ScaleButtonStyle())
     }
 
-    private func compactNavigationAction<Destination: View>(
+    private func compactNavigationAction(
         icon: String,
         title: String,
         value: String,
         tint: Color,
-        destination: Destination
+        destination: some View
     ) -> some View {
         NavigationLink(destination: destination) {
             VStack(alignment: .leading, spacing: 8) {
@@ -420,9 +420,9 @@ struct PetRetentionHubView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
         }

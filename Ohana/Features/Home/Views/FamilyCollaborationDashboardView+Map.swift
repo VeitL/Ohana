@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension FamilyCollaborationDashboardView {
     var mapHeader: some View {
@@ -96,8 +96,8 @@ extension FamilyCollaborationDashboardView {
         .offset(y: memberRailFloating ? -3 : 2)
         .animation(
             shouldRunAmbientMotion
-            ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // smoothness: allow visible-only family rail ambient float gated by AppWorkloadPolicy.
-            : nil,
+                ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // smoothness: allow visible-only family rail ambient float gated by AppWorkloadPolicy.
+                : nil,
             value: memberRailFloating
         )
         .onAppear {

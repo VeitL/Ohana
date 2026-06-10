@@ -57,8 +57,8 @@ enum ExpandedQuickActionStore {
     static func humanItems(raw: String, human: Human, defaultItems: [QuickActionItem]) -> [QuickActionItem] {
         let stored = decode(raw).filter {
             $0.entityId == human.id &&
-            $0.entityKind == .human &&
-            $0.actionType != "humanAllFeatures"
+                $0.entityKind == .human &&
+                $0.actionType != "humanAllFeatures"
         }
         return stored.isEmpty ? defaultItems : stored
     }

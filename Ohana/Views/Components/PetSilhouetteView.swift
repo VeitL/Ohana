@@ -14,28 +14,27 @@ import SwiftUI
 /// onTapEye: 点击眼睛时触发（显示瞳色选择器）
 struct PetSilhouetteView: View {
     let species: String
-    var coatColor: Color = Color(hex: "E8C49A")
-    var eyeColor: Color = Color(hex: "6B3A2A")
-    var patternName: String? = nil
-    var onTapCoat: (() -> Void)? = nil
-    var onTapEye: (() -> Void)? = nil
+    var coatColor: Color = .init(hex: "E8C49A")
+    var eyeColor: Color = .init(hex: "6B3A2A")
+    var patternName: String?
+    var onTapCoat: (() -> Void)?
+    var onTapEye: (() -> Void)?
     /// 关闭偶发眨眼（用于小尺寸预览卡等，完全静态）
     var isAnimationEnabled: Bool = true
-
     var body: some View {
         switch species {
         case "猫": CatSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                   onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
+                                onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
         case "狗": DogSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                   onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
+                                onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
         case "兔子", "兔": RabbitSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                             onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
+                                         onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
         case "仓鼠": HamsterSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                        onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
+                                     onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
         case "鸟": BirdSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
+                                 onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
+        default: GenericSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
                                    onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
-        default:   GenericSilhouette(coatColor: coatColor, eyeColor: eyeColor, patternName: patternName,
-                                      onTapCoat: onTapCoat, onTapEye: onTapEye, isAnimationEnabled: isAnimationEnabled)
         }
     }
 }
@@ -45,7 +44,6 @@ private struct SilhouetteIdleBlinkModifier: ViewModifier {
     var isEnabled: Bool
     @Binding var blinkScale: CGFloat
     @State private var blinkLoop: Task<Void, Never>? = nil
-
     func body(content: Content) -> some View {
         content
             .onAppear { restartBlinkIfNeeded() }
@@ -65,7 +63,7 @@ private struct SilhouetteIdleBlinkModifier: ViewModifier {
         blinkLoop?.cancel()
         blinkLoop = Task {
             while !Task.isCancelled {
-                let ns = UInt64(Double.random(in: 5.5...9.0) * 1_000_000_000)
+                let ns = UInt64(Double.random(in: 5.5 ... 9.0) * 1_000_000_000)
                 try? await Task.sleep(nanoseconds: ns)
                 guard !Task.isCancelled else { break }
                 await MainActor.run {
@@ -102,14 +100,12 @@ private enum SilhouetteEyeTapFeedback {
 private struct CatSilhouette: View {
     var coatColor: Color
     var eyeColor: Color
-    var patternName: String? = nil
-    var onTapCoat: (() -> Void)? = nil
-    var onTapEye: (() -> Void)? = nil
+    var patternName: String?
+    var onTapCoat: (() -> Void)?
+    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
-
     @State private var blinkScale: CGFloat = 1.0
     @State private var eyePulse: CGFloat = 1.0
-
     var body: some View {
         ZStack {
             // 地面阴影
@@ -118,17 +114,16 @@ private struct CatSilhouette: View {
                 .frame(width: 108, height: 18)
                 .blur(radius: 5)
                 .offset(y: 94)
-
             // 身体（蓬松大圆）
             Circle()
                 .fill(RadialGradient(
                     colors: [coatColor.mix(with: .white, by: 0.18), coatColor.mix(with: .black, by: 0.06)],
-                    center: UnitPoint(x: 0.45, y: 0.3), startRadius: 0, endRadius: 64))
+                    center: UnitPoint(x: 0.45, y: 0.3), startRadius: 0, endRadius: 64
+                ))
                 .frame(width: 128)
                 .overlay(patternOverlay.clipShape(Circle()))
                 .offset(y: 56)
                 .onTapGesture { onTapCoat?() }
-
             // 尾巴
             CatTailShape()
                 .stroke(LinearGradient(colors: [coatColor, coatColor.mix(with: .black, by: 0.1)],
@@ -137,7 +132,6 @@ private struct CatSilhouette: View {
                 .frame(width: 44, height: 44)
                 .offset(x: 70, y: 70)
                 .onTapGesture { onTapCoat?() }
-
             // 头部组
             ZStack {
                 // 耳朵外层
@@ -160,16 +154,15 @@ private struct CatSilhouette: View {
                     .frame(width: 15, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .scaleEffect(x: -1)
                     .offset(x: 36, y: -40)
-
                 // 大圆头（kawaii 风格，径向渐变）
                 Circle()
                     .fill(RadialGradient(
                         colors: [coatColor.mix(with: .white, by: 0.22), coatColor.mix(with: .black, by: 0.04)],
-                        center: UnitPoint(x: 0.38, y: 0.28), startRadius: 0, endRadius: 72))
+                        center: UnitPoint(x: 0.38, y: 0.28), startRadius: 0, endRadius: 72
+                    ))
                     .frame(width: 136)
                     .shadow(color: coatColor.opacity(0.25), radius: 10, y: 5) // ui-v4: allow silhouette illustration depth.
                     .overlay(patternOverlay.clipShape(Circle()))
-
                 // 脸颊腮红
                 Ellipse()
                     .fill(Color(hex: "FFB3C1").opacity(0.32))
@@ -179,7 +172,6 @@ private struct CatSilhouette: View {
                     .fill(Color(hex: "FFB3C1").opacity(0.32))
                     .frame(width: 28, height: 18) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(x: 38, y: 22)
-
                 // 眼睛（kawaii 大眼，略低位置）
                 HStack(spacing: 28) {
                     PetEyeView(eyeColor: eyeColor, size: 24)
@@ -192,13 +184,11 @@ private struct CatSilhouette: View {
                     SilhouetteEyeTapFeedback.play(eyePulse: $eyePulse)
                     onTapEye?()
                 }
-
                 // 小鼻子（粉色圆点）
                 Circle()
                     .fill(Color(hex: "FF9BAB"))
                     .frame(width: 9)
                     .offset(y: 36)
-
                 // 猫须
                 Group {
                     Capsule().fill(Color.goCardWhite.opacity(0.55)).frame(width: 24, height: 1.5).rotationEffect(.degrees(-12)).offset(x: -42, y: 32)
@@ -225,16 +215,13 @@ private struct CatSilhouette: View {
 private struct DogSilhouette: View {
     var coatColor: Color
     var eyeColor: Color
-    var patternName: String? = nil
-    var onTapCoat: (() -> Void)? = nil
-    var onTapEye: (() -> Void)? = nil
+    var patternName: String?
+    var onTapCoat: (() -> Void)?
+    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
-
     @State private var blinkScale: CGFloat = 1.0
     @State private var eyePulse: CGFloat = 1.0
-
     private var earColor: Color { coatColor.mix(with: .black, by: 0.18) }
-
     var body: some View {
         ZStack {
             // 地面阴影
@@ -243,17 +230,16 @@ private struct DogSilhouette: View {
                 .frame(width: 114, height: 18)
                 .blur(radius: 5)
                 .offset(y: 94)
-
             // 身体（蓬松大圆）
             Circle()
                 .fill(RadialGradient(
                     colors: [coatColor.mix(with: .white, by: 0.15), coatColor.mix(with: .black, by: 0.08)],
-                    center: UnitPoint(x: 0.42, y: 0.3), startRadius: 0, endRadius: 66))
+                    center: UnitPoint(x: 0.42, y: 0.3), startRadius: 0, endRadius: 66
+                ))
                 .frame(width: 132)
                 .overlay(patternOverlay.clipShape(Circle()))
                 .offset(y: 54)
                 .onTapGesture { onTapCoat?() }
-
             // 尾巴
             DogTailShape()
                 .stroke(LinearGradient(colors: [earColor, coatColor], startPoint: .leading, endPoint: .trailing),
@@ -261,7 +247,6 @@ private struct DogSilhouette: View {
                 .frame(width: 34, height: 34) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .offset(x: 68, y: 40)
                 .onTapGesture { onTapCoat?() }
-
             // 头部组
             ZStack {
                 // 垂耳（椭圆圆润形）— 在头后面
@@ -275,23 +260,21 @@ private struct DogSilhouette: View {
                                          startPoint: .top, endPoint: .bottom))
                     .frame(width: 42, height: 62)
                     .offset(x: 60, y: 12)
-
                 // 大圆头
                 Circle()
                     .fill(RadialGradient(
                         colors: [coatColor.mix(with: .white, by: 0.25), coatColor.mix(with: .black, by: 0.03)],
-                        center: UnitPoint(x: 0.38, y: 0.3), startRadius: 0, endRadius: 74))
+                        center: UnitPoint(x: 0.38, y: 0.3), startRadius: 0, endRadius: 74
+                    ))
                     .frame(width: 140)
                     .shadow(color: coatColor.opacity(0.22), radius: 10, y: 5) // ui-v4: allow silhouette illustration depth.
                     .overlay(patternOverlay.clipShape(Circle()))
-
                 // 斑纹色块（kawaii 小狗特征 — 覆盖左侧脸）
                 Ellipse()
                     .fill(earColor.opacity(0.72))
                     .frame(width: 58, height: 50)
                     .offset(x: -26, y: -4)
                     .clipShape(Circle().scale(1.0).offset(x: 0, y: 0))
-
                 // 眼睛
                 HStack(spacing: 30) {
                     PetEyeView(eyeColor: eyeColor, size: 23)
@@ -304,7 +287,6 @@ private struct DogSilhouette: View {
                     SilhouetteEyeTapFeedback.play(eyePulse: $eyePulse)
                     onTapEye?()
                 }
-
                 // 吻部浅色区
                 Ellipse()
                     .fill(coatColor.mix(with: .white, by: 0.35).opacity(0.6))
@@ -338,11 +320,10 @@ private struct DogSilhouette: View {
 private struct RabbitSilhouette: View {
     var coatColor: Color
     var eyeColor: Color
-    var patternName: String? = nil
-    var onTapCoat: (() -> Void)? = nil
-    var onTapEye: (() -> Void)? = nil
+    var patternName: String?
+    var onTapCoat: (() -> Void)?
+    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
-
     @State private var blinkScale: CGFloat = 1.0
     @State private var eyePulse: CGFloat = 1.0
 
@@ -359,7 +340,8 @@ private struct RabbitSilhouette: View {
             Circle()
                 .fill(RadialGradient(
                     colors: [coatColor.mix(with: .white, by: 0.2), coatColor.mix(with: .black, by: 0.05)],
-                    center: UnitPoint(x: 0.42, y: 0.3), startRadius: 0, endRadius: 62))
+                    center: UnitPoint(x: 0.42, y: 0.3), startRadius: 0, endRadius: 62
+                ))
                 .frame(width: 126)
                 .overlay(patternOverlay.clipShape(Circle()))
                 .offset(y: 56)
@@ -371,11 +353,12 @@ private struct RabbitSilhouette: View {
                 Capsule()
                     .fill(RadialGradient(
                         colors: [coatColor.mix(with: .white, by: 0.1), coatColor.mix(with: .black, by: 0.08)],
-                        center: .top, startRadius: 0, endRadius: 36))
+                        center: .top, startRadius: 0, endRadius: 36
+                    ))
                     .frame(width: 24, height: 72)
                     .offset(x: -28, y: -72)
                 Capsule()
-                    .fill(Color(hex: "C9A4D8").opacity(0.9))   // 紫色内耳
+                    .fill(Color(hex: "C9A4D8").opacity(0.9)) // 紫色内耳
                     .frame(width: 11, height: 48)
                     .offset(x: -28, y: -72)
 
@@ -383,7 +366,8 @@ private struct RabbitSilhouette: View {
                 Capsule()
                     .fill(RadialGradient(
                         colors: [coatColor.mix(with: .white, by: 0.1), coatColor.mix(with: .black, by: 0.08)],
-                        center: .top, startRadius: 0, endRadius: 36))
+                        center: .top, startRadius: 0, endRadius: 36
+                    ))
                     .frame(width: 24, height: 72)
                     .offset(x: 28, y: -72)
                 Capsule()
@@ -395,7 +379,8 @@ private struct RabbitSilhouette: View {
                 Circle()
                     .fill(RadialGradient(
                         colors: [coatColor.mix(with: .white, by: 0.28), coatColor.mix(with: .black, by: 0.04)],
-                        center: UnitPoint(x: 0.38, y: 0.28), startRadius: 0, endRadius: 68))
+                        center: UnitPoint(x: 0.38, y: 0.28), startRadius: 0, endRadius: 68
+                    ))
                     .frame(width: 130)
                     .shadow(color: coatColor.opacity(0.22), radius: 10, y: 5) // ui-v4: allow silhouette illustration depth.
                     .overlay(patternOverlay.clipShape(Circle()))
@@ -459,11 +444,10 @@ private struct RabbitSilhouette: View {
 private struct HamsterSilhouette: View {
     var coatColor: Color
     var eyeColor: Color
-    var patternName: String? = nil
-    var onTapCoat: (() -> Void)? = nil
-    var onTapEye: (() -> Void)? = nil
+    var patternName: String?
+    var onTapCoat: (() -> Void)?
+    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
-
     @State private var blinkScale: CGFloat = 1.0
     @State private var eyePulse: CGFloat = 1.0
 
@@ -484,7 +468,8 @@ private struct HamsterSilhouette: View {
             Circle()
                 .fill(RadialGradient(
                     colors: [faceColor, faceColor.mix(with: .black, by: 0.06)],
-                    center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 60))
+                    center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 60
+                ))
                 .frame(width: 122)
                 .overlay(patternOverlay.clipShape(Circle()))
                 .offset(y: 56)
@@ -515,7 +500,8 @@ private struct HamsterSilhouette: View {
                 Circle()
                     .fill(RadialGradient(
                         colors: [capColor.mix(with: .white, by: 0.15), capColor.mix(with: .black, by: 0.1)],
-                        center: UnitPoint(x: 0.4, y: 0.25), startRadius: 0, endRadius: 72))
+                        center: UnitPoint(x: 0.4, y: 0.25), startRadius: 0, endRadius: 72
+                    ))
                     .frame(width: 144)
                     .shadow(color: capColor.opacity(0.25), radius: 8, y: 4) // ui-v4: allow silhouette illustration depth.
                     .overlay(patternOverlay.clipShape(Circle()))
@@ -524,7 +510,8 @@ private struct HamsterSilhouette: View {
                 Ellipse()
                     .fill(RadialGradient(
                         colors: [faceColor.mix(with: .white, by: 0.2), faceColor],
-                        center: UnitPoint(x: 0.5, y: 0.1), startRadius: 0, endRadius: 55))
+                        center: UnitPoint(x: 0.5, y: 0.1), startRadius: 0, endRadius: 55
+                    ))
                     .frame(width: 118, height: 82)
                     .offset(y: 24)
 
@@ -563,9 +550,9 @@ private struct HamsterSilhouette: View {
 private struct BirdSilhouette: View {
     var coatColor: Color
     var eyeColor: Color
-    var patternName: String? = nil
-    var onTapCoat: (() -> Void)? = nil
-    var onTapEye: (() -> Void)? = nil
+    var patternName: String?
+    var onTapCoat: (() -> Void)?
+    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
 
     @State private var blinkScale: CGFloat = 1.0
@@ -584,7 +571,8 @@ private struct BirdSilhouette: View {
             Ellipse()
                 .fill(RadialGradient(
                     colors: [coatColor.mix(with: .white, by: 0.18), coatColor.mix(with: .black, by: 0.08)],
-                    center: UnitPoint(x: 0.4, y: 0.25), startRadius: 0, endRadius: 80))
+                    center: UnitPoint(x: 0.4, y: 0.25), startRadius: 0, endRadius: 80
+                ))
                 .frame(width: 150, height: 180)
                 .overlay(patternOverlay.clipShape(Ellipse()))
                 .offset(y: 32)
@@ -594,7 +582,8 @@ private struct BirdSilhouette: View {
             Ellipse()
                 .fill(RadialGradient(
                     colors: [.white.opacity(0.95), coatColor.mix(with: .white, by: 0.6).opacity(0.7)],
-                    center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 44))
+                    center: UnitPoint(x: 0.5, y: 0.3), startRadius: 0, endRadius: 44
+                ))
                 .frame(width: 76, height: 98)
                 .offset(y: 52)
 
@@ -620,7 +609,8 @@ private struct BirdSilhouette: View {
                 Circle()
                     .fill(RadialGradient(
                         colors: [coatColor.mix(with: .white, by: 0.22), coatColor.mix(with: .black, by: 0.04)],
-                        center: UnitPoint(x: 0.38, y: 0.3), startRadius: 0, endRadius: 60))
+                        center: UnitPoint(x: 0.38, y: 0.3), startRadius: 0, endRadius: 60
+                    ))
                     .frame(width: 118)
                     .shadow(color: coatColor.opacity(0.22), radius: 8, y: 4) // ui-v4: allow silhouette illustration depth.
 
@@ -641,7 +631,8 @@ private struct BirdSilhouette: View {
                 BirdBeakShape()
                     .fill(LinearGradient(
                         colors: [Color(hex: "FFB830"), Color(hex: "E07B00")],
-                        startPoint: .top, endPoint: .bottom))
+                        startPoint: .top, endPoint: .bottom
+                    ))
                     .frame(width: 22, height: 14) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                     .offset(y: 34)
             }
@@ -661,9 +652,9 @@ private struct BirdSilhouette: View {
 private struct GenericSilhouette: View {
     var coatColor: Color
     var eyeColor: Color
-    var patternName: String? = nil
-    var onTapCoat: (() -> Void)? = nil
-    var onTapEye: (() -> Void)? = nil
+    var patternName: String?
+    var onTapCoat: (() -> Void)?
+    var onTapEye: (() -> Void)?
     var isAnimationEnabled: Bool = true
 
     @State private var blinkScale: CGFloat = 1.0
@@ -680,7 +671,8 @@ private struct GenericSilhouette: View {
             Ellipse()
                 .fill(LinearGradient(
                     colors: [coatColor, coatColor.mix(with: .black, by: 0.12)],
-                    startPoint: .top, endPoint: .bottom))
+                    startPoint: .top, endPoint: .bottom
+                ))
                 .frame(width: 120, height: 92)
                 .overlay { if let p = patternName { BodyPatternDots(patternName: p).clipShape(Ellipse()) } }
                 .offset(y: 56)
@@ -692,7 +684,8 @@ private struct GenericSilhouette: View {
                 Circle()
                     .fill(LinearGradient(
                         colors: [coatColor.mix(with: .white, by: 0.06), coatColor.mix(with: .black, by: 0.08)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ))
                     .frame(width: 124)
                     .shadow(color: coatColor.opacity(0.18), radius: 6, y: 3) // ui-v4: allow silhouette illustration depth.
                     .overlay { if let p = patternName { BodyPatternDots(patternName: p).clipShape(Circle()) } }
@@ -757,10 +750,11 @@ private struct BodyPatternDots: View {
                 case "银渐层":
                     RadialGradient(
                         colors: [Color(hex: "888888").opacity(0.45), .clear],
-                        center: .top, startRadius: 0, endRadius: h * 0.8)
+                        center: .top, startRadius: 0, endRadius: h * 0.8
+                    )
                 case "虎斑":
                     VStack(spacing: h * 0.13) {
-                        ForEach(0..<3, id: \.self) { i in
+                        ForEach(0 ..< 3, id: \.self) { i in
                             Capsule().fill(Color.arkInk.opacity(0.18))
                                 .frame(width: w * (0.48 - CGFloat(i) * 0.06), height: h * 0.05)
                                 .offset(x: CGFloat(i % 2 == 0 ? -w * 0.03 : w * 0.03))
@@ -902,16 +896,20 @@ private struct BirdCrownFeather: Shape {
         p.move(to: CGPoint(x: rect.midX, y: rect.maxY))
         p.addQuadCurve(
             to: CGPoint(x: rect.maxX, y: rect.height * 0.5),
-            control: CGPoint(x: rect.maxX + rect.width * 0.1, y: rect.height * 0.75))
+            control: CGPoint(x: rect.maxX + rect.width * 0.1, y: rect.height * 0.75)
+        )
         p.addQuadCurve(
             to: CGPoint(x: rect.midX, y: 0),
-            control: CGPoint(x: rect.maxX * 0.8, y: rect.height * 0.2))
+            control: CGPoint(x: rect.maxX * 0.8, y: rect.height * 0.2)
+        )
         p.addQuadCurve(
             to: CGPoint(x: 0, y: rect.height * 0.5),
-            control: CGPoint(x: rect.minX * 1.2, y: rect.height * 0.2))
+            control: CGPoint(x: rect.minX * 1.2, y: rect.height * 0.2)
+        )
         p.addQuadCurve(
             to: CGPoint(x: rect.midX, y: rect.maxY),
-            control: CGPoint(x: rect.minX - rect.width * 0.1, y: rect.height * 0.75))
+            control: CGPoint(x: rect.minX - rect.width * 0.1, y: rect.height * 0.75)
+        )
         p.closeSubpath()
         return p
     }
@@ -926,11 +924,13 @@ private struct BirdBeakShape: Shape {
         p.addCurve(
             to: CGPoint(x: rect.midX, y: rect.maxY),
             control1: CGPoint(x: rect.maxX, y: rect.height * 0.6),
-            control2: CGPoint(x: rect.midX + 4, y: rect.maxY))
+            control2: CGPoint(x: rect.midX + 4, y: rect.maxY)
+        )
         p.addCurve(
             to: CGPoint(x: 0, y: 0),
             control1: CGPoint(x: rect.midX - 4, y: rect.maxY),
-            control2: CGPoint(x: 0, y: rect.height * 0.6))
+            control2: CGPoint(x: 0, y: rect.height * 0.6)
+        )
         p.closeSubpath()
         return p
     }
@@ -987,11 +987,11 @@ private struct CatNoseShape: Shape {
         var p = Path()
         p.move(to: CGPoint(x: rect.midX, y: 0))
         p.addCurve(to: CGPoint(x: rect.maxX, y: rect.maxY),
-                    control1: CGPoint(x: rect.maxX * 0.8, y: 0),
-                    control2: CGPoint(x: rect.maxX, y: rect.maxY * 0.6))
+                   control1: CGPoint(x: rect.maxX * 0.8, y: 0),
+                   control2: CGPoint(x: rect.maxX, y: rect.maxY * 0.6))
         p.addCurve(to: CGPoint(x: 0, y: rect.maxY),
-                    control1: CGPoint(x: rect.midX, y: rect.maxY * 1.2),
-                    control2: CGPoint(x: 0, y: rect.maxY * 0.6))
+                   control1: CGPoint(x: rect.midX, y: rect.maxY * 1.2),
+                   control2: CGPoint(x: 0, y: rect.maxY * 0.6))
         p.closeSubpath()
         return p
     }
@@ -1002,9 +1002,9 @@ private struct CatMouthShape: Shape {
         var p = Path()
         p.move(to: CGPoint(x: 0, y: 0))
         p.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.maxY),
-                        control: CGPoint(x: rect.midX * 0.5, y: rect.maxY * 0.3))
+                       control: CGPoint(x: rect.midX * 0.5, y: rect.maxY * 0.3))
         p.addQuadCurve(to: CGPoint(x: rect.maxX, y: 0),
-                        control: CGPoint(x: rect.midX * 1.5, y: rect.maxY * 0.3))
+                       control: CGPoint(x: rect.midX * 1.5, y: rect.maxY * 0.3))
         return p
     }
 }
@@ -1030,14 +1030,14 @@ private struct DogFaceDetails: View {
                     .stroke(Color(hex: "2C2C2C").opacity(0.35), lineWidth: 1.5)
                     .frame(width: 28, height: 12) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 // 舌头（伸出）
-                RoundedRectangle(cornerRadius: 5)
+                RoundedRectangle(cornerRadius: OhanaRadius.micro)
                     .fill(
                         LinearGradient(colors: [Color(hex: "FF9B9B"), Color(hex: "FF6B6B")],
                                        startPoint: .top, endPoint: .bottom)
                     )
                     .frame(width: 13, height: 18 + tongueY)
                     .offset(y: 7 + tongueY * 0.5)
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.micro))
             }
         }
     }
@@ -1048,9 +1048,9 @@ private struct DogMouthShape: Shape {
         var p = Path()
         p.move(to: CGPoint(x: 0, y: 0))
         p.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.maxY),
-                        control: CGPoint(x: rect.midX * 0.4, y: rect.maxY * 0.5))
+                       control: CGPoint(x: rect.midX * 0.4, y: rect.maxY * 0.5))
         p.addQuadCurve(to: CGPoint(x: rect.maxX, y: 0),
-                        control: CGPoint(x: rect.midX * 1.6, y: rect.maxY * 0.5))
+                       control: CGPoint(x: rect.midX * 1.6, y: rect.maxY * 0.5))
         return p
     }
 }

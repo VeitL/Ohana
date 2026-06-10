@@ -36,52 +36,52 @@ enum DesignBuilderStepV4: String, CaseIterable, Identifiable {
 
     var zh: String {
         switch self {
-        case .background: return "背景"
-        case .card: return "卡片"
-        case .button: return "按钮"
-        case .input: return "输入"
-        case .controls: return "控件"
-        case .text: return "文字"
-        case .navigation: return "导航"
-        case .sheet: return "弹窗"
-        case .chart: return "图表"
-        case .calendar: return "日历"
-        case .feedback: return "反馈"
-        case .motion: return "动效"
+        case .background: "背景"
+        case .card: "卡片"
+        case .button: "按钮"
+        case .input: "输入"
+        case .controls: "控件"
+        case .text: "文字"
+        case .navigation: "导航"
+        case .sheet: "弹窗"
+        case .chart: "图表"
+        case .calendar: "日历"
+        case .feedback: "反馈"
+        case .motion: "动效"
         }
     }
 
     var en: String {
         switch self {
-        case .background: return "Background"
-        case .card: return "Card"
-        case .button: return "Button"
-        case .input: return "Input"
-        case .controls: return "Controls"
-        case .text: return "Text"
-        case .navigation: return "Navigation"
-        case .sheet: return "Sheet"
-        case .chart: return "Chart"
-        case .calendar: return "Calendar"
-        case .feedback: return "Feedback"
-        case .motion: return "Motion"
+        case .background: "Background"
+        case .card: "Card"
+        case .button: "Button"
+        case .input: "Input"
+        case .controls: "Controls"
+        case .text: "Text"
+        case .navigation: "Navigation"
+        case .sheet: "Sheet"
+        case .chart: "Chart"
+        case .calendar: "Calendar"
+        case .feedback: "Feedback"
+        case .motion: "Motion"
         }
     }
 
     var icon: String {
         switch self {
-        case .background: return "paintpalette.fill"
-        case .card: return "rectangle.on.rectangle.angled.fill"
-        case .button: return "capsule.fill"
-        case .input: return "keyboard.fill"
-        case .controls: return "switch.2"
-        case .text: return "textformat"
-        case .navigation: return "rectangle.topthird.inset.filled"
-        case .sheet: return "rectangle.bottomthird.inset.filled"
-        case .chart: return "chart.xyaxis.line"
-        case .calendar: return "calendar"
-        case .feedback: return "bell.badge.fill"
-        case .motion: return "sparkles"
+        case .background: "paintpalette.fill"
+        case .card: "rectangle.on.rectangle.angled.fill"
+        case .button: "capsule.fill"
+        case .input: "keyboard.fill"
+        case .controls: "switch.2"
+        case .text: "textformat"
+        case .navigation: "rectangle.topthird.inset.filled"
+        case .sheet: "rectangle.bottomthird.inset.filled"
+        case .chart: "chart.xyaxis.line"
+        case .calendar: "calendar"
+        case .feedback: "bell.badge.fill"
+        case .motion: "sparkles"
         }
     }
 }
@@ -103,49 +103,49 @@ enum DesignSpecComponentStateV4: String, CaseIterable, Identifiable, Codable {
 
     var zh: String {
         switch self {
-        case .normal: return "正常"
-        case .pressed: return "按下"
-        case .selected: return "选中"
-        case .focused: return "聚焦"
-        case .disabled: return "禁用"
-        case .loading: return "加载"
-        case .empty: return "空"
-        case .error: return "错误"
-        case .warning: return "警告"
-        case .success: return "成功"
-        case .locked: return "锁定"
+        case .normal: "正常"
+        case .pressed: "按下"
+        case .selected: "选中"
+        case .focused: "聚焦"
+        case .disabled: "禁用"
+        case .loading: "加载"
+        case .empty: "空"
+        case .error: "错误"
+        case .warning: "警告"
+        case .success: "成功"
+        case .locked: "锁定"
         }
     }
 
     var en: String {
         switch self {
-        case .normal: return "Normal"
-        case .pressed: return "Pressed"
-        case .selected: return "Selected"
-        case .focused: return "Focused"
-        case .disabled: return "Disabled"
-        case .loading: return "Loading"
-        case .empty: return "Empty"
-        case .error: return "Error"
-        case .warning: return "Warning"
-        case .success: return "Success"
-        case .locked: return "Locked"
+        case .normal: "Normal"
+        case .pressed: "Pressed"
+        case .selected: "Selected"
+        case .focused: "Focused"
+        case .disabled: "Disabled"
+        case .loading: "Loading"
+        case .empty: "Empty"
+        case .error: "Error"
+        case .warning: "Warning"
+        case .success: "Success"
+        case .locked: "Locked"
         }
     }
 
     var icon: String {
         switch self {
-        case .normal: return "circle"
-        case .pressed: return "hand.tap.fill"
-        case .selected: return "checkmark.circle.fill"
-        case .focused: return "scope"
-        case .disabled: return "slash.circle"
-        case .loading: return "hourglass"
-        case .empty: return "tray"
-        case .error: return "xmark.octagon.fill"
-        case .warning: return "exclamationmark.triangle.fill"
-        case .success: return "checkmark.seal.fill"
-        case .locked: return "lock.fill"
+        case .normal: "circle"
+        case .pressed: "hand.tap.fill"
+        case .selected: "checkmark.circle.fill"
+        case .focused: "scope"
+        case .disabled: "slash.circle"
+        case .loading: "hourglass"
+        case .empty: "tray"
+        case .error: "xmark.octagon.fill"
+        case .warning: "exclamationmark.triangle.fill"
+        case .success: "checkmark.seal.fill"
+        case .locked: "lock.fill"
         }
     }
 }
@@ -411,8 +411,8 @@ extension DesignSpecSelectionV4 {
         segment = try container.decodeIfPresent(String.self, forKey: .segment) ?? defaults.segment
         progress = try container.decodeIfPresent(String.self, forKey: .progress) ?? defaults.progress
         type = try container.decodeIfPresent(String.self, forKey: .type) ?? defaults.type
-        icon = Self.normalizedIcon(try container.decodeIfPresent(String.self, forKey: .icon) ?? defaults.icon)
-        settingIcon = Self.normalizedSettingIcon(try container.decodeIfPresent(String.self, forKey: .settingIcon) ?? defaults.settingIcon)
+        icon = try Self.normalizedIcon(container.decodeIfPresent(String.self, forKey: .icon) ?? defaults.icon)
+        settingIcon = try Self.normalizedSettingIcon(container.decodeIfPresent(String.self, forKey: .settingIcon) ?? defaults.settingIcon)
         navigation = try container.decodeIfPresent(String.self, forKey: .navigation) ?? defaults.navigation
         pageBackButton = try container.decodeIfPresent(String.self, forKey: .pageBackButton) ?? defaults.pageBackButton
         pageCloseButton = try container.decodeIfPresent(String.self, forKey: .pageCloseButton) ?? defaults.pageCloseButton
@@ -421,10 +421,10 @@ extension DesignSpecSelectionV4 {
         sheet = try container.decodeIfPresent(String.self, forKey: .sheet) ?? defaults.sheet
         sheetTransparency = try container.decodeIfPresent(String.self, forKey: .sheetTransparency) ?? defaults.sheetTransparency
         sheetChrome = try container.decodeIfPresent(String.self, forKey: .sheetChrome) ?? defaults.sheetChrome
-        sheetGlass = try container.decodeIfPresent(String.self, forKey: .sheetGlass) ?? (try container.decodeIfPresent(String.self, forKey: .glass) ?? defaults.sheetGlass)
-        sheetCard = try container.decodeIfPresent(String.self, forKey: .sheetCard) ?? (try container.decodeIfPresent(String.self, forKey: .card) ?? defaults.sheetCard)
-        sheetInput = try container.decodeIfPresent(String.self, forKey: .sheetInput) ?? (try container.decodeIfPresent(String.self, forKey: .input) ?? defaults.sheetInput)
-        sheetButton = try container.decodeIfPresent(String.self, forKey: .sheetButton) ?? (try container.decodeIfPresent(String.self, forKey: .button) ?? defaults.sheetButton)
+        sheetGlass = try container.decodeIfPresent(String.self, forKey: .sheetGlass) ?? (container.decodeIfPresent(String.self, forKey: .glass) ?? defaults.sheetGlass)
+        sheetCard = try container.decodeIfPresent(String.self, forKey: .sheetCard) ?? (container.decodeIfPresent(String.self, forKey: .card) ?? defaults.sheetCard)
+        sheetInput = try container.decodeIfPresent(String.self, forKey: .sheetInput) ?? (container.decodeIfPresent(String.self, forKey: .input) ?? defaults.sheetInput)
+        sheetButton = try container.decodeIfPresent(String.self, forKey: .sheetButton) ?? (container.decodeIfPresent(String.self, forKey: .button) ?? defaults.sheetButton)
         chartLine = try container.decodeIfPresent(String.self, forKey: .chartLine) ?? defaults.chartLine
         chartAxis = try container.decodeIfPresent(String.self, forKey: .chartAxis) ?? defaults.chartAxis
         calendarLayout = try container.decodeIfPresent(String.self, forKey: .calendarLayout) ?? defaults.calendarLayout
@@ -441,22 +441,22 @@ extension DesignSpecSelectionV4 {
     }
 }
 
-fileprivate extension DesignSpecSelectionV4 {
+private extension DesignSpecSelectionV4 {
     static func normalizedIcon(_ rawValue: String) -> String {
         switch rawValue {
         case "monochromePrimary":
-            return rawValue
+            rawValue
         default:
-            return ohanaDefault.icon
+            ohanaDefault.icon
         }
     }
 
     static func normalizedSettingIcon(_ rawValue: String) -> String {
         switch rawValue {
         case "plainGlyph":
-            return rawValue
+            rawValue
         default:
-            return ohanaDefault.settingIcon
+            ohanaDefault.settingIcon
         }
     }
 }

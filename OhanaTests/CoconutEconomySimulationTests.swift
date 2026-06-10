@@ -11,26 +11,26 @@ struct CoconutEconomySimulationTests {
         let healthOnly = EconomyCohortSimulator(preset: .healthOnly).run(days: 90)
         let returning = EconomyCohortSimulator(preset: .returningLegacyNormal).run(days: 30)
 
-        print(EconomySimulationDashboard.makeMarkdown(reports: [
+        OhanaLog.info(EconomySimulationDashboard.makeMarkdown(reports: [
             light,
             normal,
             family,
             focusOnly,
             healthOnly,
             returning
-        ]))
+        ]), category: "EconomySimulation")
 
-        #expect((4...5).contains(light.levelAtDay(30).rawValue))
+        #expect((4 ... 5).contains(light.levelAtDay(30).rawValue))
         #expect(light.levelAtDay(90).rawValue >= TreeLevel.lv7.rawValue)
 
-        #expect((28...42).contains(normal.daysToLevel[.lv7] ?? 0))
+        #expect((28 ... 42).contains(normal.daysToLevel[.lv7] ?? 0))
         #expect(normal.levelAtDay(60).rawValue >= TreeLevel.lv8.rawValue)
         #expect(normal.levelAtDay(90).rawValue >= TreeLevel.lv9.rawValue)
         #expect(normal.injectedXP * 100 <= normal.totalXP * 15)
         #expect(normal.weeklySpendRate > 0.15)
         #expect(normal.finalBalance < normal.coconutsEarned)
 
-        #expect((18...35).contains(family.daysToLevel[.lv7] ?? 0))
+        #expect((18 ... 35).contains(family.daysToLevel[.lv7] ?? 0))
         #expect(family.levelAtDay(90).rawValue >= TreeLevel.lv10.rawValue)
         #expect(family.coconutsEarned <= normal.coconutsEarned * 2)
         #expect(family.careCoconutsEarned < normal.careCoconutsEarned * 2)
@@ -40,16 +40,16 @@ struct CoconutEconomySimulationTests {
         #expect(focusOnly.levelAtDay(90) == .lv7)
         #expect(focusOnly.dailyGoalCoverage == 1.0)
 
-        #expect((5...6).contains(healthOnly.levelAtDay(90).rawValue))
+        #expect((5 ... 6).contains(healthOnly.levelAtDay(90).rawValue))
 
-        #expect((1...24).contains(returning.daysToLevel[.lv7] ?? 0))
+        #expect((1 ... 24).contains(returning.daysToLevel[.lv7] ?? 0))
         #expect(returning.levelAtDay(30).rawValue >= TreeLevel.lv7.rawValue)
         #expect((returning.daysToLevel[.lv8] ?? 31) > 30)
     }
 
     @Test func heavyFeedSpamRecordsCareButDoesNotInflateCurrency() {
         let report = EconomyCohortSimulator(preset: .heavyFeedSpam).run(days: 1)
-        print(EconomySimulationDashboard.makeMarkdown(reports: [report]))
+        OhanaLog.info(EconomySimulationDashboard.makeMarkdown(reports: [report]), category: "EconomySimulation")
 
         #expect(report.totalXP >= 90)
         #expect(report.careCoconutsEarned <= 5)
@@ -69,13 +69,13 @@ private enum EconomyCohortPreset {
 
     var displayName: String {
         switch self {
-        case .lightOnePet: return "1宠轻用户90天"
-        case .normalOnePet: return "1宠普通用户90天"
-        case .familyThreePets: return "3宠家庭90天"
-        case .todayFocusOnly: return "只做Today Focus"
-        case .healthOnly: return "只用健康管理"
-        case .returningLegacyNormal: return "回流老用户30天"
-        case .heavyFeedSpam: return "重度刷50次喂食"
+        case .lightOnePet: "1宠轻用户90天"
+        case .normalOnePet: "1宠普通用户90天"
+        case .familyThreePets: "3宠家庭90天"
+        case .todayFocusOnly: "只做Today Focus"
+        case .healthOnly: "只用健康管理"
+        case .returningLegacyNormal: "回流老用户30天"
+        case .heavyFeedSpam: "重度刷50次喂食"
         }
     }
 }
@@ -101,13 +101,16 @@ private struct EconomyCohortReport {
     var averageDailyNetCoconuts: Double {
         Double(coconutsEarned - coconutsSpent) / Double(simulatedDays)
     }
+
     var weeklySpendRate: Double {
         guard coconutsEarned > 0 else { return 0 }
         return Double(coconutsSpent) / Double(coconutsEarned)
     }
+
     var budgetTouchRatio: Double {
-        Double(days.filter { $0.touchedBudget }.count) / Double(simulatedDays)
+        Double(days.count(where: { $0.touchedBudget })) / Double(simulatedDays)
     }
+
     var dailyGoalCoverage: Double {
         Double(dailyGoalDays) / Double(simulatedDays)
     }
@@ -149,7 +152,7 @@ private struct EconomyCohortSimulator {
         var lastWeeklyInjectionDay: Int?
         var budgetStore = EconomySimulationBudgetStore()
 
-        for dayIndex in 0..<days {
+        for dayIndex in 0 ..< days {
             budgetStore.startNewDay()
             let startXP = report.totalXP
             let startEarned = report.coconutsEarned
@@ -182,9 +185,9 @@ private struct EconomyCohortSimulator {
     private var legacyBaselineXP: Int {
         switch preset {
         case .returningLegacyNormal:
-            return 500
+            500
         default:
-            return 0
+            0
         }
     }
 
@@ -236,7 +239,7 @@ private struct EconomyCohortSimulator {
             }
         case .heavyFeedSpam:
             perform(.feed, budgetStore: &budgetStore, report: &report)
-            for _ in 0..<49 {
+            for _ in 0 ..< 49 {
                 perform(.feed, budgetStore: &budgetStore, report: &report, isOnCooldown: true)
             }
         }
@@ -322,7 +325,7 @@ private struct EconomyCohortSimulator {
         let currentLevel = OasisTreeManager.treeLevel(forTotalEnergy: report.totalXP)
         guard currentLevel.rawValue > previousLevel.rawValue else { return }
 
-        for rawValue in (previousLevel.rawValue + 1)...currentLevel.rawValue {
+        for rawValue in (previousLevel.rawValue + 1) ... currentLevel.rawValue {
             guard let level = TreeLevel(rawValue: rawValue) else { continue }
             report.daysToLevel[level] = report.daysToLevel[level] ?? day
             report.coconutsEarned += level.levelUpReward
@@ -427,13 +430,12 @@ private struct EconomySimulationBudgetStore {
         let growthXP = max(1, Int(ceil(Double(base.growthXP) * initialStage.xpMultiplier)))
         let scaledCoconuts = Int(ceil(Double(requestedCoconuts) * initialStage.coconutMultiplier))
         let allowedCoconuts = min(scaledCoconuts, remainingFatigueCoconuts(careObjectKeys: careObjectKeys, careObjectCount: careObjectCount))
-        let effectiveStage: EconomyBudgetStage
-        if initialStage == .normal, allowedCoconuts < requestedCoconuts {
-            effectiveStage = .fatigue
+        let effectiveStage: EconomyBudgetStage = if initialStage == .normal, allowedCoconuts < requestedCoconuts {
+            .fatigue
         } else if initialStage != .cooldown, requestedCoconuts > 0, allowedCoconuts == 0 {
-            effectiveStage = .recordOnly
+            .recordOnly
         } else {
-            effectiveStage = initialStage
+            initialStage
         }
         return EconomySimulationRewardResult(
             growthXP: growthXP,
@@ -447,10 +449,10 @@ private struct EconomySimulationBudgetStore {
         householdCoconutUsed += result.totalCoconuts
         memberXPUsed += result.growthXP
         memberCoconutUsed += result.totalCoconuts
-        Self.distribute(result.growthXP, across: careObjectKeys).forEach { objectKey, amount in
+        for (objectKey, amount) in Self.distribute(result.growthXP, across: careObjectKeys) {
             objectXPUsed[objectKey, default: 0] += amount
         }
-        Self.distribute(result.totalCoconuts, across: careObjectKeys).forEach { objectKey, amount in
+        for (objectKey, amount) in Self.distribute(result.totalCoconuts, across: careObjectKeys) {
             objectCoconutUsed[objectKey, default: 0] += amount
         }
     }
@@ -508,10 +510,10 @@ private struct EconomySimulationBudgetStore {
         highCoconutBudget: Int,
         fatigueCoconutBudget: Int
     ) -> EconomyBudgetStage {
-        if xpUsed < highXPBudget && coconutUsed < highCoconutBudget {
+        if xpUsed < highXPBudget, coconutUsed < highCoconutBudget {
             return .normal
         }
-        if xpUsed < fatigueXPBudget && coconutUsed < fatigueCoconutBudget {
+        if xpUsed < fatigueXPBudget, coconutUsed < fatigueCoconutBudget {
             return .fatigue
         }
         return .recordOnly
@@ -533,11 +535,11 @@ private struct EconomySimulationBudgetStore {
             return EconomySimulationBaseReward(growthXP: 6, coconuts: 3, humanShare: 2, petShare: 1)
         case .water:
             return EconomySimulationBaseReward(growthXP: 5, coconuts: 3, humanShare: 2, petShare: 1)
-        case .potty(let isLitter):
+        case let .potty(isLitter):
             return isLitter
                 ? EconomySimulationBaseReward(growthXP: 7, coconuts: 3, humanShare: 2, petShare: 1)
                 : EconomySimulationBaseReward(growthXP: 5, coconuts: 2, humanShare: 1, petShare: 1)
-        case .care(let type):
+        case let .care(type):
             switch type {
             case .bath:
                 return EconomySimulationBaseReward(growthXP: 14, coconuts: 8, humanShare: 6, petShare: 2)
@@ -546,7 +548,7 @@ private struct EconomySimulationBudgetStore {
             case .brushing:
                 return EconomySimulationBaseReward(growthXP: 10, coconuts: 5, humanShare: 3, petShare: 2)
             }
-        case .walk(let distanceMeters):
+        case let .walk(distanceMeters):
             let xp = min(20, max(8, Int(distanceMeters / 250)))
             let coconuts = min(14, max(5, Int(distanceMeters / 350)))
             let pet = max(1, coconuts / 3)
@@ -561,7 +563,7 @@ private struct EconomySimulationBudgetStore {
             return EconomySimulationBaseReward(growthXP: 7, coconuts: 3, humanShare: 2, petShare: 1)
         case .dailyFocusCompletion:
             return EconomySimulationBaseReward(growthXP: 18, coconuts: 8, humanShare: 8, petShare: 0)
-        case .general(let humanReward, let petReward, _, _):
+        case let .general(humanReward, petReward, _, _):
             let total = max(0, humanReward) + max(0, petReward)
             return EconomySimulationBaseReward(
                 growthXP: max(1, total),

@@ -18,11 +18,11 @@ enum AppRoute: Hashable, Identifiable {
     var id: String {
         switch self {
         case let .petProfile(id, tab):
-            return "pet-profile-\(id.uuidString)-\(tab.rawValue)"
+            "pet-profile-\(id.uuidString)-\(tab.rawValue)"
         case let .humanProfile(id):
-            return "human-profile-\(id.uuidString)"
+            "human-profile-\(id.uuidString)"
         case let .plantProfile(id):
-            return "plant-profile-\(id.uuidString)"
+            "plant-profile-\(id.uuidString)"
         }
     }
 
@@ -31,7 +31,7 @@ enum AppRoute: Hashable, Identifiable {
         case let .petProfile(id, _),
              let .humanProfile(id),
              let .plantProfile(id):
-            return id
+            id
         }
     }
 }
@@ -81,85 +81,85 @@ enum AppSheetRoute: Hashable, Identifiable {
     var id: String {
         switch self {
         case .accountSwitcher:
-            return "account-switcher"
+            "account-switcher"
         case let .addEntity(type):
-            return "add-entity-\(type.id)"
+            "add-entity-\(type.id)"
         case let .calendar(entityID, humanID):
-            return "calendar-\(entityID ?? "all")-\(humanID ?? "all")"
+            "calendar-\(entityID ?? "all")-\(humanID ?? "all")"
         case let .coconutLog(subject):
-            return "coconut-log-\(subject?.id ?? "all")"
+            "coconut-log-\(subject?.id ?? "all")"
         case let .coconutShop(category):
-            return "coconut-shop-\(category.rawValue)"
+            "coconut-shop-\(category.rawValue)"
         case let .crewRoster(mode):
-            return "crew-roster-\(mode.rawValue)"
+            "crew-roster-\(mode.rawValue)"
         case let .functionMenu(destination):
-            return "function-menu-\(String(describing: destination))"
+            "function-menu-\(String(describing: destination))"
         case let .petAllFeatures(id):
-            return "pet-all-\(id.uuidString)"
+            "pet-all-\(id.uuidString)"
         case let .petBasicInfo(id):
-            return "pet-basic-\(id.uuidString)"
+            "pet-basic-\(id.uuidString)"
         case let .petFood(id):
-            return "pet-food-\(id.uuidString)"
+            "pet-food-\(id.uuidString)"
         case let .petWeight(id):
-            return "pet-weight-\(id.uuidString)"
+            "pet-weight-\(id.uuidString)"
         case let .petExpense(id):
-            return "pet-expense-\(id.uuidString)"
+            "pet-expense-\(id.uuidString)"
         case let .petFeed(id, opensManualSheet):
-            return "pet-feed-\(id.uuidString)-manual-\(opensManualSheet)"
+            "pet-feed-\(id.uuidString)-manual-\(opensManualSheet)"
         case let .petWater(id):
-            return "pet-water-\(id.uuidString)"
+            "pet-water-\(id.uuidString)"
         case let .petPotty(id):
-            return "pet-potty-\(id.uuidString)"
+            "pet-potty-\(id.uuidString)"
         case let .petLitter(id):
-            return "pet-litter-\(id.uuidString)"
+            "pet-litter-\(id.uuidString)"
         case let .petPlay(id):
-            return "pet-play-\(id.uuidString)"
+            "pet-play-\(id.uuidString)"
         case let .petHygiene(id):
-            return "pet-hygiene-\(id.uuidString)"
+            "pet-hygiene-\(id.uuidString)"
         case let .petWalkSummary(id):
-            return "pet-walk-\(id.uuidString)"
+            "pet-walk-\(id.uuidString)"
         case let .petHealth(id, section):
-            return "pet-health-\(id.uuidString)-\(section?.appRouteIDValue ?? "default")"
+            "pet-health-\(id.uuidString)-\(section?.appRouteIDValue ?? "default")"
         case let .petMedication(id):
-            return "pet-medication-\(id.uuidString)"
+            "pet-medication-\(id.uuidString)"
         case let .petMomentHistory(id):
-            return "pet-moment-history-\(id.uuidString)"
+            "pet-moment-history-\(id.uuidString)"
         case let .petDocuments(id):
-            return "pet-documents-\(id.uuidString)"
+            "pet-documents-\(id.uuidString)"
         case let .petAchievements(id):
-            return "pet-achievements-\(id.uuidString)"
+            "pet-achievements-\(id.uuidString)"
         case let .petRetention(id):
-            return "pet-retention-\(id.uuidString)"
+            "pet-retention-\(id.uuidString)"
         case let .petBondVault(id):
-            return "pet-bond-vault-\(id.uuidString)"
+            "pet-bond-vault-\(id.uuidString)"
         case let .humanAllFeatures(id):
-            return "human-all-\(id.uuidString)"
+            "human-all-\(id.uuidString)"
         case let .humanBasicInfo(id):
-            return "human-basic-\(id.uuidString)"
+            "human-basic-\(id.uuidString)"
         case let .humanMedication(id):
-            return "human-medication-\(id.uuidString)"
+            "human-medication-\(id.uuidString)"
         case let .humanWeight(id):
-            return "human-weight-\(id.uuidString)"
+            "human-weight-\(id.uuidString)"
         case let .humanWorkout(id):
-            return "human-workout-\(id.uuidString)"
+            "human-workout-\(id.uuidString)"
         case let .humanWorkoutDashboard(id):
-            return "human-workout-dashboard-\(id.uuidString)"
+            "human-workout-dashboard-\(id.uuidString)"
         case let .humanMetrics(id):
-            return "human-metrics-\(id.uuidString)"
+            "human-metrics-\(id.uuidString)"
         case let .humanReport(id):
-            return "human-report-\(id.uuidString)"
+            "human-report-\(id.uuidString)"
         case let .humanExpense(id):
-            return "human-expense-\(id.uuidString)"
+            "human-expense-\(id.uuidString)"
         case let .humanWishlist(id):
-            return "human-wishlist-\(id.uuidString)"
+            "human-wishlist-\(id.uuidString)"
         case let .humanNote(id):
-            return "human-note-\(id.uuidString)"
+            "human-note-\(id.uuidString)"
         case .requiredAccountSwitch:
-            return "required-account-switch"
+            "required-account-switch"
         case .settings:
-            return "settings"
+            "settings"
         case .streakDetail:
-            return "streak-detail"
+            "streak-detail"
         }
     }
 }
@@ -172,11 +172,11 @@ enum AppFullScreenRoute: Hashable, Identifiable {
     var id: String {
         switch self {
         case .oasisReward:
-            return "oasis-reward"
+            "oasis-reward"
         case .requiredHumanProfile:
-            return "required-human-profile"
+            "required-human-profile"
         case let .walk(petID):
-            return "walk-\(petID.uuidString)"
+            "walk-\(petID.uuidString)"
         }
     }
 }
@@ -187,7 +187,7 @@ enum AppOverlayRoute: Hashable, Identifiable {
     var id: String {
         switch self {
         case let .quickMoment(routeID, _):
-            return "quick-moment-\(routeID.uuidString)"
+            "quick-moment-\(routeID.uuidString)"
         }
     }
 }
@@ -228,9 +228,8 @@ final class AppRouteCoordinator: ObservableObject {
         push(.humanProfile(id: id))
     }
 
-    func openPlant(_ id: UUID) {
+    func openPlant(_: UUID) {
         AppFeatureRouteGuard.recordIntercept("plantProfile")
-        return
     }
 
     func presentAccountSwitcher() {
@@ -406,9 +405,9 @@ private extension AppRouteCoordinator {
 private extension PetHealthInitialSection {
     var appRouteIDValue: String {
         switch self {
-        case .preventive: return "preventive"
-        case .medication: return "medication"
-        case .symptomVisit: return "symptomVisit"
+        case .preventive: "preventive"
+        case .medication: "medication"
+        case .symptomVisit: "symptomVisit"
         }
     }
 }

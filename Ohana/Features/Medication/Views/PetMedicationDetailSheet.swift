@@ -5,8 +5,8 @@
 //  单条用药疗程详情：进度、今日打卡、历史（基于 Event）
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetMedicationDetailContentSheet: View {
     let pet: Pet
@@ -67,7 +67,7 @@ struct PetMedicationDetailContentSheet: View {
                         detailChrome
                         headerBlock
 
-                        if todayRequired > 0 && todayDone < todayRequired {
+                        if todayRequired > 0, todayDone < todayRequired {
                             recordDoseButton
                         }
 
@@ -273,7 +273,7 @@ struct PetMedicationDetailContentSheet: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var bentoTodayStatus: some View {
@@ -301,7 +301,7 @@ struct PetMedicationDetailContentSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private var bentoAdministration: some View {
@@ -319,7 +319,7 @@ struct PetMedicationDetailContentSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private var remainingCard: some View {
@@ -343,7 +343,7 @@ struct PetMedicationDetailContentSheet: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var historySection: some View {
@@ -364,7 +364,7 @@ struct PetMedicationDetailContentSheet: View {
                                 .foregroundStyle(Color.ohanaPrimaryText)
                         }
                         if row.missedCount > 0 {
-                            ForEach(0..<row.missedCount, id: \.self) { _ in
+                            ForEach(0 ..< row.missedCount, id: \.self) { _ in
                                 Label("漏喂", systemImage: "xmark.circle.fill")
                                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                                     .foregroundStyle(Color.goRed.opacity(0.85))
@@ -388,24 +388,22 @@ struct PetMedicationDetailContentSheet: View {
     private var historyDayRows: [HistoryDayRow] {
         let cal = Calendar.current
         var rows: [HistoryDayRow] = []
-        for offset in 0..<14 {
+        for offset in 0 ..< 14 {
             guard let day = cal.date(byAdding: .day, value: -offset, to: Date()) else { continue }
             let start = cal.startOfDay(for: day)
             let req = PetMedicationDoseLogging.requiredDoses(on: day, for: medication)
             let dayEvents = medEvents.filter { cal.isDate($0.startDate, inSameDayAs: day) }
                 .sorted { $0.startDate < $1.startDate }
-            let missed: Int
-            if req == 0 {
-                missed = 0
+            let missed: Int = if req == 0 {
+                0
             } else if cal.isDateInToday(day) {
-                missed = 0
+                0
             } else {
-                missed = max(0, req - dayEvents.count)
+                max(0, req - dayEvents.count)
             }
-            let title: String
-            if cal.isDateInToday(day) { title = "今天" }
-            else if cal.isDateInYesterday(day) { title = "昨天" }
-            else { title = day.formatted(.dateTime.month().day()) }
+            let title: String = if cal.isDateInToday(day) { "今天" }
+            else if cal.isDateInYesterday(day) { "昨天" }
+            else { day.formatted(.dateTime.month().day()) }
 
             if !dayEvents.isEmpty || missed > 0 {
                 rows.append(HistoryDayRow(dayStart: start, title: title, events: dayEvents, missedCount: missed))
@@ -420,7 +418,7 @@ struct PetMedicationDetailContentSheet: View {
             return (nil, full)
         }
         let innerStart = full.index(full.startIndex, offsetBy: prefix.count)
-        let tag = String(full[innerStart..<range.lowerBound])
+        let tag = String(full[innerStart ..< range.lowerBound])
         var rest = String(full[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
         if rest.hasPrefix("\n") { rest = String(rest.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines) }
         return (tag.isEmpty ? nil : tag, rest)

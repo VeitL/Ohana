@@ -68,7 +68,7 @@ extension MemberCardCreationContentView {
                     compactBreedPicker
                 }
                 if draft.isCustomBreed {
-                    flatTextField(l.tr(zh: "自定义品种", en: "Custom breed", de: "Eigene Rasse"), text: $draft.customBreed)
+                    flatTextField(l.tr(zh: "自定义品种", en: "Custom breed", de: "Eigene Rasse"), text: $draft.customBreed) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 }
                 VStack(alignment: .leading, spacing: 7) {
                     MemberCompactDateRow(
@@ -406,18 +406,18 @@ extension MemberCardCreationContentView {
             draft.eyeColor,
             draft.humanGender,
             "\(draft.hasBirthday)",
-            "\(draft.birthday.timeIntervalSince1970.rounded())",
+            "\(draft.birthday.timeIntervalSince1970.rounded())"
         ].joined(separator: "|")
     }
 
     var cardSubtitle: String {
         switch kind {
         case .pet:
-            return [speciesLabel(draft.species), draft.resolvedBreed, draft.petGender == "unknown" ? "" : petGenderLabel(draft.petGender)]
+            [speciesLabel(draft.species), draft.resolvedBreed, draft.petGender == "unknown" ? "" : petGenderLabel(draft.petGender)]
                 .filter { !$0.isEmpty }
                 .joined(separator: " · ")
         case .human:
-            return [humanGenderLabel(draft.humanGender), draft.mbti.uppercased()]
+            [humanGenderLabel(draft.humanGender), draft.mbti.uppercased()]
                 .filter { !$0.isEmpty }
                 .joined(separator: " · ")
         }
@@ -429,11 +429,11 @@ extension MemberCardCreationContentView {
 
     var petFallbackSymbol: String {
         switch draft.species {
-        case "狗": return "dog.fill"
-        case "猫": return "cat.fill"
-        case "鸟": return "bird.fill"
-        case "鱼": return "fish.fill"
-        default: return "pawprint.fill"
+        case "狗": "dog.fill"
+        case "猫": "cat.fill"
+        case "鸟": "bird.fill"
+        case "鱼": "fish.fill"
+        default: "pawprint.fill"
         }
     }
 

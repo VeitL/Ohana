@@ -143,7 +143,7 @@ enum SharedPetActionRecorder {
             actionKind: descriptor.actionKind,
             executorId: descriptor.executorId,
             sourcePetId: descriptor.sourcePet.id.uuidString,
-            targetPetIds: targets.map { $0.id.uuidString },
+            targetPetIds: targets.map(\.id.uuidString),
             species: descriptor.sourcePet.species,
             totalAmountGrams: descriptor.totalAmountGrams,
             totalAmountMl: descriptor.totalAmountMl,
@@ -163,7 +163,7 @@ enum SharedPetActionRecorder {
         var pottyLog: PetPottyLog?
 
         switch descriptor.childLogStrategy {
-        case .care(let type):
+        case let .care(type):
             let prefix = SharedCareMetadata.prefix(for: descriptor.actionKind)
             let perPetGrams = descriptor.totalAmountGrams > 0 ? descriptor.totalAmountGrams / Double(allocationTargetCount) : 0
             let perPetMl = descriptor.totalAmountMl > 0 ? descriptor.totalAmountMl / Double(allocationTargetCount) : 0
@@ -188,7 +188,7 @@ enum SharedPetActionRecorder {
                 context.insert(log)
                 careLogs.append((target, log))
             }
-        case .unknownPotty(let type):
+        case let .unknownPotty(type):
             let log = PetPottyLog(
                 date: descriptor.date,
                 type: type,
@@ -198,7 +198,7 @@ enum SharedPetActionRecorder {
             )
             context.insert(log)
             pottyLog = log
-        case .expense(let category, let note):
+        case let .expense(category, note):
             let perPetAmount = descriptor.totalExpenseAmount > 0 ? descriptor.totalExpenseAmount / Double(allocationTargetCount) : 0
             for target in targets {
                 let log = PetExpenseLog(
@@ -213,7 +213,7 @@ enum SharedPetActionRecorder {
                 context.insert(log)
                 expenseLogs.append((target, log))
             }
-        case .walk(let distanceMeters, let endDate, let coconutsEarned, let behaviorNotes, let moodRating):
+        case let .walk(distanceMeters, endDate, coconutsEarned, behaviorNotes, moodRating):
             for target in targets {
                 let log = PetWalkLog(startDate: descriptor.date, pet: target, executorId: descriptor.executorId, sharedSessionId: session.id.uuidString)
                 log.endDate = endDate
@@ -232,9 +232,8 @@ enum SharedPetActionRecorder {
         }
         context.safeSave()
 
-        let reward: (humanGot: Int, petGot: Int)
-        if let rewardType = descriptor.reward {
-            reward = dependencies.economy.awardSharedCareAction(
+        let reward: (humanGot: Int, petGot: Int) = if let rewardType = descriptor.reward {
+            dependencies.economy.awardSharedCareAction(
                 type: rewardType,
                 pets: targets,
                 context: context,
@@ -242,7 +241,7 @@ enum SharedPetActionRecorder {
                 title: descriptor.rewardTitle
             )
         } else {
-            reward = (0, 0)
+            (0, 0)
         }
 
         recordLedger(
@@ -263,9 +262,9 @@ enum SharedPetActionRecorder {
         )
 
         if let careType = descriptor.reminderCareType {
-            targets.forEach {
+            for target in targets {
                 dependencies.quickActionReminderCompletion.completeNearestPetCareReminder(
-                    pet: $0,
+                    pet: target,
                     type: careType,
                     context: context,
                     executorId: descriptor.executorId,
@@ -278,21 +277,21 @@ enum SharedPetActionRecorder {
             descriptor: descriptor,
             session: session,
             targets: targets,
-            careLogs: careLogs.map { $0.1 },
+            careLogs: careLogs.map(\.1),
             pottyLog: pottyLog,
-            expenseLogs: expenseLogs.map { $0.1 },
-            walkLogs: walkLogs.map { $0.1 },
+            expenseLogs: expenseLogs.map(\.1),
+            walkLogs: walkLogs.map(\.1),
             revisions: dependencies.revisions
         )
 
         return SharedPetActionResult(
             sessionID: session.id,
             targetPetIDs: targets.map(\.id),
-            careLogIDs: careLogs.map { $0.1.id },
+            careLogIDs: careLogs.map(\.1.id),
             pottyLogID: pottyLog?.id,
             pottyLog: pottyLog,
-            expenseLogIDs: expenseLogs.map { $0.1.id },
-            walkLogIDs: walkLogs.map { $0.1.id },
+            expenseLogIDs: expenseLogs.map(\.1.id),
+            walkLogIDs: walkLogs.map(\.1.id),
             reward: reward
         )
     }
@@ -326,7 +325,7 @@ enum SharedPetActionRecorder {
     }
 
     private static func expenseCategory(for strategy: SharedPetChildLogStrategy) -> ExpenseCategory {
-        if case .expense(let category, _) = strategy { return category }
+        if case let .expense(category, _) = strategy { return category }
         return .other
     }
 

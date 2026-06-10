@@ -5,8 +5,8 @@
 //  V4 human expense history.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct HumanExpenseDetailContentView: View {
     let human: Human
@@ -30,15 +30,19 @@ struct HumanExpenseDetailContentView: View {
     private var isPrivacyLocked: Bool {
         appServices.privacy.isLocked(.expense, for: human, viewedBy: activeHumanId)
     }
+
     private var myExpenses: [PetExpenseLog] {
         allExpenses
     }
+
     private var monthExpenses: [PetExpenseLog] {
         myExpenses.filter { Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) }
     }
+
     private var totalAmount: Double {
         myExpenses.reduce(0) { $0 + $1.amount }
     }
+
     private var monthAmount: Double {
         monthExpenses.reduce(0) { $0 + $1.amount }
     }
@@ -131,9 +135,9 @@ struct HumanExpenseDetailContentView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -163,9 +167,9 @@ struct HumanExpenseDetailContentView: View {
                 .minimumScaleFactor(0.75)
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }

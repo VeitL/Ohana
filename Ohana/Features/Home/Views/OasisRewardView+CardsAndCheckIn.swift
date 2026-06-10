@@ -92,13 +92,14 @@ extension OasisRewardView {
 
     var monthCheckInRate: Int {
         let cal = Calendar.current
-        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
         let today = Date()
         let comps = cal.dateComponents([.year, .month], from: today)
         guard let firstOfMonth = cal.date(from: comps) else { return 0 }
         let dayOfMonth = cal.component(.day, from: today)
         var count = 0
-        for d in 0..<dayOfMonth {
+        for d in 0 ..< dayOfMonth {
             if let date = cal.date(byAdding: .day, value: d, to: firstOfMonth) {
                 let s = fmt.string(from: date)
                 if checkedInDates.contains(s) { count += 1 }

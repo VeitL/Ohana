@@ -59,13 +59,13 @@ extension TodayFocusCard {
 
     static func contentKey(for content: TodayFocusContent) -> String {
         switch content {
-        case .quest(let q): return questSkipKey(for: q)
-        case .familyTask(let task): return familyTaskSkipKey(for: task)
-        case .coconutExchange(let request): return exchangeSkipKey(for: request)
-        case .negative(let s): return negativeSkipKey(for: s)
-        case .memory(let m): return "memory:\(m.headline)"
-        case .celebrate: return "celebrate"
-        case .welcome: return "welcome"
+        case let .quest(q): questSkipKey(for: q)
+        case let .familyTask(task): familyTaskSkipKey(for: task)
+        case let .coconutExchange(request): exchangeSkipKey(for: request)
+        case let .negative(s): negativeSkipKey(for: s)
+        case let .memory(m): "memory:\(m.headline)"
+        case .celebrate: "celebrate"
+        case .welcome: "welcome"
         }
     }
 
@@ -188,7 +188,7 @@ extension TodayFocusCard {
 
     @ViewBuilder
     func cardBackground(_ accent: Color) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
         if presentation == .compactStack {
             shape
                 .fill(

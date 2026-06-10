@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
-@testable import Ohana
 import Testing
+@testable import Ohana
 
 @MainActor
 struct OnboardingJourneyCoordinatorTests {

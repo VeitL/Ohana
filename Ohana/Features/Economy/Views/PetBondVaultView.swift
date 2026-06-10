@@ -5,8 +5,8 @@
 //  Pet-only bond coconut wallet and unlocks.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetBondVaultContentView: View {
     let pet: Pet
@@ -28,7 +28,7 @@ struct PetBondVaultContentView: View {
             .map { $0.asCoconutLogEntry() }
             .filter { $0.actorId == pet.id.uuidString }
             .prefix(6)
-            .map { $0 }
+            .map(\.self)
     }
 
     var body: some View {
@@ -211,7 +211,7 @@ struct PetBondVaultContentView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 258, alignment: .topLeading)
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .animation(GoMotion.feedback, value: unlockedIDs)
     }
 
@@ -228,7 +228,7 @@ struct PetBondVaultContentView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             } else {
                 VStack(spacing: 8) {
                     ForEach(petLogs) { log in
@@ -249,7 +249,7 @@ struct PetBondVaultContentView: View {
                                 .foregroundStyle(log.amount > 0 ? Color.goTeal : Color.goOrange)
                         }
                         .padding(12)
-                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     }
                 }
             }
@@ -270,7 +270,7 @@ struct PetBondVaultContentView: View {
         }
         .foregroundStyle(Color.ohanaSecondaryText)
         .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func sectionTitle(_ title: String, subtitle: String) -> some View {
@@ -369,7 +369,7 @@ private struct PetBondVaultPreviewOverlay: View {
                         .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color(hex: item.tintHex))
                         .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.text(item.title))
@@ -413,8 +413,8 @@ private struct PetBondVaultPreviewOverlay: View {
                 .padding(.top, 16)
                 .padding(.bottom, 18)
             }
-            .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-            .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+            .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
             .shadow(color: Color.black.opacity(0.54), radius: 46, x: 0, y: -16) // ui-v4: allow liftedAlert inline popup shadow
             .shadow(color: Color(hex: "0B102C").opacity(0.38), radius: 26, x: 0, y: 12) // ui-v4: allow liftedAlert inline popup shadow
             .padding(.horizontal, 6)
@@ -426,15 +426,15 @@ private struct PetBondVaultPreviewOverlay: View {
     private var previewCaption: String {
         switch item.previewKind {
         case .cardBorder:
-            return l.tr(zh: "边框会直接出现在这只宠物的首页卡片上。", en: "The border appears on this pet's home card.", de: "Der Rahmen erscheint auf der Haustierkarte.")
+            l.tr(zh: "边框会直接出现在这只宠物的首页卡片上。", en: "The border appears on this pet's home card.", de: "Der Rahmen erscheint auf der Haustierkarte.")
         case .nameplate:
-            return l.tr(zh: "铭牌会贴在名字旁，让这只宠物更有专属感。", en: "The nameplate sits by the name for a personal touch.", de: "Das Schild sitzt neben dem Namen.")
+            l.tr(zh: "铭牌会贴在名字旁，让这只宠物更有专属感。", en: "The nameplate sits by the name for a personal touch.", de: "Das Schild sitzt neben dem Namen.")
         case .storyStyleAnimation:
-            return l.tr(zh: "故事样式会用于记录中心的回忆卡，预览以动画展示。", en: "Story style applies to diary cards; this preview animates the look.", de: "Der Stil gilt für Tagebuchkarten und wird animiert gezeigt.")
+            l.tr(zh: "故事样式会用于记录中心的回忆卡，预览以动画展示。", en: "Story style applies to diary cards; this preview animates the look.", de: "Der Stil gilt für Tagebuchkarten und wird animiert gezeigt.")
         case .oasisNest:
-            return l.tr(zh: "Oasis 装饰会用于这只宠物的小窝展示。", en: "Oasis decor is for this pet's nest display.", de: "Oase-Deko gilt für das Nest dieses Haustiers.")
+            l.tr(zh: "Oasis 装饰会用于这只宠物的小窝展示。", en: "Oasis decor is for this pet's nest display.", de: "Oase-Deko gilt für das Nest dieses Haustiers.")
         case .memorialFrame:
-            return l.tr(zh: "纪念相框只是预览黑白纪念效果，不会改变宠物状态。", en: "This previews the memorial frame without changing pet status.", de: "Nur Vorschau, der Status bleibt unverändert.")
+            l.tr(zh: "纪念相框只是预览黑白纪念效果，不会改变宠物状态。", en: "This previews the memorial frame without changing pet status.", de: "Nur Vorschau, der Status bleibt unverändert.")
         }
     }
 

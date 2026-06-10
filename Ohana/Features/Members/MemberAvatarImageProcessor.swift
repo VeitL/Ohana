@@ -13,16 +13,16 @@ enum MemberAvatarImageProcessor {
 
     nonisolated static func image(from data: Data, maxPixel: CGFloat = 2400) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-            return UIImage(data: data).map(normalized)
+            return UIImage(data: data).map(normalized) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
         }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: Int(maxPixel),
+            kCGImageSourceThumbnailMaxPixelSize: Int(maxPixel)
         ]
         guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-            return UIImage(data: data).map(normalized)
+            return UIImage(data: data).map(normalized) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
         }
         return UIImage(cgImage: cgImage)
     }

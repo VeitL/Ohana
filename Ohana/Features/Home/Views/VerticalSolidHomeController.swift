@@ -5,8 +5,8 @@
 //  Local visual state and cancellable background handoffs for verticalSolid home.
 //
 
-import Foundation
 import Combine
+import Foundation
 import SwiftUI
 
 struct HomeSnapshotRefreshRequest: Equatable {
@@ -221,10 +221,10 @@ final class VerticalSolidHomeController: ObservableObject {
 
     private func warmupDelay(for tab: VerticalSolidHomeTab) -> UInt64 {
         switch tab {
-        case .home: return 0
-        case .calendar: return 80
-        case .oasis: return 220
-        case .plants: return 360
+        case .home: 0
+        case .calendar: 80
+        case .oasis: 220
+        case .plants: 360
         }
     }
 }

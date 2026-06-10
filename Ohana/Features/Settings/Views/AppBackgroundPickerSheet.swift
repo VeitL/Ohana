@@ -102,8 +102,8 @@ struct AppBackgroundPickerSheet: View {
                             Image(systemName: CustomAppBackgroundStore.exists ? "photo.on.rectangle.angled" : "plus")
                         }
                         Text(CustomAppBackgroundStore.exists
-                             ? l.tr(zh: "更换图片", en: "Change photo", de: "Bild ändern")
-                             : l.tr(zh: "上传图片", en: "Upload photo", de: "Bild hochladen"))
+                            ? l.tr(zh: "更换图片", en: "Change photo", de: "Bild ändern")
+                            : l.tr(zh: "上传图片", en: "Upload photo", de: "Bild hochladen"))
                     }
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
@@ -158,7 +158,7 @@ struct AppBackgroundPickerSheet: View {
             VStack(alignment: .leading, spacing: 10) {
                 backgroundPairPreview(style)
                     .frame(height: 86)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                     .overlay(alignment: .topTrailing) {
                         if selected {
                             Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
@@ -181,9 +181,9 @@ struct AppBackgroundPickerSheet: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                     .strokeBorder(selected ? Color.goPrimary.opacity(0.75) : Color.ohanaGlassStroke.opacity(0.36), lineWidth: selected ? 2 : 1)
             }
         }

@@ -31,7 +31,7 @@ extension OasisRewardView {
         }
         withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) { // ui-v4: allow AppWorkloadPolicy-gated Oasis ambient breathing; smoothness: allow visible-only ambient tree scale
             treeScale = 1.055
-            treeGlow  = 0.7
+            treeGlow = 0.7
         }
     }
 
@@ -58,15 +58,15 @@ extension OasisRewardView {
     }
 
     func spawnEnergyParticles(count: Int = 8) {
-        energyParticles = (0..<count).map { _ in EnergyParticle() }
+        energyParticles = (0 ..< count).map { _ in EnergyParticle() }
         for i in energyParticles.indices {
-            withAnimation(.easeOut(duration: Double.random(in: 0.85...1.55)).delay(Double(i) * 0.035)) { // ui-v4: allow short reward particle burst
-                energyParticles[i].offsetY  = CGFloat.random(in: -180 ... -80)
-                energyParticles[i].opacity  = 0
+            withAnimation(.easeOut(duration: Double.random(in: 0.85 ... 1.55)).delay(Double(i) * 0.035)) { // ui-v4: allow short reward particle burst
+                energyParticles[i].offsetY = CGFloat.random(in: -180 ... -80)
+                energyParticles[i].opacity = 0
             }
         }
         particleCleanupTask?.cancel()
-        particleCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1_750) {
+        particleCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1750) {
             energyParticles.removeAll()
             particleCleanupTask = nil
         }

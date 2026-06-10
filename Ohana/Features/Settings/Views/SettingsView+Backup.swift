@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 extension SettingsView {
@@ -104,7 +104,7 @@ extension SettingsView {
             allowedContentTypes: [.json]
         ) { result in
             switch result {
-            case .success(let url):
+            case let .success(url):
                 isImporting = true
                 Task {
                     do {
@@ -119,7 +119,7 @@ extension SettingsView {
                     }
                     isImporting = false
                 }
-            case .failure(let error):
+            case let .failure(error):
                 importError = error.localizedDescription
                 showingImportErrorAlert = true
             }

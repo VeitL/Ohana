@@ -5,9 +5,9 @@
 //  全岛数据聚合 ViewModel — 体重变动% + 探索里程 + 趣味排行
 //
 
-import SwiftUI
-import SwiftData
 import Observation
+import SwiftData
+import SwiftUI
 
 // MARK: - Data Structs
 
@@ -15,7 +15,7 @@ struct WeightDeltaPoint: Identifiable {
     let id = UUID()
     let date: Date
     let entityName: String
-    let percentChange: Double   // 相对首条记录的变动百分比
+    let percentChange: Double // 相对首条记录的变动百分比
     let isHuman: Bool
 }
 
@@ -26,7 +26,7 @@ struct WeightAbsolutePoint: Identifiable {
     /// 分组键：`pet:<Pet.id>` / `human:<Human.id>`，避免同名成员折线被合并
     let seriesID: String
     let displayName: String
-    let weight: Double          // 实际体重（ kg；宠物已统一换算）
+    let weight: Double // 实际体重（ kg；宠物已统一换算）
     let isHuman: Bool
 }
 
@@ -41,7 +41,7 @@ struct ExplorationPoint: Identifiable {
 struct FameRanking {
     let entityName: String
     let emoji: String
-    let deltaPercent: Double    // 正为增重，负为减重
+    let deltaPercent: Double // 正为增重，负为减重
     let isHuman: Bool
 }
 
@@ -57,8 +57,8 @@ final class IslandUnifiedStatsViewModel {
     var totalMonthlyExplorationKm: Double = 0
 
     // 趣味排行
-    var gainChampion: FameRanking?   // 🏆 干饭王
-    var lossChampion: FameRanking?   // 🏃 自律王
+    var gainChampion: FameRanking? // 🏆 干饭王
+    var lossChampion: FameRanking? // 🏃 自律王
 
     // 全岛探索次数（周）= PetWalkLog 次数 + HumanWorkoutLog 步行/跑步/徒步次数
     var weeklyExplorationCount: Int = 0
@@ -182,7 +182,7 @@ final class IslandUnifiedStatsViewModel {
 
         // 任务9：排重逻辑——干饭王必须 delta>0，自律王必须 delta<0，且两者不能是同一实体
         let gainers = entries.filter { $0.deltaPercent > 0 }
-        let losers  = entries.filter { $0.deltaPercent < 0 }
+        let losers = entries.filter { $0.deltaPercent < 0 }
         gainChampion = gainers.max(by: { $0.deltaPercent < $1.deltaPercent })
         // 自律王排除已被选为干饭王的实体（虽然概率极低，但理论上可能）
         let gainName = gainChampion?.entityName
@@ -193,7 +193,7 @@ final class IslandUnifiedStatsViewModel {
 
     // MARK: - Exploration（近 7 天里程聚合）
 
-    private func loadExplorations(modelContext: ModelContext, pets: [Pet], humans: [Human]) {
+    private func loadExplorations(modelContext _: ModelContext, pets: [Pet], humans: [Human]) {
         let cal = Calendar.current
         let now = Date()
         guard let sevenDaysAgo = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: now)) else { return }
@@ -260,11 +260,11 @@ final class IslandUnifiedStatsViewModel {
 
         var count = 0
         for pet in pets {
-            count += pet.walkLogs.filter { $0.startDate >= weekStart }.count
+            count += pet.walkLogs.count(where: { $0.startDate >= weekStart })
         }
         let walkingTypes = [WorkoutType.walking.rawValue, WorkoutType.running.rawValue, WorkoutType.hiking.rawValue]
         for human in humans {
-            count += human.workoutLogs.filter { $0.date >= weekStart && walkingTypes.contains($0.typeRaw) }.count
+            count += human.workoutLogs.count(where: { $0.date >= weekStart && walkingTypes.contains($0.typeRaw) })
         }
         weeklyExplorationCount = count
     }
@@ -273,7 +273,7 @@ final class IslandUnifiedStatsViewModel {
 
     // 按实体名分组，返回 [(name, [points], isHuman)]
     var weightDeltasBySeries: [(String, [WeightDeltaPoint], Bool)] {
-        let names = Array(Set(weightDeltas.map { $0.entityName })).sorted()
+        let names = Array(Set(weightDeltas.map(\.entityName))).sorted()
         return names.map { name in
             let pts = weightDeltas.filter { $0.entityName == name }
             let isHuman = pts.first?.isHuman ?? false
@@ -285,7 +285,7 @@ final class IslandUnifiedStatsViewModel {
     var last7Days: [Date] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        return (0..<7).compactMap { cal.date(byAdding: .day, value: -6 + $0, to: today) }
+        return (0 ..< 7).compactMap { cal.date(byAdding: .day, value: -6 + $0, to: today) }
     }
 
     // 每天每实体的探索 km（用于堆叠图）

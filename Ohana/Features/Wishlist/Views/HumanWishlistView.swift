@@ -4,8 +4,8 @@
 //
 //  模块1：椰子心愿单商城
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct HumanWishlistContentView: View {
     let human: Human
@@ -30,10 +30,11 @@ struct HumanWishlistContentView: View {
     }
 
     private var pendingItems: [WishlistItem] { myItems.filter { !$0.isRedeemed } }
-    private var redeemedItems: [WishlistItem] { myItems.filter { $0.isRedeemed } }
+    private var redeemedItems: [WishlistItem] { myItems.filter(\.isRedeemed) }
     private var isPrivacyLocked: Bool {
         human.isPrivate(.wishlist, viewedBy: UUID(uuidString: activeHumanIdStr))
     }
+
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
@@ -76,7 +77,7 @@ struct HumanWishlistContentView: View {
                 HumanPrivateDataNotice(human: human, field: .wishlist)
                     .padding(.horizontal, 20)
 
-                if pendingItems.isEmpty && redeemedItems.isEmpty {
+                if pendingItems.isEmpty, redeemedItems.isEmpty {
                     emptyState.padding(.top, 60)
                 } else {
                     if !pendingItems.isEmpty {
@@ -235,13 +236,13 @@ struct HumanWishlistContentView: View {
                     HStack {
                         Image(systemName: "sparkles").accessibilityHidden(true)
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-                        TextField("心愿内容（例如：新耳机）", text: $newTitle)
+                        TextField("心愿内容（例如：新耳机）", text: $newTitle) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                             .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 14)
-                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous).strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
 
                     // 椰子费用
                     VStack(alignment: .leading, spacing: 8) {
@@ -259,8 +260,8 @@ struct HumanWishlistContentView: View {
                         Slider(value: Binding(
                             get: { Double(newCost) },
                             set: { newCost = Int($0) }
-                        ), in: 5...500, step: 5)
-                        .tint(Color.goYellow)
+                        ), in: 5 ... 500, step: 5)
+                            .tint(Color.goYellow)
                         HStack {
                             Text("5 🥥").font(OhanaFont.caption2()).foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             Spacer()
@@ -268,8 +269,8 @@ struct HumanWishlistContentView: View {
                         }
                     }
                     .padding(.horizontal, 16).padding(.vertical, 14)
-                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous).strokeBorder(Color.ohanaCardStroke, lineWidth: 1))
                 }
                 .padding(.horizontal, 24).padding(.top, 20)
 
@@ -283,7 +284,7 @@ struct HumanWishlistContentView: View {
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity).padding(.vertical, 18)
                         .background(newTitle.isEmpty ? Color.goPrimary.opacity(0.4) : Color.goPrimary,
-                                    in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                    in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                 }
                 .disabled(newTitle.isEmpty)
                 .buttonStyle(ScaleButtonStyle())
@@ -362,11 +363,11 @@ struct HumanWishlistContentView: View {
         }
     }
 
-    private func wishlistSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func wishlistSurface(@ViewBuilder content: () -> some View) -> some View {
         content()
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
     }

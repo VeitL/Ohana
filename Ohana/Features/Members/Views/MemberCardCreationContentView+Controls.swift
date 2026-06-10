@@ -81,7 +81,7 @@ extension MemberCardCreationContentView {
                 valueFont: OhanaFont.callout(.black),
                 unitFont: OhanaFont.caption2(.black),
                 fill: cardControlFill,
-                cornerRadius: 20,
+                cornerRadius: OhanaRadius.input,
                 horizontalPadding: 10,
                 verticalPadding: 8,
                 usesMiniKeypad: true
@@ -111,7 +111,7 @@ extension MemberCardCreationContentView {
         unit: String,
         maxFractionDigits: Int
     ) -> some View {
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(cardSecondaryForeground)
@@ -125,7 +125,7 @@ extension MemberCardCreationContentView {
                 valueFont: OhanaFont.title3(.black),
                 unitFont: OhanaFont.caption(.black),
                 fill: cardControlFill,
-                cornerRadius: 21,
+                cornerRadius: OhanaRadius.cardSoft,
                 horizontalPadding: 12,
                 verticalPadding: 8,
                 usesMiniKeypad: true
@@ -193,8 +193,8 @@ extension MemberCardCreationContentView {
             .background(tint.mix(with: .white, by: 0.84), in: Capsule())
     }
 
-    func flatTextField(_ title: String, text: Binding<String>) -> some View {
-        TextField(title, text: text)
+    func flatTextField(_ title: String, text: Binding<String>) -> some View { // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+        TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             .textInputAutocapitalization(.words)
             .font(OhanaFont.caption(.bold))
             .foregroundStyle(Color.ohanaPrimaryText)
@@ -203,7 +203,7 @@ extension MemberCardCreationContentView {
             .background(Color.ohanaControlFill, in: Capsule())
     }
 
-    func menuPicker<Content: View>(title: String, value: String, @ViewBuilder content: () -> Content) -> some View {
+    func menuPicker(title: String, value: String, @ViewBuilder content: () -> some View) -> some View {
         Menu {
             content()
         } label: {
@@ -228,7 +228,7 @@ extension MemberCardCreationContentView {
         .buttonStyle(ScaleButtonStyle())
     }
 
-    func compactMenuPicker<Content: View>(title: String, value: String, @ViewBuilder content: () -> Content) -> some View {
+    func compactMenuPicker(title: String, value: String, @ViewBuilder content: () -> some View) -> some View {
         Menu {
             content()
         } label: {

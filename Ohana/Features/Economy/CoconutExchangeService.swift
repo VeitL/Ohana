@@ -12,17 +12,17 @@ enum CoconutExchangeError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .sameReceiver:
-            return "不能发给自己。"
+            "不能发给自己。"
         case .insufficientBalance:
-            return "椰子余额不足。"
+            "椰子余额不足。"
         case .invalidReceiver:
-            return "请选择一个家庭成员。"
+            "请选择一个家庭成员。"
         case .notPending:
-            return "这个兑换已经处理。"
+            "这个兑换已经处理。"
         case .notSender:
-            return "只有发起人可以取消。"
+            "只有发起人可以取消。"
         case .notReceiver:
-            return "只有接收人可以确认。"
+            "只有接收人可以确认。"
         }
     }
 }

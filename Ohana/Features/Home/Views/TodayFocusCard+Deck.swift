@@ -34,25 +34,24 @@ extension TodayFocusCard {
                 !closedNegativeKeys.contains(TodayFocusCard.negativeSkipKey(for: $0))
             }
 
-            let cards: [TodayFocusContent]
-            if !negativeSignals.isEmpty {
-                cards = negativeSignals.prefix(2).map { .negative($0) } +
+            let cards: [TodayFocusContent] = if !negativeSignals.isEmpty {
+                negativeSignals.prefix(2).map { .negative($0) } +
                     assignedFamilyTasks.map { .familyTask($0) } +
                     pendingExchangeRequests.map { .coconutExchange($0) } +
                     pendingQuests.map { .quest($0) }
             } else if !assignedFamilyTasks.isEmpty {
-                cards = assignedFamilyTasks.map { .familyTask($0) } +
+                assignedFamilyTasks.map { .familyTask($0) } +
                     pendingExchangeRequests.map { .coconutExchange($0) } +
                     pendingQuests.map { .quest($0) }
             } else if !pendingExchangeRequests.isEmpty {
-                cards = pendingExchangeRequests.map { .coconutExchange($0) } +
+                pendingExchangeRequests.map { .coconutExchange($0) } +
                     pendingQuests.map { .quest($0) }
             } else if !pendingQuests.isEmpty {
-                cards = pendingQuests.map { .quest($0) }
+                pendingQuests.map { .quest($0) }
             } else if !snapshot.refreshedQuests.isEmpty || !snapshot.pets.isEmpty || !snapshot.plants.isEmpty || !snapshot.humans.isEmpty {
-                cards = [.celebrate(pets: snapshot.pets)]
+                [.celebrate(pets: snapshot.pets)]
             } else {
-                cards = [.welcome]
+                [.welcome]
             }
 
             return TodayFocusRenderDeck(
@@ -106,7 +105,7 @@ extension TodayFocusCard {
             let topPeekInset: CGFloat = backSpacing
             ZStack {
                 if backCardCount > 0 {
-                    ForEach(Array((1...backCardCount).reversed()), id: \.self) { depth in
+                    ForEach(Array((1 ... backCardCount).reversed()), id: \.self) { depth in
                         TodayFocusFrozenBackPlate(
                             depth: depth,
                             width: width,
@@ -180,7 +179,7 @@ extension TodayFocusCard {
                 }
                 .frame(height: 112)
                 .clipped()
-                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
                 .highPriorityGesture(focusSwipeGesture(count: cards.count))
 
                 if showsPageIndicator {

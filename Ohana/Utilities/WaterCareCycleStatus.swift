@@ -96,8 +96,8 @@ enum WaterCareCycleStatusCalculator {
             waterChangeStatus(for: pet, now: now, calendar: calendar).map { ("换水", $0) },
             filterCleanStatus(for: pet, now: now, calendar: calendar).map { ("滤芯", $0) },
             filterReplaceStatus(for: pet, now: now, calendar: calendar).map { ("更换", $0) }
-        ].compactMap { $0 }
-            .filter { $0.1.isOverdue }
+        ].compactMap(\.self)
+            .filter(\.1.isOverdue)
 
         return warnings.sorted { $0.1.daysUntilDue < $1.1.daysUntilDue }.first
     }

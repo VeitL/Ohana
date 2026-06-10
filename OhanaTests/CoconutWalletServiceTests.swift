@@ -1,5 +1,5 @@
-import XCTest
 import SwiftData
+import XCTest
 @testable import Ohana
 
 @MainActor
@@ -35,7 +35,7 @@ final class CoconutWalletServiceTests: XCTestCase {
             actorName: human.name
         )
         defaults.set(20, forKey: "quest_coconutCount")
-        defaults.set(try JSONEncoder().encode([legacyLog]), forKey: "quest_coconutLogs")
+        try defaults.set(JSONEncoder().encode([legacyLog]), forKey: "quest_coconutLogs")
 
         try CoconutEconomyBootstrapService.bootstrapIfNeeded(context: context, defaults: defaults)
 

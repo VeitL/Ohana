@@ -98,7 +98,7 @@ private struct MemberProfileMissingEntityView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "exclamationmark.magnifyingglass")
+            Image(systemName: "exclamationmark.magnifyingglass") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                 .font(OhanaFont.title(.bold))
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)

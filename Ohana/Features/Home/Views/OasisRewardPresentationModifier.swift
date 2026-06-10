@@ -11,7 +11,7 @@ struct OasisRewardPresentationModifier: ViewModifier {
     @Binding var sheetRoute: OasisSheetRoute?
     @Binding var fullScreenRoute: OasisFullScreenRoute?
     let pets: [Pet]
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @Environment(AppServices.self) private var appServices
 
@@ -50,7 +50,7 @@ struct OasisRewardPresentationModifier: ViewModifier {
                     allPets: pets,
                     onPresentCoconutLog: onPresentCoconutLog
                 )
-                    .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
+                .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
             }
         case .inventory:
             InventoryView()
@@ -77,14 +77,14 @@ struct OasisRewardPresentationModifier: ViewModifier {
                     presentOasisSheet(.coconutShop(category))
                 }
             )
-                .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
+            .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
         case .critterCodex:
             if AppFeatureRouteGuard.allowsOasisSheetRoute(route, currentLevel: currentFeatureLevel) {
                 OasisCritterCodexRouteContainer(
                     mode: .codex,
                     onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
                 )
-                    .ohanaSheetPagePresentation() // ui-v4: allow long critter codex overview
+                .ohanaSheetPagePresentation() // ui-v4: allow long critter codex overview
             } else {
                 lockedOasisRoute(route)
             }

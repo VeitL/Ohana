@@ -5,8 +5,8 @@
 //  里程碑全屏庆典 — daysTogether 命中 100/365/500/1000 天时弹出
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - 里程碑配置
 struct MilestoneConfig {
@@ -17,10 +17,10 @@ struct MilestoneConfig {
     let accentColor: Color
 
     static let milestones: [MilestoneConfig] = [
-        MilestoneConfig(days: 100,  emoji: "🎉", title: "百日之交",  subtitle: "相伴 100 天！感谢每一次陪伴",       accentColor: .goPrimary),
-        MilestoneConfig(days: 365,  emoji: "🌟", title: "一周年纪念", subtitle: "整整一年！你们的故事刚刚开始",     accentColor: .goYellow),
-        MilestoneConfig(days: 500,  emoji: "💎", title: "500 天传奇", subtitle: "500 天里程碑，你们是最棒的搭档！",  accentColor: .goCardCyan),
-        MilestoneConfig(days: 1000, emoji: "👑", title: "千日王冠",  subtitle: "1000 天！这段缘分已经成为传说",     accentColor: .goOrange),
+        MilestoneConfig(days: 100, emoji: "🎉", title: "百日之交", subtitle: "相伴 100 天！感谢每一次陪伴", accentColor: .goPrimary),
+        MilestoneConfig(days: 365, emoji: "🌟", title: "一周年纪念", subtitle: "整整一年！你们的故事刚刚开始", accentColor: .goYellow),
+        MilestoneConfig(days: 500, emoji: "💎", title: "500 天传奇", subtitle: "500 天里程碑，你们是最棒的搭档！", accentColor: .goCardCyan),
+        MilestoneConfig(days: 1000, emoji: "👑", title: "千日王冠", subtitle: "1000 天！这段缘分已经成为传说", accentColor: .goOrange)
     ]
 
     static func match(days: Int) -> MilestoneConfig? {
@@ -32,10 +32,10 @@ struct MilestoneConfig {
 private struct CelebParticle: Identifiable {
     let id = UUID()
     let emoji: String
-    var x: CGFloat = CGFloat.random(in: 0...1)
-    var delay: Double = Double.random(in: 0...0.8)
-    var duration: Double = Double.random(in: 1.2...2.2)
-    var size: CGFloat = CGFloat.random(in: 14...28)
+    var x: CGFloat = .random(in: 0 ... 1)
+    var delay: Double = .random(in: 0 ... 0.8)
+    var duration: Double = .random(in: 1.2 ... 2.2)
+    var size: CGFloat = .random(in: 14 ... 28)
 }
 
 // MARK: - 全屏庆典 View
@@ -58,9 +58,9 @@ struct MilestoneCelebrationOverlay: View {
     private var shouldRunGlow: Bool {
         workloadPolicy.shouldRunRepeatingAnimation(isVisible: isVisible)
     }
-    
+
     private var particleEmojis: [String] {
-        equipFxFirework ? ["🎆", "🎇", "✨", "🎊", "🌟"] : ["🎉","✨","🌟","🎊","🥥","💫","🎈","🌈","⭐️"]
+        equipFxFirework ? ["🎆", "🎇", "✨", "🎊", "🌟"] : ["🎉", "✨", "🌟", "🎊", "🥥", "💫", "🎈", "🌈", "⭐️"]
     }
 
     var body: some View {
@@ -147,10 +147,10 @@ struct MilestoneCelebrationOverlay: View {
                     .padding(.vertical, 40)
                     .padding(.horizontal, 32)
                     .background(
-                        RoundedRectangle(cornerRadius: 32, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                             .fill(Color.ohanaCardSurface)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                                RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                                     .strokeBorder(milestone.accentColor.opacity(0.4), lineWidth: 1.5)
                             )
                     )
@@ -197,7 +197,7 @@ struct MilestoneCelebrationOverlay: View {
     }
 
     private func spawnParticles() {
-        particles = (0..<24).map { _ in
+        particles = (0 ..< 24).map { _ in
             CelebParticle(emoji: particleEmojis.randomElement()!)
         }
         for p in particles {
@@ -229,7 +229,7 @@ struct MilestoneCheckModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onAppear { checkMilestones() }
-            .onChange(of: pets.map { $0.daysTogether }) { _, _ in checkMilestones() }
+            .onChange(of: pets.map(\.daysTogether)) { _, _ in checkMilestones() }
             .fullScreenCover(isPresented: $showCelebration) {
                 if let (pet, ms) = pendingMilestone {
                     MilestoneCelebrationOverlay(pet: pet, milestone: ms) {

@@ -5,8 +5,8 @@
 //  U13: 人类体重记录页
 //  统一 chrome：隐私开关（leading）+ xmark 关闭（trailing）+ 底部 FAB
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct HumanWeightHistoryView: View {
     let human: Human
@@ -32,6 +32,7 @@ struct HumanWeightHistoryView: View {
     private var sortedLogs: [HumanWeightLog] {
         human.weightLogs.sorted { $0.date > $1.date }
     }
+
     private var chartLogs: [HumanWeightLog] {
         Array(human.weightLogs.sorted { $0.date < $1.date }.suffix(20))
     }
@@ -53,7 +54,7 @@ struct HumanWeightHistoryView: View {
         let latest = sortedLogs.first?.weight ?? 60
         return [latest - 1, latest, latest + 1]
             .filter { $0 > 0 }
-            .map { (($0 * 10).rounded() / 10) }
+            .map { ($0 * 10).rounded() / 10 }
     }
 
     var body: some View {
@@ -96,7 +97,7 @@ struct HumanWeightHistoryView: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(24)
-        .ohanaStandardCard(cornerRadius: 24)
+        .ohanaStandardCard(cornerRadius: OhanaRadius.cardLarge)
         .padding(.horizontal, 24)
     }
 
@@ -175,7 +176,7 @@ struct HumanWeightHistoryView: View {
     // MARK: - Record List
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                 .fill(Color.ohanaCardSurface)
                 .ignoresSafeArea(edges: .bottom)
 
@@ -229,7 +230,7 @@ struct HumanWeightHistoryView: View {
                     .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "添加体重", en: "Add weight", de: "Gewicht hinzufügen"))
                         .font(OhanaFont.title3(.black))
@@ -265,7 +266,7 @@ struct HumanWeightHistoryView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
                 EmbeddedDecimalKeypad(
                     text: $newWeightText,
@@ -300,7 +301,7 @@ struct HumanWeightHistoryView: View {
                     .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 24)
-                    Text(l.tr(zh: "日期", en: "Date", de: "Datum"))
+                Text(l.tr(zh: "日期", en: "Date", de: "Datum"))
                     .font(OhanaFont.subheadline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
@@ -310,7 +311,7 @@ struct HumanWeightHistoryView: View {
                     .labelsHidden()
             }
             .padding(12)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
             HStack(spacing: 10) {
                 Image(systemName: "clock") // a11y: allow decorative icon covered by surrounding text or control
@@ -337,7 +338,7 @@ struct HumanWeightHistoryView: View {
                     .tint(Color.goPrimary)
             }
             .padding(12)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
             Button(action: saveInlineWeight) {
                 HStack(spacing: 8) {
@@ -354,7 +355,7 @@ struct HumanWeightHistoryView: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private func weightRow(log: HumanWeightLog) -> some View {
@@ -397,7 +398,7 @@ struct HumanWeightHistoryView: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     private func saveInlineWeight() {

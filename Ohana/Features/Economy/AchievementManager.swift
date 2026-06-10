@@ -35,11 +35,11 @@ struct AchievementComputationContext {
 
     var includesGlobalAchievements: Bool {
         !allPets.isEmpty
-        || !electronicPets.isEmpty
-        || !critterFragments.isEmpty
-        || !critterActionLogs.isEmpty
-        || !gachaOwnedItems.isEmpty
-        || !gachaDrawLogs.isEmpty
+            || !electronicPets.isEmpty
+            || !critterFragments.isEmpty
+            || !critterActionLogs.isEmpty
+            || !gachaOwnedItems.isEmpty
+            || !gachaDrawLogs.isEmpty
     }
 }
 
@@ -62,7 +62,7 @@ final class AchievementManager {
             // 找出本次新解锁的
             self.newlyUnlocked = computed.filter { badge in
                 badge.isUnlocked &&
-                !(prev.first(where: { $0.id == badge.id })?.isUnlocked ?? false)
+                    !(prev.first(where: { $0.id == badge.id })?.isUnlocked ?? false)
             }
         }
     }
@@ -114,7 +114,7 @@ final class AchievementManager {
         // F5: 预计算 — 只过滤最近 7 天的日志，避免对全量数据做 N 次 isDate(inSameDayAs:)
         let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: today) ?? today
         let recentPottyLogs = pet.pottyLogs.filter { $0.date >= sevenDaysAgo }
-        let recentWalkLogs  = pet.walkLogs.filter  { $0.startDate >= sevenDaysAgo }
+        let recentWalkLogs = pet.walkLogs.filter { $0.startDate >= sevenDaysAgo }
         let mainFeedLogs = pet.careLogs.filter { FeedLogMetadata.isMainFoodLog($0) }
         let treatLogs = pet.careLogs.filter { FeedLogMetadata.isTreatLog($0) }
         let waterLogs = pet.careLogs.filter { $0.careType == .watering }
@@ -125,12 +125,12 @@ final class AchievementManager {
         }
 
         // 预计算"今天"标志（用于多个成就复用）
-        let hasTodayHealth  = pet.healthLogs.contains  { calendar.isDateInToday($0.date) }
-        let hasTodayHygiene = pet.hygieneLogs.contains  { calendar.isDateInToday($0.date) }
-        let hasTodayPotty   = recentPottyLogs.contains  { calendar.isDateInToday($0.date) }
-        let hasTodayCare    = pet.careLogs.contains     { calendar.isDateInToday($0.date) }
-        let hasTodayWalk    = recentWalkLogs.contains   { calendar.isDateInToday($0.startDate) }
-        let hasTodayWeight  = pet.weightLogs.contains   { calendar.isDateInToday($0.date) }
+        let hasTodayHealth = pet.healthLogs.contains { calendar.isDateInToday($0.date) }
+        let hasTodayHygiene = pet.hygieneLogs.contains { calendar.isDateInToday($0.date) }
+        let hasTodayPotty = recentPottyLogs.contains { calendar.isDateInToday($0.date) }
+        let hasTodayCare = pet.careLogs.contains { calendar.isDateInToday($0.date) }
+        let hasTodayWalk = recentWalkLogs.contains { calendar.isDateInToday($0.startDate) }
+        let hasTodayWeight = pet.weightLogs.contains { calendar.isDateInToday($0.date) }
         let allRecordDates = pet.healthLogs.map(\.date)
             + pet.pottyLogs.map(\.date)
             + pet.walkLogs.map(\.startDate)
@@ -149,12 +149,16 @@ final class AchievementManager {
         // 1. 🔥 钢铁肠胃：连续 7 天每天有 perfectPoop
         let ironGut: Achievement = {
             var streak = true
-            for i in 0..<7 {
-                guard let day = calendar.date(byAdding: .day, value: -i, to: today) else { streak = false; break }
+            for i in 0 ..< 7 {
+                guard let day = calendar.date(byAdding: .day, value: -i, to: today) else { streak = false
+                    break
+                }
                 let has = recentPottyLogs.contains {
                     calendar.isDate($0.date, inSameDayAs: day) && $0.pottyType == .perfectPoop
                 }
-                if !has { streak = false; break }
+                if !has { streak = false
+                    break
+                }
             }
             return Achievement(id: "iron_gut", emoji: "💪", title: "钢铁肠胃",
                                description: "连续 7 天每天都有完美便便记录",
@@ -172,10 +176,14 @@ final class AchievementManager {
         // 3. 📅 连续巡岛：连续 7 天都有 walkLog
         let walkStreak: Achievement = {
             var streak = true
-            for i in 0..<7 {
-                guard let day = calendar.date(byAdding: .day, value: -i, to: today) else { streak = false; break }
+            for i in 0 ..< 7 {
+                guard let day = calendar.date(byAdding: .day, value: -i, to: today) else { streak = false
+                    break
+                }
                 let has = recentWalkLogs.contains { calendar.isDate($0.startDate, inSameDayAs: day) }
-                if !has { streak = false; break }
+                if !has { streak = false
+                    break
+                }
             }
             return Achievement(id: "walk_streak", emoji: "📅", title: "连续巡岛",
                                description: "连续 7 天都有遛狗记录",
@@ -225,11 +233,9 @@ final class AchievementManager {
         }()
 
         // 7. 🗓️ 相伴百日：daysTogether >= 100
-        let hundredDays: Achievement = {
-            return Achievement(id: "hundred_days", emoji: "🗓️", title: "相伴百日",
-                               description: "与宠物共同生活超过 100 天",
-                               color: Color.goCardBlue, isUnlocked: pet.daysTogether >= 100)
-        }()
+        let hundredDays = Achievement(id: "hundred_days", emoji: "🗓️", title: "相伴百日",
+                                      description: "与宠物共同生活超过 100 天",
+                                      color: Color.goCardBlue, isUnlocked: pet.daysTogether >= 100)
 
         // 8. 📝 第一步：拥有至少一条任意记录（健康/排泄/遛狗/护理）
         let firstRecord: Achievement = {
@@ -244,12 +250,10 @@ final class AchievementManager {
         }()
 
         // 9. ✅ 今日全勤：今天完成了至少一次打卡
-        let dayOneCheckin: Achievement = {
-            return Achievement(id: "day_one_checkin", emoji: "✅", title: "今日全勤",
-                               description: "今天至少完成了一次打卡记录",
-                               color: Color.goTeal,
-                               isUnlocked: hasTodayHealth || hasTodayHygiene || hasTodayPotty || hasTodayCare || hasTodayWalk || hasTodayWeight)
-        }()
+        let dayOneCheckin = Achievement(id: "day_one_checkin", emoji: "✅", title: "今日全勤",
+                                        description: "今天至少完成了一次打卡记录",
+                                        color: Color.goTeal,
+                                        isUnlocked: hasTodayHealth || hasTodayHygiene || hasTodayPotty || hasTodayCare || hasTodayWalk || hasTodayWeight)
 
         // 10. 🤝 老朋友：使用 Ohana 超过 7 天（基于 pet.createdAt）
         let oldFriend: Achievement = {
@@ -279,25 +283,19 @@ final class AchievementManager {
         }()
 
         // 13. 📸 拍照达人：上传 20 张以上照片
-        let photoEnthusiast: Achievement = {
-            return Achievement(id: "photo_enthusiast", emoji: "📸", title: "拍照达人",
-                               description: "为宠物上传了 20 张以上照片",
-                               color: Color.goPrimary, isUnlocked: pet.photoLogs.count >= 20)
-        }()
+        let photoEnthusiast = Achievement(id: "photo_enthusiast", emoji: "📸", title: "拍照达人",
+                                          description: "为宠物上传了 20 张以上照片",
+                                          color: Color.goPrimary, isUnlocked: pet.photoLogs.count >= 20)
 
         // 14. 💰 记账能手：累计记录 10 条以上花费
-        let expenseTracker: Achievement = {
-            return Achievement(id: "expense_tracker", emoji: "💰", title: "记账能手",
-                               description: "累计记录了 10 条以上花费",
-                               color: Color.goYellow, isUnlocked: pet.expenseLogs.count >= 10)
-        }()
+        let expenseTracker = Achievement(id: "expense_tracker", emoji: "💰", title: "记账能手",
+                                         description: "累计记录了 10 条以上花费",
+                                         color: Color.goYellow, isUnlocked: pet.expenseLogs.count >= 10)
 
         // 15. 🏋️ 体重管理师：累计体重记录 7 条以上
-        let weightManager: Achievement = {
-            return Achievement(id: "weight_manager", emoji: "🏋️", title: "体重管理师",
-                               description: "坚持记录体重，累计超过 7 条记录",
-                               color: Color.goCardBlue, isUnlocked: pet.weightLogs.count >= 7)
-        }()
+        let weightManager = Achievement(id: "weight_manager", emoji: "🏋️", title: "体重管理师",
+                                        description: "坚持记录体重，累计超过 7 条记录",
+                                        color: Color.goCardBlue, isUnlocked: pet.weightLogs.count >= 7)
 
         // 16. 💧 喝水伙伴：累计喂水 14 次
         let hydrationBuddy = Achievement(
@@ -402,9 +400,13 @@ final class AchievementManager {
         // 26. 🧭 照护连线：连续 14 天任意记录
         let careStreakKeeper: Achievement = {
             var streak = true
-            for i in 0..<14 {
-                guard let day = calendar.date(byAdding: .day, value: -i, to: today) else { streak = false; break }
-                if !hasAnyRecord(on: day) { streak = false; break }
+            for i in 0 ..< 14 {
+                guard let day = calendar.date(byAdding: .day, value: -i, to: today) else { streak = false
+                    break
+                }
+                if !hasAnyRecord(on: day) { streak = false
+                    break
+                }
             }
             return Achievement(
                 id: "care_streak_keeper",
@@ -523,7 +525,7 @@ final class AchievementManager {
             title: "轻养成",
             description: "累计完成 10 次电子宠物互动",
             color: Color.goCardBlue,
-            isUnlocked: context.critterActionLogs.filter { $0.action != .careEcho }.count >= 10
+            isUnlocked: context.critterActionLogs.count(where: { $0.action != .careEcho }) >= 10
         )
 
         // 32. 🎁 第一颗盲盒：完成第一次扭蛋

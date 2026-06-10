@@ -3,10 +3,10 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
 import PhotosUI
+import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 extension AddExpenseSheet {
@@ -88,7 +88,7 @@ extension AddExpenseSheet {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
-            .background(cardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             .padding(.horizontal, 20)
 
             if !hasSavedMedicalExpense {
@@ -259,7 +259,7 @@ extension AddExpenseSheet {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .padding(.horizontal, 20)
     }
 
@@ -288,7 +288,7 @@ extension AddExpenseSheet {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             }
             .disabled(hasSavedMedicalExpense)
             .buttonStyle(ScaleButtonStyle())
@@ -305,15 +305,15 @@ extension AddExpenseSheet {
                     }
 
                     infoRow(icon: "note.text", label: l.quickExpenseNote) {
-                        GoDraftTextField(
+                        GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                             l.quickExpenseOptional,
                             text: $noteInput
                         )
-                            .font(OhanaFont.subheadline(.semibold))
-                            .foregroundStyle(primaryText)
-                            .multilineTextAlignment(.trailing)
-                            .textFieldStyle(.plain)
-                            .disabled(hasSavedMedicalExpense)
+                        .font(OhanaFont.subheadline(.semibold))
+                        .foregroundStyle(primaryText)
+                        .multilineTextAlignment(.trailing)
+                        .textFieldStyle(.plain)
+                        .disabled(hasSavedMedicalExpense)
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -339,7 +339,7 @@ extension AddExpenseSheet {
             Spacer()
         }
         .padding(14)
-        .background(cardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .padding(.horizontal, 20)
     }
 

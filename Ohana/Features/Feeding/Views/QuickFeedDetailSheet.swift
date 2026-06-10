@@ -18,7 +18,7 @@ enum ManualFeedSheetMode {
 struct QuickFeedDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
-    var onClose: (() -> Void)? = nil
+    var onClose: (() -> Void)?
     var showsRemoveQuickActionFooter: Bool = true
     var showsCloseButton: Bool = true
     var opensManualSheetOnAppear: Bool = false
@@ -87,7 +87,7 @@ struct QuickFeedDetailSheet: View {
 struct QuickFeedDetailContent: View {
     let pet: Pet
     let onRemove: () -> Void
-    var onClose: (() -> Void)? = nil
+    var onClose: (() -> Void)?
     var showsRemoveQuickActionFooter: Bool = true
     var showsCloseButton: Bool = true
     var opensManualSheetOnAppear: Bool = false
@@ -522,7 +522,7 @@ struct QuickFeedDetailContent: View {
                     .ignoresSafeArea(.container, edges: .bottom)
             }
 
-            if inlineSheetDismissGestureShield && activeSheet?.usesInlineOverlay != true {
+            if inlineSheetDismissGestureShield, activeSheet?.usesInlineOverlay != true {
                 Color.clear
                     .contentShape(Rectangle())
                     .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global))

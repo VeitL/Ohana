@@ -35,6 +35,7 @@ struct HumanExpenseDashboardContent: View {
             return rangeOK && categoryOK
         }
     }
+
     private var positiveLogs: [PetExpenseLog] { filteredLogs.filter { $0.amount > 0 } }
     private var total: Double { positiveLogs.reduce(0) { $0 + $1.amount } }
 
@@ -173,7 +174,7 @@ struct HumanExpenseDashboardContent: View {
                             .buttonStyle(ScaleButtonStyle())
                         }
                         .padding(14)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                     }
                 }
             }
@@ -226,6 +227,6 @@ struct HumanExpenseDashboardContent: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 }

@@ -29,7 +29,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
                         .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title)
                             .font(OhanaFont.title3(.black))
@@ -55,16 +55,16 @@ struct CrewRosterDeleteConfirmationSheet: View {
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.68))
 
-                TextField(name, text: $confirmName)
+                TextField(name, text: $confirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.callout(.bold))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 13)
-                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                             .strokeBorder(canDelete ? Color.goRed.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1)
                     )
 
@@ -75,7 +75,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
-                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
 
@@ -85,7 +85,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
                             .foregroundStyle(canDelete ? Color.ohanaPrimaryActionText : Color.primary.opacity(0.32))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
-                            .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(!canDelete)

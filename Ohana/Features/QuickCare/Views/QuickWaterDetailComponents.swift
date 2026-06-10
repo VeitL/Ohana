@@ -16,17 +16,17 @@ enum WaterOverviewRange: String, CaseIterable, Identifiable {
 
     var days: Int {
         switch self {
-        case .days7: return 7
-        case .days30: return 30
-        case .days90: return 90
+        case .days7: 7
+        case .days30: 30
+        case .days90: 90
         }
     }
 
     var title: String {
         switch self {
-        case .days7: return "7天"
-        case .days30: return "30天"
-        case .days90: return "90天"
+        case .days7: "7天"
+        case .days30: "30天"
+        case .days90: "90天"
         }
     }
 }
@@ -213,7 +213,7 @@ struct WaterCoreCard: View {
     var secondaryTitle: String?
     var secondaryAction: (() -> Void)?
     var tapAction: (() -> Void)?
-    var feedbackToken: CheckInFeedbackToken? = nil
+    var feedbackToken: CheckInFeedbackToken?
     var isWarning: Bool = false
 
     @Environment(\.colorScheme) private var colorScheme
@@ -272,9 +272,9 @@ struct WaterCoreCard: View {
             }
         }
         .padding(16)
-        .background(cardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(cardStroke, lineWidth: isWarning ? 1.5 : 1)
         )
         .checkInPulse(feedbackToken)
@@ -373,26 +373,26 @@ struct WaterHeroCard: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .fill(Color.ohanaCardSurface)
 
             HStack(spacing: 20) {
                 ZStack {
-                    ForEach(0..<3, id: \.self) { index in
+                    ForEach(0 ..< 3, id: \.self) { index in
                         Circle()
                             .stroke(tint.opacity(0.16 - Double(index) * 0.03), lineWidth: 2)
                             .frame(width: ripple ? 98 + CGFloat(index * 18) : 62 + CGFloat(index * 10))
                             .opacity(ripple ? 0.18 : 0.58)
                             .animation(
                                 shouldAnimateHero
-                                ? .easeInOut(duration: 1.9 + Double(index) * 0.18).repeatForever(autoreverses: true) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
-                                : nil,
+                                    ? .easeInOut(duration: 1.9 + Double(index) * 0.18).repeatForever(autoreverses: true) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
+                                    : nil,
                                 value: ripple
                             )
                     }
 
                     ZStack(alignment: .bottom) {
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                             .stroke(tint.opacity(0.68), lineWidth: 4)
                             .frame(width: 86, height: 54)
                             .offset(y: 12)
@@ -570,7 +570,7 @@ struct WaterAmountSettingsSheet: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                     if showsAmountKeypad {
                         EmbeddedDecimalKeypad(
@@ -676,7 +676,7 @@ struct WaterChangeSettingsSheet: View {
         VStack(spacing: 18) {
             settingsHero(icon: "arrow.2.circlepath", title: "换水计划", value: "下次 \(nextDateText)")
 
-            Stepper(value: $intervalDays.animation(GoMotion.feedback), in: 1...30) {
+            Stepper(value: $intervalDays.animation(GoMotion.feedback), in: 1 ... 30) {
                 settingsRow("周期", value: "\(intervalDays)天")
             }
             .tint(tint)
@@ -778,12 +778,12 @@ struct FilterSettingsSheet: View {
                 Spacer()
             }
 
-            Stepper(value: $cleanIntervalDays.animation(GoMotion.feedback), in: 1...60) {
+            Stepper(value: $cleanIntervalDays.animation(GoMotion.feedback), in: 1 ... 60) {
                 settingsRow("清洗", value: "\(cleanIntervalDays)天")
             }
             .tint(tint)
 
-            Stepper(value: $replaceIntervalDays.animation(GoMotion.feedback), in: 7...365) {
+            Stepper(value: $replaceIntervalDays.animation(GoMotion.feedback), in: 7 ... 365) {
                 settingsRow("更换", value: "\(replaceIntervalDays)天")
             }
             .tint(tint)
@@ -863,7 +863,7 @@ struct WaterPlanSettingsSheet: View {
                     Spacer()
                 }
 
-                Stepper(value: $count.animation(GoMotion.feedback), in: 1...6) {
+                Stepper(value: $count.animation(GoMotion.feedback), in: 1 ... 6) {
                     settingsRow("每日次数", value: "\(count)次")
                 }
                 .tint(tint)
@@ -872,7 +872,7 @@ struct WaterPlanSettingsSheet: View {
                 }
 
                 VStack(spacing: 10) {
-                    ForEach(0..<count, id: \.self) { index in
+                    ForEach(0 ..< count, id: \.self) { index in
                         DatePicker(
                             "第 \(index + 1) 次",
                             selection: Binding(
@@ -885,7 +885,7 @@ struct WaterPlanSettingsSheet: View {
                         .tint(tint)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     }
                 }
 

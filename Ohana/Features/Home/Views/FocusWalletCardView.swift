@@ -88,7 +88,7 @@ struct FocusWalletCardView: View {
                 backgroundHeadlineLayer(w: w, progress: visualProgress)
                     .opacity(Double(WalletHeroTimeline.smooth(visualProgress, 0.02, 0.16)))
 
-                if !usesFullBleed && !usesPopoutOverlay {
+                if !usesFullBleed, !usesPopoutOverlay {
                     leftAvatarContent(
                         avatarImage: avatarImage,
                         hasPopout: hasPopout,
@@ -156,7 +156,7 @@ struct FocusWalletCardView: View {
     }
 
     @ViewBuilder
-    private func maybeMatchedShell<Content: View>(_ content: Content) -> some View {
+    private func maybeMatchedShell(_ content: some View) -> some View {
         if usesMatchedGeometry, expandedId != nil {
             content.matchedGeometryEffect(
                 id: HeroShellID(cardId: card.id),
@@ -207,29 +207,28 @@ struct FocusWalletCardView: View {
     private var electronicPetNeedsCare: Bool {
         switch electronicPetState {
         case .healthy, .dead:
-            return false
+            false
         case .needsCare, .atRisk, .sick, .critical:
-            return true
+            true
         }
     }
 
     private var electronicPetTint: Color {
         switch electronicPetState {
         case .healthy:
-            return Color.goPrimary
+            Color.goPrimary
         case .dead:
-            return Color.ohanaTertiaryText
+            Color.ohanaTertiaryText
         case .needsCare, .atRisk, .sick, .critical:
-            return Color.goRed
+            Color.goRed
         }
     }
 
     private func avatarContentWidthRatio(hasPopout: Bool, avatarProgress: CGFloat, contentProgress: CGFloat) -> CGFloat {
-        let collapsed: CGFloat
-        if hasPopout && !card.isHuman {
-            collapsed = 1.0
+        let collapsed: CGFloat = if hasPopout, !card.isHuman {
+            1.0
         } else {
-            collapsed = 0.52
+            0.52
         }
         let expanded: CGFloat = card.isHuman ? 0.76 : 0.98
         let progress = hasPopout ? avatarProgress : contentProgress
@@ -273,7 +272,7 @@ struct FocusWalletCardView: View {
                     points: [
                         SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
                         SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
-                        SIMD2(0.0, 1.0), SIMD2(0.5, 1.0),  SIMD2(1.0, 1.0)
+                        SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
                     ],
                     colors: palette
                 )
@@ -617,7 +616,7 @@ struct FocusWalletCardView: View {
     }
 
     @ViewBuilder
-    private func rightInfoColumn(h: CGFloat, usesFullBleed: Bool, progress: CGFloat) -> some View {
+    private func rightInfoColumn(h _: CGFloat, usesFullBleed: Bool, progress: CGFloat) -> some View {
         let spacing = OhanaHeroGeometry.lerp(3, 5, progress: progress)
         if presentation == .rosterMember {
             VStack(alignment: .trailing, spacing: spacing) {
@@ -727,7 +726,7 @@ struct FocusWalletCardView: View {
     }
 
     private func electronicPetInfoStack(usesFullBleed: Bool, progress: CGFloat) -> some View {
-        return VStack(alignment: .trailing, spacing: OhanaHeroGeometry.lerp(3, 5, progress: progress)) {
+        VStack(alignment: .trailing, spacing: OhanaHeroGeometry.lerp(3, 5, progress: progress)) {
             Text(card.kind.isEmpty ? "Critter" : card.kind)
                 .font(.system(size: OhanaHeroGeometry.lerp(15, 20, progress: progress), weight: .black, design: .rounded))
                 .foregroundStyle(cardPrimaryText(usesFullBleed: usesFullBleed))
@@ -840,11 +839,11 @@ struct FocusWalletCardView: View {
 
     private static func normalizeSpecies(_ s: String) -> String {
         let l = s.lowercased()
-        if s.contains("猫") || l.contains("cat")       { return "猫" }
-        if s.contains("狗") || l.contains("dog")       { return "狗" }
-        if s.contains("兔") || l.contains("rabbit")    { return "兔子" }
+        if s.contains("猫") || l.contains("cat") { return "猫" }
+        if s.contains("狗") || l.contains("dog") { return "狗" }
+        if s.contains("兔") || l.contains("rabbit") { return "兔子" }
         if s.contains("仓鼠") || l.contains("hamster") { return "仓鼠" }
-        if s.contains("鸟") || l.contains("bird")      { return "鸟" }
+        if s.contains("鸟") || l.contains("bird") { return "鸟" }
         return s
     }
 }
@@ -874,7 +873,7 @@ private struct RealPetTransitionModifier: ViewModifier {
     let heroNS: Namespace.ID
 
     func body(content: Content) -> some View {
-        if card.isReal && !card.isDummy {
+        if card.isReal, !card.isDummy {
             content
                 .matchedTransitionSource(id: card.id as UUID, in: heroNS) { cfg in
                     cfg.clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner,

@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetDocumentsCard: View {
     let pet: Pet
@@ -69,7 +69,7 @@ struct PetDocumentsCard: View {
                             Text(doc.documentCategory.emoji)
                                 .font(OhanaFont.adaptive(size: 20))
                                 .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                                .goGlassBackground(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous))
                         }
                         if pet.documents.count > 5 {
                             Text("+\(pet.documents.count - 5)")
@@ -80,7 +80,7 @@ struct PetDocumentsCard: View {
                 }
             }
             .padding(16)
-            .goTranslucentCard(cornerRadius: 20)
+            .goTranslucentCard(cornerRadius: OhanaRadius.input)
         }
         .buttonStyle(ScaleButtonStyle())
     }

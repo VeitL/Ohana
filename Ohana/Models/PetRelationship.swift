@@ -5,18 +5,18 @@
 //  宠物家庭关系模型（ArkSchemaV4 新增）
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 // MARK: - Relationship Type
 
 enum PetRelationshipType: String, CaseIterable, Codable {
-    case parent        = "parent"
-    case child         = "child"
-    case sibling       = "sibling"
-    case halfSibling   = "halfSibling"
-    case mate          = "mate"
-    case other         = "other"
+    case parent
+    case child
+    case sibling
+    case halfSibling
+    case mate
+    case other
 
     /// 根据两只宠物的性别返回适合显示的描述
     /// fromGender: 被描述宠物（关系发起方）的性别
@@ -29,14 +29,14 @@ enum PetRelationshipType: String, CaseIterable, Codable {
             return toGender == "female" ? "女儿" : toGender == "male" ? "儿子" : "孩子"
         case .sibling:
             // 同父同母
-            if fromGender == "male" && toGender == "female" { return "姐姐/妹妹" }
-            if fromGender == "female" && toGender == "male" { return "哥哥/弟弟" }
+            if fromGender == "male", toGender == "female" { return "姐姐/妹妹" }
+            if fromGender == "female", toGender == "male" { return "哥哥/弟弟" }
             if toGender == "female" { return "姐妹" }
-            if toGender == "male"   { return "兄弟" }
+            if toGender == "male" { return "兄弟" }
             return "兄弟姐妹"
         case .halfSibling:
-            if fromGender == "male" && toGender == "female" { return "同母异父姐/妹" }
-            if fromGender == "female" && toGender == "male" { return "同父异母哥/弟" }
+            if fromGender == "male", toGender == "female" { return "同母异父姐/妹" }
+            if fromGender == "female", toGender == "male" { return "同父异母哥/弟" }
             return "同父异母/同母异父"
         case .mate:
             return toGender == "female" ? "伴侣♀" : toGender == "male" ? "伴侣♂" : "伴侣"
@@ -47,19 +47,19 @@ enum PetRelationshipType: String, CaseIterable, Codable {
 
     var icon: String {
         switch self {
-        case .parent:      return "person.2.fill"
-        case .child:       return "figure.and.child.holdinghands"
-        case .sibling:     return "person.2"
-        case .halfSibling: return "person.2.slash"
-        case .mate:        return "heart.fill"
-        case .other:       return "pawprint.fill"
+        case .parent: "person.2.fill"
+        case .child: "figure.and.child.holdinghands"
+        case .sibling: "person.2"
+        case .halfSibling: "person.2.slash"
+        case .mate: "heart.fill"
+        case .other: "pawprint.fill"
         }
     }
 
     /// 按性别筛选可用的关系类型
-    static func available(fromGender: String) -> [PetRelationshipType] {
+    static func available(fromGender _: String) -> [PetRelationshipType] {
         // 所有关系都可用，但 displayName 会随性别自动调整
-        return PetRelationshipType.allCases
+        PetRelationshipType.allCases
     }
 }
 

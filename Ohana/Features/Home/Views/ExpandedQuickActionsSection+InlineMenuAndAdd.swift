@@ -186,7 +186,7 @@ struct ExpandedQuickAddInlinePanel: View {
                                 }
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 54)
-                                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                             }
                             .buttonStyle(ScaleButtonStyle())
                         }
@@ -196,12 +196,12 @@ struct ExpandedQuickAddInlinePanel: View {
             }
         }
         .padding(10)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
         .shadow(color: Color.black.opacity(0.18), radius: 18, x: 0, y: 10) // ui-v4: allow floating inline quick-add menu
-        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 }

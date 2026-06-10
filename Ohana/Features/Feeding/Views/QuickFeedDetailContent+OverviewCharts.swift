@@ -9,7 +9,7 @@ extension QuickFeedDetailContent {
                     .font(OhanaFont.adaptive(size: 18, weight: .black))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 46, height: 46)
-                    .background(mainFoodOverviewTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(mainFoodOverviewTint, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "全部喂食", en: "All feeding", de: "Alle Fütterungen"))
                         .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
@@ -79,7 +79,7 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(5)
-        .feedFlatBlockSurface(cornerRadius: 18)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
     }
 
     func overviewMetric(title: String, value: String, icon: String, tint: Color) -> some View {
@@ -88,7 +88,7 @@ extension QuickFeedDetailContent {
                 .font(OhanaFont.adaptive(size: 15, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(tint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
@@ -102,7 +102,7 @@ extension QuickFeedDetailContent {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 18)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
     }
 
     func overviewLineChart(
@@ -150,11 +150,11 @@ extension QuickFeedDetailContent {
         return content
             .background {
                 if showsSurface {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                         .fill(Color.clear)
                 }
             }
-            .modifier(ConditionalFeedGlassSurface(isEnabled: showsSurface, cornerRadius: 20, tint: tint, tintOpacity: 0.04))
+            .modifier(ConditionalFeedGlassSurface(isEnabled: showsSurface, cornerRadius: OhanaRadius.input, tint: tint, tintOpacity: 0.04))
     }
 
     func overviewFrequencyBarChart(
@@ -226,7 +226,7 @@ extension QuickFeedDetailContent {
         emptyText: String
     ) -> some View {
         let total = Int(points.reduce(0) { $0 + $1.value })
-        let activeDays = points.filter { $0.value > 0 }.count
+        let activeDays = points.count(where: { $0.value > 0 })
         let maxCount = max(1, Int(points.map(\.value).max() ?? 1))
 
         return VStack(alignment: .leading, spacing: 12) {

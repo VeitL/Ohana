@@ -14,63 +14,63 @@
 //  - 生命体征：收缩压、舒张压、心率、体温、SpO₂、呼吸率（6 项）
 //
 
-import SwiftUI
 import Foundation
+import SwiftUI
 
 // MARK: - 分类
 
 enum HealthMetricCategory: String, CaseIterable, Identifiable {
-    case thyroid = "thyroid"
-    case glucose = "glucose"
-    case lipid = "lipid"
-    case liver = "liver"
-    case kidney = "kidney"
+    case thyroid
+    case glucose
+    case lipid
+    case liver
+    case kidney
     case bloodCount = "blood_count"
     case inflammationVitamin = "inflammation_vitamin"
-    case electrolyte = "electrolyte"
-    case vitals = "vitals"
+    case electrolyte
+    case vitals
 
     var id: String { rawValue }
 
     var systemImage: String {
         switch self {
-        case .thyroid: return "waveform.path.ecg"
-        case .glucose: return "drop.fill"
-        case .lipid: return "chart.pie.fill"
-        case .liver: return "cross.vial.fill"
-        case .kidney: return "testtube.2"
-        case .bloodCount: return "allergens.fill"
-        case .inflammationVitamin: return "pills.fill"
-        case .electrolyte: return "bolt.heart.fill"
-        case .vitals: return "heart.text.square.fill"
+        case .thyroid: "waveform.path.ecg"
+        case .glucose: "drop.fill"
+        case .lipid: "chart.pie.fill"
+        case .liver: "cross.vial.fill"
+        case .kidney: "testtube.2"
+        case .bloodCount: "allergens.fill"
+        case .inflammationVitamin: "pills.fill"
+        case .electrolyte: "bolt.heart.fill"
+        case .vitals: "heart.text.square.fill"
         }
     }
 
     func displayName(_ l: L10n) -> String {
         switch self {
-        case .thyroid: return l.tr(zh: "甲状腺", en: "Thyroid", de: "Schilddrüse")
-        case .glucose: return l.tr(zh: "血糖", en: "Glucose", de: "Blutzucker")
-        case .lipid: return l.tr(zh: "血脂", en: "Lipids", de: "Blutfette")
-        case .liver: return l.tr(zh: "肝功能", en: "Liver", de: "Leber")
-        case .kidney: return l.tr(zh: "肾功能", en: "Kidney", de: "Niere")
-        case .bloodCount: return l.tr(zh: "血常规", en: "Blood Count", de: "Blutbild")
-        case .inflammationVitamin: return l.tr(zh: "炎症与维生素", en: "Inflammation & Vitamins", de: "Entzündung & Vitamine")
-        case .electrolyte: return l.tr(zh: "电解质", en: "Electrolytes", de: "Elektrolyte")
-        case .vitals: return l.tr(zh: "生命体征", en: "Vitals", de: "Vitalwerte")
+        case .thyroid: l.tr(zh: "甲状腺", en: "Thyroid", de: "Schilddrüse")
+        case .glucose: l.tr(zh: "血糖", en: "Glucose", de: "Blutzucker")
+        case .lipid: l.tr(zh: "血脂", en: "Lipids", de: "Blutfette")
+        case .liver: l.tr(zh: "肝功能", en: "Liver", de: "Leber")
+        case .kidney: l.tr(zh: "肾功能", en: "Kidney", de: "Niere")
+        case .bloodCount: l.tr(zh: "血常规", en: "Blood Count", de: "Blutbild")
+        case .inflammationVitamin: l.tr(zh: "炎症与维生素", en: "Inflammation & Vitamins", de: "Entzündung & Vitamine")
+        case .electrolyte: l.tr(zh: "电解质", en: "Electrolytes", de: "Elektrolyte")
+        case .vitals: l.tr(zh: "生命体征", en: "Vitals", de: "Vitalwerte")
         }
     }
 
     var color: Color {
         switch self {
-        case .thyroid: return Color.goPurple
-        case .glucose: return Color.goOrange
-        case .lipid: return Color.goYellow
-        case .liver: return Color.goRed
-        case .kidney: return Color(hex: "64748B")
-        case .bloodCount: return Color(hex: "E11D48")
-        case .inflammationVitamin: return Color.goTeal
-        case .electrolyte: return Color.goMint
-        case .vitals: return Color(hex: "F43F5E")
+        case .thyroid: Color.goPurple
+        case .glucose: Color.goOrange
+        case .lipid: Color.goYellow
+        case .liver: Color.goRed
+        case .kidney: Color(hex: "64748B")
+        case .bloodCount: Color(hex: "E11D48")
+        case .inflammationVitamin: Color.goTeal
+        case .electrolyte: Color.goMint
+        case .vitals: Color(hex: "F43F5E")
         }
     }
 }
@@ -91,11 +91,10 @@ struct HealthMetricUnit: Identifiable, Hashable {
     func formatted(_ value: Double) -> String {
         // 根据数量级决定小数位
         let absV = abs(value)
-        let digits: Int
-        if absV >= 1000 { digits = 0 }
-        else if absV >= 100 { digits = 1 }
-        else if absV >= 1 { digits = 2 }
-        else { digits = 3 }
+        let digits = if absV >= 1000 { 0 }
+        else if absV >= 100 { 1 }
+        else if absV >= 1 { 2 }
+        else { 3 }
         return String(format: "%.\(digits)f", value)
     }
 
@@ -133,19 +132,19 @@ enum HealthMetricStatus {
 
     var color: Color {
         switch self {
-        case .low: return Color(hex: "06B6D4")
-        case .normal: return Color.goTeal
-        case .high: return Color.goOrange
-        case .unknown: return Color.ohanaSecondaryText
+        case .low: Color(hex: "06B6D4")
+        case .normal: Color.goTeal
+        case .high: Color.goOrange
+        case .unknown: Color.ohanaSecondaryText
         }
     }
 
     func label(_ l: L10n) -> String {
         switch self {
-        case .low: return l.tr(zh: "偏低", en: "Low", de: "Niedrig")
-        case .normal: return l.tr(zh: "正常", en: "Normal", de: "Normal")
-        case .high: return l.tr(zh: "偏高", en: "High", de: "Hoch")
-        case .unknown: return l.tr(zh: "—", en: "—", de: "—")
+        case .low: l.tr(zh: "偏低", en: "Low", de: "Niedrig")
+        case .normal: l.tr(zh: "正常", en: "Normal", de: "Normal")
+        case .high: l.tr(zh: "偏高", en: "High", de: "Hoch")
+        case .unknown: l.tr(zh: "—", en: "—", de: "—")
         }
     }
 }

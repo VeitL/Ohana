@@ -5,13 +5,13 @@
 //  逗玩详情：轻量状态 + 频率图 + 计划 + 最近记录
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct QuickPlayDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
-    var onClose: (() -> Void)? = nil
+    var onClose: (() -> Void)?
     var allEvents: [Event] = []
 
     @Environment(\.modelContext) private var modelContext
@@ -49,7 +49,7 @@ struct QuickPlayDetailSheet: View {
         allEvents
             .filter {
                 $0.relatedEntityId == petKey &&
-                $0.title == playPlanTitle
+                    $0.title == playPlanTitle
             }
             .sorted { $0.startDate < $1.startDate }
             .first
@@ -76,9 +76,9 @@ struct QuickPlayDetailSheet: View {
     private var monthPlayStrip: [DayCount] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        return (0..<28).reversed().map { offset in
+        return (0 ..< 28).reversed().map { offset in
             let d = cal.date(byAdding: .day, value: -offset, to: today)!
-            let count = playLogs.filter { cal.isDate($0.date, inSameDayAs: d) }.count
+            let count = playLogs.count(where: { cal.isDate($0.date, inSameDayAs: d) })
             return DayCount(day: d, count: count)
         }
     }
@@ -97,16 +97,16 @@ struct QuickPlayDetailSheet: View {
         playLogs
             .sorted { $0.date > $1.date }
             .prefix(12)
-            .map { $0 }
+            .map(\.self)
     }
 
     private var todayPlayCount: Int {
-        playLogs.filter { Calendar.current.isDateInToday($0.date) }.count
+        playLogs.count(where: { Calendar.current.isDateInToday($0.date) })
     }
 
     private var weekPlayCount: Int {
         let cutoff = Calendar.current.date(byAdding: .day, value: -6, to: Calendar.current.startOfDay(for: Date())) ?? Date()
-        return playLogs.filter { $0.date >= cutoff }.count
+        return playLogs.count(where: { $0.date >= cutoff })
     }
 
     private var streakDays: Int {
@@ -262,7 +262,7 @@ struct QuickPlayDetailSheet: View {
                     .font(OhanaFont.adaptive(size: 22, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 48, height: 48)
-                    .background(playTint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(playTint, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(todayPlayCount > 0 ? l.tr(zh: "今天玩过啦", en: "Played today", de: "Heute gespielt") : l.tr(zh: "来玩一下", en: "Play now", de: "Jetzt spielen"))
@@ -294,7 +294,7 @@ struct QuickPlayDetailSheet: View {
             .disabled(isCommittingPlay)
         }
         .padding(18)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
         .checkInPulse(playFeedbackToken)
     }
 
@@ -339,7 +339,7 @@ struct QuickPlayDetailSheet: View {
                     .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.goPurple, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    .background(Color.goPurple, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "陪玩计划", en: "Play plan", de: "Spielplan"))
@@ -359,7 +359,7 @@ struct QuickPlayDetailSheet: View {
                     .frame(width: 42, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
             }
             .padding(14)
-            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -441,7 +441,7 @@ struct QuickPlayDetailSheet: View {
             Spacer()
         }
         .padding(14)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func recentLogRow(_ log: PetCareLog) -> some View {
@@ -484,7 +484,7 @@ struct QuickPlayDetailSheet: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private var playPlanInlineOverlay: some View {
@@ -565,7 +565,7 @@ struct QuickPlayDetailSheet: View {
                     .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.goPurple, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    .background(Color.goPurple, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(playPlanEvent == nil ? l.tr(zh: "添加陪玩计划", en: "Add play plan", de: "Spielplan hinzufügen") : l.tr(zh: "陪玩计划", en: "Play plan", de: "Spielplan"))
@@ -589,12 +589,12 @@ struct QuickPlayDetailSheet: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .contentTransition(.numericText())
                     Spacer()
-                    Stepper("", value: $playPlanIntervalDays, in: 1...30)
+                    Stepper("", value: $playPlanIntervalDays, in: 1 ... 30)
                         .labelsHidden()
                 }
             }
             .padding(15)
-            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
 
             DatePicker(
                 l.tr(zh: "起算日", en: "Start date", de: "Startdatum"),
@@ -604,7 +604,7 @@ struct QuickPlayDetailSheet: View {
             .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText)
             .padding(15)
-            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
 
             Spacer(minLength: 0)
 
@@ -783,7 +783,7 @@ struct QuickPlayDetailSheet: View {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first
+        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private func showToast(_ message: String) {

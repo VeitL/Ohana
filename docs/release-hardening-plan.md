@@ -29,11 +29,11 @@ P0 — target 2026-07-01:
 
 P1 — target 2026-08-01:
 
-- [ ] Dense-data fixture tests (per `docs/performance-and-observability.md`) for Home, Today Focus, and Calendar snapshot builders, with wall-clock budgets.
-- [ ] `XCTApplicationLaunchMetric` baseline test in `OhanaUITests` so cold-launch regressions fail CI instead of relying on prose.
-- [ ] SwiftFormat baseline: run `swiftformat .`, commit, remove `continue-on-error` from the CI SwiftFormat step.
-- [ ] SwiftLint: clean warning baseline, then flip CI to `swiftlint lint --strict`.
-- [ ] Drive `full-scope-audit-baseline.json` (1380 warnings as of 2026-06-10: ui-v4 1309 — mostly legacy corner-radius literals and raw TextFields behind the new construction-consistency rules — accessibility 60, smoothness 11) back to zero, then promote CI to direct `--all` strict gates. Migrate radius/input debt file-by-file when touching those features (UI Debt Policy below), not in one big-bang pass.
+- [x] Dense-data fixture tests (per `docs/performance-and-observability.md`) for Home, Today Focus, and Calendar snapshot builders, with wall-clock budgets.
+- [x] `XCTApplicationLaunchMetric` baseline test in `OhanaUITests` so cold-launch regressions fail CI instead of relying on prose.
+- [x] SwiftFormat baseline: run `swiftformat .`, commit, remove `continue-on-error` from the CI SwiftFormat step.
+- [x] SwiftLint: clean warning baseline, then flip CI to `swiftlint lint --strict`.
+- [x] Drive `full-scope-audit-baseline.json` back to zero, then promote CI to direct `--all` strict gates. As of 2026-06-10 the zero baseline is UI V4 0, accessibility 0, smoothness 0.
 
 P2 — target before App Store submission:
 
@@ -71,7 +71,9 @@ Baseline:
 - `scripts/build-debug-fast.sh`
 - `scripts/audit-runtime-guardrails.sh --all`
 - `scripts/audit-architecture-boundaries.sh --all`
-- `scripts/audit-full-scope-ratchet.sh` (UI V4 + accessibility + smoothness vs baseline)
+- `scripts/audit-ui-v4.sh --all`
+- `scripts/audit-accessibility.sh --all`
+- `scripts/audit-smoothness-risk.sh --all`
 - `gitleaks detect --no-git --config .gitleaks.toml`
 
 When CoreSimulator is unavailable in a sandbox, use:
@@ -82,12 +84,12 @@ This is not a release substitute; it only runs the checks that do not require th
 
 Current non-simulator baseline:
 
-- `scripts/release-hardening-check.sh --skip-build` passed on 2026-06-02.
-- Runtime guardrails passed across 412 Swift files.
-- Release data safety audit passed; it now checks backup schema version, Human memorial state, HumanHealthMetricLog backup coverage, and PIN hash/salt exclusion.
-- Changed UI audit passed for 2 SwiftUI files.
-- Backup restore tests were extended for Human memorial state and HumanHealthMetricLog, but `xcodebuild test` is still pending the fixed simulator.
-- Git size audit reported repository size around 2.1G and `.git/objects` around 565M, with no tracked tmp files.
+- `scripts/release-hardening-check.sh --skip-build` passed on 2026-06-10.
+- Runtime guardrails and architecture boundaries pass as whole-repo strict gates.
+- Release data safety, localization coverage, governance manifests, resource integrity, and git size audits pass.
+- UI V4, accessibility, and smoothness pass as whole-repo strict zero-warning gates.
+- SwiftLint strict and SwiftFormat lint pass after the P1 warning and formatting baseline cleanup.
+- Fixed-simulator Debug build passed with `scripts/build-debug-fast.sh`; full fixed-simulator `xcodebuild test` passed with `CODE_SIGNING_ALLOWED=NO` (Swift Testing 478 tests in 44 suites, XCTest UI 3 tests).
 
 Core release paths:
 

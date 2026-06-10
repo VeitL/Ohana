@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PlantDetailContentView: View {
     let plant: Plant
@@ -16,16 +16,16 @@ struct PlantDetailContentView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdRaw = ""
-    
+
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirm = false
     private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext, services: appServices) }
-    
+
     var body: some View {
         ZStack {
             OhanaAppBackground()
-            
+
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 20) {
                     heroCard
@@ -63,7 +63,7 @@ struct PlantDetailContentView: View {
             commandQueue.cancelAll()
         }
     }
-    
+
     // MARK: - Hero Card
     private var heroCard: some View {
         VStack(spacing: 16) {
@@ -80,12 +80,12 @@ struct PlantDetailContentView: View {
                 Text(plant.avatarEmoji)
                     .font(OhanaFont.adaptive(size: 52))
             }
-            
+
             VStack(spacing: 8) {
                 Text(plant.name)
                     .font(OhanaFont.adaptive(size: 32, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                
+
                 HStack(spacing: 8) {
                     if !plant.species.isEmpty {
                         Text(plant.species)
@@ -106,10 +106,10 @@ struct PlantDetailContentView: View {
         }
         .padding(.vertical, 24)
         .frame(maxWidth: .infinity)
-        .ohanaGlassStyle(cornerRadius: 32)
+        .ohanaGlassStyle(cornerRadius: OhanaRadius.sheetCompact)
         .padding(.horizontal, 16)
     }
-    
+
     // MARK: - Watering Card
     private var wateringCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -120,11 +120,11 @@ struct PlantDetailContentView: View {
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
             }
-            
+
             if let days = plant.daysSinceWatered {
                 let progress = min(1.0, Double(days) / Double(plant.wateringIntervalDays))
                 let color: Color = progress < 0.5 ? .blue : (progress < 0.8 ? .yellow : .red)
-                
+
                 HStack {
                     Text("距上次浇水 \(days) 天")
                         .font(OhanaFont.adaptive(size: 14, weight: .medium))
@@ -133,10 +133,10 @@ struct PlantDetailContentView: View {
                         .font(OhanaFont.adaptive(size: 12, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
-                
+
                 ProgressView(value: progress)
                     .tint(color)
-                
+
                 if plant.needsWatering {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
@@ -154,10 +154,10 @@ struct PlantDetailContentView: View {
             }
         }
         .padding(16)
-        .ohanaGlassStyle(cornerRadius: 20)
+        .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
         .padding(.horizontal, 16)
     }
-    
+
     // MARK: - Fertilizing Card
     private var fertilizingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -168,11 +168,11 @@ struct PlantDetailContentView: View {
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                 Spacer()
             }
-            
+
             if let days = plant.daysSinceFertilized {
                 let progress = min(1.0, Double(days) / Double(plant.fertilizingIntervalDays))
                 let color: Color = progress < 0.5 ? .green : (progress < 0.8 ? .yellow : .red)
-                
+
                 HStack {
                     Text("距上次施肥 \(days) 天")
                         .font(OhanaFont.adaptive(size: 14, weight: .medium))
@@ -181,10 +181,10 @@ struct PlantDetailContentView: View {
                         .font(OhanaFont.adaptive(size: 12, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
-                
+
                 ProgressView(value: progress)
                     .tint(color)
-                
+
                 if plant.needsFertilizing {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
@@ -202,10 +202,10 @@ struct PlantDetailContentView: View {
             }
         }
         .padding(16)
-        .ohanaGlassStyle(cornerRadius: 20)
+        .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
         .padding(.horizontal, 16)
     }
-    
+
     // MARK: - Quick Actions
     private var quickActions: some View {
         HStack(spacing: 12) {
@@ -220,13 +220,13 @@ struct PlantDetailContentView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.blue.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.blue.opacity(0.6), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                         .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
                 }
             }
-            
+
             Button {
                 fertilizePlant()
             } label: {
@@ -238,16 +238,16 @@ struct PlantDetailContentView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.green.opacity(0.6), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.green.opacity(0.6), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                         .strokeBorder(Color.ohanaCardSurface.opacity(0.24), lineWidth: 1)
                 }
             }
         }
         .padding(.horizontal, 16)
     }
-    
+
     // MARK: - Notes Card
     private var notesCard: some View {
         Group {
@@ -264,12 +264,12 @@ struct PlantDetailContentView: View {
                         .font(OhanaFont.adaptive(size: 14))
                 }
                 .padding(16)
-                .ohanaGlassStyle(cornerRadius: 20)
+                .ohanaGlassStyle(cornerRadius: OhanaRadius.input)
                 .padding(.horizontal, 16)
             }
         }
     }
-    
+
     // MARK: - Delete Section
     private var deleteSection: some View {
         Button(role: .destructive) {
@@ -283,15 +283,15 @@ struct PlantDetailContentView: View {
             .foregroundStyle(.red)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .strokeBorder(.red.opacity(0.2), lineWidth: 1)
             }
         }
         .padding(.horizontal, 16)
     }
-    
+
     // MARK: - Actions
     private func waterPlant() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -345,7 +345,7 @@ struct EditPlantSheet: View {
     @State private var fertilizingInterval = 30
     @State private var notes = ""
     @State private var isSaving = false
-    
+
     var body: some View {
         OhanaSheetWrapper(title: "编辑植物", onDismiss: { dismiss() }) {
             VStack(spacing: 20) {
@@ -353,30 +353,30 @@ struct EditPlantSheet: View {
                 formField("品种", text: $species)
                 formField("位置", text: $location)
                 formField("头像 Emoji", text: $avatarEmoji)
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("浇水周期")
                         .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                    Stepper("每 \(wateringInterval) 天", value: $wateringInterval, in: 1...90)
+                    Stepper("每 \(wateringInterval) 天", value: $wateringInterval, in: 1 ... 90)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("施肥周期")
                         .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                    Stepper("每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1...365)
+                    Stepper("每 \(fertilizingInterval) 天", value: $fertilizingInterval, in: 1 ... 365)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("备注")
                         .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     TextEditor(text: $notes)
                         .frame(height: 80)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip))
                 }
-                
+
                 Button { save() } label: {
                     Text(isSaving ? "保存中…" : "保存").capsuleButton()
                 }
@@ -398,17 +398,17 @@ struct EditPlantSheet: View {
             commandQueue.cancelAll()
         }
     }
-    
+
     private func formField(_ title: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(OhanaFont.adaptive(size: 13, weight: .medium))
                 .foregroundStyle(Color.ohanaSecondaryText)
-            TextField(title, text: text)
+            TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .textFieldStyle(.roundedBorder)
         }
     }
-    
+
     private func save() {
         guard !isSaving else { return }
         let input = PlantProfileCommandInput(

@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension CalendarView {
     // MARK: - Classic Calendar Header
@@ -124,7 +124,7 @@ extension CalendarView {
                 .ignoresSafeArea(edges: .top)
         )
     }
-    
+
     // MARK: - Go Week Strip (本周快速预览)
     var goWeekStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -171,17 +171,17 @@ extension CalendarView {
                             Text(day, format: .dateTime.weekday(.abbreviated))
                                 .font(OhanaFont.caption2(.bold))
                                 .foregroundStyle(isSelected ? chipSelFg : (isMaterial ? Color(hex: "8E8E93") : classicSoftText))
-                            
+
                             Text("\(dayNumber)")
                                 .font(OhanaFont.title3(.black))
                                 .foregroundStyle(isSelected ? chipSelFg : (isToday ? chipAccent : (isMaterial ? .primary : classicPrimaryText)))
                                 .ohanaNumericMotion(dayNumber)
-                            
+
                             // 事件点（宠物主题色，多宠物时最多3个彩点）
                             ZStack {
-                                if hasEvents && !isSelected {
+                                if hasEvents, !isSelected {
                                     HStack(spacing: 2) {
-                                        ForEach(0..<dotColors.count, id: \.self) { i in
+                                        ForEach(0 ..< dotColors.count, id: \.self) { i in
                                             Circle().fill(dotColors[i]).frame(width: 5, height: 5) // a11y: allow decorative event density dot
                                         }
                                     }
@@ -191,7 +191,7 @@ extension CalendarView {
                                         .frame(width: 5, height: 5) // a11y: allow decorative event density dot
                                 }
                             }
-                            
+
                             // 首个事件剪影图标
                             if let first = dayEvents.first {
                                 Image(systemName: first.silhouetteListSymbol)
@@ -206,7 +206,7 @@ extension CalendarView {
                         .padding(.vertical, 8)
                         .background(
                             isSelected ? chipAccent : (isToday ? chipAccent.opacity(isMaterial ? 0.12 : 0.08) : Color.clear),
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         )
                     }
                 }
@@ -215,7 +215,7 @@ extension CalendarView {
             .padding(.vertical, 8)
         }
     }
-    
+
     // MARK: - Go View Mode Toggle（图标版）
     var goViewModeToggle: some View {
         HStack(spacing: 2) {

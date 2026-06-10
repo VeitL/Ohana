@@ -119,9 +119,9 @@ struct HumanModulePrivacyLockedView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(24)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
         .padding(.horizontal, 24)

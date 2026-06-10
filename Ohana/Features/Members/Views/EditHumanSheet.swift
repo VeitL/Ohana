@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Edit Human Sheet
 struct EditHumanSheet: View {
@@ -16,7 +16,7 @@ struct EditHumanSheet: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var name: String = ""
     @State private var avatarEmoji: String = ""
-    @State private var birthday: Date = Date()
+    @State private var birthday: Date = .init()
     @State private var hasBirthday = false
     @State private var bloodType: String = ""
     @State private var role: String = "owner"
@@ -31,25 +31,25 @@ struct EditHumanSheet: View {
     @State private var privateWishlist = false
     @State private var privateExpense = false
     @State private var privateNote = false
-    
+
     var body: some View {
         OhanaSheetWrapper(title: "编辑成员", onDismiss: { dismiss() }) {
             VStack(spacing: 16) {
                 formField("姓名", text: $name)
                 formField("头像 Emoji", text: $avatarEmoji)
-                
+
                 Toggle("设置生日", isOn: $hasBirthday)
                     .tint(Color.goPrimary)
                     .padding(.horizontal, 4)
-                
+
                 if hasBirthday {
                     DatePicker("生日", selection: $birthday, displayedComponents: .date)
                 }
-                
+
                 formField("血型", text: $bloodType)
                 formField("国籍", text: $nationality)
                 formField("城市", text: $city)
-                
+
                 Picker("角色", selection: $role) {
                     Text("管理者").tag("owner")
                     Text("成员").tag("member")
@@ -62,16 +62,16 @@ struct EditHumanSheet: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("备注")
                         .font(OhanaFont.subheadline())
                         .foregroundStyle(Color.ohanaSecondaryText)
                     TextEditor(text: $notes)
                         .frame(height: 80)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip))
                 }
-                
+
                 // FIX 1: 隐私设置 Section
                 VStack(alignment: .leading, spacing: 10) {
                     Text("🔒  隐私设置")
@@ -108,25 +108,25 @@ struct EditHumanSheet: View {
             city = human.city
             // FIX 1: 加载隐私设置
             let fields = human.privateFields
-            privateWeight   = fields.contains(HumanPrivateField.weight.rawValue)
-            privateWorkout  = fields.contains(HumanPrivateField.workout.rawValue)
+            privateWeight = fields.contains(HumanPrivateField.weight.rawValue)
+            privateWorkout = fields.contains(HumanPrivateField.workout.rawValue)
             privateMedication = fields.contains(HumanPrivateField.medication.rawValue)
             privateNote = fields.contains(HumanPrivateField.note.rawValue)
             privateWishlist = fields.contains(HumanPrivateField.wishlist.rawValue)
-            privateExpense  = fields.contains(HumanPrivateField.expense.rawValue)
+            privateExpense = fields.contains(HumanPrivateField.expense.rawValue)
         }
     }
-    
+
     private func formField(_ title: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(OhanaFont.subheadline())
                 .foregroundStyle(Color.ohanaSecondaryText)
-            TextField(title, text: text)
+            TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .textFieldStyle(.roundedBorder)
         }
     }
-    
+
     private func save() {
         let input = HumanProfileCommandInput(
             name: name,
@@ -184,7 +184,6 @@ struct EditHumanSheet: View {
             Toggle("", isOn: binding).tint(Color.goPrimary).labelsHidden()
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
     }
 }
-

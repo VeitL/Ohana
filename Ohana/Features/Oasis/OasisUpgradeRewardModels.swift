@@ -29,28 +29,28 @@ enum OasisElectronicPetRarity: String, Codable, CaseIterable, Identifiable {
 
     var zh: String {
         switch self {
-        case .common: return "普通"
-        case .rare: return "稀有"
-        case .epic: return "史诗"
-        case .legendary: return "传说"
+        case .common: "普通"
+        case .rare: "稀有"
+        case .epic: "史诗"
+        case .legendary: "传说"
         }
     }
 
     var en: String {
         switch self {
-        case .common: return "Common"
-        case .rare: return "Rare"
-        case .epic: return "Epic"
-        case .legendary: return "Legendary"
+        case .common: "Common"
+        case .rare: "Rare"
+        case .epic: "Epic"
+        case .legendary: "Legendary"
         }
     }
 
     var de: String {
         switch self {
-        case .common: return "Gewohnlich"
-        case .rare: return "Selten"
-        case .epic: return "Episch"
-        case .legendary: return "Legendär"
+        case .common: "Gewohnlich"
+        case .rare: "Selten"
+        case .epic: "Episch"
+        case .legendary: "Legendär"
         }
     }
 }
@@ -68,17 +68,17 @@ enum OasisCritterLifeState: String, Codable, CaseIterable, Identifiable {
     func name(_ l: L10n) -> String {
         switch self {
         case .healthy:
-            return l.tr(zh: "安稳", en: "Settled", de: "Ruhig")
+            l.tr(zh: "安稳", en: "Settled", de: "Ruhig")
         case .needsCare:
-            return l.tr(zh: "想被照顾", en: "Needs a little care", de: "Braucht etwas Pflege")
+            l.tr(zh: "想被照顾", en: "Needs a little care", de: "Braucht etwas Pflege")
         case .atRisk:
-            return l.tr(zh: "需要你一下", en: "Needs you soon", de: "Braucht dich bald")
+            l.tr(zh: "需要你一下", en: "Needs you soon", de: "Braucht dich bald")
         case .sick:
-            return l.tr(zh: "有点不舒服", en: "A little unwell", de: "Etwas unwohl")
+            l.tr(zh: "有点不舒服", en: "A little unwell", de: "Etwas unwohl")
         case .critical:
-            return l.tr(zh: "需要救回", en: "Needs rescue", de: "Braucht Rettung")
+            l.tr(zh: "需要救回", en: "Needs rescue", de: "Braucht Rettung")
         case .dead:
-            return l.tr(zh: "纪念中", en: "Remembered", de: "In Erinnerung")
+            l.tr(zh: "纪念中", en: "Remembered", de: "In Erinnerung")
         }
     }
 }
@@ -94,13 +94,13 @@ enum OasisCritterDeathReason: String, Codable, CaseIterable, Identifiable {
     func name(_ l: L10n) -> String {
         switch self {
         case .hungry:
-            return l.tr(zh: "太久没有吃东西", en: "too long without food", de: "zu lange ohne Futter")
+            l.tr(zh: "太久没有吃东西", en: "too long without food", de: "zu lange ohne Futter")
         case .sick:
-            return l.tr(zh: "久病没有恢复", en: "illness that was not healed", de: "Krankheit ohne Erholung")
+            l.tr(zh: "久病没有恢复", en: "illness that was not healed", de: "Krankheit ohne Erholung")
         case .bored:
-            return l.tr(zh: "太久没有陪伴", en: "too long without company", de: "zu lange ohne Gesellschaft")
+            l.tr(zh: "太久没有陪伴", en: "too long without company", de: "zu lange ohne Gesellschaft")
         case .oldAge:
-            return l.tr(zh: "自然老去", en: "old age", de: "Alter")
+            l.tr(zh: "自然老去", en: "old age", de: "Alter")
         }
     }
 }
@@ -147,7 +147,7 @@ struct OasisElectronicPetCatalogEntry: Identifiable, Equatable {
     }
 
     func unlockHint(_ l: L10n) -> String {
-        if unlockHintZh.isEmpty && unlockHintEn.isEmpty && unlockHintDe.isEmpty {
+        if unlockHintZh.isEmpty, unlockHintEn.isEmpty, unlockHintDe.isEmpty {
             return sourceLevel > 0
                 ? l.tr(zh: "生命之树 Lv.\(sourceLevel)", en: "Life Tree Lv.\(sourceLevel)", de: "Lebensbaum Lv.\(sourceLevel)")
                 : l.tr(zh: "碎片唤醒", en: "Fragment awakening", de: "Fragment-Weckung")

@@ -36,7 +36,7 @@ extension QuickFeedDetailContent {
             .frame(height: 8)
         }
         .padding(14)
-        .feedFlatBlockSurface(cornerRadius: 20)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.input)
     }
 
     var stockOverviewStatusStrip: some View {
@@ -161,7 +161,7 @@ extension QuickFeedDetailContent {
                         .foregroundStyle(Color.arkInk.opacity(0.72))
                 }
                 .frame(width: 44, height: 48)
-                .background(foodKindTint(record.foodKind), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .background(foodKindTint(record.foodKind), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {
@@ -194,7 +194,7 @@ extension QuickFeedDetailContent {
                 }
             }
             .padding(12)
-            .feedFlatBlockSurface(cornerRadius: 18)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -206,7 +206,7 @@ extension QuickFeedDetailContent {
                     .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(Color.goTeal, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.goTeal, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "自动猫粮机", en: "Auto feeder", de: "Futterautomat"))
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
@@ -235,7 +235,7 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(14)
-        .feedFlatBlockSurface(cornerRadius: 18)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
     }
 
     func stockRecordDateSummary(_ record: PetFoodRecord) -> String {

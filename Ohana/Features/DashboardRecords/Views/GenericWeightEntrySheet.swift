@@ -5,8 +5,8 @@
 //  Locale-aware weight entry sheet for pets and humans.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct WeightEntryScrollHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -23,9 +23,9 @@ struct GenericWeightEntrySheet: View {
     }
 
     let target: Target
-    var onSaved: (() -> Void)? = nil
-    var onRewarded: ((Int) -> Void)? = nil
-    var onDismiss: (() -> Void)? = nil
+    var onSaved: (() -> Void)?
+    var onRewarded: ((Int) -> Void)?
+    var onDismiss: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -58,15 +58,15 @@ struct GenericWeightEntrySheet: View {
 
     private var identityColor: Color {
         switch target {
-        case .pet(let pet): return Color(hex: pet.safeThemeColorHex)
-        case .human: return Color.goPrimary
+        case let .pet(pet): Color(hex: pet.safeThemeColorHex)
+        case .human: Color.goPrimary
         }
     }
 
     private var entityName: String {
         switch target {
-        case .pet(let pet): return pet.name
-        case .human(let human): return human.name
+        case let .pet(pet): pet.name
+        case let .human(human): human.name
         }
     }
 
@@ -89,27 +89,26 @@ struct GenericWeightEntrySheet: View {
     }
 
     private var autoBcsForPet: Int? {
-        guard case .pet(let pet) = target, let kg = weightInKgForBcs else { return nil }
+        guard case let .pet(pet) = target, let kg = weightInKgForBcs else { return nil }
         return PetBodyConditionEstimator.suggestedBCS(for: pet, weightKg: kg)
     }
 
     private var quickWeights: [Double] {
         switch target {
-        case .pet(let pet):
+        case let .pet(pet):
             let latest = pet.weightLogs.sorted { $0.date > $1.date }.first?.weightInKg
             let species = pet.species.lowercased()
-            let defaults: [Double]
-            if species.contains("cat") || pet.species.contains("猫") {
-                defaults = [3.5, 4.5, 5.5]
+            let defaults: [Double] = if species.contains("cat") || pet.species.contains("猫") {
+                [3.5, 4.5, 5.5]
             } else if species.contains("dog") || pet.species.contains("狗") {
-                defaults = [5, 10, 20]
+                [5, 10, 20]
             } else {
-                defaults = [0.5, 1, 2]
+                [0.5, 1, 2]
             }
-            return uniqueWeights([latest].compactMap { $0 } + defaults)
-        case .human(let human):
+            return uniqueWeights([latest].compactMap(\.self) + defaults)
+        case let .human(human):
             let latest = human.weightLogs.sorted { $0.date > $1.date }.first?.weight
-            return uniqueWeights([latest].compactMap { $0 } + [50, 60, 70])
+            return uniqueWeights([latest].compactMap(\.self) + [50, 60, 70])
         }
     }
 
@@ -167,8 +166,8 @@ struct GenericWeightEntrySheet: View {
 
                     saveBar
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow confirmed inline popup lifted shadow
                 .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow confirmed inline popup lifted shadow
                 .padding(.horizontal, 6)
@@ -312,16 +311,16 @@ struct GenericWeightEntrySheet: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(weightText.isEmpty ? (weightUnit == "g" ? "0" : CountryDecimalInput.placeholder(countryCode: appCountry)) : weightText)
-                .font(OhanaFont.metric(size: 52, .black))
-                .foregroundStyle(weightText.isEmpty ? Color.ohanaTertiaryText : Color.ohanaPrimaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .minimumScaleFactor(0.45)
+                    .font(OhanaFont.metric(size: 52, .black))
+                    .foregroundStyle(weightText.isEmpty ? Color.ohanaTertiaryText : Color.ohanaPrimaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .minimumScaleFactor(0.45)
 
                 unitPicker
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             .padding(.horizontal, 20)
         }
     }
@@ -454,7 +453,7 @@ struct GenericWeightEntrySheet: View {
                 }
             }
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             .padding(.horizontal, 20)
         }
     }
@@ -468,7 +467,7 @@ struct GenericWeightEntrySheet: View {
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存体重记录", en: "Save weight", de: "Gewicht speichern")
                 )
-                    .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
@@ -483,10 +482,10 @@ struct GenericWeightEntrySheet: View {
         .padding(.bottom, 14)
     }
 
-    private func infoRow<Trailing: View>(
+    private func infoRow(
         icon: String,
         label: String,
-        @ViewBuilder trailing: () -> Trailing
+        @ViewBuilder trailing: () -> some View
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
@@ -500,7 +499,7 @@ struct GenericWeightEntrySheet: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .padding(.horizontal, 20)
     }
 
@@ -531,32 +530,32 @@ struct GenericWeightEntrySheet: View {
 
     private func bcsColor(_ score: Int) -> Color {
         switch score {
-        case 1...3: return Color(hex: "4ECDC4")
-        case 4...5: return Color.goPrimary
-        case 6...7: return Color(hex: "FFD93D")
-        default:    return Color(hex: "FF6B6B")
+        case 1 ... 3: Color(hex: "4ECDC4")
+        case 4 ... 5: Color.goPrimary
+        case 6 ... 7: Color(hex: "FFD93D")
+        default: Color(hex: "FF6B6B")
         }
     }
 
     private func bcsLabel(_ score: Int) -> String {
         switch score {
-        case 1: return l.tr(zh: "极度消瘦", en: "Very thin", de: "Sehr dünn")
-        case 2: return l.tr(zh: "消瘦", en: "Thin", de: "Dünn")
-        case 3: return l.tr(zh: "偏瘦", en: "Slightly thin", de: "Etwas dünn")
-        case 4: return l.tr(zh: "理想偏瘦", en: "Lean ideal", de: "Schlank ideal")
-        case 5: return l.tr(zh: "理想体型", en: "Ideal", de: "Ideal")
-        case 6: return l.tr(zh: "理想偏胖", en: "Slightly heavy", de: "Etwas schwer")
-        case 7: return l.tr(zh: "偏胖", en: "Heavy", de: "Schwer")
-        case 8: return l.tr(zh: "肥胖", en: "Obese", de: "Adipös")
-        case 9: return l.tr(zh: "极度肥胖", en: "Very obese", de: "Stark adipös")
-        default: return ""
+        case 1: l.tr(zh: "极度消瘦", en: "Very thin", de: "Sehr dünn")
+        case 2: l.tr(zh: "消瘦", en: "Thin", de: "Dünn")
+        case 3: l.tr(zh: "偏瘦", en: "Slightly thin", de: "Etwas dünn")
+        case 4: l.tr(zh: "理想偏瘦", en: "Lean ideal", de: "Schlank ideal")
+        case 5: l.tr(zh: "理想体型", en: "Ideal", de: "Ideal")
+        case 6: l.tr(zh: "理想偏胖", en: "Slightly heavy", de: "Etwas schwer")
+        case 7: l.tr(zh: "偏胖", en: "Heavy", de: "Schwer")
+        case 8: l.tr(zh: "肥胖", en: "Obese", de: "Adipös")
+        case 9: l.tr(zh: "极度肥胖", en: "Very obese", de: "Stark adipös")
+        default: ""
         }
     }
 
     @ViewBuilder
     private var avatarView: some View {
         switch target {
-        case .pet(let pet):
+        case let .pet(pet):
             PetAvatarPortraitView(
                 imageData: pet.avatarImageData,
                 fallbackText: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
@@ -564,7 +563,7 @@ struct GenericWeightEntrySheet: View {
                 size: 42,
                 showsBackground: false
             )
-        case .human(let human):
+        case let .human(human):
             HumanAvatarPipelineView(
                 human: human,
                 size: 42,
@@ -584,7 +583,7 @@ struct GenericWeightEntrySheet: View {
         let savedBcs = autoBcsForPet ?? 0
 
         switch target {
-        case .pet(let pet):
+        case let .pet(pet):
             let command = DomainCommand.weightEntry(entityID: pet.id, entityKind: "pet")
             commandQueue.enqueue(command) {
                 let result = DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetWeight(
@@ -602,7 +601,7 @@ struct GenericWeightEntrySheet: View {
                 onSaved?()
                 closeSheet()
             }
-        case .human(let human):
+        case let .human(human):
             let command = DomainCommand.weightEntry(entityID: human.id, entityKind: "human")
             commandQueue.enqueue(command) {
                 let result = DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordHumanWeight(

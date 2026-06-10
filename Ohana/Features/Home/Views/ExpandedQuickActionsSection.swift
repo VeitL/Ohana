@@ -50,7 +50,7 @@ struct ExpandedPetQuickActionsSection: View {
                 compactDoneRow
             }
 
-            if showFirstSuccessPrompt && !isEditMode {
+            if showFirstSuccessPrompt, !isEditMode {
                 ExpandedFirstSuccessPrompt(
                     onFeed: onFirstSuccessFeed,
                     onPlay: onFirstSuccessPlay,
@@ -98,7 +98,7 @@ struct ExpandedPetQuickActionsSection: View {
                         .zIndex(itemZIndex(item, index: idx))
                     }
 
-                    if isEditMode && QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity {
+                    if isEditMode, QuickActionLimit.count(for: pet, in: editItems) < QuickActionLimit.maxItemsPerEntity {
                         ExpandedPetQuickAddButton(
                             onTap: openAddPanel
                         )
@@ -108,13 +108,13 @@ struct ExpandedPetQuickActionsSection: View {
                 .animation(GoMotion.selection, value: displayedOrderSignature)
             }
 
-            if isEditMode && QuickActionLimit.count(for: pet, in: editItems) >= QuickActionLimit.maxItemsPerEntity {
+            if isEditMode, QuickActionLimit.count(for: pet, in: editItems) >= QuickActionLimit.maxItemsPerEntity {
                 limitText
             }
         }
         .padding(.horizontal, 2)
         .overlay(alignment: .bottom) {
-            if isEditMode && showingAddPanel {
+            if isEditMode, showingAddPanel {
                 ExpandedQuickAddInlinePanel(
                     items: availableAddItems,
                     emptyTitle: "已全部添加",
@@ -235,9 +235,9 @@ struct ExpandedPetQuickActionsSection: View {
             } label: {
                 Image(systemName: "checkmark").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 11, weight: .black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 30, height: 26) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                .background(Color.goPrimary, in: Capsule())
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .frame(width: 30, height: 26) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                    .background(Color.goPrimary, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
         }

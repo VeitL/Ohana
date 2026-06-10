@@ -16,25 +16,25 @@ enum PoopOverviewRange: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .days7: return "7天"
-        case .days30: return "30天"
-        case .days90: return "90天"
+        case .days7: "7天"
+        case .days30: "30天"
+        case .days90: "90天"
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .days7: return l.tr(zh: "7天", en: "7d", de: "7 T.")
-        case .days30: return l.tr(zh: "30天", en: "30d", de: "30 T.")
-        case .days90: return l.tr(zh: "90天", en: "90d", de: "90 T.")
+        case .days7: l.tr(zh: "7天", en: "7d", de: "7 T.")
+        case .days30: l.tr(zh: "30天", en: "30d", de: "30 T.")
+        case .days90: l.tr(zh: "90天", en: "90d", de: "90 T.")
         }
     }
 
     var days: Int {
         switch self {
-        case .days7: return 7
-        case .days30: return 30
-        case .days90: return 90
+        case .days7: 7
+        case .days30: 30
+        case .days90: 90
         }
     }
 }
@@ -69,52 +69,52 @@ enum PoopLogItem: Identifiable {
 
     var id: String {
         switch self {
-        case .potty(let log): return "potty-\(log.id.uuidString)"
-        case .litter(let log): return "litter-\(log.id.uuidString)"
+        case let .potty(log): "potty-\(log.id.uuidString)"
+        case let .litter(log): "litter-\(log.id.uuidString)"
         }
     }
 
     var date: Date {
         switch self {
-        case .potty(let log): return log.date
-        case .litter(let log): return log.date
+        case let .potty(log): log.date
+        case let .litter(log): log.date
         }
     }
 
     var title: String {
         switch self {
-        case .potty(let log): return log.pottyType.rawValue
-        case .litter: return CareType.litter.label
+        case let .potty(log): log.pottyType.rawValue
+        case .litter: CareType.litter.label
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .potty(let log): return log.pottyType.localizedLabel(l)
-        case .litter: return l.tr(zh: "铲砂", en: "Litter scooped", de: "Klo gereinigt")
+        case let .potty(log): log.pottyType.localizedLabel(l)
+        case .litter: l.tr(zh: "铲砂", en: "Litter scooped", de: "Klo gereinigt")
         }
     }
 
     var icon: String {
         switch self {
-        case .potty(let log): return log.pottyType.systemIconName
-        case .litter: return CareType.litter.systemIconName
+        case let .potty(log): log.pottyType.systemIconName
+        case .litter: CareType.litter.systemIconName
         }
     }
 
     var detail: String? {
         switch self {
-        case .potty(let log): return log.executorId == nil ? nil : "已记录"
-        case .litter: return nil
+        case let .potty(log): log.executorId == nil ? nil : "已记录"
+        case .litter: nil
         }
     }
 
     func detail(_ l: L10n) -> String? {
         switch self {
-        case .potty(let log):
-            return log.executorId == nil ? nil : l.tr(zh: "已记录", en: "Logged", de: "Erfasst")
+        case let .potty(log):
+            log.executorId == nil ? nil : l.tr(zh: "已记录", en: "Logged", de: "Erfasst")
         case .litter:
-            return nil
+            nil
         }
     }
 }
@@ -132,7 +132,7 @@ struct PoopCoreCard: View {
     var secondaryTitle: String?
     var secondaryAction: (() -> Void)?
     var tapAction: (() -> Void)?
-    var feedbackToken: CheckInFeedbackToken? = nil
+    var feedbackToken: CheckInFeedbackToken?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -182,9 +182,9 @@ struct PoopCoreCard: View {
             }
         }
         .padding(16)
-        .background(surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(surface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         )
         .checkInPulse(feedbackToken)
@@ -275,12 +275,12 @@ struct PoopHeroCard: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .fill(Color.ohanaCardSurface)
 
             HStack(spacing: 20) {
                 ZStack(alignment: .bottom) {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         .stroke(litterTint.opacity(0.72), lineWidth: 4)
                         .frame(width: 98, height: 58)
                         .offset(y: 18)
@@ -288,7 +288,7 @@ struct PoopHeroCard: View {
                         .fill(litterTint.opacity(0.34))
                         .frame(width: 78, height: 16)
                         .offset(y: 12)
-                    ForEach(0..<3, id: \.self) { index in
+                    ForEach(0 ..< 3, id: \.self) { index in
                         Circle()
                             .fill(tint.opacity(index == 0 ? 0.95 : 0.68))
                             .frame(width: 13 + CGFloat(index * 3), height: 13 + CGFloat(index * 3))
@@ -298,8 +298,8 @@ struct PoopHeroCard: View {
                             )
                             .animation(
                                 shouldAnimateHero
-                                ? .easeInOut(duration: 1.1 + Double(index) * 0.16).repeatForever(autoreverses: true) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
-                                : nil,
+                                    ? .easeInOut(duration: 1.1 + Double(index) * 0.16).repeatForever(autoreverses: true) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
+                                    : nil,
                                 value: bounce
                             )
                     }
@@ -426,7 +426,7 @@ struct PoopSheetHero: View {
                 .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 48, height: 48)
-                .background(tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
@@ -461,7 +461,7 @@ struct PoopInlineNotice: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 }
 
@@ -479,7 +479,7 @@ struct PoopPrimaryButton: View {
                 .foregroundStyle(Color.arkInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(isDisabled ? Color.secondary.opacity(0.28) : tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(isDisabled ? Color.secondary.opacity(0.28) : tint, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(isDisabled)
@@ -512,7 +512,7 @@ struct PoopCheckInSheet: View {
                         .font(OhanaFont.adaptive(size: 22, weight: .black))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 54, height: 54)
-                        .background(tint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(l.tr(zh: "当前状态", en: "Status now", de: "Status"))
                             .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
@@ -526,7 +526,7 @@ struct PoopCheckInSheet: View {
                     Spacer()
                 }
                 .padding(14)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                 if isPrimaryDisabled {
                     PoopInlineNotice(
@@ -554,7 +554,7 @@ struct PoopCheckInSheet: View {
                         .foregroundStyle(tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -565,8 +565,8 @@ struct PoopCheckInSheet: View {
 
 struct PottyTypeSheet: View {
     let tint: Color
-    var unknownGroupTitle: String? = nil
-    var onUnknownGroup: (() -> Void)? = nil
+    var unknownGroupTitle: String?
+    var onUnknownGroup: (() -> Void)?
     let onSelect: (PottyType) -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
@@ -605,7 +605,7 @@ struct PottyTypeSheet: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 18)
-                            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
@@ -639,10 +639,10 @@ struct PottyTypeSheet: View {
 
     private func color(for type: PottyType) -> Color {
         switch type {
-        case .perfectPoop: return tint
-        case .softPoop: return Color(hex: "F59E0B")
-        case .liquidPoop: return Color(hex: "EF4444")
-        case .pee: return Color(hex: "06B6D4")
+        case .perfectPoop: tint
+        case .softPoop: Color(hex: "F59E0B")
+        case .liquidPoop: Color(hex: "EF4444")
+        case .pee: Color(hex: "06B6D4")
         }
     }
 }
@@ -676,7 +676,7 @@ struct PoopCycleSettingsSheet: View {
                         .font(OhanaFont.adaptive(size: 18, weight: .black))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 46, height: 46)
-                        .background(tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(statusTitle)
                             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
@@ -692,7 +692,7 @@ struct PoopCycleSettingsSheet: View {
                     Spacer(minLength: 0)
                 }
                 .padding(14)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                 VStack(spacing: 12) {
                     Stepper(value: $intervalDays, in: intervalRange) {
@@ -703,8 +703,8 @@ struct PoopCycleSettingsSheet: View {
                     DatePicker(selection: $anchorDate, displayedComponents: .date) {
                         Text(l.tr(zh: "起算日", en: "Start date", de: "Startdatum"))
                     }
-                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
-                        .tint(tint)
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .tint(tint)
 
                     Toggle(isOn: $reminderOn) {
                         settingsRow(
@@ -715,7 +715,7 @@ struct PoopCycleSettingsSheet: View {
                     .tint(tint)
                 }
                 .padding(14)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                 PoopPrimaryButton(title: l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern"), icon: "checkmark", tint: tint) {
                     onSave()
@@ -729,7 +729,7 @@ struct PoopCycleSettingsSheet: View {
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }

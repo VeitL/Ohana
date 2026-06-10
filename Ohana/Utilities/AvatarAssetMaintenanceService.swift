@@ -12,8 +12,8 @@ import UIKit
 
 @MainActor
 enum AvatarAssetMaintenanceService {
-    nonisolated private static let maxStoredPixel: CGFloat = 900
-    nonisolated private static let largeAssetThreshold = 700_000
+    private nonisolated static let maxStoredPixel: CGFloat = 900
+    private nonisolated static let largeAssetThreshold = 700_000
 
     private struct AvatarPayload: Sendable {
         let id: UUID
@@ -21,19 +21,19 @@ enum AvatarAssetMaintenanceService {
     }
 
     static func compactStoredAvatars(context: ModelContext) async {
-        let existingPets = (try? context.fetch(FetchDescriptor<Pet>())) ?? []
+        let existingPets = (try? context.fetch(FetchDescriptor<Pet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let petPayloads = existingPets.compactMap { pet -> AvatarPayload? in
             guard let data = pet.avatarImageData else { return nil }
             return AvatarPayload(id: pet.id, data: data)
         }
 
-        let existingHumans = (try? context.fetch(FetchDescriptor<Human>())) ?? []
+        let existingHumans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let humanPayloads = existingHumans.compactMap { human -> AvatarPayload? in
             guard let data = human.avatarImageData else { return nil }
             return AvatarPayload(id: human.id, data: data)
         }
 
-        let updates = await Task.detached(priority: .utility) {
+        let updates = await Task.detached(priority: .utility) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
             let petUpdates = petPayloads.compactMap { payload -> (UUID, Data)? in
                 guard let compacted = compactedAvatarData(from: payload.data) else { return nil }
                 return (payload.id, compacted)
@@ -46,7 +46,7 @@ enum AvatarAssetMaintenanceService {
         }.value
 
         var didChange = false
-        let pets = (try? context.fetch(FetchDescriptor<Pet>())) ?? []
+        let pets = (try? context.fetch(FetchDescriptor<Pet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let compactedPets = Dictionary(uniqueKeysWithValues: updates.0)
         for pet in pets where compactedPets[pet.id] != nil {
             guard let compacted = compactedPets[pet.id] else { continue }
@@ -54,7 +54,7 @@ enum AvatarAssetMaintenanceService {
             didChange = true
         }
 
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? []
+        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let compactedHumans = Dictionary(uniqueKeysWithValues: updates.1)
         for human in humans where compactedHumans[human.id] != nil {
             guard let compacted = compactedHumans[human.id] else { continue }
@@ -67,8 +67,8 @@ enum AvatarAssetMaintenanceService {
         }
     }
 
-    nonisolated private static func compactedAvatarData(from data: Data) -> Data? {
-        guard data.count > largeAssetThreshold, let image = UIImage(data: data) else { return nil }
+    private nonisolated static func compactedAvatarData(from data: Data) -> Data? {
+        guard data.count > largeAssetThreshold, let image = UIImage(data: data) else { return nil } // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
 
         let preservesAlpha = ImageCutoutService.isTransparentPNG(data)
         let pixelSize = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)

@@ -19,10 +19,10 @@ enum MemberAvatarMediaRoute: Identifiable {
 
     var id: String {
         switch self {
-        case .photoLibrary: return "photoLibrary"
-        case .camera: return "camera"
-        case let .portraitCrop(item): return "portraitCrop-\(item.id.uuidString)"
-        case .permissionAlert: return "permissionAlert"
+        case .photoLibrary: "photoLibrary"
+        case .camera: "camera"
+        case let .portraitCrop(item): "portraitCrop-\(item.id.uuidString)"
+        case .permissionAlert: "permissionAlert"
         }
     }
 }
@@ -67,7 +67,7 @@ final class MemberAvatarMediaCoordinator: ObservableObject {
     func prepareCameraIfNeeded() {
         guard !didPrepareCamera else { return }
         didPrepareCamera = true
-        Task.detached(priority: .utility) {
+        Task.detached(priority: .utility) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
             let signpostID = MemberCreationPerformance.begin("Camera Device Warmup")
             _ = AVCaptureDevice.authorizationStatus(for: .video)
             _ = AVCaptureDevice.DiscoverySession(

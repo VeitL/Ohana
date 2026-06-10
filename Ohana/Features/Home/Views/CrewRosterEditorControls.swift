@@ -16,17 +16,17 @@ struct CrewRosterEditorTextField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             CrewRosterEditorLabel(title: title, icon: icon)
-            TextField(title, text: $text, axis: axis)
+            TextField(title, text: $text, axis: axis) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.goCardWhite)
                 .textFieldStyle(.plain)
-                .lineLimit(axis == .vertical ? 2...4 : 1...1)
+                .lineLimit(axis == .vertical ? 2 ... 4 : 1 ... 1)
                 .padding(.horizontal, 12)
                 .padding(.vertical, axis == .vertical ? 11 : 10)
-                .background(Color.goCardWhite.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Color.goCardWhite.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
         }
         .padding(12)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 }
 
@@ -50,7 +50,7 @@ struct CrewRosterEditorMenuRow: View {
         }
         .padding(12)
         .frame(minHeight: 56)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 }
 
@@ -70,7 +70,7 @@ struct CrewRosterEditorSegmentedRow: View {
             .pickerStyle(.segmented)
         }
         .padding(12)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 }
 
@@ -86,7 +86,7 @@ struct CrewRosterEditorToggleRow: View {
         .tint(Color.goPrimary)
         .padding(12)
         .frame(minHeight: 56)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 }
 
@@ -95,7 +95,7 @@ struct CrewRosterEditorDateToggleRow: View {
     let icon: String
     @Binding var isOn: Bool
     @Binding var date: Date
-    var upperBound: Date? = nil
+    var upperBound: Date?
 
     var body: some View {
         VStack(spacing: 10) {
@@ -120,7 +120,7 @@ struct CrewRosterEditorDateToggleRow: View {
         }
         .padding(12)
         .frame(minHeight: 56)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .animation(GoMotion.feedback, value: isOn)
     }
 }
@@ -151,7 +151,7 @@ struct CrewRosterEditorStepperRow: View {
         }
         .padding(12)
         .frame(minHeight: 56)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 }
 
@@ -190,7 +190,7 @@ struct CrewRosterThemeSwatchRow: View {
             }
         }
         .padding(12)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 }
 

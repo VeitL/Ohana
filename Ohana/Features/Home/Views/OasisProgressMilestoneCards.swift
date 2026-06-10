@@ -70,9 +70,9 @@ struct OasisProgressCard: View {
             }
         }
         .padding(18)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         )
     }
@@ -100,11 +100,10 @@ struct OasisMilestoneCard: View {
         let nextLv = min(currentLv + 1, 10)
         let nextLevel = TreeLevel(rawValue: nextLv) ?? .lv10
 
-        Button {
-        } label: {
+        Button {} label: {
             HStack(spacing: 14) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .fill(Color.goPrimary.opacity(0.15))
                         .frame(width: 48, height: 48)
                     Image(systemName: "trophy.fill").accessibilityHidden(true)
@@ -147,9 +146,9 @@ struct OasisMilestoneCard: View {
                 }
             }
             .padding(16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
             )
         }
@@ -158,16 +157,16 @@ struct OasisMilestoneCard: View {
 
     private func passiveIncomeForLevel(_ lv: TreeLevel) -> Int {
         switch lv {
-        case .lv1: return 1
-        case .lv2: return 2
-        case .lv3: return 3
-        case .lv4: return 5
-        case .lv5: return 7
-        case .lv6: return 10
-        case .lv7: return 14
-        case .lv8: return 18
-        case .lv9: return 24
-        case .lv10: return 30
+        case .lv1: 1
+        case .lv2: 2
+        case .lv3: 3
+        case .lv4: 5
+        case .lv5: 7
+        case .lv6: 10
+        case .lv7: 14
+        case .lv8: 18
+        case .lv9: 24
+        case .lv10: 30
         }
     }
 }

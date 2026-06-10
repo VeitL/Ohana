@@ -12,25 +12,25 @@ struct WalletPetCardBack: View {
     let cornerRadius: CGFloat
 
     // MARK: - Callbacks
-    var onShowSettings:     () -> Void = {}
-    var onFlipBack:         () -> Void = {}
+    var onShowSettings: () -> Void = {}
+    var onFlipBack: () -> Void = {}
 
     // 健康管理
-    var onShowHealth:       () -> Void = {}
-    var onShowMedications:  () -> Void = {}
-    var onShowWeight:       () -> Void = {}
+    var onShowHealth: () -> Void = {}
+    var onShowMedications: () -> Void = {}
+    var onShowWeight: () -> Void = {}
 
     // 日常生活
-    var onShowFood:         () -> Void = {}
-    var onShowHygiene:      () -> Void = {}
-    var onShowWalks:        () -> Void = {}
-    var onShowPotty:        () -> Void = {}
-    var onShowExpenses:     () -> Void = {}
+    var onShowFood: () -> Void = {}
+    var onShowHygiene: () -> Void = {}
+    var onShowWalks: () -> Void = {}
+    var onShowPotty: () -> Void = {}
+    var onShowExpenses: () -> Void = {}
 
     // 档案与记忆
-    var onShowBasicInfo:    () -> Void = {}
-    var onShowDocuments:    () -> Void = {}
-    var onShowMoments:      () -> Void = {}
+    var onShowBasicInfo: () -> Void = {}
+    var onShowDocuments: () -> Void = {}
+    var onShowMoments: () -> Void = {}
     var onShowAchievements: () -> Void = {}
 
     // MARK: - Models
@@ -52,14 +52,15 @@ struct WalletPetCardBack: View {
     private var isDog: Bool {
         pet.species.lowercased().contains("dog") || pet.species.contains("狗")
     }
+
     private var isFish: Bool { pet.species.contains("鱼") }
 
     // MARK: - Section data
     private var sections: [FeatureSection] {
         // ── 健康管理 ──────────────────────────
         var healthEntries: [FeatureEntry] = [
-            FeatureEntry(id: "health",  symbol: "stethoscope",    title: "健康档案", action: onShowHealth),
-            FeatureEntry(id: "weight",  symbol: "scalemass.fill", title: "体重记录", action: onShowWeight),
+            FeatureEntry(id: "health", symbol: "stethoscope", title: "健康档案", action: onShowHealth),
+            FeatureEntry(id: "weight", symbol: "scalemass.fill", title: "体重记录", action: onShowWeight)
         ]
         if !isFish {
             healthEntries.append(
@@ -69,10 +70,10 @@ struct WalletPetCardBack: View {
 
         // ── 日常生活 ──────────────────────────
         var dailyEntries: [FeatureEntry] = [
-            FeatureEntry(id: "food",     symbol: "fork.knife",                  title: "饮食管理", action: onShowFood),
-            FeatureEntry(id: "hygiene",  symbol: "bubbles.and.sparkles.fill",   title: "清洁护理", action: onShowHygiene),
-            FeatureEntry(id: "potty",    symbol: "drop.fill",                   title: "噗噗电台", action: onShowPotty),
-            FeatureEntry(id: "expenses", symbol: "creditcard.fill",             title: "花费记录", action: onShowExpenses),
+            FeatureEntry(id: "food", symbol: "fork.knife", title: "饮食管理", action: onShowFood),
+            FeatureEntry(id: "hygiene", symbol: "bubbles.and.sparkles.fill", title: "清洁护理", action: onShowHygiene),
+            FeatureEntry(id: "potty", symbol: "drop.fill", title: "噗噗电台", action: onShowPotty),
+            FeatureEntry(id: "expenses", symbol: "creditcard.fill", title: "花费记录", action: onShowExpenses)
         ]
         if isDog {
             dailyEntries.insert(
@@ -83,16 +84,16 @@ struct WalletPetCardBack: View {
 
         // ── 档案与记忆 ──────────────────────────
         let archiveEntries: [FeatureEntry] = [
-            FeatureEntry(id: "basicInfo",    symbol: "person.fill", title: "基本信息", action: onShowBasicInfo),
-            FeatureEntry(id: "documents",    symbol: "doc.fill",    title: "证件保障", action: onShowDocuments),
-            FeatureEntry(id: "moments",      symbol: "sparkles",    title: "重要时刻", action: onShowMoments),
-            FeatureEntry(id: "achievements", symbol: "trophy.fill", title: "成就",     action: onShowAchievements),
+            FeatureEntry(id: "basicInfo", symbol: "person.fill", title: "基本信息", action: onShowBasicInfo),
+            FeatureEntry(id: "documents", symbol: "doc.fill", title: "证件保障", action: onShowDocuments),
+            FeatureEntry(id: "moments", symbol: "sparkles", title: "重要时刻", action: onShowMoments),
+            FeatureEntry(id: "achievements", symbol: "trophy.fill", title: "成就", action: onShowAchievements)
         ]
 
         return [
-            FeatureSection(id: "health",  symbol: "cross.fill",   title: "健康管理", entries: healthEntries),
-            FeatureSection(id: "daily",   symbol: "sun.max.fill", title: "日常生活", entries: dailyEntries),
-            FeatureSection(id: "archive", symbol: "folder.fill",  title: "档案与记忆", entries: archiveEntries),
+            FeatureSection(id: "health", symbol: "cross.fill", title: "健康管理", entries: healthEntries),
+            FeatureSection(id: "daily", symbol: "sun.max.fill", title: "日常生活", entries: dailyEntries),
+            FeatureSection(id: "archive", symbol: "folder.fill", title: "档案与记忆", entries: archiveEntries)
         ]
     }
 
@@ -104,7 +105,7 @@ struct WalletPetCardBack: View {
                 points: [
                     SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
                     SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
-                    SIMD2(0.0, 1.0), SIMD2(0.5,  1.0), SIMD2(1.0, 1.0)
+                    SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
                 ],
                 colors: WalletPetCardTheme.meshColors(for: pet.themeColorHex)
             )
@@ -183,7 +184,7 @@ struct WalletPetCardBack: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 6)
             .padding(.vertical, 6)
-            .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+            .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         }
         .buttonStyle(ScaleButtonStyle())
     }

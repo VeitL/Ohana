@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension HumanDetailView {
@@ -63,7 +63,7 @@ extension HumanDetailView {
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .goIslandModuleCard(cornerRadius: 24)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
@@ -88,7 +88,7 @@ extension HumanDetailView {
                             .font(OhanaFont.caption())
                             .foregroundStyle(Color(hex: "6B82C4"))
                     } else {
-                        let abnormal = myReports.filter { $0.conclusion == .abnormal || $0.conclusion == .critical }.count
+                        let abnormal = myReports.count(where: { $0.conclusion == .abnormal || $0.conclusion == .critical })
                         HStack(spacing: 6) {
                             Text("\(myReports.count) 份报告")
                                 .font(OhanaFont.caption(.semibold))
@@ -115,7 +115,7 @@ extension HumanDetailView {
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .goIslandModuleCard(cornerRadius: 24)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
@@ -172,7 +172,7 @@ extension HumanDetailView {
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .goIslandModuleCard(cornerRadius: 24)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
@@ -218,7 +218,7 @@ extension HumanDetailView {
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .goIslandModuleCard(cornerRadius: 24)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)

@@ -5,8 +5,8 @@
 //  每日首次打开 App 时呈现的「岛屿日报」启动弹窗。
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct IslandDailyReportSheet: View {
     @Binding var isPresented: Bool
@@ -14,7 +14,7 @@ struct IslandDailyReportSheet: View {
     let reminders: [Reminder]
     var plants: [Plant] = []
     var events: [Event] = []
-    var onStartTasks: (() -> Void)? = nil
+    var onStartTasks: (() -> Void)?
 
     @State private var islandBounce = false
     @State private var itemsAppeared: [Bool] = []
@@ -28,9 +28,9 @@ struct IslandDailyReportSheet: View {
     private var greetingText: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<12:  return l10n.goodMorning
-        case 12..<18: return l10n.goodAfternoon
-        default:      return l10n.goodEvening
+        case 5 ..< 12: return l10n.goodMorning
+        case 12 ..< 18: return l10n.goodAfternoon
+        default: return l10n.goodEvening
         }
     }
 
@@ -117,9 +117,9 @@ struct IslandDailyReportSheet: View {
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         .padding(.horizontal, 16).padding(.vertical, 8)
-                        .background(Color.goPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                        .background(Color.goPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: OhanaRadius.badge)
                                 .strokeBorder(Color.goPrimary.opacity(0.25), lineWidth: 1)
                         )
                     }
@@ -157,7 +157,7 @@ struct IslandDailyReportSheet: View {
                 }
                 .padding(.vertical, 32)
                 .background(
-                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                         .fill(Color.ohanaCardSurface)
                 )
                 .padding(.horizontal, 16)
@@ -172,7 +172,7 @@ struct IslandDailyReportSheet: View {
                 islandBounce = true
             }
             // Staggered task rows
-            for i in 0..<quests.count {
+            for i in 0 ..< quests.count {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15 + Double(i) * 0.08) {
                     withAnimation(GoMotion.quick) {
                         if i < itemsAppeared.count {
@@ -222,7 +222,7 @@ struct IslandDailyReportSheet: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 14))
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: OhanaRadius.row))
         .opacity(appeared ? 1 : 0)
         .offset(y: appeared ? 0 : 16)
     }

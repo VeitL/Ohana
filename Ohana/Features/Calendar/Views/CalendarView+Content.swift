@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension CalendarView {
     var calendarContent: some View {
@@ -105,7 +105,7 @@ extension CalendarView {
                 if viewMode == .list {
                     scheduleInitialListPositionIfNeeded()
                 }
-            } else if !isEmbeddedVisible && !isEmbeddedActive {
+            } else if !isEmbeddedVisible, !isEmbeddedActive {
                 cancelPendingCalendarMaintenance()
                 listInitialPositionTask?.cancel()
                 listInitialPositionTask = nil
@@ -118,7 +118,7 @@ extension CalendarView {
                 if viewMode == .list {
                     scheduleInitialListPositionIfNeeded()
                 }
-            } else if !isEmbeddedPrepared && !isEmbeddedActive {
+            } else if !isEmbeddedPrepared, !isEmbeddedActive {
                 cancelPendingCalendarMaintenance()
                 listInitialPositionTask?.cancel()
                 listInitialPositionTask = nil

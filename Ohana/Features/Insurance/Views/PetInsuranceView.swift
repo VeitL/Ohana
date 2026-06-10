@@ -5,8 +5,8 @@
 //  ArkSchemaV25：宠物保险记录页
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetInsuranceView: View {
     let pet: Pet
@@ -92,7 +92,7 @@ struct PetInsuranceView: View {
             }
         }
         .padding(14)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private var standaloneScroll: some View {
@@ -196,7 +196,7 @@ struct PetInsuranceView: View {
                     }
                 }
                 .padding(16)
-                .goTranslucentCard(cornerRadius: 18)
+                .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
             }
             .buttonStyle(ScaleButtonStyle())
 
@@ -251,7 +251,7 @@ struct PetInsuranceView: View {
 
 struct AddPetInsuranceSheet: View {
     let pet: Pet
-    var existing: PetInsurance? = nil
+    var existing: PetInsurance?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -271,19 +271,19 @@ struct AddPetInsuranceSheet: View {
     @State private var notes = ""
 
     // ── 费用 ──
-    @State private var premiumInput = ""           // 用户输入的金额
-    @State private var premiumMode: PremiumInputMode = .annual   // 年费 or 月费
-    @State private var otherFeeInput = ""          // 其他费用金额
-    @State private var otherFeeNote = ""           // 其他费用说明
-    @State private var showOtherFee = false        // 展开其他费用行
+    @State private var premiumInput = "" // 用户输入的金额
+    @State private var premiumMode: PremiumInputMode = .annual // 年费 or 月费
+    @State private var otherFeeInput = "" // 其他费用金额
+    @State private var otherFeeNote = "" // 其他费用说明
+    @State private var showOtherFee = false // 展开其他费用行
 
     // ── 付款频次 + 付款日 ──
     @State private var paymentFrequency: InsurancePaymentFrequency = .annual
-    @State private var paymentDay: Int = 1         // 每月/季付款日（1-28）
+    @State private var paymentDay: Int = 1 // 每月/季付款日（1-28）
 
     // ── 自动生成选项 ──
-    @State private var autoGenExpenses = true      // 自动生成全期花费记录
-    @State private var showInCalendar = false      // 在日历中显示付款提醒
+    @State private var autoGenExpenses = true // 自动生成全期花费记录
+    @State private var showInCalendar = false // 在日历中显示付款提醒
 
     private var isEdit: Bool { existing != nil }
 
@@ -291,8 +291,8 @@ struct AddPetInsuranceSheet: View {
     private var annualPremiumDouble: Double {
         let raw = CountryDecimalInput.parse(premiumInput, countryCode: AppCountry.code) ?? 0
         switch premiumMode {
-        case .annual:   return raw
-        case .monthly:  return raw * 12
+        case .annual: return raw
+        case .monthly: return raw * 12
         }
     }
 
@@ -341,10 +341,10 @@ struct AddPetInsuranceSheet: View {
                         .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
                         .tint(Color.goPrimary)
                         .padding(14)
-                        .goTranslucentCard(cornerRadius: 14)
+                        .goTranslucentCard(cornerRadius: OhanaRadius.row)
 
                         // ── 自动生成选项 ──
-                        if !isEdit && annualPremiumDouble > 0 {
+                        if !isEdit, annualPremiumDouble > 0 {
                             autoGenSection
                         }
 
@@ -358,7 +358,7 @@ struct AddPetInsuranceSheet: View {
                                 .foregroundStyle(Color.arkInk)
                                 .frame(maxWidth: .infinity).padding(.vertical, 16)
                                 .background(productName.isEmpty ? Color.primary.opacity(0.15) : Color.goPrimary,
-                                            in: RoundedRectangle(cornerRadius: 16))
+                                            in: RoundedRectangle(cornerRadius: OhanaRadius.control))
                         }
                         .buttonStyle(ScaleButtonStyle()).disabled(productName.isEmpty || isSaving)
                         Spacer(minLength: 40)
@@ -400,7 +400,7 @@ struct AddPetInsuranceSheet: View {
             }
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 14)
+        .goTranslucentCard(cornerRadius: OhanaRadius.row)
     }
 
     // MARK: - 费用区域
@@ -427,7 +427,7 @@ struct AddPetInsuranceSheet: View {
                     step: 10,
                     valueFont: .system(size: 28, weight: .black, design: .rounded),
                     fill: Color.ohanaControlFill,
-                    cornerRadius: 16,
+                    cornerRadius: OhanaRadius.control,
                     horizontalPadding: 10,
                     verticalPadding: 8
                 )
@@ -489,25 +489,25 @@ struct AddPetInsuranceSheet: View {
                             step: 5,
                             valueFont: .system(size: 15, weight: .semibold, design: .rounded),
                             fill: Color.clear,
-                            cornerRadius: 10,
+                            cornerRadius: OhanaRadius.badge,
                             horizontalPadding: 4,
                             verticalPadding: 0
                         )
                     }
                     .padding(10)
-                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
                     .frame(maxWidth: 100)
 
-                    TextField("费用说明（如：服务费）", text: $otherFeeNote)
+                    TextField("费用说明（如：服务费）", text: $otherFeeNote) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                         .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
                         .padding(10)
-                        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 14)
+        .goTranslucentCard(cornerRadius: OhanaRadius.row)
     }
 
     private func modeTab(_ title: String, mode: PremiumInputMode) -> some View {
@@ -544,8 +544,8 @@ struct AddPetInsuranceSheet: View {
                         Text("付款日")
                             .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                         Text(paymentFrequency == .monthly
-                             ? "每月 \(paymentDay) 日扣款"
-                             : "每季度 \(paymentDay) 日扣款")
+                            ? "每月 \(paymentDay) 日扣款"
+                            : "每季度 \(paymentDay) 日扣款")
                             .font(OhanaFont.adaptive(size: 11, weight: .regular, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -582,14 +582,14 @@ struct AddPetInsuranceSheet: View {
                     DatePicker(
                         "生效与首期缴费",
                         selection: $startDate,
-                        in: Date.distantPast...Date.distantFuture,
+                        in: Date.distantPast ... Date.distantFuture,
                         displayedComponents: .date
                     )
                     .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded))
                     .tint(Color.goPrimary)
                     Text(paymentFrequency == .once
-                         ? "一次性：仅按该日生成一笔保费记录。"
-                         : "按年：每年与此日同月同日生成扣款，直至续期日前。")
+                        ? "一次性：仅按该日生成一笔保费记录。"
+                        : "按年：每年与此日同月同日生成扣款，直至续期日前。")
                         .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -597,7 +597,7 @@ struct AddPetInsuranceSheet: View {
             }
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 14)
+        .goTranslucentCard(cornerRadius: OhanaRadius.row)
     }
 
     private func frequencyGridCell(_ freq: InsurancePaymentFrequency) -> some View {
@@ -614,7 +614,7 @@ struct AddPetInsuranceSheet: View {
                 .padding(.horizontal, 6)
                 .background(
                     paymentFrequency == freq ? Color.goPrimary : Color.primary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                 )
         }
         .buttonStyle(ScaleButtonStyle())
@@ -654,7 +654,7 @@ struct AddPetInsuranceSheet: View {
             .tint(Color.goPrimary)
             .padding(14)
         }
-        .goTranslucentCard(cornerRadius: 14)
+        .goTranslucentCard(cornerRadius: OhanaRadius.row)
     }
 
     // MARK: - Sub-views
@@ -667,11 +667,11 @@ struct AddPetInsuranceSheet: View {
 
     @ViewBuilder
     private func field(_ placeholder: String, text: Binding<String>, axis: Axis = .horizontal) -> some View {
-        TextField(placeholder, text: text, axis: axis)
+        TextField(placeholder, text: text, axis: axis) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
             .lineLimit(axis == .vertical ? 3 : 1)
             .padding(14)
-            .goTranslucentCard(cornerRadius: 14)
+            .goTranslucentCard(cornerRadius: OhanaRadius.row)
     }
 
     @ViewBuilder
@@ -685,7 +685,7 @@ struct AddPetInsuranceSheet: View {
             valueFont: .system(size: 15, weight: .semibold, design: .rounded),
             valueAlignment: .leading,
             fill: Color.ohanaControlFill,
-            cornerRadius: 14,
+            cornerRadius: OhanaRadius.row,
             horizontalPadding: 14,
             verticalPadding: 10
         )
@@ -695,19 +695,19 @@ struct AddPetInsuranceSheet: View {
 
     private func prefill() {
         guard let ins = existing else { return }
-        productName       = ins.productName
-        companyName       = ins.companyName
-        policyNumber      = ins.policyNumber
+        productName = ins.productName
+        companyName = ins.companyName
+        policyNumber = ins.policyNumber
         enablePolicyNumber = !ins.policyNumber.isEmpty
-        coverageAmount    = ins.coverageAmount > 0 ? String(format: "%.2f", ins.coverageAmount) : ""
-        enableCoverage    = ins.coverageAmount > 0
-        startDate         = ins.startDate
-        renewalDate       = ins.renewalDate
-        notes             = ins.notes
-        paymentFrequency  = ins.paymentFrequency
-        paymentDay        = ins.paymentDayOfMonth
-        showInCalendar    = ins.showInCalendar
-        otherFeeNote      = ins.otherFeeNote
+        coverageAmount = ins.coverageAmount > 0 ? String(format: "%.2f", ins.coverageAmount) : ""
+        enableCoverage = ins.coverageAmount > 0
+        startDate = ins.startDate
+        renewalDate = ins.renewalDate
+        notes = ins.notes
+        paymentFrequency = ins.paymentFrequency
+        paymentDay = ins.paymentDayOfMonth
+        showInCalendar = ins.showInCalendar
+        otherFeeNote = ins.otherFeeNote
         if ins.otherFeeAmount > 0 {
             otherFeeInput = String(format: "%.2f", ins.otherFeeAmount)
             showOtherFee = true
@@ -762,7 +762,6 @@ struct AddPetInsuranceSheet: View {
             executorId: appServices.activeHumanSelection.currentHumanId
         )
     }
-
 }
 
 // MARK: - Premium Input Mode

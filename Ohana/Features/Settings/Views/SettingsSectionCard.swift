@@ -21,7 +21,7 @@ struct SettingsSectionCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.hairline, style: .continuous)
                     .fill(Color.goPrimary)
                     .frame(width: 3, height: 14) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text(title.uppercased())
@@ -37,10 +37,10 @@ struct SettingsSectionCard<Content: View>: View {
             .padding(14)
             .background(
                 reduceTransparency ? Color.ohanaCardSurfaceElevated : Color.ohanaCardSurface,
-                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
         }

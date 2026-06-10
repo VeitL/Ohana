@@ -49,7 +49,7 @@ private struct ClosedCoconut: View {
                 .offset(x: -28, y: -36)
                 .blur(radius: 4)
 
-            ForEach(0..<12, id: \.self) { index in
+            ForEach(0 ..< 12, id: \.self) { index in
                 Capsule()
                     .fill(Color(hex: "E6C29A").opacity(0.42)) // ui-v4: allow coconut fiber color
                     .frame(width: 3, height: 23) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
@@ -127,7 +127,7 @@ struct CoconutRevealParticles: View {
 
     var body: some View {
         ZStack {
-            ForEach(0..<10, id: \.self) { index in
+            ForEach(0 ..< 10, id: \.self) { index in
                 Circle()
                     .fill(index.isMultiple(of: 2) ? Color.goYellow : accent)
                     .frame(width: CGFloat(4 + (index % 3)), height: CGFloat(4 + (index % 3)))
@@ -150,14 +150,13 @@ extension GachaRarity {
     var tint: Color {
         switch self {
         case .common:
-            return Color.ohanaSecondaryText
+            Color.ohanaSecondaryText
         case .rare:
-            return Color.goTeal
+            Color.goTeal
         case .superRare:
-            return Color.goPurple
+            Color.goPurple
         case .hidden:
-            return Color.goYellow
+            Color.goYellow
         }
     }
 }
-

@@ -149,9 +149,9 @@ struct MotionPreviewLabView: View {
                                 .foregroundStyle(selectedSystem == system ? accent : Color.ohanaTertiaryText)
                         }
                         .padding(10)
-                        .background(selectedSystem == system ? accent.opacity(0.14) : Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .background(selectedSystem == system ? accent.opacity(0.14) : Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                         .overlay {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                                 .strokeBorder(selectedSystem == system ? accent.opacity(0.52) : Color.ohanaGlassStroke.opacity(0.68), lineWidth: 1)
                         }
                     }
@@ -193,9 +193,9 @@ struct MotionPreviewLabView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 72)
-                        .background(selectedAccent == item ? item.color.opacity(0.14) : Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(selectedAccent == item ? item.color.opacity(0.14) : Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                         .overlay {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                                 .strokeBorder(selectedAccent == item ? item.color.opacity(0.58) : Color.ohanaGlassStroke.opacity(0.65), lineWidth: 1)
                         }
                     }
@@ -235,7 +235,7 @@ struct MotionPreviewLabView: View {
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .frame(height: 62)
-            .background(accent, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(accent, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
             .shadow(color: accent.opacity(0.22), radius: 12, x: 0, y: 7) // ui-v4: allow primary command depth in motion preview
         }
         .buttonStyle(ScaleButtonStyle())
@@ -276,7 +276,7 @@ struct MotionPreviewLabView: View {
                     }
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(Color.ohanaControlFill.opacity(0.62), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 }
             }
         }
@@ -422,7 +422,7 @@ struct MotionPreviewLabView: View {
                 }
 
                 ZStack(alignment: .bottomLeading) {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         .fill(Color.ohanaControlFill.opacity(0.54))
                     MotionPreviewChartArea(points: chartPoints)
                         .fill(accent.opacity(0.16))
@@ -443,7 +443,7 @@ struct MotionPreviewLabView: View {
                     }
                 }
                 .frame(height: 136)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                 .animation(chartSystem.animation(.chart, reduceMotion: reduceMotion), value: chartReveal)
             }
         }
@@ -517,11 +517,11 @@ struct MotionPreviewLabView: View {
                         }
                         .padding(.horizontal, 10)
                         .frame(height: 36)
-                        .background(Color.ohanaControlFill.opacity(0.64), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(Color.ohanaControlFill.opacity(0.64), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                 }
                 .padding(12)
-                .background(Color.ohanaCardSurfaceElevated.opacity(0.58), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Color.ohanaCardSurfaceElevated.opacity(0.58), in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                 .id(selectedContext)
                 .transition(selectedSystem.switchTransition)
                 .ohanaContextHandoff(triggerToken, direction: .neutral, initialScale: selectedSystem.switchInitialScale)

@@ -163,17 +163,17 @@ nonisolated enum AppLanguage {
     static var compactMonthDayFormat: String {
         switch code {
         case "zh":
-            return "M月d日"
+            "M月d日"
         case "ja":
-            return "M月d日"
+            "M月d日"
         case "ko":
-            return "M월 d일"
+            "M월 d일"
         case "de":
-            return "d. MMM"
+            "d. MMM"
         case "es", "pt", "fr", "it":
-            return "d MMM"
+            "d MMM"
         default:
-            return "MMM d"
+            "MMM d"
         }
     }
 
@@ -184,15 +184,15 @@ nonisolated enum AppLanguage {
     static var dailyReportDateFormat: String {
         switch code {
         case "zh":
-            return "M月d日 EEEE"
+            "M月d日 EEEE"
         case "ja":
-            return "M月d日 EEEE"
+            "M月d日 EEEE"
         case "ko":
-            return "M월 d일 EEEE"
+            "M월 d일 EEEE"
         case "de", "es", "pt", "fr", "it":
-            return "EEEE, d. MMM"
+            "EEEE, d. MMM"
         default:
-            return "EEEE, MMM d"
+            "EEEE, MMM d"
         }
     }
 
@@ -359,8 +359,8 @@ nonisolated enum AppMeasurementSystem {
                 : "\(formattedNumber(grams * 0.0352739619, fractionDigits: preciseDigits)) oz"
         default:
             let preciseDigits = fractionDigits == 0 ? 1 : fractionDigits
-            return grams >= 1_000
-                ? "\(formattedNumber(grams / 1_000, fractionDigits: preciseDigits)) kg"
+            return grams >= 1000
+                ? "\(formattedNumber(grams / 1000, fractionDigits: preciseDigits)) kg"
                 : "\(formattedNumber(grams, fractionDigits: fractionDigits)) g"
         }
     }
@@ -368,13 +368,13 @@ nonisolated enum AppMeasurementSystem {
     static func formatDistanceMeters(_ meters: Double, fractionDigits: Int = 1) -> String {
         switch code {
         case "imperial":
-            let miles = meters / 1_609.344
+            let miles = meters / 1609.344
             return miles >= 0.1
                 ? "\(formattedNumber(miles, fractionDigits: fractionDigits)) mi"
                 : "\(formattedNumber(meters * 3.280839895, fractionDigits: 0)) ft"
         default:
-            return meters >= 1_000
-                ? "\(formattedNumber(meters / 1_000, fractionDigits: fractionDigits)) km"
+            return meters >= 1000
+                ? "\(formattedNumber(meters / 1000, fractionDigits: fractionDigits)) km"
                 : "\(formattedNumber(meters, fractionDigits: 0)) m"
         }
     }
@@ -443,8 +443,8 @@ nonisolated enum AppCurrency {
     }
 
     static func formatCompact(_ amount: Double) -> String {
-        if amount >= 10_000 {
-            return "\(symbol)\(String(format: "%.0fk", amount / 1_000))"
+        if amount >= 10000 {
+            return "\(symbol)\(String(format: "%.0fk", amount / 1000))"
         }
         if amount >= 100 {
             return format(amount, fractionDigits: 0)

@@ -15,11 +15,11 @@ enum QuickFeedAlertRoute: Identifiable {
     var id: String {
         switch self {
         case let .antiRepeat(id, _, _):
-            return "anti-repeat-\(id.uuidString)"
+            "anti-repeat-\(id.uuidString)"
         case let .deleteFeedLog(log):
-            return "delete-feed-log-\(log.id.uuidString)"
+            "delete-feed-log-\(log.id.uuidString)"
         case let .deleteFoodRecord(record):
-            return "delete-food-record-\(record.id.uuidString)"
+            "delete-food-record-\(record.id.uuidString)"
         }
     }
 
@@ -51,9 +51,9 @@ enum QuickFeedOverlayRoute: Identifiable {
     var id: UUID {
         switch self {
         case let .toast(id, _, _):
-            return id
+            id
         case let .treatCelebration(id, _):
-            return id
+            id
         }
     }
 }

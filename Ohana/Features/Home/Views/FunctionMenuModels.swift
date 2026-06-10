@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Function Menu Navigation Models
 
@@ -13,34 +13,34 @@ enum FeatureGroup: String, Hashable, CaseIterable {
 
     var title: String {
         switch self {
-        case .dailyCare:     return "每日照护"
-        case .healthBody:    return "健康"
-        case .archiveMemory: return "成长档案"
-        case .householdHub:  return "家庭事务"
-        case .oasisRewards:  return "绿洲奖励"
-        case .plants:        return "植物"
+        case .dailyCare: "每日照护"
+        case .healthBody: "健康"
+        case .archiveMemory: "成长档案"
+        case .householdHub: "家庭事务"
+        case .oasisRewards: "绿洲奖励"
+        case .plants: "植物"
         }
     }
 
     var icon: String {
         switch self {
-        case .dailyCare:     return "sun.max.fill"
-        case .healthBody:    return "cross.fill"
-        case .archiveMemory: return "folder.fill"
-        case .householdHub:  return "house.fill"
-        case .oasisRewards:  return "globe.asia.australia.fill"
-        case .plants:        return "leaf.fill"
+        case .dailyCare: "sun.max.fill"
+        case .healthBody: "cross.fill"
+        case .archiveMemory: "folder.fill"
+        case .householdHub: "house.fill"
+        case .oasisRewards: "globe.asia.australia.fill"
+        case .plants: "leaf.fill"
         }
     }
 
     var color: Color {
         switch self {
-        case .dailyCare:     return Color(hex: "F59E0B")
-        case .healthBody:    return Color(hex: "EF4444")
-        case .archiveMemory: return Color(hex: "F59E0B")
-        case .householdHub:  return Color.goTeal
-        case .oasisRewards:  return Color(hex: "EAB308")
-        case .plants:        return Color(hex: "22C55E")
+        case .dailyCare: Color(hex: "F59E0B")
+        case .healthBody: Color(hex: "EF4444")
+        case .archiveMemory: Color(hex: "F59E0B")
+        case .householdHub: Color.goTeal
+        case .oasisRewards: Color(hex: "EAB308")
+        case .plants: Color(hex: "22C55E")
         }
     }
 }
@@ -85,37 +85,37 @@ enum PetFeature: String, Hashable, CaseIterable {
 
     var title: String {
         switch self {
-        case .health:        return "健康档案"
-        case .medications:   return "用药管理"
-        case .food:          return "饮食管理"
-        case .hygiene:       return "清洁护理"
-        case .walks:         return "遛狗记录"
-        case .potty:         return "噗噗电台"
-        case .retention:     return "成长档案"
-        case .basicInfo:     return "基本信息"
-        case .documents:     return "证件保障"
-        case .moments:       return "重要时刻"
-        case .achievements:  return "成就"
-        case .weight:        return "体重记录"
-        case .expense:       return "花费记录"
+        case .health: "健康档案"
+        case .medications: "用药管理"
+        case .food: "饮食管理"
+        case .hygiene: "清洁护理"
+        case .walks: "遛狗记录"
+        case .potty: "噗噗电台"
+        case .retention: "成长档案"
+        case .basicInfo: "基本信息"
+        case .documents: "证件保障"
+        case .moments: "重要时刻"
+        case .achievements: "成就"
+        case .weight: "体重记录"
+        case .expense: "花费记录"
         }
     }
 
     var icon: String {
         switch self {
-        case .health:        return "cross.fill"
-        case .medications:   return "pills.fill"
-        case .food:          return "fork.knife"
-        case .hygiene:       return "bubbles.and.sparkles.fill"
-        case .walks:         return "figure.walk"
-        case .potty:         return "drop.fill"
-        case .retention:     return "sparkles.rectangle.stack.fill"
-        case .basicInfo:     return "person.fill"
-        case .documents:     return "doc.fill"
-        case .moments:       return "sparkles"
-        case .achievements:  return "trophy.fill"
-        case .weight:        return "scalemass.fill"
-        case .expense:       return "creditcard.fill"
+        case .health: "cross.fill"
+        case .medications: "pills.fill"
+        case .food: "fork.knife"
+        case .hygiene: "bubbles.and.sparkles.fill"
+        case .walks: "figure.walk"
+        case .potty: "drop.fill"
+        case .retention: "sparkles.rectangle.stack.fill"
+        case .basicInfo: "person.fill"
+        case .documents: "doc.fill"
+        case .moments: "sparkles"
+        case .achievements: "trophy.fill"
+        case .weight: "scalemass.fill"
+        case .expense: "creditcard.fill"
         }
     }
 }

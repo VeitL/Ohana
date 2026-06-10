@@ -111,9 +111,9 @@ struct OasisBentoGridView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 11)
             .frame(maxWidth: .infinity)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
             )
         }
@@ -125,7 +125,7 @@ struct OasisBentoGridView: View {
 
     private func lockedBadge(level: Int) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: "lock.fill")
+            Image(systemName: "lock.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                 .font(OhanaFont.caption2(.black))
                 .accessibilityHidden(true)
             Text(localization.tr(zh: "Lv.\(level) 解锁", en: "Lv.\(level)", de: "Lv.\(level)"))

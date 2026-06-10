@@ -11,19 +11,19 @@ enum PrivacyService {
     static func field(forHumanAction actionType: String) -> HumanPrivateField? {
         switch actionType {
         case "humanWeight", "weight":
-            return .weight
+            .weight
         case "humanWorkout", "workout":
-            return .workout
+            .workout
         case "humanMedication", "medication":
-            return .medication
+            .medication
         case "humanNote", "note":
-            return .note
+            .note
         case "humanWishlist", "wish", "wishlist":
-            return .wishlist
+            .wishlist
         case "humanExpense", "expense":
-            return .expense
+            .expense
         default:
-            return nil
+            nil
         }
     }
 
@@ -77,17 +77,17 @@ enum PrivacyService {
     static func lockedMessage(for field: HumanPrivateField) -> String {
         switch field {
         case .weight:
-            return "体重数据仅本人可见"
+            "体重数据仅本人可见"
         case .workout:
-            return "运动数据仅本人可见"
+            "运动数据仅本人可见"
         case .medication:
-            return "吃药记录仅本人可见"
+            "吃药记录仅本人可见"
         case .wishlist:
-            return "椰子资产与愿望清单仅本人可见"
+            "椰子资产与愿望清单仅本人可见"
         case .expense:
-            return "花费记录仅本人可见"
+            "花费记录仅本人可见"
         case .note:
-            return "备注仅本人可见"
+            "备注仅本人可见"
         }
     }
 }

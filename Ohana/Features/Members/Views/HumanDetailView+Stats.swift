@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension HumanDetailView {
@@ -73,10 +73,10 @@ extension HumanDetailView {
         .padding(.horizontal, 6)
         .background(
             Color.ohanaCardSurface,
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
         )
     }
@@ -112,7 +112,7 @@ extension HumanDetailView {
                     }
                 }
                 .padding(16)
-                .goIslandModuleCard(cornerRadius: 24)
+                .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
                 .padding(.horizontal, 16)
             }
         }

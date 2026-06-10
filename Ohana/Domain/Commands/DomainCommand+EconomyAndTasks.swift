@@ -12,7 +12,7 @@ extension DomainCommand {
     static func shopPurchase(humanID: UUID?, itemID: String) -> DomainCommand {
         command("shop", "purchase", [
             "humanID": humanID?.uuidString ?? "none",
-            "itemID": itemID,
+            "itemID": itemID
         ])
     }
 
@@ -20,7 +20,7 @@ extension DomainCommand {
         command("achievements", "reward", [
             "entityID": entityID.uuidString,
             "kind": kind,
-            "badgeIDs": badgeIDs.sorted().joined(separator: "|"),
+            "badgeIDs": badgeIDs.sorted().joined(separator: "|")
         ])
     }
 

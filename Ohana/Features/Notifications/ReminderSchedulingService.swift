@@ -33,11 +33,10 @@ enum ReminderSchedulingService {
             recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger, careLedger: careLedger)
             return result
         }
-        let existingIds: Set<String>
-        if let existingNotificationIds {
-            existingIds = existingNotificationIds
+        let existingIds: Set<String> = if let existingNotificationIds {
+            existingNotificationIds
         } else {
-            existingIds = await OhanaNotifications.current.pendingNotificationIds()
+            await OhanaNotifications.current.pendingNotificationIds()
         }
         let result = await withCheckedContinuation { continuation in
             OhanaNotifications.current.schedule(
@@ -79,7 +78,7 @@ enum ReminderSchedulingService {
         careLedger: CareLedgerRecording? = nil
     ) async {
         let now = Date()
-        let windowEnd = Calendar.current.date(byAdding: .day, value: windowDays, to: now) ?? now.addingTimeInterval(14 * 86_400)
+        let windowEnd = Calendar.current.date(byAdding: .day, value: windowDays, to: now) ?? now.addingTimeInterval(14 * 86400)
         let windowReminders = reminders.filter { reminder in
             reminder.isPending && reminder.scheduledAt > now && reminder.scheduledAt <= windowEnd
         }

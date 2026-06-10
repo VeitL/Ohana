@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetImmunityCard: View {
     let pet: Pet
@@ -35,7 +35,7 @@ struct PetImmunityCard: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     // MARK: - Data
@@ -78,15 +78,15 @@ struct PetImmunityCard: View {
             ImmunityRow(icon: "🩺", title: "年度体检",
                         lastDate: checkupLogs.first?.date,
                         nextDueDate: nextDue(checkupLogs.first) { Calendar.current.date(byAdding: .year, value: 1, to: $0) },
-                        note: checkupLogs.first?.note ?? ""),
+                        note: checkupLogs.first?.note ?? "")
         ]
     }
 
     private var upcomingCount: Int {
-        rows.filter { row in
+        rows.count(where: { row in
             guard let due = row.nextDueDate else { return false }
             return due < Calendar.current.date(byAdding: .month, value: 1, to: Date())!
-        }.count
+        })
     }
 
     private func immunityRow(row: ImmunityRow) -> some View {
@@ -94,7 +94,7 @@ struct PetImmunityCard: View {
             Calendar.current.dateComponents([.day], from: Date(), to: due).day ?? 0
         }
         let isOverdue = (daysUntilDue ?? 1) < 0
-        let isUrgent  = !isOverdue && (daysUntilDue ?? 999) <= 30
+        let isUrgent = !isOverdue && (daysUntilDue ?? 999) <= 30
 
         return HStack(spacing: 12) {
             Text(row.icon).font(OhanaFont.adaptive(size: 22))

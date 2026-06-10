@@ -6,8 +6,8 @@
 //  one unified SwiftData task layer, with legacy bounty data imported lazily.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct FamilyCollaborationDashboardHost: View {
     let pets: [Pet]
@@ -82,6 +82,7 @@ struct FamilyCollaborationDashboardView: View {
     var shouldRunAmbientMotion: Bool {
         workloadPolicy.shouldAnimate(isVisible: isVisible)
     }
+
     var currentHuman: Human? {
         humans.first { $0.id.uuidString == activeHumanId } ?? humans.first
     }
@@ -103,7 +104,7 @@ struct FamilyCollaborationDashboardView: View {
     }
 
     var bountyFamilyTasks: [FamilyCollaborationTask] {
-        activeFamilyTasks.filter { $0.hasReward }
+        activeFamilyTasks.filter(\.hasReward)
     }
 
     var activePets: [Pet] {
@@ -191,7 +192,7 @@ struct FamilyCollaborationDashboardView: View {
     }
 
     var todayActivityCount: Int {
-        latestActivity.filter { Calendar.current.isDateInToday($0.date) }.count
+        latestActivity.count(where: { Calendar.current.isDateInToday($0.date) })
     }
 
     var openFocusCount: Int {

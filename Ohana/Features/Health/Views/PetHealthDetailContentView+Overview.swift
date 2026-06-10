@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension PetHealthDetailContentView {
     @ViewBuilder
@@ -223,7 +223,7 @@ extension PetHealthDetailContentView {
                 .font(OhanaFont.adaptive(size: 22, weight: .black))
                 .foregroundStyle(tint)
                 .frame(width: 48, height: 48)
-                .background(tint.opacity(isDark ? 0.18 : 0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(tint.opacity(isDark ? 0.18 : 0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
@@ -255,7 +255,7 @@ extension PetHealthDetailContentView {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     func overviewActionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -315,7 +315,7 @@ extension PetHealthDetailContentView {
                 .foregroundStyle(tint)
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     func medicationDoseRow(_ item: PetHealthMedicationDoseItem) -> some View {
@@ -357,7 +357,7 @@ extension PetHealthDetailContentView {
             }
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     func overviewHistoryRow(icon: String, title: String, detail: String, tint: Color) -> some View {
@@ -378,7 +378,7 @@ extension PetHealthDetailContentView {
             Spacer()
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     func emptyOverviewRow(_ text: String) -> some View {
@@ -392,7 +392,7 @@ extension PetHealthDetailContentView {
             Spacer()
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     var symptomSeverityDistribution: some View {
@@ -400,7 +400,7 @@ extension PetHealthDetailContentView {
         let total = max(1, pet.symptomLogs.count)
         return VStack(spacing: 9) {
             ForEach(severities, id: \.rawValue) { severity in
-                let count = pet.symptomLogs.filter { $0.severity == severity }.count
+                let count = pet.symptomLogs.count(where: { $0.severity == severity })
                 HStack(spacing: 10) {
                     Text(severity.label)
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
@@ -424,20 +424,20 @@ extension PetHealthDetailContentView {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     func severityColor(_ severity: SymptomSeverity) -> Color {
         switch severity {
-        case .mild: return Color.goTeal
-        case .moderate: return Color.goYellow
-        case .severe: return Color.goOrange
-        case .critical: return Color.goRed
+        case .mild: Color.goTeal
+        case .moderate: Color.goYellow
+        case .severe: Color.goOrange
+        case .critical: Color.goRed
         }
     }
 
     func medicationName(for event: Event) -> String {
         pet.medications.first { $0.id.uuidString == event.relatedEntityId }?.name
-        ?? l.tr(zh: "服药记录", en: "Medication dose", de: "Medikamenteneinnahme")
+            ?? l.tr(zh: "服药记录", en: "Medication dose", de: "Medikamenteneinnahme")
     }
 }

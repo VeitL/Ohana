@@ -4,8 +4,8 @@
 //
 //  模块5：人宠共健仪表盘
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct CoHealthDashboardContentView: View {
     let human: Human
@@ -42,7 +42,7 @@ struct CoHealthDashboardContentView: View {
     private var associatedPets: [Pet] {
         allPets.filter { pet in
             pet.species == "狗" &&
-            pet.walkLogs.contains { $0.executorId == human.id.uuidString }
+                pet.walkLogs.contains { $0.executorId == human.id.uuidString }
         }
     }
 
@@ -62,7 +62,7 @@ struct CoHealthDashboardContentView: View {
     private var thisMonthWalkKm: Double {
         let start = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? past30Days
         let myId = human.id.uuidString
-        let allLogs: [PetWalkLog] = associatedPets.flatMap { $0.walkLogs }
+        let allLogs: [PetWalkLog] = associatedPets.flatMap(\.walkLogs)
         let filtered = allLogs.filter { $0.executorId == myId && $0.startDate >= start }
         let totalMeters = filtered.reduce(0.0) { $0 + $1.distanceMeters }
         return totalMeters / 1000
@@ -203,8 +203,8 @@ struct CoHealthDashboardContentView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(color.opacity(0.2), lineWidth: 1))
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.chip).strokeBorder(color.opacity(0.2), lineWidth: 1))
     }
 
     // MARK: - Weight Chart

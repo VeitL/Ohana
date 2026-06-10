@@ -5,19 +5,19 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 @Model
 final class PetWeightLog {
     var id: UUID
     var date: Date
     var weight: Double
-    var weightUnit: String  // "kg" | "g" — ArkSchemaV23
-    var bcsScore: Int       // ArkSchemaV24：BCS 体型评分 1-9，0 = 未评
+    var weightUnit: String // "kg" | "g" — ArkSchemaV23
+    var bcsScore: Int // ArkSchemaV24：BCS 体型评分 1-9，0 = 未评
     var executorId: String? // ArkSchemaV38: 执行该记录的 Human.id.uuidString
     var pet: Pet?
-    
+
     init(date: Date = Date(), weight: Double = 0, weightUnit: String = "kg", bcsScore: Int = 0, pet: Pet? = nil, executorId: String? = nil) {
         self.id = UUID()
         self.date = date
@@ -68,15 +68,14 @@ enum PetBodyConditionEstimator {
             idealKg *= 0.85
         }
         let ratio = weightKg / max(idealKg, 0.35)
-        let score: Int
-        switch ratio {
-        case ..<0.74: score = 2
-        case ..<0.84: score = 3
-        case ..<0.92: score = 4
-        case ..<1.03: score = 5
-        case ..<1.12: score = 6
-        case ..<1.22: score = 7
-        default: score = 8
+        let score = switch ratio {
+        case ..<0.74: 2
+        case ..<0.84: 3
+        case ..<0.92: 4
+        case ..<1.03: 5
+        case ..<1.12: 6
+        case ..<1.22: 7
+        default: 8
         }
         return min(9, max(1, score))
     }

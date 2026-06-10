@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension OasisCritterCodexView {
@@ -48,9 +48,9 @@ extension OasisCritterCodexView {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 154)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                             .strokeBorder(owned ? Color.goPrimary.opacity(0.34) : Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
                     )
                 }

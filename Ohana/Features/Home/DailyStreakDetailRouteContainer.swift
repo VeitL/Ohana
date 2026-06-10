@@ -20,9 +20,9 @@ struct DailyStreakDetailRouteContainer: View {
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query private var ledgerEvents: [CareLedgerEvent]
 
-    var onClose: (() -> Void)? = nil
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
-    var onPresentCoconutShop: ((ShopItem.ShopCategory) -> Void)? = nil
+    var onClose: (() -> Void)?
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+    var onPresentCoconutShop: ((ShopItem.ShopCategory) -> Void)?
 
     init(
         onClose: (() -> Void)? = nil,

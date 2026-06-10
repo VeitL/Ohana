@@ -288,9 +288,9 @@ enum SaveFeedPlanCommand {
                 .filter { existing in
                     switch kind {
                     case .manualReminder:
-                        return !FeedRuleMetadata.isManualReminderEvent(existing, pet: target)
+                        !FeedRuleMetadata.isManualReminderEvent(existing, pet: target)
                     case .autoFeeder:
-                        return !FeedRuleMetadata.isAutoFeederEvent(existing, pet: target)
+                        !FeedRuleMetadata.isAutoFeederEvent(existing, pet: target)
                     }
                 } + result.events
 

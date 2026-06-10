@@ -9,7 +9,7 @@ import UIKit
 struct PetImageCropView: View {
     let image: UIImage
     var species: String = "狗"
-    var silhouetteSystemName: String? = nil
+    var silhouetteSystemName: String?
     let onCrop: (UIImage?) -> Void
 
     private let cardMargin: CGFloat = 7

@@ -357,8 +357,8 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.contains { $0.legacyModelName == "PetCareLog" && $0.legacyModelId == recorded.result.careLogID.uuidString })
         #expect(ledgerEvents.contains { $0.legacyModelName == "PetPottyLog" && $0.legacyModelId == recorded.result.linkedPottyLogID?.uuidString })
 
-        let deleteResult = PetCareTrackingCommandService.deleteCareLog(
-            try #require(careLogs.first),
+        let deleteResult = try PetCareTrackingCommandService.deleteCareLog(
+            #require(careLogs.first),
             pet: pet,
             context: context
         )
@@ -594,7 +594,7 @@ struct HomeCommandExecutorTests {
             companyName: "Ohana Care",
             productName: "Care Plus",
             annualPremium: 120,
-            coverageAmount: 1_000,
+            coverageAmount: 1000,
             pet: pet
         )
         context.insert(pet)
@@ -747,8 +747,8 @@ struct HomeCommandExecutorTests {
         #expect(deletedClaim.didChange == true)
         #expect(deletedPolicy.policyID == policyID)
         #expect(deletedPolicy.petID == petID)
-        #expect((try context.fetch(FetchDescriptor<InsuranceClaim>())).isEmpty)
-        #expect((try context.fetch(FetchDescriptor<PetInsurance>())).isEmpty)
+        #expect(try (context.fetch(FetchDescriptor<InsuranceClaim>())).isEmpty)
+        #expect(try (context.fetch(FetchDescriptor<PetInsurance>())).isEmpty)
     }
 
     @MainActor
@@ -767,7 +767,7 @@ struct HomeCommandExecutorTests {
                 policyNumber: " P-1 ",
                 productName: " Care Plus ",
                 annualPremium: 120,
-                coverageAmount: 1_000,
+                coverageAmount: 1000,
                 startDate: makeDate(year: 2026, month: 6, day: 8),
                 renewalDate: makeDate(year: 2026, month: 12, day: 8),
                 notes: " Full cover ",
@@ -824,7 +824,7 @@ struct HomeCommandExecutorTests {
                 policyNumber: "P-2",
                 productName: "Premium",
                 annualPremium: 160,
-                coverageAmount: 2_000,
+                coverageAmount: 2000,
                 startDate: makeDate(year: 2026, month: 6, day: 8),
                 renewalDate: makeDate(year: 2027, month: 6, day: 8),
                 notes: "Updated",
@@ -1110,9 +1110,9 @@ struct HomeCommandExecutorTests {
         let deletedSymptom = PetHealthDeleteCommandService.deleteSymptomLog(symptom, pet: pet, context: context)
         let deletedHeat = PetHealthDeleteCommandService.deleteHeatCycleLog(heat, pet: pet, context: context)
 
-        #expect((try context.fetch(FetchDescriptor<PetHealthLog>())).isEmpty)
-        #expect((try context.fetch(FetchDescriptor<SymptomLog>())).isEmpty)
-        #expect((try context.fetch(FetchDescriptor<HeatCycleLog>())).isEmpty)
+        #expect(try (context.fetch(FetchDescriptor<PetHealthLog>())).isEmpty)
+        #expect(try (context.fetch(FetchDescriptor<SymptomLog>())).isEmpty)
+        #expect(try (context.fetch(FetchDescriptor<HeatCycleLog>())).isEmpty)
         #expect(deletedHealth.subjectID == pet.id)
         #expect(deletedHealth.kind == "health")
         #expect(deletedSymptom.subjectID == pet.id)
@@ -2024,7 +2024,7 @@ struct HomeCommandExecutorTests {
             now: makeDate(year: 2026, month: 6, day: 8),
             context: context
         )
-        guard case .incorrect(let remaining) = wrongChange else {
+        guard case let .incorrect(remaining) = wrongChange else {
             Issue.record("Expected incorrect current PIN")
             return
         }
@@ -2110,12 +2110,12 @@ struct HomeCommandExecutorTests {
         try HumanPrivacyCommandService.setPasscode("1234", for: human, context: context)
         let now = makeDate(year: 2026, month: 6, day: 8)
 
-        for _ in 0..<(HumanPasscodeService.maxFailedAttempts - 1) {
+        for _ in 0 ..< (HumanPasscodeService.maxFailedAttempts - 1) {
             _ = HumanPrivacyCommandService.verifyPasscode("0000", for: human, now: now, context: context)
         }
         let locked = HumanPrivacyCommandService.verifyPasscode("0000", for: human, now: now, context: context)
 
-        guard case .locked(let until) = locked else {
+        guard case let .locked(until) = locked else {
             Issue.record("Expected lockout")
             return
         }
@@ -2787,7 +2787,7 @@ struct HomeCommandExecutorTests {
 
         let firstDose = makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 30)
         let startDate = makeDate(year: 2026, month: 6, day: 8)
-        let metadata = HumanMedicationScheduleMetadata(doseMinutes: [570, 1_290])
+        let metadata = HumanMedicationScheduleMetadata(doseMinutes: [570, 1290])
         let notes = HumanMedicationScheduleMetadata.composeNotes(
             visibleNotes: "after meal",
             metadata: metadata
@@ -2821,7 +2821,7 @@ struct HomeCommandExecutorTests {
         #expect(result.scheduledReminderSync == false)
         #expect(medicationLogs.isEmpty)
         let parsedMetadata = try #require(HumanMedicationScheduleMetadata.parse(from: medications.first?.notes ?? ""))
-        #expect(parsedMetadata.doseMinutes == [570, 1_290])
+        #expect(parsedMetadata.doseMinutes == [570, 1290])
         #expect(HumanMedicationScheduleMetadata.visibleNotes(from: medications.first?.notes ?? "") == "after meal")
     }
 
@@ -4365,7 +4365,7 @@ struct HomeCommandExecutorTests {
                 policyNumber: "P-1",
                 productName: "Care Plus",
                 annualPremium: 120,
-                coverageAmount: 1_000,
+                coverageAmount: 1000,
                 startDate: makeDate(year: 2026, month: 6, day: 8),
                 renewalDate: makeDate(year: 2027, month: 6, day: 8),
                 notes: "primary",
@@ -5236,7 +5236,7 @@ struct HomeCommandExecutorTests {
         #expect(first.transactionKey != second.transactionKey)
         #expect(human.coconutBalance == 500 - item.cost * 2)
         #expect(questManager.coconutCount == 500 - item.cost * 2)
-        #expect(walletEntries.filter { $0.source == .shop && $0.entryKind == .spend }.count == 2)
+        #expect(walletEntries.count(where: { $0.source == .shop && $0.entryKind == .spend }) == 2)
     }
 
     @MainActor
@@ -5881,7 +5881,7 @@ struct HomeCommandExecutorTests {
         let result = executor.saveStock(
             pet: pet,
             brand: "Royal Canin",
-            totalGrams: 1_200,
+            totalGrams: 1200,
             purchaseDate: makeDate(year: 2026, month: 6, day: 8),
             openDate: makeDate(year: 2026, month: 6, day: 8),
             foodKind: .dry,
@@ -5904,7 +5904,7 @@ struct HomeCommandExecutorTests {
         #expect(records.first?.id == result.record.id)
         #expect(records.first?.pet?.id == pet.id)
         #expect(records.first?.brand == "Royal Canin")
-        #expect(records.first?.totalGrams == 1_200)
+        #expect(records.first?.totalGrams == 1200)
         #expect(records.first?.foodKind == .dry)
         #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
         #expect(mutation.command == .feedStock(petID: pet.id, action: "create"))

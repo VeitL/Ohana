@@ -10,7 +10,7 @@ import SwiftUI
 
 struct IslandFoodDashboardContentView: View {
     var standalone: Bool = true
-    var onOpenPet: ((Pet) -> Void)? = nil
+    var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
     let allEvents: [Event]
     let allCareLogs: [PetCareLog]
@@ -155,9 +155,9 @@ struct IslandFoodDashboardContentView: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
-    private func selectorChip<Avatar: View>(
+    private func selectorChip(
         title: String,
-        @ViewBuilder avatar: () -> Avatar,
+        @ViewBuilder avatar: () -> some View,
         isSelected: Bool,
         action: @escaping () -> Void
     ) -> some View {
@@ -192,7 +192,7 @@ struct IslandFoodDashboardContentView: View {
                 Image(systemName: "takeoutbag.and.cup.and.straw.fill").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 82, weight: .black))
                     .foregroundStyle(Color.foodDry.opacity(0.22))
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.foodDry.gradient)
                     .frame(width: 82, height: max(10, 68 * CGFloat(min(1, snapshot.weekGrams / max(1, Double(selectedPets.count) * 700))) * chartRevealProgress))
                     .mask {
@@ -216,7 +216,7 @@ struct IslandFoodDashboardContentView: View {
             Spacer()
         }
         .padding(18)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var trendSection: some View {
@@ -320,7 +320,7 @@ struct IslandFoodDashboardContentView: View {
                 .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -349,7 +349,7 @@ struct IslandFoodDashboardContentView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func emptyState(_ text: String) -> some View {
@@ -364,7 +364,7 @@ struct IslandFoodDashboardContentView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(18)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func compactFoodWeight(_ value: Double) -> String {

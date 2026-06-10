@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct AddSymptomSheet: View {
     let pet: Pet
@@ -124,7 +124,7 @@ struct AddSymptomSheet: View {
         formBlock {
             HStack(spacing: 10) {
                 sectionLabel(l.tr(zh: "症状", en: "Symptom", de: "Symptom"), icon: "pencil.line", tint: Color.goOrange)
-                TextField(l.tr(zh: "例如：呕吐、咳嗽、跛行", en: "e.g. vomiting, cough, limping", de: "z. B. Erbrechen, Husten, Hinken"), text: $symptomName)
+                TextField(l.tr(zh: "例如：呕吐、咳嗽、跛行", en: "e.g. vomiting, cough, limping", de: "z. B. Erbrechen, Husten, Hinken"), text: $symptomName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
@@ -171,10 +171,10 @@ struct AddSymptomSheet: View {
         formBlock {
             VStack(alignment: .leading, spacing: 10) {
                 sectionLabel(l.tr(zh: "备注", en: "Note", de: "Notiz"), icon: "note.text", tint: Color.ohanaSecondaryText)
-                TextField(l.tr(zh: "精神状态、用药、持续时间（可选）", en: "Mood, meds, duration (optional)", de: "Zustand, Medikamente, Dauer (optional)"), text: $note, axis: .vertical)
+                TextField(l.tr(zh: "精神状态、用药、持续时间（可选）", en: "Mood, meds, duration (optional)", de: "Zustand, Medikamente, Dauer (optional)"), text: $note, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(3...5)
+                    .lineLimit(3 ... 5)
             }
         }
     }
@@ -206,54 +206,54 @@ struct AddSymptomSheet: View {
         }
     }
 
-    private func formBlock<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func formBlock(@ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             content()
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func categoryTitle(_ category: SymptomCategory) -> String {
         switch category {
-        case .digestive: return l.tr(zh: "消化", en: "Digestive", de: "Verdauung")
-        case .respiratory: return l.tr(zh: "呼吸", en: "Breathing", de: "Atmung")
-        case .mobility: return l.tr(zh: "运动", en: "Mobility", de: "Bewegung")
-        case .appetite: return l.tr(zh: "饮食", en: "Appetite", de: "Appetit")
-        case .skin: return l.tr(zh: "皮毛", en: "Skin", de: "Haut")
-        case .behavior: return l.tr(zh: "精神", en: "Behavior", de: "Verhalten")
-        case .other: return l.tr(zh: "其他", en: "Other", de: "Andere")
+        case .digestive: l.tr(zh: "消化", en: "Digestive", de: "Verdauung")
+        case .respiratory: l.tr(zh: "呼吸", en: "Breathing", de: "Atmung")
+        case .mobility: l.tr(zh: "运动", en: "Mobility", de: "Bewegung")
+        case .appetite: l.tr(zh: "饮食", en: "Appetite", de: "Appetit")
+        case .skin: l.tr(zh: "皮毛", en: "Skin", de: "Haut")
+        case .behavior: l.tr(zh: "精神", en: "Behavior", de: "Verhalten")
+        case .other: l.tr(zh: "其他", en: "Other", de: "Andere")
         }
     }
 
     private func categoryIcon(_ category: SymptomCategory) -> String {
         switch category {
-        case .digestive: return "stomach.fill"
-        case .respiratory: return "lungs.fill"
-        case .mobility: return "figure.walk"
-        case .appetite: return "fork.knife"
-        case .skin: return "bandage.fill"
-        case .behavior: return "moon.zzz.fill"
-        case .other: return "magnifyingglass"
+        case .digestive: "stomach.fill"
+        case .respiratory: "lungs.fill"
+        case .mobility: "figure.walk"
+        case .appetite: "fork.knife"
+        case .skin: "bandage.fill"
+        case .behavior: "moon.zzz.fill"
+        case .other: "magnifyingglass"
         }
     }
 
     private func severityTitle(_ severity: SymptomSeverity) -> String {
         switch severity {
-        case .mild: return l.tr(zh: "轻微", en: "Mild", de: "Leicht")
-        case .moderate: return l.tr(zh: "中度", en: "Moderate", de: "Mittel")
-        case .severe: return l.tr(zh: "严重", en: "Severe", de: "Schwer")
-        case .critical: return l.tr(zh: "紧急", en: "Critical", de: "Kritisch")
+        case .mild: l.tr(zh: "轻微", en: "Mild", de: "Leicht")
+        case .moderate: l.tr(zh: "中度", en: "Moderate", de: "Mittel")
+        case .severe: l.tr(zh: "严重", en: "Severe", de: "Schwer")
+        case .critical: l.tr(zh: "紧急", en: "Critical", de: "Kritisch")
         }
     }
 
     private func severityColor(_ severity: SymptomSeverity) -> Color {
         switch severity {
-        case .mild: return Color.goTeal
-        case .moderate: return Color.goYellow
-        case .severe: return Color.goOrange
-        case .critical: return Color.goRed
+        case .mild: Color.goTeal
+        case .moderate: Color.goYellow
+        case .severe: Color.goOrange
+        case .critical: Color.goRed
         }
     }
 

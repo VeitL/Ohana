@@ -11,7 +11,7 @@ struct OhanaQuickActionIcon: View {
     let actionType: String
     let fallbackSystemName: String
     var size: CGFloat = 32
-    var color: Color = Color.ohanaFunctionalIcon
+    var color: Color = .ohanaFunctionalIcon
     var isCompleted: Bool = false
     var showsCompletionBadge: Bool = false
     var animationTrigger: Int = 0
@@ -34,7 +34,7 @@ struct OhanaQuickActionIcon: View {
         ZStack(alignment: .bottomTrailing) {
             glyphLayer
 
-            if showsCompletionBadge && isCompleted {
+            if showsCompletionBadge, isCompleted {
                 completionBadge
                     .offset(x: size * 0.08, y: size * 0.08)
                     .transition(.scale(scale: 0.82).combined(with: .opacity))
@@ -332,7 +332,7 @@ private struct OhanaQuickActionGlyph: View {
 
     private func hexFoodPiece(center: CGPoint, radius: CGFloat) -> Path {
         var points: [CGPoint] = []
-        for index in 0..<6 {
+        for index in 0 ..< 6 {
             let angle = CGFloat(index) * .pi / 3 + .pi / 6
             points.append(CGPoint(
                 x: center.x + cos(angle) * radius,
@@ -410,7 +410,7 @@ private struct OhanaQuickActionGlyph: View {
     private func gearPath() -> Path {
         var path = Path()
         let center = CGPoint(x: 16, y: 16)
-        for index in 0..<16 {
+        for index in 0 ..< 16 {
             let angle = CGFloat(index) * .pi / 8
             let radius: CGFloat = index.isMultiple(of: 2) ? 11.2 : 8.7
             let point = CGPoint(

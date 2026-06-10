@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct EditPetContentSheet: View {
     let pet: Pet
@@ -40,9 +40,9 @@ struct EditPetContentSheet: View {
     /// 全岛重名检查（忽略大小写/空格，排除自身原名）
     private var isNameDuplicate: Bool {
         let candidate = name.trimmingCharacters(in: .whitespaces).lowercased()
-        let original  = pet.name.trimmingCharacters(in: .whitespaces).lowercased()
+        let original = pet.name.trimmingCharacters(in: .whitespaces).lowercased()
         guard !candidate.isEmpty, candidate != original else { return false }
-        let petNames   = allPets.map   { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
+        let petNames = allPets.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
         let humanNames = allHumans.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
         return petNames.contains(candidate) || humanNames.contains(candidate)
     }
@@ -57,20 +57,20 @@ struct EditPetContentSheet: View {
                         formField("物种", text: $species)
                         formField("品种", text: $breed)
                         formField("头像 Emoji", text: $avatarEmoji)
-                        
+
                         Picker("性别", selection: $gender) {
                             Text("♂ 男孩").tag("male")
                             Text("♀ 女孩").tag("female")
                             Text("未知").tag("unknown")
                         }
                         .pickerStyle(.segmented)
-                        
+
                         Toggle("已绝育", isOn: $isNeutered)
                             .tint(.arkCoral)
                     }
                     .padding(16)
                 }
-                
+
                 UltimateGlassCard {
                     VStack(spacing: 16) {
                         sectionHeader("日期")
@@ -82,7 +82,7 @@ struct EditPetContentSheet: View {
                     }
                     .padding(16)
                 }
-                
+
                 UltimateGlassCard {
                     VStack(spacing: 16) {
                         sectionHeader("出生地")
@@ -91,7 +91,7 @@ struct EditPetContentSheet: View {
                     }
                     .padding(16)
                 }
-                
+
                 UltimateGlassCard {
                     VStack(spacing: 16) {
                         sectionHeader("健康信息")
@@ -101,7 +101,7 @@ struct EditPetContentSheet: View {
                     }
                     .padding(16)
                 }
-                
+
                 UltimateGlassCard {
                     VStack(spacing: 16) {
                         sectionHeader("饮食")
@@ -121,7 +121,7 @@ struct EditPetContentSheet: View {
                                 valueFont: OhanaFont.callout(.bold),
                                 valueAlignment: .trailing,
                                 fill: Color.ohanaControlFill,
-                                cornerRadius: 12,
+                                cornerRadius: OhanaRadius.chip,
                                 horizontalPadding: 8,
                                 verticalPadding: 6
                             )
@@ -130,7 +130,7 @@ struct EditPetContentSheet: View {
                     }
                     .padding(16)
                 }
-                
+
                 UltimateGlassCard {
                     VStack(spacing: 16) {
                         sectionHeader("主题色")
@@ -159,14 +159,16 @@ struct EditPetContentSheet: View {
                         sectionHeader("备注")
                         TextEditor(text: $notes)
                             .frame(height: 80)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip))
                             .background(Color.primary.opacity(0.05))
                     }
                     .padding(16)
                 }
-                
+
                 Button {
-                    if isNameDuplicate { showDuplicateNameAlert = true; return }
+                    if isNameDuplicate { showDuplicateNameAlert = true
+                        return
+                    }
                     save()
                 } label: {
                     Text("保存")
@@ -182,12 +184,12 @@ struct EditPetContentSheet: View {
         }
         .onAppear { loadData() }
         .alert("名字已被占用 🏠", isPresented: $showDuplicateNameAlert) {
-            Button("好的，我换一个", role: .cancel) { }
+            Button("好的，我换一个", role: .cancel) {}
         } message: {
             Text("Ohana 里已经有一个叫「\(name.trimmingCharacters(in: .whitespaces))」的家人啦，换一个名字吧！")
         }
     }
-    
+
     private func sectionHeader(_ title: String) -> some View {
         HStack {
             Text(title)
@@ -198,16 +200,16 @@ struct EditPetContentSheet: View {
             Spacer()
         }
     }
-    
+
     private func formField(_ title: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(OhanaFont.caption(.medium))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-            TextField(title, text: text)
+            TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .textFieldStyle(.plain)
                 .padding(12)
-                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
+                .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
         }
     }
 
@@ -221,7 +223,7 @@ struct EditPetContentSheet: View {
             }
         )
     }
-    
+
     private func loadData() {
         name = pet.name
         species = pet.species
@@ -241,7 +243,7 @@ struct EditPetContentSheet: View {
         notes = pet.notes
         themeColorHex = pet.themeColorHex
     }
-    
+
     private func save() {
         let input = PetProfileCommandInput(
             name: name,

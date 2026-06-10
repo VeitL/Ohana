@@ -4,8 +4,8 @@
 //
 //  模块2：家庭财务 AA 结算室
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct ExpenseSplitterCard: View {
     let filteredLogs: [PetExpenseLog]
@@ -16,7 +16,7 @@ struct ExpenseSplitterCard: View {
         let name: String
         let emoji: String
         let paid: Double
-        let balance: Double      // 正=应收，负=应付
+        let balance: Double // 正=应收，负=应付
         let themeHex: String
     }
 
@@ -38,8 +38,8 @@ struct ExpenseSplitterCard: View {
     }
 
     private var settlementText: String {
-        let payers   = results.filter { $0.balance > 0.5 }.sorted { $0.balance > $1.balance }
-        let owes     = results.filter { $0.balance < -0.5 }.sorted { $0.balance < $1.balance }
+        let payers = results.filter { $0.balance > 0.5 }.sorted { $0.balance > $1.balance }
+        let owes = results.filter { $0.balance < -0.5 }.sorted { $0.balance < $1.balance }
         guard let top = payers.first, let debtor = owes.first else {
             return results.isEmpty ? "暂无记录" : "大家花费相当，无需结算 🎉"
         }
@@ -90,9 +90,9 @@ struct ExpenseSplitterCard: View {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .fill(.white.opacity(0.05)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-                .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(.white.opacity(0.1), lineWidth: 1)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                .overlay(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge).strokeBorder(.white.opacity(0.1), lineWidth: 1)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         )
     }
 
@@ -120,7 +120,7 @@ struct ExpenseSplitterCard: View {
             }
         }
         .padding(12)
-        .background(accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(accent.opacity(0.2), lineWidth: 1))
+        .background(accent.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row).strokeBorder(accent.opacity(0.2), lineWidth: 1))
     }
 }

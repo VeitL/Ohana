@@ -5,8 +5,8 @@
 //  B7: 椰子获取记录页（从 OasisRewardView 椰子按钮进入）
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 enum CoconutLogSubject: Identifiable, Hashable {
     case pet(UUID)
@@ -14,14 +14,14 @@ enum CoconutLogSubject: Identifiable, Hashable {
 
     var id: String {
         switch self {
-        case .pet(let id): "pet-\(id.uuidString)"
-        case .human(let id): "human-\(id.uuidString)"
+        case let .pet(id): "pet-\(id.uuidString)"
+        case let .human(id): "human-\(id.uuidString)"
         }
     }
 
     var actorId: String {
         switch self {
-        case .pet(let id), .human(let id):
+        case let .pet(id), let .human(id):
             id.uuidString
         }
     }
@@ -294,7 +294,7 @@ struct CoconutLogContentView: View {
 
         GoDashedDivider().padding(.horizontal, 20)
 
-        if subject == nil && !knownActors.isEmpty {
+        if subject == nil, !knownActors.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     filterChip(id: nil, emoji: "🌴", name: l.tr(zh: "全部", en: "All", de: "Alle"))
@@ -350,8 +350,8 @@ struct CoconutLogContentView: View {
         VStack(spacing: 12) {
             Text("🥥").font(OhanaFont.adaptive(size: 48)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text((subject == nil && selectedActorId == nil)
-                 ? l.tr(zh: "还没有椰子记录", en: "No coconut history yet", de: "Noch keine Kokosnuss-Historie")
-                 : l.tr(zh: "该成员暂无椰子记录", en: "No history for this member", de: "Keine Historie für dieses Mitglied"))
+                ? l.tr(zh: "还没有椰子记录", en: "No coconut history yet", de: "Noch keine Kokosnuss-Historie")
+                : l.tr(zh: "该成员暂无椰子记录", en: "No history for this member", de: "Keine Historie für dieses Mitglied"))
                 .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             Text(l.tr(zh: "完成打卡后，椰子收支会出现在这里", en: "Coconut changes appear here after check-ins", de: "Kokosnuss-Bewegungen erscheinen hier nach Check-ins"))

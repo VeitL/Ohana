@@ -111,7 +111,7 @@ extension QuickPottyDetailSheet {
                 statusTitle: scoopReminderOn ? l.tr(zh: "提醒已开启", en: "Reminder on", de: "Erinnerung an") : l.tr(zh: "仅本地记录", en: "Local only", de: "Nur lokal"),
                 statusValue: dueText(daysUntil: daysUntilScoop),
                 statusDetail: "\(scoopPlanDetail) · \(scoopLastActionText)",
-                intervalRange: 1...14,
+                intervalRange: 1 ... 14,
                 intervalDays: $scoopIntervalDays,
                 anchorDate: $scoopAnchorDate,
                 reminderOn: $scoopReminderOn,
@@ -141,7 +141,7 @@ extension QuickPottyDetailSheet {
                 statusTitle: litterReminderOn ? l.tr(zh: "提醒已开启", en: "Reminder on", de: "Erinnerung an") : l.tr(zh: "仅本地记录", en: "Local only", de: "Nur lokal"),
                 statusValue: dueText(daysUntil: daysUntilLitterChange),
                 statusDetail: "\(litterPlanDetail) · \(litterLastActionText)",
-                intervalRange: 3...60,
+                intervalRange: 3 ... 60,
                 intervalDays: $litterChangeIntervalDays,
                 anchorDate: $litterCycleAnchorDate,
                 reminderOn: $litterReminderOn,
@@ -456,7 +456,7 @@ extension QuickPottyDetailSheet {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     func poopOverviewLineChart(title: String, subtitle: String, points: [PoopChartPoint], tint: Color, emptyText: String) -> some View {
@@ -509,7 +509,7 @@ extension QuickPottyDetailSheet {
             .frame(height: 10)
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     func overviewSectionHeader(_ title: String) -> some View {
@@ -547,7 +547,7 @@ extension QuickPottyDetailSheet {
                 .foregroundStyle(tint)
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     var pottyChartPoints: [PoopChartPoint] {
@@ -556,7 +556,7 @@ extension QuickPottyDetailSheet {
         let today = calendar.startOfDay(for: Date())
         let start = calendar.date(byAdding: .day, value: -(dayCount - 1), to: today) ?? today
         let grouped = Dictionary(grouping: pottyLogs.filter { $0.date >= start }) { calendar.startOfDay(for: $0.date) }
-        return (0..<dayCount).map { offset in
+        return (0 ..< dayCount).map { offset in
             let date = calendar.date(byAdding: .day, value: offset, to: start) ?? start
             return PoopChartPoint(date: date, value: Double(grouped[date]?.count ?? 0))
         }
@@ -568,7 +568,7 @@ extension QuickPottyDetailSheet {
         let today = calendar.startOfDay(for: Date())
         let start = calendar.date(byAdding: .day, value: -(dayCount - 1), to: today) ?? today
         let grouped = Dictionary(grouping: litterLogs.filter { $0.date >= start }) { calendar.startOfDay(for: $0.date) }
-        return (0..<dayCount).map { offset in
+        return (0 ..< dayCount).map { offset in
             let date = calendar.date(byAdding: .day, value: offset, to: start) ?? start
             return PoopChartPoint(date: date, value: Double(grouped[date]?.count ?? 0))
         }
@@ -576,7 +576,7 @@ extension QuickPottyDetailSheet {
 
     var pottyTypeSummaries: [PoopTypeSummary] {
         PottyType.allCases.compactMap { type in
-            let count = pottyLogs.filter { $0.pottyType == type }.count
+            let count = pottyLogs.count(where: { $0.pottyType == type })
             guard count > 0 else { return nil }
             return PoopTypeSummary(title: type.localizedLabel(l), icon: type.systemIconName, count: count, tint: pottyTypeColor(type))
         }

@@ -31,20 +31,20 @@ extension AvatarColorPreset {
         .init(name: "冰蓝", hex: "A8D8EA"),
         .init(name: "灰色", hex: "9E9E9E"),
         .init(name: "榛色", hex: "8E6B3E"),
-        .init(name: "黑色", hex: "1A1A1A"),
+        .init(name: "黑色", hex: "1A1A1A")
     ]
 
     static let furPresets: [AvatarColorPreset] = [
         .init(name: "象牙白", hex: "F5F0E8"),
-        .init(name: "奶油",   hex: "F0E0C0"),
-        .init(name: "金黄",   hex: "D4A847"),
-        .init(name: "姜橙",   hex: "C87941"),
-        .init(name: "焦糖",   hex: "8B5E3C"),
+        .init(name: "奶油", hex: "F0E0C0"),
+        .init(name: "金黄", hex: "D4A847"),
+        .init(name: "姜橙", hex: "C87941"),
+        .init(name: "焦糖", hex: "8B5E3C"),
         .init(name: "巧克力", hex: "4A2C17"),
-        .init(name: "银灰",   hex: "A0A0A0"),
-        .init(name: "炭黑",   hex: "2A2A2A"),
-        .init(name: "三花",   hex: "D4A847"),
-        .init(name: "虎纹",   hex: "8B6914"),
+        .init(name: "银灰", hex: "A0A0A0"),
+        .init(name: "炭黑", hex: "2A2A2A"),
+        .init(name: "三花", hex: "D4A847"),
+        .init(name: "虎纹", hex: "8B6914")
     ]
 }
 
@@ -61,14 +61,14 @@ struct LayeredAvatarView: View {
     /// When false, suppresses the picker popups (e.g. read-only display)
     var allowCustomize: Bool = true
 
-    @State private var showEyePicker  = false
-    @State private var showFurPicker  = false
-    @State private var eyePressScale: CGFloat  = 1
+    @State private var showEyePicker = false
+    @State private var showFurPicker = false
+    @State private var eyePressScale: CGFloat = 1
     @State private var bodyPressScale: CGFloat = 1
     @State private var decodedAvatarImage: UIImage?
 
-    private var furColor: Color  { Color(hex: furHex.isEmpty ? "D4A847" : furHex) }
-    private var eyeColor: Color  { Color(hex: eyeHex.isEmpty ? "D4A017" : eyeHex) }
+    private var furColor: Color { Color(hex: furHex.isEmpty ? "D4A847" : furHex) }
+    private var eyeColor: Color { Color(hex: eyeHex.isEmpty ? "D4A017" : eyeHex) }
     private var avatarSignature: String {
         imageData.map { FocusWalletAvatarCache.signature(for: $0) } ?? "empty"
     }
@@ -94,8 +94,8 @@ struct LayeredAvatarView: View {
                 presets: AvatarColorPreset.eyePresets,
                 selectedHex: $eyeHex
             )
-            .presentationDetents([.height(340)])
-            .presentationCornerRadius(32)
+            .presentationDetents(OhanaSheetDetents.compactMedium)
+            .presentationCornerRadius(OhanaRadius.sheetCompact)
         }
         .sheet(isPresented: $showFurPicker) {
             ColorPickerPopup(
@@ -103,8 +103,8 @@ struct LayeredAvatarView: View {
                 presets: AvatarColorPreset.furPresets,
                 selectedHex: $furHex
             )
-            .presentationDetents([.height(340)])
-            .presentationCornerRadius(32)
+            .presentationDetents(OhanaSheetDetents.compactMedium)
+            .presentationCornerRadius(OhanaRadius.sheetCompact)
         }
         .task(id: avatarSignature) {
             guard let imageData else {
@@ -261,14 +261,15 @@ private struct PetSilhouetteIcon: View {
     var body: some View {
         Image(systemName: systemIconName)
     }
+
     private var systemIconName: String {
         switch species {
-        case "狗":   return "dog.fill"
-        case "猫":   return "cat.fill"
-        case "兔子": return "hare.fill"
-        case "仓鼠": return "circle.fill"
-        case "鸟":   return "bird.fill"
-        default:     return "pawprint.fill"
+        case "狗": "dog.fill"
+        case "猫": "cat.fill"
+        case "兔子": "hare.fill"
+        case "仓鼠": "circle.fill"
+        case "鸟": "bird.fill"
+        default: "pawprint.fill"
         }
     }
 }
@@ -283,7 +284,7 @@ struct ColorPickerPopup: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private var surface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
-    private var bg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
+    private var bg: Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     private var textSec: Color { colorScheme == .light ? Color(hex: "8E8E93") : Color(hex: "64748B") }
     private let accent = Color(hex: "FF5A00")
 

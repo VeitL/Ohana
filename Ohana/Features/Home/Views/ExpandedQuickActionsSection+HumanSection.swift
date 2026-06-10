@@ -84,7 +84,7 @@ struct ExpandedHumanQuickActionsSection: View {
                     .zIndex(itemZIndex(item, index: idx))
                 }
 
-                if isEditMode && editItems.count < QuickActionLimit.maxItemsPerEntity {
+                if isEditMode, editItems.count < QuickActionLimit.maxItemsPerEntity {
                     ExpandedHumanQuickAddButton(
                         onTap: openAddPanel
                     )
@@ -93,13 +93,13 @@ struct ExpandedHumanQuickActionsSection: View {
             }
             .animation(GoMotion.selection, value: displayedOrderSignature)
 
-            if isEditMode && editItems.count >= QuickActionLimit.maxItemsPerEntity {
+            if isEditMode, editItems.count >= QuickActionLimit.maxItemsPerEntity {
                 limitText
             }
         }
         .padding(.horizontal, 2)
         .overlay(alignment: .bottom) {
-            if isEditMode && showingAddPanel {
+            if isEditMode, showingAddPanel {
                 ExpandedQuickAddInlinePanel(
                     items: availableAddItems,
                     emptyTitle: "已全部添加",
@@ -214,9 +214,9 @@ struct ExpandedHumanQuickActionsSection: View {
             } label: {
                 Image(systemName: "checkmark").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 11, weight: .black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 30, height: 26) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                .background(Color.goPrimary, in: Capsule())
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .frame(width: 30, height: 26) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+                    .background(Color.goPrimary, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
         }

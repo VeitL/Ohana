@@ -5,14 +5,14 @@ struct CrewRosterOverlayRouteContainer: View {
     let initialMode: CrewRosterMode
     let onSelectPet: (Pet) -> Void
     let onSelectHuman: (Human) -> Void
-    var onAddEntity: ((EntityType) -> Void)? = nil
-    var onClose: (() -> Void)? = nil
+    var onAddEntity: ((EntityType) -> Void)?
+    var onClose: (() -> Void)?
     var hideToolbar: Bool = false
     var searchTrigger: Bool = false
     var addMemberTrigger: Bool = false
     var safeTopInset: CGFloat = 0
     var safeBottomInset: CGFloat = 0
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]

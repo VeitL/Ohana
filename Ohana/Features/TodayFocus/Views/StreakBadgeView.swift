@@ -73,8 +73,8 @@ struct StreakBadgeView: View {
 
     private var streakSubtitle: String {
         if streak == 0 { return "开始打卡吧" }
-        if streak < 3  { return "好的开始！" }
-        if streak < 7  { return "继续加油" }
+        if streak < 3 { return "好的开始！" }
+        if streak < 7 { return "继续加油" }
         if streak < 30 { return "势不可当！" }
         return "传说级铲屎官"
     }

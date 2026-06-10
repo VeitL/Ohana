@@ -5,8 +5,8 @@
 //  Smart Today Task Card (C5) - App 自动决定今日最重要待办
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Action Target
 enum SmartTaskTarget {
@@ -29,7 +29,7 @@ struct SmartTask {
 }
 
 // MARK: - Smart Task Engine
-struct SmartTaskEngine {
+enum SmartTaskEngine {
     static func topTask(pets: [Pet], reminders: [Reminder], plants: [Plant] = []) -> SmartTask {
         let cal = Calendar.current
         let now = Date()
@@ -135,7 +135,7 @@ struct SmartTaskEngine {
         if let dog = pets.first(where: { $0.species == "狗" }) {
             let todayWalked = dog.walkLogs.contains { cal.isDateInToday($0.startDate) }
             let isWalkTime = (hour >= 6 && hour < 10) || (hour >= 16 && hour < 20)
-            if !todayWalked && isWalkTime {
+            if !todayWalked, isWalkTime {
                 return SmartTask(
                     emoji: hour < 12 ? "🌅" : "🌇",
                     title: "该带 \(dog.name) 出门了",
@@ -184,7 +184,7 @@ struct SmartTodayCard: View {
     let task: SmartTask
     let onAction: () -> Void
     /// 里程碑奖励完成回调（供首页触发椰子奖励等）
-    var onMilestoneRewardCompleted: (() -> Void)? = nil
+    var onMilestoneRewardCompleted: (() -> Void)?
 
     private var textColor: Color {
         if task.accentColor == .goPrimary || task.accentColor == .goYellow {
@@ -195,7 +195,7 @@ struct SmartTodayCard: View {
 
     var body: some View {
         Group {
-            if case .reminder(let reminder) = task.actionTarget,
+            if case let .reminder(reminder) = task.actionTarget,
                isMilestoneReminder(reminder) {
                 GoldenRewardRow(
                     reminder: reminder,
@@ -264,7 +264,7 @@ private struct NormalTaskCard: View {
                 .padding(.horizontal, 20).padding(.vertical, 14)
             }
         }
-        .background(task.accentColor, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(task.accentColor, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 }
 
@@ -350,7 +350,7 @@ private struct GoldenRewardRow: View {
                 .padding(.bottom, 10)
         }
         // 金色发光底板
-        .background(Color.goYellow, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.goYellow, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .shadow(color: Color.goYellow.opacity(sparkleOpacity), radius: 14, x: 0, y: 0) // ui-v4: allow milestone reward glow
         .shadow(color: Color.goYellow.opacity(sparkleOpacity * 0.5), radius: 28, x: 0, y: 4) // ui-v4: allow milestone reward glow
         .coconutRewardOverlay(trigger: $showCoconutDrop, amount: milestoneReward)

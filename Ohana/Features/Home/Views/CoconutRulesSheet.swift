@@ -188,9 +188,9 @@ struct CoconutRulesSheet: View {
                             )
                         }
                         .padding(14)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
                         )
 
@@ -264,7 +264,7 @@ struct CoconutRulesSheet: View {
                 .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(card.glowColor, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(card.glowColor, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             Text(card.title)
                 .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -286,9 +286,9 @@ struct CoconutRulesSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         )
         .scaleEffect(appeared ? 1 : 0.88)
@@ -303,7 +303,7 @@ struct CoconutRulesSheet: View {
                 .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 32, height: 32) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))

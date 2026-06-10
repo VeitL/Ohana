@@ -57,7 +57,7 @@ enum WalletPetCardTheme {
         let bi = PetBreedDatabase.breeds(for: pet.species).first { $0.name == pet.breed }
         let coatItems = bi?.coatColors ?? PetBreedDatabase.genericCoatColors
         if let found = coatItems.first(where: { $0.name == name }) { return found.color }
-        if name.count == 6, name.allSatisfy({ $0.isHexDigit }) { return Color(hex: name) }
+        if name.count == 6, name.allSatisfy(\.isHexDigit) { return Color(hex: name) }
         return Color(hex: "E8C49A")
     }
 
@@ -68,7 +68,7 @@ enum WalletPetCardTheme {
         let bi = PetBreedDatabase.breeds(for: pet.species).first { $0.name == pet.breed }
         let eyeItems = bi?.eyeColors ?? PetBreedDatabase.genericEyeColors
         if let found = eyeItems.first(where: { $0.name == name }) { return found.color }
-        if name.count == 6, name.allSatisfy({ $0.isHexDigit }) { return Color(hex: name) }
+        if name.count == 6, name.allSatisfy(\.isHexDigit) { return Color(hex: name) }
         return Color(hex: "6B3A2A")
     }
 
@@ -90,7 +90,7 @@ enum WalletPetCardTheme {
         return [
             lighter, light, top,
             light, top, bottom,
-            top, bottom, darker,
+            top, bottom, darker
         ]
     }
 
@@ -166,7 +166,7 @@ enum HomeCardVisibility {
 
     static func visibleCardCount(pets: [Pet], humans: [Human], raw: String? = nil) -> Int {
         let hiddenRaw = raw ?? ""
-        let petCount = pets.filter { !$0.hasPassedAway && isPetVisible($0, raw: hiddenRaw) }.count
+        let petCount = pets.count(where: { !$0.hasPassedAway && isPetVisible($0, raw: hiddenRaw) })
         let humanCount = humans.filter(\.shouldShowOnHome).count
         return petCount + humanCount
     }
@@ -273,7 +273,7 @@ enum HomeActiveHumanCardSync {
             showDummyCards: false
         )
         .prefix(HomeCardVisibility.maxVisibleCards)
-        .map { $0.id.uuidString }
+        .map(\.id.uuidString)
     }
 
     private static func orderRawByInserting(

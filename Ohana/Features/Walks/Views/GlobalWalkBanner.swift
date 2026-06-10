@@ -8,9 +8,9 @@
 //  - 结束后：卡片翻转到背面显示遛狗详情（地图+数据）+关闭按钮
 //
 
-import SwiftUI
-import SwiftData
 import CoreLocation
+import SwiftData
+import SwiftUI
 import UIKit
 
 struct GlobalWalkBanner: View {
@@ -19,9 +19,9 @@ struct GlobalWalkBanner: View {
     @Environment(AppServices.self) private var appServices
 
     @State private var isMinimized = true
-    @State private var showSummaryCard = false       // 结束后翻到背面
-    @State private var summaryRotation: Double = 0   // 翻转角度
-    @State private var isStopped = false             // B2: 结束状态，隐藏展开卡
+    @State private var showSummaryCard = false // 结束后翻到背面
+    @State private var summaryRotation: Double = 0 // 翻转角度
+    @State private var isStopped = false // B2: 结束状态，隐藏展开卡
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var summaryMapSnapshotWalkId: UUID?
     @State private var summaryMapSnapshotPreparedSignature = "none"
@@ -29,7 +29,7 @@ struct GlobalWalkBanner: View {
     @State private var summaryMapSnapshotDecodeTask: Task<Void, Never>?
 
     // 气泡拖动位置（Y轴，锚点在屏幕右侧）
-    @State private var bubbleAnchorY: CGFloat = 0    // B1: 拖动结束后保存的Y
+    @State private var bubbleAnchorY: CGFloat = 0 // B1: 拖动结束后保存的Y
     @GestureState private var dragDelta: CGFloat = 0 // B1: 实时拖动偏移（GestureState自动归零）
 
     private var mgr: PetWalkingManaging { appServices.walking }
@@ -38,6 +38,7 @@ struct GlobalWalkBanner: View {
     private var shouldShowFloatingControl: Bool {
         isActive && !mgr.isWalkCardExpandedSurfaceVisible
     }
+
     private var walkClockInterval: TimeInterval {
         workloadPolicy.refreshInterval(
             default: 1,
@@ -47,23 +48,26 @@ struct GlobalWalkBanner: View {
             allowDuringActiveWalk: true
         )
     }
+
     private var shouldRunWalkClock: Bool {
         workloadPolicy.refreshBudget(
             isVisible: shouldShowFloatingControl,
             allowDuringActiveWalk: true
         ) == .live
     }
+
     private var walkPanelFill: Color {
         colorScheme == .dark ? Color(hex: "10180F") : Color(hex: "F7FAEF")
     }
+
     private var walkPanelStroke: Color {
         Color.ohanaGlassStroke
     }
 
     private var isActive: Bool {
         switch mgr.phase {
-        case .running, .paused: return true
-        default: return false
+        case .running, .paused: true
+        default: false
         }
     }
 
@@ -115,7 +119,7 @@ struct GlobalWalkBanner: View {
     }
 
     // MARK: - 最小化气泡（B1: GestureState 消除幻影，drawingGroup 避免卡顿）
-    private func draggableBubble(pet: Pet, geo: GeometryProxy) -> some View {
+    private func draggableBubble(pet _: Pet, geo: GeometryProxy) -> some View {
         let minY = -geo.size.height + 200
         let rawY = bubbleAnchorY + dragDelta
         let clampedY = max(minY, min(0, rawY))
@@ -133,8 +137,8 @@ struct GlobalWalkBanner: View {
             }
         }
         .frame(width: 64, height: 64)
-        .clipShape(Circle())  // C7: 裁剪成圆形，消除方块背景
-        .compositingGroup()   // C7: 替代 drawingGroup，避免背景溢出
+        .clipShape(Circle()) // C7: 裁剪成圆形，消除方块背景
+        .compositingGroup() // C7: 替代 drawingGroup，避免背景溢出
         .onTapGesture { withAnimation { isMinimized = false } }
         .gesture(
             DragGesture(minimumDistance: 4)
@@ -236,7 +240,7 @@ struct GlobalWalkBanner: View {
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                     .background(mgr.phase == .running ? Color.goYellow : Color.goTeal,
-                                in: RoundedRectangle(cornerRadius: 14))
+                                in: RoundedRectangle(cornerRadius: OhanaRadius.row))
                 }
                 Button {
                     mgr.addPoop()
@@ -244,7 +248,7 @@ struct GlobalWalkBanner: View {
                 } label: {
                     Text("💩").font(OhanaFont.adaptive(size: 20))
                         .frame(width: 48, height: 48)
-                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 }
                 Button {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -258,15 +262,15 @@ struct GlobalWalkBanner: View {
                         .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
-                        .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
+                        .background(Color.goRed, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
                 }
             }
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20).padding(.vertical, 14)
         }
-        .background(walkPanelFill, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(walkPanelFill, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
                 .strokeBorder(walkPanelStroke, lineWidth: 1)
         }
         .shadow(color: Color.arkInk.opacity(0.25), radius: 16, x: 0, y: 6) // ui-v4: allow active walk card elevation
@@ -275,7 +279,7 @@ struct GlobalWalkBanner: View {
     // MARK: - 结束后翻转详情卡（B2 重写）
     private func summaryFlipCard(pet: Pet, geo: GeometryProxy) -> some View {
         let elapsed: TimeInterval = {
-            if case .finished(let elapsed, _) = mgr.phase, mgr.currentPet?.id == pet.id {
+            if case let .finished(elapsed, _) = mgr.phase, mgr.currentPet?.id == pet.id {
                 return elapsed
             }
             return mgr.elapsedTime
@@ -285,7 +289,7 @@ struct GlobalWalkBanner: View {
             : pet.walkLogs.sorted { $0.startDate > $1.startDate }.first
         let distance = latestWalk?.distanceMeters ?? locationProvider.totalDistance
         let poop: Int = {
-            if case .finished(_, let poopCount) = mgr.phase, mgr.currentPet?.id == pet.id {
+            if case let .finished(_, poopCount) = mgr.phase, mgr.currentPet?.id == pet.id {
                 return poopCount
             }
             return mgr.poopCount
@@ -305,7 +309,7 @@ struct GlobalWalkBanner: View {
                 latestWalk: latestWalk,
                 mapSnapshotImage: preparedMapImage
             )
-                .opacity(showBack ? 0 : 1)
+            .opacity(showBack ? 0 : 1)
 
             summaryBackFace(
                 pet: pet,
@@ -315,14 +319,14 @@ struct GlobalWalkBanner: View {
                 latestWalk: latestWalk,
                 mapSnapshotImage: preparedMapImage
             )
-                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                .opacity(showBack ? 1 : 0)
+            .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+            .opacity(showBack ? 1 : 0)
         }
         .frame(maxWidth: .infinity, minHeight: flipCardHeight, maxHeight: flipCardHeight)
         .rotation3DEffect(.degrees(summaryRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)
-        .background(walkPanelFill, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(walkPanelFill, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
                 .strokeBorder(walkPanelStroke, lineWidth: 1)
         }
         .shadow(color: Color.arkInk.opacity(0.25), radius: 16, x: 0, y: 6) // ui-v4: allow walk summary card elevation
@@ -394,8 +398,8 @@ struct GlobalWalkBanner: View {
                             .resizable().scaledToFill()
                             .frame(maxWidth: .infinity).frame(height: 108)
                             .clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                             .overlay(
                                 HStack(spacing: 4) {
                                     Image(systemName: "map.fill").accessibilityHidden(true).font(OhanaFont.adaptive(size: 11, weight: .bold))
@@ -418,7 +422,7 @@ struct GlobalWalkBanner: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 108)
                 } else {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                         .fill(Color.ohanaControlFill)
                         .frame(maxWidth: .infinity).frame(height: 108)
                         .overlay(
@@ -487,7 +491,7 @@ struct GlobalWalkBanner: View {
     }
 
     // MARK: - 数据格（活跃中）
-    private func walkStatCell<V: View>(label: String, accent: Color, @ViewBuilder value: () -> V) -> some View {
+    private func walkStatCell(label: String, accent _: Color, @ViewBuilder value: () -> some View) -> some View {
         VStack(spacing: 3) {
             value()
             Text(label)
@@ -498,7 +502,7 @@ struct GlobalWalkBanner: View {
     }
 
     // MARK: - 数据格（详情卡）
-    private func summaryStatCell(label: String, value: String, accent: Color) -> some View {
+    private func summaryStatCell(label: String, value: String, accent _: Color) -> some View {
         VStack(spacing: 3) {
             Text(value)
                 .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
@@ -564,5 +568,4 @@ struct GlobalWalkBanner: View {
             return CLLocationCoordinate2D(latitude: lat, longitude: lon)
         }
     }
-
 }

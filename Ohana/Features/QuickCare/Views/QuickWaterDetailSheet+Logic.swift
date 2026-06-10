@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension QuickWaterDetailSheet {
     // MARK: - Persistence
@@ -432,7 +432,7 @@ extension QuickWaterDetailSheet {
     }
 
     var waterPlanPostSaveMaintenanceDelayMilliseconds: UInt64 {
-        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 1_120 : 420
+        workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 1120 : 420
     }
 
     func scheduleSettledWaterModeMaintenance(

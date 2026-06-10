@@ -40,19 +40,19 @@ struct AppLifecycleReducer {
     mutating func reduce(_ event: AppLifecycleEvent) -> [AppLifecycleCommand] {
         switch event {
         case let .rootAppeared(scenePhase):
-            return [.allowSystemAutoLock]
+            [.allowSystemAutoLock]
                 + transitionCommands(to: scenePhase)
                 + [.refreshWorkload(reason: "contentAppear")]
         case let .scenePhaseChanged(phase):
-            return activeCommandsIfNeeded(for: phase) + transitionCommands(to: phase)
+            activeCommandsIfNeeded(for: phase) + transitionCommands(to: phase)
         case .didEnterBackground:
-            return transitionCommands(to: .background) + [.scheduleReminderRefill]
+            transitionCommands(to: .background) + [.scheduleReminderRefill]
         case .willResignActive:
-            return transitionCommands(to: .inactive)
+            transitionCommands(to: .inactive)
         case .didBecomeActive:
-            return [.allowSystemAutoLock] + transitionCommands(to: .active)
+            [.allowSystemAutoLock] + transitionCommands(to: .active)
         case .willTerminate:
-            return [.pauseWalkingForTermination]
+            [.pauseWalkingForTermination]
         }
     }
 

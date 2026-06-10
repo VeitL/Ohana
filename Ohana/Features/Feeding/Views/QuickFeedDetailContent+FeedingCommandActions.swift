@@ -101,11 +101,10 @@ extension QuickFeedDetailContent {
     }
 
     func completeSelectedPlanOccurrence(_ occurrence: FeedPlanCalendarOccurrence) {
-        let reminder: Reminder
-        if let existingReminder = occurrence.reminder {
-            reminder = existingReminder
+        let reminder: Reminder = if let existingReminder = occurrence.reminder {
+            existingReminder
         } else {
-            reminder = commandExecutor.reminder(
+            commandExecutor.reminder(
                 for: occurrence.event,
                 scheduledAt: occurrence.date,
                 existing: nil

@@ -38,12 +38,12 @@ enum PetMedicationDoseLogging {
 
     static func todayDoseCount(events: [Event], medicationId: UUID) -> Int {
         let cal = Calendar.current
-        return events.filter { ev in
+        return events.count(where: { ev in
             ev.eventType == EventType.petMedicationDose.rawValue
                 && ev.relatedEntityType == relatedEntityTypeMedication
                 && ev.relatedEntityId == medicationId.uuidString
                 && cal.isDateInToday(ev.startDate)
-        }.count
+        })
     }
 
     @discardableResult

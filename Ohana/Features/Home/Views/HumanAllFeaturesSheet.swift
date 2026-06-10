@@ -23,34 +23,34 @@ enum HumanAllFeatureDestination: Hashable {
 extension HumanAllFeatureDestination: Identifiable {
     var id: String {
         switch self {
-        case .basicInfo: return "basicInfo"
-        case .weight: return "weight"
-        case .workout: return "workout"
-        case .metrics: return "metrics"
-        case .medication: return "medication"
-        case .report: return "report"
-        case .expense: return "expense"
-        case .wishlist: return "wishlist"
-        case .notes: return "notes"
+        case .basicInfo: "basicInfo"
+        case .weight: "weight"
+        case .workout: "workout"
+        case .metrics: "metrics"
+        case .medication: "medication"
+        case .report: "report"
+        case .expense: "expense"
+        case .wishlist: "wishlist"
+        case .notes: "notes"
         }
     }
 
     var privacyField: HumanPrivateField? {
         switch self {
         case .basicInfo:
-            return nil
+            nil
         case .weight, .metrics, .report:
-            return .weight
+            .weight
         case .workout:
-            return .workout
+            .workout
         case .medication:
-            return .medication
+            .medication
         case .expense:
-            return .expense
+            .expense
         case .wishlist:
-            return .wishlist
+            .wishlist
         case .notes:
-            return .note
+            .note
         }
     }
 }
@@ -116,7 +116,7 @@ struct HumanAllFeaturesSheet: View {
             } content: {
                 if human.hasPassedAway {
                     HumanMemorialBanner(human: human, appLanguage: appLanguage)
-                } else if isViewingOwnProfile && !human.privateFields.isEmpty {
+                } else if isViewingOwnProfile, !human.privateFields.isEmpty {
                     HumanOwnerPrivacyHint(appLanguage: appLanguage)
                 }
 
@@ -427,7 +427,7 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private var workoutMetric: String {
-        let count = human.workoutLogs.filter { Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) }.count
+        let count = human.workoutLogs.count(where: { Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) })
         return "\(count)"
     }
 
@@ -594,9 +594,9 @@ private struct HumanMemorialBanner: View {
             Spacer()
         }
         .padding(14)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.goPurple.opacity(0.25), lineWidth: 1)
         }
     }

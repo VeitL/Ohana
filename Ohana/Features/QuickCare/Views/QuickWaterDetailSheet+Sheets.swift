@@ -395,7 +395,7 @@ extension QuickWaterDetailSheet {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .waterGlassSurface(cornerRadius: 18, tint: tint, tintOpacity: 0.04)
+        .waterGlassSurface(cornerRadius: OhanaRadius.controlLarge, tint: tint, tintOpacity: 0.04)
     }
 
     func overviewLineChart(title: String, subtitle: String, points: [WaterChartPoint], tint: Color, emptyText: String) -> some View {
@@ -465,7 +465,7 @@ extension QuickWaterDetailSheet {
             .frame(height: 10)
         }
         .padding(16)
-        .waterGlassSurface(cornerRadius: 20, tint: tint, tintOpacity: isWarning ? 0.16 : 0.04)
+        .waterGlassSurface(cornerRadius: OhanaRadius.input, tint: tint, tintOpacity: isWarning ? 0.16 : 0.04)
     }
 
     func overviewSectionHeader(_ title: String) -> some View {
@@ -505,14 +505,14 @@ extension QuickWaterDetailSheet {
         let dayCount = overviewRange.days
         let today = calendar.startOfDay(for: Date())
         let start = calendar.date(byAdding: .day, value: -(dayCount - 1), to: today) ?? today
-        let end = calendar.date(byAdding: .day, value: 1, to: today) ?? today.addingTimeInterval(86_400)
+        let end = calendar.date(byAdding: .day, value: 1, to: today) ?? today.addingTimeInterval(86400)
         let logs = waterCareLogs.filter { log in
             log.type == type.rawValue &&
-            log.date >= start &&
-            log.date < end
+                log.date >= start &&
+                log.date < end
         }
         let grouped = Dictionary(grouping: logs) { calendar.startOfDay(for: $0.date) }
-        return (0..<dayCount).map { offset in
+        return (0 ..< dayCount).map { offset in
             let date = calendar.date(byAdding: .day, value: offset, to: start) ?? start
             let logs = grouped[date] ?? []
             let value = useAmountMl ? logs.reduce(0) { $0 + $1.amountMl } : Double(logs.count)
@@ -542,7 +542,7 @@ extension QuickWaterDetailSheet {
         let base = max(last ?? anchor, anchor)
         var next = calendar.date(byAdding: .day, value: max(intervalDays, 1), to: base) ?? base
         while next < today {
-            next = calendar.date(byAdding: .day, value: max(intervalDays, 1), to: next) ?? next.addingTimeInterval(Double(max(intervalDays, 1)) * 86_400)
+            next = calendar.date(byAdding: .day, value: max(intervalDays, 1), to: next) ?? next.addingTimeInterval(Double(max(intervalDays, 1)) * 86400)
         }
         return next
     }
@@ -558,7 +558,7 @@ extension QuickWaterDetailSheet {
         if days == 1 {
             return "明天"
         }
-        if days > 1 && days <= 7 {
+        if days > 1, days <= 7 {
             return "\(days)天后"
         }
         return date.formatted(.dateTime.month().day())

@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 extension SettingsView {
@@ -19,7 +19,7 @@ extension SettingsView {
             }
         }
     }
-    
+
     // MARK: - 设备身份绑定卡
     func deviceIdentitySection(_ humans: [Human]) -> some View {
         settingsSection(title: "设备身份") {
@@ -46,7 +46,7 @@ extension SettingsView {
                     }
                     .padding(12)
                     .frame(minHeight: 44)
-                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
                 ScrollView(.horizontal, showsIndicators: false) {

@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetMilestonesCard: View {
     let pet: Pet
@@ -43,7 +43,7 @@ struct PetMilestonesCard: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     private func timelineRow(milestone: PetMilestone, index: Int, total: Int) -> some View {

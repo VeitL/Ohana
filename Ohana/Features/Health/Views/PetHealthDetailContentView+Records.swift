@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension PetHealthDetailContentView {
     var healthCoreGrid: some View {
@@ -81,7 +81,7 @@ extension PetHealthDetailContentView {
             }
             .frame(maxWidth: .infinity, minHeight: 124, alignment: .leading)
             .padding(14)
-            .goIslandModuleCard(cornerRadius: 22)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardSoft)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -107,7 +107,7 @@ extension PetHealthDetailContentView {
             immunityOverviewRow
         }
         .padding(14)
-        .goIslandModuleCard(cornerRadius: 20)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.input)
     }
 
     var quickToolsRow: some View {
@@ -153,7 +153,7 @@ extension PetHealthDetailContentView {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .goIslandModuleCard(cornerRadius: 18)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.controlLarge)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -215,21 +215,21 @@ extension PetHealthDetailContentView {
             }
         }
         .padding(14)
-        .goIslandModuleCard(cornerRadius: 20)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.input)
     }
 
     // MARK: - 免疫状态总览条
     var immunityOverviewRow: some View {
         let items: [(HealthLogType, String, String, Int)] = [
-            (.vaccine,           "syringe.fill", l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung"),  365),
+            (.vaccine, "syringe.fill", l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung"), 365),
             (.dewormingInternal, "pills.fill", l.tr(zh: "体内", en: "Internal", de: "Innen"), 90),
             (.dewormingExternal, "shield.lefthalf.filled", l.tr(zh: "体外", en: "External", de: "Außen"), 90),
-            (.checkup,           "stethoscope", l.tr(zh: "体检", en: "Checkup", de: "Check-up"),  365),
+            (.checkup, "stethoscope", l.tr(zh: "体检", en: "Checkup", de: "Check-up"), 365)
         ]
         return HStack(spacing: 0) {
             ForEach(items, id: \.0) { type, icon, label, cycle in
                 let last = latestLog(type: type)
-                let due  = dueDate(for: type)
+                let due = dueDate(for: type)
                 let days = daysUntil(due)
                 let color: Color = {
                     guard let d = days else { return .primary.opacity(0.3) }
@@ -240,7 +240,7 @@ extension PetHealthDetailContentView {
                 VStack(spacing: 5) {
                     ZStack {
                         Circle().stroke(color.opacity(0.18), lineWidth: 3).frame(width: 44, height: 44)
-                        if let last = last {
+                        if let last {
                             let elapsed = Calendar.current.dateComponents([.day], from: last.date, to: Date()).day ?? 0
                             let progress = min(1.0, Double(elapsed) / Double(cycle))
                             Circle()
@@ -419,8 +419,8 @@ extension PetHealthDetailContentView {
                     }
                     .padding(.vertical, 6)
                     if log.id != sortedLogs.last?.id {
-                    Divider()
-                }
+                        Divider()
+                    }
                 }
             }
         }
@@ -565,7 +565,7 @@ extension PetHealthDetailContentView {
             ForEach(healthAlerts.prefix(5)) { alert in
                 HStack(spacing: 10) {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                             .fill(alertColor(alert).opacity(0.15))
                             .frame(width: 32, height: 32) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         Image(systemName: alertIcon(for: alert.type))
@@ -594,21 +594,19 @@ extension PetHealthDetailContentView {
 
     func alertColor(_ alert: HealthAlert) -> Color {
         switch alert.severity {
-        case .urgent:  return isDark ? Color.goPrimary : Color.goOrange
-        case .warning: return isDark ? Color.goPrimary.opacity(0.85) : Color.goYellow
-        case .info:    return isDark ? Color.goPrimary.opacity(0.7) : Color.goTeal
+        case .urgent: isDark ? Color.goPrimary : Color.goOrange
+        case .warning: isDark ? Color.goPrimary.opacity(0.85) : Color.goYellow
+        case .info: isDark ? Color.goPrimary.opacity(0.7) : Color.goTeal
         }
     }
 
     @ViewBuilder
     func severityBadge(_ severity: HealthAlert.Severity) -> some View {
-        let (label, color): (String, Color) = {
-            switch severity {
-            case .urgent:  return ("紧急", isDark ? Color.goPrimary : Color.goOrange)
-            case .warning: return ("注意", isDark ? Color.goPrimary.opacity(0.9) : Color.goYellow)
-            case .info:    return ("提示", isDark ? Color.goPrimary.opacity(0.75) : Color.goTeal)
-            }
-        }()
+        let (label, color): (String, Color) = switch severity {
+        case .urgent: ("紧急", isDark ? Color.goPrimary : Color.goOrange)
+        case .warning: ("注意", isDark ? Color.goPrimary.opacity(0.9) : Color.goYellow)
+        case .info: ("提示", isDark ? Color.goPrimary.opacity(0.75) : Color.goTeal)
+        }
         Text(label)
             .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
             .foregroundStyle(color)

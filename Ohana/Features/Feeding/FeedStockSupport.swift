@@ -87,8 +87,7 @@ enum FeedStockCalculator {
             return max(0, sharedStockTotal)
         }
         if !log.sharedSessionId.isEmpty,
-           log.note.hasPrefix(SharedCareMetadata.feedNotePrefix)
-        {
+           log.note.hasPrefix(SharedCareMetadata.feedNotePrefix) {
             return 0
         }
         return effectiveMainFoodAmount(for: log, pet: pet)
@@ -149,11 +148,11 @@ enum FeedStockCalculator {
         let activeEvents = events.filter { event in
             switch mode {
             case .manual:
-                return false
+                false
             case .manualReminder:
-                return FeedRuleMetadata.isManualReminderEvent(event, pet: pet)
+                FeedRuleMetadata.isManualReminderEvent(event, pet: pet)
             case .autoFeeder:
-                return FeedRuleMetadata.isAutoFeederEvent(event, pet: pet)
+                FeedRuleMetadata.isAutoFeederEvent(event, pet: pet)
             }
         }
         return dailyTotalGrams(for: activeEvents, foodKind: foodKind)
@@ -232,8 +231,7 @@ enum FeedStockCalculator {
         let remaining: Double
         if let stockRecord,
            let correctionGrams = stockRecord.remainingCorrectionGrams,
-           let correctionDate = stockRecord.remainingCorrectionDate
-        {
+           let correctionDate = stockRecord.remainingCorrectionDate {
             consumed = stockConsumptionLogs(for: pet, foodKind: foodKind, since: correctionDate, careLogs: careLogs, calculationMode: calculationMode)
                 .filter { $0.date <= now }
                 .reduce(0) { $0 + stockDeductionAmount(for: $1, pet: pet) }
@@ -276,9 +274,9 @@ enum FeedStockCalculator {
     private static func logMatchesStockCalculationMode(_ log: PetCareLog, mode: FeedStockCalculationMode) -> Bool {
         switch mode {
         case .manualOrPlan:
-            return FeedLogMetadata.source(for: log) != .autoMain
+            FeedLogMetadata.source(for: log) != .autoMain
         case .autoFeeder:
-            return FeedLogMetadata.source(for: log) == .autoMain
+            FeedLogMetadata.source(for: log) == .autoMain
         }
     }
 

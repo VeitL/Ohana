@@ -18,7 +18,7 @@ Purpose:
 
 Options:
   --skip-build   Run checks that do not require CoreSimulator.
-  --ui-all-soft  Deprecated compatibility no-op; UI/accessibility/smoothness run through the full-scope ratchet.
+  --ui-all-soft  Deprecated compatibility no-op; UI/accessibility/smoothness run as strict --all gates.
 USAGE
 }
 
@@ -79,8 +79,10 @@ scripts/audit-governance-manifests.sh
 section "Resource integrity"
 scripts/audit-resource-integrity.sh
 
-section "UI/accessibility/smoothness full-scope ratchet"
-scripts/audit-full-scope-ratchet.sh
+section "UI/accessibility/smoothness strict audits"
+scripts/audit-ui-v4.sh --all
+scripts/audit-accessibility.sh --all
+scripts/audit-smoothness-risk.sh --all
 
 section "Secret scan (working tree)"
 if command -v gitleaks >/dev/null 2>&1; then

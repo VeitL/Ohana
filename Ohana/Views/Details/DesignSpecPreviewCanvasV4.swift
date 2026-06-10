@@ -21,7 +21,6 @@ struct DesignSpecPreviewCanvasV4: View {
     @State private var rewardActive = false
     @State private var fieldFocused = false
     @State private var isVisible = false
-
     private var palette: DesignSpecPaletteV4 {
         DesignSpecPaletteV4(selection: selection, mode: mode)
     }
@@ -50,10 +49,10 @@ struct DesignSpecPreviewCanvasV4: View {
             }
         }
         .frame(height: 640)
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
         .shadow(color: .black.opacity(mode == .dark ? 0.22 : 0.08), radius: 18, y: 10) // ui-v4: allow framed developer preview depth
-        .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous))
         .onTapGesture {
             play("画布点击 / Canvas tap")
         }
@@ -86,7 +85,7 @@ struct DesignSpecPreviewCanvasV4: View {
         .foregroundStyle(palette.secondaryText)
         .padding(.horizontal, 9)
         .padding(.vertical, 6)
-        .background(sheetGlass(cornerRadius: 999))
+        .background(sheetGlass(cornerRadius: OhanaRadius.pill))
         .padding(.bottom, 8)
     }
 
@@ -244,7 +243,7 @@ struct DesignSpecPreviewCanvasV4: View {
                         .foregroundStyle(palette.tertiaryText)
                         .frame(maxWidth: .infinity)
                 }
-                ForEach(1...28, id: \.self) { day in
+                ForEach(1 ... 28, id: \.self) { day in
                     calendarDayCell(day, isToday: day == 11, isSelected: day == 12, intensity: calendarIntensity(day))
                 }
             }
@@ -330,7 +329,7 @@ struct DesignSpecPreviewCanvasV4: View {
     private func calendarEventMarker(_ day: Int) -> some View {
         switch selection.calendarEvent {
         case "bars":
-            RoundedRectangle(cornerRadius: 999, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.pill, style: .continuous)
                 .fill(day.isMultiple(of: 2) ? palette.accent : Color.goBlue)
                 .frame(width: 18, height: 3) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
         case "icons":
@@ -584,7 +583,7 @@ struct DesignSpecPreviewCanvasV4: View {
                 .frame(width: 40, height: 40) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
             } else if selection.progress == "steps" {
                 HStack(spacing: 5) {
-                    ForEach(0..<5, id: \.self) { index in
+                    ForEach(0 ..< 5, id: \.self) { index in
                         Circle()
                             .fill(index < Int((sliderValue * 5).rounded(.up)) ? palette.accent : palette.stroke)
                             .frame(width: 10, height: 10) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
@@ -603,7 +602,7 @@ struct DesignSpecPreviewCanvasV4: View {
                 .frame(height: 10)
                 .padding(.vertical, 12)
             } else {
-                Slider(value: $sliderValue, in: 0...1)
+                Slider(value: $sliderValue, in: 0 ... 1)
                     .tint(palette.accent)
             }
         }
@@ -769,7 +768,7 @@ struct DesignSpecPreviewCanvasV4: View {
             .foregroundStyle(palette.primaryText)
             .padding(.horizontal, 11)
             .padding(.vertical, 8)
-            .background(sheetGlass(cornerRadius: 999))
+            .background(sheetGlass(cornerRadius: OhanaRadius.pill))
         }
         .buttonStyle(ScaleButtonStyle()) // ui-v4: allow custom floating action row
     }
@@ -824,7 +823,7 @@ struct DesignSpecPreviewCanvasV4: View {
             iconTab("gearshape.fill", "Set", selected: false)
         }
         .padding(8)
-        .background(sheetGlass(cornerRadius: 999))
+        .background(sheetGlass(cornerRadius: OhanaRadius.pill))
     }
 
     private func iconTab(_ iconName: String, _ title: String, selected: Bool) -> some View {
@@ -891,7 +890,7 @@ struct DesignSpecPreviewCanvasV4: View {
             ZStack {
                 if selection.chartAxis != "none" {
                     VStack(spacing: 0) {
-                        ForEach(0..<4, id: \.self) { _ in
+                        ForEach(0 ..< 4, id: \.self) { _ in
                             Rectangle()
                                 .fill(palette.stroke.opacity(selection.chartAxis == "strong" ? 0.95 : 0.55))
                                 .frame(height: 0.7)
@@ -903,7 +902,7 @@ struct DesignSpecPreviewCanvasV4: View {
                 if selection.chartLine == "bars" {
                     HStack(alignment: .bottom, spacing: 7) {
                         ForEach(values, id: \.self) { value in
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
                                 .fill(palette.accent)
                                 .frame(height: max(14, value * height))
                         }
@@ -1283,54 +1282,54 @@ struct DesignSpecPreviewCanvasV4: View {
 
     private func glassOpacity(for id: String) -> Double {
         switch id {
-        case "refractive": return 0.08
-        case "nativeRegular": return 0
-        case "calendarWidget": return 0.42
-        case "clear": return 0
-        case "edgePrism": return 0.12
-        case "frosted": return 0.86
-        case "solid": return 1
-        default: return 0.68
+        case "refractive": 0.08
+        case "nativeRegular": 0
+        case "calendarWidget": 0.42
+        case "clear": 0
+        case "edgePrism": 0.12
+        case "frosted": 0.86
+        case "solid": 1
+        default: 0.68
         }
     }
 
     private func glassTint(for id: String) -> Color {
         switch id {
         case "refractive":
-            return palette.controlFill
+            palette.controlFill
         case "nativeRegular", "clear":
-            return .clear
+            .clear
         case "edgePrism":
-            return palette.accent.opacity(mode == .dark ? 0.035 : 0.020)
+            palette.accent.opacity(mode == .dark ? 0.035 : 0.020)
         case "calendarWidget":
-            return Color(hex: "1A0738").opacity(mode == .dark ? 0.46 : 0.18)
+            Color(hex: "1A0738").opacity(mode == .dark ? 0.46 : 0.18)
         case "frosted":
-            return Color.white.opacity(mode == .dark ? 0.12 : 0.34) // ui-v4: allow frosted glass tint
+            Color.white.opacity(mode == .dark ? 0.12 : 0.34) // ui-v4: allow frosted glass tint
         case "solid":
-            return mode == .dark ? Color(hex: "17162A").opacity(0.94) : Color.white.opacity(0.92) // ui-v4: allow solid sheet tint
+            mode == .dark ? Color(hex: "17162A").opacity(0.94) : Color.white.opacity(0.92) // ui-v4: allow solid sheet tint
         default:
-            return palette.accent.opacity(0.06)
+            palette.accent.opacity(0.06)
         }
     }
 
     private func glassStroke(for id: String) -> Color {
         switch id {
         case "refractive":
-            return palette.stroke
+            palette.stroke
         case "nativeRegular":
-            return Color.white.opacity(mode == .dark ? 0.24 : 0.38) // ui-v4: allow native glass rim
+            Color.white.opacity(mode == .dark ? 0.24 : 0.38) // ui-v4: allow native glass rim
         case "clear":
-            return Color.white.opacity(mode == .dark ? 0.18 : 0.30) // ui-v4: allow clear glass rim
+            Color.white.opacity(mode == .dark ? 0.18 : 0.30) // ui-v4: allow clear glass rim
         case "edgePrism":
-            return palette.accent.opacity(mode == .dark ? 0.42 : 0.34)
+            palette.accent.opacity(mode == .dark ? 0.42 : 0.34)
         case "calendarWidget":
-            return Color.white.opacity(mode == .dark ? 0.26 : 0.38) // ui-v4: allow widget glass rim
+            Color.white.opacity(mode == .dark ? 0.26 : 0.38) // ui-v4: allow widget glass rim
         case "solid":
-            return palette.stroke
+            palette.stroke
         case "frosted":
-            return Color.white.opacity(mode == .dark ? 0.22 : 0.48) // ui-v4: allow frosted glass rim
+            Color.white.opacity(mode == .dark ? 0.22 : 0.48) // ui-v4: allow frosted glass rim
         default:
-            return Color.white.opacity(mode == .dark ? 0.22 : 0.48) // ui-v4: allow glass rim
+            Color.white.opacity(mode == .dark ? 0.22 : 0.48) // ui-v4: allow glass rim
         }
     }
 
@@ -1344,9 +1343,9 @@ struct DesignSpecPreviewCanvasV4: View {
 
     private func bannerFill(tint: Color) -> Color {
         switch selection.banner {
-        case "quiet": return palette.controlFill
-        case "card": return tint.opacity(0.14)
-        default: return tint.opacity(0.10)
+        case "quiet": palette.controlFill
+        case "card": tint.opacity(0.14)
+        default: tint.opacity(0.10)
         }
     }
 
@@ -1392,15 +1391,15 @@ struct DesignSpecPreviewCanvasV4: View {
 
     private func stateTint(_ state: DesignSpecComponentStateV4) -> Color {
         switch state {
-        case .error: return palette.danger
-        case .warning: return palette.warning
-        case .success: return palette.success
-        case .locked: return Color.goYellow
-        case .selected, .focused, .pressed: return palette.accent
-        case .disabled: return palette.secondaryText
-        case .loading: return Color.goBlue
-        case .empty: return palette.tertiaryText
-        default: return palette.secondaryAccent
+        case .error: palette.danger
+        case .warning: palette.warning
+        case .success: palette.success
+        case .locked: Color.goYellow
+        case .selected, .focused, .pressed: palette.accent
+        case .disabled: palette.secondaryText
+        case .loading: Color.goBlue
+        case .empty: palette.tertiaryText
+        default: palette.secondaryAccent
         }
     }
 
@@ -1416,39 +1415,40 @@ struct DesignSpecPreviewCanvasV4: View {
         if selection.card == "flat" { return 0 }
         return selection.card == "elevated" ? 0.16 : 0.06
     }
+
     private var sheetBackdropBlur: CGFloat {
         switch selection.sheetGlass {
-        case "nativeRegular", "clear": return 0.4
-        case "calendarWidget": return 1.4
-        case "edgePrism": return 1.1
-        default: return 0.8
+        case "nativeRegular", "clear": 0.4
+        case "calendarWidget": 1.4
+        case "edgePrism": 1.1
+        default: 0.8
         }
     }
 
     private var sheetTransition: AnyTransition {
         switch selection.transition {
-        case "slide": return .move(edge: .bottom).combined(with: .opacity)
-        case "fade": return .opacity
-        case "blur": return .scale(scale: 0.98).combined(with: .opacity)
-        default: return .scale(scale: 0.88, anchor: .bottom).combined(with: .opacity)
+        case "slide": .move(edge: .bottom).combined(with: .opacity)
+        case "fade": .opacity
+        case "blur": .scale(scale: 0.98).combined(with: .opacity)
+        default: .scale(scale: 0.88, anchor: .bottom).combined(with: .opacity)
         }
     }
 
     private var fabMenuTransition: AnyTransition {
         switch selection.transition {
-        case "slide": return .move(edge: .bottom).combined(with: .opacity)
-        case "fade": return .opacity
-        case "blur": return .scale(scale: 0.98).combined(with: .opacity)
-        default: return .scale(scale: 0.84, anchor: .bottomTrailing).combined(with: .opacity)
+        case "slide": .move(edge: .bottom).combined(with: .opacity)
+        case "fade": .opacity
+        case "blur": .scale(scale: 0.98).combined(with: .opacity)
+        default: .scale(scale: 0.84, anchor: .bottomTrailing).combined(with: .opacity)
         }
     }
 
     private var sheetTitle: String {
         switch selection.sheet {
-        case "overview": return "喂食 Overview"
-        case "minimal": return "快速打卡"
-        case "confirm": return "确认操作"
-        default: return "记录喂食"
+        case "overview": "喂食 Overview"
+        case "minimal": "快速打卡"
+        case "confirm": "确认操作"
+        default: "记录喂食"
         }
     }
 

@@ -3,10 +3,10 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
 import PhotosUI
+import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 extension AddExpenseSheet {
@@ -30,7 +30,7 @@ extension AddExpenseSheet {
         .foregroundStyle(primaryText)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     func receiptAttachmentChip(_ receipt: ExpenseReceiptAttachment) -> some View {
@@ -45,7 +45,7 @@ extension AddExpenseSheet {
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(sheetTint)
                     .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(sheetTint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .background(sheetTint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous))
                     .accessibilityHidden(true)
             }
 
@@ -70,7 +70,7 @@ extension AddExpenseSheet {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     func primaryActionContent(icon: String, title: String) -> some View {
@@ -108,11 +108,11 @@ extension AddExpenseSheet {
         .buttonStyle(ScaleButtonStyle())
     }
 
-    func payerChip<Avatar: View>(
+    func payerChip(
         id: String?,
         name: String,
-        color: Color,
-        @ViewBuilder avatar: () -> Avatar
+        color _: Color,
+        @ViewBuilder avatar: () -> some View
     ) -> some View {
         let isSelected = selectedPayerId == id
         return Button {
@@ -149,10 +149,10 @@ extension AddExpenseSheet {
         }
     }
 
-    func infoRow<Trailing: View>(
+    func infoRow(
         icon: String,
         label: String,
-        @ViewBuilder trailing: () -> Trailing
+        @ViewBuilder trailing: () -> some View
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
@@ -166,7 +166,7 @@ extension AddExpenseSheet {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(cardSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .padding(.horizontal, 20)
     }
 

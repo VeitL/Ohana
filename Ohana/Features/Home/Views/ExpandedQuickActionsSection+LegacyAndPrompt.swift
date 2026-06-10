@@ -61,9 +61,9 @@ struct ExpandedFirstSuccessPrompt: View {
             button(title: "记录", actionType: "moment", icon: "camera.fill", action: onMoment)
         }
         .padding(8)
-        .background(Color.ohanaCardSurface.opacity(0.52), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface.opacity(0.52), in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.goPrimary.opacity(0.26), lineWidth: 1)
         )
     }

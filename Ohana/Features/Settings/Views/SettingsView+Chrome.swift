@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 extension SettingsView {
@@ -38,7 +38,7 @@ extension SettingsView {
     }
 
     // MARK: - Settings Section
-    func settingsSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+    func settingsSection(title: String, @ViewBuilder content: () -> some View) -> some View {
         SettingsSectionCard(
             title: title,
             tertiaryText: tertiaryText,
@@ -85,8 +85,8 @@ extension SettingsView {
                     en: "Reduces background refresh and decorative motion",
                     de: "Reduziert Hintergrundaktualisierung und Deko-Bewegung"
                 ))
-                    .font(OhanaFont.footnote())
-                    .foregroundStyle(tertiaryText)
+                .font(OhanaFont.footnote())
+                .foregroundStyle(tertiaryText)
             }
             Spacer()
             Toggle("", isOn: $powerSavingMode)
@@ -130,8 +130,8 @@ extension SettingsView {
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
-    
-    func settingsIcon(_ icon: String, color: Color) -> some View {
+
+    func settingsIcon(_ icon: String, color _: Color) -> some View {
         Image(systemName: icon)
             .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaFunctionalIcon)

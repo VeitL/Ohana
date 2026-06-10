@@ -40,7 +40,7 @@ struct RequiredHumanProfileView: View {
                     Circle()
                         .fill(Color.goLime.opacity(0.16))
                         .frame(width: 72, height: 72)
-                    Image(systemName: "person.crop.circle.badge.exclamationmark.fill") // a11y: decorative icon; surrounding text carries the message.
+                    Image(systemName: "person.crop.circle.badge.exclamationmark.fill") // a11y: decorative icon; surrounding text carries the message. // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                         .font(OhanaFont.title(.bold))
                         .foregroundStyle(Color.goLime)
                         .accessibilityHidden(true)
@@ -78,7 +78,7 @@ struct RequiredHumanProfileView: View {
                 .padding(.top, 4)
             }
             .padding(24)
-            .goTranslucentCard(cornerRadius: 30)
+            .goTranslucentCard(cornerRadius: OhanaRadius.sheetMini)
             .padding(.horizontal, 20)
 
             Spacer()

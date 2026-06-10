@@ -16,7 +16,7 @@ extension VerticalSolidHomeView {
         homeCardOrderRaw = FocusHomeCardDataSource.promotedOrderRaw(id: id, currentRaw: homeCardOrderRaw)
         arrivingHomeCardId = id
         arrivalClearTask?.cancel()
-        arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1_500) {
+        arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 1500) {
             guard arrivingHomeCardId == id else { return }
             arrivingHomeCardId = nil
             arrivalClearTask = nil
@@ -203,7 +203,7 @@ extension VerticalSolidHomeView {
         openFunctionMenu(destination: .featureGroup(.healthBody))
     }
 
-    func openTodayFocusFamilyTask(_ task: TodayFocusFamilyTaskSnapshot) {
+    func openTodayFocusFamilyTask(_: TodayFocusFamilyTaskSnapshot) {
         routeCoordinator.openCrewRoster(mode: .collaboration)
     }
 

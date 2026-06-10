@@ -5,8 +5,8 @@
 //  T3: Quick Access 先选宠物再执行动作
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetPickerSheet: View {
     let pets: [Pet]
@@ -17,21 +17,21 @@ struct PetPickerSheet: View {
 
     private var actionTitle: String {
         switch actionId {
-        case "walk":   return "选择要遛的狗"
-        case "health": return "选择宠物查看健康"
-        case "groom":  return "选择要护理的宠物"
-        case "potty":  return "选择宠物记录排泄"
-        default:       return "选择宠物"
+        case "walk": "选择要遛的狗"
+        case "health": "选择宠物查看健康"
+        case "groom": "选择要护理的宠物"
+        case "potty": "选择宠物记录排泄"
+        default: "选择宠物"
         }
     }
 
     private var actionEmoji: String {
         switch actionId {
-        case "walk":   return "🦮"
-        case "health": return "❤️"
-        case "groom":  return "✂️"
-        case "potty":  return "💩"
-        default:       return "🐾"
+        case "walk": "🦮"
+        case "health": "❤️"
+        case "groom": "✂️"
+        case "potty": "💩"
+        default: "🐾"
         }
     }
 
@@ -93,7 +93,7 @@ struct PetPickerSheet: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+                            .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: OhanaRadius.control))
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }

@@ -65,9 +65,9 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
             .background {
                 cardBackground(width: width, height: height)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                     .strokeBorder(Color.goCardWhite.opacity(0.24), lineWidth: 1)
                     .allowsHitTesting(false)
             }
@@ -82,7 +82,7 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                 colors: [
                     accent.mix(with: .white, by: 0.14),
                     accent,
-                    accent.mix(with: .black, by: 0.34),
+                    accent.mix(with: .black, by: 0.34)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -189,7 +189,7 @@ struct MemberAvatarCandidateCell: View {
         Button(action: action) {
             VStack(spacing: 6) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         .fill(isSelected ? Color.goPrimary : Color.ohanaControlFill)
                     if let image {
                         Image(uiImage: image)
@@ -204,7 +204,7 @@ struct MemberAvatarCandidateCell: View {
                 }
                 .frame(width: 76, height: 96)
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         .strokeBorder(isSelected ? Color.goPrimary : Color.clear, lineWidth: 2)
                 }
                 Text(candidate.isDefault ? l.tr(zh: "智能", en: "Smart", de: "Smart") : candidate.subtitle)
@@ -218,7 +218,7 @@ struct MemberAvatarCandidateCell: View {
         .buttonStyle(ScaleButtonStyle())
         .task(id: candidate.id) {
             let data = candidate.data
-            image = await Task.detached(priority: .utility) {
+            image = await Task.detached(priority: .utility) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
                 UIImage(data: data) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
             }.value
         }
@@ -315,11 +315,11 @@ struct MemberPortraitCropView: View {
             let cropHeight = cropWidth * MemberAvatarImageProcessor.portraitAspect
 
             ZStack {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                     .fill(Color.arkCardDark)
                     .frame(width: cropWidth, height: cropHeight)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                             .strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 1)
                     }
 
@@ -386,14 +386,14 @@ struct MemberPortraitCropView: View {
                     .mask {
                         Rectangle()
                             .overlay {
-                                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                                RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                                     .frame(width: cropWidth, height: cropHeight)
                                     .blendMode(.destinationOut)
                             }
                     }
                     .allowsHitTesting(false)
 
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                     .strokeBorder(Color.goPrimary, lineWidth: 2)
                     .frame(width: cropWidth, height: cropHeight)
                     .allowsHitTesting(false)
@@ -492,7 +492,7 @@ struct MemberPortraitCropView: View {
             guard !Task.isCancelled else { return }
 
             let decodeID = MemberCreationPerformance.begin("Avatar Photo Decode")
-            let image = await Task.detached(priority: .userInitiated) {
+            let image = await Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
                 MemberAvatarImageProcessor.image(from: data)
             }.value
             MemberCreationPerformance.end("Avatar Photo Decode", decodeID)

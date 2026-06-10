@@ -67,7 +67,7 @@ enum OnboardingJourneyCoordinator {
     @MainActor
     static func currentPhase(
         activeHumanID: String?,
-        context: ModelContext,
+        context _: ModelContext,
         defaults: UserDefaults = .standard
     ) -> OnboardingJourneyPhase {
         if activeHumanID?.isEmpty != false {

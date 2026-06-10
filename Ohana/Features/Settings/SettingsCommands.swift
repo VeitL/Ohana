@@ -69,9 +69,8 @@ enum SettingsCommandService {
         let delta = amount - current
         if delta != 0 {
             do {
-                let walletDelta: CoconutWalletDelta
-                if let human {
-                    walletDelta = .human(
+                let walletDelta: CoconutWalletDelta = if let human {
+                    .human(
                         human,
                         delta: delta,
                         entryKind: .adjustment,
@@ -84,7 +83,7 @@ enum SettingsCommandService {
                         subjectId: human.id.uuidString
                     )
                 } else {
-                    walletDelta = .system(
+                    .system(
                         delta: delta,
                         entryKind: .adjustment,
                         source: .service,
@@ -105,7 +104,7 @@ enum SettingsCommandService {
                 context.safeSave()
             } catch {
                 #if DEBUG
-                print("❌ [SettingsCoconutBalanceCommandService] wallet adjustment failed: \(error.localizedDescription)")
+                    OhanaLog.error("[SettingsCoconutBalanceCommandService] wallet adjustment failed: \(error.localizedDescription)", category: "Economy")
                 #endif
             }
         }

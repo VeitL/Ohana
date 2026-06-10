@@ -3,15 +3,15 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Time Range
 enum WealthTimeRange: String, CaseIterable, Identifiable {
-    case day   = "日"
-    case week  = "周"
+    case day = "日"
+    case week = "周"
     case month = "月"
-    case all   = "全部"
+    case all = "全部"
     var id: String { rawValue }
 }
 
@@ -42,7 +42,7 @@ struct WealthLeaderRow: Identifiable {
     let emoji: String
     let name: String
     let entityId: String
-    let amount: Int        // 直接读 coconutBalance
+    let amount: Int // 直接读 coconutBalance
     let periodIncome: Int
     let periodSpending: Int
     let periodNet: Int
@@ -54,7 +54,7 @@ struct WealthLeaderRow: Identifiable {
 final class IslandWealthScreenModel {
     var timeRange: WealthTimeRange = .week
     var showSystemCoconuts: Bool = true
-    var selectedActorId: String? = nil
+    var selectedActorId: String?
 
     // 注入实体列表（由 View 从 @Query 传入）
     var pets: [Pet] = []
@@ -181,7 +181,7 @@ final class IslandWealthScreenModel {
     }
 
     // MARK: - 收支汇总
-    var periodIncome:   Int { filteredIncome.reduce(0)   { $0 + $1.amount } }
+    var periodIncome: Int { filteredIncome.reduce(0) { $0 + $1.amount } }
     var periodSpending: Int { filteredSpending.reduce(0) { $0 + abs($1.amount) } }
     var periodNet: Int { periodIncome - periodSpending }
 
@@ -206,17 +206,17 @@ final class IslandWealthScreenModel {
 
     // 时间段内活跃实体名集合（用于图例）
     var activeEntityNames: [String] {
-        let names = Set(filteredIncome.compactMap { $0.actorName })
+        let names = Set(filteredIncome.compactMap(\.actorName))
         return Array(names).sorted()
     }
 
     // 共享桶化组件
     private var bucketComponent: Calendar.Component {
         switch timeRange {
-        case .day:   return .hour
-        case .week:  return .day
-        case .month: return .day
-        case .all:   return .month
+        case .day: .hour
+        case .week: .day
+        case .month: .day
+        case .all: .month
         }
     }
 
@@ -315,22 +315,22 @@ final class IslandWealthScreenModel {
             let bucket = cal.dateInterval(of: component, for: log.date)?.start ?? log.date
             // 严格按 actorId 分桶；未知实体归入 system
             let rawId = log.actorId ?? ""
-            let isPet   = !rawId.isEmpty && pets.contains   { $0.id.uuidString == rawId }
+            let isPet = !rawId.isEmpty && pets.contains { $0.id.uuidString == rawId }
             let isHuman = !rawId.isEmpty && humans.contains { $0.id.uuidString == rawId }
             let eid: String
             let name: String
             if isPet {
-                eid  = rawId
+                eid = rawId
                 name = pets.first { $0.id.uuidString == rawId }?.name ?? (log.actorName ?? "宠物")
             } else if isHuman {
-                eid  = rawId
+                eid = rawId
                 name = humans.first { $0.id.uuidString == rawId }?.name ?? (log.actorName ?? "家人")
             } else {
-                eid  = "system"
+                eid = "system"
                 name = "其他/系统"
             }
             // 过滤系统椰子（当 toggle 关闭时）
-            if !showSystemCoconuts && eid == "system" { continue }
+            if !showSystemCoconuts, eid == "system" { continue }
             let key = "\(bucket.timeIntervalSince1970)_\(eid)"
             if let existing = dict[key] {
                 dict[key] = (bucket, name, eid, existing.sum + log.amount)
@@ -345,7 +345,7 @@ final class IslandWealthScreenModel {
 
     // 所有图表中出现的实体名（用于 chartForegroundStyleScale domain）
     var chartEntityNames: [String] {
-        Array(Set(chartBars.map { $0.entityName })).sorted()
+        Array(Set(chartBars.map(\.entityName))).sorted()
     }
 
     // 对应的颜色数组（与 chartEntityNames 严格一一对应）

@@ -27,7 +27,7 @@ enum OhanaChartStyle {
     ) -> ClosedRange<Double> {
         let cleanValues = values.filter(\.isFinite)
         guard let minValue = cleanValues.min(), let maxValue = cleanValues.max() else {
-            return 0...1
+            return 0 ... 1
         }
 
         var lower = includeZero ? min(0, minValue) : minValue
@@ -45,7 +45,7 @@ enum OhanaChartStyle {
         if upper <= lower {
             upper = lower + minimumSpan
         }
-        return lower...upper
+        return lower ... upper
     }
 
     static func weightReferenceLabel(kilograms: Double, domain: ClosedRange<Double>) -> String {
@@ -121,7 +121,7 @@ enum OhanaChartStyle {
 
         let count = points.count
         var slopes = Array(repeating: CGFloat.zero, count: count - 1)
-        for index in 0..<(count - 1) {
+        for index in 0 ..< (count - 1) {
             let dx = max(points[index + 1].x - points[index].x, 0.0001)
             slopes[index] = (points[index + 1].y - points[index].y) / dx
         }
@@ -131,7 +131,7 @@ enum OhanaChartStyle {
         tangents[count - 1] = slopes[count - 2]
 
         if count > 2 {
-            for index in 1..<(count - 1) {
+            for index in 1 ..< (count - 1) {
                 let previous = slopes[index - 1]
                 let next = slopes[index]
                 if previous == 0 || next == 0 || previous.sign != next.sign {
@@ -146,7 +146,7 @@ enum OhanaChartStyle {
             }
         }
 
-        for index in 0..<(count - 1) {
+        for index in 0 ..< (count - 1) {
             let p1 = points[index]
             let p2 = points[index + 1]
             let dx = p2.x - p1.x
@@ -210,7 +210,7 @@ struct OhanaMinimalTrendChart: View {
     var progress: Double = 1
     var showsLatestPoint: Bool = true
     var yReferenceLineCount: Int = 0
-    var yReferenceFormatter: ((Double, ClosedRange<Double>) -> String)? = nil
+    var yReferenceFormatter: ((Double, ClosedRange<Double>) -> String)?
 
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var entranceProgress: Double = 0
@@ -245,7 +245,7 @@ struct OhanaMinimalTrendChart: View {
         let domain = resolvedYDomain
         let span = domain.upperBound - domain.lowerBound
         guard span.isFinite, span > 0 else { return [] }
-        return (0..<count).map { index in
+        return (0 ..< count).map { index in
             domain.lowerBound + span * Double(index) / Double(count - 1)
         }
     }
@@ -353,12 +353,12 @@ struct OhanaMinimalTrendChart: View {
         if let xDomain { return xDomain }
         guard let first = points.first?.date, let last = points.last?.date else {
             let now = Date()
-            return now...now.addingTimeInterval(1)
+            return now ... now.addingTimeInterval(1)
         }
         if first == last {
-            return first.addingTimeInterval(-43_200)...last.addingTimeInterval(43_200)
+            return first.addingTimeInterval(-43200) ... last.addingTimeInterval(43200)
         }
-        return first...last
+        return first ... last
     }
 
     private func playEntrance() {
@@ -462,12 +462,12 @@ struct OhanaMinimalMultiTrendChart: View {
         if let xDomain { return xDomain }
         guard let first = allPoints.first?.date, let last = allPoints.last?.date else {
             let now = Date()
-            return now...now.addingTimeInterval(1)
+            return now ... now.addingTimeInterval(1)
         }
         if first == last {
-            return first.addingTimeInterval(-43_200)...last.addingTimeInterval(43_200)
+            return first.addingTimeInterval(-43200) ... last.addingTimeInterval(43200)
         }
-        return first...last
+        return first ... last
     }
 
     private func playEntrance() {
@@ -488,7 +488,7 @@ struct OhanaMinimalBarChart: View {
     var progress: Double = 1
     var showsLabels: Bool = true
     var maxBarHeight: CGFloat = 90
-    var emptyBarColor: Color = Color.ohanaControlFill.opacity(0.70)
+    var emptyBarColor: Color = .ohanaControlFill.opacity(0.70)
 
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var entranceProgress: Double = 0

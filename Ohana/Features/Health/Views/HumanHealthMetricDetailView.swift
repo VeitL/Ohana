@@ -5,8 +5,8 @@
 //  Trend, reference range, and history for one human checkup metric.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct HumanHealthMetricDetailView: View {
     let human: Human
@@ -127,7 +127,7 @@ struct HumanHealthMetricDetailView: View {
                 .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(metric.displayName(l))
@@ -199,7 +199,7 @@ struct HumanHealthMetricDetailView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var unitSelector: some View {
@@ -232,7 +232,7 @@ struct HumanHealthMetricDetailView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .frame(minWidth: 116, minHeight: 64, alignment: .leading)
-                            .goSelectableSurface(isSelected: selected, tint: tint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .goSelectableSurface(isSelected: selected, tint: tint, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
@@ -282,7 +282,7 @@ struct HumanHealthMetricDetailView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var referenceSection: some View {
@@ -358,7 +358,7 @@ struct HumanHealthMetricDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var addButton: some View {
@@ -416,7 +416,7 @@ struct HumanHealthMetricDetailView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func statusBadge(for log: HumanHealthMetricLog) -> some View {
@@ -496,6 +496,6 @@ struct HumanHealthMetricDetailView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 }

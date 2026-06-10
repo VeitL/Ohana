@@ -7,24 +7,24 @@
 //
 
 import Foundation
-import SwiftData
 import Observation
+import SwiftData
 
 @Observable
 final class StreakRewardManager {
     // 里程碑配置：(连续天数, 奖励椰子)
     static let milestones: [(days: Int, reward: Int)] = [
-        (7,   20),
-        (30,  100),
+        (7, 20),
+        (30, 100),
         (100, 500),
-        (365, 2000),
+        (365, 2000)
     ]
 
     // 触发回调：UI 可监听此值来显示 Toast
-    var lastMilestone: (days: Int, reward: Int)? = nil
+    var lastMilestone: (days: Int, reward: Int)?
 
     private static let defaults = UserDefaults.standard
-    private static let rewardsKey = "streakRewards_claimed"  // { "petId_days": timestamp }
+    private static let rewardsKey = "streakRewards_claimed" // { "petId_days": timestamp }
 
     init() {}
 
@@ -37,7 +37,7 @@ final class StreakRewardManager {
             guard streak >= milestone.days else { continue }
             let key = "\(pet.id.uuidString)_\(milestone.days)"
             var claimed = Self.defaults.dictionary(forKey: Self.rewardsKey) ?? [:]
-            if claimed[key] != nil { continue }  // 已领取
+            if claimed[key] != nil { continue } // 已领取
 
             // 记录领取
             claimed[key] = Date().timeIntervalSince1970

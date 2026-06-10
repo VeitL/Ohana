@@ -27,25 +27,25 @@ enum OhanaDeferredInlinePageCoverStyle {
     func topGap(safeTop: CGFloat) -> CGFloat {
         switch self {
         case .fullScreen:
-            return 0
+            0
         case .sheetPage:
-            return max(10, safeTop - 18)
+            max(10, safeTop - 18)
         }
     }
 
     var horizontalInset: CGFloat {
         switch self {
         case .fullScreen, .sheetPage:
-            return 0
+            0
         }
     }
 
     var topCornerRadius: CGFloat {
         switch self {
         case .fullScreen:
-            return 0
+            0
         case .sheetPage:
-            return 36
+            36
         }
     }
 

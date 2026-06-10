@@ -4,77 +4,77 @@
 //
 //  身体检测报告模型 — 记录人类成员的体检 / 检测结果
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 /// 报告类型
 enum HealthReportType: String, Codable, CaseIterable, Identifiable {
-    case bloodTest      = "血液检测"
-    case urineTest      = "尿液检测"
-    case physical       = "全身体检"
-    case vision         = "视力检查"
-    case dental         = "口腔检查"
-    case cardiac        = "心脏检查"
-    case imaging        = "影像检查"
-    case allergy        = "过敏检测"
-    case other          = "其他"
+    case bloodTest = "血液检测"
+    case urineTest = "尿液检测"
+    case physical = "全身体检"
+    case vision = "视力检查"
+    case dental = "口腔检查"
+    case cardiac = "心脏检查"
+    case imaging = "影像检查"
+    case allergy = "过敏检测"
+    case other = "其他"
 
     var id: String { rawValue }
 
     var emoji: String {
         switch self {
-        case .bloodTest:  return "🩸"
-        case .urineTest:  return "🧪"
-        case .physical:   return "🏥"
-        case .vision:     return "👁️"
-        case .dental:     return "🦷"
-        case .cardiac:    return "❤️"
-        case .imaging:    return "📷"
-        case .allergy:    return "🤧"
-        case .other:      return "📋"
+        case .bloodTest: "🩸"
+        case .urineTest: "🧪"
+        case .physical: "🏥"
+        case .vision: "👁️"
+        case .dental: "🦷"
+        case .cardiac: "❤️"
+        case .imaging: "📷"
+        case .allergy: "🤧"
+        case .other: "📋"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .bloodTest:  return "drop.fill"
-        case .urineTest:  return "flask.fill"
-        case .physical:   return "stethoscope"
-        case .vision:     return "eye.fill"
-        case .dental:     return "mouth.fill"
-        case .cardiac:    return "heart.fill"
-        case .imaging:    return "camera.metering.spot"
-        case .allergy:    return "allergens.fill"
-        case .other:      return "doc.text.fill"
+        case .bloodTest: "drop.fill"
+        case .urineTest: "flask.fill"
+        case .physical: "stethoscope"
+        case .vision: "eye.fill"
+        case .dental: "mouth.fill"
+        case .cardiac: "heart.fill"
+        case .imaging: "camera.metering.spot"
+        case .allergy: "allergens.fill"
+        case .other: "doc.text.fill"
         }
     }
 }
 
 /// 报告结论等级
 enum ReportConclusion: String, Codable, CaseIterable, Identifiable {
-    case normal     = "正常"
-    case attention  = "注意"
-    case abnormal   = "异常"
-    case critical   = "危急"
+    case normal = "正常"
+    case attention = "注意"
+    case abnormal = "异常"
+    case critical = "危急"
 
     var id: String { rawValue }
 
     var color: Color {
         switch self {
-        case .normal:    return .goTeal
-        case .attention: return .goYellow
-        case .abnormal:  return .goOrange
-        case .critical:  return .goRed
+        case .normal: .goTeal
+        case .attention: .goYellow
+        case .abnormal: .goOrange
+        case .critical: .goRed
         }
     }
 
     var emoji: String {
         switch self {
-        case .normal:    return "✅"
-        case .attention: return "⚠️"
-        case .abnormal:  return "🔶"
-        case .critical:  return "🔴"
+        case .normal: "✅"
+        case .attention: "⚠️"
+        case .abnormal: "🔶"
+        case .critical: "🔴"
         }
     }
 }

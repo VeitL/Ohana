@@ -21,22 +21,24 @@ struct VerticalGlassHomeLabView: View {
     @State private var isFocusCollapsed = false
     @State private var selectedFocusIndex = 0
     @GestureState private var focusDragY: CGFloat = 0
-
     private let cards = VerticalGlassHomeLabCard.fixtures
     private let focusItems = VerticalGlassHomeLabFocus.fixtures
     private var l: L10n { L10n(appLanguage) }
     private var canFloat: Bool {
         !reduceMotion && workloadPolicy.ambientMotionBudget(isVisible: isVisible).allowsMotion
     }
+
     private var bottomNavGlassTint: Color {
         if reduceTransparency {
             return Color.ohanaCardSurface.opacity(0.92)
         }
         return Color.ohanaCardSurface.opacity(colorScheme == .dark ? 0.28 : 0.34)
     }
+
     private var bottomNavSpecularStroke: Color {
         colorScheme == .dark ? Color.ohanaPrimaryText.opacity(0.18) : Color.ohanaSecondaryText.opacity(0.10)
     }
+
     private var clampedFocusDragY: CGFloat {
         min(74, max(-74, focusDragY))
     }
@@ -44,11 +46,9 @@ struct VerticalGlassHomeLabView: View {
     var body: some View {
         ZStack {
             OhanaAppBackground().ignoresSafeArea()
-
             GeometryReader { geo in
                 TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !canFloat)) { timeline in // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
                     let time = canFloat ? timeline.date.timeIntervalSinceReferenceDate : 0
-
                     ZStack {
                         header(safeTop: geo.safeAreaInsets.top)
                             .frame(maxHeight: .infinity, alignment: .top)
@@ -152,18 +152,18 @@ struct VerticalGlassHomeLabView: View {
             let dragProgress = min(1, abs(dragY) / 74)
 
             ZStack(alignment: .top) {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
                     .fill(Color.ohanaCardSurface.opacity(0.46))
                     .offset(y: 36 + dragProgress * 8)
                     .scaleEffect(x: 0.82 + dragProgress * 0.03, y: 1, anchor: .top)
-                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous)
                     .fill(Color.ohanaCardSurface.opacity(0.66))
                     .offset(y: 24 + dragProgress * 5)
                     .scaleEffect(x: 0.90 + dragProgress * 0.02, y: 1, anchor: .top)
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                     .fill(Color.ohanaCardSurface)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                             .strokeBorder(Color.ohanaGlassStroke.opacity(0.22), lineWidth: 1)
                     }
 
@@ -180,7 +180,7 @@ struct VerticalGlassHomeLabView: View {
                 }
                 .frame(height: 112)
                 .clipped()
-                .contentShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous))
                 .highPriorityGesture(focusSwipeGesture)
                 .accessibilityAction(named: Text(l.tr(zh: "下一张任务", en: "Next focus", de: "Nächster Fokus"))) {
                     shiftFocus(1, withFeedback: true)
@@ -428,7 +428,7 @@ private struct VerticalGlassHomeLabStage: View {
 
     private func cardFrame(
         for card: VerticalGlassHomeLabCard,
-        at index: Int,
+        at _: Int,
         in size: CGSize,
         isSelected: Bool
     ) -> CGRect {
@@ -655,7 +655,7 @@ private struct VerticalGlassHomeLabCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private var quickActions: some View {
@@ -675,7 +675,7 @@ private struct VerticalGlassHomeLabCardView: View {
                     .foregroundStyle(action.isPrimary ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(action.isPrimary ? card.tint : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(action.isPrimary ? card.tint : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -693,19 +693,19 @@ private enum VerticalGlassHomeLabTab: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .home: return "house"
-        case .calendar: return "calendar"
-        case .oasis: return "tree"
-        case .plants: return "leaf"
+        case .home: "house"
+        case .calendar: "calendar"
+        case .oasis: "tree"
+        case .plants: "leaf"
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .home: return l.tr(zh: "首页", en: "Home", de: "Home")
-        case .calendar: return l.tr(zh: "日历", en: "Calendar", de: "Kalender")
-        case .oasis: return "Oasis"
-        case .plants: return l.tr(zh: "植物", en: "Plants", de: "Pflanzen")
+        case .home: l.tr(zh: "首页", en: "Home", de: "Home")
+        case .calendar: l.tr(zh: "日历", en: "Calendar", de: "Kalender")
+        case .oasis: "Oasis"
+        case .plants: l.tr(zh: "植物", en: "Plants", de: "Pflanzen")
         }
     }
 }
@@ -884,7 +884,7 @@ private struct VerticalGlassHomeLabFocusItemView: View {
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                     .fill(item.tint.opacity(0.16))
                 Image(systemName: item.icon)
                     .font(OhanaFont.adaptive(size: 34, weight: .black))

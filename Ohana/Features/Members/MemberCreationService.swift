@@ -24,17 +24,17 @@ enum MemberCreationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .emptyName:
-            return "Name is required."
+            "Name is required."
         case .duplicateName:
-            return "Name already exists."
+            "Name already exists."
         case .avatarPassRequired:
-            return "A 2.5D avatar pass is required."
+            "A 2.5D avatar pass is required."
         case let .insufficientCoconuts(missing):
-            return "Need \(missing) more coconuts."
+            "Need \(missing) more coconuts."
         case .missingActiveHuman:
-            return "No active human member."
+            "No active human member."
         case let .saveFailed(message):
-            return message
+            message
         }
     }
 }
@@ -183,7 +183,7 @@ final class MemberCreationService: MemberCreating {
     ) throws -> SaveResult {
         let existingCount = existingPets.count
         let shouldUse2D = draft.avatarSource == .avatar2D && draft.avatarImageData != nil
-        if shouldUse2D && !Avatar2DAccess.hasAccess(kind: .pet, existingCount: existingCount) {
+        if shouldUse2D, !Avatar2DAccess.hasAccess(kind: .pet, existingCount: existingCount) {
             throw ServiceError.avatarPassRequired
         }
         let pet = Pet(
@@ -286,7 +286,7 @@ final class MemberCreationService: MemberCreating {
     ) throws -> SaveResult {
         let existingCount = existingHumans.count
         let shouldUse2D = draft.avatarSource == .avatar2D && draft.avatarImageData != nil
-        if shouldUse2D && !Avatar2DAccess.hasAccess(kind: .human, existingCount: existingCount) {
+        if shouldUse2D, !Avatar2DAccess.hasAccess(kind: .human, existingCount: existingCount) {
             throw ServiceError.avatarPassRequired
         }
         let human = Human(
@@ -425,14 +425,14 @@ final class MemberCreationService: MemberCreating {
 
     private func speciesEmoji(_ species: String) -> String {
         switch species {
-        case "狗": return "🐕"
-        case "猫": return "🐈"
-        case "兔子": return "🐇"
-        case "鱼": return "🐟"
-        case "鸟": return "🦜"
-        case "爬宠": return "🦎"
-        case "仓鼠": return "🐹"
-        default: return "🐾"
+        case "狗": "🐕"
+        case "猫": "🐈"
+        case "兔子": "🐇"
+        case "鱼": "🐟"
+        case "鸟": "🦜"
+        case "爬宠": "🦎"
+        case "仓鼠": "🐹"
+        default: "🐾"
         }
     }
 
@@ -445,7 +445,7 @@ final class MemberCreationService: MemberCreating {
     private func humanNotes(draft: MemberCreationDraft) -> String {
         [
             "性别:\(HumanProfileOptions.normalizedGender(draft.humanGender))",
-            draft.notes.trimmingCharacters(in: .whitespacesAndNewlines),
+            draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         ]
         .filter { !$0.isEmpty }
         .joined(separator: "｜")

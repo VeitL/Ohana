@@ -58,32 +58,33 @@ struct PetHealthRecordInlinePopup: View {
     private var showsNameField: Bool {
         selectedType == .vaccine || selectedType == .dewormingInternal || selectedType == .dewormingExternal || selectedType == .medication
     }
+
     private var showsExpiration: Bool { selectedType.needsExpiration }
     private var showsNextCheckup: Bool { selectedType == .checkup }
 
     private var typeLabel: String {
         switch selectedType {
-        case .vaccine: return l.tr(zh: "疫苗接种", en: "Vaccine", de: "Impfung")
-        case .dewormingInternal: return l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
-        case .dewormingExternal: return l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
-        case .checkup: return l.tr(zh: "体检记录", en: "Checkup", de: "Check-up")
-        case .surgery: return l.tr(zh: "就诊记录", en: "Visit", de: "Besuch")
-        default: return selectedType.rawValue
+        case .vaccine: l.tr(zh: "疫苗接种", en: "Vaccine", de: "Impfung")
+        case .dewormingInternal: l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .dewormingExternal: l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
+        case .checkup: l.tr(zh: "体检记录", en: "Checkup", de: "Check-up")
+        case .surgery: l.tr(zh: "就诊记录", en: "Visit", de: "Besuch")
+        default: selectedType.rawValue
         }
     }
 
     private func healthIcon(for type: HealthLogType) -> String {
         switch type {
-        case .general: return "clipboard.fill"
-        case .vaccine: return "syringe.fill"
-        case .medication: return "pill.fill"
-        case .dewormingInternal: return "pills.fill"
-        case .dewormingExternal: return "shield.lefthalf.filled"
-        case .surgery: return "cross.case.fill"
-        case .dental: return "mouth.fill"
-        case .checkup: return "stethoscope"
-        case .emergency: return "cross.circle.fill"
-        case .other: return "doc.text.fill"
+        case .general: "clipboard.fill"
+        case .vaccine: "syringe.fill"
+        case .medication: "pill.fill"
+        case .dewormingInternal: "pills.fill"
+        case .dewormingExternal: "shield.lefthalf.filled"
+        case .surgery: "cross.case.fill"
+        case .dental: "mouth.fill"
+        case .checkup: "stethoscope"
+        case .emergency: "cross.circle.fill"
+        case .other: "doc.text.fill"
         }
     }
 
@@ -99,7 +100,7 @@ struct PetHealthRecordInlinePopup: View {
                     .font(OhanaFont.adaptive(size: 20, weight: .black))
                     .foregroundStyle(accent)
                     .frame(width: 46, height: 46)
-                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(typeLabel)
                         .font(OhanaFont.title3(.black))
@@ -124,7 +125,7 @@ struct PetHealthRecordInlinePopup: View {
 
                     if showsNameField {
                         inlineField(icon: "pencil.line", tint: accent) {
-                            TextField(l.tr(zh: "名称（可选）", en: "Name (optional)", de: "Name (optional)"), text: $name)
+                            TextField(l.tr(zh: "名称（可选）", en: "Name (optional)", de: "Name (optional)"), text: $name) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                 .font(OhanaFont.subheadline(.semibold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                         }
@@ -157,7 +158,7 @@ struct PetHealthRecordInlinePopup: View {
                     }
 
                     inlineField(icon: "stethoscope", tint: Color.goTeal) {
-                        TextField(l.tr(zh: "医生 / 诊所（可选）", en: "Vet / clinic (optional)", de: "Tierarzt / Klinik (optional)"), text: $vetName)
+                        TextField(l.tr(zh: "医生 / 诊所（可选）", en: "Vet / clinic (optional)", de: "Tierarzt / Klinik (optional)"), text: $vetName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                             .font(OhanaFont.subheadline(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
@@ -172,17 +173,17 @@ struct PetHealthRecordInlinePopup: View {
                             valueFont: OhanaFont.subheadline(.semibold),
                             valueAlignment: .leading,
                             fill: Color.clear,
-                            cornerRadius: 12,
+                            cornerRadius: OhanaRadius.chip,
                             horizontalPadding: 4,
                             verticalPadding: 0
                         )
                     }
 
                     inlineField(icon: "note.text", tint: Color.ohanaSecondaryText) {
-                        TextField(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"), text: $note, axis: .vertical)
+                        TextField(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"), text: $note, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                             .font(OhanaFont.subheadline(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(2...4)
+                            .lineLimit(2 ... 4)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -209,7 +210,7 @@ struct PetHealthRecordInlinePopup: View {
             .padding(.bottom, 14)
         }
         .background {
-            FeedInlineSheetGlassSurface(cornerRadius: 52, glassMode: .regular)
+            FeedInlineSheetGlassSurface(cornerRadius: OhanaRadius.inlinePopup, glassMode: .regular)
         }
         .onAppear(perform: applyDefaultsForSelectedType)
         .onChange(of: selectedType) { _, _ in applyDefaultsForSelectedType() }
@@ -224,14 +225,12 @@ struct PetHealthRecordInlinePopup: View {
     }
 
     private func healthSubtypeSelector(mode: HealthRecordEntryMode) -> some View {
-        let options: [(HealthLogType, String)] = {
-            switch mode {
-            case .preventive:
-                return [(.vaccine, "疫苗"), (.dewormingInternal, "体内"), (.dewormingExternal, "体外"), (.checkup, "体检")]
-            case .visit:
-                return [(.surgery, "就诊"), (.general, "常规")]
-            }
-        }()
+        let options: [(HealthLogType, String)] = switch mode {
+        case .preventive:
+            [(.vaccine, "疫苗"), (.dewormingInternal, "体内"), (.dewormingExternal, "体外"), (.checkup, "体检")]
+        case .visit:
+            [(.surgery, "就诊"), (.general, "常规")]
+        }
 
         return HStack(spacing: 8) {
             ForEach(options, id: \.0) { type, title in
@@ -253,13 +252,13 @@ struct PetHealthRecordInlinePopup: View {
             }
         }
         .padding(10)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
-    private func inlineField<Content: View>(
+    private func inlineField(
         icon: String,
         tint: Color,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: () -> some View
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
@@ -270,7 +269,7 @@ struct PetHealthRecordInlinePopup: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func inlineToggleDateBlock(
@@ -298,7 +297,7 @@ struct PetHealthRecordInlinePopup: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func defaultExpirationDate(from base: Date) -> Date {

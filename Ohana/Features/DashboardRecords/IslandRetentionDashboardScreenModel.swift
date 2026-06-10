@@ -52,6 +52,6 @@ struct IslandRetentionDashboardScreenModel {
             !pet.expenseLogs.isEmpty,
             !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty,
             achievements.contains(where: \.isUnlocked) || pet.currentStreak > 0
-        ].filter { $0 }.count
+        ].count(where: { $0 })
     }
 }

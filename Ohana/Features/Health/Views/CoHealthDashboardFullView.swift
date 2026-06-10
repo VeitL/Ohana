@@ -4,8 +4,8 @@
 //
 //  模块5：人宠共健仪表盘全屏页
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct CoHealthDashboardFullContentView: View {
     let human: Human
@@ -20,7 +20,7 @@ struct CoHealthDashboardFullContentView: View {
 
     private var past30Days: Date {
         Calendar.current.date(byAdding: .day, value: -29,
-            to: Calendar.current.startOfDay(for: Date())) ?? Date()
+                              to: Calendar.current.startOfDay(for: Date())) ?? Date()
     }
 
     private var associatedPets: [Pet] {
@@ -32,7 +32,7 @@ struct CoHealthDashboardFullContentView: View {
     private var thisMonthWalkKm: Double {
         let start = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? past30Days
         let myId = human.id.uuidString
-        let allLogs: [PetWalkLog] = associatedPets.flatMap { $0.walkLogs }
+        let allLogs: [PetWalkLog] = associatedPets.flatMap(\.walkLogs)
         let filtered = allLogs.filter { $0.executorId == myId && $0.startDate >= start }
         let total = filtered.reduce(0.0) { acc, log in acc + log.distanceMeters }
         return total / 1000
@@ -139,7 +139,7 @@ struct CoHealthDashboardFullContentView: View {
                 .lineSpacing(4)
         }
         .padding(20)
-        .goTranslucentCard(cornerRadius: 24)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardLarge)
     }
 
     // MARK: - Walk Bar Section
@@ -154,7 +154,7 @@ struct CoHealthDashboardFullContentView: View {
                 OhanaMinimalBarChart(
                     points: data.enumerated().map { index, pt in
                         OhanaMinimalChartPoint(
-                            date: Date(timeIntervalSinceReferenceDate: Double(index) * 86_400),
+                            date: Date(timeIntervalSinceReferenceDate: Double(index) * 86400),
                             value: pt.km,
                             label: pt.label,
                             id: pt.id.uuidString
@@ -168,20 +168,20 @@ struct CoHealthDashboardFullContentView: View {
             }
         }
         .padding(20)
-        .goTranslucentCard(cornerRadius: 24)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardLarge)
     }
 
     private var last7DaysWalkData: [DayWalkPoint] {
         let myId = human.id.uuidString
-        let allLogs: [PetWalkLog] = associatedPets.flatMap { $0.walkLogs }
+        let allLogs: [PetWalkLog] = associatedPets.flatMap(\.walkLogs)
         let fmt = DateFormatter()
         fmt.dateFormat = "E"
         fmt.locale = AppLanguage.effectiveLocale
-        return (0..<7).map { offset in
+        return (0 ..< 7).map { offset in
             let day = Calendar.current.date(byAdding: .day, value: -(6 - offset), to: Date())!
             let dayLogs = allLogs.filter { log in
                 log.executorId == myId &&
-                Calendar.current.isDate(log.startDate, inSameDayAs: day)
+                    Calendar.current.isDate(log.startDate, inSameDayAs: day)
             }
             let totalMeters = dayLogs.reduce(0.0) { acc, log in acc + log.distanceMeters }
             let km = totalMeters / 1000
@@ -199,7 +199,7 @@ struct CoHealthDashboardFullContentView: View {
                 .allowsHitTesting(false)
         }
         .padding(20)
-        .goTranslucentCard(cornerRadius: 24)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardLarge)
     }
 
     // MARK: - Pet Health Section
@@ -228,7 +228,8 @@ struct CoHealthDashboardFullContentView: View {
                     Spacer()
                     let monthWalk = pet.walkLogs
                         .filter { $0.executorId == human.id.uuidString &&
-                            Calendar.current.isDate($0.startDate, equalTo: Date(), toGranularity: .month) }
+                            Calendar.current.isDate($0.startDate, equalTo: Date(), toGranularity: .month)
+                        }
                         .reduce(0.0) { $0 + $1.distanceMeters } / 1000
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(String(format: "%.1f km", monthWalk))
@@ -240,7 +241,7 @@ struct CoHealthDashboardFullContentView: View {
             }
         }
         .padding(20)
-        .goTranslucentCard(cornerRadius: 24)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardLarge)
     }
 
     // MARK: - Helpers

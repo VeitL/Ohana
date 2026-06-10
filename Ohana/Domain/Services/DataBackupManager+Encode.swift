@@ -10,7 +10,7 @@ nonisolated extension DataBackupManager {
     // MARK: - Encode helpers
 
     func d(_ date: Date?) -> String? { date.map { iso.string(from: $0) } }
-    func d(_ date: Date) -> String   { iso.string(from: date) }
+    func d(_ date: Date) -> String { iso.string(from: date) }
 
     func encodePet(_ p: Pet) -> PetBackup {
         PetBackup(
@@ -113,18 +113,18 @@ nonisolated extension DataBackupManager {
 
     func encodeCareLog(_ l: PetCareLog) -> PetCareLogBackup {
         PetCareLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
-            amountGrams: l.amountGrams, amountMl: l.amountMl, note: l.note,
-            foodKindRaw: l.foodKindRaw, treatKindRaw: l.treatKindRaw,
-            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId,
-            executorId: l.executorId, petId: l.pet?.id.uuidString)
+                         amountGrams: l.amountGrams, amountMl: l.amountMl, note: l.note,
+                         foodKindRaw: l.foodKindRaw, treatKindRaw: l.treatKindRaw,
+                         sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId,
+                         executorId: l.executorId, petId: l.pet?.id.uuidString)
     }
 
     func encodePottyLog(_ l: PetPottyLog) -> PetPottyLogBackup {
         PetPottyLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
-            executorId: l.executorId, petId: l.pet?.id.uuidString,
-            latitude: l.latitude, longitude: l.longitude,
-            locationAccuracyMeters: l.locationAccuracyMeters, walkLogId: l.walkLogId,
-            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
+                          executorId: l.executorId, petId: l.pet?.id.uuidString,
+                          latitude: l.latitude, longitude: l.longitude,
+                          locationAccuracyMeters: l.locationAccuracyMeters, walkLogId: l.walkLogId,
+                          sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
     }
 
     func encodeSharedCareSession(_ session: SharedCareSession) -> SharedCareSessionBackup {
@@ -153,59 +153,59 @@ nonisolated extension DataBackupManager {
 
     func encodeWalkLog(_ l: PetWalkLog) -> PetWalkLogBackup {
         PetWalkLogBackup(id: l.id.uuidString, startDate: d(l.startDate),
-            endDate: d(l.endDate), distanceMeters: l.distanceMeters,
-            coconutsEarned: l.coconutsEarned,
-            executorId: l.executorId, petId: l.pet?.id.uuidString,
-            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
+                         endDate: d(l.endDate), distanceMeters: l.distanceMeters,
+                         coconutsEarned: l.coconutsEarned,
+                         executorId: l.executorId, petId: l.pet?.id.uuidString,
+                         sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
     }
 
     func encodeWeightLog(_ l: PetWeightLog) -> PetWeightLogBackup {
         PetWeightLogBackup(id: l.id.uuidString, date: d(l.date),
-            weight: l.weight, petId: l.pet?.id.uuidString,
-            executorId: l.executorId)
+                           weight: l.weight, petId: l.pet?.id.uuidString,
+                           executorId: l.executorId)
     }
 
     func encodeExpenseLog(_ l: PetExpenseLog) -> PetExpenseLogBackup {
         PetExpenseLogBackup(id: l.id.uuidString, date: d(l.date),
-            amount: l.amount, category: l.category, note: l.note,
-            petId: l.pet?.id.uuidString,
-            executorId: l.executorId,
-            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
+                            amount: l.amount, category: l.category, note: l.note,
+                            petId: l.pet?.id.uuidString,
+                            executorId: l.executorId,
+                            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
     }
 
     func encodeHealthLog(_ l: PetHealthLog) -> PetHealthLogBackup {
         PetHealthLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
-            note: l.note, expirationDate: d(l.expirationDate), vetName: l.vetName,
-            cost: l.cost, petId: l.pet?.id.uuidString,
-            executorId: l.executorId)
+                           note: l.note, expirationDate: d(l.expirationDate), vetName: l.vetName,
+                           cost: l.cost, petId: l.pet?.id.uuidString,
+                           executorId: l.executorId)
     }
 
     func encodeHygieneLog(_ l: PetHygieneLog) -> PetHygieneLogBackup {
         PetHygieneLogBackup(id: l.id.uuidString, date: d(l.date), type: l.type,
-            petId: l.pet?.id.uuidString,
-            executorId: l.executorId)
+                            petId: l.pet?.id.uuidString,
+                            executorId: l.executorId)
     }
 
     func encodeFoodRecord(_ r: PetFoodRecord) -> PetFoodRecordBackup {
         PetFoodRecordBackup(id: r.id.uuidString, date: d(r.startDate), brand: r.brand,
-            dailyGrams: r.dailyGrams, totalGrams: r.totalGrams, foodKindRaw: r.foodKindRaw,
-            petId: r.pet?.id.uuidString,
-            purchaseDate: d(r.purchaseDate),
-            remainingCorrectionGrams: r.remainingCorrectionGrams,
-            remainingCorrectionDate: d(r.remainingCorrectionDate),
-            notes: r.notes, executorId: r.executorId)
+                            dailyGrams: r.dailyGrams, totalGrams: r.totalGrams, foodKindRaw: r.foodKindRaw,
+                            petId: r.pet?.id.uuidString,
+                            purchaseDate: d(r.purchaseDate),
+                            remainingCorrectionGrams: r.remainingCorrectionGrams,
+                            remainingCorrectionDate: d(r.remainingCorrectionDate),
+                            notes: r.notes, executorId: r.executorId)
     }
 
     func encodeDocument(_ doc: PetDocument) -> PetDocumentBackup {
         PetDocumentBackup(id: doc.id.uuidString, title: doc.title, categoryRaw: doc.category,
-            expiryDate: d(doc.expiryDate), petId: doc.pet?.id.uuidString,
-            issueDate: d(doc.issueDate),
-            issuingAuthority: doc.issuingAuthority,
-            notes: doc.notes,
-            reminderDate: d(doc.reminderDate),
-            cost: doc.cost,
-            attachmentBase64: doc.attachmentData?.base64EncodedString(),
-            attachmentFilename: doc.attachmentFilename.isEmpty ? nil : doc.attachmentFilename)
+                          expiryDate: d(doc.expiryDate), petId: doc.pet?.id.uuidString,
+                          issueDate: d(doc.issueDate),
+                          issuingAuthority: doc.issuingAuthority,
+                          notes: doc.notes,
+                          reminderDate: d(doc.reminderDate),
+                          cost: doc.cost,
+                          attachmentBase64: doc.attachmentData?.base64EncodedString(),
+                          attachmentFilename: doc.attachmentFilename.isEmpty ? nil : doc.attachmentFilename)
     }
 
     func encodeDocumentAttachments(_ doc: PetDocument) -> [PetDocumentAttachmentBackup] {
@@ -222,24 +222,24 @@ nonisolated extension DataBackupManager {
 
     func encodeMilestone(_ m: PetMilestone) -> PetMilestoneBackup {
         PetMilestoneBackup(id: m.id.uuidString, date: d(m.date), title: m.title,
-            emoji: m.emoji, notes: m.notes, petId: m.pet?.id.uuidString)
+                           emoji: m.emoji, notes: m.notes, petId: m.pet?.id.uuidString)
     }
 
     func encodeHumanWeight(_ l: HumanWeightLog) -> HumanWeightLogBackup {
         HumanWeightLogBackup(id: l.id.uuidString, date: d(l.date),
-            weight: l.weight, humanId: l.human?.id.uuidString,
-            executorId: l.executorId)
+                             weight: l.weight, humanId: l.human?.id.uuidString,
+                             executorId: l.executorId)
     }
 
     func encodeHumanWorkout(_ l: HumanWorkoutLog) -> HumanWorkoutLogBackup {
         HumanWorkoutLogBackup(id: l.id.uuidString, date: d(l.date), typeRaw: l.typeRaw,
-            durationMinutes: l.durationMinutes, notes: l.notes,
-            humanId: l.human?.id.uuidString)
+                              durationMinutes: l.durationMinutes, notes: l.notes,
+                              humanId: l.human?.id.uuidString)
     }
 
     func encodeWaterLog(_ l: WaterLog) -> WaterLogBackup {
         WaterLogBackup(id: l.id.uuidString, date: d(l.date),
-            amountMl: l.amountMl, note: l.note)
+                       amountMl: l.amountMl, note: l.note)
     }
 
     func encodePhotoLog(_ l: PetPhotoLog) -> PetPhotoLogBackup {
@@ -384,7 +384,7 @@ nonisolated extension DataBackupManager {
 
     func encodeWishlist(_ w: WishlistItem) -> WishlistItemBackup {
         WishlistItemBackup(id: w.id.uuidString, title: w.title, cost: w.cost,
-            creatorId: w.creatorId, isRedeemed: w.isRedeemed, createdAt: d(w.createdAt))
+                           creatorId: w.creatorId, isRedeemed: w.isRedeemed, createdAt: d(w.createdAt))
     }
 
     func encodeCareLedgerEvent(_ e: CareLedgerEvent) -> CareLedgerEventBackup {

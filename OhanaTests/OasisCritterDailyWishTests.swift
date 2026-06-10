@@ -307,7 +307,7 @@ struct OasisCritterDailyWishTests {
         context.insert(critter)
         context.insert(OasisCritterFragmentBalance(catalogId: critter.catalogId, amount: 400))
         let human = Human(name: "Ava")
-        human.coconutBalance = 1_000
+        human.coconutBalance = 1000
         UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
         context.insert(human)
 

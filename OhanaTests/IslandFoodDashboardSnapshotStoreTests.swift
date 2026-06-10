@@ -1,6 +1,6 @@
 import Foundation
-@testable import Ohana
 import Testing
+@testable import Ohana
 
 @MainActor
 struct IslandFoodDashboardSnapshotStoreTests {

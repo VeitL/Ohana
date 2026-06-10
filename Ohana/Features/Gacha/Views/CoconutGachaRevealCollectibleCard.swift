@@ -17,13 +17,13 @@ struct GachaCollectibleThumbnailView: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                 .fill(isOwned ? item.rarity.tint.opacity(0.18) : Color.ohanaControlFill)
             GachaAssetImage(assetName: assetName, fallbackSymbol: isOwned ? item.placeholderSymbol : "❔")
                 .padding(isOwned ? 3 : 5)
                 .saturation(isOwned ? 1 : 0.2)
                 .opacity(isOwned ? 1 : 0.68)
-            if !isOwned && item.isHidden {
+            if !isOwned, item.isHidden {
                 Image(systemName: "questionmark").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 16, weight: .black))
                     .foregroundStyle(Color.goYellow)
@@ -32,12 +32,12 @@ struct GachaCollectibleThumbnailView: View {
         }
         .frame(width: 52, height: 62)
         .overlay(
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                 .strokeBorder(isPulsing ? item.rarity.tint.opacity(0.82) : Color.ohanaCardStroke, lineWidth: isPulsing ? 2 : 1)
         )
         .shadow(color: isPulsing ? item.rarity.tint.opacity(0.32) : Color.clear, radius: 12, y: 5) // ui-v4: allow transient collection target pulse
         .scaleEffect(isPulsing ? 1.08 : 1)
-        .ohanaShine(trigger: isPulsing ? item.id : "", cornerRadius: 15, isEnabled: isPulsing)
+        .ohanaShine(trigger: isPulsing ? item.id : "", cornerRadius: OhanaRadius.control, isEnabled: isPulsing)
         .animation(GoMotion.feedback, value: isPulsing)
         .accessibilityHidden(true)
     }
@@ -64,37 +64,37 @@ struct GachaBlindBoxCore: View {
     private var boxScale: CGFloat {
         switch revealCardPhase {
         case .idle:
-            return phase == .charging ? 1.04 : 1
+            phase == .charging ? 1.04 : 1
         case .cardPopped, .flipping:
-            return 0.84
+            0.84
         case .revealed, .secretBurst, .toyAppearing, .toyReady, .cardGone, .flying, .settled:
-            return 0.72
+            0.72
         }
     }
 
     private var boxYOffset: CGFloat {
         switch revealCardPhase {
         case .idle:
-            return phase.showsPrize ? 74 : 58
+            phase.showsPrize ? 74 : 58
         case .cardPopped, .flipping:
-            return 96
+            96
         case .revealed, .secretBurst, .toyAppearing, .toyReady, .cardGone, .flying, .settled:
-            return 108
+            108
         }
     }
 
     private var boxOpacity: Double {
         switch revealCardPhase {
         case .idle:
-            return phase == .settled ? 0.28 : 1
+            phase == .settled ? 0.28 : 1
         case .cardPopped, .flipping:
-            return 0.78
+            0.78
         case .revealed:
-            return 0.36
+            0.36
         case .secretBurst, .toyAppearing, .toyReady:
-            return 0.20
+            0.20
         case .cardGone, .flying, .settled:
-            return 0.12
+            0.12
         }
     }
 }
@@ -105,8 +105,8 @@ struct GachaCollectibleRevealCardView: View {
     let l: L10n
     let shouldAnimate: Bool
     let isNewCollectible: Bool
-    var onTap: (() -> Void)? = nil
-    var onKeep: (() -> Void)? = nil
+    var onTap: (() -> Void)?
+    var onKeep: (() -> Void)?
 
     @State private var flashlightSweep = false
 
@@ -116,45 +116,48 @@ struct GachaCollectibleRevealCardView: View {
     private var rotation: Double {
         switch phase {
         case .idle, .cardPopped:
-            return 0
+            0
         case .flipping:
-            return 540
+            540
         case .revealed, .secretBurst, .toyAppearing, .toyReady, .cardGone, .flying, .settled:
-            return 540
+            540
         }
     }
+
     private var scale: CGFloat {
         switch phase {
         case .idle:
-            return 0.62
+            0.62
         case .cardPopped:
-            return 0.82
+            0.82
         case .flipping:
-            return 1.02
+            1.02
         case .revealed:
-            return 1.10
+            1.10
         case .secretBurst:
-            return 1.10
+            1.10
         case .toyAppearing:
-            return 1.08
+            1.08
         case .toyReady:
-            return 1.06
+            1.06
         case .cardGone, .flying, .settled:
-            return 1.02
+            1.02
         }
     }
+
     private var yOffset: CGFloat {
         switch phase {
         case .idle:
-            return 34
+            34
         case .cardPopped:
-            return -8
+            -8
         case .flipping:
-            return -16
+            -16
         case .revealed, .secretBurst, .toyAppearing, .toyReady, .cardGone, .flying, .settled:
-            return -20
+            -20
         }
     }
+
     private var isCardTapReady: Bool { phase == .revealed }
     private var isKeepReady: Bool { phase == .toyReady }
 
@@ -232,19 +235,19 @@ struct GachaCollectibleRevealCardView: View {
         .rotation3DEffect(.degrees(rotation), axis: (x: 0, y: 1, z: 0), perspective: 0.58)
         .shadow(color: accent.opacity(shouldAnimate ? 0.34 : 0.14), radius: 22, x: 0, y: 12) // ui-v4: allow reward card 3D lift
         .ohanaShake(trigger: phase, amount: item.isHidden ? 5 : 3, isEnabled: shouldAnimate && isSecretBursting)
-        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .onTapGesture {
             guard isCardTapReady else { return }
             onTap?()
         }
         .allowsHitTesting(isCardTapReady || isKeepReady)
-            .ohanaBreathingGlow(accent: accent, isActive: shouldAnimate && (isCardTapReady || isKeepReady))
-            .onChange(of: phase) { _, newPhase in
-                triggerFlashlightIfNeeded(for: newPhase)
-            }
-            .onAppear {
-                triggerFlashlightIfNeeded(for: phase)
-            }
+        .ohanaBreathingGlow(accent: accent, isActive: shouldAnimate && (isCardTapReady || isKeepReady))
+        .onChange(of: phase) { _, newPhase in
+            triggerFlashlightIfNeeded(for: newPhase)
+        }
+        .onAppear {
+            triggerFlashlightIfNeeded(for: phase)
+        }
     }
 
     private func triggerFlashlightIfNeeded(for newPhase: GachaCollectibleRevealPhase) {
@@ -260,7 +263,7 @@ struct GachaCollectibleRevealCardView: View {
 
     @ViewBuilder
     private var newBackGlow: some View {
-        if isNewCollectible && phase.showsCard {
+        if isNewCollectible, phase.showsCard {
             ZStack {
                 Circle()
                     .fill(
@@ -277,7 +280,7 @@ struct GachaCollectibleRevealCardView: View {
                     )
                     .frame(width: 256, height: 256)
 
-                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous)
                     .strokeBorder(Color.goPrimary.opacity(item.isHidden ? 0.44 : 0.30), lineWidth: 2)
                     .frame(width: 204, height: 272)
                     .blur(radius: 7)
@@ -290,7 +293,7 @@ struct GachaCollectibleRevealCardView: View {
 
     @ViewBuilder
     private var secretHalo: some View {
-        if item.isHidden && (phase == .secretBurst || phase == .toyReady) {
+        if item.isHidden, phase == .secretBurst || phase == .toyReady {
             ZStack {
                 Circle()
                     .fill(
@@ -307,7 +310,7 @@ struct GachaCollectibleRevealCardView: View {
                     )
                     .frame(width: 300, height: 300)
 
-                ForEach(0..<18, id: \.self) { index in
+                ForEach(0 ..< 18, id: \.self) { index in
                     Image(systemName: index.isMultiple(of: 3) ? "sparkle" : "diamond.fill")
                         .font(.system(size: index.isMultiple(of: 3) ? 18 : 8, weight: .black))
                         .foregroundStyle(index.isMultiple(of: 2) ? Color.goYellow : Color.goCardWhite)
@@ -326,7 +329,7 @@ struct GachaCollectibleRevealCardView: View {
     }
 
     private var cardSurface: some View {
-        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         return shape
             .fill(
                 LinearGradient(
@@ -382,7 +385,7 @@ struct GachaCollectibleRevealCardView: View {
 
     @ViewBuilder
     private var newRevealWord: some View {
-        if isNewCollectible && phase.showsCard && phase.showsRealAsset {
+        if isNewCollectible, phase.showsCard, phase.showsRealAsset {
             Text("NEW")
                 .font(.system(size: item.isHidden ? 58 : 48, weight: .black, design: .rounded))
                 .foregroundStyle(
@@ -407,7 +410,7 @@ struct GachaCollectibleRevealCardView: View {
                 .opacity(phase == .cardGone || phase == .flying || phase == .settled ? 0 : 0.92)
                 .scaleEffect(x: rotation > 90 ? -1 : 1)
                 .ohanaPhasePop(trigger: phase, enabled: shouldAnimate)
-                .ohanaShine(trigger: phase, cornerRadius: 16, isEnabled: shouldAnimate)
+                .ohanaShine(trigger: phase, cornerRadius: OhanaRadius.control, isEnabled: shouldAnimate)
                 .accessibilityLabel("NEW")
         }
     }
@@ -421,7 +424,7 @@ struct GachaCollectibleRevealCardView: View {
                     .frame(width: phase == .secretBurst ? 176 : (phase == .toyAppearing ? 126 : 148), height: phase == .secretBurst ? 176 : (phase == .toyAppearing ? 126 : 148))
                     .opacity(phase == .secretBurst ? 0.88 : (phase == .toyAppearing ? 0.72 : 0.22))
 
-                ForEach(0..<7, id: \.self) { index in
+                ForEach(0 ..< 7, id: \.self) { index in
                     Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "plus")
                         .font(.system(size: index.isMultiple(of: 2) ? 12 : 8, weight: .black))
                         .foregroundStyle(item.isHidden ? Color.goYellow : accent)
@@ -441,7 +444,7 @@ struct GachaCollectibleRevealCardView: View {
 
     @ViewBuilder
     private var flashlightReveal: some View {
-        if shouldAnimate && (phase == .secretBurst || phase == .toyAppearing) {
+        if shouldAnimate, phase == .secretBurst || phase == .toyAppearing {
             ZStack {
                 Circle()
                     .fill(
@@ -460,7 +463,7 @@ struct GachaCollectibleRevealCardView: View {
                     .scaleEffect(flashlightSweep ? 1.10 : 0.58)
                     .opacity(flashlightSweep ? 0.24 : 0.88)
 
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(
                         LinearGradient(
                             colors: [
@@ -489,7 +492,7 @@ struct GachaCollectibleRevealCardView: View {
                     .opacity(flashlightSweep ? 0.12 : 0.82)
             }
             .scaleEffect(x: rotation > 90 ? -1 : 1)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .allowsHitTesting(false)
         }
     }
@@ -533,43 +536,42 @@ struct GachaFloatingCollectibleView: View {
     private var scale: CGFloat {
         switch phase {
         case .cardGone:
-            return 1
+            1
         case .flying:
-            return 0.42
+            0.42
         case .idle, .cardPopped, .flipping, .revealed, .secretBurst, .toyAppearing, .toyReady, .settled:
-            return 0.1
+            0.1
         }
     }
 
     private var xOffset: CGFloat {
         switch phase {
         case .flying:
-            return 94
+            94
         default:
-            return 0
+            0
         }
     }
 
     private var yOffset: CGFloat {
         switch phase {
         case .cardGone:
-            return -26
+            -26
         case .flying:
-            return 108
+            108
         default:
-            return -26
+            -26
         }
     }
 
     private var opacity: Double {
         switch phase {
         case .cardGone:
-            return 1
+            1
         case .flying:
-            return 0.72
+            0.72
         default:
-            return 0
+            0
         }
     }
 }
-

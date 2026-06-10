@@ -37,9 +37,9 @@ struct GrowthUnlockStep: Identifiable, Hashable {
 
     private func localized(zh: String, en: String, de: String, language: String) -> String {
         switch language {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }
@@ -74,9 +74,9 @@ enum AppFeatureAvailability: Equatable {
     var status: GrowthUnlockStatus? {
         switch self {
         case let .visible(status), let .hiddenLocked(status):
-            return status
+            status
         case .outOfScope:
-            return nil
+            nil
         }
     }
 }
@@ -219,7 +219,7 @@ enum GrowthUnlockPolicy {
             .first(where: { currentLevel < $0.requiredLevel })
     }
 
-    static func roadmapStages(includeOutOfScope: Bool = false) -> [GrowthUnlockStep] {
+    static func roadmapStages(includeOutOfScope _: Bool = false) -> [GrowthUnlockStep] {
         stages
     }
 
@@ -237,25 +237,25 @@ enum GrowthUnlockPolicy {
     static func primaryDestination(for stageID: GrowthUnlockStageID) -> FMDest {
         switch stageID {
         case .dailyCare:
-            return .featureGroup(.dailyCare)
+            .featureGroup(.dailyCare)
         case .bodyHealth:
-            return .featureGroup(.healthBody)
+            .featureGroup(.healthBody)
         case .memory:
-            return .featureGroup(.archiveMemory)
+            .featureGroup(.archiveMemory)
         case .household:
-            return .featureGroup(.householdHub)
+            .featureGroup(.householdHub)
         case .oasisPlants:
-            return .wealthDashboard
+            .wealthDashboard
         case .rewards:
-            return .coconutShop
+            .coconutShop
         case .advancedPlay:
-            return .gacha
+            .gacha
         case .advancedInsights:
-            return .careLedgerAnalysis
+            .careLedgerAnalysis
         case .memoryReview:
-            return .familyWeeklyReport
+            .familyWeeklyReport
         case .mastery:
-            return .wealthDashboard
+            .wealthDashboard
         }
     }
 
@@ -266,25 +266,25 @@ enum GrowthUnlockPolicy {
     static func primaryDestinationTitle(for stageID: GrowthUnlockStageID, language: String) -> String {
         switch stageID {
         case .dailyCare:
-            return localized(zh: "每日照护", en: "Daily care", de: "Tägliche Pflege", language: language)
+            localized(zh: "每日照护", en: "Daily care", de: "Tägliche Pflege", language: language)
         case .bodyHealth:
-            return localized(zh: "健康管理", en: "Health", de: "Gesundheit", language: language)
+            localized(zh: "健康管理", en: "Health", de: "Gesundheit", language: language)
         case .memory:
-            return localized(zh: "成长档案", en: "Growth archive", de: "Wachstumsarchiv", language: language)
+            localized(zh: "成长档案", en: "Growth archive", de: "Wachstumsarchiv", language: language)
         case .household:
-            return localized(zh: "家庭事务", en: "Household", de: "Familie", language: language)
+            localized(zh: "家庭事务", en: "Household", de: "Familie", language: language)
         case .oasisPlants:
-            return localized(zh: "Oasis 树收益", en: "Oasis tree income", de: "Oasis-Baum-Erträge", language: language)
+            localized(zh: "Oasis 树收益", en: "Oasis tree income", de: "Oasis-Baum-Erträge", language: language)
         case .rewards:
-            return localized(zh: "椰子商店", en: "Coconut shop", de: "Kokos-Shop", language: language)
+            localized(zh: "椰子商店", en: "Coconut shop", de: "Kokos-Shop", language: language)
         case .advancedPlay:
-            return localized(zh: "扭蛋玩法", en: "Gacha play", de: "Gacha-Spiel", language: language)
+            localized(zh: "扭蛋玩法", en: "Gacha play", de: "Gacha-Spiel", language: language)
         case .advancedInsights:
-            return localized(zh: "高级洞察", en: "Advanced insights", de: "Erweiterte Einsichten", language: language)
+            localized(zh: "高级洞察", en: "Advanced insights", de: "Erweiterte Einsichten", language: language)
         case .memoryReview:
-            return localized(zh: "成长回顾", en: "Growth review", de: "Wachstumsrückblick", language: language)
+            localized(zh: "成长回顾", en: "Growth review", de: "Wachstumsrückblick", language: language)
         case .mastery:
-            return localized(zh: "大师树冠", en: "Master canopy", de: "Meister-Krone", language: language)
+            localized(zh: "大师树冠", en: "Master canopy", de: "Meister-Krone", language: language)
         }
     }
 
@@ -324,11 +324,11 @@ enum GrowthUnlockPolicy {
     static func isOutOfScope(_ destination: FMDest) -> Bool {
         switch destination {
         case .plantsDashboard, .plantDetail:
-            return plantsAreOutOfScope
+            plantsAreOutOfScope
         case .featureGroup(.plants):
-            return plantsAreOutOfScope
+            plantsAreOutOfScope
         default:
-            return false
+            false
         }
     }
 
@@ -345,49 +345,49 @@ enum GrowthUnlockPolicy {
 
     static func stageID(for group: FeatureGroup) -> GrowthUnlockStageID {
         switch group {
-        case .dailyCare: return .dailyCare
-        case .healthBody: return .bodyHealth
-        case .archiveMemory: return .memory
-        case .householdHub: return .household
-        case .plants: return .oasisPlants
-        case .oasisRewards: return .rewards
+        case .dailyCare: .dailyCare
+        case .healthBody: .bodyHealth
+        case .archiveMemory: .memory
+        case .householdHub: .household
+        case .plants: .oasisPlants
+        case .oasisRewards: .rewards
         }
     }
 
     static func stageID(for feature: PetFeature) -> GrowthUnlockStageID {
         switch feature {
         case .food, .potty, .basicInfo, .health, .hygiene, .weight, .medications, .walks, .documents, .expense:
-            return .dailyCare
+            .dailyCare
         case .moments, .achievements, .retention:
-            return .memory
+            .memory
         }
     }
 
     static func stageID(for destination: FMDest) -> GrowthUnlockStageID {
         switch destination {
         case .growthRoadmap:
-            return .dailyCare
-        case .featureGroup(let group):
-            return stageID(for: group)
-        case .featureAggregate(let feature):
-            return stageID(for: feature)
+            .dailyCare
+        case let .featureGroup(group):
+            stageID(for: group)
+        case let .featureAggregate(feature):
+            stageID(for: feature)
         case .petFood, .petPotty, .petBasicInfo, .calendar,
              .petHealth, .petHygiene, .petWeight, .humanWeight,
              .petMedications, .petWalks, .petDocuments, .petInsurance,
              .petExpense, .humanExpense:
-            return .dailyCare
+            .dailyCare
         case .petMoments, .petTimeline, .petAchievements, .petRetention:
-            return .memory
+            .memory
         case .bountyBoard:
-            return .household
+            .household
         case .careLedgerAnalysis, .reminderObservability:
-            return .advancedInsights
+            .advancedInsights
         case .plantsDashboard, .plantDetail, .wealthDashboard:
-            return .oasisPlants
+            .oasisPlants
         case .familyWeeklyReport, .coconutShop:
-            return .rewards
+            .rewards
         case .gacha:
-            return .advancedPlay
+            .advancedPlay
         }
     }
 
@@ -395,9 +395,9 @@ enum GrowthUnlockPolicy {
 
     private static func localized(zh: String, en: String, de: String, language: String) -> String {
         switch language {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }

@@ -55,9 +55,9 @@ struct OasisStageOpenedRewardCard: View {
                 .buttonStyle(ScaleButtonStyle())
             }
             .padding(12)
-            .background(Color.ohanaCardSurface.opacity(0.94), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface.opacity(0.94), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.goPrimary.opacity(0.18), lineWidth: 1)
             )
             .shadow(color: Color.goPrimary.opacity(0.16), radius: 18, x: 0, y: 9) // ui-v4: allow transient upgrade reward focus
@@ -66,10 +66,10 @@ struct OasisStageOpenedRewardCard: View {
 
     private func critterRarityColor(_ rarity: OasisElectronicPetRarity) -> Color {
         switch rarity {
-        case .common: return Color.goTeal
-        case .rare: return Color.goPrimary
-        case .epic: return Color.goPurple
-        case .legendary: return Color.goYellow
+        case .common: Color.goTeal
+        case .rare: Color.goPrimary
+        case .epic: Color.goPurple
+        case .legendary: Color.goYellow
         }
     }
 }
@@ -112,7 +112,7 @@ struct OasisOpenedUpgradeRewardDockCard: View {
         .padding(12)
         .background(
             Color.goPrimary.opacity(reward.isMilestoneCritter ? 0.16 : 0.08),
-            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
         )
     }
 }
@@ -131,32 +131,32 @@ struct OasisRewardKindIcon: View {
     private var systemName: String {
         switch reward.kind {
         case .coconuts:
-            return "circle.hexagongrid.fill"
+            "circle.hexagongrid.fill"
         case .treeEnergy:
-            return "bolt.fill"
+            "bolt.fill"
         case .decoration:
-            return "sparkles"
+            "sparkles"
         case .fragments:
-            return "diamond.fill"
+            "diamond.fill"
         case .storyStyle:
-            return "text.bubble.fill"
+            "text.bubble.fill"
         case .temporaryEffect:
-            return "wand.and.stars"
+            "wand.and.stars"
         case .electronicPet:
-            return "pawprint.fill"
+            "pawprint.fill"
         }
     }
 
     private var tint: Color {
         switch reward.kind {
         case .coconuts, .treeEnergy:
-            return Color.goYellow
+            Color.goYellow
         case .decoration, .storyStyle, .temporaryEffect:
-            return Color.goPrimary
+            Color.goPrimary
         case .fragments:
-            return Color.goPurple
+            Color.goPurple
         case .electronicPet:
-            return Color.goTeal
+            Color.goTeal
         }
     }
 }
@@ -235,9 +235,9 @@ private struct OasisCritterUnlockRewardCard: View {
         }
         .padding(16)
         .frame(maxWidth: 344)
-        .background(Color.ohanaCardSurface.opacity(0.96), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .background(Color.ohanaCardSurface.opacity(0.96), in: RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous)
                 .strokeBorder(accent.opacity(0.32), lineWidth: 1.2)
         }
         .shadow(color: accent.opacity(0.26), radius: 28, x: 0, y: 12) // ui-v4: allow transient electronic-pet unlock focus
@@ -261,7 +261,7 @@ private struct OasisCritterUnlockRewardCard: View {
 
     private var unlockSparkles: some View {
         ZStack {
-            ForEach(0..<10, id: \.self) { index in
+            ForEach(0 ..< 10, id: \.self) { index in
                 let angle = Angle.degrees(Double(index) * 36)
                 Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "star.fill")
                     .font(.system(size: index.isMultiple(of: 2) ? 13 : 8, weight: .black))

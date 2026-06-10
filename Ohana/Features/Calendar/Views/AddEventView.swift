@@ -5,12 +5,12 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 struct AddEventContentView: View {
-    var onClose: (() -> Void)? = nil
+    var onClose: (() -> Void)?
     let pets: [Pet]
     let humans: [Human]
 
@@ -52,21 +52,21 @@ struct AddEventContentView: View {
 
         func title(_ l: L10n) -> String {
             switch self {
-            case .none: return l.tr(zh: "不重复", en: "Never", de: "Nie")
-            case .daily: return l.tr(zh: "每天", en: "Daily", de: "Täglich")
-            case .weekly: return l.tr(zh: "每周", en: "Weekly", de: "Wöchentlich")
-            case .monthly: return l.tr(zh: "每月", en: "Monthly", de: "Monatlich")
-            case .custom: return l.tr(zh: "自定义", en: "Custom", de: "Eigen")
+            case .none: l.tr(zh: "不重复", en: "Never", de: "Nie")
+            case .daily: l.tr(zh: "每天", en: "Daily", de: "Täglich")
+            case .weekly: l.tr(zh: "每周", en: "Weekly", de: "Wöchentlich")
+            case .monthly: l.tr(zh: "每月", en: "Monthly", de: "Monatlich")
+            case .custom: l.tr(zh: "自定义", en: "Custom", de: "Eigen")
             }
         }
 
         var presetDays: Int? {
             switch self {
-            case .none: return nil
-            case .daily: return 1
-            case .weekly: return 7
-            case .monthly: return 30
-            case .custom: return nil
+            case .none: nil
+            case .daily: 1
+            case .weekly: 7
+            case .monthly: 30
+            case .custom: nil
             }
         }
     }
@@ -81,10 +81,10 @@ struct AddEventContentView: View {
 
         func title(_ l: L10n) -> String {
             switch self {
-            case .thirtyMinutes: return l.tr(zh: "前30分钟", en: "30m before", de: "30 Min. vorher")
-            case .oneHour: return l.tr(zh: "前1小时", en: "1h before", de: "1 Std. vorher")
-            case .threeHours: return l.tr(zh: "前3小时", en: "3h before", de: "3 Std. vorher")
-            case .oneDay: return l.tr(zh: "前一天", en: "1 day before", de: "1 Tag vorher")
+            case .thirtyMinutes: l.tr(zh: "前30分钟", en: "30m before", de: "30 Min. vorher")
+            case .oneHour: l.tr(zh: "前1小时", en: "1h before", de: "1 Std. vorher")
+            case .threeHours: l.tr(zh: "前3小时", en: "3h before", de: "3 Std. vorher")
+            case .oneDay: l.tr(zh: "前一天", en: "1 day before", de: "1 Tag vorher")
             }
         }
     }
@@ -158,7 +158,6 @@ struct AddEventContentView: View {
 
                 saveBar(safeBottom: bottomControlInset)
                     .frame(maxHeight: .infinity, alignment: .bottom)
-
             }
         }
         .ohanaSheetPagePresentation() // ui-v4: allow long calendar editor uses system sheet
@@ -241,7 +240,7 @@ struct AddEventContentView: View {
                     .buttonStyle(ScaleButtonStyle())
                     .accessibilityLabel(l.tr(zh: "更换类型", en: "Change type", de: "Typ ändern"))
 
-                    TextField(l.tr(zh: "给这件事起个名字", en: "Name this event", de: "Termin benennen"), text: $title)
+                    TextField(l.tr(zh: "给这件事起个名字", en: "Name this event", de: "Termin benennen"), text: $title) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                         .focused($titleFocused)
                         .submitLabel(.done)
                         .textInputAutocapitalization(.sentences)
@@ -265,7 +264,7 @@ struct AddEventContentView: View {
                     }
                 }
                 .padding(14)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                 if showsTypePicker {
                     eventTypeAnchorMenu
@@ -313,7 +312,7 @@ struct AddEventContentView: View {
                 }
             }
             .padding(12)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
     }
 
@@ -358,7 +357,6 @@ struct AddEventContentView: View {
                             relatedEntityId = human.id.uuidString
                         }
                     }
-
                 }
                 .padding(.vertical, 1)
             }
@@ -376,7 +374,7 @@ struct AddEventContentView: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var recurrenceEndSection: some View {
@@ -389,10 +387,10 @@ struct AddEventContentView: View {
                 components: .date
             )
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .padding(14)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var reminderLeadSection: some View {
@@ -418,7 +416,7 @@ struct AddEventContentView: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var assigneeSection: some View {
@@ -451,7 +449,7 @@ struct AddEventContentView: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func saveBar(safeBottom: CGFloat) -> some View {
@@ -536,7 +534,7 @@ struct AddEventContentView: View {
         }
         .padding(10)
         .frame(width: 268)
-        .background { OhanaPopupGlassSurface(cornerRadius: 24) }
+        .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.cardLarge) }
         .shadow(color: Color.black.opacity(0.34), radius: 24, x: 0, y: 14) // ui-v4: allow anchored menu shadow
     }
 
@@ -575,7 +573,7 @@ struct AddEventContentView: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 10)
             .padding(.vertical, 10)
-            .background(selected ? Color.goPrimary.opacity(0.16) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(selected ? Color.goPrimary.opacity(0.16) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -699,25 +697,25 @@ struct AddEventContentView: View {
 
     private func eventTypeTitle(_ type: EventType) -> String {
         switch type {
-        case .birthday: return l.tr(zh: "生日", en: "Birthday", de: "Geburtstag")
-        case .anniversary: return l.tr(zh: "纪念日", en: "Anniversary", de: "Jahrestag")
-        case .daily: return l.tr(zh: "日常", en: "Daily", de: "Alltag")
-        case .health: return l.tr(zh: "健康", en: "Health", de: "Gesundheit")
-        case .task: return l.tr(zh: "任务", en: "Task", de: "Aufgabe")
-        case .shoppingList: return l.tr(zh: "购物", en: "Shopping", de: "Einkauf")
-        case .chore: return l.tr(zh: "家务", en: "Chore", de: "Haushalt")
-        case .vaccine: return l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
-        case .externalDeworming: return l.tr(zh: "体外驱虫", en: "External", de: "Äußerlich")
-        case .internalDeworming: return l.tr(zh: "体内驱虫", en: "Internal", de: "Innerlich")
-        case .grooming: return l.tr(zh: "护理", en: "Grooming", de: "Pflege")
-        case .vetVisit: return l.tr(zh: "就医", en: "Vet", de: "Tierarzt")
-        case .foodChange: return l.tr(zh: "饮食", en: "Food", de: "Futter")
-        case .litterBox: return l.tr(zh: "猫砂", en: "Litter", de: "Streu")
-        case .watering: return l.tr(zh: "浇水", en: "Water", de: "Gießen")
-        case .fertilizing: return l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
-        case .medication: return l.tr(zh: "吃药", en: "Medication", de: "Medizin")
-        case .petMedicationDose: return l.tr(zh: "喂药", en: "Dose", de: "Dosis")
-        case .insurancePremium: return l.tr(zh: "保险", en: "Insurance", de: "Versicherung")
+        case .birthday: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag")
+        case .anniversary: l.tr(zh: "纪念日", en: "Anniversary", de: "Jahrestag")
+        case .daily: l.tr(zh: "日常", en: "Daily", de: "Alltag")
+        case .health: l.tr(zh: "健康", en: "Health", de: "Gesundheit")
+        case .task: l.tr(zh: "任务", en: "Task", de: "Aufgabe")
+        case .shoppingList: l.tr(zh: "购物", en: "Shopping", de: "Einkauf")
+        case .chore: l.tr(zh: "家务", en: "Chore", de: "Haushalt")
+        case .vaccine: l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+        case .externalDeworming: l.tr(zh: "体外驱虫", en: "External", de: "Äußerlich")
+        case .internalDeworming: l.tr(zh: "体内驱虫", en: "Internal", de: "Innerlich")
+        case .grooming: l.tr(zh: "护理", en: "Grooming", de: "Pflege")
+        case .vetVisit: l.tr(zh: "就医", en: "Vet", de: "Tierarzt")
+        case .foodChange: l.tr(zh: "饮食", en: "Food", de: "Futter")
+        case .litterBox: l.tr(zh: "猫砂", en: "Litter", de: "Streu")
+        case .watering: l.tr(zh: "浇水", en: "Water", de: "Gießen")
+        case .fertilizing: l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
+        case .medication: l.tr(zh: "吃药", en: "Medication", de: "Medizin")
+        case .petMedicationDose: l.tr(zh: "喂药", en: "Dose", de: "Dosis")
+        case .insurancePremium: l.tr(zh: "保险", en: "Insurance", de: "Versicherung")
         }
     }
 

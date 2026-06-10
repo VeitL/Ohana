@@ -5,9 +5,9 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 enum ReminderStatus: String, Codable {
     case pending
@@ -28,7 +28,7 @@ final class Reminder {
     var completedBy: String
     var notificationId: String
     var createdAt: Date
-    
+
     init(
         event: Event? = nil,
         scheduledAt: Date = Date()
@@ -42,12 +42,12 @@ final class Reminder {
         self.notificationId = UUID().uuidString
         self.createdAt = Date()
     }
-    
+
     var statusEnum: ReminderStatus {
         get { ReminderStatus(rawValue: status) ?? .pending }
         set { status = newValue.rawValue }
     }
-    
+
     var isPending: Bool { statusEnum == .pending }
     var isCompleted: Bool { statusEnum == .completed }
     var isFailed: Bool { statusEnum == .failed }

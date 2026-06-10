@@ -244,7 +244,7 @@ struct CrewRosterExpandedMemberOverlay: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             }
         }
     }
@@ -279,7 +279,7 @@ struct CrewRosterExpandedMemberOverlay: View {
                     .padding(.horizontal, 12)
                 }
             }
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
     }
 
@@ -317,11 +317,10 @@ struct CrewRosterExpandedMemberOverlay: View {
     }
 
     private func petGenderText(_ pet: Pet) -> String {
-        let base: String
-        switch pet.gender {
-        case "male": base = l.tr(zh: "男孩", en: "Male", de: "Männlich")
-        case "female": base = l.tr(zh: "女孩", en: "Female", de: "Weiblich")
-        default: base = l.tr(zh: "未填写", en: "Not set", de: "Nicht gesetzt")
+        let base: String = switch pet.gender {
+        case "male": l.tr(zh: "男孩", en: "Male", de: "Männlich")
+        case "female": l.tr(zh: "女孩", en: "Female", de: "Weiblich")
+        default: l.tr(zh: "未填写", en: "Not set", de: "Nicht gesetzt")
         }
         return pet.isNeutered ? "\(base) · \(l.tr(zh: "已绝育", en: "neutered", de: "kastriert"))" : base
     }

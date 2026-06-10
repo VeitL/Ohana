@@ -64,7 +64,7 @@ struct FeedRuleState {
     }
 
     var completedTodayManualReminders: [Reminder] {
-        todayManualReminders.filter { $0.isCompleted }
+        todayManualReminders.filter(\.isCompleted)
     }
 
     var nextPendingManualReminder: Reminder? {

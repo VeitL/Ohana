@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension HumanDetailView {
@@ -47,7 +47,7 @@ extension HumanDetailView {
             }
         }
         .padding(16)
-        .goIslandModuleCard(cornerRadius: 24)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         .padding(.horizontal, 16)
     }
 
@@ -105,7 +105,7 @@ extension HumanDetailView {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(16)
-                    .goIslandModuleCard(cornerRadius: 24)
+                    .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
                 }
                 .padding(.horizontal, 16)
             }
@@ -120,8 +120,8 @@ extension HumanDetailView {
                 .foregroundStyle(Color.goRed)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.goRed.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.goRed.opacity(0.2), lineWidth: 1))
+                .background(Color.goRed.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous).strokeBorder(Color.goRed.opacity(0.2), lineWidth: 1))
         }
         .padding(.horizontal, 16)
     }
@@ -139,7 +139,7 @@ extension HumanDetailView {
 
     func sectionHeader(_ text: String) -> some View {
         HStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 2)
+            RoundedRectangle(cornerRadius: OhanaRadius.hairline)
                 .fill(Color.goPrimary)
                 .frame(width: 3, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(text)

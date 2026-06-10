@@ -58,14 +58,15 @@ Rules in this file and `docs/` are enforced mechanically, not only by memory.
 
 - `audits`: audit self-tests first (`scripts/tests/run-audit-fixture-tests.sh`
   proves every audit rule still fires and that scan scope has not collapsed),
-  then the UI/accessibility/smoothness full-scope ratchet
-  (`scripts/audit-full-scope-ratchet.sh`), whole-repo strict runtime guardrails
-  and architecture boundaries, localization coverage, release data-safety,
-  governance manifests, resource integrity / xattr pre-sign checks, git size,
-  and a gitleaks secret scan (`.gitleaks.toml`).
+  then direct strict whole-repo UI V4, accessibility, and smoothness audits,
+  whole-repo strict runtime guardrails and architecture boundaries,
+  localization coverage, release data-safety, governance manifests, resource
+  integrity / xattr pre-sign checks, git size, and a gitleaks secret scan
+  (`.gitleaks.toml`).
 - `lint`: SwiftLint (`.swiftlint.yml`) and SwiftFormat (`.swiftformat`), with
   tool versions pinned via `scripts/ci-tool-versions.env` and
-  `scripts/check-tool-versions.sh`.
+  `scripts/check-tool-versions.sh`. SwiftLint runs with `--strict`, and
+  SwiftFormat runs as a required lint gate.
 - `build-test`: `xcodebuild test` on the `iPhone 17` simulator (by name).
 
 Treat a red CI as a blocking failure. Do not merge around it. When you add a new
@@ -75,20 +76,12 @@ enforced automatically rather than as prose — and add a bad/good fixture pair 
 requires a runner whose Xcode ships the iOS 26 SDK and an iPhone 17 simulator;
 see `docs/os-support-matrix.md`.
 
-UI/accessibility/smoothness run as a full-scope RATCHET, not a zero gate. The
-scan scope was widened from `Ohana/Views` + `Ohana/Utilities` (91 files) to the
-whole `Ohana/` tree on 2026-06-10, and construction-consistency rules
-(raw-textfield, hardcoded-corner-radius, hardcoded-detent-height) were added
-the same day, which surfaced pre-existing debt into
-`docs/governance/manifests/full-scope-audit-baseline.json` (ui-v4 1309,
-accessibility 60, smoothness 12 as of 2026-06-10 — the ui-v4 number is
-dominated by legacy radius literals). Any new or increased per-file/per-rule
-warning count fails CI; reductions are locked in with
-`scripts/audit-full-scope-ratchet.sh --update-baseline`. Drive the baseline
-back to zero, then promote CI back to direct `--all` strict gates per
-`docs/governance/full-scope-ratchet-policy.md`. SwiftFormat remains the last
-report-only ratchet until its baseline is formatted and committed; both
-deadlines are tracked in `docs/release-hardening-plan.md`.
+UI/accessibility/smoothness are full-repo strict gates. CI runs
+`scripts/audit-ui-v4.sh --all`, `scripts/audit-accessibility.sh --all`, and
+`scripts/audit-smoothness-risk.sh --all`; the zero baseline is retained in
+`docs/governance/manifests/full-scope-audit-baseline.json` as promotion
+evidence, not as a debt allowance. SwiftLint strict mode and SwiftFormat lint
+mode are required gates after the P1 warning and formatting baseline cleanup.
 
 ## Parallel Agent & Build Isolation
 

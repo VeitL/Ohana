@@ -87,7 +87,7 @@ enum PetMilestoneCommandService {
         }
         return PetMilestoneCommandResult(
             petID: pet.id,
-            milestoneIDs: created.map { $0.milestone.id },
+            milestoneIDs: created.map(\.milestone.id),
             coconutDelta: 0
         )
     }
@@ -203,7 +203,7 @@ enum PetMilestoneCommandService {
         context: ModelContext
     ) -> [CareLedgerEvent] {
         let idString = milestone.id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return events.filter { $0.legacyModelName == "PetMilestone" && $0.legacyModelId == idString }
     }
 }

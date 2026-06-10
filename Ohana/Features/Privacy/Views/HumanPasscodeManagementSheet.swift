@@ -52,7 +52,7 @@ struct HumanPasscodeManagementSheet: View {
             }
             .padding(20)
         }
-        .presentationDetents([.height(470), .medium])
+        .presentationDetents(OhanaSheetDetents.overview)
         .presentationDragIndicator(.hidden)
         .onChange(of: currentPin) { _, value in currentPin = sanitized(value) }
         .onChange(of: newPin) { _, value in newPin = sanitized(value) }
@@ -68,7 +68,7 @@ struct HumanPasscodeManagementSheet: View {
                 .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(Color.goYellow.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Color.goYellow.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text("账户 4 位密码")
                     .font(OhanaFont.title3(.black))
@@ -95,11 +95,15 @@ struct HumanPasscodeManagementSheet: View {
         case .overview:
             VStack(spacing: 12) {
                 statusCard(title: "已开启", subtitle: "其他成员切换到此账户时需要输入 4 位密码", icon: "checkmark.shield.fill", tint: Color.goPrimary)
-                Button { resetInputs(); mode = .change } label: {
+                Button { resetInputs()
+                    mode = .change
+                } label: {
                     actionRow(title: "修改密码", icon: "key.fill", tint: Color.goPrimary)
                 }
                 .buttonStyle(ScaleButtonStyle())
-                Button { resetInputs(); mode = .remove } label: {
+                Button { resetInputs()
+                    mode = .remove
+                } label: {
                     actionRow(title: "关闭密码", icon: "lock.open.fill", tint: Color.goRed)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -124,7 +128,9 @@ struct HumanPasscodeManagementSheet: View {
                 pinField("当前密码", text: $currentPin, target: .current)
                 messageView
                 HStack(spacing: 10) {
-                    secondaryButton("返回") { resetInputs(); mode = .overview }
+                    secondaryButton("返回") { resetInputs()
+                        mode = .overview
+                    }
                     primaryButton("关闭密码", tint: Color.goRed, foreground: .white, action: removePasscode)
                 }
             }
@@ -144,7 +150,9 @@ struct HumanPasscodeManagementSheet: View {
             messageView
             HStack(spacing: 10) {
                 if appServices.passcodes.hasPasscode(human) {
-                    secondaryButton("返回") { resetInputs(); mode = .overview }
+                    secondaryButton("返回") { resetInputs()
+                        mode = .overview
+                    }
                 }
                 primaryButton(primaryTitle, tint: Color.goPrimary, action: primaryAction)
             }
@@ -157,7 +165,7 @@ struct HumanPasscodeManagementSheet: View {
                 .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(OhanaFont.callout(.black))
@@ -170,7 +178,7 @@ struct HumanPasscodeManagementSheet: View {
             Spacer()
         }
         .padding(14)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func actionRow(title: String, icon: String, tint: Color) -> some View {
@@ -179,7 +187,7 @@ struct HumanPasscodeManagementSheet: View {
                 .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
             Text(title)
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -189,7 +197,7 @@ struct HumanPasscodeManagementSheet: View {
                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
         }
         .padding(14)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func pinField(_ title: String, text: Binding<String>, target: PinInputTarget) -> some View {
@@ -206,7 +214,7 @@ struct HumanPasscodeManagementSheet: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     HStack(spacing: 7) {
-                        ForEach(0..<4, id: \.self) { index in
+                        ForEach(0 ..< 4, id: \.self) { index in
                             Circle()
                                 .fill(index < text.wrappedValue.count ? Color.goPrimary : Color.ohanaControlFill)
                                 .frame(width: 10, height: 10) // a11y: allow decorative non-interactive frame; hit area handled by parent
@@ -215,9 +223,9 @@ struct HumanPasscodeManagementSheet: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 13)
-                .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .background(Color.primary.opacity(0.07), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                         .strokeBorder(activePinTarget == target ? Color.goPrimary.opacity(0.42) : Color.primary.opacity(0.10), lineWidth: 1)
                 }
             }
@@ -251,7 +259,7 @@ struct HumanPasscodeManagementSheet: View {
                 .foregroundStyle(foreground)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .background(tint, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -263,7 +271,7 @@ struct HumanPasscodeManagementSheet: View {
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -314,9 +322,9 @@ struct HumanPasscodeManagementSheet: View {
         switch result {
         case .success:
             successAndDismiss(success)
-        case .incorrect(let remaining):
+        case let .incorrect(remaining):
             showError("当前密码不正确，还可尝试 \(remaining) 次")
-        case .locked(let until):
+        case let .locked(until):
             showError("尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(Date()))))) 秒后再试")
         case .invalidFormat:
             showError("请输入 4 位数字")
@@ -360,12 +368,11 @@ struct HumanPasscodeManagementSheet: View {
     }
 
     private func sanitized(_ value: String) -> String {
-        String(value.filter { $0.isNumber }.prefix(4))
+        String(value.filter(\.isNumber).prefix(4))
     }
 
     private func displayName(_ human: Human) -> String {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? "未命名成员" : name
     }
-
 }

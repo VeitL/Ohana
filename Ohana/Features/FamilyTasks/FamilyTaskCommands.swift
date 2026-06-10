@@ -21,23 +21,23 @@ enum FamilyTaskCommand: FeatureDomainCommand {
     var domainCommand: DomainCommand {
         switch self {
         case .migrateLegacyBounties:
-            return .unknown(action: "familyTask:migrateLegacyBounties")
+            .unknown(action: "familyTask:migrateLegacyBounties")
         case let .assignReminder(taskID, _):
-            return .legacyBounty(taskID: taskID, action: "assignReminder")
+            .legacyBounty(taskID: taskID, action: "assignReminder")
         case let .create(taskID):
-            return .legacyBounty(taskID: taskID, action: "create")
+            .legacyBounty(taskID: taskID, action: "create")
         case let .update(taskID):
-            return .legacyBounty(taskID: taskID, action: "update")
+            .legacyBounty(taskID: taskID, action: "update")
         case let .delete(taskID):
-            return .legacyBounty(taskID: taskID, action: "delete")
+            .legacyBounty(taskID: taskID, action: "delete")
         case let .claim(taskID, _):
-            return .legacyBounty(taskID: taskID, action: "claim")
+            .legacyBounty(taskID: taskID, action: "claim")
         case let .complete(taskID, _):
-            return .legacyBounty(taskID: taskID, action: "complete")
+            .legacyBounty(taskID: taskID, action: "complete")
         case let .confirm(taskID, _):
-            return .legacyBounty(taskID: taskID, action: "confirm")
+            .legacyBounty(taskID: taskID, action: "confirm")
         case let .reject(taskID, _):
-            return .legacyBounty(taskID: taskID, action: "reject")
+            .legacyBounty(taskID: taskID, action: "reject")
         }
     }
 
@@ -71,23 +71,23 @@ enum FamilyTaskCommand: FeatureDomainCommand {
     private var actionName: String {
         switch self {
         case .migrateLegacyBounties:
-            return "migrateLegacyBounties"
+            "migrateLegacyBounties"
         case .assignReminder:
-            return "assignReminder"
+            "assignReminder"
         case .create:
-            return "create"
+            "create"
         case .update:
-            return "update"
+            "update"
         case .delete:
-            return "delete"
+            "delete"
         case .claim:
-            return "claim"
+            "claim"
         case .complete:
-            return "complete"
+            "complete"
         case .confirm:
-            return "confirm"
+            "confirm"
         case .reject:
-            return "reject"
+            "reject"
         }
     }
 }

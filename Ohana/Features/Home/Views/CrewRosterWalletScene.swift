@@ -115,10 +115,10 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
                     .overlay {
                         if isActive {
                             memberContent(card, WalletHeroTimeline.smooth(cardEditorProgress), isCardEditorMounted)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                            .opacity(Double(WalletHeroTimeline.smooth(progress, 0.26, 0.46)))
-                            .allowsHitTesting(isEditorInteractionReady)
-                            .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                                .opacity(Double(WalletHeroTimeline.smooth(progress, 0.26, 0.46)))
+                                .allowsHitTesting(isEditorInteractionReady)
+                                .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous))
                         }
                     }
                     .frame(width: frame.width, height: frame.height)
@@ -141,7 +141,7 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
                         .zIndex(70)
                 }
 
-                if isExpandedInteractionReady && !isEditorActive {
+                if isExpandedInteractionReady, !isEditorActive {
                     expandedCardHitZone(layout: layout)
                         .zIndex(80)
                 }
@@ -274,17 +274,16 @@ struct CrewRosterWalletScene<CardOverlay: View, MemberContent: View>: View {
 
     private func frame(for card: FocusCard, index: Int, layout: WalletHeroLayout, editorFrame: CGRect) -> CGRect {
         let collapsed = layout.collapsedFrame(index: index, count: cards.count)
-        let baseFrame: CGRect
-        if reduceMotion {
-            baseFrame = card.id == selectedCardId ? layout.expandedFrame : collapsed
+        let baseFrame: CGRect = if reduceMotion {
+            card.id == selectedCardId ? layout.expandedFrame : collapsed
         } else if card.id == selectedCardId {
-            baseFrame = WalletHeroTimeline.activeFrame(
+            WalletHeroTimeline.activeFrame(
                 from: collapsed,
                 to: layout.expandedFrame,
                 progress: progress
             )
         } else {
-            baseFrame = WalletHeroTimeline.inactiveFrame(
+            WalletHeroTimeline.inactiveFrame(
                 from: collapsed,
                 index: index,
                 selectedIndex: selectedCardIndex,

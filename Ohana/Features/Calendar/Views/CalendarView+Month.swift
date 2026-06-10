@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension CalendarView {
     // MARK: - Go Month View
@@ -25,15 +25,15 @@ extension CalendarView {
                         .background(isMaterial ? matSurface : classicSubtleFill, in: Circle())
                 }
                 .accessibilityLabel(l.tr(zh: "上个月", en: "Previous month", de: "Vorheriger Monat"))
-                
+
                 Spacer()
-                
+
                 Text(selectedDate, format: .dateTime.year().month(.wide))
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                
+
                 Spacer()
-                
+
                 Button {
                     shiftMonth(by: 1)
                 } label: {
@@ -48,10 +48,10 @@ extension CalendarView {
                 .accessibilityLabel(l.tr(zh: "下个月", en: "Next month", de: "Nächster Monat"))
             }
             .padding(.horizontal, 20)
-            
+
             // Weekday header — 日一二三四五六
             HStack(spacing: 0) {
-                ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
+                ForEach(["日", "一", "二", "三", "四", "五", "六"], id: \.self) { d in
                     Text(d)
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
@@ -62,9 +62,9 @@ extension CalendarView {
 
             // Calendar grid
             let daysInMonth = calendarDays()
-            
+
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
-                ForEach(Array(daysInMonth.enumerated()), id: \.offset) { offset, date in
+                ForEach(Array(daysInMonth.enumerated()), id: \.offset) { _, date in
                     if let date {
                         let isToday = Calendar.current.isDateInToday(date)
                         let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
@@ -73,7 +73,7 @@ extension CalendarView {
                             eventOccursOnDate($0, date: date) &&
                                 shouldShowEventOccurrence($0, occurrenceDate: date)
                         }
-                        
+
                         Button {
                             withAnimation(GoMotion.feedback) {
                                 selectedDate = date
@@ -84,7 +84,7 @@ extension CalendarView {
                                     .font(OhanaFont.headline(isSelected || isToday ? .bold : .medium))
                                     .foregroundStyle(isSelected ? chipSelFg : (isToday ? chipAccent : (isMaterial ? .primary : classicPrimaryText)))
                                     .ohanaNumericMotion(dayNumber)
-                                
+
                                 Circle()
                                     .fill(hasEvents ? (isSelected ? chipSelFg.opacity(0.7) : chipAccent) : .clear)
                                     .frame(width: 5, height: 5) // a11y: allow decorative event density dot
@@ -92,7 +92,7 @@ extension CalendarView {
                             .frame(width: 40, height: 48)
                             .background(
                                 isSelected ? chipAccent : (isToday ? chipAccent.opacity(isMaterial ? 0.12 : 0.08) : .clear),
-                                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                             )
                         }
                     } else {
@@ -103,11 +103,11 @@ extension CalendarView {
             .padding(.horizontal, 12)
             .id(calendarMonthKey)
             .transition(.opacity.combined(with: .scale(scale: 0.996, anchor: .center)))
-            
+
             GoDashedDivider()
                 .padding(.horizontal, 20)
                 .padding(.vertical, 4)
-            
+
             // Events for selected date — Go 风格
             ScrollView {
                 VStack(spacing: 8) {

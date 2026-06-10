@@ -4,42 +4,42 @@
 //
 //  U14: 人类运动记录
 
-import SwiftData
 import Foundation
+import SwiftData
 
 enum WorkoutType: String, Codable, CaseIterable {
-    case running    = "跑步"
-    case walking    = "步行"
-    case cycling    = "骑行"
-    case swimming   = "游泳"
-    case gym        = "健身"
-    case yoga       = "瑜伽"
-    case hiking     = "徒步"
-    case other      = "其他"
+    case running = "跑步"
+    case walking = "步行"
+    case cycling = "骑行"
+    case swimming = "游泳"
+    case gym = "健身"
+    case yoga = "瑜伽"
+    case hiking = "徒步"
+    case other = "其他"
 
     var icon: String {
         switch self {
-        case .running:  return "figure.run"
-        case .walking:  return "figure.walk"
-        case .cycling:  return "figure.outdoor.cycle"
-        case .swimming: return "figure.pool.swim"
-        case .gym:      return "dumbbell.fill"
-        case .yoga:     return "figure.mind.and.body"
-        case .hiking:   return "mountain.2.fill"
-        case .other:    return "sparkles"
+        case .running: "figure.run"
+        case .walking: "figure.walk"
+        case .cycling: "figure.outdoor.cycle"
+        case .swimming: "figure.pool.swim"
+        case .gym: "dumbbell.fill"
+        case .yoga: "figure.mind.and.body"
+        case .hiking: "mountain.2.fill"
+        case .other: "sparkles"
         }
     }
 
     var colorHex: String {
         switch self {
-        case .running:  return "F97316"
-        case .walking:  return "80FFEA"
-        case .cycling:  return "FF8C42"
-        case .swimming: return "5B6AFF"
-        case .gym:      return "FF4757"
-        case .yoga:     return "B8A9C9"
-        case .hiking:   return "00D4AA"
-        case .other:    return "FFF44F"
+        case .running: "F97316"
+        case .walking: "80FFEA"
+        case .cycling: "FF8C42"
+        case .swimming: "5B6AFF"
+        case .gym: "FF4757"
+        case .yoga: "B8A9C9"
+        case .hiking: "00D4AA"
+        case .other: "FFF44F"
         }
     }
 }

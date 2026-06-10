@@ -9,13 +9,13 @@ extension TodayFocusCard {
     @ViewBuilder
     func cardContent(_ content: TodayFocusContent) -> some View {
         switch content {
-        case .quest(let q):      questCard(q)
-        case .familyTask(let t): familyTaskCard(t)
-        case .coconutExchange(let request): exchangeCard(request)
-        case .negative(let s):   negativeCard(s)
-        case .memory(let m):     memoryCard(m)
-        case .celebrate:         celebrateCard
-        case .welcome:           welcomeCard
+        case let .quest(q): questCard(q)
+        case let .familyTask(t): familyTaskCard(t)
+        case let .coconutExchange(request): exchangeCard(request)
+        case let .negative(s): negativeCard(s)
+        case let .memory(m): memoryCard(m)
+        case .celebrate: celebrateCard
+        case .welcome: welcomeCard
         }
     }
 
@@ -128,7 +128,7 @@ extension TodayFocusCard {
         .padding(14)
         .background(cardBackground(accent))
         .ohanaPing(trigger: task.statusRaw, accent: Color.goYellow, isEnabled: task.status == .pendingReview && task.hasReward)
-        .ohanaShine(trigger: task.statusRaw, cornerRadius: 20, isEnabled: task.status == .pendingReview)
+        .ohanaShine(trigger: task.statusRaw, cornerRadius: OhanaRadius.input, isEnabled: task.status == .pendingReview)
     }
 
     func exchangeCard(_ request: TodayFocusExchangeRequestSnapshot) -> some View {
@@ -299,13 +299,13 @@ extension TodayFocusCard {
     func negativeActionTitle(for signal: IslandNegativeSignal) -> String {
         switch signal.healthAlertType {
         case .weightGainAlert, .weightLossAlert:
-            return l.tr(zh: "趋势", en: "Trend", de: "Trend")
+            l.tr(zh: "趋势", en: "Trend", de: "Trend")
         case .drinkingWeightAlert:
-            return l.tr(zh: "健康", en: "Health", de: "Gesundheit")
+            l.tr(zh: "健康", en: "Health", de: "Gesundheit")
         case .none:
-            return signal.severity == .critical ? l.tr(zh: "处理", en: "Act", de: "Los") : l.tr(zh: "查看", en: "Open", de: "Öffnen")
+            signal.severity == .critical ? l.tr(zh: "处理", en: "Act", de: "Los") : l.tr(zh: "查看", en: "Open", de: "Öffnen")
         default:
-            return signal.severity == .critical ? l.tr(zh: "处理", en: "Act", de: "Los") : l.tr(zh: "查看", en: "Open", de: "Öffnen")
+            signal.severity == .critical ? l.tr(zh: "处理", en: "Act", de: "Los") : l.tr(zh: "查看", en: "Open", de: "Öffnen")
         }
     }
 
@@ -367,8 +367,8 @@ extension TodayFocusCard {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(skippedFocusKeys.isEmpty
-                     ? l.tr(zh: "今日清空", en: "All clear", de: "Alles klar")
-                     : l.tr(zh: "已暂时跳过", en: "Skipped today", de: "Heute übersprungen"))
+                    ? l.tr(zh: "今日清空", en: "All clear", de: "Alles klar")
+                    : l.tr(zh: "已暂时跳过", en: "Skipped today", de: "Heute übersprungen"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -385,8 +385,8 @@ extension TodayFocusCard {
                 }
             } label: {
                 Text(skippedFocusKeys.isEmpty
-                     ? l.tr(zh: "绿洲", en: "Oasis", de: "Oase")
-                     : l.tr(zh: "恢复", en: "Restore", de: "Zurück"))
+                    ? l.tr(zh: "绿洲", en: "Oasis", de: "Oase")
+                    : l.tr(zh: "恢复", en: "Restore", de: "Zurück"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 14).padding(.vertical, 10)
@@ -449,7 +449,7 @@ extension TodayFocusCard {
 
     func focusPageIndicator(count: Int, selected: Int) -> some View {
         HStack(spacing: 5) {
-            ForEach(0..<count, id: \.self) { idx in
+            ForEach(0 ..< count, id: \.self) { idx in
                 Capsule()
                     .fill(idx == selected ? Color.goPrimary : Color.ohanaControlFill)
                     .frame(width: idx == selected ? 16 : 5, height: 5)

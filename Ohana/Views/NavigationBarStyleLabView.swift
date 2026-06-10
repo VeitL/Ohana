@@ -147,24 +147,24 @@ private struct NavigationBarLabVariantPreview: View {
                 navChrome
             }
             .frame(height: style.canvasHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                     .strokeBorder(Color.ohanaGlassStroke.opacity(0.18), lineWidth: 1)
             }
         }
         .padding(12)
         .background(
             reduceTransparency ? Color.ohanaCardSurfaceElevated : Color.ohanaCardSurface,
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
     }
 
     private var previewSurface: some View {
-        RoundedRectangle(cornerRadius: 22, style: .continuous)
+        RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
             .fill(Color.ohanaControlFill.opacity(0.72))
             .overlay(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .fill(Color.ohanaCardSurfaceElevated.opacity(0.82))
                     .frame(width: 118, height: 64)
                     .padding(12)
@@ -190,9 +190,9 @@ private struct NavigationBarLabVariantPreview: View {
             }
 
             HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                     .fill(Color.ohanaCardSurfaceElevated.opacity(0.72))
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
                     .fill(Color.ohanaCardSurfaceElevated.opacity(0.52))
             }
             .frame(height: style.canvasHeight > 180 ? 82 : 46)
@@ -299,7 +299,7 @@ private struct NavigationBarLabVariantPreview: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 10)
             .frame(width: 62)
-            .background(Color.ohanaCardSurface.opacity(0.96), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface.opacity(0.96), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .padding(.leading, 12)
             .padding(.vertical, 12)
 
@@ -364,7 +364,7 @@ private struct NavigationBarLabVariantPreview: View {
             .frame(height: 42)
             .padding(.horizontal, 4)
             .background {
-                if isSelected && showsSelectedFill {
+                if isSelected, showsSelectedFill {
                     Capsule()
                         .fill(Color.goPrimary.opacity(0.16))
                 }
@@ -462,59 +462,59 @@ private enum NavigationBarLabStyle: CaseIterable, Identifiable {
 
     var id: String {
         switch self {
-        case .floatingCapsule: return "floatingCapsule"
-        case .splitActionDock: return "splitActionDock"
-        case .topSegment: return "topSegment"
-        case .inlineToolbar: return "inlineToolbar"
-        case .sideRail: return "sideRail"
+        case .floatingCapsule: "floatingCapsule"
+        case .splitActionDock: "splitActionDock"
+        case .topSegment: "topSegment"
+        case .inlineToolbar: "inlineToolbar"
+        case .sideRail: "sideRail"
         }
     }
 
     var icon: String {
         switch self {
-        case .floatingCapsule: return "capsule.portrait"
-        case .splitActionDock: return "plus.circle.fill"
-        case .topSegment: return "rectangle.topthird.inset.filled"
-        case .inlineToolbar: return "slider.horizontal.3"
-        case .sideRail: return "sidebar.left"
+        case .floatingCapsule: "capsule.portrait"
+        case .splitActionDock: "plus.circle.fill"
+        case .topSegment: "rectangle.topthird.inset.filled"
+        case .inlineToolbar: "slider.horizontal.3"
+        case .sideRail: "sidebar.left"
         }
     }
 
     var canvasHeight: CGFloat {
         switch self {
-        case .sideRail: return 224
-        case .topSegment: return 166
-        default: return 154
+        case .sideRail: 224
+        case .topSegment: 166
+        default: 154
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
         case .floatingCapsule:
-            return l.tr(zh: "浮动胶囊导航", en: "Floating Capsule", de: "Schwebende Kapsel")
+            l.tr(zh: "浮动胶囊导航", en: "Floating Capsule", de: "Schwebende Kapsel")
         case .splitActionDock:
-            return l.tr(zh: "中心按钮 Dock", en: "Center Action Dock", de: "Dock mit Mitteltaste")
+            l.tr(zh: "中心按钮 Dock", en: "Center Action Dock", de: "Dock mit Mitteltaste")
         case .topSegment:
-            return l.tr(zh: "顶部标题分段", en: "Top Title Segment", de: "Oberes Titelsegment")
+            l.tr(zh: "顶部标题分段", en: "Top Title Segment", de: "Oberes Titelsegment")
         case .inlineToolbar:
-            return l.tr(zh: "轻量工具条", en: "Light Toolbar", de: "Leichte Werkzeugleiste")
+            l.tr(zh: "轻量工具条", en: "Light Toolbar", de: "Leichte Werkzeugleiste")
         case .sideRail:
-            return l.tr(zh: "侧边 Rail", en: "Side Rail", de: "Seitenleiste")
+            l.tr(zh: "侧边 Rail", en: "Side Rail", de: "Seitenleiste")
         }
     }
 
     func subtitle(_ l: L10n) -> String {
         switch self {
         case .floatingCapsule:
-            return l.tr(zh: "底部浮层，主题按钮独立跟随", en: "Bottom float with a separate theme action", de: "Unten schwebend mit eigener Designaktion")
+            l.tr(zh: "底部浮层，主题按钮独立跟随", en: "Bottom float with a separate theme action", de: "Unten schwebend mit eigener Designaktion")
         case .splitActionDock:
-            return l.tr(zh: "主操作居中，Tab 分列两侧", en: "Primary action centered between tabs", de: "Hauptaktion mittig zwischen Tabs")
+            l.tr(zh: "主操作居中，Tab 分列两侧", en: "Primary action centered between tabs", de: "Hauptaktion mittig zwischen Tabs")
         case .topSegment:
-            return l.tr(zh: "标题与 Tab 同在顶部", en: "Title and tabs share the top bar", de: "Titel und Tabs teilen die obere Leiste")
+            l.tr(zh: "标题与 Tab 同在顶部", en: "Title and tabs share the top bar", de: "Titel und Tabs teilen die obere Leiste")
         case .inlineToolbar:
-            return l.tr(zh: "选中项展开，未选中项保持图标", en: "Selected item expands, others stay icon-only", de: "Auswahl klappt auf, andere bleiben Symbole")
+            l.tr(zh: "选中项展开，未选中项保持图标", en: "Selected item expands, others stay icon-only", de: "Auswahl klappt auf, andere bleiben Symbole")
         case .sideRail:
-            return l.tr(zh: "竖向导航，适合大屏或专注页", en: "Vertical nav for wide or focused screens", de: "Vertikale Navigation für breite oder fokussierte Ansichten")
+            l.tr(zh: "竖向导航，适合大屏或专注页", en: "Vertical nav for wide or focused screens", de: "Vertikale Navigation für breite oder fokussierte Ansichten")
         }
     }
 }

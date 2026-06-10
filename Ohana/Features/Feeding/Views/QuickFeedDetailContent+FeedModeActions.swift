@@ -44,7 +44,7 @@ extension QuickFeedDetailContent {
             var refreshRequest: QuickFeedRefreshRequest = [
                 .reloadSnapshots,
                 .syncDisplayedMode,
-                .forceDisplayedMode,
+                .forceDisplayedMode
             ]
             if kind == .manualReminder {
                 refreshRequest.insert(.ensurePlanReminders)
@@ -105,9 +105,9 @@ extension QuickFeedDetailContent {
         allEvents.filter { event in
             switch kind {
             case .manualReminder:
-                return !FeedRuleMetadata.isManualReminderEvent(event, pet: pet)
+                !FeedRuleMetadata.isManualReminderEvent(event, pet: pet)
             case .autoFeeder:
-                return !FeedRuleMetadata.isAutoFeederEvent(event, pet: pet)
+                !FeedRuleMetadata.isAutoFeederEvent(event, pet: pet)
             }
         } + replacement
     }

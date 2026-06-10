@@ -29,13 +29,12 @@ final class IslandToastManager {
     }
 
     func showQuestProgress(completed: Int, total: Int) {
-        let message: String
-        if completed == total {
-            message = "🎉 今日委托全部完成！岛屿能量 MAX"
-        } else if completed % 3 == 0 && completed > 0 {
-            message = "🔥 连击 \(completed) 个！继续！"
+        let message = if completed == total {
+            "🎉 今日委托全部完成！岛屿能量 MAX"
+        } else if completed % 3 == 0, completed > 0 {
+            "🔥 连击 \(completed) 个！继续！"
         } else {
-            message = "✨ 已完成 \(completed)/\(total) · +椰子入账"
+            "✨ 已完成 \(completed)/\(total) · +椰子入账"
         }
         show(message)
     }

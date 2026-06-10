@@ -5,10 +5,10 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
-import SwiftData
-import UIKit
 import Combine
+import SwiftData
+import SwiftUI
+import UIKit
 
 struct RootView: View {
     @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
@@ -53,7 +53,6 @@ struct RootView: View {
             Text("数据库加载失败，当前为临时模式。本次会话的数据不会被保存。请尝试重启 App，如问题持续请联系开发者。")
         }
     }
-
 }
 
 #Preview {

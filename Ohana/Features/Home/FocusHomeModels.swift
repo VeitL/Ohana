@@ -28,13 +28,13 @@ nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
     var avatarImageData: Data?
     var avatarImageSignature: String = ""
     var cardStyleRaw: String = "classic"
-    var cardPopoutImageData: Data? = nil
+    var cardPopoutImageData: Data?
     var cardPopoutImageSignature: String = ""
     var cardPopoutSourceRaw: String = ""
     var petBondCardBorderActive: Bool = false
     var petBondNameplateActive: Bool = false
-    var petBondNameplateText: String? = nil
-    var humanGender: String? = nil
+    var petBondNameplateText: String?
+    var humanGender: String?
     var petSpecies: String?
     var coatColor: Color = .init(hex: "E8C49A")
     var eyeColor: Color = .init(hex: "6B3A2A")
@@ -43,15 +43,15 @@ nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
     var daysTogether: Int = 0
     var breed: String = ""
     var hasPassedAway: Bool = false
-    var passedAwayDate: Date? = nil
+    var passedAwayDate: Date?
     var daysTogetherAtPassing: Int = 0
     var isShownOnHome: Bool = true
-    var equippedTitleBadgeText: String? = nil
-    var statusBadgeText: String? = nil
+    var equippedTitleBadgeText: String?
+    var statusBadgeText: String?
     var statusBadgeIsWarning: Bool = false
     var isHuman: Bool = false
     var isElectronicPet: Bool = false
-    var critterCatalogId: String? = nil
+    var critterCatalogId: String?
     var critterAppearanceStage: Int = 1
     var critterLifeStateRaw: String = ""
     var isDummy: Bool = false
@@ -126,8 +126,7 @@ extension FocusCard {
     private var electronicPetLevelMetricValue: String {
         let trimmed = (ageText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if let firstNumber = trimmed.split(whereSeparator: { !$0.isNumber }).first,
-           !firstNumber.isEmpty
-        {
+           !firstNumber.isEmpty {
             return String(firstNumber)
         }
         return "\(max(1, critterAppearanceStage))"
@@ -138,8 +137,8 @@ struct HomeFabFunctionShortcut: Identifiable {
     var label: String
     var icon: String
     var isAvailable: Bool = true
-    var badge: String? = nil
-    var destination: FMDest? = nil
+    var badge: String?
+    var destination: FMDest?
 
     var id: String { label }
 }
@@ -157,7 +156,7 @@ struct ExpandedCardFabShortcut: Identifiable {
     var icon: String
     var action: ExpandedCardFabAction
     var isAvailable: Bool = true
-    var badge: String? = nil
+    var badge: String?
 
     var id: String { "\(label)-\(String(describing: action))" }
 }
@@ -311,14 +310,13 @@ extension FocusCard {
         let l = L10n(language)
         let state = critter.lifeState
         let days = max(0, Calendar.current.dateComponents([.day], from: critter.obtainedAt, to: Date()).day ?? 0)
-        let themeHex: String
-        switch state {
+        let themeHex = switch state {
         case .healthy:
-            themeHex = "9EF06A"
+            "9EF06A"
         case .dead:
-            themeHex = "7C828D"
+            "7C828D"
         case .needsCare, .atRisk, .sick, .critical:
-            themeHex = "FF4757"
+            "FF4757"
         }
         return FocusCard(
             id: critter.id,
@@ -346,7 +344,7 @@ extension FocusCard {
             actions: [
                 .init(label: l.tr(zh: "照顾", en: "CARE", de: "PFLEGE"), icon: "cross.case.fill", colorHex: "9EF06A"),
                 .init(label: l.tr(zh: "喂", en: "FEED", de: "FUTTER"), icon: "fork.knife", colorHex: "FFDD44"),
-                .init(label: l.tr(zh: "玩", en: "PLAY", de: "SPIEL"), icon: "sparkles", colorHex: "80FFEA"),
+                .init(label: l.tr(zh: "玩", en: "PLAY", de: "SPIEL"), icon: "sparkles", colorHex: "80FFEA")
             ]
         )
     }
@@ -382,7 +380,7 @@ extension FocusCard {
                   petSpecies: "鱼", isDummy: true,
                   actions: [.init(label: "FEED", icon: "fork.knife", colorHex: "FFDD44"),
                             .init(label: "WATER", icon: "drop.circle", colorHex: "00D4AA"),
-                            .init(label: "FILTER", icon: "wrench.and.screwdriver", colorHex: "A78BFA")]),
+                            .init(label: "FILTER", icon: "wrench.and.screwdriver", colorHex: "A78BFA")])
     ]
 }
 
@@ -461,12 +459,11 @@ enum FocusPetHumanAgeEstimator {
         if age <= 1 { return Int((age * 15).rounded()) }
         if age <= 2 { return Int((15 + (age - 1) * 9).rounded()) }
 
-        let increment: Double
-        switch dogSize(for: breed) {
-        case .small: increment = 4
-        case .medium: increment = 5
-        case .large: increment = 6
-        case .giant: increment = 7
+        let increment: Double = switch dogSize(for: breed) {
+        case .small: 4
+        case .medium: 5
+        case .large: 6
+        case .giant: 7
         }
         return Int((24 + (age - 2) * increment).rounded())
     }

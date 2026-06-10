@@ -6,8 +6,8 @@
 //  walk detail maps, and static map snapshots.
 //
 
-import SwiftUI
 import MapKit
+import SwiftUI
 import UIKit
 
 enum RainbowWalkEffectKeys {
@@ -154,7 +154,7 @@ enum MapSnapshotRainbowRenderer {
         context.setLineJoin(.round)
 
         if isRainbow {
-            for index in 1..<coordinates.count {
+            for index in 1 ..< coordinates.count {
                 let start = snapshot.point(for: coordinates[index - 1])
                 let end = snapshot.point(for: coordinates[index])
                 context.setStrokeColor(RainbowWalkPalette.uiColors[(index - 1) % RainbowWalkPalette.uiColors.count].cgColor)

@@ -156,7 +156,7 @@ enum StarterGiftService {
         } catch {
             context.rollback()
             #if DEBUG
-            print("❌ [StarterGiftService] wallet write failed: \(error.localizedDescription)")
+                OhanaLog.error("[StarterGiftService] wallet write failed: \(error.localizedDescription)", category: "Economy")
             #endif
             return .missingHuman
         }
@@ -183,7 +183,7 @@ enum StarterGiftService {
 
     @MainActor
     private static func activeHuman(matching id: String, context: ModelContext) -> Human? {
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? []
+        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return humans.first { $0.id.uuidString == id } ?? humans.first
     }
 

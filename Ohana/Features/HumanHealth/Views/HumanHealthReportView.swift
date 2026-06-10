@@ -4,8 +4,8 @@
 //
 //  身体检测报告列表 + 添加/编辑
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Main View
 
@@ -28,10 +28,10 @@ struct HumanHealthReportContentView: View {
     }
 
     private var upcomingCheckCount: Int {
-        myReports.filter {
+        myReports.count(where: {
             if let days = $0.daysUntilNextCheck { return days >= 0 && days <= 30 }
             return false
-        }.count
+        })
     }
 
     var body: some View {
@@ -131,7 +131,7 @@ struct HumanHealthReportContentView: View {
     }
 
     private var abnormalCount: Int {
-        myReports.filter { $0.conclusion == .abnormal || $0.conclusion == .critical }.count
+        myReports.count(where: { $0.conclusion == .abnormal || $0.conclusion == .critical })
     }
 
     private var divider: some View {
@@ -243,11 +243,11 @@ struct HumanHealthReportContentView: View {
             .padding(.horizontal, 20)
     }
 
-    private func humanReportSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func humanReportSurface(@ViewBuilder content: () -> some View) -> some View {
         content()
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
     }
@@ -257,7 +257,7 @@ struct HumanHealthReportContentView: View {
 
 struct AddHumanHealthReportSheet: View {
     let human: Human
-    var editing: HumanHealthReport? = nil
+    var editing: HumanHealthReport?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -348,7 +348,7 @@ struct AddHumanHealthReportSheet: View {
                                         .foregroundStyle(conclusion == c ? Color.arkInk : Color.ohanaPrimaryText)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 10)
-                                        .background(conclusion == c ? c.color : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 12))
+                                        .background(conclusion == c ? c.color : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
                                     }
                                     .buttonStyle(ScaleButtonStyle())
                                 }
@@ -364,12 +364,12 @@ struct AddHumanHealthReportSheet: View {
                             cardHeader(icon: "building.2.fill", color: Color.goCardCyan, title: "检测详情")
 
                             fieldRow(icon: "building.2", label: "医院名称") {
-                                TextField("如：北京协和医院", text: $hospitalName)
+                                TextField("如：北京协和医院", text: $hospitalName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.body())
                                     .foregroundStyle(Color.ohanaPrimaryText)
                             }
                             fieldRow(icon: "person.fill", label: "医生姓名") {
-                                TextField("如：张医生", text: $doctorName)
+                                TextField("如：张医生", text: $doctorName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.body())
                                     .foregroundStyle(Color.ohanaPrimaryText)
                             }
@@ -420,7 +420,7 @@ struct AddHumanHealthReportSheet: View {
                                     .scrollContentBackground(.hidden)
                                     .frame(height: 60)
                                     .padding(10)
-                                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 10))
+                                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
                             }
 
                             VStack(alignment: .leading, spacing: 6) {
@@ -433,7 +433,7 @@ struct AddHumanHealthReportSheet: View {
                                     .scrollContentBackground(.hidden)
                                     .frame(height: 60)
                                     .padding(10)
-                                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 10))
+                                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
                             }
                         }
                         .padding(16)
@@ -488,22 +488,22 @@ struct AddHumanHealthReportSheet: View {
         }
     }
 
-    private func fieldRow<Content: View>(icon: String, label: String, @ViewBuilder content: () -> Content) -> some View {
+    private func fieldRow(icon: String, label: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(label, systemImage: icon)
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack { content() }
                 .padding(12)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 12))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
         }
     }
 
-    private func reportSheetCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func reportSheetCard(@ViewBuilder content: () -> some View) -> some View {
         content()
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
     }

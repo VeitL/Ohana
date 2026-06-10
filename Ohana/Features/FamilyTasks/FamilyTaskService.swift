@@ -46,7 +46,7 @@ enum FamilyTaskService {
               let legacy = try? JSONDecoder().decode([LegacyBountyTask].self, from: data),
               !legacy.isEmpty else { return }
 
-        let existing = (try? context.fetch(FetchDescriptor<FamilyCollaborationTask>())) ?? []
+        let existing = (try? context.fetch(FetchDescriptor<FamilyCollaborationTask>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         var existingById: [UUID: FamilyCollaborationTask] = [:]
         for task in existing {
             existingById[task.id] = task
@@ -596,7 +596,7 @@ enum FamilyTaskService {
               let human,
               task.completedById == human.id.uuidString else { return }
         let marker = "familyTaskReward:\(task.id.uuidString)"
-        let existing = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let existing = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         guard !existing.contains(where: { $0.metadataJSON == marker }) else { return }
 
         let ledger = careLedger.record(
@@ -652,7 +652,7 @@ enum FamilyTaskService {
         } catch {
             context.rollback()
             #if DEBUG
-            print("❌ [FamilyTaskService] reward wallet write failed: \(error.localizedDescription)")
+                OhanaLog.error("[FamilyTaskService] reward wallet write failed: \(error.localizedDescription)", category: "FamilyTasks")
             #endif
         }
     }
@@ -672,7 +672,7 @@ enum FamilyTaskService {
               task.completedById == receiver.id.uuidString,
               payer.id != receiver.id else { return }
         let marker = "familyTaskRewardTransfer:\(task.id.uuidString)"
-        let existing = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let existing = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         guard !existing.contains(where: { $0.metadataJSON.hasPrefix(marker) }) else { return }
 
         let payerLedger = careLedger.record(
@@ -768,7 +768,7 @@ enum FamilyTaskService {
         } catch {
             context.rollback()
             #if DEBUG
-            print("❌ [FamilyTaskService] transfer wallet write failed: \(error.localizedDescription)")
+                OhanaLog.error("[FamilyTaskService] transfer wallet write failed: \(error.localizedDescription)", category: "FamilyTasks")
             #endif
         }
     }

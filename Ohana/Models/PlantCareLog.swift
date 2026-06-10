@@ -5,27 +5,27 @@
 //  植物养护日志：记录每次浇水/施肥的历史
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 enum PlantCareType: String, Codable, CaseIterable, Identifiable {
-    case watering = "watering"
-    case fertilizing = "fertilizing"
+    case watering
+    case fertilizing
 
     var id: String { rawValue }
 
     var emoji: String {
         switch self {
-        case .watering: return "💧"
-        case .fertilizing: return "🌿"
+        case .watering: "💧"
+        case .fertilizing: "🌿"
         }
     }
 
     var displayName: String {
         switch self {
-        case .watering: return "浇水"
-        case .fertilizing: return "施肥"
+        case .watering: "浇水"
+        case .fertilizing: "施肥"
         }
     }
 }

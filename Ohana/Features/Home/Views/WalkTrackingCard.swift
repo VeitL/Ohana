@@ -5,14 +5,14 @@
 //  遛狗追踪卡片：地图铺满卡片背景，控制面板以玻璃层叠加。
 //
 
-import SwiftUI
-import SwiftData
 import MapKit
+import SwiftData
+import SwiftUI
 
 struct WalkTrackingCard: View {
     let pet: Pet
     let snapshot: WalkTrackingSnapshot
-    var onCloseSummaryToPetCard: (() -> Void)? = nil
+    var onCloseSummaryToPetCard: (() -> Void)?
     var onStopWalk: () -> Void
     var onSaveWeeklyGoal: (Double) -> Void
 
@@ -37,6 +37,7 @@ struct WalkTrackingCard: View {
     var isActivePet: Bool {
         mgr.currentPet?.id == pet.id || mgr.phase == .idle
     }
+
     var isWalking: Bool {
         guard isActivePet else { return false }
         switch mgr.phase {
@@ -44,11 +45,13 @@ struct WalkTrackingCard: View {
         default: return false
         }
     }
+
     var isRunningWalk: Bool {
         guard isActivePet else { return false }
         if case .running = mgr.phase { return true }
         return false
     }
+
     var walkClockInterval: TimeInterval {
         guard walkSurfaceGate.allowsRefresh else { return 60 }
         return workloadPolicy.refreshInterval(
@@ -59,12 +62,15 @@ struct WalkTrackingCard: View {
             allowDuringActiveWalk: true
         )
     }
+
     var liveRouteCoordinates: [CLLocationCoordinate2D] {
         routeCoordinates(from: locationMgr.collectedLocations, maxCount: 320)
     }
+
     var livePoopMarkers: [WalkPoopMarker] {
         isActivePet ? mgr.activePoopMarkers : []
     }
+
     var shouldAnimateRainbowWalkEffects: Bool {
         walkSurfaceGate.allowsAmbientMotion
     }
@@ -94,9 +100,9 @@ struct WalkTrackingCard: View {
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .rotation3DEffect(.degrees(summaryRotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                     .strokeBorder(Color.goCardWhite.opacity(0.12), lineWidth: 1)
             )
             .overlay(alignment: .topTrailing) {
@@ -108,7 +114,7 @@ struct WalkTrackingCard: View {
                         .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topTrailing)))
                 }
             }
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
         .clipped()
         .sheet(item: $showWalkDetail) { walk in WalkDetailView(walk: walk, pet: pet) }
@@ -117,7 +123,7 @@ struct WalkTrackingCard: View {
                 .ohanaCompactSheetPresentation(detents: [.height(320)])
         }
         .onChange(of: mgr.showSummary) { _, newVal in
-            if newVal && mgr.currentPet?.id == pet.id {
+            if newVal, mgr.currentPet?.id == pet.id {
                 presentSummaryBack()
                 mgr.showSummary = false
             }

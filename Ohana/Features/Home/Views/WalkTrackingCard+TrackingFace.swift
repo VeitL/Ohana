@@ -3,9 +3,9 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
 import MapKit
+import SwiftData
+import SwiftUI
 
 extension WalkTrackingCard {
     var trackingFrontFace: some View {
@@ -22,7 +22,7 @@ extension WalkTrackingCard {
                 controlPanel
             }
             .background(Color.ohanaCardSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
     }
 
@@ -250,9 +250,9 @@ extension WalkTrackingCard {
     var statusColor: Color {
         guard isActivePet else { return Color.ohanaTertiaryText.opacity(0.3) }
         switch mgr.phase {
-        case .idle:     return Color.ohanaTertiaryText.opacity(0.3)
-        case .running:  return Color.goPrimary
-        case .paused:   return Color.goYellow
+        case .idle: return Color.ohanaTertiaryText.opacity(0.3)
+        case .running: return Color.goPrimary
+        case .paused: return Color.goYellow
         case .finished: return Color.goTeal
         }
     }
@@ -277,8 +277,8 @@ extension WalkTrackingCard {
         let m = (elapsed % 3600) / 60
         let s = elapsed % 60
         return Text(h > 0
-             ? String(format: "%d:%02d:%02d", h, m, s)
-             : String(format: "%02d:%02d", m, s))
+            ? String(format: "%d:%02d:%02d", h, m, s)
+            : String(format: "%02d:%02d", m, s))
             .font(OhanaFont.metric(size: 22))
             .foregroundStyle(Color.ohanaPrimaryText)
             .contentTransition(.numericText())

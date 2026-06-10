@@ -5,9 +5,9 @@
 //  Inline V4 popup for creating pet protection documents.
 //
 
-import SwiftUI
-import SwiftData
 import PhotosUI
+import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 struct ProtectionDocumentContentPopup: View {
@@ -91,11 +91,11 @@ struct ProtectionDocumentContentPopup: View {
                             .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.arkInk)
                             .frame(width: 48, height: 48)
-                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(isEdit
-                                 ? l.tr(zh: "编辑证件", en: "Edit Document", de: "Dokument bearbeiten")
-                                 : l.tr(zh: "添加证件", en: "Add Document", de: "Dokument hinzufügen"))
+                                ? l.tr(zh: "编辑证件", en: "Edit Document", de: "Dokument bearbeiten")
+                                : l.tr(zh: "添加证件", en: "Add Document", de: "Dokument hinzufügen"))
                                 .font(OhanaFont.title3(.black))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(pet.name)
@@ -136,8 +136,8 @@ struct ProtectionDocumentContentPopup: View {
                     .padding(.bottom, 22)
                 }
                 .frame(maxWidth: .infinity)
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.54), radius: 46, x: 0, y: -16) // ui-v4: allow popup liftedAlert shadow
                 .shadow(color: Color(hex: "0B102C").opacity(0.38), radius: 26, x: 0, y: 12) // ui-v4: allow popup liftedAlert shadow
                 .padding(.horizontal, 6)
@@ -168,7 +168,7 @@ struct ProtectionDocumentContentPopup: View {
             }
         }
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [UTType.pdf, UTType.image, UTType.data]) { result in
-            guard case .success(let url) = result else { return }
+            guard case let .success(url) = result else { return }
             Task {
                 let data = await AttachmentImageDecoder.readFileData(url)
                 let isImage = UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
@@ -183,7 +183,7 @@ struct ProtectionDocumentContentPopup: View {
             }
         }
         .sheet(isPresented: $showingCamera) {
-            PetCameraPickerView(maxPixel: 1_600) { image in
+            PetCameraPickerView(maxPixel: 1600) { image in
                 attachmentData = image.jpegData(compressionQuality: 0.82)
                 attachmentFilename = "camera.jpg"
                 attachmentIsImage = true
@@ -269,19 +269,19 @@ struct ProtectionDocumentContentPopup: View {
                 }
 
                 VStack(spacing: 10) {
-                    formTextField(
+                    formTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                         label: formSpec.titleLabel,
                         placeholder: formSpec.titlePlaceholder,
                         text: $title,
                         icon: formSpec.titleIcon
                     )
-                    formTextField(
+                    formTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                         label: formSpec.authorityLabel,
                         placeholder: formSpec.authorityPlaceholder,
                         text: $issuingAuthority,
                         icon: formSpec.authorityIcon
                     )
-                    formTextField(
+                    formTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                         label: formSpec.notesLabel,
                         placeholder: formSpec.notesPlaceholder,
                         text: $notes,
@@ -292,7 +292,7 @@ struct ProtectionDocumentContentPopup: View {
         }
     }
 
-    private func formTextField(label: String, placeholder: String, text: Binding<String>, icon: String) -> some View {
+    private func formTextField(label: String, placeholder: String, text: Binding<String>, icon: String) -> some View { // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -302,14 +302,14 @@ struct ProtectionDocumentContentPopup: View {
                 Text(label)
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                TextField(placeholder, text: text, axis: .vertical)
+                TextField(placeholder, text: text, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1...3)
+                    .lineLimit(1 ... 3)
             }
         }
         .padding(12)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private var dateRows: some View {
@@ -347,8 +347,8 @@ struct ProtectionDocumentContentPopup: View {
                             .font(OhanaFont.subheadline(.black))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(isEnabled.wrappedValue
-                             ? date.wrappedValue.formatted(.dateTime.year().month().day())
-                             : l.tr(zh: "可选", en: "Optional", de: "Optional"))
+                            ? date.wrappedValue.formatted(.dateTime.year().month().day())
+                            : l.tr(zh: "可选", en: "Optional", de: "Optional"))
                             .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -415,7 +415,7 @@ struct ProtectionDocumentContentPopup: View {
         .foregroundStyle(Color.ohanaPrimaryText)
         .frame(maxWidth: .infinity)
         .frame(height: 54)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private var costSection: some View {
@@ -451,13 +451,13 @@ struct ProtectionDocumentContentPopup: View {
         }
     }
 
-    private func popupBlock<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func popupBlock(@ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             content()
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func presentCamera() {
@@ -580,7 +580,7 @@ private struct ProtectionDocumentFormSpec {
     static func spec(for category: DocumentCategory, petName: String, l: L10n) -> ProtectionDocumentFormSpec {
         switch category {
         case .passport:
-            return ProtectionDocumentFormSpec(
+            ProtectionDocumentFormSpec(
                 sectionTitle: l.tr(zh: "护照信息", en: "Passport Info", de: "Passdaten"),
                 titleLabel: l.tr(zh: "护照编号 / 名称", en: "Passport No. / Name", de: "Passnummer / Name"),
                 titlePlaceholder: l.tr(zh: "例如 \(petName) 护照", en: "e.g. \(petName) Passport", de: "z. B. \(petName) Pass"),
@@ -598,7 +598,7 @@ private struct ProtectionDocumentFormSpec {
                 defaultHasExpiryDate: true
             )
         case .medical:
-            return ProtectionDocumentFormSpec(
+            ProtectionDocumentFormSpec(
                 sectionTitle: l.tr(zh: "病历信息", en: "Medical Record Info", de: "Krankenakte"),
                 titleLabel: l.tr(zh: "病历 / 报告名称", en: "Record / Report Name", de: "Akte / Bericht"),
                 titlePlaceholder: l.tr(zh: "例如 体检报告", en: "e.g. Checkup Report", de: "z. B. Untersuchungsbericht"),
@@ -616,7 +616,7 @@ private struct ProtectionDocumentFormSpec {
                 defaultHasExpiryDate: false
             )
         case .registration:
-            return ProtectionDocumentFormSpec(
+            ProtectionDocumentFormSpec(
                 sectionTitle: l.tr(zh: "登记信息", en: "Registration Info", de: "Registrierung"),
                 titleLabel: l.tr(zh: "登记编号 / 名称", en: "Registration No. / Name", de: "Registrierungsnummer / Name"),
                 titlePlaceholder: l.tr(zh: "例如 犬证", en: "e.g. Dog License", de: "z. B. Hundemarke"),
@@ -634,7 +634,7 @@ private struct ProtectionDocumentFormSpec {
                 defaultHasExpiryDate: false
             )
         case .vaccine, .insurance, .other:
-            return ProtectionDocumentFormSpec(
+            ProtectionDocumentFormSpec(
                 sectionTitle: l.tr(zh: "文件信息", en: "File Info", de: "Dateiinfo"),
                 titleLabel: l.tr(zh: "文件名称", en: "File Name", de: "Dateiname"),
                 titlePlaceholder: l.tr(zh: "例如 领养协议", en: "e.g. Adoption Paper", de: "z. B. Adoptionsvertrag"),

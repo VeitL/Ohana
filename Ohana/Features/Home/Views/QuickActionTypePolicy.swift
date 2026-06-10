@@ -8,22 +8,22 @@
 import Foundation
 
 enum QACardType: String, CaseIterable, Codable {
-    case walk = "walk"
-    case feed = "feed"
-    case water = "water"
-    case potty = "potty"
-    case litter = "litter"
-    case care = "care"
-    case health = "health"
-    case expense = "expense"
-    case weight = "weight"
-    case play = "play"
-    case waterChange = "waterChange"
-    case filterClean = "filterClean"
-    case cageCleaning = "cageCleaning"
-    case freeFlight = "freeFlight"
-    case misting = "misting"
-    case substrateChange = "substrateChange"
+    case walk
+    case feed
+    case water
+    case potty
+    case litter
+    case care
+    case health
+    case expense
+    case weight
+    case play
+    case waterChange
+    case filterClean
+    case cageCleaning
+    case freeFlight
+    case misting
+    case substrateChange
 
     static func available(for species: String) -> [QACardType] {
         let normalizedSpecies = species.lowercased()

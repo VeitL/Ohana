@@ -172,7 +172,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .overlay(alignment: .bottom) {
-            if isEditMode && showingAddPanel {
+            if isEditMode, showingAddPanel {
                 addOptionsPanel
                     .padding(.horizontal, 8)
                     .padding(.bottom, 2)
@@ -242,7 +242,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 guard !isEditMode else { return }
                 triggerIconAnimation(for: item.id)
                 OhanaFeedback.light()
-                if item.detailAction == nil && item.menuOptions.isEmpty {
+                if item.detailAction == nil, item.menuOptions.isEmpty {
                     item.action()
                 } else {
                     withAnimation(motion) {
@@ -264,13 +264,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
                             animationTrigger: iconAnimationTokens[item.id, default: 0],
                             animatesStateChanges: !shouldReduceWork
                         )
-                        if item.showsAttention && !isEditMode {
+                        if item.showsAttention, !isEditMode {
                             Circle()
                                 .fill(Color.goRed)
                                 .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                 .offset(x: 3, y: -3)
                         }
-                        if item.isLocked && !isEditMode {
+                        if item.isLocked, !isEditMode {
                             Image(systemName: "lock.fill").accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 8, weight: .black))
                                 .foregroundStyle(Color.goYellow)
@@ -290,7 +290,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: cellHeight)
-                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
             .allowsHitTesting(!isEditMode)
@@ -409,9 +409,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 color: foreground,
                 animatesStateChanges: false
             )
-                .frame(width: 44, height: 38)
-                .background(tint, in: Circle())
-                .contentShape(Rectangle())
+            .frame(width: 44, height: 38)
+            .background(tint, in: Circle())
+            .contentShape(Rectangle())
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(isDisabled)
@@ -451,13 +451,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
             .frame(maxWidth: .infinity)
             .frame(height: cellHeight)
             .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                     .stroke(
                         Color.goCardWhite.opacity(0.24),
                         style: StrokeStyle(lineWidth: 1, dash: [4, 4])
                     )
             }
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"))
@@ -506,9 +506,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
             .frame(maxHeight: 179)
         }
         .padding(10)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
         .shadow(color: Color.arkInk.opacity(0.22), radius: 20, x: 0, y: 12) // ui-v4: allow floating quick-action add panel
@@ -540,13 +540,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .padding(6)
             }
         }
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .opacity(item.isAddDisabled ? 0.62 : 1)
     }
 
     private func editDragLayer(for item: VerticalHomeEmbeddedAction) -> some View {
         Color.clear
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             .frame(maxWidth: .infinity)
             .frame(height: cellHeight)
             .onDrag {
@@ -644,13 +644,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
         statusForeground: Color
     ) {
         let completed = item.isCompleted && !isEditMode
-        if item.isLocked && !isEditMode {
+        if item.isLocked, !isEditMode {
             return (false, Color.goCardWhite.opacity(0.74), Color.goYellow.opacity(0.92))
         }
         if completed {
             return (true, Color.goPrimary, Color.goPrimary.opacity(0.9))
         }
-        if item.showsAttention && !isEditMode {
+        if item.showsAttention, !isEditMode {
             return (false, Color.goCardWhite, Color.goRed.mix(with: Color.goCardWhite, by: 0.18))
         }
         return (false, Color.goCardWhite, Color.goCardWhite.opacity(0.58))

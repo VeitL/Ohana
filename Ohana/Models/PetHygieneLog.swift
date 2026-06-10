@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 enum HygieneType: String, Codable, CaseIterable {
     case teeth = "刷牙"
@@ -14,35 +14,35 @@ enum HygieneType: String, Codable, CaseIterable {
     case ears = "清耳"
     case brushing = "梳毛"
     case bath = "洗澡"
-    
+
     var emoji: String {
         switch self {
-        case .teeth: return "🦷"
-        case .nails: return "✂️"
-        case .ears: return "👂"
-        case .brushing: return "🪮"
-        case .bath: return "🛁"
+        case .teeth: "🦷"
+        case .nails: "✂️"
+        case .ears: "👂"
+        case .brushing: "🪮"
+        case .bath: "🛁"
         }
     }
 
     var systemIconName: String {
         switch self {
-        case .teeth:    return "mouth.fill"
-        case .nails:    return "scissors"
-        case .ears:     return "ear.fill"
-        case .brushing: return "comb.fill"
-        case .bath:     return "drop.fill"
+        case .teeth: "mouth.fill"
+        case .nails: "scissors"
+        case .ears: "ear.fill"
+        case .brushing: "comb.fill"
+        case .bath: "drop.fill"
         }
     }
-    
+
     /// 系统默认周期天数
     var defaultCycleDays: Int {
         switch self {
-        case .teeth: return 1
-        case .nails: return 14
-        case .ears: return 7
-        case .brushing: return 3
-        case .bath: return 14
+        case .teeth: 1
+        case .nails: 14
+        case .ears: 7
+        case .brushing: 3
+        case .bath: 14
         }
     }
 
@@ -82,7 +82,7 @@ final class PetHygieneLog {
     var type: String
     var executorId: String? // ArkSchemaV38: 执行该记录的 Human.id.uuidString
     var pet: Pet?
-    
+
     init(date: Date = Date(), type: HygieneType = .bath, pet: Pet? = nil, executorId: String? = nil) {
         self.id = UUID()
         self.date = date
@@ -90,7 +90,7 @@ final class PetHygieneLog {
         self.executorId = executorId
         self.pet = pet
     }
-    
+
     var hygieneType: HygieneType {
         HygieneType(rawValue: type) ?? .bath
     }

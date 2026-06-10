@@ -4,8 +4,8 @@
 //
 //  模块4：排班提醒与「拍一拍」催办组件
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Assignee Avatar Chip（显示在待办旁边）
 struct AssigneeChip: View {

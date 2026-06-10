@@ -67,9 +67,9 @@ struct CrewRosterEditorShell<Content: View>: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.arkInk.opacity(0.50), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.arkInk.opacity(0.50), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 0.75)
         )
     }

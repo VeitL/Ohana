@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension CoconutShopView {
     func openCashExchangeForm() {
@@ -97,7 +97,7 @@ extension CoconutShopView {
                     pendingPurchaseItem = nil
                     showPurchaseSuccess(item)
                 }
-            case .failure(let error):
+            case let .failure(error):
                 pendingPurchaseItem = nil
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 showToast(error.localizedDescription, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
@@ -112,7 +112,7 @@ extension CoconutShopView {
                 selectedAppIcon = descriptor.itemId
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 showToast(successMessage, icon: "checkmark.circle.fill", tint: Color.goPrimary)
-            case .failure(let error):
+            case let .failure(error):
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 showToast(error.localizedDescription, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             }
@@ -246,8 +246,8 @@ extension CoconutShopView {
     }
 
     func spawnConfetti() {
-        confettiItems = (0..<12).map { index in
-            ConfettiDrop(emoji: ["🥥", "✦", "●", "✨"].randomElement() ?? "🥥", x: CGFloat.random(in: 36...360), delay: Double(index) * 0.025)
+        confettiItems = (0 ..< 12).map { index in
+            ConfettiDrop(emoji: ["🥥", "✦", "●", "✨"].randomElement() ?? "🥥", x: CGFloat.random(in: 36 ... 360), delay: Double(index) * 0.025)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
             confettiItems.removeAll()
@@ -263,7 +263,7 @@ extension CoconutShopView {
             appServices.shopInventory.activateDoubleRewardBoost()
             return true
         case "boost_streak":
-            appServices.shopInventory.activateStreakShield(until: Date().addingTimeInterval(172800))
+            appServices.shopInventory.activateStreakShield(until: Date().addingTimeInterval(172_800))
             return true
         case "boost_backdate_single", "boost_backdate_pack":
             appServices.shopInventory.addBackdatePasses(item.id == "boost_backdate_pack" ? 3 : 1)
@@ -347,7 +347,7 @@ extension CoconutShopView {
             equipFxRainbowPoop.toggle()
         case "fx_popout_card":
             equipFxPopoutCard.toggle()
-            if equipFxPopoutCard && !pets.contains(where: { $0.cardStyleRaw == "popout" }) {
+            if equipFxPopoutCard, !pets.contains(where: { $0.cardStyleRaw == "popout" }) {
                 openPopoutPetPicker()
             }
         case "fx_stars":
@@ -390,14 +390,14 @@ extension CoconutShopView {
 
     func isOwnedItemEquipped(_ item: ShopItem) -> Bool {
         switch item.id {
-        case "fx_lime_glow": return equipFxLimeGlow
-        case "fx_rainbow": return equipFxRainbow
-        case "fx_rainbow_poop": return equipFxRainbowPoop
-        case "fx_popout_card": return equipFxPopoutCard && pets.contains { $0.cardStyleRaw == "popout" }
-        case "fx_stars": return equipFxStars
-        case "fx_firework": return equipFxFirework
-        case "title_guardian", "title_pioneer", "title_chef": return equippedTitle == item.id
-        default: return false
+        case "fx_lime_glow": equipFxLimeGlow
+        case "fx_rainbow": equipFxRainbow
+        case "fx_rainbow_poop": equipFxRainbowPoop
+        case "fx_popout_card": equipFxPopoutCard && pets.contains { $0.cardStyleRaw == "popout" }
+        case "fx_stars": equipFxStars
+        case "fx_firework": equipFxFirework
+        case "title_guardian", "title_pioneer", "title_chef": equippedTitle == item.id
+        default: false
         }
     }
 
@@ -414,9 +414,9 @@ extension CoconutShopView {
     func isToggleableEffect(_ item: ShopItem) -> Bool {
         switch item.id {
         case "fx_lime_glow", "fx_rainbow", "fx_rainbow_poop", "fx_popout_card", "fx_stars", "fx_firework":
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 
@@ -492,14 +492,13 @@ extension CoconutShopView {
 
     func handleAvatar2DUpgradeResult(_ result: Avatar2DUpgradeCommandResult, name: String) {
         guard result.didUpgrade else {
-            let message: String
-            switch result.failure {
+            let message: String = switch result.failure {
             case .missingProfile:
-                message = result.kind == EntityKind.human.rawValue
+                result.kind == EntityKind.human.rawValue
                     ? l.tr(zh: "请先补充性别或生日资料后再试。", en: "Add gender or birthday details first.", de: "Ergänze zuerst Geschlecht oder Geburtstag.")
                     : l.tr(zh: "请先补充物种或品种资料后再试。", en: "Add species or breed details first.", de: "Ergänze zuerst Art oder Rasse.")
             case .noPass, nil:
-                message = l.tr(zh: "当前没有可用的 2.5D 头像券。", en: "No 2.5D avatar pass available.", de: "Kein 2,5D-Avatarpass verfügbar.")
+                l.tr(zh: "当前没有可用的 2.5D 头像券。", en: "No 2.5D avatar pass available.", de: "Kein 2,5D-Avatarpass verfügbar.")
             }
             showToast(message, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             return

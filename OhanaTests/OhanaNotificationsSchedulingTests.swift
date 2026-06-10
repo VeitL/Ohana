@@ -1,7 +1,7 @@
 import Foundation
-@testable import Ohana
 import SwiftData
 import Testing
+@testable import Ohana
 
 @MainActor
 struct OhanaNotificationsSchedulingTests {
@@ -10,20 +10,21 @@ struct OhanaNotificationsSchedulingTests {
     final class FakeScheduler: ReminderNotificationScheduling, @unchecked Sendable {
         private(set) var cancelledIds: [String] = []
 
-        func schedule(reminder: Reminder) {}
+        func schedule(reminder _: Reminder) {}
         func schedule(
-            reminder: Reminder,
-            existingNotificationIds: Set<String>?,
+            reminder _: Reminder,
+            existingNotificationIds _: Set<String>?,
             completion: ((ReminderNotificationScheduleResult) -> Void)?
         ) {
             completion?(.scheduled)
         }
+
         func pendingNotificationIds() async -> Set<String> { [] }
-        func scheduleRollingWindow(reminders: [Reminder]) {}
-        func refillWindowIfNeeded(allReminders: [Reminder]) {}
+        func scheduleRollingWindow(reminders _: [Reminder]) {}
+        func refillWindowIfNeeded(allReminders _: [Reminder]) {}
         func cancel(notificationId: String) { cancelledIds.append(notificationId) }
-        func cancelAll(for petId: String, reminders: [Reminder]) {}
-        func compensate(reminders: [Reminder]) {}
+        func cancelAll(for _: String, reminders _: [Reminder]) {}
+        func compensate(reminders _: [Reminder]) {}
     }
 
     @Test func skipRoutesCancelThroughInjectedSeam() throws {

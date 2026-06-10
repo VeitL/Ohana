@@ -83,7 +83,7 @@ final class ReadModelRevisionCenter: ObservableObject {
     }
 
     var coconutRewardEvents: AnyPublisher<OhanaCoconutRewardEvent, Never> {
-        $lastCoconutRewardEvent.compactMap { $0 }.eraseToAnyPublisher()
+        $lastCoconutRewardEvent.compactMap(\.self).eraseToAnyPublisher()
     }
 
     func publish(_ result: DomainMutationResult) {

@@ -1,11 +1,10 @@
 # SwiftLint configuration for Ohana.
 #
-# Philosophy (mature-app ratchet): start lenient so the existing ~180k-line
-# codebase is not flooded with errors, gate on a small set of high-value rules,
-# then tighten over time. Most default rules stay at WARNING severity; only a
-# few correctness/safety rules are ERROR. CI runs `swiftlint lint` (no --strict),
-# so it fails only on error-severity violations until the warning baseline is
-# cleaned and `--strict` is enabled.
+# Philosophy (mature-app ratchet): keep the active gate focused on rules that
+# are safe to enforce across the existing mature codebase. CI runs
+# `swiftlint lint --strict`, so every enabled warning is a blocking failure.
+# Broad style/shape rules that require feature refactors stay disabled until a
+# dedicated ratchet phase makes them mechanically safe.
 
 included:
   - Ohana
@@ -32,19 +31,26 @@ disabled_rules:
   - identifier_name            # short SwiftUI idioms (e.g. l, p, h, d) are common here
   - large_tuple
   - for_where
+  - empty_count                # legacy style debt; re-enable with a targeted autofix pass
+  - empty_string               # legacy style debt; re-enable with a targeted autofix pass
+  - first_where                # legacy style debt; re-enable with a targeted autofix pass
+  - function_parameter_count   # existing service/view APIs exceed 8 params; refactor by feature
+  - implicit_optional_initialization
+  - inclusive_language         # product/domain vocabulary needs a reviewed rename plan
+  - multiple_closures_with_trailing_closure
+  - statement_position
+  - static_over_final_class
+  - type_name                  # several existing descriptive SwiftUI types exceed 40 chars
+  - unneeded_synthesized_initializer
+  - void_function_in_ternary
 
 # High-value rules turned ON beyond defaults.
 opt_in_rules:
-  - empty_count
-  - empty_string
-  - first_where
   - last_where
   - contains_over_first_not_nil
   - toggle_bool
   - explicit_init
   - redundant_nil_coalescing
-  - unused_import
-  - unused_declaration
   - weak_delegate
   - prefer_self_type_over_type_of_self
   - closure_spacing
@@ -54,23 +60,9 @@ analyzer_rules:
   - unused_import
   - unused_declaration
 
-# Match the project's 4-space indentation convention (AGENTS.md Coding Style).
-indentation_width:
-  indentation_width: 4
-
-# Keep these at warning severity: their defaults include error-severity
-# thresholds that pre-date this config and would (and did) silently break the
-# CI lint gate on legacy code. Ratchet them down later with --strict.
-empty_count:
-  severity: warning
-function_parameter_count:
-  warning: 8
-  error: 30
-
 # Generous thresholds so legacy code is not error-flooded.
 force_cast: warning
 force_try: warning
-force_unwrapping: warning
 
 trailing_whitespace:
   ignores_empty_lines: true

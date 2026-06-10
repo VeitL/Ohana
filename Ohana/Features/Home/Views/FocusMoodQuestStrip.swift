@@ -2,8 +2,8 @@
 // GO UI 首页心情 + 任务组合卡片
 // 白卡风格，与粉色背景形成对比；多任务时左右滑动切换
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct FocusMoodQuestStrip: View {
     let pets: [Pet]
@@ -11,14 +11,14 @@ struct FocusMoodQuestStrip: View {
     let pendingReminders: [Reminder]
     let activePet: Pet?
     let checkInStreak: Int
-    let quests: [IslandQuest]          // already computed by parent engine — trust this
+    let quests: [IslandQuest] // already computed by parent engine — trust this
     var onCompleteQuest: (IslandQuest) -> Void = { _ in }
     var onExpand: () -> Void = {}
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
-    @State private var currentPage  = 0
-    @State private var completingId: String? = nil  // 正在完成动画的任务 id
+    @State private var currentPage = 0
+    @State private var completingId: String? = nil // 正在完成动画的任务 id
 
     private var cardSurface: Color {
         colorScheme == .dark ? Color.white.opacity(0.08) : Color.white // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
@@ -53,12 +53,12 @@ struct FocusMoodQuestStrip: View {
 
     private var moodEmoji: String {
         switch mood {
-        case .celebrate:   return "🎉"
-        case .plantBreeze: return "🌿"
-        case .breezy:      return "🌤"
-        case .calm:        return "☀️"
-        case .cloudy:      return "⛅"
-        case .storm:       return "⛈"
+        case .celebrate: "🎉"
+        case .plantBreeze: "🌿"
+        case .breezy: "🌤"
+        case .calm: "☀️"
+        case .cloudy: "⛅"
+        case .storm: "⛈"
         }
     }
 
@@ -74,7 +74,7 @@ struct FocusMoodQuestStrip: View {
             }
             // Only claim "all done" when quests are actually empty; otherwise mood may
             // have been triggered by reminder completion while pet quests still pending.
-            if pendingQuests.isEmpty && !quests.isEmpty {
+            if pendingQuests.isEmpty, !quests.isEmpty {
                 return "今日任务全部完成 🎉"
             }
             if let pet = activePet ?? activePets.first { return "岛屿氛围不错 · \(pet.name) 今天棒" }
@@ -82,8 +82,8 @@ struct FocusMoodQuestStrip: View {
         case .plantBreeze: return "植物刚喝饱水"
         default: break
         }
-        if checkInStreak >= 7  { return "🔥 连续打卡 \(checkInStreak) 天" }
-        if checkInStreak >= 3  { return "连击 \(checkInStreak) 天 · 继续加油" }
+        if checkInStreak >= 7 { return "🔥 连续打卡 \(checkInStreak) 天" }
+        if checkInStreak >= 3 { return "连击 \(checkInStreak) 天 · 继续加油" }
         if let w = negativeSignals.first { return w.title }
         if let pet = activePet ?? activePets.first { return "岛屿晴朗 · \(pet.name) 今天不错" }
         return "岛屿等待你的第一位家人"
@@ -159,11 +159,11 @@ struct FocusMoodQuestStrip: View {
                 // Page dots
                 if pendingQuests.count > 1 {
                     HStack(spacing: 5) {
-                        ForEach(0..<pendingQuests.count, id: \.self) { i in
+                        ForEach(0 ..< pendingQuests.count, id: \.self) { i in
                             Capsule()
                                 .fill(i == currentPage
-                                      ? Color(hex: "1A2E8A")
-                                      : Color(hex: "23181A").opacity(0.18))
+                                    ? Color(hex: "1A2E8A")
+                                    : Color(hex: "23181A").opacity(0.18))
                                 .frame(width: i == currentPage ? 14 : 5, height: 5)
                                 .animation(.spring(response: 0.3), value: currentPage) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                         }
@@ -191,14 +191,14 @@ struct FocusMoodQuestStrip: View {
                 .buttonStyle(ScaleButtonStyle())
             }
         }
-        .background(cardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(cardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.04), lineWidth: 1)
         )
-        .shadow(color: (colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "23181A").opacity(0.09)), radius: 12, y: 4) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+        .shadow(color: colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "23181A").opacity(0.09), radius: 12, y: 4) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         .onChange(of: pendingQuests.count) { _, newCount in
-            if currentPage >= newCount && newCount > 0 {
+            if currentPage >= newCount, newCount > 0 {
                 currentPage = newCount - 1
             }
         }

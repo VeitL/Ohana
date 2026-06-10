@@ -10,122 +10,122 @@ extension OasisRewardView {
 
     var oasisCritterMotivationCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .center, spacing: 14) {
-                    if let critter = featuredCritter {
-                        OasisCritterIllustration(catalogId: critter.catalogId, locked: false, size: 104, critter: critter)
-                            .scaleEffect(critterActionPulseId == critter.id ? 1.06 : 1)
-                        VStack(alignment: .leading, spacing: 7) {
-                            HStack(spacing: 7) {
-                                Text(l.tr(zh: "电子宠物小窝", en: "Critter Nest", de: "Critter-Nest"))
-                                    .font(OhanaFont.title3(.black))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                Text(l.tr(zh: critter.rarity.zh, en: critter.rarity.en, de: critter.rarity.de))
-                                    .font(OhanaFont.caption2(.black))
-                                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(critterRarityColor(critter.rarity), in: Capsule())
-                            }
-                            Text(critter.displayName(l))
-                                .font(OhanaFont.title(.black))
-                                .foregroundStyle(Color.goPrimary)
-                                .contentTransition(.numericText())
-                            HStack(spacing: 8) {
-                                critterQuickMetric(icon: "fork.knife", value: "\(critter.hunger)")
-                                critterQuickMetric(icon: "face.smiling", value: "\(critter.mood)")
-                                critterQuickMetric(icon: "cross.case.fill", value: "\(critter.health)")
-                                critterQuickMetric(icon: "heart.fill", value: "B\(critterRenderSnapshot(for: critter).bondLevel)")
-                                critterQuickMetric(icon: "star.fill", value: "\(critter.starLevel)")
-                            }
-                        }
-                    } else {
-                        OasisCritterIllustration(catalogId: OasisUpgradeRewardCatalog.firstCritterId, locked: true, size: 104)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(l.tr(zh: "升级生命树，唤醒电子宠物", en: "Level the tree. Wake critters.", de: "Baum leveln. Critter wecken."))
-                                .font(OhanaFont.title2(.black))
+            HStack(alignment: .center, spacing: 14) {
+                if let critter = featuredCritter {
+                    OasisCritterIllustration(catalogId: critter.catalogId, locked: false, size: 104, critter: critter)
+                        .scaleEffect(critterActionPulseId == critter.id ? 1.06 : 1)
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 7) {
+                            Text(l.tr(zh: "电子宠物小窝", en: "Critter Nest", de: "Critter-Nest"))
+                                .font(OhanaFont.title3(.black))
                                 .foregroundStyle(Color.ohanaPrimaryText)
-                                .lineLimit(2)
-                            Text(nextCritterGoalText)
-                                .font(OhanaFont.footnote(.black))
-                                .foregroundStyle(Color.goPrimary)
-                            milestoneProgressBar
+                            Text(l.tr(zh: critter.rarity.zh, en: critter.rarity.en, de: critter.rarity.de))
+                                .font(OhanaFont.caption2(.black))
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(critterRarityColor(critter.rarity), in: Capsule())
+                        }
+                        Text(critter.displayName(l))
+                            .font(OhanaFont.title(.black))
+                            .foregroundStyle(Color.goPrimary)
+                            .contentTransition(.numericText())
+                        HStack(spacing: 8) {
+                            critterQuickMetric(icon: "fork.knife", value: "\(critter.hunger)")
+                            critterQuickMetric(icon: "face.smiling", value: "\(critter.mood)")
+                            critterQuickMetric(icon: "cross.case.fill", value: "\(critter.health)")
+                            critterQuickMetric(icon: "heart.fill", value: "B\(critterRenderSnapshot(for: critter).bondLevel)")
+                            critterQuickMetric(icon: "star.fill", value: "\(critter.starLevel)")
                         }
                     }
-
-                    Spacer(minLength: 4)
-
-                    Image(systemName: "chevron.right") // a11y: allow decorative disclosure cue
-                        .font(OhanaFont.subheadline(.black))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .accessibilityHidden(true)
+                } else {
+                    OasisCritterIllustration(catalogId: OasisUpgradeRewardCatalog.firstCritterId, locked: true, size: 104)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(l.tr(zh: "升级生命树，唤醒电子宠物", en: "Level the tree. Wake critters.", de: "Baum leveln. Critter wecken."))
+                            .font(OhanaFont.title2(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(2)
+                        Text(nextCritterGoalText)
+                            .font(OhanaFont.footnote(.black))
+                            .foregroundStyle(Color.goPrimary)
+                        milestoneProgressBar
+                    }
                 }
 
-                if featuredCritter == nil {
-                    HStack(spacing: 10) {
-                        critterMilestonePill(level: 10, catalogId: OasisUpgradeRewardCatalog.firstCritterId)
-                        critterMilestonePill(level: 20, catalogId: OasisUpgradeRewardCatalog.legendaryCritterId)
-                    }
-                } else if let critter = featuredCritter {
-                    let snapshot = critterRenderSnapshot(for: critter)
-                    let wish = snapshot.dailyWish
-                    critterLifeStrip(critter, snapshot: snapshot.lifecycle)
-                    if let wish {
-                        critterWishStrip(wish, critter: critter, isCompleted: snapshot.isDailyWishCompleted)
-                    }
-                    if let lastCritterInteractionOutcome, lastCritterInteractionOutcome.success {
-                        critterOutcomeStrip(lastCritterInteractionOutcome)
-                    }
-                    if snapshot.lifecycle.isRescuable {
-                        HStack(spacing: 8) {
-                            critterNestAction(
-                                icon: "cross.case.fill",
-                                title: l.tr(zh: "照顾一下", en: "Care now", de: "Pflegen"),
-                                cost: l.tr(zh: "免费", en: "Free", de: "Gratis"),
-                                enabled: rescuingCritterId != critter.id,
-                                highlighted: true
-                            ) {
-                                rescue(with: critter)
-                            }
-                        }
-                    }
+                Spacer(minLength: 4)
+
+                Image(systemName: "chevron.right") // a11y: allow decorative disclosure cue
+                    .font(OhanaFont.subheadline(.black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .accessibilityHidden(true)
+            }
+
+            if featuredCritter == nil {
+                HStack(spacing: 10) {
+                    critterMilestonePill(level: 10, catalogId: OasisUpgradeRewardCatalog.firstCritterId)
+                    critterMilestonePill(level: 20, catalogId: OasisUpgradeRewardCatalog.legendaryCritterId)
+                }
+            } else if let critter = featuredCritter {
+                let snapshot = critterRenderSnapshot(for: critter)
+                let wish = snapshot.dailyWish
+                critterLifeStrip(critter, snapshot: snapshot.lifecycle)
+                if let wish {
+                    critterWishStrip(wish, critter: critter, isCompleted: snapshot.isDailyWishCompleted)
+                }
+                if let lastCritterInteractionOutcome, lastCritterInteractionOutcome.success {
+                    critterOutcomeStrip(lastCritterInteractionOutcome)
+                }
+                if snapshot.lifecycle.isRescuable {
                     HStack(spacing: 8) {
                         critterNestAction(
-                            icon: "fork.knife",
-                            title: l.tr(zh: "喂养", en: "Feed", de: "Füttern"),
-                            cost: critterInteractionCostText(snapshot.feedCost),
-                            enabled: snapshot.canFeed,
-                            highlighted: !snapshot.isDailyWishCompleted && wish?.action == .feed
+                            icon: "cross.case.fill",
+                            title: l.tr(zh: "照顾一下", en: "Care now", de: "Pflegen"),
+                            cost: l.tr(zh: "免费", en: "Free", de: "Gratis"),
+                            enabled: rescuingCritterId != critter.id,
+                            highlighted: true
                         ) {
-                            interact(with: critter, action: .feed)
+                            rescue(with: critter)
                         }
-                        critterNestAction(
-                            icon: "sparkles",
-                            title: l.tr(zh: "玩耍", en: "Play", de: "Spielen"),
-                            cost: critterInteractionCostText(snapshot.playCost),
-                            enabled: snapshot.canPlay,
-                            highlighted: !snapshot.isDailyWishCompleted && wish?.action == .play
-                        ) {
-                            interact(with: critter, action: .play)
-                        }
-                        critterNestAction(
-                            icon: "moon.fill",
-                            title: l.tr(zh: "休息", en: "Rest", de: "Ruhen"),
-                            cost: critterInteractionCostText(snapshot.restCost),
-                            enabled: snapshot.canRest,
-                            highlighted: !snapshot.isDailyWishCompleted && wish?.action == .rest
-                        ) {
-                            interact(with: critter, action: .rest)
-                        }
+                    }
+                }
+                HStack(spacing: 8) {
+                    critterNestAction(
+                        icon: "fork.knife",
+                        title: l.tr(zh: "喂养", en: "Feed", de: "Füttern"),
+                        cost: critterInteractionCostText(snapshot.feedCost),
+                        enabled: snapshot.canFeed,
+                        highlighted: !snapshot.isDailyWishCompleted && wish?.action == .feed
+                    ) {
+                        interact(with: critter, action: .feed)
+                    }
+                    critterNestAction(
+                        icon: "sparkles",
+                        title: l.tr(zh: "玩耍", en: "Play", de: "Spielen"),
+                        cost: critterInteractionCostText(snapshot.playCost),
+                        enabled: snapshot.canPlay,
+                        highlighted: !snapshot.isDailyWishCompleted && wish?.action == .play
+                    ) {
+                        interact(with: critter, action: .play)
+                    }
+                    critterNestAction(
+                        icon: "moon.fill",
+                        title: l.tr(zh: "休息", en: "Rest", de: "Ruhen"),
+                        cost: critterInteractionCostText(snapshot.restCost),
+                        enabled: snapshot.canRest,
+                        highlighted: !snapshot.isDailyWishCompleted && wish?.action == .rest
+                    ) {
+                        interact(with: critter, action: .rest)
                     }
                 }
             }
-            .padding(16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(Color.goPrimary.opacity(0.16), lineWidth: 1)
-            )
-        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        }
+        .padding(16)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
+                .strokeBorder(Color.goPrimary.opacity(0.16), lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
         .onTapGesture {
             OhanaFeedback.light()
             openSheet(.critterCodex)
@@ -209,7 +209,7 @@ extension OasisRewardView {
         }
         .padding(9)
         .frame(maxWidth: .infinity)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     func critterQuickMetric(icon: String, value: String) -> some View {
@@ -231,7 +231,7 @@ extension OasisRewardView {
                 .font(OhanaFont.footnote(.black))
                 .foregroundStyle(snapshot.state == .critical ? Color.arkInk : Color.ohanaPrimaryActionText)
                 .frame(width: 32, height: 32) // a11y: allow decorative lifecycle badge paired with state text
-                .background(critterLifecycleTint(for: snapshot.state), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(critterLifecycleTint(for: snapshot.state), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -248,7 +248,7 @@ extension OasisRewardView {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     func critterWishStrip(_ wish: OasisCritterDailyWish, critter: OasisElectronicPet, isCompleted: Bool) -> some View {
@@ -257,7 +257,7 @@ extension OasisRewardView {
                 .font(OhanaFont.footnote(.black))
                 .foregroundStyle(isCompleted ? Color.arkInk : Color.ohanaPrimaryActionText)
                 .frame(width: 32, height: 32) // a11y: allow decorative wish badge paired with text
-                .background(isCompleted ? Color.goPrimary : critterRarityColor(critter.rarity), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(isCompleted ? Color.goPrimary : critterRarityColor(critter.rarity), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -275,7 +275,7 @@ extension OasisRewardView {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .animation(GoMotion.feedback, value: isCompleted)
     }
 
@@ -303,7 +303,7 @@ extension OasisRewardView {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.ohanaCardSurface.opacity(0.72), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .background(Color.ohanaCardSurface.opacity(0.72), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .transition(.opacity.combined(with: .scale(scale: 0.96)))
     }
 
@@ -329,48 +329,48 @@ extension OasisRewardView {
     }
 
     func critterInteractionCostText(_ cost: Int) -> String {
-        return cost == 0 ? l.tr(zh: "免费", en: "Free", de: "Gratis") : "\(cost)🥥"
+        cost == 0 ? l.tr(zh: "免费", en: "Free", de: "Gratis") : "\(cost)🥥"
     }
 
     func critterRarityColor(_ rarity: OasisElectronicPetRarity) -> Color {
         switch rarity {
-        case .common: return Color.goTeal
-        case .rare: return Color(hex: "7C6CFF")
-        case .epic: return Color(hex: "B45CFF")
-        case .legendary: return Color.goOrange
+        case .common: Color.goTeal
+        case .rare: Color(hex: "7C6CFF")
+        case .epic: Color(hex: "B45CFF")
+        case .legendary: Color.goOrange
         }
     }
 
     func critterLifecycleIcon(for state: OasisCritterLifeState) -> String {
         switch state {
-        case .healthy: return "heart.fill"
-        case .needsCare: return "hand.raised.fill"
-        case .atRisk: return "exclamationmark.circle.fill"
-        case .sick: return "cross.case.fill"
-        case .critical: return "hourglass"
-        case .dead: return "leaf.fill"
+        case .healthy: "heart.fill"
+        case .needsCare: "hand.raised.fill"
+        case .atRisk: "exclamationmark.circle.fill"
+        case .sick: "cross.case.fill"
+        case .critical: "hourglass"
+        case .dead: "leaf.fill"
         }
     }
 
     func critterLifecycleTint(for state: OasisCritterLifeState) -> Color {
         switch state {
-        case .healthy: return Color.goPrimary
-        case .needsCare: return Color.goTeal
-        case .atRisk: return Color.goOrange
-        case .sick: return Color.goPurple
-        case .critical: return Color.goYellow
-        case .dead: return Color.ohanaCardSurface
+        case .healthy: Color.goPrimary
+        case .needsCare: Color.goTeal
+        case .atRisk: Color.goOrange
+        case .sick: Color.goPurple
+        case .critical: Color.goYellow
+        case .dead: Color.ohanaCardSurface
         }
     }
 
     func critterLifecycleAuraTint(_ state: OasisCritterLifeState) -> Color {
         switch state {
         case .healthy:
-            return Color.goPrimary
+            Color.goPrimary
         case .dead:
-            return Color.ohanaTertiaryText
+            Color.ohanaTertiaryText
         case .needsCare, .atRisk, .sick, .critical:
-            return Color.goRed
+            Color.goRed
         }
     }
 
@@ -388,7 +388,7 @@ extension OasisRewardView {
                         }
                     }
                 )
-                    .transition(.scale(scale: 0.96).combined(with: .opacity))
+                .transition(.scale(scale: 0.96).combined(with: .opacity))
             }
 
             if !pendingUpgradeCoconuts.isEmpty {
@@ -421,9 +421,9 @@ extension OasisRewardView {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         )
     }
@@ -450,7 +450,7 @@ extension OasisRewardView {
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(isMilestone
-                         ? l.tr(zh: "里程碑保底", en: "Milestone guaranteed", de: "Meilenstein garantiert")
+                        ? l.tr(zh: "里程碑保底", en: "Milestone guaranteed", de: "Meilenstein garantiert")
                         : coconut.description(l))
                         .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(isMilestone ? Color.goPrimary : Color.ohanaSecondaryText)
@@ -467,7 +467,7 @@ extension OasisRewardView {
                     .accessibilityHidden(true)
             }
             .padding(10)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel("\(coconut.title(l)) \(l.tr(zh: "敲开", en: "Open", de: "Öffnen"))")
@@ -494,7 +494,7 @@ extension OasisRewardView {
     }
 
     var fragmentSummary: some View {
-        return HStack(spacing: 4) {
+        HStack(spacing: 4) {
             Text("◇")
                 .font(OhanaFont.footnote(.black))
             Text("\(actionSnapshot.critterFragmentTotal)")
@@ -569,7 +569,7 @@ extension OasisRewardView {
             }
         }
         .padding(10)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     func critterMeter(value: Int, icon: String) -> some View {
@@ -715,7 +715,7 @@ extension OasisRewardView {
 
     func clearCritterInteractionOutcomeLater(_ outcome: OasisCritterInteractionOutcome) {
         critterOutcomeCleanupTask?.cancel()
-        critterOutcomeCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3_400) {
+        critterOutcomeCleanupTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3400) {
             guard lastCritterInteractionOutcome == outcome else {
                 critterOutcomeCleanupTask = nil
                 return

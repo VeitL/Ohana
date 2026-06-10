@@ -5,10 +5,10 @@
 //  花费快捷添加 Sheet — Go Focus 快速记账
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
 import PhotosUI
+import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 struct ExpenseReceiptAttachment: Identifiable, Equatable {
@@ -30,7 +30,7 @@ struct ExpenseReceiptThumbnail: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                 .fill(tint.opacity(0.12))
                 .frame(width: 44, height: 44)
 
@@ -39,7 +39,7 @@ struct ExpenseReceiptThumbnail: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
             } else {
                 Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.callout(.semibold))
@@ -114,10 +114,10 @@ struct ExpenseReceiptPreviewViewer: View {
 struct AddExpenseSheet: View {
     let pet: Pet
     let humans: [Human]
-    var preselectedPayerId: String? = nil
-    var onSaved: (() -> Void)? = nil
-    var onRewarded: ((Int) -> Void)? = nil
-    var onDismiss: (() -> Void)? = nil
+    var preselectedPayerId: String?
+    var onSaved: (() -> Void)?
+    var onRewarded: ((Int) -> Void)?
+    var onDismiss: (() -> Void)?
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
@@ -200,7 +200,7 @@ struct AddExpenseSheet: View {
 
     // 该宠物的活跃保单（用于报销快捷入口）
     var activeInsurances: [PetInsurance] {
-        pet.insurances.filter { $0.isActive }
+        pet.insurances.filter(\.isActive)
     }
 
     var quickAmounts: [Double] {
@@ -265,8 +265,8 @@ struct AddExpenseSheet: View {
 
                     bottomActionBar
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow confirmed inline popup liftedAlert shadow token
                 .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow confirmed inline popup liftedAlert shadow token
                 .padding(.horizontal, 6)
@@ -351,10 +351,10 @@ struct AddExpenseSheet: View {
 }
 
 extension View {
-    func quickExpenseSolidSelectionSurface<S: InsettableShape>(
+    func quickExpenseSolidSelectionSurface(
         isSelected: Bool,
         tint: Color,
-        in shape: S
+        in shape: some InsettableShape
     ) -> some View {
         background(isSelected ? tint : Color.ohanaCardSurfaceElevated, in: shape)
     }

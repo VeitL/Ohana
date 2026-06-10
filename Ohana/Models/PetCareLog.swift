@@ -5,69 +5,69 @@
 //  喂食 / 喂水 / 铲屎 追踪记录（V7 新增）
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 // MARK: - Care Type
 enum CareType: String, CaseIterable, Codable {
     // 基础
-    case feeding      = "喂食"
-    case watering     = "喂水"
-    case litter       = "铲屎"
+    case feeding = "喂食"
+    case watering = "喂水"
+    case litter = "铲屎"
     // 鱼类
-    case waterChange  = "换水"
-    case filterClean  = "清理滤材"
+    case waterChange = "换水"
+    case filterClean = "清理滤材"
     // 鸟类
     case cageCleaning = "清理鸟笼"
-    case freeFlight   = "放飞互动"
+    case freeFlight = "放飞互动"
     // 爬宠/其他
-    case misting      = "喷水保湿"
+    case misting = "喷水保湿"
     case substrateChange = "换垫材"
     // 通用互动
-    case play         = "逗玩"
+    case play = "逗玩"
 
     var emoji: String {
         switch self {
-        case .feeding:        return "🍽️"
-        case .watering:       return "💧"
-        case .litter:         return "🧹"
-        case .waterChange:    return "🪣"
-        case .filterClean:    return "🔧"
-        case .cageCleaning:   return "🧺"
-        case .freeFlight:     return "🕊️"
-        case .misting:        return "💦"
-        case .substrateChange: return "🪵"
-        case .play:           return "🎾"
+        case .feeding: "🍽️"
+        case .watering: "💧"
+        case .litter: "🧹"
+        case .waterChange: "🪣"
+        case .filterClean: "🔧"
+        case .cageCleaning: "🧺"
+        case .freeFlight: "🕊️"
+        case .misting: "💦"
+        case .substrateChange: "🪵"
+        case .play: "🎾"
         }
     }
 
     var systemIconName: String {
         switch self {
-        case .feeding:           return "fork.knife"
-        case .watering:          return "drop.fill"
-        case .litter:            return "trash.fill"
-        case .waterChange:       return "arrow.2.circlepath"
-        case .filterClean:       return "sparkles"
-        case .cageCleaning:      return "house.fill"
-        case .freeFlight:        return "bird.fill"
-        case .misting:           return "humidity.fill"
-        case .substrateChange:   return "leaf.fill"
-        case .play:              return "gamecontroller.fill"
+        case .feeding: "fork.knife"
+        case .watering: "drop.fill"
+        case .litter: "trash.fill"
+        case .waterChange: "arrow.2.circlepath"
+        case .filterClean: "sparkles"
+        case .cageCleaning: "house.fill"
+        case .freeFlight: "bird.fill"
+        case .misting: "humidity.fill"
+        case .substrateChange: "leaf.fill"
+        case .play: "gamecontroller.fill"
         }
     }
 
     var accentColorHex: String {
         switch self {
-        case .feeding:        return "FF8C00"
-        case .watering:       return "00D4AA"
-        case .litter:         return "FFF44F"
-        case .waterChange:    return "4ECDC4"
-        case .filterClean:    return "A78BFA"
-        case .cageCleaning:   return "80FFEA"
-        case .freeFlight:     return "F59E0B"
-        case .misting:        return "00D4FF"
-        case .substrateChange: return "D4A574"
-        case .play:           return "FF6B6B"
+        case .feeding: "FF8C00"
+        case .watering: "00D4AA"
+        case .litter: "FFF44F"
+        case .waterChange: "4ECDC4"
+        case .filterClean: "A78BFA"
+        case .cageCleaning: "80FFEA"
+        case .freeFlight: "F59E0B"
+        case .misting: "00D4FF"
+        case .substrateChange: "D4A574"
+        case .play: "FF6B6B"
         }
     }
 
@@ -80,14 +80,14 @@ final class PetCareLog {
     #Index<PetCareLog>([\.date])
     var id: UUID
     var date: Date
-    var type: String       // CareType.rawValue
-    var amountGrams: Double  // 仅 feeding 用（喂食克数）
-    var amountMl: Double     // 仅 watering 用（喂水毫升）
+    var type: String // CareType.rawValue
+    var amountGrams: Double // 仅 feeding 用（喂食克数）
+    var amountMl: Double // 仅 watering 用（喂水毫升）
     var note: String
     var foodKindRaw: String = FeedFoodKind.dry.rawValue
     var treatKindRaw: String = ""
     var sharedSessionId: String = ""
-    var executorId: String?  // ArkSchemaV11: 执行该动作的 Human.id.uuidString
+    var executorId: String? // ArkSchemaV11: 执行该动作的 Human.id.uuidString
     var pet: Pet?
 
     init(
@@ -154,11 +154,11 @@ enum HomeFeedRecordMode: String {
     case planned
 
     static func storedRaw(for petId: UUID) -> String {
-        HomeFeedRecordModePreferenceStore.storedRaw(for: petId, fallback: Self.manual.rawValue)
+        HomeFeedRecordModePreferenceStore.storedRaw(for: petId, fallback: manual.rawValue)
     }
 
     static func isPlanned(for petId: UUID) -> Bool {
-        storedRaw(for: petId) == Self.planned.rawValue
+        storedRaw(for: petId) == planned.rawValue
     }
 
     static func set(_ petId: UUID, mode: HomeFeedRecordMode) {
@@ -260,9 +260,9 @@ struct FeedTodayState {
         observedCareLogs
             .filter {
                 (careLogs == nil || $0.pet?.id == pet.id) &&
-                $0.careType == .feeding &&
-                $0.isManualFeedLogEntry &&
-                calendar.isDate($0.date, inSameDayAs: now)
+                    $0.careType == .feeding &&
+                    $0.isManualFeedLogEntry &&
+                    calendar.isDate($0.date, inSameDayAs: now)
             }
             .sorted { $0.date > $1.date }
     }
@@ -271,9 +271,9 @@ struct FeedTodayState {
         observedCareLogs
             .filter {
                 (careLogs == nil || $0.pet?.id == pet.id) &&
-                $0.careType == .feeding &&
-                $0.isPlannedFeedLogEntry &&
-                calendar.isDate($0.date, inSameDayAs: now)
+                    $0.careType == .feeding &&
+                    $0.isPlannedFeedLogEntry &&
+                    calendar.isDate($0.date, inSameDayAs: now)
             }
             .sorted { $0.date > $1.date }
     }
@@ -282,8 +282,8 @@ struct FeedTodayState {
         observedCareLogs
             .filter {
                 (careLogs == nil || $0.pet?.id == pet.id) &&
-                $0.careType == .feeding &&
-                calendar.isDate($0.date, inSameDayAs: now)
+                    $0.careType == .feeding &&
+                    calendar.isDate($0.date, inSameDayAs: now)
             }
             .sorted { $0.date > $1.date }
     }

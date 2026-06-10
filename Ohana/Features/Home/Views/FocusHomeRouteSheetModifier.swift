@@ -98,7 +98,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private var modalSheetRouteBinding: Binding<HomeModalRoute?> {
         Binding(
             get: {
-                return routes.modal
+                routes.modal
             },
             set: { route in
                 routes.modal = route
@@ -109,7 +109,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private var fullScreenRouteBinding: Binding<HomeFullScreenRoute?> {
         Binding(
             get: {
-                return routes.fullScreen
+                routes.fullScreen
             },
             set: { route in
                 routes.fullScreen = route
@@ -120,7 +120,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private var systemSheetRouteBinding: Binding<HomeSheetRoute?> {
         Binding(
             get: {
-                return routes.sheet
+                routes.sheet
             },
             set: { route in
                 routes.sheet = route
@@ -141,7 +141,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                     routes.openCoconutLog(subject)
                 }
             )
-                .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
+            .ohanaSheetPagePresentation() // ui-v4: allow long streak overview
         case let .addEntity(type):
             AddEntityDestinationView(
                 type: type,
@@ -194,7 +194,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 homeHumans: humans,
                 homeElectronicPets: electronicPets
             )
-                .ohanaCompactSheetPresentation(detents: [.medium, .large])
+            .ohanaCompactSheetPresentation(detents: [.medium, .large])
         case let .calendar(entityID, humanID):
             CalendarRouteContainer(
                 preselectedPetId: entityID,
@@ -499,7 +499,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                         routes.openSheet(homePetFeatureRoute(petID: pet.id, destination: destination))
                     }
                 )
-                    .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
+                .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
             } else {
                 missingRouteDismissView()
             }
@@ -562,7 +562,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .petWater(id):
             if let pet = pet(id) {
                 QuickWaterDetailRouteContainer(id: pet.id, onRemove: { routes.dismissSheet() }, onClose: { routes.dismissSheet() })
-                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()
             }
@@ -641,7 +641,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                         }
                     )
                 }
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()
             }
@@ -747,33 +747,33 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     ) -> HomeSheetRoute {
         switch destination {
         case .health:
-            return .petHealth(petID, initialSection: nil)
+            .petHealth(petID, initialSection: nil)
         case .medications:
-            return .petMedication(petID)
+            .petMedication(petID)
         case .food:
-            return .petFood(petID)
+            .petFood(petID)
         case .hygiene:
-            return .petHygiene(petID)
+            .petHygiene(petID)
         case .walks:
-            return .petWalkSummary(petID)
+            .petWalkSummary(petID)
         case .potty:
-            return .petPotty(petID)
+            .petPotty(petID)
         case .basicInfo:
-            return .petBasicInfo(petID)
+            .petBasicInfo(petID)
         case .documents:
-            return .petDocuments(petID)
+            .petDocuments(petID)
         case .moments, .timeline:
-            return .petMomentHistory(petID)
+            .petMomentHistory(petID)
         case .achievements:
-            return .petAchievements(petID)
+            .petAchievements(petID)
         case .retention:
-            return .petRetention(petID)
+            .petRetention(petID)
         case .weight:
-            return .petWeight(petID)
+            .petWeight(petID)
         case .expense:
-            return .petExpense(petID)
+            .petExpense(petID)
         case .bondVault:
-            return .petBondVault(petID)
+            .petBondVault(petID)
         }
     }
 
@@ -783,23 +783,23 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     ) -> HomeSheetRoute {
         switch destination {
         case .basicInfo:
-            return .humanBasicInfo(humanID)
+            .humanBasicInfo(humanID)
         case .weight:
-            return .humanWeight(humanID)
+            .humanWeight(humanID)
         case .workout:
-            return .humanWorkoutDashboard(humanID)
+            .humanWorkoutDashboard(humanID)
         case .metrics:
-            return .humanMetrics(humanID)
+            .humanMetrics(humanID)
         case .medication:
-            return .humanMedication(humanID)
+            .humanMedication(humanID)
         case .report:
-            return .humanReport(humanID)
+            .humanReport(humanID)
         case .expense:
-            return .humanExpense(humanID)
+            .humanExpense(humanID)
         case .wishlist:
-            return .humanWishlist(humanID)
+            .humanWishlist(humanID)
         case .notes:
-            return .humanNote(humanID)
+            .humanNote(humanID)
         }
     }
 
@@ -816,5 +816,4 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 routes.dismissFullScreen()
             }
     }
-
 }

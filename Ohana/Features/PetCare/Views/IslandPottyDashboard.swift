@@ -5,8 +5,8 @@
 //  Cross-pet potty rhythm overview for GO home FAB and feature groups.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct PottyDayPulse: Identifiable {
     let id = UUID()
@@ -25,7 +25,7 @@ private struct PottyPetSummary: Identifiable {
 
 struct IslandPottyDashboardContentView: View {
     var standalone: Bool = true
-    var onOpenPet: ((Pet) -> Void)? = nil
+    var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
 
     @Environment(\.dismiss) private var dismiss
@@ -59,16 +59,16 @@ struct IslandPottyDashboardContentView: View {
     private var dayPulses: [PottyDayPulse] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        return (0..<10).reversed().map { offset in
+        return (0 ..< 10).reversed().map { offset in
             let day = cal.date(byAdding: .day, value: -offset, to: today) ?? today
-            let count = allLogs.filter { cal.isDate($0.date, inSameDayAs: day) }.count
+            let count = allLogs.count(where: { cal.isDate($0.date, inSameDayAs: day) })
             return PottyDayPulse(date: day, count: count)
         }
     }
 
     private var typeCounts: [(type: PottyType, count: Int)] {
         PottyType.allCases.map { type in
-            (type, allLogs.filter { $0.type == type.rawValue }.count)
+            (type, allLogs.count(where: { $0.type == type.rawValue }))
         }
     }
 
@@ -96,8 +96,8 @@ struct IslandPottyDashboardContentView: View {
             return PottyPetSummary(
                 id: pet.id,
                 pet: pet,
-                todayCount: pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count,
-                weekCount: pet.pottyLogs.filter { $0.date >= cutoff }.count,
+                todayCount: pet.pottyLogs.count(where: { cal.isDateInToday($0.date) }),
+                weekCount: pet.pottyLogs.count(where: { $0.date >= cutoff }),
                 latestType: latest?.pottyType,
                 latestDate: latest?.date
             )
@@ -187,7 +187,7 @@ struct IslandPottyDashboardContentView: View {
                 Circle()
                     .fill(pottyBrown.opacity(0.15))
                     .frame(width: 96, height: 96)
-                ForEach(0..<3, id: \.self) { index in
+                ForEach(0 ..< 3, id: \.self) { index in
                     Circle()
                         .stroke(pottyBrown.opacity(0.18 - Double(index) * 0.04), lineWidth: 8)
                         .scaleEffect(0.62 + CGFloat(index) * 0.22 + pulseProgress * 0.08)
@@ -220,10 +220,10 @@ struct IslandPottyDashboardContentView: View {
         .padding(18)
         .background(
             LinearGradient(colors: [pottyBrown.opacity(0.22), Color.goCardWhite.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(pottyBrown.opacity(0.24), lineWidth: 1)
         }
     }
@@ -244,7 +244,7 @@ struct IslandPottyDashboardContentView: View {
                 .foregroundStyle(pottyColor(item.type))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
-                .background(pottyColor(item.type).opacity(0.13), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(pottyColor(item.type).opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             }
         }
     }
@@ -258,7 +258,7 @@ struct IslandPottyDashboardContentView: View {
             HStack(alignment: .bottom, spacing: 6) {
                 ForEach(dayPulses) { pulse in
                     VStack(spacing: 5) {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                             .fill(pulse.count > 0 ? pottyBrown.gradient : Color.goCardWhite.opacity(0.08).gradient)
                             .frame(height: max(10, CGFloat(pulse.count) * 17 * pulseProgress))
                         Text(pulse.date, format: .dateTime.weekday(.narrow))
@@ -271,7 +271,7 @@ struct IslandPottyDashboardContentView: View {
             .frame(height: 104, alignment: .bottom)
         }
         .padding(16)
-        .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var pottyRows: some View {
@@ -305,7 +305,7 @@ struct IslandPottyDashboardContentView: View {
                             .foregroundStyle(Color.goCardWhite.opacity(0.3))
                     }
                     .padding(14)
-                    .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(Color.goCardWhite.opacity(0.07), in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -313,7 +313,7 @@ struct IslandPottyDashboardContentView: View {
     }
 
     @ViewBuilder
-    private func selectorChip<A: View>(title: String, avatar: () -> A, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    private func selectorChip(title: String, avatar: () -> some View, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 avatar()
@@ -338,10 +338,10 @@ struct IslandPottyDashboardContentView: View {
 
     private func pottyColor(_ type: PottyType) -> Color {
         switch type {
-        case .perfectPoop: return pottyBrown
-        case .softPoop:    return Color.goOrange
-        case .liquidPoop:  return Color.goRed
-        case .pee:         return Color(hex: "06B6D4")
+        case .perfectPoop: pottyBrown
+        case .softPoop: Color.goOrange
+        case .liquidPoop: Color.goRed
+        case .pee: Color(hex: "06B6D4")
         }
     }
 

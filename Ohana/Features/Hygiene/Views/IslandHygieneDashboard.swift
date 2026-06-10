@@ -5,8 +5,8 @@
 //  Cross-pet hygiene and cleaning dashboard.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private enum HygieneDashboardRange: Hashable, CaseIterable {
     case days7
@@ -16,23 +16,23 @@ private enum HygieneDashboardRange: Hashable, CaseIterable {
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .days7: return l.tr(zh: "7天", en: "7D", de: "7T")
-        case .days30: return l.tr(zh: "30天", en: "30D", de: "30T")
-        case .days90: return l.tr(zh: "90天", en: "90D", de: "90T")
-        case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
+        case .days7: l.tr(zh: "7天", en: "7D", de: "7T")
+        case .days30: l.tr(zh: "30天", en: "30D", de: "30T")
+        case .days90: l.tr(zh: "90天", en: "90D", de: "90T")
+        case .all: l.tr(zh: "全部", en: "All", de: "Alle")
         }
     }
 
     func startDate(now: Date = Date(), calendar: Calendar = .current) -> Date? {
         switch self {
         case .days7:
-            return calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
+            calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
         case .days30:
-            return calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
+            calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
         case .days90:
-            return calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
+            calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
         case .all:
-            return nil
+            nil
         }
     }
 }
@@ -58,7 +58,7 @@ private struct HygienePetSummary: Identifiable {
 
 struct IslandHygieneDashboardContentView: View {
     var standalone: Bool = true
-    var onOpenPet: ((Pet) -> Void)? = nil
+    var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
 
     @Environment(\.dismiss) private var dismiss
@@ -124,7 +124,7 @@ struct IslandHygieneDashboardContentView: View {
         let nowStart = calendar.startOfDay(for: Date())
         let start = calendar.startOfDay(for: chartStartDate)
         let dayCount = max(0, calendar.dateComponents([.day], from: start, to: nowStart).day ?? 0)
-        return (0...dayCount).compactMap { offset in
+        return (0 ... dayCount).compactMap { offset in
             guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
             let count = selectedPets.reduce(0) { total, pet in
                 total + hygieneActionCount(for: pet, matching: { calendar.isDate($0, inSameDayAs: day) })
@@ -304,7 +304,7 @@ struct IslandHygieneDashboardContentView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var hygieneBadgeStrip: some View {
@@ -407,9 +407,9 @@ struct IslandHygieneDashboardContentView: View {
     }
 
     @ViewBuilder
-    private func selectorChip<A: View>(
+    private func selectorChip(
         title: String,
-        avatar: () -> A,
+        avatar: () -> some View,
         isSelected: Bool,
         action: @escaping () -> Void
     ) -> some View {
@@ -489,8 +489,8 @@ struct IslandHygieneDashboardContentView: View {
     }
 
     private func hygieneActionCount(for pet: Pet, matching dateMatches: (Date) -> Bool) -> Int {
-        let hygiene = pet.hygieneLogs.filter { dateMatches($0.date) }.count
-        let care = pet.careLogs.filter { hygieneCareTypes.contains($0.careType) && dateMatches($0.date) }.count
+        let hygiene = pet.hygieneLogs.count(where: { dateMatches($0.date) })
+        let care = pet.careLogs.count(where: { hygieneCareTypes.contains($0.careType) && dateMatches($0.date) })
         return hygiene + care
     }
 

@@ -15,7 +15,7 @@ enum HomeFabShortcutCatalog {
             HomeFabFunctionShortcut(label: PetFeature.health.title, icon: PetFeature.health.icon, destination: .featureAggregate(.health)),
             HomeFabFunctionShortcut(label: PetFeature.weight.title, icon: PetFeature.weight.icon, destination: .featureAggregate(.weight)),
             HomeFabFunctionShortcut(label: PetFeature.expense.title, icon: PetFeature.expense.icon, destination: .featureAggregate(.expense)),
-            HomeFabFunctionShortcut(label: "更多", icon: "ellipsis.circle.fill", destination: nil),
+            HomeFabFunctionShortcut(label: "更多", icon: "ellipsis.circle.fill", destination: nil)
         ]
     }
 }

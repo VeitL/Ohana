@@ -3,10 +3,10 @@
 //  Ohana
 //
 
-import SwiftUI
-import PhotosUI
-import UIKit
 import Foundation
+import PhotosUI
+import SwiftUI
+import UIKit
 
 private enum AvatarImageEditingSupport {
     nonisolated static func downsample(_ image: UIImage, maxDim: CGFloat) -> UIImage {
@@ -101,7 +101,7 @@ struct EditableProfileAvatarPicker: View {
                 prepareCapturedAvatarForCrop(img)
             }
         }) {
-            PetCameraPickerView(maxPixel: 1_600) { img in
+            PetCameraPickerView(maxPixel: 1600) { img in
                 AppPerformanceMonitor.shared.markStart("avatar.camera.to.crop")
                 pendingCapturedAvatarImage = img
                 showingCamera = false
@@ -138,7 +138,7 @@ struct EditableProfileAvatarPicker: View {
             .presentationDetents([.large]) // ui-v4: allow photo crop editor needs full-height system sheet
         }
         .alert("无法打开相机", isPresented: $showCameraPermissionAlert) {
-            Button("好", role: .cancel) { }
+            Button("好", role: .cancel) {}
         } message: {
             Text("请在系统设置中允许 Ohana 访问相机。")
         }
@@ -162,7 +162,7 @@ struct EditableProfileAvatarPicker: View {
         .foregroundStyle(Color.arkInk)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(accentColor, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(accentColor, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
     }
 
     private func handlePhotosPickerItemChanged(_ item: PhotosPickerItem?) {
@@ -170,8 +170,8 @@ struct EditableProfileAvatarPicker: View {
             guard let item else { return }
             let startedAt = CFAbsoluteTimeGetCurrent()
             if let data = try? await item.loadTransferable(type: Data.self) {
-                let resized = await Task.detached(priority: .userInitiated) {
-                    AddPetWizardView.cropReadyImage(from: data, maxPixel: 1_600)
+                let resized = await Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
+                    AddPetWizardView.cropReadyImage(from: data, maxPixel: 1600)
                 }.value
                 await MainActor.run {
                     photosPickerItem = nil
@@ -213,8 +213,8 @@ struct EditableProfileAvatarPicker: View {
         let startedAt = CFAbsoluteTimeGetCurrent()
         isPasting = true
         Task {
-            let prepared = await Task.detached(priority: .userInitiated) {
-                AddPetWizardView.preparedCropImage(img, maxPixel: 1_600)
+            let prepared = await Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
+                AddPetWizardView.preparedCropImage(img, maxPixel: 1600)
             }.value
             cropImageItem = IdentifiableCropImage(image: prepared)
             AppPerformanceMonitor.shared.record("粘贴到裁剪页", startedAt: startedAt, note: cropSpecies)
@@ -224,8 +224,8 @@ struct EditableProfileAvatarPicker: View {
 
     private func prepareCapturedAvatarForCrop(_ image: UIImage) {
         Task {
-            let prepared = await Task.detached(priority: .userInitiated) {
-                AddPetWizardView.preparedCropImage(image, maxPixel: 1_600)
+            let prepared = await Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
+                AddPetWizardView.preparedCropImage(image, maxPixel: 1600)
             }.value
             await MainActor.run {
                 presentAvatarCropAfterMediaDismissal(prepared, delayMilliseconds: 320) {

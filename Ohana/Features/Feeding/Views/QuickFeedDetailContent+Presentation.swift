@@ -31,7 +31,7 @@ extension QuickFeedDetailContent {
                         .ignoresSafeArea(.container, edges: .bottom)
                 }
 
-                if inlineSheetDismissGestureShield && nestedInlineSheet == nil {
+                if inlineSheetDismissGestureShield, nestedInlineSheet == nil {
                     Color.clear
                         .contentShape(Rectangle())
                         .highPriorityGesture(DragGesture(minimumDistance: 0, coordinateSpace: .global))
@@ -58,12 +58,12 @@ extension QuickFeedDetailContent {
         .presentationDragIndicator(.hidden)
         .presentationBackground {
             FeedNativeSheetGlassSurface(
-                cornerRadius: 30,
+                cornerRadius: OhanaRadius.sheetMini,
                 glassMode: .regular
             )
             .ignoresSafeArea() // ui-v4: sheet glass belongs to presentation background, not content background
         }
-        .presentationCornerRadius(30)
+        .presentationCornerRadius(OhanaRadius.sheetMini)
         .presentationContentInteraction(.scrolls)
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
@@ -151,9 +151,9 @@ extension QuickFeedDetailContent {
     func inlineSheetCloseTopPadding(for sheet: ActiveFeedSheet) -> CGFloat {
         switch sheet {
         case .plan:
-            return 22
+            22
         default:
-            return 10
+            10
         }
     }
 
@@ -198,7 +198,7 @@ extension QuickFeedDetailContent {
             LinearGradient(
                 colors: [
                     Color.clear,
-                    Color.black.opacity(inlineSheetVisible ? 0.26 : 0), // ui-v4: allow modal grounding shade behind bottom glass sheet
+                    Color.black.opacity(inlineSheetVisible ? 0.26 : 0) // ui-v4: allow modal grounding shade behind bottom glass sheet
                 ],
                 startPoint: .top,
                 endPoint: .bottom

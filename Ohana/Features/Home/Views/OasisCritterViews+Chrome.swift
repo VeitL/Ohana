@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension OasisCritterCodexView {
@@ -39,9 +39,9 @@ extension OasisCritterCodexView {
                     .padding(.bottom, 18)
             }
         }
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 34, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.10), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.24), radius: 26, x: 0, y: 18) // ui-v4: allow centered modal lift

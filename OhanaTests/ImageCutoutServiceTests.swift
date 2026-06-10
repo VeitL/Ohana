@@ -1,6 +1,6 @@
 import Testing
-@testable import Ohana
 import UIKit
+@testable import Ohana
 
 struct ImageCutoutServiceTests {
     @Test func oneTransparentPixelDoesNotMakePhotoAPopout() {

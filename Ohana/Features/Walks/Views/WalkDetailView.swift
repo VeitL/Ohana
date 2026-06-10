@@ -4,8 +4,8 @@
 //
 //  N2: 遛狗详情页 — 交互式地图 + 路径 + Apple Maps 跳转
 
-import SwiftUI
 import MapKit
+import SwiftUI
 
 struct WalkDetailView: View {
     let walk: PetWalkLog
@@ -239,7 +239,7 @@ struct WalkDetailView: View {
                     }
                 }
                 .frame(height: 334)
-                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous))
                 .overlay(alignment: .topLeading) {
                     mapBadge(icon: "point.topleft.down.curvedto.point.bottomright.up", text: "\(coords.count)")
                         .padding(12)
@@ -267,7 +267,7 @@ struct WalkDetailView: View {
             WalkDetailSnapshotImage(snapshotData: snapshotData)
         } else {
             ZStack {
-                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                     .fill(Color.ohanaControlFill)
                     .frame(height: 240)
                 VStack(spacing: 8) {
@@ -395,7 +395,7 @@ struct WalkDetailView: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func timelineRow(icon: String, title: String, value: String, tint: Color) -> some View {
@@ -418,7 +418,7 @@ struct WalkDetailView: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     // MARK: - Share
@@ -441,9 +441,9 @@ struct WalkDetailView: View {
                 heroSummary
                 metricStrip
             }
-                .frame(width: 360)
-                .padding(20)
-                .background(Color(hex: "4338FF"))
+            .frame(width: 360)
+            .padding(20)
+            .background(Color(hex: "4338FF"))
         )
         renderer.scale = 3.0
         if let img = renderer.uiImage {
@@ -495,7 +495,7 @@ private struct WalkDetailSnapshotImage: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                     .fill(Color.ohanaControlFill)
                     .overlay {
                         ProgressView()
@@ -504,7 +504,7 @@ private struct WalkDetailSnapshotImage: View {
             }
         }
         .frame(height: 300)
-        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous))
         .task(id: imageKey) {
             let decoded = await MapSnapshotImageDecoder.decode(snapshotData)
             guard !Task.isCancelled else { return }
@@ -519,9 +519,9 @@ private struct WalkDetailSnapshotImage: View {
 struct ShareSheet: UIViewControllerRepresentable {
     let image: UIImage
 
-    func makeUIViewController(context: Context) -> UIActivityViewController {
+    func makeUIViewController(context _: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: [image], applicationActivities: nil)
     }
 
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    func updateUIViewController(_: UIActivityViewController, context _: Context) {}
 }

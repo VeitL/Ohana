@@ -17,14 +17,14 @@ enum PetCoatPattern: String, CaseIterable {
     var gradient: AnyShapeStyle {
         switch self {
         case .calico:
-            return AnyShapeStyle(
+            AnyShapeStyle(
                 AngularGradient(
                     gradient: Gradient(colors: [.white, .black, Color(hex: "E87722"), .white]),
                     center: .center
                 )
             )
         case .silverChinchilla:
-            return AnyShapeStyle(
+            AnyShapeStyle(
                 RadialGradient(
                     colors: [.white, Color(hex: "C8C8C8"), Color(hex: "909090")],
                     center: .center,
@@ -33,20 +33,20 @@ enum PetCoatPattern: String, CaseIterable {
                 )
             )
         case .tortoiseshell:
-            return AnyShapeStyle(
+            AnyShapeStyle(
                 AngularGradient(
                     gradient: Gradient(colors: [
                         Color(hex: "2C1A0E"),
                         Color(hex: "C05A00"),
                         Color(hex: "1A1A1A"),
                         Color(hex: "D4820A"),
-                        Color(hex: "2C1A0E"),
+                        Color(hex: "2C1A0E")
                     ]),
                     center: .center
                 )
             )
         case .cowPattern:
-            return AnyShapeStyle(
+            AnyShapeStyle(
                 LinearGradient(
                     stops: [
                         .init(color: .white, location: 0),
@@ -54,14 +54,14 @@ enum PetCoatPattern: String, CaseIterable {
                         .init(color: .black, location: 0.4),
                         .init(color: .black, location: 0.65),
                         .init(color: .white, location: 0.65),
-                        .init(color: .white, location: 1),
+                        .init(color: .white, location: 1)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
         case .bicolor:
-            return AnyShapeStyle(
+            AnyShapeStyle(
                 LinearGradient(
                     colors: [Color(hex: "95ADBE"), .white],
                     startPoint: .topLeading,

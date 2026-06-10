@@ -1,7 +1,7 @@
 import Foundation
-@testable import Ohana
 import SwiftData
 import Testing
+@testable import Ohana
 
 @MainActor
 struct StartupFeedAutoLogMaintenanceServiceTests {

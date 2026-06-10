@@ -162,7 +162,7 @@ enum ExpandedQuickActionLogic {
             if WaterQuickActionPolicy.isAquatic(species: pet.species) {
                 return pet.careLogs.contains {
                     ($0.type == CareType.waterChange.rawValue || $0.type == CareType.filterClean.rawValue) &&
-                    cal.isDateInToday($0.date)
+                        cal.isDateInToday($0.date)
                 }
             }
             let waterState = waterRuleState(for: pet, allEvents: allEvents)
@@ -218,9 +218,9 @@ enum ExpandedQuickActionLogic {
             let dashboard = feedDashboard(for: pet, allEvents: allEvents, allFeedCareLogs: allFeedCareLogs, now: now)
             switch dashboard.operatingMode {
             case .manual:
-                let count = pet.careLogs.filter {
+                let count = pet.careLogs.count(where: {
                     $0.type == CareType.feeding.rawValue && cal.isDateInToday($0.date) && $0.isManualFeedLogEntry
-                }.count
+                })
                 if count > 0 { return "手动 \(count)餐" }
                 return pet.dailyPortionGrams > 0 ? "\(Int(pet.dailyPortionGrams.rounded()))g" : "待设置"
             case .manualReminder:
@@ -254,7 +254,7 @@ enum ExpandedQuickActionLogic {
                 }
                 return "计划 \(waterState.completionText)"
             }
-            let count = pet.careLogs.filter { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) }.count
+            let count = pet.careLogs.count(where: { $0.type == CareType.watering.rawValue && cal.isDateInToday($0.date) })
             if count > 0 { return "今日 \(count)次" }
             if let amount = defaultWaterAmountMl(for: pet) {
                 return "\(Int(amount.rounded()))ml"
@@ -280,7 +280,7 @@ enum ExpandedQuickActionLogic {
             let distText = dist >= 1000 ? String(format: "%.1fkm", dist / 1000) : String(format: "%.0fm", dist)
             return "今日 \(walks.count)次 · \(distText)"
         case "potty":
-            let count = pet.pottyLogs.filter { cal.isDateInToday($0.date) }.count
+            let count = pet.pottyLogs.count(where: { cal.isDateInToday($0.date) })
             if count > 0 { return "今日 \(count)次" }
             if let last = pet.pottyLogs.max(by: { $0.date < $1.date }),
                last.pottyType == .softPoop || last.pottyType == .liquidPoop {
@@ -291,14 +291,14 @@ enum ExpandedQuickActionLogic {
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            let count = pet.careLogs.filter { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) }.count
+            let count = pet.careLogs.count(where: { $0.type == CareType.litter.rawValue && cal.isDateInToday($0.date) })
             if count > 0 { return "今日已铲" }
             return scoopQuickStatusText(for: pet, calendar: cal)
         case "play":
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            let count = pet.careLogs.filter { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) }.count
+            let count = pet.careLogs.count(where: { $0.type == CareType.play.rawValue && cal.isDateInToday($0.date) })
             if count > 0 { return "今日陪玩 \(count)次" }
             if let event = playPlanEvent(for: pet, allEvents: allEvents) {
                 let eventDay = cal.startOfDay(for: event.startDate)
@@ -327,7 +327,7 @@ enum ExpandedQuickActionLogic {
                 .reduce(0.0) { $0 + $1.amount }
             return total > 0 ? "本月 \(AppCurrency.format(total, fractionDigits: 0))" : nil
         case "moment":
-            let todayCount = pet.photoLogs.filter { cal.isDateInToday($0.date) }.count
+            let todayCount = pet.photoLogs.count(where: { cal.isDateInToday($0.date) })
             if todayCount > 0 { return "今天 \(todayCount) 条" }
             if let last = pet.photoLogs.max(by: { $0.date < $1.date }) {
                 return "最近：\(relativeDayText(for: last.date, calendar: cal))"
@@ -359,13 +359,13 @@ enum ExpandedQuickActionLogic {
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            let count = pet.careLogs.filter { $0.type == CareType.freeFlight.rawValue && cal.isDateInToday($0.date) }.count
+            let count = pet.careLogs.count(where: { $0.type == CareType.freeFlight.rawValue && cal.isDateInToday($0.date) })
             return count > 0 ? "今日 \(count)次" : nil
         case "misting":
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
                 return overdue
             }
-            let count = pet.careLogs.filter { $0.type == CareType.misting.rawValue && cal.isDateInToday($0.date) }.count
+            let count = pet.careLogs.count(where: { $0.type == CareType.misting.rawValue && cal.isDateInToday($0.date) })
             return count > 0 ? "今日 \(count)次" : nil
         case "substrateChange":
             if let overdue = overdueQuickStatusText(for: item.actionType, pet: pet, allEvents: allEvents, now: now, calendar: cal) {
@@ -381,50 +381,50 @@ enum ExpandedQuickActionLogic {
 
     static func singleUseLabel(for actionType: String) -> String? {
         switch actionType {
-        case "litter": return "铲屎"
-        case "waterChange": return "换水"
-        case "filterClean": return "清理滤材"
-        case "cageCleaning": return "清理鸟笼"
-        case "substrateChange": return "换垫材"
-        default: return nil
+        case "litter": "铲屎"
+        case "waterChange": "换水"
+        case "filterClean": "清理滤材"
+        case "cageCleaning": "清理鸟笼"
+        case "substrateChange": "换垫材"
+        default: nil
         }
     }
 
     static func petTapRoute(for item: QuickActionItem, pet: Pet) -> ExpandedPetQuickTapRoute {
         switch item.actionType {
         case "feed", "walk", "play", "litter", "cageCleaning", "freeFlight", "misting", "substrateChange", "medication":
-            return .perform(item.actionType)
+            .perform(item.actionType)
         case "water":
-            return WaterQuickActionPolicy.isAquatic(species: pet.species) ? .waterManagement : .perform("water")
+            WaterQuickActionPolicy.isAquatic(species: pet.species) ? .waterManagement : .perform("water")
         case "waterChange", "filterClean":
-            return .waterManagement
+            .waterManagement
         case "weight":
-            return .weight
+            .weight
         case "expense":
-            return .expense
+            .expense
         case "moment":
-            return .moment
+            .moment
         case "health":
-            return .health
+            .health
         default:
-            return .none
+            .none
         }
     }
 
     static func petLongPressRoute(for item: QuickActionItem) -> ExpandedPetQuickLongPressRoute {
         switch item.actionType {
-        case "feed": return .feedDetail
-        case "water", "waterChange", "filterClean": return .waterManagement
-        case "walk": return .walk
-        case "play": return .playDetail
-        case "potty", "litter": return .pottyDetail
-        case "groom", "cageCleaning", "freeFlight", "misting", "substrateChange": return .hygiene
-        case "health": return .health
-        case "medication": return .medication
-        case "weight": return .weightDetail
-        case "expense": return .expenseDetail
-        case "moment": return .momentHistory
-        default: return .none
+        case "feed": .feedDetail
+        case "water", "waterChange", "filterClean": .waterManagement
+        case "walk": .walk
+        case "play": .playDetail
+        case "potty", "litter": .pottyDetail
+        case "groom", "cageCleaning", "freeFlight", "misting", "substrateChange": .hygiene
+        case "health": .health
+        case "medication": .medication
+        case "weight": .weightDetail
+        case "expense": .expenseDetail
+        case "moment": .momentHistory
+        default: .none
         }
     }
 
@@ -472,8 +472,8 @@ enum ExpandedQuickActionLogic {
             let humanId = human.id.uuidString
             return todayMedicationLogs.contains {
                 $0.humanId == humanId &&
-                cal.isDateInToday($0.scheduledTime) &&
-                $0.status == .taken
+                    cal.isDateInToday($0.scheduledTime) &&
+                    $0.status == .taken
             }
         case "humanExpense":
             return latestHumanExpenseDate(for: human, in: expenses).map { cal.isDateInToday($0) } ?? false
@@ -515,11 +515,11 @@ enum ExpandedQuickActionLogic {
                 .first {
                 return "下次 \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))"
             }
-            let takenToday = todayMedicationLogs.filter {
+            let takenToday = todayMedicationLogs.count(where: {
                 $0.humanId == humanId &&
-                cal.isDateInToday($0.scheduledTime) &&
-                $0.status == .taken
-            }.count
+                    cal.isDateInToday($0.scheduledTime) &&
+                    $0.status == .taken
+            })
             let plannedToday = HumanMedicationSchedulePlan.plannedDoseCount(on: Date(), medications: meds, calendar: cal)
             return plannedToday > 0 ? "今日已服 \(takenToday)/\(plannedToday)" : "按需记录"
         case "humanNote":
@@ -549,19 +549,19 @@ enum ExpandedQuickActionLogic {
     static func humanPrivacyField(for actionType: String) -> HumanPrivateField? {
         switch actionType {
         case "humanWeight", "weight":
-            return .weight
+            .weight
         case "humanWorkout", "workout":
-            return .workout
+            .workout
         case "humanMedication", "medication":
-            return .medication
+            .medication
         case "humanNote", "note":
-            return .note
+            .note
         case "humanWishlist", "wish", "wishlist":
-            return .wishlist
+            .wishlist
         case "humanExpense", "expense":
-            return .expense
+            .expense
         default:
-            return nil
+            nil
         }
     }
 
@@ -580,22 +580,22 @@ enum ExpandedQuickActionLogic {
 
     static func quickActionTitle(_ raw: String) -> String {
         switch raw.uppercased() {
-        case "FEED": return "喂食"
-        case "WALK": return "出行"
-        case "WATER": return "喂水"
-        case "POTTY": return "便便"
-        case "LITTER": return "铲屎"
-        case "PLAY": return "逗玩"
-        case "FILTER": return "滤材"
-        case "CAGE": return "清笼"
-        case "FLIGHT": return "放飞"
-        case "MIST": return "喷水"
-        case "SUBSTRATE": return "换垫"
-        case "TEMP": return "温湿"
-        case "WEIGHT": return "体重"
-        case "WORKOUT": return "运动"
-        case "NOTE": return "记录"
-        default: return raw.capitalized
+        case "FEED": "喂食"
+        case "WALK": "出行"
+        case "WATER": "喂水"
+        case "POTTY": "便便"
+        case "LITTER": "铲屎"
+        case "PLAY": "逗玩"
+        case "FILTER": "滤材"
+        case "CAGE": "清笼"
+        case "FLIGHT": "放飞"
+        case "MIST": "喷水"
+        case "SUBSTRATE": "换垫"
+        case "TEMP": "温湿"
+        case "WEIGHT": "体重"
+        case "WORKOUT": "运动"
+        case "NOTE": "记录"
+        default: raw.capitalized
         }
     }
 
@@ -680,7 +680,7 @@ enum ExpandedQuickActionLogic {
                       let bracketEnd = trimmed.firstIndex(of: "]") else {
                     return nil
                 }
-                let dateText = String(trimmed[trimmed.index(after: trimmed.startIndex)..<bracketEnd])
+                let dateText = String(trimmed[trimmed.index(after: trimmed.startIndex) ..< bracketEnd])
                 return formatter.date(from: dateText)
             }
             .max()

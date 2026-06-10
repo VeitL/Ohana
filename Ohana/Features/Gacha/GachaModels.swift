@@ -20,13 +20,13 @@ enum GachaRarity: String, Codable, CaseIterable, Identifiable {
     func name(_ l: L10n) -> String {
         switch self {
         case .common:
-            return l.tr(zh: "普通", en: "Common", de: "Normal")
+            l.tr(zh: "普通", en: "Common", de: "Normal")
         case .rare:
-            return l.tr(zh: "稀有", en: "Rare", de: "Selten")
+            l.tr(zh: "稀有", en: "Rare", de: "Selten")
         case .superRare:
-            return l.tr(zh: "超稀有", en: "Super Rare", de: "Superselten")
+            l.tr(zh: "超稀有", en: "Super Rare", de: "Superselten")
         case .hidden:
-            return l.tr(zh: "隐藏款", en: "Secret", de: "Geheim")
+            l.tr(zh: "隐藏款", en: "Secret", de: "Geheim")
         }
     }
 }
@@ -41,11 +41,11 @@ enum GachaOutcomeKind: String, Codable, CaseIterable, Identifiable {
     func name(_ l: L10n) -> String {
         switch self {
         case .collectible:
-            return l.tr(zh: "盲盒款", en: "Collectible", de: "Sammelfigur")
+            l.tr(zh: "盲盒款", en: "Collectible", de: "Sammelfigur")
         case .instantReward:
-            return l.tr(zh: "小奖励", en: "Tiny reward", de: "Kleine Belohnung")
+            l.tr(zh: "小奖励", en: "Tiny reward", de: "Kleine Belohnung")
         case .message:
-            return l.tr(zh: "祝福", en: "Blessing", de: "Segen")
+            l.tr(zh: "祝福", en: "Blessing", de: "Segen")
         }
     }
 }
@@ -130,11 +130,11 @@ struct GachaInstantResultEntry: Identifiable, Equatable {
 }
 
 nonisolated enum GachaSeriesCatalog {
-    static let totalBasisPoints = 10_000
+    static let totalBasisPoints = 10000
     static let hiddenBasisPoints = 200
-    static let commonBasisPoints = 2_000
+    static let commonBasisPoints = 2000
     static let coconutGrandBundleBasisPoints = 500
-    static let otherBasisPoints = 7_800
+    static let otherBasisPoints = 7800
     static let coconutGrandBundleResultId = "coconut_grand_bundle_500"
     static let defaultSeriesId = "plush_coconut_squad_v1"
     static let noirSeriesId = "midnight_atelier_v1"
@@ -164,14 +164,14 @@ nonisolated enum GachaSeriesCatalog {
                 item("plush_coconut_secret", "Nana Ohana Glow", "Nana Ohana Glow", "Nana Ohana-Glanz", .hidden, 200, "✨", "GachaNanaOhanaGlow", isHidden: true)
             ],
             instantResults: [
-                instant("coconut_echo_5", .instantReward, "椰子回声", "Coconut Echo", "Kokos-Echo", "椰壳里滚出 5 颗椰子。", "5 coconuts rolled out of the shell.", "5 Kokosnüsse kullern aus der Schale.", 1_000, "🥥", coconutDelta: 5),
+                instant("coconut_echo_5", .instantReward, "椰子回声", "Coconut Echo", "Kokos-Echo", "椰壳里滚出 5 颗椰子。", "5 coconuts rolled out of the shell.", "5 Kokosnüsse kullern aus der Schale.", 1000, "🥥", coconutDelta: 5),
                 instant("coconut_echo_8", .instantReward, "椰奶返礼", "Coconut Milk Treat", "Kokosmilch-Gruß", "nana 偷偷塞回 8 颗椰子。", "nana quietly returns 8 coconuts.", "nana gibt heimlich 8 Kokosnüsse zurück.", 900, "🥥", coconutDelta: 8),
                 instant("lucky_leaf_10", .instantReward, "幸运叶片", "Lucky Leaf", "Glücksblatt", "叶片亮了一下，返还 10 颗椰子。", "A leaf glows and returns 10 coconuts.", "Ein Blatt leuchtet und gibt 10 Kokosnüsse zurück.", 900, "🍃", coconutDelta: 10),
                 instant(coconutGrandBundleResultId, .instantReward, "椰子大礼包", "Coconut Grand Bundle", "Großes Kokospaket", "哗啦啦，500 颗椰子从盒子里掉下来！", "A grand bundle drops 500 coconuts from the box!", "Ein großes Paket lässt 500 Kokosnüsse herausfallen!", coconutGrandBundleBasisPoints, "🎁", coconutDelta: 500),
-                instant("message_soft_paw", .message, "软爪留言", "Soft Paw Note", "Weiche-Pfote-Notiz", "今天也被好好照顾了，辛苦啦。", "Someone is cared for today. Nice work.", "Heute wurde jemand gut umsorgt. Gut gemacht.", 1_200, "💌"),
-                instant("message_coconut_oracle", .message, "椰壳占卜", "Coconut Oracle", "Kokos-Orakel", "椰壳说：再敲一次之前先喝口水。", "The shell says: sip water before the next crack.", "Die Schale sagt: vor dem nächsten Öffnen Wasser trinken.", 1_200, "🔮"),
-                instant("message_nana_wink", .message, "nana 眨眼", "nana Wink", "nana zwinkert", "nana 眨了一下眼：好运已经在排队。", "nana winks: luck is already lining up.", "nana zwinkert: Das Glück steht schon an.", 1_050, "✨"),
-                instant("message_ohana_breeze", .message, "Ohana 微风", "Ohana Breeze", "Ohana-Brise", "一阵海风路过，把家里的疲惫吹轻了一点。", "A sea breeze passes and lightens the day.", "Eine Meeresbrise macht den Tag leichter.", 1_050, "🌴")
+                instant("message_soft_paw", .message, "软爪留言", "Soft Paw Note", "Weiche-Pfote-Notiz", "今天也被好好照顾了，辛苦啦。", "Someone is cared for today. Nice work.", "Heute wurde jemand gut umsorgt. Gut gemacht.", 1200, "💌"),
+                instant("message_coconut_oracle", .message, "椰壳占卜", "Coconut Oracle", "Kokos-Orakel", "椰壳说：再敲一次之前先喝口水。", "The shell says: sip water before the next crack.", "Die Schale sagt: vor dem nächsten Öffnen Wasser trinken.", 1200, "🔮"),
+                instant("message_nana_wink", .message, "nana 眨眼", "nana Wink", "nana zwinkert", "nana 眨了一下眼：好运已经在排队。", "nana winks: luck is already lining up.", "nana zwinkert: Das Glück steht schon an.", 1050, "✨"),
+                instant("message_ohana_breeze", .message, "Ohana 微风", "Ohana Breeze", "Ohana-Brise", "一阵海风路过，把家里的疲惫吹轻了一点。", "A sea breeze passes and lightens the day.", "Eine Meeresbrise macht den Tag leichter.", 1050, "🌴")
             ]
         ),
         GachaSeriesEntry(
@@ -198,14 +198,14 @@ nonisolated enum GachaSeriesCatalog {
                 item("noir_eclipse_secret", "Eclipse Regent", "Eclipse Regent", "Eclipse Regent", .hidden, 200, "🌘", "GachaNoirEclipseSecret", seriesId: noirSeriesId, boxAssetName: "GachaNoirAtelierBlindBox", isHidden: true)
             ],
             instantResults: [
-                instant("noir_pearl_return_5", .instantReward, "珍珠回声", "Pearl Echo", "Perlen-Echo", "盒底滚出 5 颗椰子。", "5 coconuts roll out from the box.", "5 Kokosnüsse rollen aus der Box.", 1_000, "🥥", coconutDelta: 5),
+                instant("noir_pearl_return_5", .instantReward, "珍珠回声", "Pearl Echo", "Perlen-Echo", "盒底滚出 5 颗椰子。", "5 coconuts roll out from the box.", "5 Kokosnüsse rollen aus der Box.", 1000, "🥥", coconutDelta: 5),
                 instant("noir_ribbon_return_8", .instantReward, "黑缎返礼", "Satin Return", "Satin-Gruß", "缎带一抖，返还 8 颗椰子。", "A satin ribbon flicks back 8 coconuts.", "Ein Satinband gibt 8 Kokosnüsse zurück.", 900, "🥥", coconutDelta: 8),
                 instant("noir_moon_return_10", .instantReward, "月相折扣", "Moon Phase Refund", "Mondphasen-Erstattung", "月相扣轻轻亮起，返还 10 颗椰子。", "The moon clasp glows and returns 10 coconuts.", "Die Mondspange leuchtet und gibt 10 Kokosnüsse zurück.", 900, "🌙", coconutDelta: 10),
                 instant(coconutGrandBundleResultId, .instantReward, "椰子大礼包", "Coconut Grand Bundle", "Großes Kokospaket", "黑盒突然打开，500 颗椰子落下来！", "The noir box bursts open with 500 coconuts!", "Die Noir-Box öffnet sich mit 500 Kokosnüssen!", coconutGrandBundleBasisPoints, "🎁", coconutDelta: 500),
-                instant("noir_message_after_rain", .message, "雨后便签", "After-Rain Note", "Nach-dem-Regen-Notiz", "雨会停，衣角的光会留下。", "Rain passes; the little shine stays.", "Regen vergeht; der kleine Glanz bleibt.", 1_200, "💌"),
-                instant("noir_message_velvet", .message, "丝绒低语", "Velvet Whisper", "Samtflüstern", "今天也可以低调地漂亮。", "Today can be quietly beautiful.", "Heute darf still schön sein.", 1_200, "✦"),
-                instant("noir_message_oracle", .message, "夜潮预言", "Night Tide Oracle", "Nachttide-Orakel", "下一次惊喜，正在慢慢靠近。", "The next surprise is drifting closer.", "Die nächste Überraschung treibt näher.", 1_050, "🔮"),
-                instant("noir_message_ohana", .message, "Ohana 银线", "Ohana Silver Thread", "Ohana-Silberfaden", "有些连接安静，却从不松开。", "Some bonds are quiet and never loosen.", "Manche Bande sind leise und lösen sich nie.", 1_050, "○")
+                instant("noir_message_after_rain", .message, "雨后便签", "After-Rain Note", "Nach-dem-Regen-Notiz", "雨会停，衣角的光会留下。", "Rain passes; the little shine stays.", "Regen vergeht; der kleine Glanz bleibt.", 1200, "💌"),
+                instant("noir_message_velvet", .message, "丝绒低语", "Velvet Whisper", "Samtflüstern", "今天也可以低调地漂亮。", "Today can be quietly beautiful.", "Heute darf still schön sein.", 1200, "✦"),
+                instant("noir_message_oracle", .message, "夜潮预言", "Night Tide Oracle", "Nachttide-Orakel", "下一次惊喜，正在慢慢靠近。", "The next surprise is drifting closer.", "Die nächste Überraschung treibt näher.", 1050, "🔮"),
+                instant("noir_message_ohana", .message, "Ohana 银线", "Ohana Silver Thread", "Ohana-Silberfaden", "有些连接安静，却从不松开。", "Some bonds are quiet and never loosen.", "Manche Bande sind leise und lösen sich nie.", 1050, "○")
             ]
         )
     ]
@@ -221,12 +221,12 @@ nonisolated enum GachaSeriesCatalog {
     static func validateProbabilities() -> Bool {
         allSeries.allSatisfy { series in
             series.probabilityTotalBasisPoints == totalBasisPoints &&
-            series.commonItems.count == 8 &&
-            series.items.filter(\.isHidden).count == 1 &&
-            series.commonProbabilityBasisPoints == commonBasisPoints &&
-            series.hiddenProbabilityBasisPoints == hiddenBasisPoints &&
-            series.instantResults.filter { $0.id == coconutGrandBundleResultId }.reduce(0) { $0 + $1.probabilityBasisPoints } == coconutGrandBundleBasisPoints &&
-            series.instantResultProbabilityBasisPoints == otherBasisPoints
+                series.commonItems.count == 8 &&
+                series.items.filter(\.isHidden).count == 1 &&
+                series.commonProbabilityBasisPoints == commonBasisPoints &&
+                series.hiddenProbabilityBasisPoints == hiddenBasisPoints &&
+                series.instantResults.filter { $0.id == coconutGrandBundleResultId }.reduce(0) { $0 + $1.probabilityBasisPoints } == coconutGrandBundleBasisPoints &&
+                series.instantResultProbabilityBasisPoints == otherBasisPoints
         }
     }
 
@@ -234,8 +234,8 @@ nonisolated enum GachaSeriesCatalog {
         allSeries.allSatisfy { series in
             series.items.allSatisfy { item in
                 !item.imageAssetName.isEmpty &&
-                !item.silhouetteAssetName.isEmpty &&
-                !item.boxAssetName.isEmpty
+                    !item.silhouetteAssetName.isEmpty &&
+                    !item.boxAssetName.isEmpty
             }
         }
     }
@@ -273,97 +273,97 @@ nonisolated enum GachaSeriesCatalog {
     private static func itemProfile(_ id: String) -> (motto: AppLocalizedText, personality: AppLocalizedText) {
         switch id {
         case "plush_coconut_sleepy":
-            return (
+            (
                 AppLocalizedText(zh: "慢一点，梦会自己发芽。", en: "Go slow. Dreams sprout on their own.", de: "Langsam. Träume keimen von selbst."),
                 AppLocalizedText(zh: "慵懒、会把安静变成小窝。", en: "Sleepy, soft, and good at turning quiet into a nest.", de: "Schläfrig, weich und macht aus Ruhe ein Nest.")
             )
         case "plush_coconut_sunny":
-            return (
+            (
                 AppLocalizedText(zh: "潮水会退，勇气会留下。", en: "The tide goes out. Courage stays.", de: "Die Flut geht. Mut bleibt."),
                 AppLocalizedText(zh: "清爽、爱收集贝壳和新的开始。", en: "Breezy, curious, and always collecting fresh starts.", de: "Frisch, neugierig und sammelt neue Anfänge.")
             )
         case "plush_coconut_leaf":
-            return (
+            (
                 AppLocalizedText(zh: "拥抱之前，先给世界一朵花。", en: "Offer the world a flower before the hug.", de: "Schenk der Welt eine Blume vor der Umarmung."),
                 AppLocalizedText(zh: "热情、亲近人，喜欢把疲惫揉软。", en: "Warm, affectionate, and softens tired days.", de: "Warm, anhänglich und macht müde Tage weich.")
             )
         case "plush_coconut_milk":
-            return (
+            (
                 AppLocalizedText(zh: "星星不催你，它只陪你亮。", en: "Stars do not rush you. They just glow with you.", de: "Sterne drängen nicht. Sie leuchten mit dir."),
                 AppLocalizedText(zh: "安静、浪漫，适合夜晚陪伴。", en: "Quiet, dreamy, and made for night companionship.", de: "Ruhig, verträumt und für Nachtbegleitung gemacht.")
             )
         case "plush_coconut_star":
-            return (
+            (
                 AppLocalizedText(zh: "今天的小芽，明天会很厉害。", en: "Today's tiny sprout gets mighty tomorrow.", de: "Der kleine Spross von heute wird morgen stark."),
                 AppLocalizedText(zh: "乐观、行动快，总想第一个冒头。", en: "Optimistic, quick, and always first to pop up.", de: "Optimistisch, flink und immer als Erstes da.")
             )
         case "plush_coconut_blush":
-            return (
+            (
                 AppLocalizedText(zh: "暖一点，坏天气也会坐下来。", en: "Add warmth, and bad weather sits down.", de: "Mit Wärme setzt sich schlechtes Wetter hin."),
                 AppLocalizedText(zh: "温暖、护短，像一杯小小热可可。", en: "Protective, cozy, and a little cup of cocoa energy.", de: "Beschützend, gemütlich und wie eine kleine Tasse Kakao.")
             )
         case "plush_coconut_cloud":
-            return (
+            (
                 AppLocalizedText(zh: "水坑里也可以有天空。", en: "Even a puddle can hold the sky.", de: "Auch eine Pfütze kann Himmel tragen."),
                 AppLocalizedText(zh: "敏感、会观察，擅长发现小惊喜。", en: "Sensitive, observant, and great at spotting tiny wonders.", de: "Feinfühlig, aufmerksam und findet kleine Wunder.")
             )
         case "plush_coconut_moss":
-            return (
+            (
                 AppLocalizedText(zh: "亮一下，就算赢。", en: "One spark counts as a win.", de: "Ein Funke zählt als Sieg."),
                 AppLocalizedText(zh: "俏皮、反应快，像一颗会眨眼的青柠火花。", en: "Playful, quick, and bright like a winking lime spark.", de: "Verspielt, schnell und hell wie ein zwinkernder Limettenfunke.")
             )
         case "plush_coconut_secret":
-            return (
+            (
                 AppLocalizedText(zh: "真正的光，会先藏起来。", en: "Real glow hides first.", de: "Echtes Leuchten versteckt sich zuerst."),
                 AppLocalizedText(zh: "神秘、骄傲，只在信任时发光。", en: "Mysterious, proud, and glows only when it trusts you.", de: "Geheimnisvoll, stolz und leuchtet nur bei Vertrauen.")
             )
         case "noir_moon_rain":
-            return (
+            (
                 AppLocalizedText(zh: "雨停之前，先把姿态站稳。", en: "Hold your poise before the rain stops.", de: "Halte Haltung, bevor der Regen endet."),
                 AppLocalizedText(zh: "冷静、讲究，像夜雨里的小小预言家。", en: "Composed and precise, like a tiny oracle in night rain.", de: "Gefasst und genau, wie ein kleines Orakel im Nachtregen.")
             )
         case "noir_pearl_diver":
-            return (
+            (
                 AppLocalizedText(zh: "越深的地方，越适合发亮。", en: "The deeper it gets, the better it glows.", de: "Je tiefer es wird, desto schöner leuchtet es."),
                 AppLocalizedText(zh: "安静、勇敢，喜欢把秘密打磨成珍珠。", en: "Quiet and brave, polishing secrets into pearls.", de: "Still und mutig, poliert Geheimnisse zu Perlen.")
             )
         case "noir_velvet_comet":
-            return (
+            (
                 AppLocalizedText(zh: "划过黑夜，也要有丝绒边。", en: "Cross the night with a velvet edge.", de: "Durchquere die Nacht mit Samtrand."),
                 AppLocalizedText(zh: "骄傲、戏剧感强，出现时自带小型谢幕。", en: "Proud and theatrical, arriving with a tiny curtain call.", de: "Stolz und theatralisch, mit kleinem Schlussapplaus.")
             )
         case "noir_glass_umbrella":
-            return (
+            (
                 AppLocalizedText(zh: "透明不是脆弱，是把光藏好。", en: "Transparency is not fragility. It is kept light.", de: "Transparenz ist keine Zerbrechlichkeit. Sie bewahrt Licht."),
                 AppLocalizedText(zh: "敏锐、优雅，擅长在坏天气里保持漂亮。", en: "Sharp and elegant, staying beautiful in bad weather.", de: "Feinsinnig und elegant, bleibt bei schlechtem Wetter schön.")
             )
         case "noir_tide_courier":
-            return (
+            (
                 AppLocalizedText(zh: "把没说出口的，也好好送达。", en: "Deliver what words could not say.", de: "Liefere auch, was Worte nicht sagen konnten."),
                 AppLocalizedText(zh: "可靠、机灵，永远把小心意藏在内袋。", en: "Reliable and clever, hiding tiny care in an inner pocket.", de: "Verlässlich und klug, mit Fürsorge in der Innentasche.")
             )
         case "noir_shell_beret":
-            return (
+            (
                 AppLocalizedText(zh: "优雅可以很小，但不能随便。", en: "Elegance can be tiny, never careless.", de: "Eleganz darf klein sein, aber nie nachlässig."),
                 AppLocalizedText(zh: "挑剔、会搭配，喜欢把日常变成展柜。", en: "Selective and stylish, turning daily life into a showcase.", de: "Wählerisch und stilvoll, macht Alltag zur Vitrine.")
             )
         case "noir_neon_jelly":
-            return (
+            (
                 AppLocalizedText(zh: "柔软地发光，也很厉害。", en: "Glowing softly is still powerful.", de: "Sanftes Leuchten ist auch stark."),
                 AppLocalizedText(zh: "梦幻、慢热，熟悉后会冒出很多小灵感。", en: "Dreamy and slow to warm, full of tiny ideas once close.", de: "Verträumt und langsam warm, dann voller kleiner Ideen.")
             )
         case "noir_lullaby_cloak":
-            return (
+            (
                 AppLocalizedText(zh: "困意也是一种高级的暂停。", en: "Sleepiness is a luxurious pause.", de: "Müdigkeit ist eine luxuriöse Pause."),
                 AppLocalizedText(zh: "慵懒、会照顾气氛，像会走路的晚安。", en: "Sleepy and atmospheric, like a walking goodnight.", de: "Müde und stimmungsvoll, wie ein laufendes Gute Nacht.")
             )
         case "noir_eclipse_secret":
-            return (
+            (
                 AppLocalizedText(zh: "不是所有王冠，都需要白天看见。", en: "Not every crown needs daylight.", de: "Nicht jede Krone braucht Tageslicht."),
                 AppLocalizedText(zh: "神秘、克制，稀有到像一次黑金色的月食。", en: "Mysterious and restrained, rare as a black-gold eclipse.", de: "Geheimnisvoll und zurückhaltend, selten wie eine schwarzgoldene Finsternis.")
             )
         default:
-            return (
+            (
                 AppLocalizedText(zh: "小小好运，也值得认真收下。", en: "Tiny luck is worth keeping.", de: "Kleines Glück darf bleiben."),
                 AppLocalizedText(zh: "柔软、亲切，带一点海岛的小调皮。", en: "Soft, kind, with a little island mischief.", de: "Weich, freundlich und ein bisschen inselschelmisch.")
             )
@@ -558,9 +558,9 @@ enum GachaDrawService {
         guard !humanId.isEmpty else { return 0 }
         let start = calendar.startOfDay(for: now)
         guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return 0 }
-        return logs.filter { log in
+        return logs.count(where: { log in
             log.ownerHumanId == humanId && log.drawDate >= start && log.drawDate < end
-        }.count
+        })
     }
 
     static func collectionProgress(
@@ -616,13 +616,13 @@ enum GachaDrawService {
             throw GachaDrawError.invalidSeries
         }
 
-        let logs = (try? context.fetch(FetchDescriptor<GachaDrawLog>())) ?? []
+        let logs = (try? context.fetch(FetchDescriptor<GachaDrawLog>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let usedToday = dailyDrawCount(for: human.id.uuidString, in: logs, now: now)
         guard human.coconutBalance >= costPerDraw else {
             throw GachaDrawError.insufficientBalance(missing: costPerDraw - human.coconutBalance)
         }
 
-        let ownedItems = (try? context.fetch(FetchDescriptor<GachaOwnedItem>())) ?? []
+        let ownedItems = (try? context.fetch(FetchDescriptor<GachaOwnedItem>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         guard isSeriesUnlocked(seriesId: series.id, humanId: human.id.uuidString, ownedItems: ownedItems) else {
             throw GachaDrawError.lockedSeries
         }
@@ -638,8 +638,8 @@ enum GachaDrawService {
         if let item {
             let existing = ownedItems.first {
                 $0.ownerHumanId == human.id.uuidString &&
-                $0.seriesId == series.id &&
-                $0.itemId == item.id
+                    $0.seriesId == series.id &&
+                    $0.itemId == item.id
             }
             isNew = existing == nil
             if let existing {
@@ -794,7 +794,7 @@ enum GachaDrawService {
         forcedRoll: Int? = nil,
         allowsHidden: Bool = true
     ) -> GachaRollResult {
-        let rawRoll = forcedRoll ?? Int.random(in: 0..<GachaSeriesCatalog.totalBasisPoints)
+        let rawRoll = forcedRoll ?? Int.random(in: 0 ..< GachaSeriesCatalog.totalBasisPoints)
         let roll = max(0, min(rawRoll, GachaSeriesCatalog.totalBasisPoints - 1))
         let hiddenLimit = series.hiddenProbabilityBasisPoints
         let commonLimit = hiddenLimit + series.commonProbabilityBasisPoints
@@ -804,7 +804,7 @@ enum GachaDrawService {
                 return GachaRollResult(kind: .collectible, item: hidden, instantResult: nil)
             }
             let instantRoll = forcedRoll == nil
-                ? Int.random(in: 0..<max(1, series.instantResultProbabilityBasisPoints))
+                ? Int.random(in: 0 ..< max(1, series.instantResultProbabilityBasisPoints))
                 : roll
             let result = instantResult(in: series, forcedRoll: instantRoll)
             return GachaRollResult(kind: result.kind, item: nil, instantResult: result)

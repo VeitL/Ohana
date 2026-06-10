@@ -147,6 +147,7 @@
 				4FDA023A2F54E0D6004B725F /* Sources */,
 				4FDA023B2F54E0D6004B725F /* Frameworks */,
 				4FDA023C2F54E0D6004B725F /* Resources */,
+				4FDA09212F7C0001004B725F /* Strip Bundle Extended Attributes */,
 			);
 			buildRules = (
 			);
@@ -170,6 +171,7 @@
 				4FDA02442F54E0D6004B725F /* Sources */,
 				4FDA02452F54E0D6004B725F /* Frameworks */,
 				4FDA02462F54E0D6004B725F /* Resources */,
+				4FDA09222F7C0001004B725F /* Strip Bundle Extended Attributes */,
 			);
 			buildRules = (
 			);
@@ -266,6 +268,46 @@
 
 /* Begin PBXShellScriptBuildPhase section */
 		4FDA09202F7C0001004B725F /* Strip Bundle Extended Attributes */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Strip Bundle Extended Attributes";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ -n \"${TARGET_BUILD_DIR:-}\" ] && [ -n \"${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}\" ]; then\n  APP_BUNDLE=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\n  /usr/bin/xattr -cr \"${APP_BUNDLE}\" 2>/dev/null || true\n  /usr/bin/xattr -d com.apple.FinderInfo \"${APP_BUNDLE}\" 2>/dev/null || true\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+		4FDA09212F7C0001004B725F /* Strip Bundle Extended Attributes */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Strip Bundle Extended Attributes";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ -n \"${TARGET_BUILD_DIR:-}\" ] && [ -n \"${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}\" ]; then\n  APP_BUNDLE=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\n  /usr/bin/xattr -cr \"${APP_BUNDLE}\" 2>/dev/null || true\n  /usr/bin/xattr -d com.apple.FinderInfo \"${APP_BUNDLE}\" 2>/dev/null || true\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+		4FDA09222F7C0001004B725F /* Strip Bundle Extended Attributes */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;

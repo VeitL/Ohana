@@ -13,8 +13,8 @@ enum BackupError: LocalizedError {
     case unsupportedVersion(Int)
     var errorDescription: String? {
         switch self {
-        case .unsupportedVersion(let v):
-            return "备份文件版本 v\(v) 不受支持，请更新 App 后重试。"
+        case let .unsupportedVersion(v):
+            "备份文件版本 v\(v) 不受支持，请更新 App 后重试。"
         }
     }
 }

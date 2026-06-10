@@ -26,18 +26,18 @@ final class AntiRepeatCareManager {
         in humans: [Human]
     ) -> (executorName: String, minutesAgo: Int)? {
         let now = Date()
-        
+
         // 查找指定类型、且在时间窗口内的所有记录
         let recentLogs = pet.careLogs
             .filter { $0.careType == type }
             .filter { now.timeIntervalSince($0.date) < Double(thresholdMinutes * 60) }
             .sorted { $0.date > $1.date }
-        
+
         guard let latestLog = recentLogs.first else { return nil }
-        
+
         // 计算发生了多少分钟
         let minutesAgo = Int(now.timeIntervalSince(latestLog.date) / 60)
-        
+
         // 解析执行者名称
         var executorName = "某人"
         if let executorId = latestLog.executorId, !executorId.isEmpty {
@@ -47,7 +47,7 @@ final class AntiRepeatCareManager {
                 executorName = human.name
             }
         }
-        
+
         return (executorName, max(1, minutesAgo))
     }
 }

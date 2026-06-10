@@ -5,8 +5,8 @@
 //  家庭悬赏榜 — 家人间发布任务，接单完成后资产转移
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - 悬赏榜主视图
 struct BountyBoardContentView: View {
@@ -18,8 +18,8 @@ struct BountyBoardContentView: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("bountyTasks") private var tasksRaw: String = ""
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
-    @State private var showAddTask   = false
-    @State private var selectedTab   = 0   // 0=进行中 1=已完成 2=周报
+    @State private var showAddTask = false
+    @State private var selectedTab = 0 // 0=进行中 1=已完成 2=周报
     @State private var completedTaskId: UUID? = nil
     @State private var showCompleteConfirm = false
     @State private var pendingCompleteId: UUID? = nil
@@ -28,14 +28,15 @@ struct BountyBoardContentView: View {
         BountyTask.decode(tasksRaw)
     }
 
-    private var activeTasks: [BountyTask]    { tasks.filter { !$0.isCompleted } }
-    private var completedTasks: [BountyTask] { tasks.filter { $0.isCompleted } }
+    private var activeTasks: [BountyTask] { tasks.filter { !$0.isCompleted } }
+    private var completedTasks: [BountyTask] { tasks.filter(\.isCompleted) }
 
     // P2: 历史归档 — 7天前完成的任务
     private var recentCompleted: [BountyTask] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
         return completedTasks.filter { ($0.completedAt ?? $0.createdAt) >= cutoff }
     }
+
     private var archivedCompleted: [BountyTask] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
         return completedTasks.filter { ($0.completedAt ?? $0.createdAt) < cutoff }
@@ -203,10 +204,10 @@ struct BountyBoardContentView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                 .fill(Color.ohanaCardSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
                 )
         )
@@ -250,7 +251,7 @@ struct BountyBoardContentView: View {
                 Text(task.emoji)
                     .font(OhanaFont.metric(size: 28))
                     .frame(width: 48, height: 48)
-                    .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                    .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title)
@@ -303,10 +304,10 @@ struct BountyBoardContentView: View {
                     }
                     .padding(.horizontal, 7).padding(.vertical, 2)
                     .background(
-                        (task.assignedToId == activeHumanId
+                        task.assignedToId == activeHumanId
                             ? Color.goPrimary.opacity(0.18)
-                            : Color.goTeal.opacity(0.12)
-                        ),
+                            : Color.goTeal.opacity(0.12),
+
                         in: Capsule()
                     )
                 } else {
@@ -321,8 +322,8 @@ struct BountyBoardContentView: View {
                     let isOwner = task.creatorId == activeHumanId
                     let isAssignedToMe = task.assignedToId == activeHumanId
                     let canComplete: Bool = {
-                        if task.assignedToId == nil { return !isOwner }    // 所有人可接（除自己发布的）
-                        return isAssignedToMe                              // 被 @ 才能完成
+                        if task.assignedToId == nil { return !isOwner } // 所有人可接（除自己发布的）
+                        return isAssignedToMe // 被 @ 才能完成
                     }()
 
                     if isOwner {
@@ -385,14 +386,14 @@ struct BountyBoardContentView: View {
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .fill(
                     isActive
                         ? Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.06)
                         : Color.goTeal.opacity(0.05)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         .strokeBorder(
                             isActive ? Color.goYellow.opacity(0.18) : Color.goTeal.opacity(0.15),
                             lineWidth: 1
@@ -453,10 +454,10 @@ struct BountyBoardContentView: View {
 
     /// 单个家人的本周统计
     private struct HumanWeekStat: Identifiable {
-        let id: String              // humanId
+        let id: String // humanId
         let human: Human
-        let count: Int              // 本周所有护理动作总数
-        let careCount: Int          // 喂食/喝水/换水等
+        let count: Int // 本周所有护理动作总数
+        let careCount: Int // 喂食/喝水/换水等
         let pottyCount: Int
         let walkCount: Int
         let expenseCount: Int
@@ -475,9 +476,9 @@ struct BountyBoardContentView: View {
     private var weeklyStats: [HumanWeekStat] {
         let start = weekStart
 
-        var care: [String: Int]    = [:]
-        var potty: [String: Int]   = [:]
-        var walk: [String: Int]    = [:]
+        var care: [String: Int] = [:]
+        var potty: [String: Int] = [:]
+        var walk: [String: Int] = [:]
         var expense: [String: Int] = [:]
 
         for pet in pets {
@@ -567,10 +568,10 @@ struct BountyBoardContentView: View {
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .fill(Color.ohanaCardSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.1), lineWidth: 1)
                 )
         )
@@ -618,10 +619,10 @@ struct BountyBoardContentView: View {
                 // 柱图
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: OhanaRadius.micro)
                             .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.06))
                             .frame(height: 8)
-                        RoundedRectangle(cornerRadius: 4)
+                        RoundedRectangle(cornerRadius: OhanaRadius.micro)
                             .fill(
                                 LinearGradient(
                                     colors: [
@@ -660,7 +661,7 @@ struct BountyBoardContentView: View {
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: OhanaRadius.row)
                 .fill(
                     isTop
                         ? Color.goYellow.opacity(0.06)
@@ -668,7 +669,7 @@ struct BountyBoardContentView: View {
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: OhanaRadius.row)
                 .strokeBorder(
                     isTop
                         ? Color.goYellow.opacity(0.25)

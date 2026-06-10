@@ -25,28 +25,28 @@ struct ShopItem: Identifiable, Equatable {
         func title(_ l: L10n = L10n()) -> String {
             switch self {
             case .appIcon:
-                return l.tr(zh: "App Icon", en: "App Icon", de: "App Icon")
+                l.tr(zh: "App Icon", en: "App Icon", de: "App Icon")
             case .avatar2d:
-                return l.tr(zh: "2.5D 头像", en: "2.5D Avatar", de: "2,5D-Avatar")
+                l.tr(zh: "2.5D 头像", en: "2.5D Avatar", de: "2,5D-Avatar")
             case .cashExchange:
-                return l.tr(zh: "货币兑换", en: "Cash Exchange", de: "Geldtausch")
+                l.tr(zh: "货币兑换", en: "Cash Exchange", de: "Geldtausch")
             case .effect:
-                return l.tr(zh: "外观特效", en: "Effects", de: "Effekte")
+                l.tr(zh: "外观特效", en: "Effects", de: "Effekte")
             case .title_:
-                return l.tr(zh: "称号", en: "Titles", de: "Titel")
+                l.tr(zh: "称号", en: "Titles", de: "Titel")
             case .boost:
-                return l.tr(zh: "加成道具", en: "Boosts", de: "Boosts")
+                l.tr(zh: "加成道具", en: "Boosts", de: "Boosts")
             }
         }
 
         var icon: String {
             switch self {
-            case .appIcon: return "app.badge.fill"
-            case .avatar2d: return "person.crop.square.fill"
-            case .cashExchange: return "banknote.fill"
-            case .effect: return "sparkles"
-            case .title_: return "rosette"
-            case .boost: return "bolt.fill"
+            case .appIcon: "app.badge.fill"
+            case .avatar2d: "person.crop.square.fill"
+            case .cashExchange: "banknote.fill"
+            case .effect: "sparkles"
+            case .title_: "rosette"
+            case .boost: "bolt.fill"
             }
         }
     }
@@ -58,7 +58,7 @@ struct ShopItem: Identifiable, Equatable {
     let cost: Int
     let category: ShopCategory
     var isConsumable: Bool = false
-    var appIcon: AppIconShopDescriptor? = nil
+    var appIcon: AppIconShopDescriptor?
     var isPurchased: Bool = false
 
     var name: String { nameText.resolve() }

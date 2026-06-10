@@ -11,7 +11,7 @@ import SwiftUI
 
 struct AddMedicationSheet: View {
     let human: Human
-    var editing: HumanMedication? = nil
+    var editing: HumanMedication?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -54,30 +54,30 @@ struct AddMedicationSheet: View {
         func title(l: L10n) -> String {
             switch self {
             case .tablet:
-                return l.tr(zh: "片剂", en: "Tablet", de: "Tablette")
+                l.tr(zh: "片剂", en: "Tablet", de: "Tablette")
             case .liquid:
-                return l.tr(zh: "液体", en: "Liquid", de: "Flüssig")
+                l.tr(zh: "液体", en: "Liquid", de: "Flüssig")
             case .powder:
-                return l.tr(zh: "粉剂", en: "Powder", de: "Pulver")
+                l.tr(zh: "粉剂", en: "Powder", de: "Pulver")
             case .injection:
-                return l.tr(zh: "注射", en: "Injection", de: "Injektion")
+                l.tr(zh: "注射", en: "Injection", de: "Injektion")
             case .other:
-                return l.tr(zh: "其他", en: "Other", de: "Andere")
+                l.tr(zh: "其他", en: "Other", de: "Andere")
             }
         }
 
         var unitOptions: [String] {
             switch self {
             case .tablet:
-                return ["片", "粒", "mg"]
+                ["片", "粒", "mg"]
             case .liquid:
-                return ["ml", "滴"]
+                ["ml", "滴"]
             case .powder:
-                return ["mg", "g", "勺"]
+                ["mg", "g", "勺"]
             case .injection:
-                return ["ml", "IU"]
+                ["ml", "IU"]
             case .other:
-                return ["单位", "mg", "ml"]
+                ["单位", "mg", "ml"]
             }
         }
     }
@@ -152,7 +152,7 @@ struct AddMedicationSheet: View {
             }
         }
         .alert(l.tr(zh: "删除药物计划？", en: "Delete medication plan?", de: "Medikamentenplan löschen?"), isPresented: $showDeleteConfirmation) {
-            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) { }
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
             Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
                 deleteMedication()
             }
@@ -213,14 +213,14 @@ struct AddMedicationSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 cardHeader(icon: "pills.fill", color: Color(hex: colorHex), title: l.tr(zh: "药物信息", en: "Medication", de: "Medikament"))
                 fieldRow(icon: "textformat", label: l.tr(zh: "药品名称", en: "Name", de: "Name")) {
-                    GoDraftTextField(
+                    GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                         l.tr(zh: "如：维生素 D", en: "e.g. Vitamin D", de: "z. B. Vitamin D"),
                         text: $name,
                         capitalization: .words,
                         autoFocusDelay: 0.25
                     )
-                        .font(OhanaFont.body())
-                        .foregroundStyle(primaryText)
+                    .font(OhanaFont.body())
+                    .foregroundStyle(primaryText)
                 }
                 VStack(alignment: .leading, spacing: 10) {
                     Label(l.tr(zh: "剂型", en: "Form", de: "Form"), systemImage: "pills")
@@ -252,7 +252,7 @@ struct AddMedicationSheet: View {
                     }
                 }
                 fieldRow(icon: "scalemass", label: l.tr(zh: "每次剂量", en: "Dose per time", de: "Dosis pro Einnahme")) {
-                    GoDraftTextField(
+                    GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                         l.tr(zh: "数值", en: "Amount", de: "Menge"),
                         text: $doseAmount,
                         keyboardType: .decimalPad
@@ -299,12 +299,12 @@ struct AddMedicationSheet: View {
                 }
                 if frequency == .custom {
                     fieldRow(icon: "text.bubble", label: l.tr(zh: "自定义说明", en: "Custom note", de: "Eigene Notiz")) {
-                        GoDraftTextField(
+                        GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                             l.tr(zh: "说明服药规则", en: "Describe the rule", de: "Regel beschreiben"),
                             text: $customNote
                         )
-                            .font(OhanaFont.body())
-                            .foregroundStyle(primaryText)
+                        .font(OhanaFont.body())
+                        .foregroundStyle(primaryText)
                     }
                 }
             }
@@ -325,7 +325,7 @@ struct AddMedicationSheet: View {
                         .simultaneousGesture(TapGesture().onEnded { endEditing() })
                 }
                 .padding(12)
-                .background(controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
 
                 Toggle(isOn: $hasEndDate) {
                     Label(l.tr(zh: "设置结束日期", en: "Set end date", de: "Enddatum setzen"), systemImage: "calendar.badge.checkmark")
@@ -346,7 +346,7 @@ struct AddMedicationSheet: View {
                             .simultaneousGesture(TapGesture().onEnded { endEditing() })
                     }
                     .padding(12)
-                    .background(controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 }
             }
         }
@@ -368,7 +368,7 @@ struct AddMedicationSheet: View {
                             .simultaneousGesture(TapGesture().onEnded { endEditing() })
                     }
                     .padding(12)
-                    .background(controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 }
 
                 if frequency == .weekly {
@@ -417,8 +417,8 @@ struct AddMedicationSheet: View {
             Spacer()
         }
         .padding(14)
-        .background(Color.goYellow.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.goYellow.opacity(0.28), lineWidth: 1))
+        .background(Color.goYellow.opacity(0.10), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous).strokeBorder(Color.goYellow.opacity(0.28), lineWidth: 1))
     }
 
     private var manualModeCard: some View {
@@ -438,8 +438,8 @@ struct AddMedicationSheet: View {
             Spacer()
         }
         .padding(14)
-        .background(Color.goPrimary.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.goPrimary.opacity(0.24), lineWidth: 1))
+        .background(Color.goPrimary.opacity(0.10), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous).strokeBorder(Color.goPrimary.opacity(0.24), lineWidth: 1))
     }
 
     private var editingStateCard: some View {
@@ -492,7 +492,7 @@ struct AddMedicationSheet: View {
                     .foregroundStyle(secondaryText)
             }
             .padding(14)
-            .background(controlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -532,12 +532,12 @@ struct AddMedicationSheet: View {
                         text: $notes,
                         minHeight: 74
                     )
-                        .font(OhanaFont.body())
-                        .foregroundStyle(primaryText)
-                        .frame(height: 74)
-                        .padding(10)
-                        .background(controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(controlStroke, lineWidth: 1))
+                    .font(OhanaFont.body())
+                    .foregroundStyle(primaryText)
+                    .frame(height: 74)
+                    .padding(10)
+                    .background(controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous).strokeBorder(controlStroke, lineWidth: 1))
                 }
             }
         }
@@ -573,12 +573,12 @@ struct AddMedicationSheet: View {
         .background(Color.ohanaCardSurface)
     }
 
-    private func sheetCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func sheetCard(@ViewBuilder content: () -> some View) -> some View {
         content()
             .padding(16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
     }
@@ -594,15 +594,15 @@ struct AddMedicationSheet: View {
         }
     }
 
-    private func fieldRow<Content: View>(icon: String, label: String, @ViewBuilder content: () -> Content) -> some View {
+    private func fieldRow(icon: String, label: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(label, systemImage: icon)
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(secondaryText)
             HStack { content() }
                 .padding(12)
-                .background(controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(controlStroke, lineWidth: 1))
+                .background(controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous).strokeBorder(controlStroke, lineWidth: 1))
         }
     }
 
@@ -647,7 +647,7 @@ struct AddMedicationSheet: View {
         let formatter = DateFormatter()
         formatter.locale = AppLanguage.effectiveLocale
         let symbols = formatter.shortWeekdaySymbols ?? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        return (1...7).map { ($0, symbols[$0 - 1]) }
+        return (1 ... 7).map { ($0, symbols[$0 - 1]) }
     }
 
     private var previewText: String {
@@ -665,7 +665,7 @@ struct AddMedicationSheet: View {
         let now = Date()
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: now)
-        return (0..<14).flatMap { offset -> [Date] in
+        return (0 ..< 14).flatMap { offset -> [Date] in
             guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return [] }
             guard calendar.startOfDay(for: day) >= calendar.startOfDay(for: startDate) else { return [] }
             if hasEndDate, calendar.startOfDay(for: day) > calendar.startOfDay(for: endDate) { return [] }
@@ -749,15 +749,15 @@ struct AddMedicationSheet: View {
     private func inferredDoseForm(for unit: String) -> HumanMedicationDoseForm {
         switch unit {
         case "片", "粒":
-            return .tablet
+            .tablet
         case "ml", "滴":
-            return .liquid
+            .liquid
         case "mg", "g", "勺":
-            return .powder
+            .powder
         case "IU":
-            return .injection
+            .injection
         default:
-            return .other
+            .other
         }
     }
 

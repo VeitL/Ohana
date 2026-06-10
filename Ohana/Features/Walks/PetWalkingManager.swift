@@ -6,9 +6,9 @@
 //
 
 import Foundation
-import SwiftData
-import Observation
 import MapKit
+import Observation
+import SwiftData
 import UIKit
 
 enum WalkPhase: Equatable {
@@ -81,14 +81,14 @@ final class PetWalkingManager {
     var activePoopMarkers: [WalkPoopMarker] = []
     var lastCompletedPoopMarkers: [WalkPoopMarker] = []
 
-    private var pausedElapsed: TimeInterval = 0  // 暂停前已累计时间
-    private var resumeTime: Date?                // 最近一次 resume/start 时间
+    private var pausedElapsed: TimeInterval = 0 // 暂停前已累计时间
+    private var resumeTime: Date? // 最近一次 resume/start 时间
     private var timer: Timer?
     private var walkStopStartedAt: CFAbsoluteTime?
     private let locationManager: LocationManager
     private let questManager: QuestManager
     private let activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
-    
+
     init(locationManager: LocationManager, questManager: QuestManager = QuestManager()) {
         self.locationManager = locationManager
         self.questManager = questManager
@@ -98,7 +98,7 @@ final class PetWalkingManager {
         guard case .running = phase else { return false }
         return currentPet != nil && startTime != nil
     }
-    
+
     // MARK: - Actions
     func start(pet: Pet) {
         currentPet = pet
@@ -120,7 +120,7 @@ final class PetWalkingManager {
         locationManager.startWalkSession()
         startTimer()
     }
-    
+
     func pause() {
         // 暂停前把已跑时间存起来
         if let r = resumeTime {
@@ -136,7 +136,7 @@ final class PetWalkingManager {
         locationManager.pauseWalkSession()
         stopTimer()
     }
-    
+
     func resume() {
         resumeTime = Date()
         phase = .running
@@ -148,7 +148,7 @@ final class PetWalkingManager {
         locationManager.resumeWalkSession()
         startTimer()
     }
-    
+
     func stop(modelContext: ModelContext) {
         walkStopStartedAt = CFAbsoluteTimeGetCurrent()
         // 最终elapsed：已暂停部分 + 本次跑步部分
@@ -160,11 +160,11 @@ final class PetWalkingManager {
 
         stopTimer()
         locationManager.stopWalkSession()
-        
+
         let elapsed = elapsedTime
         let poopMarkers = activePoopMarkers
         let poop = max(poopCount, poopMarkers.count)
-        
+
         guard let pet = currentPet else {
             walkStopStartedAt = nil
             return
@@ -178,7 +178,7 @@ final class PetWalkingManager {
         walkLog.endDate = Date()
         let distanceMeters = locationManager.totalDistance
         walkLog.distanceMeters = distanceMeters
-        
+
         let routeLocations = locationManager.routeLocationsForPersistence()
         let routeCoordinates = routeLocations.map(\.coordinate)
         let coordinates = routeLocations.map {
@@ -190,12 +190,12 @@ final class PetWalkingManager {
         lastCompletedWalk = walkLog
         lastCompletedRouteCoordinates = routeCoordinates
         lastCompletedPoopMarkers = poopMarkers
-        
+
         generateMapSnapshot(for: walkLog, routeLocations: routeLocations, poopMarkers: poopMarkers, modelContext: modelContext)
-        
+
         // 保存遛狗中的便便路线事件（含真实打卡时间与可选坐标）
         let persistedMarkers: [WalkPoopMarker] = poopMarkers.isEmpty && poop > 0
-            ? (0..<poop).map { _ in WalkPoopMarker(date: Date(), location: nil) }
+            ? (0 ..< poop).map { _ in WalkPoopMarker(date: Date(), location: nil) }
             : poopMarkers
         for marker in persistedMarkers {
             let pottyLog = PetPottyLog(
@@ -210,9 +210,9 @@ final class PetWalkingManager {
             )
             modelContext.insert(pottyLog)
         }
-        
+
         // N2/Phase54: 遛狗椰子奖励（距离 < 20m 不发放奖励，日志正常保存）
-        let minimumRewardDistance: Double = 20.0
+        let minimumRewardDistance = 20.0
         let earnedCoconuts = distanceMeters >= minimumRewardDistance
             ? PetWalkLog.coconuts(for: distanceMeters)
             : 0
@@ -227,7 +227,7 @@ final class PetWalkingManager {
         }
         // 遛狗中每次便便：人+2, 宠物+5（OhanaActionType.potty(isLitter:false)）
         if poop > 0 {
-            for _ in 0..<poop {
+            for _ in 0 ..< poop {
                 questManager.awardAction(
                     type: .potty(isLitter: false),
                     pet: pet,
@@ -254,7 +254,7 @@ final class PetWalkingManager {
         )
         walkStopStartedAt = nil
     }
-    
+
     func reset() {
         stopTimer()
         locationManager.stopAllLocationActivity()
@@ -331,13 +331,13 @@ final class PetWalkingManager {
             return
         }
     }
-    
+
     func addPoop(type: PottyType = .perfectPoop) {
         poopCount += 1
         let location = locationManager.currentLocation ?? locationManager.collectedLocations.last
         activePoopMarkers.append(WalkPoopMarker(location: location, type: type))
     }
-    
+
     // MARK: - Timer
     private func startTimer() {
         stopTimer()
@@ -346,7 +346,7 @@ final class PetWalkingManager {
             self.elapsedTime = self.pausedElapsed + Date().timeIntervalSince(r)
         }
     }
-    
+
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
@@ -364,17 +364,17 @@ final class PetWalkingManager {
             "poopCount": "\(poopCount)"
         ]
     }
-    
+
     // MARK: - Map Snapshot
     private func generateMapSnapshot(for walkLog: PetWalkLog, routeLocations: [CLLocation], poopMarkers: [WalkPoopMarker], modelContext: ModelContext) {
         let locations = routeLocations
         guard locations.count >= 2 else { return }
-        
+
         let coordinates = locations.map(\.coordinate)
         let poopCoordinates = poopMarkers.compactMap(\.coordinate)
         let regionCoordinates = coordinates + poopCoordinates
         var region = MKCoordinateRegion()
-        
+
         let lats = regionCoordinates.map(\.latitude)
         let lons = regionCoordinates.map(\.longitude)
         let center = CLLocationCoordinate2D(
@@ -386,19 +386,19 @@ final class PetWalkingManager {
             longitudeDelta: max(0.005, (lons.max()! - lons.min()!) * 1.5)
         )
         region = MKCoordinateRegion(center: center, span: span)
-        
+
         let options = MKMapSnapshotter.Options()
         options.region = region
         options.size = CGSize(width: 400, height: 300)
         options.mapType = .standard
-        
+
         let snapshotter = MKMapSnapshotter(options: options)
         snapshotter.start { snapshot, error in
             guard let snapshot, error == nil else { return }
-            
+
             let image = UIGraphicsImageRenderer(size: snapshot.image.size).image { ctx in
                 snapshot.image.draw(at: .zero)
-                
+
                 MapSnapshotRainbowRenderer.drawRoute(
                     coordinates: coordinates,
                     on: snapshot,
@@ -406,12 +406,12 @@ final class PetWalkingManager {
                     isRainbow: WalkEffectPreferenceStore.isRainbowRouteEnabled(),
                     lineWidth: 3
                 )
-                
+
                 // 起点绿点
                 let startPoint = snapshot.point(for: coordinates.first!)
                 UIColor.green.setFill()
                 UIBezierPath(arcCenter: startPoint, radius: 5, startAngle: 0, endAngle: .pi * 2, clockwise: true).fill()
-                
+
                 // 终点蓝点
                 let endPoint = snapshot.point(for: coordinates.last!)
                 UIColor.blue.setFill()
@@ -426,7 +426,7 @@ final class PetWalkingManager {
                     )
                 }
             }
-            
+
             let jpegData = image.jpegData(compressionQuality: 0.7)
             // F2: SwiftData 模型必须在 MainActor 上写入
             DispatchQueue.main.async {
@@ -444,7 +444,7 @@ final class PetWalkingManager {
         let seconds = total % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
-    
+
     var distanceText: String {
         AppMeasurementSystem.formatDistanceMeters(locationManager.totalDistance, fractionDigits: 2)
     }

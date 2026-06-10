@@ -30,19 +30,19 @@ struct DesignSpecVividGlassBackdrop: View {
         let drift = cos(phase * 0.26)
         return ZStack {
             Color(hex: mode == .dark ? "080B28" : "EAF7FF")
-            ForEach(0..<16, id: \.self) { index in
+            ForEach(0 ..< 16, id: \.self) { index in
                 let offset = CGFloat(index) * 36 - 240
                 let y = CGFloat((index * 31) % 180) - 78
                 let width = CGFloat(220 + (index % 4) * 42)
                 let height = CGFloat(index % 3 == 0 ? 8 : 5)
-                RoundedRectangle(cornerRadius: 999, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.pill, style: .continuous)
                     .fill(vividLineColor(index).opacity(index % 5 == 0 ? 0.96 : 0.78))
                     .frame(width: width, height: height)
                     .rotationEffect(.degrees(index.isMultiple(of: 2) ? -23 : 18))
                     .offset(x: offset + CGFloat(wave) * 28 + CGFloat(index % 4) * CGFloat(drift) * 8, y: y + CGFloat(drift) * 22)
                     .blur(radius: index % 6 == 0 ? 0.6 : 0)
             }
-            ForEach(0..<8, id: \.self) { index in
+            ForEach(0 ..< 8, id: \.self) { index in
                 Capsule()
                     .stroke(vividLineColor(index + 8).opacity(0.55), lineWidth: 2)
                     .frame(width: CGFloat(72 + index * 16), height: CGFloat(22 + index * 5))
@@ -75,7 +75,7 @@ struct DesignSpecVividGlassBackdrop: View {
 
     private func glassBackdropDenseTextLayer(wave: Double, drift: Double) -> some View {
         ZStack {
-            ForEach(0..<15, id: \.self) { index in
+            ForEach(0 ..< 15, id: \.self) { index in
                 Text(denseGlassLine(index))
                     .font(OhanaFont.adaptive(size: 8.5, weight: .black, design: .rounded))
                     .tracking(1.1)
@@ -88,7 +88,7 @@ struct DesignSpecVividGlassBackdrop: View {
                         y: CGFloat(index * 15) - 112 + CGFloat(wave) * CGFloat(7 + index % 4)
                     )
             }
-            ForEach(0..<10, id: \.self) { index in
+            ForEach(0 ..< 10, id: \.self) { index in
                 Text("0123456789  文字穿过玻璃  LENS")
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .tracking(1.5)
@@ -105,7 +105,7 @@ struct DesignSpecVividGlassBackdrop: View {
 
     private func glassBackdropTextLayer(wave: Double, drift: Double) -> some View {
         ZStack {
-            ForEach(0..<9, id: \.self) { index in
+            ForEach(0 ..< 9, id: \.self) { index in
                 Text(glassBackdropPhrase(index))
                     .font(.system(size: CGFloat(20 + (index % 5) * 4), weight: .black, design: .rounded))
                     .tracking(1.2)
@@ -117,7 +117,7 @@ struct DesignSpecVividGlassBackdrop: View {
                     )
                     .blur(radius: index == 3 ? 0.35 : 0)
             }
-            ForEach(0..<14, id: \.self) { index in
+            ForEach(0 ..< 14, id: \.self) { index in
                 Text("GLASS \(index + 1) · 12345 · UI")
                     .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                     .tracking(1.8)
@@ -134,31 +134,31 @@ struct DesignSpecVividGlassBackdrop: View {
 
     private func denseGlassLine(_ index: Int) -> String {
         switch index % 4 {
-        case 0: return "OHANA UI GLASS LAB  ·  文字穿过玻璃  ·  0123456789"
-        case 1: return "REFRACTION TEST  ·  CONTROL GAUSSIAN  ·  ABCDEFG"
-        case 2: return "深色浅色开关参数  ·  controlFill stroke accent"
-        default: return "LENS MAGNIFIER  ·  moving text behind sheet glass"
+        case 0: "OHANA UI GLASS LAB  ·  文字穿过玻璃  ·  0123456789"
+        case 1: "REFRACTION TEST  ·  CONTROL GAUSSIAN  ·  ABCDEFG"
+        case 2: "深色浅色开关参数  ·  controlFill stroke accent"
+        default: "LENS MAGNIFIER  ·  moving text behind sheet glass"
         }
     }
 
     private func glassBackdropPhrase(_ index: Int) -> String {
         switch index % 5 {
-        case 0: return "OHANA GLASS"
-        case 1: return "高斯控件"
-        case 2: return "LENS TEST"
-        case 3: return "文字穿透"
-        default: return "REFRACTION"
+        case 0: "OHANA GLASS"
+        case 1: "高斯控件"
+        case 2: "LENS TEST"
+        case 3: "文字穿透"
+        default: "REFRACTION"
         }
     }
 
     private func vividLineColor(_ index: Int) -> Color {
         switch index % 6 {
-        case 0: return Color(hex: "00E5FF")
-        case 1: return Color(hex: "C9FF27")
-        case 2: return Color(hex: "FF3DA6")
-        case 3: return Color(hex: "7A3DFF")
-        case 4: return Color(hex: "FFB000")
-        default: return Color(hex: "35FFB5")
+        case 0: Color(hex: "00E5FF")
+        case 1: Color(hex: "C9FF27")
+        case 2: Color(hex: "FF3DA6")
+        case 3: Color(hex: "7A3DFF")
+        case 4: Color(hex: "FFB000")
+        default: Color(hex: "35FFB5")
         }
     }
 }

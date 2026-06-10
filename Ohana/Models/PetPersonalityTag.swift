@@ -92,7 +92,7 @@ struct PetPersonalityTag: Identifiable, Hashable {
         .init(id: "zen", sfSymbol: "figure.mind.and.body", titleZh: "禅宗派", titleEn: "Zen master", titleDe: "Zen-Modus"),
         .init(id: "jealous", sfSymbol: "eyes", titleZh: "超吃醋", titleEn: "Jelly bean", titleDe: "Eifersüchtig"),
         .init(id: "foodthief", sfSymbol: "hand.raised.fill", titleZh: "偷食小贼", titleEn: "Food bandit", titleDe: "Futterdieb"),
-        .init(id: "chatty", sfSymbol: "bubble.left.fill", titleZh: "碎碎念", titleEn: "Chatty", titleDe: "Plaudrig"),
+        .init(id: "chatty", sfSymbol: "bubble.left.fill", titleZh: "碎碎念", titleEn: "Chatty", titleDe: "Plaudrig")
     ]
 
     static func lookup(_ id: String) -> PetPersonalityTag? {
@@ -140,8 +140,8 @@ enum PetTagGreeting {
     }
 
     private static func defaultTimeHint(name: String, hour: Int, l: L10n) -> String {
-        if hour >= 6 && hour < 10 { return l.morningHint(name) }
-        if hour >= 17 && hour < 20 { return l.eveningHint(name) }
+        if hour >= 6, hour < 10 { return l.morningHint(name) }
+        if hour >= 17, hour < 20 { return l.eveningHint(name) }
         return l.defaultHint(name)
     }
 
@@ -175,7 +175,7 @@ enum PetTagGreeting {
         ]
     }
 
-    private static func lines(for tagId: String, name: String, hour: Int, l: L10n) -> [String] {
+    private static func lines(for tagId: String, name: String, hour _: Int, l: L10n) -> [String] {
         let custom = customLines(tagId: tagId, name: name, l: l)
         if !custom.isEmpty { return custom }
 
@@ -307,8 +307,8 @@ enum PetTagGreeting {
 
 // MARK: - 标签驱动的轻量行为偏好
 
-internal enum PetPersonalityBehavior {
-    internal static func priorityBonus(for actionType: String, pet: Pet) -> Int {
+enum PetPersonalityBehavior {
+    static func priorityBonus(for actionType: String, pet: Pet) -> Int {
         let tags = Set(pet.personalityTagIdList)
         guard !tags.isEmpty else { return 0 }
 
@@ -351,7 +351,7 @@ internal enum PetPersonalityBehavior {
         }
     }
 
-    internal static func prioritized<T>(
+    static func prioritized<T>(
         _ values: [T],
         actionType: (T) -> String,
         stableRank: (T) -> Int,
@@ -365,11 +365,11 @@ internal enum PetPersonalityBehavior {
         }
     }
 
-    internal static func preferredPet(
+    static func preferredPet(
         from pets: [Pet],
         actionType: String,
-        calendar: Calendar = .current,
-        now: Date = Date(),
+        calendar _: Calendar = .current,
+        now _: Date = Date(),
         isAlreadyDone: (Pet) -> Bool
     ) -> Pet? {
         pets

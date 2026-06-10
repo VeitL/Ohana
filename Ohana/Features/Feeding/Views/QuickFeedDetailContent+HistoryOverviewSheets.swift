@@ -12,7 +12,7 @@ extension QuickFeedDetailContent {
                 feedModeSelector
             }
             .padding(12)
-            .feedFlatBlockSurface(cornerRadius: 18)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
             manageRow(
                 icon: "fork.knife",
                 title: l.tr(zh: "默认粮种 / 克数", en: "Default food / grams", de: "Standardfutter / Gramm"),
@@ -170,7 +170,7 @@ extension QuickFeedDetailContent {
                 DatePicker(l.tr(zh: "时间", en: "Time", de: "Zeit"), selection: $draftStore.editFeedLogDate)
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .padding(12)
-                    .feedFlatBlockSurface(cornerRadius: 16)
+                    .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
                 if let inputError = draftStore.inputError {
                     errorText(inputError)
                 }

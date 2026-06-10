@@ -25,6 +25,7 @@ struct CoconutBalanceTestContentView: View {
     private var selectedHuman: Human? {
         humans.first { $0.id.uuidString == selectedHumanId }
     }
+
     private var currentDisplayAmount: Int {
         if let selectedHuman {
             return walletAccounts.first { $0.ownerKind == .human && $0.ownerId == selectedHuman.id.uuidString }?.balance
@@ -32,6 +33,7 @@ struct CoconutBalanceTestContentView: View {
         }
         return walletAccounts.reduce(0) { $0 + $1.balance }
     }
+
     private var parsedAmount: Int {
         max(0, Int(amountText.filter(\.isNumber)) ?? 0)
     }
@@ -56,7 +58,7 @@ struct CoconutBalanceTestContentView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 10)
                             .padding(.horizontal, 12)
-                            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
@@ -112,7 +114,7 @@ struct CoconutBalanceTestContentView: View {
                 .font(OhanaFont.adaptive(size: 22, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 48, height: 48)
-                .background(Color.goYellow.opacity(0.16), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.goYellow.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayName(selectedHuman))
                     .font(OhanaFont.callout(.black))
@@ -128,9 +130,9 @@ struct CoconutBalanceTestContentView: View {
                 .contentTransition(.numericText())
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
         .animation(GoMotion.feedback, value: currentDisplayAmount)
@@ -171,7 +173,7 @@ struct CoconutBalanceTestContentView: View {
                 valueFont: .system(size: 44, weight: .black, design: .rounded),
                 unitFont: .system(size: 28, weight: .black),
                 fill: Color.ohanaControlFill,
-                cornerRadius: 22,
+                cornerRadius: OhanaRadius.cardSoft,
                 horizontalPadding: 16,
                 verticalPadding: 12
             )
@@ -182,7 +184,7 @@ struct CoconutBalanceTestContentView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle(l.tr(zh: "快速设置", en: "Quick presets", de: "Schnellwerte"))
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                ForEach([0, 100, 500, 1_000, 5_000, 10_000], id: \.self) { value in
+                ForEach([0, 100, 500, 1000, 5000, 10000], id: \.self) { value in
                     Button {
                         withAnimation(GoMotion.feedback) {
                             amountText = "\(value)"
@@ -268,7 +270,7 @@ struct CoconutBalanceTestContentView: View {
                 .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(Color.goYellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Color.goYellow.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(OhanaFont.callout(.black))
@@ -279,7 +281,7 @@ struct CoconutBalanceTestContentView: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func configureInitialSelection() {

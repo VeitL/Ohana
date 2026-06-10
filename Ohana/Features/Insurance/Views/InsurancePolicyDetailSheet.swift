@@ -5,8 +5,8 @@
 //  V4 insurance policy detail page.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct InsurancePolicyDetailSheet: View {
     let insurance: PetInsurance
@@ -109,7 +109,7 @@ struct InsurancePolicyDetailSheet: View {
                 .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(Color.goPurple)
                 .frame(width: 48, height: 48)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(insurance.productName.isEmpty ? l.tr(zh: "保单详情", en: "Policy", de: "Police") : insurance.productName)
                     .font(OhanaFont.title3(.black))
@@ -150,9 +150,9 @@ struct InsurancePolicyDetailSheet: View {
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.tiny, style: .continuous)
                         .fill(Color.ohanaControlFill)
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.tiny, style: .continuous)
                         .fill(Color(hex: insurance.renewalStatusColor))
                         .frame(width: geo.size.width * coverageProgress)
                 }
@@ -255,7 +255,7 @@ struct InsurancePolicyDetailSheet: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .contextMenu {
             ForEach(ClaimStatus.allCases, id: \.rawValue) { status in
                 if status != claim.claimStatus {
@@ -450,7 +450,7 @@ private struct InsuranceClaimPopup: View {
                             .font(OhanaFont.adaptive(size: 18, weight: .black))
                             .foregroundStyle(Color.arkInk)
                             .frame(width: 48, height: 48)
-                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(l.tr(zh: "新增报销", en: "Add Claim", de: "Erstattung"))
                                 .font(OhanaFont.title3(.black))
@@ -507,7 +507,7 @@ private struct InsuranceClaimPopup: View {
                                 Text(l.tr(zh: "申请金额", en: "Claim amount", de: "Beantragter Betrag"))
                                     .font(OhanaFont.caption(.black))
                                     .foregroundStyle(Color.ohanaSecondaryText)
-                                if claimedAmount > totalExpense && totalExpense > 0 {
+                                if claimedAmount > totalExpense, totalExpense > 0 {
                                     Text(l.tr(zh: "报销金额不能超过总花费", en: "Claim cannot exceed total", de: "Betrag darf Kosten nicht übersteigen"))
                                         .font(OhanaFont.caption2(.black))
                                         .foregroundStyle(Color.goRed)
@@ -515,10 +515,10 @@ private struct InsuranceClaimPopup: View {
                             }
                             statusBlock
                             popupBlock {
-                                TextField(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"), text: $noteInput, axis: .vertical)
+                                TextField(l.tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)"), text: $noteInput, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.subheadline(.bold))
                                     .foregroundStyle(Color.ohanaPrimaryText)
-                                    .lineLimit(2...4)
+                                    .lineLimit(2 ... 4)
                             }
                         }
                         .padding(.horizontal, 24)
@@ -541,8 +541,8 @@ private struct InsuranceClaimPopup: View {
                     .padding(.bottom, 22)
                 }
                 .frame(maxWidth: .infinity)
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.54), radius: 46, x: 0, y: -16) // ui-v4: allow popup liftedAlert shadow
                 .shadow(color: Color(hex: "0B102C").opacity(0.38), radius: 26, x: 0, y: 12) // ui-v4: allow popup liftedAlert shadow
                 .padding(.horizontal, 6)
@@ -591,7 +591,7 @@ private struct InsuranceClaimPopup: View {
                         .foregroundStyle(initialStatus == status ? Color.arkInk : Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
-                        .background(initialStatus == status ? Color.goPrimary : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(initialStatus == status ? Color.goPrimary : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -599,13 +599,13 @@ private struct InsuranceClaimPopup: View {
         }
     }
 
-    private func popupBlock<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func popupBlock(@ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             content()
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func close() {

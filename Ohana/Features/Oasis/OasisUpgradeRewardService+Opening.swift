@@ -10,12 +10,12 @@ extension OasisUpgradeRewardService {
     @discardableResult
     static func ensureUpgradeCoconuts(from firstLevel: Int, through lastLevel: Int, context: ModelContext) throws -> Int {
         guard lastLevel >= max(2, firstLevel) else { return 0 }
-        let existing = (try? context.fetch(FetchDescriptor<OasisUpgradeCoconut>())) ?? []
+        let existing = (try? context.fetch(FetchDescriptor<OasisUpgradeCoconut>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let existingLevels = Set(existing.map(\.level))
         var inserted = 0
         var insertedCoconuts: [OasisUpgradeCoconut] = []
 
-        for level in max(2, firstLevel)...lastLevel where !existingLevels.contains(level) {
+        for level in max(2, firstLevel) ... lastLevel where !existingLevels.contains(level) {
             let coconut = OasisUpgradeRewardCatalog.rule(for: level).makeCoconut()
             context.insert(coconut)
             insertedCoconuts.append(coconut)
@@ -102,7 +102,7 @@ extension OasisUpgradeRewardService {
                 addFragments(critterId: critterId, amount: max(coconut.fragmentAmount, 120), context: context)
                 unlock(id: "\(critterId)_duplicate_memorial", kind: .decoration, sourceLevel: coconut.level, context: context)
             } else if let entry = OasisUpgradeRewardCatalog.critter(id: critterId) {
-                let hasFeatured = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [])
+                let hasFeatured = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
                     .contains { $0.isFeaturedOnOasis && !$0.isArchived }
                 let critter = OasisElectronicPet(
                     catalogId: entry.id,

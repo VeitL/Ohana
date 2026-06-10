@@ -19,18 +19,18 @@ struct ShopAppliedPreview: View {
     private var l: L10n { L10n(appLanguage) }
     private var accent: Color {
         switch item.category {
-        case .appIcon: return Color.goPrimary
-        case .avatar2d: return Color.goTeal
-        case .cashExchange: return Color.goYellow
-        case .effect: return Color.goPurple
-        case .title_: return Color.goYellow
-        case .boost: return Color.goOrange
+        case .appIcon: Color.goPrimary
+        case .avatar2d: Color.goTeal
+        case .cashExchange: Color.goYellow
+        case .effect: Color.goPurple
+        case .title_: Color.goYellow
+        case .boost: Color.goOrange
         }
     }
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [
@@ -66,7 +66,7 @@ struct ShopAppliedPreview: View {
                     .padding(10)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .onAppear {
             withAnimation(GoMotion.page) {
                 animate = true
@@ -87,7 +87,7 @@ struct ShopAppliedPreview: View {
                 .foregroundStyle(accent)
             VStack(spacing: 3) {
                 ZStack(alignment: .bottom) {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                         .fill(accent.opacity(0.18))
                         .frame(width: 48, height: 42)
                     petAvatar(size: 54)
@@ -123,7 +123,7 @@ struct ShopAppliedPreview: View {
 
     private var popoutCardPreview: some View {
         ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .fill(Color(hex: pet?.safeThemeColorHex ?? "5A67D8").opacity(0.34))
                 .frame(height: 58)
                 .padding(.horizontal, 14)
@@ -229,7 +229,7 @@ struct ShopAppliedPreview: View {
             }
             .padding(.horizontal, 16)
 
-            ForEach(0..<5, id: \.self) { index in
+            ForEach(0 ..< 5, id: \.self) { index in
                 Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "star.fill")
                     .font(OhanaFont.adaptive(size: 9 + CGFloat(index), weight: .black))
                     .foregroundStyle(index.isMultiple(of: 2) ? Color.goYellow : Color.goPurple)
@@ -250,7 +250,7 @@ struct ShopAppliedPreview: View {
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
-            ForEach(0..<8, id: \.self) { index in
+            ForEach(0 ..< 8, id: \.self) { index in
                 Circle()
                     .fill([Color.goYellow, .goOrange, .goPurple, .goTeal][index % 4])
                     .frame(width: 5, height: 5) // a11y: allow decorative non-interactive frame; hit area handled by parent
@@ -332,8 +332,8 @@ struct ShopAppliedPreview: View {
                 Spacer()
             }
             HStack(spacing: 5) {
-                ForEach(0..<7, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                ForEach(0 ..< 7, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
                         .fill(index == 4 ? Color.goTeal : Color.goPrimary.opacity(0.72))
                         .frame(height: 18)
                         .overlay {
@@ -384,7 +384,7 @@ struct ShopAppliedPreview: View {
                     .foregroundStyle(Color.goPrimary)
             }
             .frame(width: 54, height: 58)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "补签入库", en: "Backdate pass", de: "Nachtragspass"))
                     .font(OhanaFont.caption(.black))
@@ -459,7 +459,7 @@ struct AppIconPreview: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .fill(
                         LinearGradient(
                             colors: descriptor.gradientHex.map { Color(hex: $0) },
@@ -485,7 +485,7 @@ struct AppIconPreview: View {
                 }
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var assetName: String {

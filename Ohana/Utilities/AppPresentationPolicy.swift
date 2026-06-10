@@ -29,9 +29,9 @@ enum AppPresentationLoading: Equatable {
     var delayMS: UInt64 {
         switch self {
         case .immediate:
-            return 0
+            0
         case let .shellFirst(delayMS):
-            return delayMS
+            delayMS
         }
     }
 }
@@ -73,20 +73,20 @@ enum AppPresentationPolicyProvider {
     static func policy(for route: AppSheetRoute) -> AppPresentationPolicy {
         switch route {
         case .accountSwitcher, .requiredAccountSwitch:
-            return AppPresentationPolicy(
+            AppPresentationPolicy(
                 surface: .compactSheet,
                 loading: .shellFirst(delayMS: 64),
                 instrumentationName: route.presentationName,
                 detents: [.medium, .large],
-                cornerRadius: 32
+                cornerRadius: OhanaRadius.sheetCompact
             )
         default:
-            return AppPresentationPolicy(
+            AppPresentationPolicy(
                 surface: .sheetPage,
                 loading: .shellFirst(delayMS: 80),
                 instrumentationName: route.presentationName,
                 detents: [.large],
-                cornerRadius: 36
+                cornerRadius: OhanaRadius.sheetPage
             )
         }
     }
@@ -177,15 +177,15 @@ struct AppRouteLoadingShell: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 14) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous)
                     .fill(Color.ohanaGlassStroke.opacity(0.18))
                     .frame(width: 82, height: 8)
 
                 VStack(spacing: 9) {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                         .fill(Color.ohanaCardSurface.opacity(0.82))
                         .frame(width: 186, height: 12)
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                         .fill(Color.ohanaCardSurface.opacity(0.58))
                         .frame(width: 132, height: 10)
                 }
@@ -233,11 +233,11 @@ private extension AppRoute {
     var presentationName: String {
         switch self {
         case .petProfile:
-            return "petProfile"
+            "petProfile"
         case .humanProfile:
-            return "humanProfile"
+            "humanProfile"
         case .plantProfile:
-            return "plantProfile"
+            "plantProfile"
         }
     }
 }
@@ -246,85 +246,85 @@ private extension AppSheetRoute {
     var presentationName: String {
         switch self {
         case .accountSwitcher:
-            return "accountSwitcher"
+            "accountSwitcher"
         case .addEntity:
-            return "addEntity"
+            "addEntity"
         case .calendar:
-            return "calendar"
+            "calendar"
         case .coconutLog:
-            return "coconutLog"
+            "coconutLog"
         case .coconutShop:
-            return "coconutShop"
+            "coconutShop"
         case .crewRoster:
-            return "crewRoster"
+            "crewRoster"
         case .functionMenu:
-            return "functionMenu"
+            "functionMenu"
         case .petAllFeatures:
-            return "petAllFeatures"
+            "petAllFeatures"
         case .petBasicInfo:
-            return "petBasicInfo"
+            "petBasicInfo"
         case .petFood:
-            return "petFood"
+            "petFood"
         case .petWeight:
-            return "petWeight"
+            "petWeight"
         case .petExpense:
-            return "petExpense"
+            "petExpense"
         case .petFeed:
-            return "petFeed"
+            "petFeed"
         case .petWater:
-            return "petWater"
+            "petWater"
         case .petPotty:
-            return "petPotty"
+            "petPotty"
         case .petLitter:
-            return "petLitter"
+            "petLitter"
         case .petPlay:
-            return "petPlay"
+            "petPlay"
         case .petHygiene:
-            return "petHygiene"
+            "petHygiene"
         case .petWalkSummary:
-            return "petWalkSummary"
+            "petWalkSummary"
         case .petHealth:
-            return "petHealth"
+            "petHealth"
         case .petMedication:
-            return "petMedication"
+            "petMedication"
         case .petMomentHistory:
-            return "petMomentHistory"
+            "petMomentHistory"
         case .petDocuments:
-            return "petDocuments"
+            "petDocuments"
         case .petAchievements:
-            return "petAchievements"
+            "petAchievements"
         case .petRetention:
-            return "petRetention"
+            "petRetention"
         case .petBondVault:
-            return "petBondVault"
+            "petBondVault"
         case .humanAllFeatures:
-            return "humanAllFeatures"
+            "humanAllFeatures"
         case .humanBasicInfo:
-            return "humanBasicInfo"
+            "humanBasicInfo"
         case .humanMedication:
-            return "humanMedication"
+            "humanMedication"
         case .humanWeight:
-            return "humanWeight"
+            "humanWeight"
         case .humanWorkout:
-            return "humanWorkout"
+            "humanWorkout"
         case .humanWorkoutDashboard:
-            return "humanWorkoutDashboard"
+            "humanWorkoutDashboard"
         case .humanMetrics:
-            return "humanMetrics"
+            "humanMetrics"
         case .humanReport:
-            return "humanReport"
+            "humanReport"
         case .humanExpense:
-            return "humanExpense"
+            "humanExpense"
         case .humanWishlist:
-            return "humanWishlist"
+            "humanWishlist"
         case .humanNote:
-            return "humanNote"
+            "humanNote"
         case .requiredAccountSwitch:
-            return "requiredAccountSwitch"
+            "requiredAccountSwitch"
         case .settings:
-            return "settings"
+            "settings"
         case .streakDetail:
-            return "streakDetail"
+            "streakDetail"
         }
     }
 }
@@ -333,11 +333,11 @@ private extension AppFullScreenRoute {
     var presentationName: String {
         switch self {
         case .oasisReward:
-            return "oasisReward"
+            "oasisReward"
         case .requiredHumanProfile:
-            return "requiredHumanProfile"
+            "requiredHumanProfile"
         case .walk:
-            return "walk"
+            "walk"
         }
     }
 }
@@ -346,7 +346,7 @@ private extension AppOverlayRoute {
     var presentationName: String {
         switch self {
         case .quickMoment:
-            return "quickMoment"
+            "quickMoment"
         }
     }
 }

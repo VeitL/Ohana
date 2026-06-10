@@ -5,12 +5,12 @@
 //  Cross-pet archive and memory overview for GO home FAB and feature groups.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct IslandRetentionDashboardContentView: View {
     var standalone: Bool = true
-    var onOpenPet: ((Pet) -> Void)? = nil
+    var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
 
     @Environment(\.dismiss) private var dismiss
@@ -126,10 +126,10 @@ struct IslandRetentionDashboardContentView: View {
     private var treeHero: some View {
         HStack(spacing: 16) {
             ZStack(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous)
                     .fill(Color.goLime.opacity(0.72))
                     .frame(width: 18, height: 64 * growProgress)
-                ForEach(0..<5, id: \.self) { index in
+                ForEach(0 ..< 5, id: \.self) { index in
                     Circle()
                         .fill(index < Int(averageScore.rounded()) ? Color.goLime.opacity(0.82) : Color.white.opacity(0.12)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                         .frame(width: 22 + CGFloat(index) * 9, height: 22 + CGFloat(index) * 9)
@@ -161,7 +161,7 @@ struct IslandRetentionDashboardContentView: View {
         .padding(18)
         .background(
             LinearGradient(colors: [Color.goLime.opacity(0.19), Color.white.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing), // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
     }
 
@@ -186,7 +186,7 @@ struct IslandRetentionDashboardContentView: View {
         .foregroundStyle(color)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(color.opacity(0.13), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(color.opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private var archiveRows: some View {
@@ -227,7 +227,7 @@ struct IslandRetentionDashboardContentView: View {
                             .foregroundStyle(.white.opacity(0.3)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                     }
                     .padding(14)
-                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 20, style: .continuous)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -235,7 +235,7 @@ struct IslandRetentionDashboardContentView: View {
     }
 
     @ViewBuilder
-    private func selectorChip<A: View>(title: String, avatar: () -> A, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    private func selectorChip(title: String, avatar: () -> some View, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 avatar()

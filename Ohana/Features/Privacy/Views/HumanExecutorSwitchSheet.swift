@@ -10,7 +10,7 @@ import SwiftUI
 
 struct HumanExecutorSwitchSheet: View {
     let humans: [Human]
-    var onSwitched: (() -> Void)? = nil
+    var onSwitched: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -59,7 +59,7 @@ struct HumanExecutorSwitchSheet: View {
                 .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text("切换执行人")
                     .font(OhanaFont.title3(.black))
@@ -127,10 +127,10 @@ struct HumanExecutorSwitchSheet: View {
             .padding(12)
             .background(
                 Color.primary.opacity(pendingHuman?.id == human.id ? 0.11 : (isActive ? 0.09 : 0.055)),
-                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+                in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .strokeBorder(pendingHuman?.id == human.id ? Color.goPrimary.opacity(0.52) : Color.primary.opacity(0.08), lineWidth: 1)
             }
         }
@@ -171,9 +171,9 @@ struct HumanExecutorSwitchSheet: View {
             }
         }
         .padding(14)
-        .background(Color.primary.opacity(0.075), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.primary.opacity(0.075), in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
         }
     }
@@ -206,12 +206,12 @@ struct HumanExecutorSwitchSheet: View {
         switch HumanPrivacyCommandExecutor(context: modelContext, services: appServices).verifyPasscode(pin, for: human, now: now) {
         case .success, .noPasscode:
             switchTo(human)
-        case .incorrect(let remaining):
+        case let .incorrect(remaining):
             pin = ""
             isError = true
             statusMessage = "密码不正确，还可尝试 \(remaining) 次"
             UINotificationFeedbackGenerator().notificationOccurred(.error)
-        case .locked(let until):
+        case let .locked(until):
             pin = ""
             isError = true
             statusMessage = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"

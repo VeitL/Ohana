@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetHealthLogCard: View {
     let pet: Pet
@@ -45,7 +45,7 @@ struct PetHealthLogCard: View {
                             let daysUntil = Calendar.current.dateComponents([.day], from: Date(), to: expirationDate).day ?? 0
                             let isExpired = daysUntil <= 0
                             let isUrgent = daysUntil <= 7 && daysUntil > 0
-                            
+
                             HStack(spacing: 4) {
                                 Image(systemName: isExpired ? "exclamationmark.triangle.fill" : "calendar")
                                     .font(OhanaFont.adaptive(size: 10))
@@ -56,13 +56,13 @@ struct PetHealthLogCard: View {
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background((isExpired ? Color.goRed : (isUrgent ? Color.goYellow : .primary.opacity(0.08))).opacity(0.2), in: Capsule())
                         }
-                        
+
                         // 显示下次体检提醒（仅体检记录）
                         if log.healthLogType == .checkup, let nextCheckupDate = log.nextCheckupDate {
                             let daysUntil = Calendar.current.dateComponents([.day], from: Date(), to: nextCheckupDate).day ?? 0
                             let isOverdue = daysUntil <= 0
                             let isSoon = daysUntil <= 30 && daysUntil > 0
-                            
+
                             HStack(spacing: 4) {
                                 Image(systemName: "bell.circle").accessibilityHidden(true)
                                     .font(OhanaFont.adaptive(size: 10))
@@ -112,7 +112,7 @@ struct PetHealthLogCard: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
         .navigationDestination(isPresented: $showingAllLogs) {
             HealthLogListView(pet: pet)
         }
@@ -219,6 +219,6 @@ struct HealthLogListView: View {
             }
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.control)
     }
 }

@@ -376,26 +376,24 @@ enum ExpandedQuickActionExecutor {
         feedback: (Feedback) -> Void,
         careEvents: CareEventRecording
     ) {
-        let reward: QuestManager.OhanaActionType
-        switch type {
+        let reward: QuestManager.OhanaActionType = switch type {
         case .play:
-            reward = .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 互动奖励")
+            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 互动奖励")
         case .filterClean:
-            reward = .general(humanReward: 25, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理滤材报酬")
+            .general(humanReward: 25, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理滤材报酬")
         case .cageCleaning:
-            reward = .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理鸟笼奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理鸟笼奖励")
         case .freeFlight:
-            reward = .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 放飞互动奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 放飞互动奖励")
         case .misting:
-            reward = .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 保湿打卡奖励")
+            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 保湿打卡奖励")
         case .substrateChange:
-            reward = .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 环境清洁奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 环境清洁奖励")
         default:
-            reward = .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 打卡奖励")
+            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 打卡奖励")
         }
         let got = careEvents.recordCare(pet: pet, type: type, amountMl: 0, context: modelContext, executorId: executorId, reward: reward, quality: .none, date: Date())
         let delta = got.humanGot + got.petGot
         feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "\(type.emoji) +\(delta)🥥" : nil))
     }
-
 }

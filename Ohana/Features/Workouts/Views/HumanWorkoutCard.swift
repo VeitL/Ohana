@@ -4,9 +4,9 @@
 //
 //  U14: 人类运动卡片 + Apple Health 同步 (优雅降级 - 待开发)
 
-import SwiftUI
-import SwiftData
 import Combine
+import SwiftData
+import SwiftUI
 
 // MARK: - HumanWorkoutCard
 struct HumanWorkoutCard: View {
@@ -77,7 +77,7 @@ struct HumanWorkoutCard: View {
                 recentLogsSection
             }
         }
-        .goIslandModuleCard(cornerRadius: 20)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.input)
         .overlay(alignment: .top) {
             if toastVisible {
                 rewardToastBanner
@@ -88,7 +88,7 @@ struct HumanWorkoutCard: View {
             await hkManager.requestAuthorization()
             await hkManager.fetchTodayStats(pets: pets)
         }
-        .onReceive(hkManager.$rewardToast.compactMap { $0 }) { toast in
+        .onReceive(hkManager.$rewardToast.compactMap(\.self)) { toast in
             toastMessage = toast.message
             toastColor = toast.color
             withAnimation(GoMotion.feedback) { toastVisible = true }
@@ -152,7 +152,7 @@ struct HumanWorkoutCard: View {
         }
     }
 
-    private func workoutRow(icon: String, name: String, duration: Int, distance: Double, calories: Int, date: Date, colorHex: String, isHealthKit: Bool) -> some View {
+    private func workoutRow(icon: String, name: String, duration: Int, distance: Double, calories: Int, date: Date, colorHex: String, isHealthKit _: Bool) -> some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
@@ -227,7 +227,7 @@ struct HumanWorkoutCard: View {
 // MARK: - Add Workout Sheet
 struct AddWorkoutSheet: View {
     let human: Human
-    var onSaved: (() -> Void)? = nil
+    var onSaved: (() -> Void)?
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -265,7 +265,7 @@ struct AddWorkoutSheet: View {
                                 }
                             }
                         }
-                        .padding(16).goIslandModuleCard(cornerRadius: 20)
+                        .padding(16).goIslandModuleCard(cornerRadius: OhanaRadius.input)
 
                         // 时长/距离/卡路里
                         VStack(spacing: 12) {
@@ -273,7 +273,7 @@ struct AddWorkoutSheet: View {
                             workoutField(icon: "map", label: "距离（公里，可选）", placeholder: "0.0", text: $distanceStr, color: .goCardCyan)
                             workoutField(icon: "flame", label: "卡路里（可选）", placeholder: "0", text: $caloriesStr, color: .goOrange)
                         }
-                        .padding(16).goIslandModuleCard(cornerRadius: 20)
+                        .padding(16).goIslandModuleCard(cornerRadius: OhanaRadius.input)
 
                         // 日期
                         HStack {
@@ -289,7 +289,7 @@ struct AddWorkoutSheet: View {
                                 .tint(Color.goPrimary)
                                 .labelsHidden()
                         }
-                        .padding(16).goIslandModuleCard(cornerRadius: 20)
+                        .padding(16).goIslandModuleCard(cornerRadius: OhanaRadius.input)
 
                         // 备注
                         VStack(alignment: .leading, spacing: 8) {
@@ -302,9 +302,9 @@ struct AddWorkoutSheet: View {
                                 .scrollContentBackground(.hidden)
                                 .frame(minHeight: 80)
                                 .padding(10)
-                                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                         }
-                        .padding(16).goIslandModuleCard(cornerRadius: 20)
+                        .padding(16).goIslandModuleCard(cornerRadius: OhanaRadius.input)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)
                 }
@@ -342,10 +342,10 @@ struct AddWorkoutSheet: View {
             .padding(.vertical, 12)
             .background(
                 isSelected ? color.opacity(0.2) : Color.primary.opacity(0.06),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                     .strokeBorder(isSelected ? color.opacity(0.45) : .clear, lineWidth: 1)
             )
         }
@@ -358,7 +358,7 @@ struct AddWorkoutSheet: View {
                 .font(OhanaFont.adaptive(size: 28, weight: .bold))
                 .foregroundStyle(Color(hex: selectedType.colorHex))
                 .frame(width: 56, height: 56)
-                .background(Color(hex: selectedType.colorHex).opacity(0.16), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color(hex: selectedType.colorHex).opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
             VStack(alignment: .leading, spacing: 5) {
                 Text("\(human.name) 的\(selectedType.rawValue)")
@@ -371,7 +371,7 @@ struct AddWorkoutSheet: View {
             Spacer()
         }
         .padding(16)
-        .goIslandModuleCard(cornerRadius: 22)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var previewSubtitle: String {
@@ -402,7 +402,7 @@ struct AddWorkoutSheet: View {
                 valueFont: OhanaFont.callout(.bold),
                 valueAlignment: .trailing,
                 fill: Color.ohanaControlFill,
-                cornerRadius: 14,
+                cornerRadius: OhanaRadius.row,
                 horizontalPadding: 10,
                 verticalPadding: 6
             )
@@ -499,7 +499,7 @@ struct HumanWorkoutHistoryView: View {
                                     .padding(.vertical, 12)
                                     .background(
                                         Color.ohanaControlFill,
-                                        in: RoundedRectangle(cornerRadius: 12)
+                                        in: RoundedRectangle(cornerRadius: OhanaRadius.chip)
                                     )
                                 }
                             }
@@ -574,7 +574,7 @@ struct HumanWorkoutHistoryView: View {
             summaryCell(value: String(format: "%.1f", sortedLogs.reduce(0) { $0 + $1.distanceKm }), label: "总公里", color: .goOrange)
         }
         .padding(.vertical, 14)
-        .goIslandModuleCard(cornerRadius: 20)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.input)
     }
 
     private func summaryCell(value: String, label: String, color: Color) -> some View {
@@ -589,7 +589,6 @@ struct HumanWorkoutHistoryView: View {
         .frame(maxWidth: .infinity)
     }
 
-    
     private var manualSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("手动记录")
@@ -646,7 +645,7 @@ struct HumanWorkoutHistoryView: View {
                     }
                 }
             }
-            .goIslandModuleCard(cornerRadius: 20)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.input)
             .padding(.horizontal, 16)
         }
     }

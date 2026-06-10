@@ -38,20 +38,18 @@ extension OasisUpgradeRewardService {
     ) -> OasisCritterLifecycleSnapshot {
         _ = context
         let state = critter.lifeState
-        let remainingHours: Int?
-        if state == .critical, let criticalStartedAt = critter.criticalStartedAt {
-            remainingHours = max(0, criticalToDeathHours - hoursBetween(criticalStartedAt, now))
+        let remainingHours: Int? = if state == .critical, let criticalStartedAt = critter.criticalStartedAt {
+            max(0, criticalToDeathHours - hoursBetween(criticalStartedAt, now))
         } else {
-            remainingHours = nil
+            nil
         }
-        let urgency: Int
-        switch state {
-        case .healthy: urgency = 0
-        case .needsCare: urgency = 1
-        case .atRisk: urgency = 2
-        case .sick: urgency = 3
-        case .critical: urgency = 4
-        case .dead: urgency = 5
+        let urgency = switch state {
+        case .healthy: 0
+        case .needsCare: 1
+        case .atRisk: 2
+        case .sick: 3
+        case .critical: 4
+        case .dead: 5
         }
         return OasisCritterLifecycleSnapshot(
             state: state,

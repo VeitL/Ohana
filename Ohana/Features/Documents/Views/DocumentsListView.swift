@@ -5,8 +5,8 @@
 //  V4 protection cockpit for documents and insurance.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct DocumentsListView: View {
     let pet: Pet
@@ -65,7 +65,7 @@ struct DocumentsListView: View {
                         withAnimation(GoMotion.page) { self.activePopup = nil }
                     }
                     .zIndex(30)
-                case .editDocument(let doc):
+                case let .editDocument(doc):
                     ProtectionDocumentPopup(pet: pet, existing: doc) {
                         withAnimation(GoMotion.page) { self.activePopup = nil }
                     }
@@ -75,7 +75,7 @@ struct DocumentsListView: View {
                         withAnimation(GoMotion.page) { self.activePopup = nil }
                     }
                     .zIndex(31)
-                case .editInsurance(let insurance):
+                case let .editInsurance(insurance):
                     ProtectionInsurancePopup(pet: pet, existing: insurance) {
                         withAnimation(GoMotion.page) { self.activePopup = nil }
                     }
@@ -284,13 +284,13 @@ private enum ActiveProtectionPopup: Identifiable {
     var id: String {
         switch self {
         case .addDocument:
-            return "addDocument"
-        case .editDocument(let doc):
-            return "editDocument-\(doc.id.uuidString)"
+            "addDocument"
+        case let .editDocument(doc):
+            "editDocument-\(doc.id.uuidString)"
         case .addInsurance:
-            return "addInsurance"
-        case .editInsurance(let insurance):
-            return "editInsurance-\(insurance.id.uuidString)"
+            "addInsurance"
+        case let .editInsurance(insurance):
+            "editInsurance-\(insurance.id.uuidString)"
         }
     }
 }

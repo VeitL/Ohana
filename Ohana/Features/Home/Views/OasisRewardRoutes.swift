@@ -19,19 +19,19 @@ enum OasisSheetRoute: Identifiable, Equatable {
     var id: String {
         switch self {
         case .coconutRules:
-            return "coconut-rules"
+            "coconut-rules"
         case .achievements:
-            return "achievements"
+            "achievements"
         case .inventory:
-            return "inventory"
+            "inventory"
         case let .coconutShop(category):
-            return "coconut-shop-\(category.rawValue)"
+            "coconut-shop-\(category.rawValue)"
         case .gacha:
-            return "gacha"
+            "gacha"
         case .checkInDetail:
-            return "check-in-detail"
+            "check-in-detail"
         case .critterCodex:
-            return "critter-codex"
+            "critter-codex"
         }
     }
 }
@@ -42,7 +42,7 @@ enum OasisFullScreenRoute: Identifiable, Equatable {
     var id: String {
         switch self {
         case .coconutLog:
-            return "coconut-log"
+            "coconut-log"
         }
     }
 }
@@ -53,14 +53,14 @@ enum OasisOverlayRoute: Identifiable, Equatable {
     var id: UUID {
         switch self {
         case let .upgradeReward(routeID, _):
-            return routeID
+            routeID
         }
     }
 
     var upgradeReward: OasisOpenedUpgradeReward? {
         switch self {
         case let .upgradeReward(_, reward):
-            return reward
+            reward
         }
     }
 }
@@ -71,14 +71,14 @@ enum OasisConfirmationRoute: Identifiable, Equatable {
     var id: String {
         switch self {
         case let .makeup(date):
-            return "makeup-\(date)"
+            "makeup-\(date)"
         }
     }
 
     var makeupDate: String? {
         switch self {
         case let .makeup(date):
-            return date
+            date
         }
     }
 }

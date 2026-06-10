@@ -41,7 +41,7 @@ enum FocusPopoutImageCache {
         }
         guard !decodePayloads.isEmpty else { return didChange }
 
-        let decoded = await Task.detached(priority: .userInitiated) {
+        let decoded = await Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
             decodePayloads.map { id, data, signature in
                 (id, signature, decodedImage(from: data))
             }
@@ -69,15 +69,15 @@ enum FocusPopoutImageCache {
         evictionGeneration &+= 1
     }
 
-#if DEBUG
-    static func resetForTesting() {
-        entries.removeAll(keepingCapacity: false)
-        evictionGeneration &+= 1
-    }
-#endif
+    #if DEBUG
+        static func resetForTesting() {
+            entries.removeAll(keepingCapacity: false)
+            evictionGeneration &+= 1
+        }
+    #endif
 
-    nonisolated private static func decodedImage(from data: Data) -> UIImage? {
-        let raw = UIImage(data: data)
+    private nonisolated static func decodedImage(from data: Data) -> UIImage? {
+        let raw = UIImage(data: data) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
         return raw.flatMap { ImageCutoutService.trimmedTransparentSubjectImage(from: $0) } ?? raw
     }
 }

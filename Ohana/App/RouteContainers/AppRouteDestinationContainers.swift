@@ -590,7 +590,7 @@ private struct AppSheetRouteDestination: View {
                     coordinator.presentCoconutShop(category: category)
                 }
             )
-                .ohanaSheetPagePresentation()
+            .ohanaSheetPagePresentation()
         }
     }
 
@@ -599,61 +599,59 @@ private struct AppSheetRouteDestination: View {
     }
 
     private func openPetAllFeatureDestination(_ petID: UUID, destination: PetAllFeatureDestination) {
-        let route: AppSheetRoute
-        switch destination {
+        let route: AppSheetRoute = switch destination {
         case .health:
-            route = .petHealth(petID, initialSection: nil)
+            .petHealth(petID, initialSection: nil)
         case .medications:
-            route = .petMedication(petID)
+            .petMedication(petID)
         case .food:
-            route = .petFood(petID)
+            .petFood(petID)
         case .hygiene:
-            route = .petHygiene(petID)
+            .petHygiene(petID)
         case .walks:
-            route = .petWalkSummary(petID)
+            .petWalkSummary(petID)
         case .potty:
-            route = .petPotty(petID)
+            .petPotty(petID)
         case .basicInfo:
-            route = .petBasicInfo(petID)
+            .petBasicInfo(petID)
         case .documents:
-            route = .petDocuments(petID)
+            .petDocuments(petID)
         case .moments, .timeline:
-            route = .petMomentHistory(petID)
+            .petMomentHistory(petID)
         case .achievements:
-            route = .petAchievements(petID)
+            .petAchievements(petID)
         case .retention:
-            route = .petRetention(petID)
+            .petRetention(petID)
         case .weight:
-            route = .petWeight(petID)
+            .petWeight(petID)
         case .expense:
-            route = .petExpense(petID)
+            .petExpense(petID)
         case .bondVault:
-            route = .petBondVault(petID)
+            .petBondVault(petID)
         }
         presentFeatureRouteAfterTap(route)
     }
 
     private func openHumanAllFeatureDestination(_ humanID: UUID, destination: HumanAllFeatureDestination) {
-        let route: AppSheetRoute
-        switch destination {
+        let route: AppSheetRoute = switch destination {
         case .basicInfo:
-            route = .humanBasicInfo(humanID)
+            .humanBasicInfo(humanID)
         case .weight:
-            route = .humanWeight(humanID)
+            .humanWeight(humanID)
         case .workout:
-            route = .humanWorkoutDashboard(humanID)
+            .humanWorkoutDashboard(humanID)
         case .metrics:
-            route = .humanMetrics(humanID)
+            .humanMetrics(humanID)
         case .medication:
-            route = .humanMedication(humanID)
+            .humanMedication(humanID)
         case .report:
-            route = .humanReport(humanID)
+            .humanReport(humanID)
         case .expense:
-            route = .humanExpense(humanID)
+            .humanExpense(humanID)
         case .wishlist:
-            route = .humanWishlist(humanID)
+            .humanWishlist(humanID)
         case .notes:
-            route = .humanNote(humanID)
+            .humanNote(humanID)
         }
         presentFeatureRouteAfterTap(route)
     }

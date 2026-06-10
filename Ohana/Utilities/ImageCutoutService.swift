@@ -52,7 +52,7 @@ final class ImageCutoutService {
 
     // MARK: - 将 mask 应用到原图，输出透明背景 UIImage
     private func apply(mask: CVPixelBuffer, to cgImage: CGImage) -> UIImage? {
-        let width  = CVPixelBufferGetWidth(mask)
+        let width = CVPixelBufferGetWidth(mask)
         let height = CVPixelBufferGetHeight(mask)
 
         // 创建 RGBA 输出 context
@@ -104,16 +104,16 @@ final class ImageCutoutService {
         let sourceBytes = sourceData.bindMemory(to: UInt8.self, capacity: width * height * 4)
 
         // 逐像素合成：mask=255 保留，mask=0 透明
-        for row in 0..<height {
+        for row in 0 ..< height {
             let maskRowPtr = maskBase.advanced(by: row * maskBytesPerRow).bindMemory(to: UInt8.self, capacity: width)
-            for col in 0..<width {
-                let maskVal  = maskRowPtr[col]
-                let srcIdx   = (row * width + col) * 4
-                let alpha    = maskVal > 128 ? UInt8(255) : UInt8(0)
-                outputBytes[srcIdx]     = sourceBytes[srcIdx]       // R
-                outputBytes[srcIdx + 1] = sourceBytes[srcIdx + 1]   // G
-                outputBytes[srcIdx + 2] = sourceBytes[srcIdx + 2]   // B
-                outputBytes[srcIdx + 3] = alpha                     // A
+            for col in 0 ..< width {
+                let maskVal = maskRowPtr[col]
+                let srcIdx = (row * width + col) * 4
+                let alpha = maskVal > 128 ? UInt8(255) : UInt8(0)
+                outputBytes[srcIdx] = sourceBytes[srcIdx] // R
+                outputBytes[srcIdx + 1] = sourceBytes[srcIdx + 1] // G
+                outputBytes[srcIdx + 2] = sourceBytes[srcIdx + 2] // B
+                outputBytes[srcIdx + 3] = alpha // A
             }
         }
 
@@ -125,14 +125,14 @@ final class ImageCutoutService {
     /// 检测 Data 是否真的包含透明像素。普通相册 PNG 往往带 alpha 通道但全部不透明，
     /// 不能把它误判成「粘贴主体」抠图。
     nonisolated static func isTransparentPNG(_ data: Data) -> Bool {
-        guard let image = UIImage(data: data) else { return false }
+        guard let image = UIImage(data: data) else { return false } // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
         return imageHasTransparentPixels(image)
     }
 
     nonisolated static func imageHasTransparentPixels(_ image: UIImage, alphaThreshold: UInt8 = 245) -> Bool {
         guard let cgImage = image.cgImage else { return false }
         let alpha = cgImage.alphaInfo
-        guard alpha != .none && alpha != .noneSkipFirst && alpha != .noneSkipLast else { return false }
+        guard alpha != .none, alpha != .noneSkipFirst, alpha != .noneSkipLast else { return false }
 
         let sourceW = cgImage.width
         let sourceH = cgImage.height
@@ -149,13 +149,13 @@ final class ImageCutoutService {
         return pixels.withUnsafeMutableBytes { rawBuffer in
             guard let baseAddress = rawBuffer.baseAddress,
                   let context = CGContext(
-                    data: baseAddress,
-                    width: sampleW,
-                    height: sampleH,
-                    bitsPerComponent: 8,
-                    bytesPerRow: bytesPerRow,
-                    space: CGColorSpaceCreateDeviceRGB(),
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                      data: baseAddress,
+                      width: sampleW,
+                      height: sampleH,
+                      bitsPerComponent: 8,
+                      bytesPerRow: bytesPerRow,
+                      space: CGColorSpaceCreateDeviceRGB(),
+                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
                   ) else {
                 return false
             }
@@ -171,9 +171,9 @@ final class ImageCutoutService {
             var opaqueMaxX = -1
             var opaqueMaxY = -1
 
-            for y in 0..<sampleH {
+            for y in 0 ..< sampleH {
                 let rowStart = y * bytesPerRow
-                for x in 0..<sampleW {
+                for x in 0 ..< sampleW {
                     let alpha = buffer[rowStart + x * 4 + 3]
                     if alpha < alphaThreshold {
                         transparentCount += 1
@@ -201,7 +201,7 @@ final class ImageCutoutService {
             // A rounded/circular real photo can have transparent corners while
             // still filling the card visually. Keep those as photo cards; reserve
             // popout rendering for meaningful transparent backdrops.
-            if fillsCanvas && transparentRatio < 0.28 {
+            if fillsCanvas, transparentRatio < 0.28 {
                 return false
             }
             return true
@@ -222,13 +222,13 @@ final class ImageCutoutService {
         let bounds = pixels.withUnsafeMutableBytes { rawBuffer -> CGRect? in
             guard let baseAddress = rawBuffer.baseAddress,
                   let context = CGContext(
-                    data: baseAddress,
-                    width: width,
-                    height: height,
-                    bitsPerComponent: 8,
-                    bytesPerRow: bytesPerRow,
-                    space: CGColorSpaceCreateDeviceRGB(),
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                      data: baseAddress,
+                      width: width,
+                      height: height,
+                      bitsPerComponent: 8,
+                      bytesPerRow: bytesPerRow,
+                      space: CGColorSpaceCreateDeviceRGB(),
+                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
                   ) else {
                 return nil
             }
@@ -242,9 +242,9 @@ final class ImageCutoutService {
             var maxX = -1
             var maxY = -1
 
-            for y in 0..<height {
+            for y in 0 ..< height {
                 let rowStart = y * bytesPerRow
-                for x in 0..<width {
+                for x in 0 ..< width {
                     let alpha = buffer[rowStart + x * bytesPerPixel + 3]
                     guard alpha > alphaThreshold else { continue }
                     minX = min(minX, x)
@@ -277,23 +277,23 @@ final class ImageCutoutService {
         guard cropW > 0, cropH > 0 else { return image }
 
         var croppedPixels = [UInt8](repeating: 0, count: cropW * cropH * bytesPerPixel)
-        for row in 0..<cropH {
+        for row in 0 ..< cropH {
             let srcStart = (cropY + row) * bytesPerRow + cropX * bytesPerPixel
             let dstStart = row * cropW * bytesPerPixel
-            croppedPixels[dstStart..<(dstStart + cropW * bytesPerPixel)] =
-                pixels[srcStart..<(srcStart + cropW * bytesPerPixel)]
+            croppedPixels[dstStart ..< (dstStart + cropW * bytesPerPixel)] =
+                pixels[srcStart ..< (srcStart + cropW * bytesPerPixel)]
         }
 
         return croppedPixels.withUnsafeMutableBytes { rawBuffer -> UIImage? in
             guard let baseAddress = rawBuffer.baseAddress,
                   let context = CGContext(
-                    data: baseAddress,
-                    width: cropW,
-                    height: cropH,
-                    bitsPerComponent: 8,
-                    bytesPerRow: cropW * bytesPerPixel,
-                    space: CGColorSpaceCreateDeviceRGB(),
-                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                      data: baseAddress,
+                      width: cropW,
+                      height: cropH,
+                      bitsPerComponent: 8,
+                      bytesPerRow: cropW * bytesPerPixel,
+                      space: CGColorSpaceCreateDeviceRGB(),
+                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
                   ),
                   let croppedCGImage = context.makeImage()
             else {

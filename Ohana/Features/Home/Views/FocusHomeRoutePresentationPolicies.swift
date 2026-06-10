@@ -11,27 +11,27 @@ extension AppPresentationPolicyProvider {
     static func policy(for route: HomeModalRoute) -> AppPresentationPolicy {
         switch route {
         case .accountSwitcher:
-            return AppPresentationPolicy(
+            AppPresentationPolicy(
                 surface: .compactSheet,
                 loading: .shellFirst(delayMS: 64),
                 instrumentationName: "home.accountSwitcher",
                 detents: [.medium, .large],
-                cornerRadius: 32
+                cornerRadius: OhanaRadius.sheetCompact
             )
         case .functionMenu:
-            return homeSheetPagePolicy("home.functionMenu")
+            homeSheetPagePolicy("home.functionMenu")
         case .streakDetail:
-            return homeSheetPagePolicy("home.streakDetail")
+            homeSheetPagePolicy("home.streakDetail")
         case .addEntity:
-            return homeSheetPagePolicy("home.addEntity")
+            homeSheetPagePolicy("home.addEntity")
         case .coconutLog:
-            return homeSheetPagePolicy("home.coconutLog")
+            homeSheetPagePolicy("home.coconutLog")
         case .crewRoster:
-            return homeSheetPagePolicy("home.crewRoster")
+            homeSheetPagePolicy("home.crewRoster")
         case .calendar:
-            return homeSheetPagePolicy("home.calendar")
+            homeSheetPagePolicy("home.calendar")
         case .settings:
-            return homeSheetPagePolicy("home.settings")
+            homeSheetPagePolicy("home.settings")
         }
     }
 
@@ -73,7 +73,7 @@ extension AppPresentationPolicyProvider {
             loading: .shellFirst(delayMS: 80),
             instrumentationName: name,
             detents: [.large],
-            cornerRadius: 36
+            cornerRadius: OhanaRadius.sheetPage
         )
     }
 }
@@ -82,65 +82,65 @@ private extension HomeSheetRoute {
     var presentationName: String {
         switch self {
         case .petAllFeatures:
-            return "petAllFeatures"
+            "petAllFeatures"
         case .humanAllFeatures:
-            return "humanAllFeatures"
+            "humanAllFeatures"
         case .petBasicInfo:
-            return "petBasicInfo"
+            "petBasicInfo"
         case .humanBasicInfo:
-            return "humanBasicInfo"
+            "humanBasicInfo"
         case .petFood:
-            return "petFood"
+            "petFood"
         case .petWeight:
-            return "petWeight"
+            "petWeight"
         case .petExpense:
-            return "petExpense"
+            "petExpense"
         case .petFeed:
-            return "petFeed"
+            "petFeed"
         case .petWater:
-            return "petWater"
+            "petWater"
         case .petPotty:
-            return "petPotty"
+            "petPotty"
         case .petLitter:
-            return "petLitter"
+            "petLitter"
         case .petPlay:
-            return "petPlay"
+            "petPlay"
         case .petHygiene:
-            return "petHygiene"
+            "petHygiene"
         case .petWalkSummary:
-            return "petWalkSummary"
+            "petWalkSummary"
         case .petHealth:
-            return "petHealth"
+            "petHealth"
         case .petMedication:
-            return "petMedication"
+            "petMedication"
         case .petMomentHistory:
-            return "petMomentHistory"
+            "petMomentHistory"
         case .petDocuments:
-            return "petDocuments"
+            "petDocuments"
         case .petAchievements:
-            return "petAchievements"
+            "petAchievements"
         case .petRetention:
-            return "petRetention"
+            "petRetention"
         case .petBondVault:
-            return "petBondVault"
+            "petBondVault"
         case .humanMedication:
-            return "humanMedication"
+            "humanMedication"
         case .humanWeight:
-            return "humanWeight"
+            "humanWeight"
         case .humanWorkout:
-            return "humanWorkout"
+            "humanWorkout"
         case .humanWorkoutDashboard:
-            return "humanWorkoutDashboard"
+            "humanWorkoutDashboard"
         case .humanMetrics:
-            return "humanMetrics"
+            "humanMetrics"
         case .humanReport:
-            return "humanReport"
+            "humanReport"
         case .humanExpense:
-            return "humanExpense"
+            "humanExpense"
         case .humanWishlist:
-            return "humanWishlist"
+            "humanWishlist"
         case .humanNote:
-            return "humanNote"
+            "humanNote"
         }
     }
 }
@@ -149,9 +149,9 @@ private extension HomeFullScreenRoute {
     var presentationName: String {
         switch self {
         case .walk:
-            return "walk"
+            "walk"
         case .oasisReward:
-            return "oasisReward"
+            "oasisReward"
         }
     }
 }
@@ -160,8 +160,7 @@ private extension HomeOverlayRoute {
     var presentationName: String {
         switch self {
         case .quickMoment:
-            return "quickMoment"
+            "quickMoment"
         }
     }
 }
-

@@ -4,8 +4,8 @@ import SwiftUI
 struct PetHealthDetailView: View {
     let pet: Pet
     var isModal: Bool = false
-    var initialSection: PetHealthInitialSection? = nil
-    var onFullDismiss: (() -> Void)? = nil
+    var initialSection: PetHealthInitialSection?
+    var onFullDismiss: (() -> Void)?
 
     @Query(sort: \Event.startDate) private var allEvents: [Event]
 

@@ -6,8 +6,8 @@
 //  放置在 NavigationStack toolbar leading 位置
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 /// 单字段隐私开关胶囊按钮
 /// - 仅当 activeHumanId == human.id 时允许切换（即本人查看时）
@@ -25,9 +25,11 @@ struct HumanPrivacyToggleButton: View {
     private var isFieldPrivate: Bool {
         human.privateFields.contains(field.rawValue)
     }
+
     private var displayIsPrivate: Bool {
         optimisticIsPrivate ?? isFieldPrivate
     }
+
     private var isOwner: Bool {
         UUID(uuidString: activeHumanIdStr) == human.id
     }
@@ -128,7 +130,7 @@ struct HumanPrivateDataNotice: View {
     }
 
     var body: some View {
-        if isOwner && isFieldPrivate {
+        if isOwner, isFieldPrivate {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "lock.shield.fill").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 13, weight: .black))
@@ -149,9 +151,9 @@ struct HumanPrivateDataNotice: View {
                 Spacer(minLength: 0)
             }
             .padding(12)
-            .background(Color.goYellow.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.goYellow.opacity(0.10), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .strokeBorder(Color.goYellow.opacity(0.18), lineWidth: 1)
             )
         }

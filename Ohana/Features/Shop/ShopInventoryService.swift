@@ -16,7 +16,7 @@ nonisolated protocol ShopInventoryManaging {
     func consumableSnapshot() -> ShopConsumableInventorySnapshot
 }
 
-nonisolated final class UserDefaultsShopInventoryManager: ShopInventoryManaging {
+final nonisolated class UserDefaultsShopInventoryManager: ShopInventoryManaging {
     private enum Keys {
         static let doubleRewardBoost = "shop_boostDoubleActive"
         static let streakShieldExpiry = "shop_streakShieldExpiry"

@@ -19,7 +19,7 @@ struct HumanPasscodePad: View {
     var body: some View {
         VStack(spacing: 14) {
             HStack(spacing: 9) {
-                ForEach(0..<4, id: \.self) { index in
+                ForEach(0 ..< 4, id: \.self) { index in
                     Circle()
                         .fill(index < pin.count ? accent : Color.primary.opacity(0.16))
                         .frame(width: 12, height: 12) // a11y: allow decorative non-interactive frame; hit area handled by parent
@@ -46,7 +46,7 @@ struct HumanPasscodePad: View {
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)
-                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }

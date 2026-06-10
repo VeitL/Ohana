@@ -9,7 +9,7 @@ extension QuickFeedDetailContent {
                     .font(OhanaFont.adaptive(size: 16, weight: .black))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
@@ -24,7 +24,7 @@ extension QuickFeedDetailContent {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(12)
-            .feedFlatBlockSurface(cornerRadius: 18)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -40,7 +40,7 @@ extension QuickFeedDetailContent {
             Spacer()
         }
         .padding(14)
-        .feedFlatBlockSurface(cornerRadius: 18)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
     }
 
     func feedLogRow(_ log: PetCareLog, compact: Bool, solidSurface _: Bool = false) -> some View {
@@ -88,7 +88,7 @@ extension QuickFeedDetailContent {
         .padding(compact ? 0 : 12)
         .background {
             if !compact {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.ohanaCardSurface)
             }
         }
@@ -113,7 +113,7 @@ extension QuickFeedDetailContent {
                 .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(tint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(statusTitle)
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
@@ -123,7 +123,7 @@ extension QuickFeedDetailContent {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            if allowsCatchUp && overdue && canCatchUpPlanReminder(reminder) {
+            if allowsCatchUp, overdue, canCatchUpPlanReminder(reminder) {
                 Button {
                     completePlannedFeed(reminder)
                 } label: {
@@ -138,7 +138,7 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 18)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
     }
 
     func foodRecordRow(_ record: PetFoodRecord) -> some View {
@@ -148,7 +148,7 @@ extension QuickFeedDetailContent {
                 .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(foodKindTint(record.foodKind), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(foodKindTint(record.foodKind), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(record.brand.isEmpty ? l.tr(zh: "未命名主粮", en: "Food", de: "Futter") : record.brand)
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
@@ -185,6 +185,6 @@ extension QuickFeedDetailContent {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 18)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
     }
 }

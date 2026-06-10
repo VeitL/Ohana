@@ -112,7 +112,7 @@ struct FamilyCollaborationPlaygroundView: View {
             .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 11)
-            .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -155,7 +155,7 @@ struct FamilyCollaborationPlaygroundView: View {
                     .font(OhanaFont.adaptive(size: 17, weight: .black))
                     .foregroundStyle(tint)
                     .frame(width: 46, height: 46)
-                    .background(tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                    .background(tint.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
                         .font(OhanaFont.callout(.black))
@@ -174,7 +174,7 @@ struct FamilyCollaborationPlaygroundView: View {
                     .background(Color.goPrimary, in: Capsule())
             }
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -232,13 +232,11 @@ struct FamilyCollaborationPlaygroundView: View {
     }
 
     private var selectedPetInfo: some View {
-        let label: String = {
-            switch selectedPetID {
-            case "lilo": return l.tr(zh: "Lilo 需要喂食和铲屎", en: "Lilo needs feed and litter", de: "Lilo braucht Futter und Klo")
-            case "momo": return l.tr(zh: "Momo 需要陪玩", en: "Momo needs play", de: "Momo braucht Spiel")
-            default: return l.tr(zh: "Rio 今日已完成", en: "Rio is covered today", de: "Rio ist heute erledigt")
-            }
-        }()
+        let label: String = switch selectedPetID {
+        case "lilo": l.tr(zh: "Lilo 需要喂食和铲屎", en: "Lilo needs feed and litter", de: "Lilo braucht Futter und Klo")
+        case "momo": l.tr(zh: "Momo 需要陪玩", en: "Momo needs play", de: "Momo braucht Spiel")
+        default: l.tr(zh: "Rio 今日已完成", en: "Rio is covered today", de: "Rio ist heute erledigt")
+        }
         return HStack(spacing: 10) {
             Image(systemName: "sparkles").accessibilityHidden(true)
                 .foregroundStyle(Color.goPrimary)
@@ -248,7 +246,7 @@ struct FamilyCollaborationPlaygroundView: View {
             Spacer()
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private var racePreview: some View {
@@ -293,7 +291,7 @@ struct FamilyCollaborationPlaygroundView: View {
                 }
             }
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -334,4 +332,3 @@ struct FamilyCollaborationPlaygroundView: View {
         .padding(.top, 2)
     }
 }
-

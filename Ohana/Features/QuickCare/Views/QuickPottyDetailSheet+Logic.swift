@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension QuickPottyDetailSheet {
     // MARK: - Persistence
@@ -281,8 +281,8 @@ extension QuickPottyDetailSheet {
             scheduleFeedbackClear()
             showSaveConfirmation(
                 targets.count > 1
-                ? l.tr(zh: "\(targets.count)只猫 已换砂", en: "\(targets.count) litter boxes changed", de: "\(targets.count) Katzenstreus gewechselt")
-                : l.tr(zh: "换砂已记录", en: "Litter change logged", de: "Streuwechsel erfasst")
+                    ? l.tr(zh: "\(targets.count)只猫 已换砂", en: "\(targets.count) litter boxes changed", de: "\(targets.count) Katzenstreus gewechselt")
+                    : l.tr(zh: "换砂已记录", en: "Litter change logged", de: "Streuwechsel erfasst")
             )
         }
     }
@@ -302,7 +302,7 @@ extension QuickPottyDetailSheet {
 
     func deleteItem(_ item: PoopLogItem) {
         switch item {
-        case .potty(let log):
+        case let .potty(log):
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             commandQueue.enqueue(.petPottyDelete(petID: pet.id, logID: log.id)) {
                 _ = PetCareCommandExecutor(context: modelContext, services: appServices).deletePottyLog(
@@ -311,7 +311,7 @@ extension QuickPottyDetailSheet {
                     note: "quickPotty.deletePotty"
                 )
             }
-        case .litter(let log):
+        case let .litter(log):
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             commandQueue.enqueue(.petCareDelete(petID: pet.id, logID: log.id)) {
                 _ = PetCareCommandExecutor(context: modelContext, services: appServices).deleteCareLog(
@@ -340,14 +340,14 @@ extension QuickPottyDetailSheet {
             },
             sortBy: [SortDescriptor(\.startDate)]
         )
-        return (try? modelContext.fetch(descriptor)) ?? allEvents
+        return (try? modelContext.fetch(descriptor)) ?? allEvents // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     func scheduleCarePlanReminders(titleContains text: String) {
         let reminders = latestAllEvents()
             .filter { event in
                 event.relatedEntityId == pet.id.uuidString &&
-                event.title.contains(text)
+                    event.title.contains(text)
             }
             .flatMap(\.reminders)
 
@@ -414,19 +414,19 @@ extension QuickPottyDetailSheet {
 
     func tint(for item: PoopLogItem) -> Color {
         switch item {
-        case .potty(let log):
-            return pottyTypeColor(log.pottyType)
+        case let .potty(log):
+            pottyTypeColor(log.pottyType)
         case .litter:
-            return scoopTint
+            scoopTint
         }
     }
 
     func pottyTypeColor(_ type: PottyType) -> Color {
         switch type {
-        case .perfectPoop: return pottyTint
-        case .softPoop: return Color(hex: "F59E0B")
-        case .liquidPoop: return Color(hex: "EF4444")
-        case .pee: return Color(hex: "06B6D4")
+        case .perfectPoop: pottyTint
+        case .softPoop: Color(hex: "F59E0B")
+        case .liquidPoop: Color(hex: "EF4444")
+        case .pee: Color(hex: "06B6D4")
         }
     }
 }

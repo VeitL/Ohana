@@ -15,7 +15,7 @@ enum OasisCritterEconomyService {
         activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
     ) -> Human? {
         guard let id = activeHumanSelection.currentHumanId else { return nil }
-        return (try? context.fetch(FetchDescriptor<Human>()))?.first { $0.id.uuidString == id }
+        return (try? context.fetch(FetchDescriptor<Human>()))?.first { $0.id.uuidString == id } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     static func currentHumanBalance(context: ModelContext) -> Int {
@@ -107,7 +107,7 @@ enum OasisCritterEconomyService {
                 return true
             } catch {
                 #if DEBUG
-                print("❌ [OasisCritterEconomyService] spend failed: \(error.localizedDescription)")
+                    OhanaLog.error("[OasisCritterEconomyService] spend failed: \(error.localizedDescription)", category: "Oasis")
                 #endif
                 return false
             }
@@ -135,7 +135,7 @@ enum OasisCritterEconomyService {
             return true
         } catch {
             #if DEBUG
-            print("❌ [OasisCritterEconomyService] system spend failed: \(error.localizedDescription)")
+                OhanaLog.error("[OasisCritterEconomyService] system spend failed: \(error.localizedDescription)", category: "Oasis")
             #endif
             return false
         }

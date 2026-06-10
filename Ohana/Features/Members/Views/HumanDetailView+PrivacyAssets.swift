@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension HumanDetailView {
@@ -28,7 +28,7 @@ extension HumanDetailView {
             Toggle("", isOn: Binding(
                 get: { displayedHomeVisibility },
                 set: { visible in
-                    if visible && !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
+                    if visible, !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
                         showingHomeStackFullAlert = true
                         return
                     }
@@ -51,7 +51,7 @@ extension HumanDetailView {
             .labelsHidden()
         }
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .goIslandModuleCard(cornerRadius: 24)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         .padding(.horizontal, 16)
     }
 
@@ -86,7 +86,7 @@ extension HumanDetailView {
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .goIslandModuleCard(cornerRadius: 24)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
@@ -116,7 +116,7 @@ extension HumanDetailView {
                     .foregroundStyle(Color(hex: "6B82C4").opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 14)
-            .goIslandModuleCard(cornerRadius: 24)
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         }
         .buttonStyle(ScaleButtonStyle())
         .padding(.horizontal, 16)
@@ -126,7 +126,7 @@ extension HumanDetailView {
     var coHealthCard: some View {
         Button { showingCoHealth = true } label: {
             CoHealthDashboardView(human: human)
-                .goIslandModuleCard(cornerRadius: 24)
+                .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
                 .padding(.horizontal, 16)
         }
         .buttonStyle(ScaleButtonStyle())
@@ -144,7 +144,7 @@ extension HumanDetailView {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16).padding(.vertical, 14)
-        .goIslandModuleCard(cornerRadius: 24)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         .padding(.horizontal, 16)
     }
 
@@ -165,7 +165,7 @@ extension HumanDetailView {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 22)
         .padding(.vertical, 28)
-        .goIslandModuleCard(cornerRadius: 24)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
         .padding(.horizontal, 16)
     }
 

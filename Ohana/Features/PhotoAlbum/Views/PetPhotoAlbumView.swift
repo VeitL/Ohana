@@ -5,14 +5,14 @@
 //  ArkSchemaV25：宠物照片回忆相册（可独立展示或嵌入「重要时刻」页）
 //
 
-import SwiftUI
-import SwiftData
 import PhotosUI
+import SwiftData
+import SwiftUI
 
 struct PetPhotoAlbumView: View {
     let pet: Pet
     /// 嵌入 `PetMomentsHubView` 时传入，由外层工具栏与 onChange 负责选图入库
-    var hubPickerSelection: Binding<[PhotosPickerItem]>? = nil
+    var hubPickerSelection: Binding<[PhotosPickerItem]>?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -207,7 +207,9 @@ struct PetPhotoAlbumView: View {
         if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let root = scene.windows.first?.rootViewController {
             var presenter = root
-            while let presented = presenter.presentedViewController { presenter = presented }
+            while let presented = presenter.presentedViewController {
+                presenter = presented
+            }
             av.popoverPresentationController?.sourceView = presenter.view
             presenter.present(av, animated: true)
         }
@@ -277,7 +279,7 @@ private struct PhotoDetailSheet: View {
                             .foregroundStyle(.white.opacity(0.6)) // ui-v4: allow fullScreenPhotoViewer
 
                         if isEditingNote {
-                            TextField("添加备注…", text: $noteText, axis: .vertical)
+                            TextField("添加备注…", text: $noteText, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                 .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(.white) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)

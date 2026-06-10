@@ -15,7 +15,7 @@ extension QuickFeedDetailContent {
                 foodKindPicker(selection: $draftStore.selectedStockFoodKind)
                 stockCalculationModePicker
                 VStack(spacing: 12) {
-                    TextField(l.tr(zh: "品牌，可选", en: "Brand, optional", de: "Marke, optional"), text: $draftStore.stockBrandText)
+                    TextField(l.tr(zh: "品牌，可选", en: "Brand, optional", de: "Marke, optional"), text: $draftStore.stockBrandText) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                         .textInputAutocapitalization(.words)
                         .focused($focusedField, equals: .stockBrand)
                         .feedingTextFieldStyle(tint: stockTint)
@@ -57,7 +57,7 @@ extension QuickFeedDetailContent {
                     }
                 }
                 .padding(14)
-                .feedFlatBlockSurface(cornerRadius: 18)
+                .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
 
                 if let inputError = draftStore.inputError {
                     errorText(inputError)
@@ -111,7 +111,7 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 18)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
     }
 
     func stockCalculationModeButton(_ mode: FeedStockCalculationMode) -> some View {
@@ -150,7 +150,7 @@ extension QuickFeedDetailContent {
             .padding(.horizontal, 12)
             .frame(minHeight: 54)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? tint : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(isSelected ? tint : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(stockCalculationModeTitle(mode))
@@ -159,32 +159,32 @@ extension QuickFeedDetailContent {
     func stockCalculationModeTitle(_ mode: FeedStockCalculationMode) -> String {
         switch mode {
         case .manualOrPlan:
-            return l.tr(zh: "手动/计划", en: "Manual/Plan", de: "Manuell/Plan")
+            l.tr(zh: "手动/计划", en: "Manual/Plan", de: "Manuell/Plan")
         case .autoFeeder:
-            return l.tr(zh: "自动模式", en: "Auto mode", de: "Automatik")
+            l.tr(zh: "自动模式", en: "Auto mode", de: "Automatik")
         }
     }
 
     func stockCalculationModeSubtitle(_ mode: FeedStockCalculationMode) -> String {
         switch mode {
         case .manualOrPlan:
-            return l.tr(zh: "按打卡扣粮", en: "Logged meals", de: "Einträge")
+            l.tr(zh: "按打卡扣粮", en: "Logged meals", de: "Einträge")
         case .autoFeeder:
-            return l.tr(zh: "按自动扣粮", en: "Auto deduct", de: "Auto-Abzug")
+            l.tr(zh: "按自动扣粮", en: "Auto deduct", de: "Auto-Abzug")
         }
     }
 
     func stockCalculationModeIcon(_ mode: FeedStockCalculationMode) -> String {
         switch mode {
-        case .manualOrPlan: return "hand.tap.fill"
-        case .autoFeeder: return "dot.radiowaves.left.and.right"
+        case .manualOrPlan: "hand.tap.fill"
+        case .autoFeeder: "dot.radiowaves.left.and.right"
         }
     }
 
     func stockCalculationModeTint(_ mode: FeedStockCalculationMode) -> Color {
         switch mode {
-        case .manualOrPlan: return Color.goPurple
-        case .autoFeeder: return Color.goTeal
+        case .manualOrPlan: Color.goPurple
+        case .autoFeeder: Color.goTeal
         }
     }
 
@@ -207,7 +207,7 @@ extension QuickFeedDetailContent {
             LinearGradient(
                 colors: [
                     Color.ohanaCardSurface.opacity(0.02),
-                    Color.ohanaCardSurface.opacity(0.62),
+                    Color.ohanaCardSurface.opacity(0.62)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -234,7 +234,7 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 16)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
     }
 
     var stockExpenseOptions: some View {
@@ -267,7 +267,7 @@ extension QuickFeedDetailContent {
             stockExpenseAmountInput
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 16)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
     }
 
     var stockExpenseAmountInput: some View {
@@ -311,7 +311,7 @@ extension QuickFeedDetailContent {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
 
@@ -395,7 +395,7 @@ extension QuickFeedDetailContent {
                     .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.goRed)
                     .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "删除这袋粮", en: "Delete this bag", de: "Diesen Vorrat löschen"))
                         .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
@@ -411,7 +411,7 @@ extension QuickFeedDetailContent {
                 Spacer()
             }
             .padding(14)
-            .feedFlatBlockSurface(cornerRadius: 20)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.input)
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(pet.hasPassedAway)
@@ -470,8 +470,8 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(14)
-        .feedFlatBlockSurface(cornerRadius: 20)
-        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.input)
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .onTapGesture {
             prepareStockSheet(record: record)
             openFeedSheet(.stock)
@@ -520,13 +520,13 @@ extension QuickFeedDetailContent {
                 feedInlineNumberPad(field: .stockCorrection, text: $draftStore.stockCorrectionText, tint: stockTint, maxFractionDigits: 0)
             }
             .padding(12)
-            .feedFlatBlockSurface(cornerRadius: 16)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
             FoodPrimaryButton(title: l.tr(zh: "保存修正", en: "Save correction", de: "Korrektur speichern"), icon: "checkmark", tint: stockTint) {
                 correctStock(record)
             }
         }
         .padding(14)
-        .feedFlatBlockSurface(cornerRadius: 20)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.input)
     }
 
     var stockReminderManageCard: some View {
@@ -555,12 +555,12 @@ extension QuickFeedDetailContent {
                     .foregroundStyle(stockTint)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .feedFlatBlockSurface(cornerRadius: 16)
+                    .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
             }
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
-        .feedFlatBlockSurface(cornerRadius: 20)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.input)
     }
 
     var stockPendingRecordsCard: some View {
@@ -608,7 +608,7 @@ extension QuickFeedDetailContent {
                             .foregroundStyle(stockTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
-                            .feedFlatBlockSurface(cornerRadius: 18)
+                            .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }

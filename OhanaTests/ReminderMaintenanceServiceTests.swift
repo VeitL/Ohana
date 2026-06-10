@@ -1,7 +1,7 @@
 import Foundation
-@testable import Ohana
 import SwiftData
 import Testing
+@testable import Ohana
 
 @MainActor
 struct ReminderMaintenanceServiceTests {
@@ -32,7 +32,7 @@ struct ReminderMaintenanceServiceTests {
         let expiredPending = Reminder(scheduledAt: Date(timeIntervalSince1970: 1))
         let expiredCompleted = Reminder(scheduledAt: Date(timeIntervalSince1970: 1))
         expiredCompleted.statusEnum = .completed
-        let futurePending = Reminder(scheduledAt: Date().addingTimeInterval(86_400))
+        let futurePending = Reminder(scheduledAt: Date().addingTimeInterval(86400))
 
         context.insert(expiredPending)
         context.insert(expiredCompleted)

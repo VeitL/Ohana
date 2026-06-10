@@ -5,8 +5,8 @@
 //  V4 human note history.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 struct HumanNoteEntry: Identifiable {
@@ -156,9 +156,9 @@ struct HumanNoteHistorySheet: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -212,9 +212,9 @@ struct HumanNoteHistorySheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -262,7 +262,7 @@ struct HumanNoteHistorySheet: View {
             guard !trimmed.isEmpty else { return nil }
             if trimmed.hasPrefix("["),
                let bracketEnd = trimmed.firstIndex(of: "]") {
-                let dateStr = String(trimmed[trimmed.index(after: trimmed.startIndex)..<bracketEnd])
+                let dateStr = String(trimmed[trimmed.index(after: trimmed.startIndex) ..< bracketEnd])
                 let rest = String(trimmed[trimmed.index(after: bracketEnd)...])
                     .trimmingCharacters(in: .whitespaces)
                 if let date = Self.noteDateFormatter.date(from: dateStr) {
@@ -310,7 +310,7 @@ private struct HumanNoteAttachmentImagePreview: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .fill(Color.goPurple.opacity(0.12))
                 .frame(width: 74, height: 74)
 
@@ -319,7 +319,7 @@ private struct HumanNoteAttachmentImagePreview: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: 74, height: 74)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             } else {
                 VStack(spacing: 5) {
                     Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control

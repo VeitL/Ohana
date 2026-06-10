@@ -5,8 +5,8 @@
 //  Global expense dashboard, aligned with the V4 "planet" dashboard language.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct CategorySpendBreakdown: Identifiable {
     var id: String { category.rawValue }
@@ -192,7 +192,7 @@ struct IslandExpenseDashboardContentView: View {
         guard let start else { return [] }
         let dayCount = max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: now)).day ?? 0)
 
-        return (0...dayCount).compactMap { offset in
+        return (0 ... dayCount).compactMap { offset in
             guard let day = calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: start)) else {
                 return nil
             }
@@ -341,7 +341,7 @@ struct IslandExpenseDashboardContentView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private var expenseBadgeStrip: some View {
@@ -437,10 +437,10 @@ struct IslandExpenseDashboardContentView: View {
         .padding(.horizontal, 4)
     }
 
-    private func dashboardSection<Content: View>(
+    private func dashboardSection(
         title: String,
         icon: String,
-        @ViewBuilder content: () -> Content
+        @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: icon)
@@ -500,7 +500,7 @@ struct IslandExpenseDashboardContentView: View {
         GeometryReader { proxy in
             HStack(spacing: 3) {
                 ForEach(categories.prefix(5)) { item in
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
                         .fill(expenseTint(item.category))
                         .frame(width: max(6, proxy.size.width * item.pct))
                 }
@@ -607,19 +607,19 @@ struct IslandExpenseDashboardContentView: View {
         guard !categories.isEmpty else {
             return l.tr(zh: "暂无分类", en: "No category", de: "Keine Kategorie")
         }
-        let names = categories.prefix(2).map { $0.category.rawValue }.joined(separator: " · ")
+        let names = categories.prefix(2).map(\.category.rawValue).joined(separator: " · ")
         return "\(prefix) \(names)"
     }
 
     private func expenseTint(_ category: ExpenseCategory) -> Color {
         switch category {
-        case .food: return Color.foodDry
-        case .treats: return Color(hex: "10B981")
-        case .medical: return Color(hex: "F59E0B")
-        case .grooming: return Color(hex: "8B5CF6")
-        case .toys: return Color(hex: "EC4899")
-        case .insurancePremium: return Color(hex: "06B6D4")
-        case .other: return Color(hex: "6B7280")
+        case .food: Color.foodDry
+        case .treats: Color(hex: "10B981")
+        case .medical: Color(hex: "F59E0B")
+        case .grooming: Color(hex: "8B5CF6")
+        case .toys: Color(hex: "EC4899")
+        case .insurancePremium: Color(hex: "06B6D4")
+        case .other: Color(hex: "6B7280")
         }
     }
 
@@ -634,5 +634,4 @@ struct IslandExpenseDashboardContentView: View {
         formatter.setLocalizedDateFormatFromTemplate("Md")
         return formatter.string(from: date)
     }
-
 }

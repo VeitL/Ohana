@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension FamilyCollaborationDashboardView {
     func scheduleLegacyBountySync() {

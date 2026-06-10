@@ -20,22 +20,31 @@ nonisolated extension DataBackupManager {
                     isNeutered: dto.isNeutered)
         if let uuid = UUID(uuidString: dto.id) { p.id = uuid }
         p.avatarEmoji = dto.avatarEmoji
-        p.microchipID = dto.microchipID; p.vetContact = dto.vetContact
-        p.allergies = dto.allergies; p.passportNumber = dto.passportNumber
+        p.microchipID = dto.microchipID
+        p.vetContact = dto.vetContact
+        p.allergies = dto.allergies
+        p.passportNumber = dto.passportNumber
         p.passportExpiryDate = parseDate(dto.passportExpiryDate)
-        p.formerName = dto.formerName; p.lineageInfo = dto.lineageInfo
+        p.formerName = dto.formerName
+        p.lineageInfo = dto.lineageInfo
         p.themeColorHex = OhanaThemeColorPolicy.normalizedMemberThemeHex(
             dto.themeColorHex,
             fallback: OhanaThemeColorPolicy.petFallbackHex
         )
         p.homeDate = parseDate(dto.homeDate)
-        p.birthCountry = dto.birthCountry; p.birthCity = dto.birthCity
-        p.foodBrand = dto.foodBrand; p.restockDate = parseDate(dto.restockDate)
-        p.restockWeight = dto.restockWeight; p.dailyPortionGrams = dto.dailyPortionGrams
+        p.birthCountry = dto.birthCountry
+        p.birthCity = dto.birthCity
+        p.foodBrand = dto.foodBrand
+        p.restockDate = parseDate(dto.restockDate)
+        p.restockWeight = dto.restockWeight
+        p.dailyPortionGrams = dto.dailyPortionGrams
         p.mainFoodKindRaw = dto.mainFoodKindRaw ?? FeedFoodKind.dry.rawValue
-        p.foodPrice = dto.foodPrice; p.isShared = dto.isShared
+        p.foodPrice = dto.foodPrice
+        p.isShared = dto.isShared
         p.createdAt = parseDate(dto.createdAt) ?? Date()
-        p.notes = dto.notes; p.coatColor = dto.coatColor; p.eyeColor = dto.eyeColor
+        p.notes = dto.notes
+        p.coatColor = dto.coatColor
+        p.eyeColor = dto.eyeColor
         p.currentStreak = dto.currentStreak
         p.lastCheckInDate = parseDate(dto.lastCheckInDate)
         p.foodTrackingModeRaw = dto.foodTrackingModeRaw

@@ -7,11 +7,11 @@ extension QuickFeedDetailContent {
     var feedingOverviewModeValue: String {
         switch activeFeedingMode {
         case .manual:
-            return pet.dailyPortionGrams > 0 ? formattedFoodWeight(pet.dailyPortionGrams) : "--"
+            pet.dailyPortionGrams > 0 ? formattedFoodWeight(pet.dailyPortionGrams) : "--"
         case .manualReminder:
-            return feedTaskState.todayManualPlanCompletionText
+            feedTaskState.todayManualPlanCompletionText
         case .autoFeeder:
-            return "\(feedTaskState.todayAutoFeedCount)x"
+            "\(feedTaskState.todayAutoFeedCount)x"
         }
     }
 
@@ -69,22 +69,22 @@ extension QuickFeedDetailContent {
     var feedModeHistoryTitle: String {
         switch activeFeedingMode {
         case .manual:
-            return l.tr(zh: "手动历史", en: "Manual history", de: "Manueller Verlauf")
+            l.tr(zh: "手动历史", en: "Manual history", de: "Manueller Verlauf")
         case .manualReminder:
-            return l.tr(zh: "计划日历", en: "Plan calendar", de: "Plankalender")
+            l.tr(zh: "计划日历", en: "Plan calendar", de: "Plankalender")
         case .autoFeeder:
-            return l.tr(zh: "自动日历", en: "Auto calendar", de: "Auto-Kalender")
+            l.tr(zh: "自动日历", en: "Auto calendar", de: "Auto-Kalender")
         }
     }
 
     var feedModeHistoryChartSubtitle: String {
         switch activeFeedingMode {
         case .manual:
-            return l.tr(zh: "只显示手动主粮记录。", en: "Manual main-food logs only.", de: "Nur manuelle Hauptfutter-Einträge.")
+            l.tr(zh: "只显示手动主粮记录。", en: "Manual main-food logs only.", de: "Nur manuelle Hauptfutter-Einträge.")
         case .manualReminder:
-            return l.tr(zh: "只显示喂食计划完成记录。", en: "Completed plan check-ins only.", de: "Nur erledigte Plan-Check-ins.")
+            l.tr(zh: "只显示喂食计划完成记录。", en: "Completed plan check-ins only.", de: "Nur erledigte Plan-Check-ins.")
         case .autoFeeder:
-            return l.tr(zh: "只显示自动猫粮机补记。", en: "Auto feeder logs only.", de: "Nur Futterautomat-Einträge.")
+            l.tr(zh: "只显示自动猫粮机补记。", en: "Auto feeder logs only.", de: "Nur Futterautomat-Einträge.")
         }
     }
 
@@ -223,13 +223,11 @@ extension QuickFeedDetailContent {
             return "\(prefix) · \(l.tr(zh: "今天", en: "Today", de: "Heute"))"
         }
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: clockTick)),
-           calendar.isDate(draftStore.feedPlanCalendarSelectedDate, inSameDayAs: tomorrow)
-        {
+           calendar.isDate(draftStore.feedPlanCalendarSelectedDate, inSameDayAs: tomorrow) {
             return "\(prefix) · \(l.tr(zh: "明天", en: "Tomorrow", de: "Morgen"))"
         }
         if let yesterday = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: clockTick)),
-           calendar.isDate(draftStore.feedPlanCalendarSelectedDate, inSameDayAs: yesterday)
-        {
+           calendar.isDate(draftStore.feedPlanCalendarSelectedDate, inSameDayAs: yesterday) {
             return "\(prefix) · \(l.tr(zh: "昨天", en: "Yesterday", de: "Gestern"))"
         }
         return "\(prefix) · \(draftStore.feedPlanCalendarSelectedDate.formatted(.dateTime.month().day()))"
@@ -244,13 +242,16 @@ extension QuickFeedDetailContent {
     }
 
     var feedPlanWeekdayTitles: [String] {
-        if appLanguage == "zh" {
-            return ["一", "二", "三", "四", "五", "六", "日"]
-        }
-        if appLanguage == "de" {
-            return ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
-        }
-        return ["M", "T", "W", "T", "F", "S", "S"]
+        let l = L10n(appLanguage)
+        return [
+            l.tr(zh: "一", en: "M", de: "Mo"),
+            l.tr(zh: "二", en: "T", de: "Di"),
+            l.tr(zh: "三", en: "W", de: "Mi"),
+            l.tr(zh: "四", en: "T", de: "Do"),
+            l.tr(zh: "五", en: "F", de: "Fr"),
+            l.tr(zh: "六", en: "S", de: "Sa"),
+            l.tr(zh: "日", en: "S", de: "So")
+        ]
     }
 
     var feedPlanCalendarDaySummaries: [FeedPlanCalendarDaySummary] {
@@ -302,13 +303,11 @@ extension QuickFeedDetailContent {
             return "\(l.tr(zh: "今天", en: "Today", de: "Heute")) \(time)"
         }
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: clockTick)),
-           calendar.isDate(date, inSameDayAs: tomorrow)
-        {
+           calendar.isDate(date, inSameDayAs: tomorrow) {
             return "\(l.tr(zh: "明天", en: "Tomorrow", de: "Morgen")) \(time)"
         }
         if let afterTomorrow = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: clockTick)),
-           calendar.isDate(date, inSameDayAs: afterTomorrow)
-        {
+           calendar.isDate(date, inSameDayAs: afterTomorrow) {
             return "\(l.tr(zh: "后天", en: "In 2 days", de: "Übermorgen")) \(time)"
         }
         return date.formatted(.dateTime.month().day().hour().minute())
@@ -371,13 +370,13 @@ extension QuickFeedDetailContent {
     func feedLogBadge(for log: PetCareLog) -> (title: String, tint: Color, icon: String) {
         switch FeedLogMetadata.source(for: log) ?? .manualMain {
         case .manualMain:
-            return ("\(l.tr(zh: "手动", en: "Manual", de: "Manuell")) · \(log.foodKind.title(l))", foodKindTint(log.foodKind), "hand.tap.fill")
+            ("\(l.tr(zh: "手动", en: "Manual", de: "Manuell")) · \(log.foodKind.title(l))", foodKindTint(log.foodKind), "hand.tap.fill")
         case .manualReminder:
-            return ("\(l.tr(zh: "计划", en: "Plan", de: "Plan")) · \(log.foodKind.title(l))", Color.goPurple, FeedRuleKind.manualReminder.iconName)
+            ("\(l.tr(zh: "计划", en: "Plan", de: "Plan")) · \(log.foodKind.title(l))", Color.goPurple, FeedRuleKind.manualReminder.iconName)
         case .autoMain:
-            return ("\(l.tr(zh: "自动", en: "Auto", de: "Auto")) · \(log.foodKind.title(l))", Color.goTeal, FeedRuleKind.autoFeeder.iconName)
+            ("\(l.tr(zh: "自动", en: "Auto", de: "Auto")) · \(log.foodKind.title(l))", Color.goTeal, FeedRuleKind.autoFeeder.iconName)
         case .treat:
-            return (log.treatKind?.title(l) ?? l.tr(zh: "零食", en: "Treat", de: "Snack"), treatTint, log.treatKind?.systemIconName ?? "birthday.cake.fill")
+            (log.treatKind?.title(l) ?? l.tr(zh: "零食", en: "Treat", de: "Snack"), treatTint, log.treatKind?.systemIconName ?? "birthday.cake.fill")
         }
     }
 

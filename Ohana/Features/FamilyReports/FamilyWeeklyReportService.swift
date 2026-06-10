@@ -21,14 +21,14 @@ final class FamilyWeeklyReportService {
 
         let content = UNMutableNotificationContent()
         content.title = "📊 本周 Ohana 家庭周报"
-        content.body  = "看看这周谁最勤快、谁在默默付出，别忘了感谢家人"
+        content.body = "看看这周谁最勤快、谁在默默付出，别忘了感谢家人"
         content.sound = .default
         content.categoryIdentifier = "FAMILY_WEEKLY_REPORT"
 
         var comps = DateComponents()
-        comps.weekday = 1   // Calendar.current：周日
-        comps.hour    = 20
-        comps.minute  = 0
+        comps.weekday = 1 // Calendar.current：周日
+        comps.hour = 20
+        comps.minute = 0
 
         let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)

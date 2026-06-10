@@ -65,9 +65,9 @@ struct PerformanceDiagnosticsView: View {
                     }
                     .padding(14)
                     .background(Color.ohanaCardSurface,
-                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                             .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
                     )
 
@@ -120,7 +120,7 @@ struct PerformanceDiagnosticsView: View {
         .padding(14)
         .frame(maxWidth: .infinity)
         .background(Color.ohanaCardSurface,
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func performanceSampleRow(_ sample: AppPerformanceMonitor.Sample) -> some View {
@@ -141,14 +141,14 @@ struct PerformanceDiagnosticsView: View {
             Spacer(minLength: 8)
             Text(formatMS(sample.valueMS))
                 .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(sample.valueMS > 1_000 ? Color.goRed : Color.goPrimary)
+                .foregroundStyle(sample.valueMS > 1000 ? Color.goRed : Color.goPrimary)
         }
         .padding(.vertical, 10)
     }
 
     private func formatMS(_ value: Double) -> String {
-        if value >= 1_000 {
-            return String(format: "%.2fs", value / 1_000)
+        if value >= 1000 {
+            return String(format: "%.2fs", value / 1000)
         }
         return String(format: "%.0fms", value)
     }

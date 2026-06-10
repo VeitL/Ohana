@@ -4,8 +4,8 @@ import UIKit
 
 struct AddPetWizardView: View {
     let onComplete: () -> Void
-    var onCancel: (() -> Void)? = nil
-    var onPetSaved: ((Pet) -> Void)? = nil
+    var onCancel: (() -> Void)?
+    var onPetSaved: ((Pet) -> Void)?
 
     var body: some View {
         AddPetWizardContentView(

@@ -101,7 +101,7 @@ struct FeatureHubHeader<Avatar: View>: View {
 }
 
 struct FeatureHubAvatar: View {
-    var image: UIImage? = nil
+    var image: UIImage?
     let imageData: Data?
     let emoji: String
     let fallback: String
@@ -110,7 +110,7 @@ struct FeatureHubAvatar: View {
     var body: some View {
         ZStack {
             if let image {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(tint.opacity(0.18))
                 Image(uiImage: image)
                     .resizable()
@@ -122,15 +122,15 @@ struct FeatureHubAvatar: View {
                     fallbackText: emoji.isEmpty ? fallback : emoji,
                     themeColor: tint,
                     size: 58,
-                    cornerRadius: 18,
+                    cornerRadius: OhanaRadius.controlLarge,
                     backgroundOpacity: 0.18
                 )
             }
         }
         .frame(width: 58, height: 58)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -156,7 +156,7 @@ struct FeatureHubMetricStrip: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 11)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                 .ohanaSmoothAppear(index: index)
             }
         }
@@ -272,9 +272,9 @@ private struct FeatureHubTile: View {
         }
         .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
         .ohanaStateMotion(data)
@@ -302,9 +302,9 @@ struct PetMemorialBanner: View {
             Spacer()
         }
         .padding(14)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.goPurple.opacity(0.25), lineWidth: 1)
         }
     }

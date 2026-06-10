@@ -15,20 +15,20 @@ enum CareLedgerRangeFilter: CaseIterable {
 
     var title: String {
         switch self {
-        case .week: return "本周"
-        case .month: return "本月"
-        case .all: return "全部"
+        case .week: "本周"
+        case .month: "本月"
+        case .all: "全部"
         }
     }
 
     var cutoff: Date? {
         switch self {
         case .week:
-            return Calendar.current.date(byAdding: .day, value: -7, to: Date())
+            Calendar.current.date(byAdding: .day, value: -7, to: Date())
         case .month:
-            return Calendar.current.date(byAdding: .month, value: -1, to: Date())
+            Calendar.current.date(byAdding: .month, value: -1, to: Date())
         case .all:
-            return nil
+            nil
         }
     }
 }

@@ -11,7 +11,7 @@ import SwiftUI
 struct AchievementWallView: View {
     let pet: Pet
     var allPets: [Pet] = []
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @Query(sort: \OasisElectronicPet.obtainedAt, order: .reverse) private var electronicPets: [OasisElectronicPet]
     @Query(sort: \OasisCritterFragmentBalance.updatedAt, order: .reverse) private var critterFragments: [OasisCritterFragmentBalance]

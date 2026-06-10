@@ -42,6 +42,7 @@ enum HeroAnim {
     static var walletContentSpring: Animation {
         .interactiveSpring(response: 0.34, dampingFraction: 0.9, blendDuration: 0.12)
     }
+
     static var walletReduced: Animation { .easeOut(duration: 0.22) }
     static var fabSpring: Animation { GoMotion.fab }
     static var buttonSpring: Animation { GoMotion.feedback }

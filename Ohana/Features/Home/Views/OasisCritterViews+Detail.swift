@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension OasisCritterCodexView {
@@ -17,62 +17,62 @@ extension OasisCritterCodexView {
         return VStack(alignment: .leading, spacing: 16) {
             if critter == nil {
                 VStack(spacing: 12) {
-                ZStack(alignment: .topTrailing) {
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    rarityColor(entry.rarity).opacity(critter == nil ? 0.08 : 0.26),
-                                    Color.ohanaControlFill
-                                ],
-                                center: .top,
-                                startRadius: 20,
-                                endRadius: 220
+                    ZStack(alignment: .topTrailing) {
+                        RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        rarityColor(entry.rarity).opacity(critter == nil ? 0.08 : 0.26),
+                                        Color.ohanaControlFill
+                                    ],
+                                    center: .top,
+                                    startRadius: 20,
+                                    endRadius: 220
+                                )
                             )
-                        )
-                        .frame(height: 212)
+                            .frame(height: 212)
 
-                    OasisCritterIllustration(catalogId: entry.id, locked: critter == nil, size: 168, critter: critter)
-                        .scaleEffect(pulseCatalogId == entry.id ? 1.08 : 1)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        OasisCritterIllustration(catalogId: entry.id, locked: critter == nil, size: 168, critter: critter)
+                            .scaleEffect(pulseCatalogId == entry.id ? 1.08 : 1)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
-                    HStack(spacing: 8) {
-                        Text(l.tr(zh: entry.rarity.zh, en: entry.rarity.en, de: entry.rarity.de))
-                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.ohanaPrimaryActionText)
+                        HStack(spacing: 8) {
+                            Text(l.tr(zh: entry.rarity.zh, en: entry.rarity.en, de: entry.rarity.de))
+                                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(rarityColor(entry.rarity), in: Capsule())
+                        }
+                        .padding(12)
+                    }
+
+                    VStack(spacing: 6) {
+                        Text(entry.name(l))
+                            .font(OhanaFont.adaptive(size: 25, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                        Text(entry.tagline(l))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
                             .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(rarityColor(entry.rarity), in: Capsule())
-                    }
-                    .padding(12)
-                }
-
-                VStack(spacing: 6) {
-                    Text(entry.name(l))
-                        .font(OhanaFont.adaptive(size: 25, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                    Text(entry.tagline(l))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .padding(.horizontal, 8)
-                    HStack(spacing: 7) {
-                        codexMetric(value: "\(fragmentCount)◇", label: l.tr(zh: "碎片", en: "Fragments", de: "Fragmente"))
-                        if critter == nil {
-                            codexMetric(value: "\(awakeningCost.fragments)◇", label: l.tr(zh: "唤醒", en: "Awaken", de: "Wecken"))
+                        HStack(spacing: 7) {
+                            codexMetric(value: "\(fragmentCount)◇", label: l.tr(zh: "碎片", en: "Fragments", de: "Fragmente"))
+                            if critter == nil {
+                                codexMetric(value: "\(awakeningCost.fragments)◇", label: l.tr(zh: "唤醒", en: "Awaken", de: "Wecken"))
+                            }
+                            if let critter {
+                                codexMetric(value: "Lv.\(critter.level)", label: l.tr(zh: "等级", en: "Level", de: "Level"))
+                                codexMetric(value: "\(critter.starLevel)★", label: l.tr(zh: "星级", en: "Stars", de: "Sterne"))
+                                codexMetric(value: "B\(snapshot?.bondLevel ?? 1)", label: l.tr(zh: "羁绊", en: "Bond", de: "Bindung"))
+                                codexMetric(value: "\(snapshot?.todayInteractionCount ?? 0)/3", label: l.tr(zh: "今日", en: "Today", de: "Heute"))
+                            }
                         }
-                        if let critter {
-                            codexMetric(value: "Lv.\(critter.level)", label: l.tr(zh: "等级", en: "Level", de: "Level"))
-                            codexMetric(value: "\(critter.starLevel)★", label: l.tr(zh: "星级", en: "Stars", de: "Sterne"))
-                            codexMetric(value: "B\(snapshot?.bondLevel ?? 1)", label: l.tr(zh: "羁绊", en: "Bond", de: "Bindung"))
-                            codexMetric(value: "\(snapshot?.todayInteractionCount ?? 0)/3", label: l.tr(zh: "今日", en: "Today", de: "Heute"))
-                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
-                }
                 }
             }
 
@@ -90,12 +90,12 @@ extension OasisCritterCodexView {
 
     var selectedDetail: some View {
         selectedDetailContent
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
-        )
+            .padding(16)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
+                    .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
+            )
     }
 
     func critterToySurface(
@@ -118,7 +118,7 @@ extension OasisCritterCodexView {
                             .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(1)
-                        }
+                    }
                     Spacer(minLength: 0)
                     if !(mode == .nest && isPopup) {
                         coconutBalanceButton
@@ -133,7 +133,7 @@ extension OasisCritterCodexView {
                 }
             }
             .padding(12)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
             GeometryReader { proxy in
                 let width = proxy.size.width
@@ -307,7 +307,7 @@ extension OasisCritterCodexView {
     }
 
     func toyActionButton(icon: String, title: String, cost: String = "", enabled: Bool = true, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
         return Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
@@ -325,7 +325,7 @@ extension OasisCritterCodexView {
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1.5)
                         .background(
-                            (highlighted ? Color.arkInk.opacity(0.14) : Color.ohanaControlFill.opacity(0.95)),
+                            highlighted ? Color.arkInk.opacity(0.14) : Color.ohanaControlFill.opacity(0.95),
                             in: Capsule()
                         )
                 }
@@ -356,7 +356,7 @@ extension OasisCritterCodexView {
             toyProgressRow(icon: "bolt.fill", value: snapshot.xpPercent, label: l.tr(zh: "成长 XP", en: "Growth XP", de: "Wachstum XP"), detail: "\(snapshot.xpProgress)/\(snapshot.xpTarget)", tint: Color.goPrimary)
         }
         .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     func toyStatusRow(icon: String, value: Int, label: String, tint: Color) -> some View {
@@ -366,7 +366,7 @@ extension OasisCritterCodexView {
                 .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(tint, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
@@ -386,9 +386,9 @@ extension OasisCritterCodexView {
             }
         }
         .padding(10)
-        .background(Color.ohanaCardSurface.opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface.opacity(0.72), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                 .strokeBorder(tint.opacity(0.16), lineWidth: 1)
         )
     }
@@ -468,12 +468,12 @@ extension OasisCritterCodexView {
 
     func lifecycleShortText(_ snapshot: OasisCritterLifecycleSnapshot) -> String {
         switch snapshot.state {
-        case .healthy: return l.tr(zh: "状态很好", en: "Settled", de: "Ruhig")
-        case .needsCare: return l.tr(zh: "想你了", en: "Needs you", de: "Vermisst dich")
-        case .atRisk: return l.tr(zh: "需要照顾", en: "Needs care", de: "Braucht Pflege")
-        case .sick: return l.tr(zh: "有点没精神", en: "Low energy", de: "Wenig Energie")
-        case .critical: return l.tr(zh: "请照顾一下", en: "Care now", de: "Jetzt pflegen")
-        case .dead: return l.tr(zh: "纪念中", en: "Memorial", de: "Erinnerung")
+        case .healthy: l.tr(zh: "状态很好", en: "Settled", de: "Ruhig")
+        case .needsCare: l.tr(zh: "想你了", en: "Needs you", de: "Vermisst dich")
+        case .atRisk: l.tr(zh: "需要照顾", en: "Needs care", de: "Braucht Pflege")
+        case .sick: l.tr(zh: "有点没精神", en: "Low energy", de: "Wenig Energie")
+        case .critical: l.tr(zh: "请照顾一下", en: "Care now", de: "Jetzt pflegen")
+        case .dead: l.tr(zh: "纪念中", en: "Memorial", de: "Erinnerung")
         }
     }
 
@@ -523,6 +523,6 @@ extension OasisCritterCodexView {
             }
         }
         .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 }

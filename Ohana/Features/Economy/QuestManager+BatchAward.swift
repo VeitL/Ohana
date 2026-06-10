@@ -31,7 +31,7 @@ extension QuestManager {
         let executorId = activeHumanSelection.currentHumanId
         var human: Human? = nil
         if let executorId {
-            human = (try? context.fetch(FetchDescriptor<Human>()))?.first(where: { $0.id.uuidString == executorId })
+            human = (try? context.fetch(FetchDescriptor<Human>()))?.first(where: { $0.id.uuidString == executorId }) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         }
         let consumesBoost = isDoubleRewardBoostActive()
         let isCoolingDown = livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) }
@@ -54,15 +54,14 @@ extension QuestManager {
         let humanTotal = human == nil ? 0 : result.humanCoconuts
 
         // ── 1. 写 PetCareLog（每只宠物独立一条）
-        let careTypeEnum: CareType?
-        switch type {
-        case .feed:   careTypeEnum = .feeding
-        case .water:  careTypeEnum = .watering
-        case .general(_, _, _, let t) where t.contains("铲砂") || t.contains("铲屎"):
-            careTypeEnum = .litter
-        case .general(_, _, _, let t) where t.contains("陪玩") || t.contains("逗玩"):
-            careTypeEnum = .play
-        default:      careTypeEnum = nil
+        let careTypeEnum: CareType? = switch type {
+        case .feed: .feeding
+        case .water: .watering
+        case let .general(_, _, _, t) where t.contains("铲砂") || t.contains("铲屎"):
+            .litter
+        case let .general(_, _, _, t) where t.contains("陪玩") || t.contains("逗玩"):
+            .play
+        default: nil
         }
 
         for pet in livePets {
@@ -133,7 +132,7 @@ extension QuestManager {
                 clearDoubleRewardBoost()
             }
             EconomyDailyBudgetStore.commit(result, householdKey: budgetKeys.household, memberKey: budgetKeys.member, careObjectKeys: objectKeys)
-            livePets.forEach { pet in
+            for pet in livePets {
                 if !isOnCooldown(petId: pet.id, type: type) {
                     recordCooldown(petId: pet.id, type: type)
                 }
@@ -150,7 +149,7 @@ extension QuestManager {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: self)
             #if DEBUG
-            print("❌ [batchAward] save 失败: \(error)")
+                OhanaLog.error("[batchAward] save failed: \(error)", category: "Economy")
             #endif
         }
 

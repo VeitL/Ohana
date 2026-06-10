@@ -33,7 +33,7 @@ extension QuestManager {
     func appendLog(_ entry: CoconutLogEntry, postsRewardFeedback: Bool = true) {
         coconutLogs.insert(entry, at: 0)
         if coconutLogs.count > 200 { coconutLogs = Array(coconutLogs.prefix(200)) }
-        if (entry.amount > 0 || (entry.growthXP ?? 0) > 0), postsRewardFeedback {
+        if entry.amount > 0 || (entry.growthXP ?? 0) > 0, postsRewardFeedback {
             publishCoconutRewardFeedback(for: entry)
         }
         publishCoconutProjectionRevision(note: "questManager.coconutLog.append")
@@ -57,7 +57,7 @@ extension QuestManager {
         guard total > 0, count > 0 else { return Array(repeating: 0, count: max(0, count)) }
         let base = total / count
         let remainder = total % count
-        return (0..<count).map { index in
+        return (0 ..< count).map { index in
             base + (index < remainder ? 1 : 0)
         }
     }
@@ -142,8 +142,8 @@ extension QuestManager {
         let descriptor = FetchDescriptor<Reminder>(
             predicate: #Predicate { r in
                 r.status == "pending" &&
-                r.scheduledAt >= today &&
-                r.scheduledAt < tomorrow
+                    r.scheduledAt >= today &&
+                    r.scheduledAt < tomorrow
             }
         )
         guard let reminders = try? context.fetch(descriptor) else { return }
@@ -151,7 +151,7 @@ extension QuestManager {
         for reminder in reminders {
             guard let event = reminder.event,
                   event.relatedEntityId == petIdStr,
-                  (event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet") else { continue }
+                  event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet" else { continue }
             let title = event.title
             let keyword = careKeyword
             guard title.contains(keyword) else { continue }

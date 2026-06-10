@@ -3,14 +3,14 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension HumanDetailView {
     var heroCard: some View {
         VStack(spacing: 20) {
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: [themeColor, themeColor.opacity(0.65)],
@@ -37,7 +37,7 @@ extension HumanDetailView {
                         if !human.bloodType.isEmpty { humanChip("血型 \(human.bloodType)", color: Color.goRed) }
                         if !human.nationality.isEmpty { humanChip("🌍 \(human.nationality)", color: Color(hex: "6B82C4")) }
                         if !human.city.isEmpty { humanChip("📍 \(human.city)", color: Color(hex: "6B82C4")) }
-                        if human.heightCm > 0 && human.heightCm.isFinite { humanChip(String(format: "%.0f cm", human.heightCm), color: Color.goTeal) }
+                        if human.heightCm > 0, human.heightCm.isFinite { humanChip(String(format: "%.0f cm", human.heightCm), color: Color.goTeal) }
                     }
                     .padding(.horizontal, 4)
                 }
@@ -45,7 +45,7 @@ extension HumanDetailView {
         }
         .padding(.vertical, 26)
         .padding(.horizontal, 16)
-        .goIslandModuleCard(cornerRadius: 28)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.hero)
         .padding(.horizontal, 16)
     }
 

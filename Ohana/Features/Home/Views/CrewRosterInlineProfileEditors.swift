@@ -37,9 +37,9 @@ struct CrewRosterPetProfileEditor: View {
             onCancel: onCancel,
             onSave: saveChanges
         ) {
-            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor")
+            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             CrewRosterEditorMenuRow(title: "物种", icon: "pawprint.fill", selection: $species, options: speciesOptions)
-            CrewRosterEditorTextField(title: "品种", text: $breed, icon: "tag.fill")
+            CrewRosterEditorTextField(title: "品种", text: $breed, icon: "tag.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             CrewRosterEditorSegmentedRow(
                 title: "性别",
                 selection: $gender,
@@ -49,7 +49,7 @@ struct CrewRosterPetProfileEditor: View {
             CrewRosterEditorDateToggleRow(title: "生日", icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
             CrewRosterEditorDateToggleRow(title: "到家日", icon: "house.fill", isOn: $hasHomeDate, date: $homeDate)
             CrewRosterThemeSwatchRow(title: "主题色", selectedHex: $themeHex)
-            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical)
+            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         }
         .onAppear(perform: loadState)
     }
@@ -127,7 +127,7 @@ struct CrewRosterHumanProfileEditor: View {
             onCancel: onCancel,
             onSave: saveChanges
         ) {
-            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor")
+            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             CrewRosterEditorSegmentedRow(
                 title: "权限",
                 selection: $role,
@@ -142,10 +142,10 @@ struct CrewRosterHumanProfileEditor: View {
             CrewRosterEditorDateToggleRow(title: "生日", icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
             CrewRosterEditorMenuRow(title: "血型", icon: "drop.fill", selection: $bloodType, options: bloodTypeOptions)
             CrewRosterEditorMenuRow(title: "MBTI", icon: "brain.head.profile", selection: $mbti, options: mbtiOptions)
-            CrewRosterEditorTextField(title: "国籍", text: $nationality, icon: "globe.asia.australia.fill")
-            CrewRosterEditorTextField(title: "现居地", text: $city, icon: "location.fill")
+            CrewRosterEditorTextField(title: "国籍", text: $nationality, icon: "globe.asia.australia.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: "现居地", text: $city, icon: "location.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             CrewRosterThemeSwatchRow(title: "主题色", selectedHex: $themeHex)
-            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical)
+            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         }
         .onAppear(perform: loadState)
     }
@@ -220,13 +220,13 @@ struct CrewRosterPlantProfileEditor: View {
             onCancel: onCancel,
             onSave: saveChanges
         ) {
-            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor")
-            CrewRosterEditorTextField(title: "品种", text: $species, icon: "leaf.fill")
-            CrewRosterEditorTextField(title: "位置", text: $location, icon: "location.fill")
-            CrewRosterEditorStepperRow(title: "浇水间隔", icon: "drop.fill", value: $wateringDays, range: 1...60, unit: "天")
-            CrewRosterEditorStepperRow(title: "施肥间隔", icon: "sparkles", value: $fertilizingDays, range: 1...120, unit: "天")
+            CrewRosterEditorTextField(title: "名字", text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: "品种", text: $species, icon: "leaf.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorTextField(title: "位置", text: $location, icon: "location.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            CrewRosterEditorStepperRow(title: "浇水间隔", icon: "drop.fill", value: $wateringDays, range: 1 ... 60, unit: "天")
+            CrewRosterEditorStepperRow(title: "施肥间隔", icon: "sparkles", value: $fertilizingDays, range: 1 ... 120, unit: "天")
             CrewRosterThemeSwatchRow(title: "主题色", selectedHex: $themeHex)
-            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical)
+            CrewRosterEditorTextField(title: "备注", text: $notes, icon: "note.text", axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         }
         .onAppear(perform: loadState)
     }

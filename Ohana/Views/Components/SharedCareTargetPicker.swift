@@ -37,7 +37,7 @@ struct SharedCareTargetPicker: View {
             }
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func targetChip(_ pet: Pet) -> some View {
@@ -53,9 +53,9 @@ struct SharedCareTargetPicker: View {
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             HStack(spacing: 7) {
-                    PetAvatarPortraitView(
-                        pet: pet,
-                        size: 28,
+                PetAvatarPortraitView(
+                    pet: pet,
+                    size: 28,
                     showsBackground: !(pet.avatarImageData.map { PetAvatarTransparencyCache.isTransparentAvatar($0) } ?? false),
                     backgroundOpacity: 0.14,
                     transparentScale: 0.92,

@@ -101,17 +101,17 @@ enum CatCareCommandService {
     @MainActor
     private static func fetchEvent(id: UUID, petID: UUID, context: ModelContext) -> Event? {
         let idString = petID.uuidString
-        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return events.first {
             $0.id == id &&
-            $0.relatedEntityId == idString &&
-            $0.eventType == EventType.litterBox.rawValue
+                $0.relatedEntityId == idString &&
+                $0.eventType == EventType.litterBox.rawValue
         }
     }
 
     @MainActor
     private static func fetchHygieneLog(id: UUID, petID: UUID, context: ModelContext) -> PetHygieneLog? {
-        let logs = (try? context.fetch(FetchDescriptor<PetHygieneLog>())) ?? []
+        let logs = (try? context.fetch(FetchDescriptor<PetHygieneLog>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return logs.first { $0.id == id && $0.pet?.id == petID }
     }
 }

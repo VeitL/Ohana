@@ -5,8 +5,8 @@
 //  报销申请表单 Sheet — 支持关联现有医疗花费记录，审批到账时写负值 PetExpenseLog
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct AddInsuranceClaimSheet: View {
     let insurance: PetInsurance
@@ -14,7 +14,7 @@ struct AddInsuranceClaimSheet: View {
     let allExpenses: [PetExpenseLog]
 
     // 可选：从 AddExpenseSheet 打开时直接预填花费记录
-    var prelinkedExpenseId: String? = nil
+    var prelinkedExpenseId: String?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -45,9 +45,11 @@ struct AddInsuranceClaimSheet: View {
     private var totalExpenseDouble: Double {
         CountryDecimalInput.parse(totalExpenseInput, countryCode: AppCountry.code) ?? 0
     }
+
     private var claimedDouble: Double {
         CountryDecimalInput.parse(claimedAmountInput, countryCode: AppCountry.code) ?? 0
     }
+
     private var canSave: Bool {
         totalExpenseDouble > 0 && claimedDouble > 0 && claimedDouble <= totalExpenseDouble
     }
@@ -85,7 +87,7 @@ struct AddInsuranceClaimSheet: View {
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .padding(12)
-                            .background(Color.goPrimary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                            .background(Color.goPrimary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
                         }
 
                         // 就诊 / 事故日期
@@ -93,13 +95,13 @@ struct AddInsuranceClaimSheet: View {
                             .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .tint(Color.goPrimary)
                             .padding(14)
-                            .goTranslucentCard(cornerRadius: 14)
+                            .goTranslucentCard(cornerRadius: OhanaRadius.row)
 
                         // 金额区
                         VStack(spacing: 10) {
                             amountRow(label: "本次总花费 *", placeholder: "0.00", text: $totalExpenseInput)
                             amountRow(label: "申请报销金额 *", placeholder: "0.00", text: $claimedAmountInput)
-                            if claimedDouble > totalExpenseDouble && totalExpenseDouble > 0 {
+                            if claimedDouble > totalExpenseDouble, totalExpenseDouble > 0 {
                                 Text("报销金额不能超过总花费")
                                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color(hex: "FF6B6B"))
@@ -148,7 +150,7 @@ struct AddInsuranceClaimSheet: View {
                                     }
                                 }
                                 .padding(14)
-                                .goTranslucentCard(cornerRadius: 14)
+                                .goTranslucentCard(cornerRadius: OhanaRadius.row)
                             }
                             .buttonStyle(ScaleButtonStyle())
                         }
@@ -180,14 +182,14 @@ struct AddInsuranceClaimSheet: View {
                             }
                         }
                         .padding(14)
-                        .goTranslucentCard(cornerRadius: 14)
+                        .goTranslucentCard(cornerRadius: OhanaRadius.row)
 
                         // 备注
-                        TextField("备注（诊断、病因等，可选）", text: $noteInput, axis: .vertical)
+                        TextField("备注（诊断、病因等，可选）", text: $noteInput, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .lineLimit(3)
                             .padding(14)
-                            .goTranslucentCard(cornerRadius: 14)
+                            .goTranslucentCard(cornerRadius: OhanaRadius.row)
 
                         // 保存
                         Button { save() } label: {
@@ -201,7 +203,7 @@ struct AddInsuranceClaimSheet: View {
                             .frame(maxWidth: .infinity).padding(.vertical, 16)
                             .background(
                                 canSave && !isSaving ? Color.goPrimary : Color.primary.opacity(0.15),
-                                in: RoundedRectangle(cornerRadius: 16)
+                                in: RoundedRectangle(cornerRadius: OhanaRadius.control)
                             )
                         }
                         .buttonStyle(ScaleButtonStyle()).disabled(!canSave || isSaving)
@@ -266,7 +268,7 @@ struct AddInsuranceClaimSheet: View {
                     valueFont: .system(size: 17, weight: .black, design: .rounded),
                     valueAlignment: .trailing,
                     fill: Color.clear,
-                    cornerRadius: 12,
+                    cornerRadius: OhanaRadius.chip,
                     horizontalPadding: 4,
                     verticalPadding: 0
                 )
@@ -274,7 +276,7 @@ struct AddInsuranceClaimSheet: View {
             }
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 14)
+        .goTranslucentCard(cornerRadius: OhanaRadius.row)
     }
 
     // MARK: - Logic

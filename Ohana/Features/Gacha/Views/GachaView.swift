@@ -5,13 +5,13 @@
 //  Series blind-box gacha presented as an inline V4 glass popup.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct GachaView: View {
     var drawsBackground: Bool = true
-    var onClose: (() -> Void)? = nil
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onClose: (() -> Void)?
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     let humans: [Human]
     let ownedItems: [GachaOwnedItem]
     let drawLogs: [GachaDrawLog]
@@ -25,7 +25,6 @@ struct GachaView: View {
     @AppStorage("appLanguage") private var appLanguage: String = "zh"
     @AppStorage("currentActiveHumanId") private var activeHumanId: String = ""
     @AppStorage("gachaHistory") private var legacyHistoryRaw: String = ""
-
     @State private var selectedSeriesId = GachaSeriesCatalog.defaultSeriesId
     @State private var isDrawing = false
     @State private var revealPhase: CoconutGachaRevealPhase = .idle
@@ -42,7 +41,6 @@ struct GachaView: View {
     @State private var isCollectionCompletionCelebrating = false
     @State private var revealResetToken = 0
     @State private var selectedCollectionItemId: String?
-
     init(
         drawsBackground: Bool = true,
         onClose: (() -> Void)? = nil,
@@ -64,10 +62,12 @@ struct GachaView: View {
     private var currentHuman: Human? {
         humans.first { $0.id.uuidString == activeHumanId }
     }
+
     private var currentCoconutBalance: Int { currentHuman?.coconutBalance ?? 0 }
     private var currentHumanLogs: [GachaDrawLog] {
         drawLogs.filter { $0.ownerHumanId == currentHuman?.id.uuidString && $0.seriesId == series.id }
     }
+
     private var collectionProgress: (owned: Int, total: Int) {
         appServices.gacha.collectionProgress(
             humanId: currentHuman?.id.uuidString ?? "",
@@ -75,6 +75,7 @@ struct GachaView: View {
             ownedItems: ownedItems
         )
     }
+
     private var selectedSeriesUnlocked: Bool {
         appServices.gacha.isSeriesUnlocked(
             seriesId: series.id,
@@ -82,36 +83,41 @@ struct GachaView: View {
             ownedItems: ownedItems
         )
     }
+
     private var defaultCommonProgress: (owned: Int, total: Int) {
         let firstSeries = GachaSeriesCatalog.series(id: GachaSeriesCatalog.defaultSeriesId)
         let ownedIds = Set(ownedItems
             .filter {
                 $0.ownerHumanId == currentHuman?.id.uuidString &&
-                $0.seriesId == firstSeries.id &&
-                $0.ownedCount > 0
+                    $0.seriesId == firstSeries.id &&
+                    $0.ownedCount > 0
             }
             .map(\.itemId))
         return (
-            firstSeries.commonItems.filter { ownedIds.contains($0.id) }.count,
+            firstSeries.commonItems.count(where: { ownedIds.contains($0.id) }),
             firstSeries.commonItems.count
         )
     }
+
     private var displayedCollectionProgress: (owned: Int, total: Int) {
         guard revealingCollectibleItemId != nil, revealCardPhase.holdsCollectionUpdate else {
             return collectionProgress
         }
         return (
-            preRevealOwnedCounts.values.filter { $0 > 0 }.count,
+            preRevealOwnedCounts.values.count(where: { $0 > 0 }),
             series.items.count
         )
     }
+
     private var canDraw: Bool {
         guard let currentHuman else { return false }
         return currentHuman.coconutBalance >= appServices.gacha.costPerDraw && !isDrawing && selectedSeriesUnlocked
     }
+
     private var shouldAnimateReveal: Bool {
         !reduceMotion && workloadPolicy.shouldRunInteractionAnimation(isVisible: true)
     }
+
     private var selectedCollectionItem: GachaItemEntry? {
         guard let selectedCollectionItemId else { return nil }
         return series.items.first { $0.id == selectedCollectionItemId }
@@ -124,7 +130,6 @@ struct GachaView: View {
                     OhanaAppBackground()
                         .ignoresSafeArea()
                 }
-
                 LinearGradient(
                     colors: [
                         Color.black.opacity(colorScheme == .dark ? 0.34 : 0.16), // ui-v4: allow modal scrim ink
@@ -135,14 +140,12 @@ struct GachaView: View {
                 )
                 .ignoresSafeArea()
                 .onTapGesture { close() }
-
                 VStack {
                     Spacer(minLength: 0)
                     popupPanel(maxHeight: proxy.size.height * 0.94)
                         .padding(.horizontal, 6)
                         .padding(.bottom, 4)
                 }
-
                 if let selectedCollectionItem {
                     collectionItemDetailOverlay(selectedCollectionItem)
                         .zIndex(4)
@@ -158,7 +161,6 @@ struct GachaView: View {
             OhanaPopupDragHandle(tint: Color.ohanaPrimaryText.opacity(0.24))
                 .padding(.top, 8)
                 .padding(.bottom, 6)
-
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "Ohana 盲盒", en: "Ohana Blind Box", de: "Ohana Blindbox"))
@@ -168,9 +170,7 @@ struct GachaView: View {
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
-
                 Spacer()
-
                 balancePill
 
                 OhanaPopupCloseButton(tint: Color.ohanaPrimaryText) { close() }
@@ -198,7 +198,7 @@ struct GachaView: View {
             .scrollDismissesKeyboard(.immediately)
         }
         .frame(maxHeight: maxHeight)
-        .background { OhanaPopupGlassSurface(cornerRadius: 52) }
+        .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.32 : 0.18), radius: 34, x: 0, y: -8) // ui-v4: allow lifted inline popup shadow
     }
 
@@ -241,7 +241,7 @@ struct GachaView: View {
                     .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .foregroundStyle(isSelected && isUnlocked ? Color.arkInk : Color.ohanaPrimaryText)
                     .background(
-                        (isSelected && isUnlocked ? Color.goPrimary : Color.ohanaControlFill),
+                        isSelected && isUnlocked ? Color.goPrimary : Color.ohanaControlFill,
                         in: Circle()
                     )
 
@@ -321,7 +321,7 @@ struct GachaView: View {
 
     private var gachaStage: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
                 .fill(Color.ohanaCardSurface)
 
             VStack(spacing: 8) {
@@ -361,7 +361,7 @@ struct GachaView: View {
                 Text(outcome.displaySymbol)
                     .font(OhanaFont.adaptive(size: 34)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .frame(width: 54, height: 54)
-                    .background(tint.opacity(0.18), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(tint.opacity(0.18), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -369,7 +369,7 @@ struct GachaView: View {
                     Text(outcomeTitle(outcome))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    if outcome.log.isNew && outcome.item != nil {
+                    if outcome.log.isNew, outcome.item != nil {
                         Text("NEW")
                             .font(OhanaFont.caption2(.black))
                             .foregroundStyle(Color.arkInk)
@@ -396,7 +396,7 @@ struct GachaView: View {
             }
         }
         .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func outcomeTitle(_ outcome: GachaDrawOutcome) -> String {
@@ -477,12 +477,12 @@ struct GachaView: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .overlay(collectionCompletionGlow)
         .scaleEffect(isCollectionCompletionCelebrating ? 1.012 : 1)
         .ohanaShine(
             trigger: collectionCompletionToken,
-            cornerRadius: 26,
+            cornerRadius: OhanaRadius.cardLarge,
             isEnabled: shouldAnimateReveal && collectionCompletionToken > 0
         )
         .animation(shouldAnimateReveal ? GoMotion.feedback : GoMotion.reduced, value: isCollectionCompletionCelebrating)
@@ -492,10 +492,10 @@ struct GachaView: View {
     private var collectionCompletionGlow: some View {
         if isCollectionCompletionCelebrating {
             ZStack {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.goPrimary.opacity(0.54), lineWidth: 2)
 
-                ForEach(0..<9, id: \.self) { index in
+                ForEach(0 ..< 9, id: \.self) { index in
                     Image(systemName: index.isMultiple(of: 2) ? "sparkle" : "star.fill")
                         .font(.system(size: index.isMultiple(of: 2) ? 15 : 9, weight: .black))
                         .foregroundStyle(index.isMultiple(of: 2) ? Color.goPrimary : Color.goYellow)
@@ -514,8 +514,8 @@ struct GachaView: View {
     private func collectionCell(_ item: GachaItemEntry) -> some View {
         let owned = ownedItems.first {
             $0.ownerHumanId == currentHuman?.id.uuidString &&
-            $0.seriesId == series.id &&
-            $0.itemId == item.id
+                $0.seriesId == series.id &&
+                $0.itemId == item.id
         }
         let ownedCount = displayedOwnedCount(for: item, actualCount: owned?.ownedCount ?? 0)
         let isPulsing = collectionPulseItemId == item.id
@@ -532,17 +532,17 @@ struct GachaView: View {
                     ownedCount: ownedCount,
                     isPulsing: isPulsing
                 )
-                    .overlay(alignment: .topTrailing) {
-                        if ownedCount > 1 {
-                            Text("x\(ownedCount)")
-                                .font(OhanaFont.caption2(.black))
-                                .foregroundStyle(Color.arkInk)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(Color.goPrimary, in: Capsule())
-                                .offset(x: 5, y: -5)
-                        }
+                .overlay(alignment: .topTrailing) {
+                    if ownedCount > 1 {
+                        Text("x\(ownedCount)")
+                            .font(OhanaFont.caption2(.black))
+                            .foregroundStyle(Color.arkInk)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.goPrimary, in: Capsule())
+                            .offset(x: 5, y: -5)
                     }
+                }
                 Text(collectionDisplayName(for: item))
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(ownedCount == 0 ? Color.ohanaTertiaryText : item.rarity.tint)
@@ -612,7 +612,7 @@ struct GachaView: View {
                 collectionDetailImage(item)
                     .frame(width: 230, height: 292)
                     .padding(.vertical, 2)
-                    .ohanaShine(trigger: item.id, cornerRadius: 30, isEnabled: shouldAnimateReveal)
+                    .ohanaShine(trigger: item.id, cornerRadius: OhanaRadius.sheetMini, isEnabled: shouldAnimateReveal)
 
                 HStack(spacing: 8) {
                     Label("x\(ownedCount(for: item))", systemImage: "square.stack.3d.up.fill")
@@ -624,7 +624,7 @@ struct GachaView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
                 Text("“\(item.localizedMotto(l))”")
                     .font(OhanaFont.callout(.black))
@@ -636,7 +636,7 @@ struct GachaView: View {
             }
             .padding(18)
             .frame(maxWidth: 356)
-            .background { OhanaPopupGlassSurface(cornerRadius: 42) }
+            .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.sheetLarge) }
             .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.34 : 0.18), radius: 28, x: 0, y: 14) // ui-v4: allow focused collectible viewer lift
             .padding(.horizontal, 18)
         }
@@ -667,8 +667,8 @@ struct GachaView: View {
     private func ownedCount(for item: GachaItemEntry) -> Int {
         ownedItems.first {
             $0.ownerHumanId == currentHuman?.id.uuidString &&
-            $0.seriesId == series.id &&
-            $0.itemId == item.id
+                $0.seriesId == series.id &&
+                $0.itemId == item.id
         }?.ownedCount ?? 0
     }
 
@@ -706,7 +706,7 @@ struct GachaView: View {
                             Text(row.symbol)
                                 .font(OhanaFont.adaptive(size: 22)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                                .background(row.tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                                .background(row.tint.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(row.title)
                                     .font(OhanaFont.caption(.black))
@@ -733,7 +733,7 @@ struct GachaView: View {
                 }
             }
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         }
     }
 
@@ -823,7 +823,7 @@ struct GachaView: View {
 
     private func isFirstCollectionCompletion(outcome: GachaDrawOutcome, previousCounts: [String: Int]) -> Bool {
         guard outcome.item != nil, outcome.log.isNew else { return false }
-        let previouslyOwnedCount = previousCounts.values.filter { $0 > 0 }.count
+        let previouslyOwnedCount = previousCounts.values.count(where: { $0 > 0 })
         return previouslyOwnedCount == series.items.count - 1
     }
 
@@ -1023,13 +1023,13 @@ struct GachaView: View {
     private func message(for error: GachaDrawError) -> String {
         switch error {
         case .missingHuman:
-            return l.tr(zh: "先切换到本人账户", en: "Switch to your account first", de: "Wechsle zuerst zu deinem Konto")
-        case .insufficientBalance(let missing):
-            return l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig")
+            l.tr(zh: "先切换到本人账户", en: "Switch to your account first", de: "Wechsle zuerst zu deinem Konto")
+        case let .insufficientBalance(missing):
+            l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig")
         case .invalidSeries:
-            return l.tr(zh: "这个系列概率配置不完整", en: "This series has invalid odds", de: "Diese Serie hat ungültige Chancen")
+            l.tr(zh: "这个系列概率配置不完整", en: "This series has invalid odds", de: "Diese Serie hat ungültige Chancen")
         case .lockedSeries:
-            return lockedSeriesMessage
+            lockedSeriesMessage
         }
     }
 

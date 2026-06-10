@@ -192,13 +192,12 @@ final class AppWorkloadPolicy: ObservableObject {
 
     func refreshBudget(isVisible: Bool = true, allowDuringActiveWalk: Bool = false) -> OhanaRefreshBudget {
         guard isVisible else { return .paused }
-        let base: OhanaRefreshBudget
-        if !isForeground {
-            base = allowDuringActiveWalk && hasRunningWalk ? .throttled : .paused
+        let base: OhanaRefreshBudget = if !isForeground {
+            allowDuringActiveWalk && hasRunningWalk ? .throttled : .paused
         } else if isLowPowerModeEnabled || isReduceMotionEnabled || userPowerSavingMode {
-            base = .throttled
+            .throttled
         } else {
-            base = .live
+            .live
         }
         return stricterRefreshBudget(base, thermalRefreshBudget)
     }
@@ -211,15 +210,15 @@ final class AppWorkloadPolicy: ObservableObject {
         allowDuringActiveWalk: Bool = false
     ) -> TimeInterval {
         switch refreshBudget(isVisible: isVisible, allowDuringActiveWalk: allowDuringActiveWalk) {
-        case .live: return liveInterval
-        case .throttled: return throttledInterval
-        case .paused: return pausedInterval
+        case .live: liveInterval
+        case .throttled: throttledInterval
+        case .paused: pausedInterval
         }
     }
 
     private func reductionReason(isVisible: Bool, allowDuringActiveWalk: Bool) -> String? {
         if !isVisible { return "notVisible" }
-        if !isForeground && !(allowDuringActiveWalk && hasRunningWalk) { return "background" }
+        if !isForeground, !(allowDuringActiveWalk && hasRunningWalk) { return "background" }
         if thermalState == .critical { return "thermalCritical" }
         if thermalState == .serious { return "thermalSerious" }
         if isLowPowerModeEnabled { return "lowPowerMode" }
@@ -275,17 +274,17 @@ final class AppWorkloadPolicy: ObservableObject {
 
     private func motionSeverity(_ budget: OhanaMotionBudget) -> Int {
         switch budget {
-        case .full: return 0
-        case .efficient: return 1
-        case .static: return 2
+        case .full: 0
+        case .efficient: 1
+        case .static: 2
         }
     }
 
     private func refreshSeverity(_ budget: OhanaRefreshBudget) -> Int {
         switch budget {
-        case .live: return 0
-        case .throttled: return 1
-        case .paused: return 2
+        case .live: 0
+        case .throttled: 1
+        case .paused: 2
         }
     }
 
@@ -325,7 +324,7 @@ final class AppPerformanceMonitor: ObservableObject {
     }
 
     func record(_ name: String, startedAt: CFAbsoluteTime, note: String? = nil) {
-        let elapsed = max(0, (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+        let elapsed = max(0, (CFAbsoluteTimeGetCurrent() - startedAt) * 1000)
         record(name, valueMS: elapsed, note: note)
     }
 
@@ -393,7 +392,7 @@ enum AppFlowPerformance {
         let sampleName = "\(flow).\(phase)"
         let noteString = formattedNote(note)
         if let startedAt {
-            let elapsedMS = max(0, (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000)
+            let elapsedMS = max(0, (CFAbsoluteTimeGetCurrent() - startedAt) * 1000)
             AppPerformanceSignposts.recordFlow(flow, phase: phase, valueMS: elapsedMS, note: noteString)
             AppPerformanceMonitor.shared.record(sampleName, valueMS: elapsedMS, note: noteString)
         } else {

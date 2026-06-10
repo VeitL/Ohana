@@ -7,7 +7,7 @@
 
 import SwiftUI
 #if os(iOS)
-import UIKit
+    import UIKit
 #endif
 
 // MARK: - GO Motion Tokens
@@ -18,7 +18,6 @@ enum GoMotion {
     static let feedback: Animation = .interactiveSpring(response: 0.24, dampingFraction: 0.82, blendDuration: 0.10)
     static let quick: Animation = .easeOut(duration: 0.18)
     static let reduced: Animation = .easeInOut(duration: 0.12)
-
     static let tap: Animation = .interactiveSpring(response: 0.18, dampingFraction: 0.84, blendDuration: 0.08)
     static let selection: Animation = .interactiveSpring(response: 0.32, dampingFraction: 0.88, blendDuration: 0.16)
     static let stateChange: Animation = .interactiveSpring(response: 0.38, dampingFraction: 0.90, blendDuration: 0.18)
@@ -31,7 +30,6 @@ enum GoMotion {
     static let zStackHero: Animation = .interactiveSpring(response: 0.62, dampingFraction: 0.92, blendDuration: 0.18)
     static let zStackMenu: Animation = .interactiveSpring(response: 0.34, dampingFraction: 0.78, blendDuration: 0.16)
     static let zStackPopup: Animation = .interactiveSpring(response: 0.40, dampingFraction: 0.88, blendDuration: 0.20)
-
     static func staggerDelay(_ index: Int, step: Double = 0.035, maxDelay: Double = 0.24) -> Double {
         min(Double(max(index, 0)) * step, maxDelay)
     }
@@ -50,7 +48,6 @@ struct CoconutBalanceCapsule: View {
     private let showsDeltaAnimation: Bool
     private let deltaAnimationContext: String
     let onTap: () -> Void
-
     init(
         balance: Int? = nil,
         showsDeltaAnimation: Bool? = nil,
@@ -152,7 +149,6 @@ struct CoconutBalanceCapsule: View {
         floatingDelta = nextDelta == 0 ? delta : nextDelta
         floatingDeltaToken += 1
         let token = floatingDeltaToken
-
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
@@ -215,7 +211,7 @@ private struct CoconutBalanceDeltaState: Equatable {
 }
 
 // MARK: - Screen Compat（优先 UIWindowScene，避免直接读 UIScreen.main）
-struct ScreenCompat {
+enum ScreenCompat {
     static var bounds: CGRect {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         for scene in scenes {
@@ -228,33 +224,32 @@ struct ScreenCompat {
         }
         return CGRect(x: 0, y: 0, width: 393, height: 852)
     }
+
     static var width: CGFloat { bounds.width }
     static var height: CGFloat { bounds.height }
-
-#if os(iOS)
-    /// 物理屏圆角半径（与 SpringBoard / 桌面玻璃一致）。优先 `_displayCornerRadius`； unavailable 时用短边比例估算。
-    /// - Note: 公开 SDK 暂无 `UIScreen.displayCornerRadius` 成员时依赖 runtime key；若未来系统提供公开 API 可替换。
-    static var displayCornerRadius: CGFloat {
-        let screen = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.screen
-        if let r = screen?.value(forKey: "_displayCornerRadius") as? CGFloat, r > 1 {
-            return r
+    #if os(iOS)
+        /// 物理屏圆角半径（与 SpringBoard / 桌面玻璃一致）。优先 `_displayCornerRadius`； unavailable 时用短边比例估算。
+        /// - Note: 公开 SDK 暂无 `UIScreen.displayCornerRadius` 成员时依赖 runtime key；若未来系统提供公开 API 可替换。
+        static var displayCornerRadius: CGFloat {
+            let screen = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first?.screen
+            if let r = screen?.value(forKey: "_displayCornerRadius") as? CGFloat, r > 1 {
+                return r
+            }
+            let s = bounds.size
+            let m = min(s.width, s.height)
+            return max(46, m * 0.134)
         }
-        let s = bounds.size
-        let m = min(s.width, s.height)
-        return max(46, m * 0.134)
-    }
-#else
-    static var displayCornerRadius: CGFloat {
-        let s = bounds.size
-        return max(46, min(s.width, s.height) * 0.134)
-    }
-#endif
+    #else
+        static var displayCornerRadius: CGFloat {
+            let s = bounds.size
+            return max(46, min(s.width, s.height) * 0.134)
+        }
+    #endif
 }
 
 // MARK: - Environment：屏幕圆角（Focus / 同心卡片等）
-
 enum OhanaDisplayCornerRadiusKey: EnvironmentKey {
     static var defaultValue: CGFloat { ScreenCompat.displayCornerRadius }
 }
@@ -271,7 +266,6 @@ extension EnvironmentValues {
 struct OhanaGlassModifier: ViewModifier {
     var cornerRadius: CGFloat
     var fillOpacity: CGFloat
-    
     func body(content: Content) -> some View {
         content
             .background {
@@ -289,7 +283,6 @@ struct OhanaGlassModifier: ViewModifier {
 // MARK: - Card Modifiers
 struct NeoWhiteCardModifier: ViewModifier {
     var cornerRadius: CGFloat
-    
     func body(content: Content) -> some View {
         content
             .foregroundStyle(Color.ohanaPrimaryText)
@@ -308,7 +301,6 @@ struct NeoWhiteCardModifier: ViewModifier {
 /// 与 GO Focus 首页区块一致；表面色跟随全局浅/深色偏好。
 struct GoIslandModuleCardModifier: ViewModifier {
     var cornerRadius: CGFloat
-
     func body(content: Content) -> some View {
         content
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -329,10 +321,10 @@ struct NeoDarkCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .fill(Color.ohanaCardSurface)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 }
 
@@ -384,7 +376,6 @@ struct HeroTitleStyle: ViewModifier {
 
 struct GiantMetricStyle: ViewModifier {
     var size: CGFloat
-    
     func body(content: Content) -> some View {
         content
             .font(OhanaFont.metric(size: size, .heavy))
@@ -396,7 +387,6 @@ struct GoCardModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     var cornerRadius: CGFloat
     var color: Color
-    
     func body(content: Content) -> some View {
         content
             .background(color, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -409,7 +399,6 @@ struct GoCardModifier: ViewModifier {
 
 struct GoBlueCardModifier: ViewModifier {
     var cornerRadius: CGFloat = 24
-    
     func body(content: Content) -> some View {
         content
             .background {
@@ -432,7 +421,6 @@ struct GoBlueCardModifier: ViewModifier {
 
 struct GoTranslucentCardModifier: ViewModifier {
     var cornerRadius: CGFloat = 20
-    
     func body(content: Content) -> some View {
         content
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -446,7 +434,6 @@ struct GoTranslucentCardModifier: ViewModifier {
 struct GoGlassBackground<S: InsettableShape>: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     var shape: S
-    
     func body(content: Content) -> some View {
         content
             .background(Color.ohanaControlFill.opacity(colorScheme == .dark ? 0.92 : 0.86), in: shape)
@@ -490,60 +477,60 @@ extension View {
     func ohanaGlassStyle(cornerRadius: CGFloat = 32, fillOpacity: CGFloat = 0.12) -> some View {
         modifier(OhanaGlassModifier(cornerRadius: cornerRadius, fillOpacity: fillOpacity))
     }
-    
+
     func neoWhiteCard(cornerRadius: CGFloat = 32) -> some View {
         modifier(NeoWhiteCardModifier(cornerRadius: cornerRadius))
     }
-    
+
     func neoDarkCard() -> some View {
         modifier(NeoDarkCardModifier())
     }
-    
+
     func capsuleButton() -> some View {
         modifier(CapsuleButtonModifier())
     }
-    
+
     func neonCapsuleButton() -> some View {
         modifier(NeonCapsuleButtonModifier())
     }
-    
-    func goGlassBackground<S: InsettableShape>(_ shape: S) -> some View {
+
+    func goGlassBackground(_ shape: some InsettableShape) -> some View {
         modifier(GoGlassBackground(shape: shape))
     }
 
-    func goSelectableSurface<S: InsettableShape>(
+    func goSelectableSurface(
         isSelected: Bool,
         tint: Color,
-        in shape: S
+        in shape: some InsettableShape
     ) -> some View {
         modifier(GoSelectableSurface(isSelected: isSelected, tint: tint, shape: shape))
     }
-    
+
     func capsuleButtonDark() -> some View {
         modifier(CapsuleButtonDarkModifier())
     }
-    
+
     func heroTitleStyle() -> some View {
         modifier(HeroTitleStyle())
     }
-    
+
     func giantMetricStyle(size: CGFloat = 60) -> some View {
         modifier(GiantMetricStyle(size: size))
     }
-    
+
     func arkMetric(size: CGFloat = 80) -> some View {
         font(OhanaFont.metric(size: size, .heavy))
     }
-    
+
     func arkMetricSM(size: CGFloat = 40) -> some View {
         font(OhanaFont.metric(size: size, .heavy))
     }
-    
+
     // MARK: - Go UI Style Extensions
     func goCard(color: Color = Color.ohanaCardSurface, cornerRadius: CGFloat = 24) -> some View {
         modifier(GoCardModifier(cornerRadius: cornerRadius, color: color))
     }
-    
+
     func goBlueCard(cornerRadius: CGFloat = 24) -> some View {
         modifier(GoBlueCardModifier(cornerRadius: cornerRadius))
     }
@@ -552,7 +539,7 @@ extension View {
     func goSolidCardSurface(cornerRadius: CGFloat = 20) -> some View {
         modifier(GoTranslucentCardModifier(cornerRadius: cornerRadius))
     }
-    
+
     func goTranslucentCard(cornerRadius: CGFloat = 20) -> some View {
         modifier(GoTranslucentCardModifier(cornerRadius: cornerRadius))
     }
@@ -560,8 +547,8 @@ extension View {
 
 // MARK: - Go Dashed Divider
 struct GoDashedDivider: View {
-    var color: Color = Color.ohanaDivider
-    
+    var color: Color = .ohanaDivider
+
     var body: some View {
         GeometryReader { geo in
             Path { path in
@@ -579,7 +566,6 @@ struct GoDashedDivider: View {
 struct GoBottomTabBar: View {
     let tabs: [(icon: String, label: String)]
     @Binding var selectedIndex: Int
-    
     var body: some View {
         HStack(spacing: 0) {
             ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
@@ -618,7 +604,7 @@ struct GoBottomTabBar: View {
 // MARK: - Ohana Sheet Wrapper
 struct OhanaSheetPageScaffold<Leading: View, Trailing: View, Content: View, Floating: View>: View {
     let title: String
-    var subtitle: String? = nil
+    var subtitle: String?
     var showsCloseButton: Bool = true
     let onClose: () -> Void
     @ViewBuilder let leading: () -> Leading
@@ -700,7 +686,7 @@ struct OhanaSheetWrapper<Content: View>: View {
     let title: String
     let onDismiss: () -> Void
     @ViewBuilder let content: () -> Content
-    
+
     var body: some View {
         OhanaSheetPageScaffold(
             title: title,
@@ -752,8 +738,8 @@ extension View {
 
 // MARK: - Dashed Divider
 struct OhanaDashedDivider: View {
-    var color: Color = Color.ohanaDivider
-    
+    var color: Color = .ohanaDivider
+
     var body: some View {
         GeometryReader { geo in
             Path { path in
@@ -770,7 +756,7 @@ struct OhanaDashedDivider: View {
 // MARK: - Capsule Bar Shape
 struct CapsuleBarShape: Shape {
     var cornerRadius: CGFloat = 4
-    
+
     func path(in rect: CGRect) -> Path {
         var path = Path()
         path.addRoundedRect(
@@ -789,26 +775,25 @@ enum OhanaFont {
         weight: Font.Weight = .regular,
         design: Font.Design = .default
     ) -> Font {
-        let style: Font.TextStyle
-        switch size {
+        let style: Font.TextStyle = switch size {
         case ..<11:
-            style = .caption2
+            .caption2
         case ..<13:
-            style = .caption
+            .caption
         case ..<15:
-            style = .footnote
+            .footnote
         case ..<17:
-            style = .callout
+            .callout
         case ..<20:
-            style = .headline
+            .headline
         case ..<23:
-            style = .title3
+            .title3
         case ..<28:
-            style = .title2
+            .title2
         case ..<34:
-            style = .title
+            .title
         default:
-            style = .largeTitle
+            .largeTitle
         }
         return .system(style, design: design).weight(weight)
     }
@@ -816,36 +801,47 @@ enum OhanaFont {
     static func largeTitle(_ weight: Font.Weight = .black) -> Font {
         adaptive(size: 34, weight: weight, design: .rounded)
     }
+
     static func title(_ weight: Font.Weight = .bold) -> Font {
         adaptive(size: 24, weight: weight, design: .rounded)
     }
+
     static func title2(_ weight: Font.Weight = .bold) -> Font {
         adaptive(size: 20, weight: weight, design: .rounded)
     }
+
     static func title3(_ weight: Font.Weight = .semibold) -> Font {
         adaptive(size: 17, weight: weight, design: .rounded)
     }
+
     static func headline(_ weight: Font.Weight = .bold) -> Font {
         adaptive(size: 16, weight: weight, design: .rounded)
     }
+
     static func body(_ weight: Font.Weight = .medium) -> Font {
         adaptive(size: 15, weight: weight, design: .rounded)
     }
+
     static func callout(_ weight: Font.Weight = .medium) -> Font {
         adaptive(size: 14, weight: weight, design: .rounded)
     }
+
     static func subheadline(_ weight: Font.Weight = .medium) -> Font {
         adaptive(size: 13, weight: weight, design: .rounded)
     }
+
     static func footnote(_ weight: Font.Weight = .medium) -> Font {
         adaptive(size: 12, weight: weight, design: .rounded)
     }
+
     static func caption(_ weight: Font.Weight = .medium) -> Font {
         adaptive(size: 11, weight: weight, design: .rounded)
     }
+
     static func caption2(_ weight: Font.Weight = .medium) -> Font {
         adaptive(size: 10, weight: weight, design: .rounded)
     }
+
     static func metric(size: CGFloat, _ weight: Font.Weight = .black) -> Font {
         adaptive(size: size, weight: weight, design: .rounded)
     }
@@ -857,42 +853,46 @@ enum AlertStyle {
 
     var icon: String {
         switch self {
-        case .success: return "checkmark.circle.fill"
-        case .warning: return "exclamationmark.triangle.fill"
-        case .error:   return "xmark.circle.fill"
-        case .info:    return "info.circle.fill"
+        case .success: "checkmark.circle.fill"
+        case .warning: "exclamationmark.triangle.fill"
+        case .error: "xmark.circle.fill"
+        case .info: "info.circle.fill"
         }
     }
+
     var bg: Color {
         switch self {
-        case .success: return .alertSuccessBg
-        case .warning: return .alertWarningBg
-        case .error:   return .alertErrorBg
-        case .info:    return .alertInfoBg
+        case .success: .alertSuccessBg
+        case .warning: .alertWarningBg
+        case .error: .alertErrorBg
+        case .info: .alertInfoBg
         }
     }
+
     var border: Color {
         switch self {
-        case .success: return .alertSuccessBorder
-        case .warning: return .alertWarningBorder
-        case .error:   return .alertErrorBorder
-        case .info:    return .alertInfoBorder
+        case .success: .alertSuccessBorder
+        case .warning: .alertWarningBorder
+        case .error: .alertErrorBorder
+        case .info: .alertInfoBorder
         }
     }
+
     var textColor: Color {
         switch self {
-        case .success: return .alertSuccessText
-        case .warning: return .alertWarningText
-        case .error:   return .alertErrorText
-        case .info:    return .alertInfoText
+        case .success: .alertSuccessText
+        case .warning: .alertWarningText
+        case .error: .alertErrorText
+        case .info: .alertInfoText
         }
     }
+
     var iconColor: Color {
         switch self {
-        case .success: return .alertSuccessIcon
-        case .warning: return .alertWarningIcon
-        case .error:   return .alertErrorIcon
-        case .info:    return .alertInfoIcon
+        case .success: .alertSuccessIcon
+        case .warning: .alertWarningIcon
+        case .error: .alertErrorIcon
+        case .info: .alertInfoIcon
         }
     }
 }
@@ -900,8 +900,8 @@ enum AlertStyle {
 struct AlertBanner: View {
     let style: AlertStyle
     let message: String
-    var title: String? = nil
-    var onDismiss: (() -> Void)? = nil
+    var title: String?
+    var onDismiss: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -935,9 +935,9 @@ struct AlertBanner: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(style.bg)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                 .strokeBorder(style.border, lineWidth: 1)
         )
     }
@@ -952,7 +952,7 @@ struct NoiseTextureView: View {
             let density = min(1.25, max(0.45, area / baselineArea))
             let pointCount = Int(640 * density)
 
-            for index in 0..<pointCount {
+            for index in 0 ..< pointCount {
                 let x = CGFloat(Self.unitNoise(index, salt: 17)) * size.width
                 let y = CGFloat(Self.unitNoise(index, salt: 71)) * size.height
                 let opacity = 0.018 + Self.unitNoise(index, salt: 131) * 0.045
@@ -1014,9 +1014,9 @@ struct CoconutRewardModifier: ViewModifier {
                     }
                 }
                 .padding(32)
-                .background(Color.ohanaCardSurfaceElevated.opacity(0.92), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .background(Color.ohanaCardSurfaceElevated.opacity(0.92), in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
                         .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
                 }
                 .transition(.opacity)
@@ -1041,11 +1041,11 @@ struct CoconutRewardModifier: ViewModifier {
 // MARK: - Coconut Balance Toolbar Modifier
 struct CoconutBalanceToolbarModifier: ViewModifier {
     let onTap: () -> Void
-    
+
     init(onTap: @escaping () -> Void = {}) {
         self.onTap = onTap
     }
-    
+
     func body(content: Content) -> some View {
         content
             .toolbar {
@@ -1065,7 +1065,7 @@ extension View {
     func coconutRewardOverlay(trigger: Binding<Bool>, amount: Int, label: String? = nil) -> some View {
         self.modifier(CoconutRewardModifier(trigger: trigger, amount: amount, label: label))
     }
-    
+
     /// 为 NavigationStack 页面添加椰子余额胶囊到 toolbar
     /// - Parameter onTap: 点击胶囊时的回调，默认打开 CoconutLogView
     func withCoconutToolbar(onTap: @escaping () -> Void = {}) -> some View {

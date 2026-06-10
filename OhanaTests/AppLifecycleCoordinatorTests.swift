@@ -1,6 +1,6 @@
 import SwiftUI
-@testable import Ohana
 import Testing
+@testable import Ohana
 
 @MainActor
 struct AppLifecycleCoordinatorTests {

@@ -25,10 +25,8 @@ nonisolated struct L10n {
     var isKorean: Bool { lang == "ko" }
     var isItalian: Bool { lang == "it" }
     var usesEnglishFallback: Bool { lang != "zh" }
-
     /// Legacy compatibility flag for older two-language helpers. New UI copy should use `tr` or `text`.
     var isEn: Bool { usesEnglishFallback }
-
     func text(_ value: AppLocalizedText) -> String {
         value.resolve(lang)
     }
@@ -203,7 +201,6 @@ nonisolated struct L10n {
         "继续": ["es": "Continuar", "pt": "Continuar", "fr": "Continuer"],
         "结束": ["es": "Terminar", "pt": "Encerrar", "fr": "Terminer"]
     ]
-
     private static let curatedStaticTranslationsExpansion: [String: [String: String]] = [
         "首页": ["ja": "ホーム", "ko": "홈", "it": "Home"],
         "植物": ["ja": "植物", "ko": "식물", "it": "Piante"],
@@ -350,7 +347,6 @@ nonisolated struct L10n {
         "继续": ["ja": "再開", "ko": "계속", "it": "Riprendi"],
         "结束": ["ja": "終了", "ko": "종료", "it": "Fine"]
     ]
-
     private static let curatedStaticTranslations: [String: [String: String]] = {
         var values = curatedStaticTranslationsBase
         for (key, translations) in curatedStaticTranslationsExpansion {
@@ -359,24 +355,23 @@ nonisolated struct L10n {
         return values
     }()
 
-    // MARK: - Dock / Tab
     var tabHome: String { tr(zh: "首页", en: "Home", de: "Start") }
     var tabPlant: String { tr(zh: "植物", en: "Plants", de: "Pflanzen") }
     var tabCalendar: String { tr(zh: "日历", en: "Calendar", de: "Kalender") }
     var tabCrew: String { tr(zh: "图鉴", en: "Crew", de: "Team") }
     var tabOasis: String { tr(zh: "绿洲", en: "Oasis", de: "Oase") }
 
-    // MARK: - Global Header
     func greeting(_ text: String) -> String { text } // greeting 已由逻辑生成
     var ohanaCrew: String { tr(zh: "Ohana 图鉴", en: "Ohana Crew", de: "Ohana Team") }
 
-    // MARK: - Greeting hints
     func morningHint(_ name: String) -> String {
         tr(zh: "带 \(name) 早晨出去走走吧", en: "Take \(name) for a morning walk", de: "Geh morgens mit \(name) spazieren")
     }
+
     func eveningHint(_ name: String) -> String {
         tr(zh: "黄金时段，带 \(name) 散个步 🌇", en: "Golden hour — walk \(name) 🌇", de: "Goldene Stunde — geh mit \(name) raus 🌇")
     }
+
     func defaultHint(_ name: String) -> String {
         tr(zh: "\(name) 在等你呢", en: "\(name) is waiting for you", de: "\(name) wartet auf dich")
     }
@@ -385,7 +380,6 @@ nonisolated struct L10n {
     var goodAfternoon: String { tr(zh: "下午好", en: "Good afternoon", de: "Guten Tag") }
     var goodEvening: String { tr(zh: "晚上好", en: "Good evening", de: "Guten Abend") }
     var goodNight: String { tr(zh: "晚安", en: "Good night", de: "Gute Nacht") }
-
     // MARK: - Settings
     var settings: String { tr(zh: "设置", en: "Settings", de: "Einstellungen") }
     var addMember: String { tr(zh: "添加成员", en: "Add Member", de: "Mitglied hinzufügen") }
@@ -400,6 +394,7 @@ nonisolated struct L10n {
             de: "Setzt Sprache, Einheiten und Währung vor, bleibt einzeln änderbar"
         )
     }
+
     var language: String { tr(zh: "语言", en: "Language", de: "Sprache") }
     var measurementUnits: String { tr(zh: "计量单位", en: "Measurement units", de: "Maßeinheiten") }
     var measurementUnitsHint: String {
@@ -409,6 +404,7 @@ nonisolated struct L10n {
             de: "Für Gewicht, Distanz und Futtermengen"
         )
     }
+
     var currency: String { tr(zh: "货币", en: "Currency", de: "Währung") }
     var currencyDisplayOnlyHint: String {
         tr(
@@ -417,6 +413,7 @@ nonisolated struct L10n {
             de: "Ändert nur die Anzeige, keine Umrechnung"
         )
     }
+
     var appearance: String { tr(zh: "外观主题", en: "Appearance", de: "Darstellung") }
     var themeSystem: String { tr(zh: "跟随系统", en: "System", de: "System") }
     var themeLight: String { tr(zh: "浅色模式", en: "Light", de: "Hell") }
@@ -425,6 +422,7 @@ nonisolated struct L10n {
     var replayOnboardingSubtitle: String {
         tr(zh: "重新播放首次启动引导，方便测试", en: "Replay the first-launch guide for testing", de: "Startanleitung zum Testen erneut anzeigen")
     }
+
     var personalInfo: String { tr(zh: "个人信息", en: "Profile", de: "Profil") }
     var notSet: String { tr(zh: "未设置", en: "Not set", de: "Nicht festgelegt") }
     var editNickname: String { tr(zh: "修改昵称", en: "Edit nickname", de: "Spitznamen ändern") }
@@ -437,7 +435,6 @@ nonisolated struct L10n {
     var manageNotification: String { tr(zh: "管理通知设置", en: "Manage notification settings", de: "Benachrichtigungseinstellungen verwalten") }
     var deviceIdentity: String { tr(zh: "设备身份", en: "Device Identity", de: "Geräteidentität") }
     var nickname: String { tr(zh: "昵称", en: "Nickname", de: "Spitzname") }
-
     // MARK: - Pet Detail
     var edit: String { tr(zh: "编辑", en: "Edit", de: "Bearbeiten") }
     var calendar: String { tr(zh: "日历", en: "Calendar", de: "Kalender") }
@@ -449,6 +446,7 @@ nonisolated struct L10n {
     func validUntil(_ date: String) -> String {
         tr(zh: "有效至 \(date)", en: "Valid until \(date)", de: "Gültig bis \(date)", es: "Válido hasta \(date)", pt: "Válido até \(date)", fr: "Valable jusqu'au \(date)")
     }
+
     var weight: String { tr(zh: "体重", en: "Weight", de: "Gewicht") }
     var expense: String { tr(zh: "花费", en: "Expense", de: "Ausgabe") }
     var quickExpenseTitle: String { tr(zh: "快速记账", en: "Quick expense", de: "Schnelle Ausgabe") }
@@ -470,12 +468,14 @@ nonisolated struct L10n {
     func quickExpenseSubmitToInsurer(_ name: String) -> String {
         tr(zh: "可以继续提交给 \(name)", en: "You can submit it to \(name)", de: "Du kannst sie bei \(name) einreichen", es: "Puedes enviarlo a \(name)", pt: "Você pode enviar para \(name)", fr: "Tu peux l'envoyer à \(name)")
     }
+
     var quickExpenseInsuranceCompany: String { tr(zh: "保险公司", en: "insurer", de: "Versicherung") }
     var quickExpenseApplyClaim: String { tr(zh: "已记录 · 申请报销", en: "Saved · Claim", de: "Gespeichert · Erstattung") }
     var quickExpenseReceipt: String { tr(zh: "凭证", en: "Receipt", de: "Beleg") }
     func quickExpenseReceiptCount(_ count: Int) -> String {
         tr(zh: "\(count) 个附件", en: "\(count) attachment\(count == 1 ? "" : "s")", de: "\(count) Anhang\(count == 1 ? "" : "e")", es: "\(count) adjunto\(count == 1 ? "" : "s")", pt: "\(count) anexo\(count == 1 ? "" : "s")", fr: "\(count) pièce\(count == 1 ? "" : "s") jointe\(count == 1 ? "" : "s")")
     }
+
     var quickExpenseCamera: String { tr(zh: "拍照", en: "Camera", de: "Kamera") }
     var quickExpensePhotos: String { tr(zh: "相册", en: "Photos", de: "Fotos") }
     var quickExpenseFile: String { tr(zh: "文件", en: "File", de: "Datei") }
@@ -485,32 +485,37 @@ nonisolated struct L10n {
     var quickExpenseCameraPermissionMessage: String {
         tr(zh: "请在系统设置中允许 Ohana 访问相机。", en: "Allow Ohana to access the camera in system settings.", de: "Erlaube Ohana den Kamerazugriff in den Systemeinstellungen.", es: "Permite que Ohana acceda a la cámara en los ajustes del sistema.", pt: "Permita que o Ohana acesse a câmera nos ajustes do sistema.", fr: "Autorise Ohana à accéder à l'appareil photo dans les réglages système.")
     }
+
     var quickExpenseInsuranceSingleTitle: String { tr(zh: "单笔保险费", en: "Single insurance expense", de: "Einzelne Versicherungszahlung") }
     var quickExpenseInsuranceSingleWithPolicy: String {
         tr(zh: "长期扣款请在保单页管理，避免重复生成。", en: "Manage recurring payments on the policy page to avoid duplicates.", de: "Wiederkehrende Zahlungen bitte in der Police verwalten, um Duplikate zu vermeiden.", es: "Gestiona los pagos recurrentes en la póliza para evitar duplicados.", pt: "Gerencie pagamentos recorrentes na apólice para evitar duplicatas.", fr: "Gère les paiements récurrents dans la police pour éviter les doublons.")
     }
+
     var quickExpenseInsuranceSingleNoPolicy: String {
         tr(zh: "这里可以先补记一笔保险费；长期计划请从保单页创建。", en: "Use this for one insurance payment; create long-term plans from the policy page.", de: "Hier nur eine Zahlung erfassen; langfristige Pläne in der Police anlegen.", es: "Úsalo para un pago de seguro; crea planes largos desde la póliza.", pt: "Use para um pagamento de seguro; crie planos longos na apólice.", fr: "Utilise ceci pour un paiement d'assurance; crée les plans durables depuis la police.")
     }
+
     func expenseCategoryTitle(_ category: ExpenseCategory) -> String {
         switch category {
-        case .food: return tr(zh: "食物", en: "Food", de: "Futter")
-        case .treats: return tr(zh: "零食", en: "Treats", de: "Snacks")
-        case .medical: return tr(zh: "医疗", en: "Medical", de: "Medizin")
-        case .grooming: return tr(zh: "美容", en: "Grooming", de: "Pflege")
-        case .toys: return tr(zh: "玩具", en: "Toys", de: "Spielzeug")
-        case .insurancePremium: return tr(zh: "保险费", en: "Insurance", de: "Versicherung")
-        case .other: return tr(zh: "其他", en: "Other", de: "Sonstiges")
+        case .food: tr(zh: "食物", en: "Food", de: "Futter")
+        case .treats: tr(zh: "零食", en: "Treats", de: "Snacks")
+        case .medical: tr(zh: "医疗", en: "Medical", de: "Medizin")
+        case .grooming: tr(zh: "美容", en: "Grooming", de: "Pflege")
+        case .toys: tr(zh: "玩具", en: "Toys", de: "Spielzeug")
+        case .insurancePremium: tr(zh: "保险费", en: "Insurance", de: "Versicherung")
+        case .other: tr(zh: "其他", en: "Other", de: "Sonstiges")
         }
     }
+
     func insuranceFrequencyTitle(_ frequency: InsurancePaymentFrequency) -> String {
         switch frequency {
-        case .monthly: return tr(zh: "按月", en: "Monthly", de: "Monatlich")
-        case .quarterly: return tr(zh: "按季", en: "Quarterly", de: "Vierteljährlich")
-        case .annual: return tr(zh: "按年", en: "Yearly", de: "Jährlich")
-        case .once: return tr(zh: "一次性", en: "Once", de: "Einmalig")
+        case .monthly: tr(zh: "按月", en: "Monthly", de: "Monatlich")
+        case .quarterly: tr(zh: "按季", en: "Quarterly", de: "Vierteljährlich")
+        case .annual: tr(zh: "按年", en: "Yearly", de: "Jährlich")
+        case .once: tr(zh: "一次性", en: "Once", de: "Einmalig")
         }
     }
+
     var thisMonth: String { tr(zh: "本月", en: "This month", de: "Diesen Monat") }
     var patrol: String { tr(zh: "巡岛", en: "Patrol", de: "Runde drehen") }
     var potty: String { tr(zh: "噗噗", en: "Poop", de: "Häufchen") }
@@ -523,7 +528,6 @@ nonisolated struct L10n {
     var dangerZone: String { tr(zh: "危险区域", en: "Danger zone", de: "Gefahrenbereich") }
     var clearRecords: String { tr(zh: "仅清空所有记录", en: "Clear records only", de: "Nur Einträge löschen") }
     func deletePet(_ name: String) -> String { tr(zh: "彻底删除 \(name)", en: "Delete \(name)", de: "\(name) löschen", es: "Eliminar \(name)", pt: "Excluir \(name)", fr: "Supprimer \(name)") }
-
     // MARK: - Human Detail
     var healthBody: String { tr(zh: "健康 & 身体", en: "Health & Body", de: "Gesundheit & Körper") }
     var activityRecords: String { tr(zh: "活动 & 记录", en: "Activity & Records", de: "Aktivität & Einträge") }
@@ -534,7 +538,6 @@ nonisolated struct L10n {
     var coconut: String { tr(zh: "椰子", en: "Coconut", de: "Kokosnuss") }
     var notes: String { tr(zh: "备注", en: "Notes", de: "Notizen") }
     var deleteMember: String { tr(zh: "删除成员", en: "Delete Member", de: "Mitglied löschen") }
-
     // MARK: - Common
     var save: String { tr(zh: "保存", en: "Save", de: "Speichern") }
     var cancel: String { tr(zh: "取消", en: "Cancel", de: "Abbrechen") }
@@ -544,24 +547,21 @@ nonisolated struct L10n {
     func searchPlaceholder(_ text: String) -> String {
         tr(zh: "搜索\(text)...", en: "Search \(text)...", de: "\(text) suchen...", es: "Buscar \(text)...", pt: "Buscar \(text)...", fr: "Rechercher \(text)...")
     }
+
     var times: String { tr(zh: "次", en: "times", de: "Mal") }
     var types: String { tr(zh: "种", en: "types", de: "Arten") }
     var items: String { tr(zh: "条", en: "items", de: "Einträge") }
-
     // MARK: - Pet Species
     var dog: String { tr(zh: "狗", en: "Dog", de: "Hund") }
     var cat: String { tr(zh: "猫", en: "Cat", de: "Katze") }
     var rabbit: String { tr(zh: "兔子", en: "Rabbit", de: "Kaninchen") }
     var hamster: String { tr(zh: "仓鼠", en: "Hamster", de: "Hamster") }
-
     // MARK: - Calendar
     var monthView: String { tr(zh: "月视图", en: "Month", de: "Monat") }
     var listView: String { tr(zh: "列表", en: "List", de: "Liste") }
     var addEvent: String { tr(zh: "添加事件", en: "Add Event", de: "Termin hinzufügen") }
-
     // MARK: - Oasis
     var oasis: String { tr(zh: "绿洲", en: "Oasis", de: "Oase") }
-
     // MARK: - Crew Roster
     func searchCrewPlaceholder() -> String {
         tr(zh: "搜索岛民...", en: "Search island residents...", de: "Inselteam suchen...", es: "Buscar habitantes...", pt: "Buscar moradores...", fr: "Rechercher l'équipe...")
@@ -569,10 +569,8 @@ nonisolated struct L10n {
 
     // MARK: - Batch Actions
     var batchCheckIn: String { tr(zh: "一键全家", en: "Crew check-in", de: "Team-Check-in") }
-
     /// 无 `@AppStorage` 的视图可用（与 `SettingsView` / `AppLanguage` 一致）
     static var current: L10n { L10n(UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.detectedCode) }
-
     // MARK: - Add Entity sheet
     var addEntityNavRoot: String { tr(zh: "添加家人", en: "Add to the island", de: "Zur Insel hinzufügen") }
     var addEntityHeadline: String { tr(zh: "谁要上岛？", en: "Who's joining the fun?", de: "Wer kommt dazu?") }
@@ -586,7 +584,6 @@ nonisolated struct L10n {
     var addEntityHumanBlurb: String { tr(zh: "添加一起照顾家的搭子", en: "Two-leg family & co-pilots", de: "Familie und Co-Piloten") }
     var addEntityPlantTitle: String { tr(zh: "叶子朋友", en: "Leafy friend", de: "Blattfreund") }
     var addEntityPlantBlurb: String { tr(zh: "阳光、水分和一点好心情", en: "Water, sun, good vibes only", de: "Wasser, Sonne, gute Laune") }
-
     // MARK: - Human wizard — mesh card titles
     var humanWizMesh1: String { tr(zh: "名字 · 1/6", en: "NAME · 1/6", de: "NAME · 1/6") }
     var humanWizMesh2: String { tr(zh: "个人档案 · 2/6", en: "PROFILE · 2/6", de: "PROFIL · 2/6") }
@@ -594,7 +591,6 @@ nonisolated struct L10n {
     var humanWizMesh4: String { tr(zh: "资料与权限 · 4/6", en: "DETAILS & PERMISSION · 4/6", de: "DETAILS & RECHTE · 4/6") }
     var humanWizMesh5: String { tr(zh: "身体数据 · 5/6", en: "BODY & PRIVACY · 5/6", de: "KÖRPER & PRIVATSPHÄRE · 5/6") }
     var humanWizMesh6: String { tr(zh: "确认信息 · 6/6", en: "FINAL CHECK · 6/6", de: "ABSCHLUSS · 6/6") }
-
     var humanWizNameLabel: String { tr(zh: "姓名（必填）", en: "Name (required)", de: "Name (Pflicht)") }
     var humanWizNamePlaceholder: String { tr(zh: "输入名字", en: "Their island name", de: "Inselname") }
     var humanWizAvatarPhoto: String { tr(zh: "头像照片", en: "Profile photo", de: "Profilfoto") }
@@ -608,9 +604,9 @@ nonisolated struct L10n {
             de: "Person in Fotos halten → Motiv kopieren → hier tippen"
         )
     }
+
     var humanWizEmojiAvatar: String { tr(zh: "或选择 Emoji 头像", en: "Or pick an emoji face", de: "Oder Emoji-Gesicht wählen") }
     var humanWizDupNameInline: String { tr(zh: "名字已被占用，请换一个", en: "That name's taken. Try another!", de: "Name schon vergeben. Nimm einen anderen.") }
-
     var humanWizGenderLabel: String { tr(zh: "性别/身份（必选）", en: "Gender / identity (required)", de: "Geschlecht / Identität (erforderlich)") }
     var humanWizBirthdayLabel: String { tr(zh: "生日（可选）", en: "Birthday (optional)", de: "Geburtstag (optional)") }
     var humanWizBirthdayHint: String { tr(zh: "点按选择日期，滚轮选好后点「完成」", en: "Tap to spin the wheel, then hit Done", de: "Tippen, Datum drehen, dann Fertig") }
@@ -619,7 +615,6 @@ nonisolated struct L10n {
     var humanWizSkipChip: String { tr(zh: "不填", en: "Skip", de: "Überspringen") }
     func humanWizBloodTag(_ type: String) -> String { tr(zh: "血型 \(type)", en: "Type \(type)", de: "Blutgruppe \(type)", es: "Tipo \(type)", pt: "Tipo \(type)", fr: "Groupe \(type)") }
     func humanWizNationalityTag(_ country: String) -> String { tr(zh: "国籍 \(country)", en: "From \(country)", de: "Aus \(country)", es: "De \(country)", pt: "De \(country)", fr: "De \(country)") }
-
     var humanWizNationalityLabel: String { tr(zh: "国籍（可选）", en: "Nationality (optional)", de: "Nationalität (optional)") }
     var humanWizNationalityHint: String { tr(zh: "从列表选择护照国籍，可不填", en: "Passport country from the list, or skip", de: "Passland wählen oder überspringen") }
     var humanWizResidenceLabel: String { tr(zh: "现居地（可选）", en: "Where you live (optional)", de: "Wohnort (optional)") }
@@ -627,26 +622,22 @@ nonisolated struct L10n {
     var humanWizResidenceCityPlaceholder: String { tr(zh: "输入城市名称", en: "Type your city", de: "Stadt eingeben") }
     var humanWizNotesLabel: String { tr(zh: "备注（可选）", en: "Notes (optional)", de: "Notizen (optional)") }
     var humanWizNotesPlaceholder: String { tr(zh: "任何想记录的信息", en: "Anything cozy to remember", de: "Alles, was bleiben soll") }
-
     var humanWizBodyLabel: String { tr(zh: "身体数据（可选）", en: "Body stats (optional)", de: "Körperdaten (optional)") }
     var humanWizHeightLabel: String { tr(zh: "身高", en: "Height", de: "Größe") }
     var humanWizHeightPh: String { tr(zh: "如 170", en: "e.g. 170", de: "z. B. 170") }
     var humanWizWeightLabel: String { tr(zh: "体重", en: "Weight", de: "Gewicht") }
     var humanWizWeightPh: String { tr(zh: "如 65.0", en: "e.g. 65", de: "z. B. 65") }
     var humanWizWeightFootnote: String { tr(zh: "填写体重将自动创建初始体重记录", en: "Adding weight creates a first log for charts", de: "Gewicht legt den ersten Diagramm-Eintrag an") }
-
     var humanWizPrivacyLabel: String { tr(zh: "隐私设置", en: "Privacy toggles", de: "Privatsphäre") }
     var humanWizPrivacyHint: String { tr(zh: "设为私密后，同设备的其他成员无法查看该内容", en: "When private, other profiles on this device can't peek", de: "Privat heißt: andere Profile auf diesem Gerät sehen es nicht") }
     var humanWizPrivacyWeight: String { tr(zh: "体重记录与图表", en: "Weight logs & charts", de: "Gewicht & Diagramme") }
     var humanWizPrivacyWorkout: String { tr(zh: "运动记录", en: "Workouts", de: "Workouts") }
     var humanWizPrivacyWishlist: String { tr(zh: "心愿单", en: "Wishlist", de: "Wunschliste") }
     var humanWizPrivacyExpense: String { tr(zh: "花费记录", en: "Spending", de: "Ausgaben") }
-
     var humanWizThemeLabel: String { tr(zh: "主题颜色", en: "Accent color", de: "Akzentfarbe") }
     var humanWizRolePermsLabel: String { tr(zh: "权限", en: "Permission", de: "Berechtigung") }
     var humanWizSummaryLabel: String { tr(zh: "信息摘要", en: "Cozy recap", de: "Kurzüberblick") }
     var humanWizSummaryEmpty: String { tr(zh: "选择权限和性别/身份后会出现在这里", en: "Pick permission and identity to preview them here", de: "Wähle Berechtigung und Identität für die Vorschau") }
-
     var humanWizRoleOwnerTitle: String { tr(zh: "管理者", en: "Admin", de: "Verwaltung") }
     var humanWizRoleOwnerDesc: String { tr(zh: "管理家庭资料与核心设置", en: "Manages home profile and core settings", de: "Verwaltet Haushalt und zentrale Einstellungen") }
     var humanWizRoleMemberTitle: String { tr(zh: "成员", en: "Member", de: "Mitglied") }
@@ -655,14 +646,12 @@ nonisolated struct L10n {
     var humanWizRoleEditorDesc: String { humanWizRoleMemberDesc }
     var humanWizRoleViewerTitle: String { humanWizRoleMemberTitle }
     var humanWizRoleViewerDesc: String { humanWizRoleMemberDesc }
-
     var humanWizJoinIsland: String { tr(zh: "加入 Ohana 岛", en: "Hop onto Ohana Isle!", de: "Ab auf die Ohana-Insel!") }
     var humanWizNeedName: String { tr(zh: "请先填写名字", en: "Name first, please", de: "Erst der Name") }
     var humanWizNeedGender: String { tr(zh: "请选择性别/身份", en: "Pick gender / identity", de: "Identität auswählen") }
     var humanWizNameTakenBtn: String { tr(zh: "名字已被占用", en: "Name taken", de: "Name vergeben") }
     var humanWizBirthdaySheetTitle: String { tr(zh: "选择生日", en: "Pick a birthday", de: "Geburtstag wählen") }
     var humanWizBirthdayEventSuffix: String { tr(zh: " 的生日 🎂", en: "'s birthday 🎂", de: " hat Geburtstag 🎂") }
-
     var humanWizDupAlertTitle: String { tr(zh: "名字已被占用 🏠", en: "That name's taken 🏠", de: "Name schon vergeben 🏠") }
     var humanWizDupAlertOk: String { tr(zh: "好的，换一个", en: "Got it. New name!", de: "Okay, neuer Name!") }
     func humanWizDupAlertMsg(_ name: String) -> String {
@@ -678,42 +667,42 @@ nonisolated struct L10n {
 
     func humanGenderDisplay(_ key: String) -> String {
         switch HumanProfileOptions.normalizedGender(key) {
-        case "男": return tr(zh: "男", en: "Man", de: "Mann")
-        case "女": return tr(zh: "女", en: "Woman", de: "Frau")
-        case "非二元": return tr(zh: "非二元", en: "Non-binary", de: "Nichtbinär")
-        case "不透露": return tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
-        default: return key
+        case "男": tr(zh: "男", en: "Man", de: "Mann")
+        case "女": tr(zh: "女", en: "Woman", de: "Frau")
+        case "非二元": tr(zh: "非二元", en: "Non-binary", de: "Nichtbinär")
+        case "不透露": tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
+        default: key
         }
     }
 
     func humanThemeSwatchLabel(_ zh: String) -> String {
         switch zh {
-        case "青柠": return tr(zh: "青柠", en: "Lime", de: "Limette")
-        case "橙色": return tr(zh: "橙色", en: "Orange", de: "Orange")
-        case "珊瑚": return tr(zh: "珊瑚", en: "Coral", de: "Koralle")
-        case "玫红": return tr(zh: "玫红", en: "Rose", de: "Rosé")
-        case "莓果": return tr(zh: "莓果", en: "Berry", de: "Beere")
-        case "靛蓝": return tr(zh: "靛蓝", en: "Indigo", de: "Indigo")
-        case "深靛": return tr(zh: "深靛", en: "Deep indigo", de: "Tiefes Indigo")
-        case "粉色": return tr(zh: "粉色", en: "Pink", de: "Pink")
-        case "青色": return tr(zh: "青色", en: "Teal", de: "Türkis")
-        case "深青": return tr(zh: "深青", en: "Deep teal", de: "Tiefes Türkis")
-        case "海青": return tr(zh: "海青", en: "Sea cyan", de: "Meerescyan")
-        case "湖蓝": return tr(zh: "湖蓝", en: "Lake blue", de: "Seeblau")
-        case "孔雀": return tr(zh: "孔雀", en: "Peacock", de: "Pfau")
-        case "森林": return tr(zh: "森林", en: "Forest", de: "Wald")
-        case "橄榄": return tr(zh: "橄榄", en: "Olive", de: "Olive")
-        case "叶绿": return tr(zh: "叶绿", en: "Leaf", de: "Blattgrün")
-        case "紫色": return tr(zh: "紫色", en: "Purple", de: "Violett")
-        case "紫罗兰": return tr(zh: "紫罗兰", en: "Violet", de: "Violett")
-        case "红色": return tr(zh: "红色", en: "Red", de: "Rot")
-        case "金色": return tr(zh: "金色", en: "Gold", de: "Gold")
-        case "琥珀": return tr(zh: "琥珀", en: "Amber", de: "Bernstein")
-        case "栗色": return tr(zh: "栗色", en: "Chestnut", de: "Kastanie")
-        case "酒红": return tr(zh: "酒红", en: "Wine", de: "Weinrot")
-        case "咖啡": return tr(zh: "咖啡", en: "Coffee", de: "Kaffee")
-        case "灰色": return tr(zh: "灰色", en: "Slate", de: "Schiefer")
-        default: return zh
+        case "青柠": tr(zh: "青柠", en: "Lime", de: "Limette")
+        case "橙色": tr(zh: "橙色", en: "Orange", de: "Orange")
+        case "珊瑚": tr(zh: "珊瑚", en: "Coral", de: "Koralle")
+        case "玫红": tr(zh: "玫红", en: "Rose", de: "Rosé")
+        case "莓果": tr(zh: "莓果", en: "Berry", de: "Beere")
+        case "靛蓝": tr(zh: "靛蓝", en: "Indigo", de: "Indigo")
+        case "深靛": tr(zh: "深靛", en: "Deep indigo", de: "Tiefes Indigo")
+        case "粉色": tr(zh: "粉色", en: "Pink", de: "Pink")
+        case "青色": tr(zh: "青色", en: "Teal", de: "Türkis")
+        case "深青": tr(zh: "深青", en: "Deep teal", de: "Tiefes Türkis")
+        case "海青": tr(zh: "海青", en: "Sea cyan", de: "Meerescyan")
+        case "湖蓝": tr(zh: "湖蓝", en: "Lake blue", de: "Seeblau")
+        case "孔雀": tr(zh: "孔雀", en: "Peacock", de: "Pfau")
+        case "森林": tr(zh: "森林", en: "Forest", de: "Wald")
+        case "橄榄": tr(zh: "橄榄", en: "Olive", de: "Olive")
+        case "叶绿": tr(zh: "叶绿", en: "Leaf", de: "Blattgrün")
+        case "紫色": tr(zh: "紫色", en: "Purple", de: "Violett")
+        case "紫罗兰": tr(zh: "紫罗兰", en: "Violet", de: "Violett")
+        case "红色": tr(zh: "红色", en: "Red", de: "Rot")
+        case "金色": tr(zh: "金色", en: "Gold", de: "Gold")
+        case "琥珀": tr(zh: "琥珀", en: "Amber", de: "Bernstein")
+        case "栗色": tr(zh: "栗色", en: "Chestnut", de: "Kastanie")
+        case "酒红": tr(zh: "酒红", en: "Wine", de: "Weinrot")
+        case "咖啡": tr(zh: "咖啡", en: "Coffee", de: "Kaffee")
+        case "灰色": tr(zh: "灰色", en: "Slate", de: "Schiefer")
+        default: zh
         }
     }
 
@@ -725,7 +714,6 @@ nonisolated struct L10n {
     var humanWalletNewMember: String { tr(zh: "新成员", en: "New island buddy", de: "Neuer Inselbuddy") }
     var humanWalletResident: String { tr(zh: "岛民", en: "Island pal", de: "Inselfreund") }
     var humanWalletSubtitlePlaceholder: String { tr(zh: "填写下方信息完善档案", en: "Fill the lil' form below ✨", de: "Unten ausfüllen, Profil wird rund ✨") }
-
     // MARK: - Add Pet Wizard
     var petWizMesh1: String { tr(zh: "基本信息 · 1/6", en: "WHO'S THAT CUTIE · 1/6", de: "WER IST SO SÜSS · 1/6") }
     var petWizMesh2: String { tr(zh: "生物特征 · 2/6", en: "LIL' BIO · 2/6", de: "KLEINE BIO · 2/6") }
@@ -733,7 +721,6 @@ nonisolated struct L10n {
     var petWizMesh4: String { tr(zh: "头像 · 4/6", en: "PHOTO BOOP · 4/6", de: "FOTO-TIPP · 4/6") }
     var petWizMesh5: String { tr(zh: "标签 · 5/6", en: "VIBE TAGS · 5/6", de: "VIBE-TAGS · 5/6") }
     var petWizMesh6: String { tr(zh: "确认信息 · 6/6", en: "ALL SET? · 6/6", de: "ALLES BEREIT? · 6/6") }
-
     var petWizIslandWelcome: String { tr(zh: "岛屿欢迎新家人！", en: "The isle throws a welcome party!", de: "Die Insel schmeißt eine Willkommensrunde!") }
     var petWizBentoBasic: String { tr(zh: "基本信息", en: "Basics", de: "Basics") }
     var petWizBentoBreed: String { tr(zh: "品种", en: "Breed", de: "Rasse") }
@@ -789,7 +776,6 @@ nonisolated struct L10n {
     var petWizNoSameSpeciesPets: String { tr(zh: "岛上暂时没有同品种宠物", en: "No same-species pals on the isle yet", de: "Noch keine Artgenossen auf der Insel") }
     var petWizCrossBreedHint: String { tr(zh: "不同品种间没有亲属关系，直接跳过", en: "Cross-breed bonds aren't tracked. Skip ahead!", de: "Artübergreifende Bindungen werden nicht verfolgt. Weiter!") }
     var petWizPickRelationIntro: String { tr(zh: "选择与每只宠物的关系（可多选，选填）", en: "Pick a vibe with each pet (multi, optional)", de: "Beziehung zu jedem Tier wählen (optional)") }
-
     var petWizPickCoatTitle: String { tr(zh: "选择毛色", en: "Pick coat color", de: "Fellfarbe wählen") }
     var petWizPickEyeTitle: String { tr(zh: "选择瞳色", en: "Pick eye color", de: "Augenfarbe wählen") }
     var petWizCustomColorPickerTitle: String { tr(zh: "自定义颜色", en: "Custom color", de: "Eigene Farbe") }
@@ -804,6 +790,7 @@ nonisolated struct L10n {
             fr: "Pas encore de race ? Robe et yeux génériques d'abord. Choisis une race pour affiner."
         )
     }
+
     var petWizSaving: String { tr(zh: "保存中…", en: "Saving…", de: "Speichert…") }
     var petWizSavingShort: String { tr(zh: "保存中...", en: "Saving...", de: "Speichert...") }
     var petWizSaveFailedTitle: String { tr(zh: "保存失败", en: "Couldn't save", de: "Speichern fehlgeschlagen") }
@@ -812,27 +799,26 @@ nonisolated struct L10n {
     var petWizBreedSheetTitle: String { tr(zh: "选择品种", en: "Choose breed", de: "Rasse wählen") }
     var petWizBreedSearchPrompt: String { tr(zh: "搜索品种", en: "Search breeds", de: "Rassen suchen") }
     var petWizBreedFieldPh: String { tr(zh: "请输入品种名称", en: "Type breed name", de: "Rassenname eingeben") }
-
     func petSpeciesLabel(_ storageKey: String) -> String {
         switch storageKey {
-        case "狗": return dog
-        case "猫": return cat
-        case "兔子": return rabbit
-        case "仓鼠": return hamster
-        case "鸟": return tr(zh: "鸟", en: "Birdie", de: "Vogel")
-        case "其他": return tr(zh: "其他", en: "Other critter", de: "Anderer Liebling")
-        default: return storageKey
+        case "狗": dog
+        case "猫": cat
+        case "兔子": rabbit
+        case "仓鼠": hamster
+        case "鸟": tr(zh: "鸟", en: "Birdie", de: "Vogel")
+        case "其他": tr(zh: "其他", en: "Other critter", de: "Anderer Liebling")
+        default: storageKey
         }
     }
 
     func petCoatPatternDisplay(_ zh: String) -> String {
         switch zh {
-        case "三花": return tr(zh: "三花", en: "Calico", de: "Schildpatt-Weiß")
-        case "银渐层": return tr(zh: "银渐层", en: "Silver shaded", de: "Silber schattiert")
-        case "玳瑁": return tr(zh: "玳瑁", en: "Tortie", de: "Schildpatt")
-        case "奶牛色": return tr(zh: "奶牛色", en: "Cow", de: "Kuhmuster")
-        case "蓝白双色": return tr(zh: "蓝白双色", en: "Blue & white", de: "Blau-Weiß")
-        default: return zh
+        case "三花": tr(zh: "三花", en: "Calico", de: "Schildpatt-Weiß")
+        case "银渐层": tr(zh: "银渐层", en: "Silver shaded", de: "Silber schattiert")
+        case "玳瑁": tr(zh: "玳瑁", en: "Tortie", de: "Schildpatt")
+        case "奶牛色": tr(zh: "奶牛色", en: "Cow", de: "Kuhmuster")
+        case "蓝白双色": tr(zh: "蓝白双色", en: "Blue & white", de: "Blau-Weiß")
+        default: zh
         }
     }
 
@@ -847,10 +833,12 @@ nonisolated struct L10n {
     func petWizDaysUntilHome(_ days: Int) -> String {
         tr(zh: "还有 \(days) 天到家", en: "\(days) days until gotcha 🏠", de: "Noch \(days) Tage bis zum Einzug 🏠", es: "\(days) días para llegar a casa 🏠", pt: "\(days) dias até chegar em casa 🏠", fr: "\(days) jours avant l'arrivée 🏠")
     }
+
     var petWizHomeToday: String { tr(zh: "今天到家", en: "Gotcha day is today!", de: "Heute ist Einzugstag!") }
     func petWizTogetherDays(_ days: Int) -> String {
         tr(zh: "已陪伴 \(days) 天", en: "Together \(days) days 💛", de: "\(days) Tage zusammen 💛", es: "\(days) días juntos 💛", pt: "\(days) dias juntos 💛", fr: "\(days) jours ensemble 💛")
     }
+
     func petWizMilestoneTogether(_ days: Int) -> String {
         tr(zh: "共度 \(days) 天", en: "Together \(days) days", de: "\(days) Tage zusammen", es: "\(days) días juntos", pt: "\(days) dias juntos", fr: "\(days) jours ensemble")
     }
@@ -914,7 +902,6 @@ nonisolated struct L10n {
         "黑白": "Schwarz-Weiß",
         "黑色": "Schwarz"
     ]
-
     private static let petAppearanceZhToEn: [String: String] = [
         "三色": "Tricolor",
         "乳白": "Cream white",
@@ -1044,9 +1031,8 @@ nonisolated struct L10n {
         "红色（白化）": "Red (albino)",
         "蓝色（灰蓝）": "Blue (slate)",
         "黑棕（鞍形）": "Black saddle",
-        "三花（黑白橘）": "Calico (B/W/O)",
+        "三花（黑白橘）": "Calico (B/W/O)"
     ]
-
     // MARK: - Pet cutout pro tip
     var petProTipTitle: String { tr(zh: "解锁 3D 悬浮卡片", en: "Unlock the 3D floaty card", de: "3D-Schwebekarte freischalten") }
     var petProTipStep1Prefix: String { tr(zh: "在系统相册中", en: "In Photos, ", de: "In Fotos: ") }
@@ -1056,7 +1042,6 @@ nonisolated struct L10n {
     var petProTipStep2Suffix: String { tr(zh: "保存到剪贴板", en: " to stash it on the clipboard", de: " antippen") }
     var petProTipStep3Prefix: String { tr(zh: "返回 Ohana，点击上方", en: "Back in Ohana, tap ", de: "Zurück in Ohana: ") }
     var petProTipStep3Highlight: String { tr(zh: "粘贴按钮", en: "Paste", de: "Einfügen") }
-
     // MARK: - Home / Overview & GO dashboard
     var homeDailyCoconutTitle: String { tr(zh: "每日登录奖励 +1🥥", en: "Daily login +1 🥥", de: "Täglicher Login +1 🥥") }
     var homeDailyCoconutSub: String { tr(zh: "坚持照顾家人，收获更多椰子", en: "Keep caring for your crew. More coconuts await!", de: "Weiter kümmern. Mehr Kokosnüsse warten!") }
@@ -1064,6 +1049,7 @@ nonisolated struct L10n {
     func homeFamilyCareTitle(petName: String) -> String {
         tr(zh: "今日 · 谁在照顾 \(petName)", en: "Today · Who's on duty for \(petName)", de: "Heute · Wer kümmert sich um \(petName)?", es: "Hoy · ¿quién cuida de \(petName)?", pt: "Hoje · quem cuida de \(petName)?", fr: "Aujourd'hui · qui veille sur \(petName) ?")
     }
+
     var homeRecordMoment: String { tr(zh: "记录时刻", en: "Log a moment", de: "Moment festhalten") }
     var homeConfirmCheckIn: String { tr(zh: "确定打卡", en: "Check in anyway", de: "Trotzdem eintragen") }
     var homeMemoryShardsTitle: String { tr(zh: "记忆碎片", en: "Memory sparkles", de: "Erinnerungsfunken") }
@@ -1077,16 +1063,16 @@ nonisolated struct L10n {
             fr: "Continue à noter repas, promenades ou poids.\nLes petits moments doux apparaîtront ici ✨"
         )
     }
+
     var homeMemoryCoconutTitle: String { tr(zh: "珍惜记忆 +1🥥", en: "Cherished memory +1 🥥", de: "Lieblingserinnerung +1 🥥") }
     var homeDailyCheckInRewardTitle: String { tr(zh: "每日打卡奖励", en: "Daily check-in reward", de: "Tägliche Check-in-Belohnung") }
     var homeDailyLoginRewardTitle: String { tr(zh: "每日登录奖励", en: "Daily login reward", de: "Tägliche Login-Belohnung") }
     var homeIslandQuestRewardTitle: String { tr(zh: "岛屿委托奖励", en: "Island quest reward", de: "Inselauftrag-Belohnung") }
-
     var homeQuickCheckInNote: String { tr(zh: "快捷打卡", en: "Quick log", de: "Schnelllog") }
-
     func homePlantWaterEventTitle(plantName: String) -> String {
         tr(zh: "💧 给 \(plantName) 浇水", en: "💧 Water \(plantName)", de: "💧 \(plantName) gießen", es: "💧 Regar \(plantName)", pt: "💧 Regar \(plantName)", fr: "💧 Arroser \(plantName)")
     }
+
     func homePlantFertilizeEventTitle(plantName: String) -> String {
         tr(zh: "🌿 给 \(plantName) 施肥", en: "🌿 Fertilize \(plantName)", de: "🌿 \(plantName) düngen", es: "🌿 Abonar \(plantName)", pt: "🌿 Adubar \(plantName)", fr: "🌿 Fertiliser \(plantName)")
     }
@@ -1094,33 +1080,43 @@ nonisolated struct L10n {
     func homeToastWalkStarted(_ petName: String) -> String {
         tr(zh: "开始遛 \(petName)！", en: "Walking \(petName)!", de: "\(petName) geht los!", es: "¡Paseo con \(petName)!", pt: "Passeio com \(petName)!", fr: "Promenade avec \(petName) !")
     }
+
     func homeToastPotty(_ petName: String, points: Int) -> String {
         tr(zh: "\(petName) 噗噗打卡 +\(points)🥥", en: "\(petName) poop logged +\(points) 🥥", de: "\(petName) Häufchen +\(points) 🥥", es: "\(petName) popó registrado +\(points) 🥥", pt: "\(petName) cocô registrado +\(points) 🥥", fr: "\(petName) caca noté +\(points) 🥥", ja: "\(petName) ぷっぷ記録 +\(points) 🥥", ko: "\(petName) 뿌뿌 기록 +\(points) 🥥", it: "\(petName) popò registrata +\(points) 🥥")
     }
+
     func homeToastLitter(_ petName: String, points: Int) -> String {
         tr(zh: "\(petName) 铲砂完成 +\(points)🥥", en: "\(petName) litter scooped +\(points) 🥥", de: "\(petName) Klo sauber +\(points) 🥥", es: "\(petName) arena limpia +\(points) 🥥", pt: "\(petName) areia limpa +\(points) 🥥", fr: "\(petName) litière propre +\(points) 🥥")
     }
+
     func homeToastManualFeed(_ petName: String, points: Int) -> String {
         tr(zh: "\(petName) 手动喂食 +\(points)🥥", en: "\(petName) manual feed +\(points) 🥥", de: "\(petName) Futter +\(points) 🥥", es: "\(petName) comida manual +\(points) 🥥", pt: "\(petName) comida manual +\(points) 🥥", fr: "\(petName) repas manuel +\(points) 🥥")
     }
+
     func homeToastWater(_ petName: String, points: Int) -> String {
         tr(zh: "\(petName) 喂水打卡 +\(points)🥥", en: "\(petName) water log +\(points) 🥥", de: "\(petName) Wasser +\(points) 🥥", es: "\(petName) agua registrada +\(points) 🥥", pt: "\(petName) água registrada +\(points) 🥥", fr: "\(petName) eau notée +\(points) 🥥")
     }
+
     func homeToastPlay(_ petName: String, points: Int) -> String {
         tr(zh: "\(petName) 逗玩打卡 +\(points)🥥", en: "\(petName) playtime +\(points) 🥥", de: "\(petName) Spielzeit +\(points) 🥥", es: "\(petName) juego +\(points) 🥥", pt: "\(petName) brincadeira +\(points) 🥥", fr: "\(petName) jeu +\(points) 🥥")
     }
+
     func homePlayQuestTitle(_ petName: String) -> String {
         tr(zh: "\(petName) 逗玩打卡", en: "\(petName) · playtime", de: "\(petName) · Spielzeit", es: "\(petName) · juego", pt: "\(petName) · brincar", fr: "\(petName) · jeu")
     }
+
     func homeToastPlannedFeed(_ petName: String, points: Int) -> String {
         tr(zh: "\(petName) 计划喂食打卡 +\(points)🥥", en: "\(petName) planned meal +\(points) 🥥", de: "\(petName) geplante Mahlzeit +\(points) 🥥", es: "\(petName) comida planificada +\(points) 🥥", pt: "\(petName) refeição planejada +\(points) 🥥", fr: "\(petName) repas prévu +\(points) 🥥")
     }
+
     func homeToastHealthVaccine(_ petName: String) -> String {
         tr(zh: "\(petName) 疫苗记录 ✅", en: "\(petName) vaccine logged ✅", de: "\(petName) Impfung gespeichert ✅", es: "\(petName) vacuna registrada ✅", pt: "\(petName) vacina registrada ✅", fr: "\(petName) vaccin noté ✅")
     }
+
     func homeToastHealthDeworm(_ petName: String) -> String {
         tr(zh: "\(petName) 驱虫记录 ✅", en: "\(petName) dewormer logged ✅", de: "\(petName) Entwurmung gespeichert ✅", es: "\(petName) desparasitación registrada ✅", pt: "\(petName) vermífugo registrado ✅", fr: "\(petName) vermifuge noté ✅")
     }
+
     func homeToastHealthVisit(_ petName: String) -> String {
         tr(zh: "\(petName) 就诊记录 ✅", en: "\(petName) vet visit logged ✅", de: "\(petName) Tierarztbesuch gespeichert ✅", es: "\(petName) visita al vet registrada ✅", pt: "\(petName) visita ao vet registrada ✅", fr: "\(petName) visite véto notée ✅")
     }
@@ -1129,16 +1125,20 @@ nonisolated struct L10n {
     func homeWalkTodayBadge(count: Int, dist: String) -> String {
         tr(zh: "今日\(count)次·\(dist)", en: "\(count)× today · \(dist)", de: "\(count)× heute · \(dist)", es: "\(count)× hoy · \(dist)", pt: "\(count)× hoje · \(dist)", fr: "\(count)× aujourd'hui · \(dist)")
     }
+
     func homeFeedMealsProgress(current: Int, goal: Int) -> String {
         tr(zh: "\(current)/\(goal)餐", en: "\(current)/\(goal) meals", de: "\(current)/\(goal) Mahlzeiten", es: "\(current)/\(goal) comidas", pt: "\(current)/\(goal) refeições", fr: "\(current)/\(goal) repas")
     }
+
     func homeTimesToday(_ n: Int) -> String {
         tr(zh: "今日\(n)次", en: "\(n)× today", de: "\(n)× heute", es: "\(n)× hoy", pt: "\(n)× hoje", fr: "\(n)× aujourd'hui")
     }
+
     func homeExpenseMonthCNY(_ amount: Int) -> String {
         let formatted = AppCurrency.format(Double(amount), fractionDigits: 0)
         return tr(zh: "本月\(formatted)", en: "\(formatted) this month", de: "\(formatted) diesen Monat", es: "\(formatted) este mes", pt: "\(formatted) este mês", fr: "\(formatted) ce mois-ci")
     }
+
     func homeLastWeightKg(_ kg: Double) -> String {
         let formatted = AppMeasurementSystem.formatWeightKilograms(kg)
         return tr(zh: "上次\(formatted)", en: "Last \(formatted)", de: "Zuletzt \(formatted)", es: "Último \(formatted)", pt: "Último \(formatted)", fr: "Dernier \(formatted)")
@@ -1148,12 +1148,12 @@ nonisolated struct L10n {
     func homeAntiDupFeedMessage(executor: String, minutes: Int, petName: String) -> String {
         tr(zh: "\(executor) 在 \(minutes) 分钟前刚喂过 \(petName) ，确定要再喂一次吗？", en: "\(executor) fed \(petName) \(minutes) min ago. Log another meal?", de: "\(executor) hat \(petName) vor \(minutes) Min. gefüttert. Noch eine Mahlzeit?", es: "\(executor) alimentó a \(petName) hace \(minutes) min. ¿Registrar otra comida?", pt: "\(executor) alimentou \(petName) há \(minutes) min. Registrar outra refeição?", fr: "\(executor) a nourri \(petName) il y a \(minutes) min. Noter un autre repas ?")
     }
+
     var homeAntiDupWaterTitle: String { tr(zh: "重复喂水提醒", en: "Water again?", de: "Noch einmal Wasser?") }
     func homeAntiDupWaterMessage(executor: String, minutes: Int, petName: String) -> String {
         tr(zh: "\(executor) 在 \(minutes) 分钟前刚喂过 \(petName) 水，确定要再记录一次吗？", en: "\(executor) refreshed \(petName)'s water \(minutes) min ago. Log again?", de: "\(executor) hat \(petName)s Wasser vor \(minutes) Min. erneuert. Noch einmal?", es: "\(executor) refrescó el agua de \(petName) hace \(minutes) min. ¿Registrar otra vez?", pt: "\(executor) trocou a água de \(petName) há \(minutes) min. Registrar de novo?", fr: "\(executor) a rafraîchi l'eau de \(petName) il y a \(minutes) min. Noter encore ?")
     }
 
-    // Quick action chip labels (home / GO)
     var homeQAFeed: String { tr(zh: "喂食", en: "Feed", de: "Füttern") }
     var homeQAWater: String { tr(zh: "喂水", en: "Water", de: "Wasser") }
     var homeQAWaterChange: String { tr(zh: "换水", en: "Change water", de: "Wasser wechseln") }
@@ -1169,8 +1169,6 @@ nonisolated struct L10n {
     var homeQAPlay: String { tr(zh: "陪玩", en: "Play", de: "Spielen") }
     var homeQACageClean: String { tr(zh: "清鸟笼", en: "Clean cage", de: "Käfig reinigen") }
     var homeQAFreeFlight: String { tr(zh: "放飞", en: "Free flight", de: "Freiflug") }
-
-    // GO dashboard sections & hub
     var goSectionIslandQuests: String { tr(zh: "🏝️ 今日委托", en: "🏝️ Island quests", de: "🏝️ Inselaufträge") }
     var goSectionIslandQuestsLabel: String { tr(zh: "ISLAND QUESTS", en: "ISLAND QUESTS", de: "INSELAUFTRÄGE") }
     var goSectionQuickActions: String { tr(zh: "⚡ 快捷打卡", en: "⚡ Quick check-in", de: "⚡ Schnell-Check-in") }
@@ -1181,9 +1179,11 @@ nonisolated struct L10n {
     func goLifeTreeTitle(levelName: String) -> String {
         tr(zh: "生命之树 · \(levelName)", en: "Life Tree · \(levelName)", de: "Lebensbaum · \(levelName)", es: "Árbol de vida · \(levelName)", pt: "Árvore da vida · \(levelName)", fr: "Arbre de vie · \(levelName)")
     }
+
     func goTreeNeedEnergy(_ n: Int) -> String {
         tr(zh: "还差 \(n) 🥥 能量升级", en: "\(n) more 🥥 to level up", de: "Noch \(n) 🥥 bis zum Level-up", es: "Faltan \(n) 🥥 para subir", pt: "Faltam \(n) 🥥 para subir", fr: "Encore \(n) 🥥 pour monter")
     }
+
     var goTreeMaxLevel: String { tr(zh: "已达最高等级 ✨", en: "Max level reached ✨", de: "Max-Level erreicht ✨") }
     var goInjectEnergy: String { tr(zh: "⚡ 注入能量", en: "⚡ Send energy", de: "⚡ Energie senden") }
     var goToOasis: String { tr(zh: "前往绿洲", en: "Open Oasis", de: "Oase öffnen") }
@@ -1212,26 +1212,26 @@ nonisolated struct L10n {
     // MARK: - Care / hygiene / potty (UI labels; persisted logs keep zh `rawValue`)
     func careTypeUILabel(_ type: CareType) -> String {
         switch type {
-        case .feeding: return tr(zh: "喂食", en: "Feeding", de: "Füttern")
-        case .watering: return tr(zh: "喂水", en: "Water", de: "Wasser")
-        case .litter: return tr(zh: "铲砂", en: "Scoop litter", de: "Klo reinigen")
-        case .waterChange: return tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
-        case .filterClean: return tr(zh: "清滤材", en: "Filter cleaning", de: "Filter reinigen")
-        case .cageCleaning: return tr(zh: "清鸟笼", en: "Cage cleaning", de: "Käfig reinigen")
-        case .freeFlight: return tr(zh: "放飞", en: "Free flight", de: "Freiflug")
-        case .misting: return tr(zh: "喷水", en: "Misting", de: "Besprühen")
-        case .substrateChange: return tr(zh: "换垫材", en: "Substrate change", de: "Substratwechsel")
-        case .play: return tr(zh: "陪玩", en: "Playtime", de: "Spielen")
+        case .feeding: tr(zh: "喂食", en: "Feeding", de: "Füttern")
+        case .watering: tr(zh: "喂水", en: "Water", de: "Wasser")
+        case .litter: tr(zh: "铲砂", en: "Scoop litter", de: "Klo reinigen")
+        case .waterChange: tr(zh: "换水", en: "Water change", de: "Wasserwechsel")
+        case .filterClean: tr(zh: "清滤材", en: "Filter cleaning", de: "Filter reinigen")
+        case .cageCleaning: tr(zh: "清鸟笼", en: "Cage cleaning", de: "Käfig reinigen")
+        case .freeFlight: tr(zh: "放飞", en: "Free flight", de: "Freiflug")
+        case .misting: tr(zh: "喷水", en: "Misting", de: "Besprühen")
+        case .substrateChange: tr(zh: "换垫材", en: "Substrate change", de: "Substratwechsel")
+        case .play: tr(zh: "陪玩", en: "Playtime", de: "Spielen")
         }
     }
 
     func hygieneTypeUILabel(_ type: HygieneType) -> String {
         switch type {
-        case .teeth: return tr(zh: "刷牙", en: "Teeth", de: "Zähne")
-        case .nails: return tr(zh: "剪甲", en: "Nails", de: "Krallen")
-        case .ears: return tr(zh: "耳朵", en: "Ears", de: "Ohren")
-        case .brushing: return tr(zh: "梳毛", en: "Brushing", de: "Bürsten")
-        case .bath: return tr(zh: "洗澡", en: "Bath", de: "Bad")
+        case .teeth: tr(zh: "刷牙", en: "Teeth", de: "Zähne")
+        case .nails: tr(zh: "剪甲", en: "Nails", de: "Krallen")
+        case .ears: tr(zh: "耳朵", en: "Ears", de: "Ohren")
+        case .brushing: tr(zh: "梳毛", en: "Brushing", de: "Bürsten")
+        case .bath: tr(zh: "洗澡", en: "Bath", de: "Bad")
         }
     }
 
@@ -1262,6 +1262,7 @@ nonisolated struct L10n {
     func petCardStreak(_ days: Int) -> String {
         tr(zh: "🔥 \(days)天连续", en: "🔥 \(days)-day streak", de: "🔥 \(days)-Tage-Serie", es: "🔥 racha de \(days) días", pt: "🔥 sequência de \(days) dias", fr: "🔥 série de \(days) jours")
     }
+
     var petCardDayUnit: String { tr(zh: "天", en: "d", de: "T") }
     var petCardTogetherPrefix: String { tr(zh: "一起度过了", en: "Together for", de: "Zusammen seit") }
     var petCardRainbowTitle: String { tr(zh: "化作星星，守护着你", en: "Shining as stars, watching over you", de: "Als Stern bei dir") }
@@ -1285,7 +1286,6 @@ nonisolated struct L10n {
     var petCardPause: String { tr(zh: "暂停", en: "Pause", de: "Pause") }
     var petCardResume: String { tr(zh: "继续", en: "Resume", de: "Weiter") }
     var petCardEndWalk: String { tr(zh: "结束", en: "End", de: "Beenden") }
-
     func petCardVaccineCountdown(daysUntilDue: Int) -> String {
         if daysUntilDue < 0 {
             let overdue = abs(daysUntilDue)
@@ -1301,10 +1301,10 @@ nonisolated struct L10n {
 
     func petCardHumanEquivBody(humanAge: Int, isFemale: Bool) -> String {
         switch humanAge {
-        case 0..<3:
-            return tr(zh: "👶 相当于人类宝宝 \(humanAge) 岁", en: "👶 ≈ human baby \(humanAge)", de: "👶 ≈ Menschenbaby \(humanAge)", es: "👶 ≈ bebé humano de \(humanAge)", pt: "👶 ≈ bebê humano de \(humanAge)", fr: "👶 ≈ bébé humain de \(humanAge)")
-        case 3..<8:
-            return tr(
+        case 0 ..< 3:
+            tr(zh: "👶 相当于人类宝宝 \(humanAge) 岁", en: "👶 ≈ human baby \(humanAge)", de: "👶 ≈ Menschenbaby \(humanAge)", es: "👶 ≈ bebé humano de \(humanAge)", pt: "👶 ≈ bebê humano de \(humanAge)", fr: "👶 ≈ bébé humain de \(humanAge)")
+        case 3 ..< 8:
+            tr(
                 zh: "🎠 相当于 \(humanAge) 岁的\(isFemale ? "小公主" : "小男孩")",
                 en: "🎠 ≈ a \(humanAge)-yr-old \(isFemale ? "little princess" : "little dude")",
                 de: "🎠 ≈ \(humanAge) Jahre, \(isFemale ? "kleine Prinzessin" : "kleiner Wirbel")",
@@ -1312,8 +1312,8 @@ nonisolated struct L10n {
                 pt: "🎠 ≈ \(humanAge) anos, \(isFemale ? "mini princesa" : "mini aventureiro")",
                 fr: "🎠 ≈ \(humanAge) ans, \(isFemale ? "mini princesse" : "mini aventurier")"
             )
-        case 8..<13:
-            return tr(
+        case 8 ..< 13:
+            tr(
                 zh: "🎒 相当于 \(humanAge) 岁的\(isFemale ? "萌妹" : "小大人")",
                 en: "🎒 ≈ \(humanAge) yrs \(isFemale ? "cool kid sis" : "cool kid bro")",
                 de: "🎒 ≈ \(humanAge) Jahre, \(isFemale ? "cooles Mädchen" : "cooler Typ")",
@@ -1321,8 +1321,8 @@ nonisolated struct L10n {
                 pt: "🎒 ≈ \(humanAge) anos, \(isFemale ? "garota esperta" : "mini adulto")",
                 fr: "🎒 ≈ \(humanAge) ans, \(isFemale ? "fillette pétillante" : "petit grand")"
             )
-        case 13..<18:
-            return tr(
+        case 13 ..< 18:
+            tr(
                 zh: "🌱 相当于 \(humanAge) 岁的\(isFemale ? "少女" : "少男")",
                 en: "🌱 ≈ \(humanAge) yrs \(isFemale ? "teen queen" : "teen pal")",
                 de: "🌱 ≈ \(humanAge) Jahre Teenie-Energie",
@@ -1330,8 +1330,8 @@ nonisolated struct L10n {
                 pt: "🌱 ≈ \(humanAge) anos de energia teen",
                 fr: "🌱 ≈ \(humanAge) ans d'énergie ado"
             )
-        case 18..<25:
-            return tr(
+        case 18 ..< 25:
+            tr(
                 zh: "🔥 相当于 \(humanAge) 岁的\(isFemale ? "活力少女" : "鲜肉小哥")",
                 en: "🔥 ≈ \(humanAge) yrs \(isFemale ? "sparkly young adult" : "bright young adult")",
                 de: "🔥 ≈ \(humanAge) Jahre, jung und hellwach",
@@ -1339,8 +1339,8 @@ nonisolated struct L10n {
                 pt: "🔥 ≈ \(humanAge) anos, jovem cheio de brilho",
                 fr: "🔥 ≈ \(humanAge) ans, jeune et lumineux"
             )
-        case 25..<35:
-            return tr(
+        case 25 ..< 35:
+            tr(
                 zh: "💼 相当于 \(humanAge) 岁的\(isFemale ? "独立美女" : "稳重帅哥")",
                 en: "💼 ≈ \(humanAge) yrs \(isFemale ? "grown-up glow" : "steady glow-up")",
                 de: "💼 ≈ \(humanAge) Jahre, erwachsen mit Glanz",
@@ -1348,8 +1348,8 @@ nonisolated struct L10n {
                 pt: "💼 ≈ \(humanAge) anos, adulto com charme",
                 fr: "💼 ≈ \(humanAge) ans, adulte avec style"
             )
-        case 35..<50:
-            return tr(
+        case 35 ..< 50:
+            tr(
                 zh: "🌟 相当于 \(humanAge) 岁的\(isFemale ? "优雅女士" : "成熟大叔")",
                 en: "🌟 ≈ \(humanAge) yrs \(isFemale ? "elegant vibes" : "seasoned vibes")",
                 de: "🌟 ≈ \(humanAge) Jahre, souverän und warm",
@@ -1357,8 +1357,8 @@ nonisolated struct L10n {
                 pt: "🌟 ≈ \(humanAge) anos, vibe elegante",
                 fr: "🌟 ≈ \(humanAge) ans, vibe élégante"
             )
-        case 50..<65:
-            return tr(
+        case 50 ..< 65:
+            tr(
                 zh: "👑 相当于 \(humanAge) 岁的\(isFemale ? "典雅长辈" : "稳重前辈")",
                 en: "👑 ≈ \(humanAge) yrs \(isFemale ? "wise matriarch" : "wise patriarch")",
                 de: "👑 ≈ \(humanAge) Jahre, weise und königlich",
@@ -1367,7 +1367,7 @@ nonisolated struct L10n {
                 fr: "👑 ≈ \(humanAge) ans, sage et royal"
             )
         default:
-            return tr(zh: "🧓 相当于人类 \(humanAge) 岁的长者", en: "🧓 ≈ \(humanAge) human yrs wise & warm", de: "🧓 ≈ \(humanAge) Menschenjahre, weise und warm", es: "🧓 ≈ \(humanAge) años humanos, sabio y cálido", pt: "🧓 ≈ \(humanAge) anos humanos, sábio e quentinho", fr: "🧓 ≈ \(humanAge) ans humains, sage et doux")
+            tr(zh: "🧓 相当于人类 \(humanAge) 岁的长者", en: "🧓 ≈ \(humanAge) human yrs wise & warm", de: "🧓 ≈ \(humanAge) Menschenjahre, weise und warm", es: "🧓 ≈ \(humanAge) años humanos, sabio y cálido", pt: "🧓 ≈ \(humanAge) anos humanos, sábio e quentinho", fr: "🧓 ≈ \(humanAge) ans humains, sage et doux")
         }
     }
 }

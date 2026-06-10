@@ -8,8 +8,8 @@
 //  - HumanHealthMetricLog：单一指标的某次具体数值（TSH 4.5 mIU/L），用于趋势图
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 /// 单条体检指标记录
 @Model

@@ -36,8 +36,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
         }
         .padding(space(12, 14, 17))
         .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
         .shadow(color: .black.opacity(mode == .dark ? 0.18 : 0.08), radius: 14, y: 8) // ui-v4: allow preview canvas floating depth
         .animation(DesignSpecUIV4.controlChangeAnimation(selection), value: step)
     }
@@ -136,8 +136,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
                     .padding(10)
             }
             .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
 
             LazyVGrid(columns: previewColumns, spacing: 8) {
                 sheetTokenCell("背景", "Background", selection.sheetGlass)
@@ -195,8 +195,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
             iconButton("person.crop.circle.fill", selected: false)
         }
         .padding(selection.navigation == "floating" ? 10 : 0)
-        .background(selection.navigation == "floating" ? palette.controlFill : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(selection.navigation == "floating" ? palette.stroke : .clear, lineWidth: 1))
+        .background(selection.navigation == "floating" ? palette.controlFill : .clear, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous).strokeBorder(selection.navigation == "floating" ? palette.stroke : .clear, lineWidth: 1))
     }
 
     private var pageChromeAndSettingsPreview: some View {
@@ -214,8 +214,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
             }
         }
         .padding(10)
-        .background(palette.controlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
+        .background(palette.controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
     }
 
     private var calendarCompact: some View {
@@ -231,7 +231,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
         }
     }
 
-    private func miniPanel<Content: View>(_ zh: String, _ en: String, @ViewBuilder content: () -> Content) -> some View {
+    private func miniPanel(_ zh: String, _ en: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Text(zh)
@@ -246,8 +246,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
         }
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
         .padding(9)
-        .background(palette.controlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
+        .background(palette.controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
     }
 
     private var sheetPreviewBackdrop: some View {
@@ -258,7 +258,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                 endPoint: .bottomTrailing
             )
             VStack(spacing: 10) {
-                ForEach(0..<5, id: \.self) { index in
+                ForEach(0 ..< 5, id: \.self) { index in
                     HStack(spacing: 12) {
                         Text(index.isMultiple(of: 2) ? "OHANA SHEET 12345" : "弹窗透明度  输入  按钮")
                             .font(font(13, .black))
@@ -292,8 +292,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
             Spacer(minLength: 0)
         }
         .padding(9)
-        .background(palette.controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
+        .background(palette.controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous).strokeBorder(palette.stroke, lineWidth: 1))
     }
 
     private var fabMiniButton: some View {
@@ -341,7 +341,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                     .scaleEffect(selection.fabMotion == "pop" && fabOpen ? 1.10 : 1)
                     .offset(y: selection.fabMotion == "float" && fabOpen ? -6 : 0)
                     .overlay(alignment: .topTrailing) {
-                        if selection.fabMotion == "fan" && fabOpen {
+                        if selection.fabMotion == "fan", fabOpen {
                             Circle()
                                 .fill(Color.goBlue)
                                 .frame(width: 14, height: 14) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
@@ -378,8 +378,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
                 iconButton("person.crop.circle.fill", selected: false)
             }
             .padding(selection.navigation == "floating" ? 10 : 0)
-            .background(selection.navigation == "floating" ? palette.controlFill : .clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(selection.navigation == "floating" ? palette.stroke : .clear, lineWidth: 1))
+            .background(selection.navigation == "floating" ? palette.controlFill : .clear, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous).strokeBorder(selection.navigation == "floating" ? palette.stroke : .clear, lineWidth: 1))
 
             if selection.navigation == "bottom" {
                 HStack {
@@ -546,8 +546,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
         let tokens = sheetStyle ? sheetTokenSelection : selection
         return VStack(alignment: .leading, spacing: 5) {
             Text(title)
-            .font(font(9, .black))
-            .foregroundStyle(state == "errorFirst" ? palette.danger : palette.secondaryText)
+                .font(font(9, .black))
+                .foregroundStyle(state == "errorFirst" ? palette.danger : palette.secondaryText)
             HStack(spacing: 7) {
                 Image(systemName: icon("keyboard.fill"))
                     .font(OhanaFont.adaptive(size: 10, weight: .black))
@@ -583,7 +583,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                     .frame(width: 42, height: 42) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 case "steps":
                     HStack(spacing: 5) {
-                        ForEach(0..<5, id: \.self) { index in
+                        ForEach(0 ..< 5, id: \.self) { index in
                             Circle()
                                 .fill(index < 4 ? palette.accent : palette.stroke.opacity(0.55))
                                 .frame(width: 10, height: 10) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
@@ -634,7 +634,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
         case "bars":
             Capsule().fill(palette.accent).frame(width: 18, height: 3) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
         case "icons":
-                Image(systemName: icon(day.isMultiple(of: 2) ? "fork.knife" : "drop.fill"))
+            Image(systemName: icon(day.isMultiple(of: 2) ? "fork.knife" : "drop.fill"))
                 .font(OhanaFont.adaptive(size: 7, weight: .black))
                 .foregroundStyle(palette.accent)
         case "stack":
@@ -673,8 +673,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
             Spacer()
         }
         .padding(9)
-        .background(calendarAgendaFill(tint), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(selection.calendarAgenda == "swipeRows" ? palette.accent.opacity(0.40) : .clear, lineWidth: 1))
+        .background(calendarAgendaFill(tint), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous).strokeBorder(selection.calendarAgenda == "swipeRows" ? palette.accent.opacity(0.40) : .clear, lineWidth: 1))
         .overlay(alignment: .trailing) {
             if selection.calendarAgenda == "swipeRows" {
                 HStack(spacing: 4) {
@@ -784,7 +784,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
     }
 
     private var sheetFill: some View {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
         return ZStack {
             sheetGlassLayers(selection.sheetGlass, shape: shape)
             shape.fill(palette.accent.opacity(0.018))
@@ -830,11 +830,11 @@ struct DesignSpecSafePreviewCanvasV4: View {
 
     private func sheetGlassStroke(_ id: String) -> Color {
         switch id {
-        case "refractive": return palette.stroke
-        case "nativeRegular": return Color.white.opacity(mode == .dark ? 0.24 : 0.38) // ui-v4: allow native sheet rim
-        case "clear": return Color.white.opacity(mode == .dark ? 0.18 : 0.30) // ui-v4: allow clear sheet rim
-        case "edgePrism": return palette.accent.opacity(mode == .dark ? 0.42 : 0.34)
-        default: return Color.white.opacity(mode == .dark ? 0.26 : 0.38) // ui-v4: allow widget sheet rim
+        case "refractive": palette.stroke
+        case "nativeRegular": Color.white.opacity(mode == .dark ? 0.24 : 0.38) // ui-v4: allow native sheet rim
+        case "clear": Color.white.opacity(mode == .dark ? 0.18 : 0.30) // ui-v4: allow clear sheet rim
+        case "edgePrism": palette.accent.opacity(mode == .dark ? 0.42 : 0.34)
+        default: Color.white.opacity(mode == .dark ? 0.26 : 0.38) // ui-v4: allow widget sheet rim
         }
     }
 
@@ -847,10 +847,10 @@ struct DesignSpecSafePreviewCanvasV4: View {
 
     private var calendarLabel: String {
         switch selection.calendarLayout {
-        case "monthGrid": return "月历"
-        case "weekStrip": return "周条"
-        case "timeline": return "时间轴"
-        default: return "混合"
+        case "monthGrid": "月历"
+        case "weekStrip": "周条"
+        case "timeline": "时间轴"
+        default: "混合"
         }
     }
 
@@ -1003,8 +1003,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
         }
         .frame(maxWidth: .infinity)
         .padding(8)
-        .background(selection.listRow == "plain" ? .clear : rowFill, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).strokeBorder(selection.listRow == "outlined" ? palette.stroke : .clear, lineWidth: 1))
+        .background(selection.listRow == "plain" ? .clear : rowFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous).strokeBorder(selection.listRow == "outlined" ? palette.stroke : .clear, lineWidth: 1))
     }
 
     @ViewBuilder
@@ -1025,12 +1025,12 @@ struct DesignSpecSafePreviewCanvasV4: View {
             glyph
                 .foregroundStyle(tint)
                 .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
-                .background(palette.flatBlock, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(palette.flatBlock, in: RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous))
         default:
             glyph
                 .foregroundStyle(tint)
                 .frame(width: 28, height: 28) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
-                .background(tint.opacity(mode == .dark ? 0.16 : 0.10), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .background(tint.opacity(mode == .dark ? 0.16 : 0.10), in: RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous))
         }
     }
 
@@ -1064,15 +1064,15 @@ struct DesignSpecSafePreviewCanvasV4: View {
             badge("Row")
         }
         .padding(selection.listRow == "dense" ? 7 : 9)
-        .background(selection.listRow == "plain" ? .clear : palette.controlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(selection.listRow == "outlined" ? palette.stroke : .clear, lineWidth: 1))
+        .background(selection.listRow == "plain" ? .clear : palette.controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous).strokeBorder(selection.listRow == "outlined" ? palette.stroke : .clear, lineWidth: 1))
     }
 
     private var rowFill: Color {
         switch selection.listRow {
-        case "dense": return palette.flatBlock
-        case "plain": return .clear
-        default: return palette.controlFill
+        case "dense": palette.flatBlock
+        case "plain": .clear
+        default: palette.controlFill
         }
     }
 
@@ -1089,14 +1089,14 @@ struct DesignSpecSafePreviewCanvasV4: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background {
-                            if selectedChip == item && selection.segment != "underline" {
+                            if selectedChip == item, selection.segment != "underline" {
                                 segmentItemShape
                                     .fill(segmentItemFill(selected: true))
                                     .matchedGeometryEffect(id: "segmentSelection", in: controlNamespace)
                             }
                         }
                         .overlay(alignment: .bottom) {
-                            if selection.segment == "underline" && selectedChip == item {
+                            if selection.segment == "underline", selectedChip == item {
                                 Capsule()
                                     .fill(palette.accent)
                                     .frame(height: 2)
@@ -1163,7 +1163,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                     .foregroundStyle(palette.primaryText)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(palette.controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(palette.controlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 default:
                     compactSwitch
                 }
@@ -1201,7 +1201,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
             ZStack {
                 if selection.chartAxis != "none" {
                     VStack(spacing: 0) {
-                        ForEach(0..<4, id: \.self) { _ in
+                        ForEach(0 ..< 4, id: \.self) { _ in
                             Rectangle()
                                 .fill(palette.stroke.opacity(selection.chartAxis == "strong" ? 0.95 : 0.55))
                                 .frame(height: 0.7)
@@ -1213,7 +1213,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                 if selection.chartLine == "bars" {
                     HStack(alignment: .bottom, spacing: 7) {
                         ForEach(values, id: \.self) { value in
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
                                 .fill(palette.accent)
                                 .frame(height: max(14, value * height))
                         }
@@ -1284,7 +1284,7 @@ struct DesignSpecSafePreviewCanvasV4: View {
                 Spacer()
             }
             .padding(10)
-            .background(palette.danger.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(palette.danger.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         case "minimal":
             HStack(spacing: 8) {
                 chip("50g", selected: true)
@@ -1330,8 +1330,8 @@ struct DesignSpecSafePreviewCanvasV4: View {
             Spacer()
         }
         .padding(10)
-        .background(bannerFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(selection.banner == "top" ? palette.warning.opacity(0.35) : .clear, lineWidth: 1))
+        .background(bannerFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous).strokeBorder(selection.banner == "top" ? palette.warning.opacity(0.35) : .clear, lineWidth: 1))
     }
 
     private var rewardPreview: some View {
@@ -1351,27 +1351,27 @@ struct DesignSpecSafePreviewCanvasV4: View {
 
     private var rewardIcon: String {
         switch selection.reward {
-        case "confetti": return "sparkles"
-        case "quiet": return "checkmark"
-        case "soundless": return "speaker.slash.fill"
-        default: return "heart.fill"
+        case "confetti": "sparkles"
+        case "quiet": "checkmark"
+        case "soundless": "speaker.slash.fill"
+        default: "heart.fill"
         }
     }
 
     private var bannerFill: Color {
         switch selection.banner {
-        case "quiet": return palette.controlFill
-        case "card": return palette.warning.opacity(0.14)
-        case "top": return palette.warning.opacity(0.10)
-        default: return palette.accent.opacity(0.10)
+        case "quiet": palette.controlFill
+        case "card": palette.warning.opacity(0.14)
+        case "top": palette.warning.opacity(0.10)
+        default: palette.accent.opacity(0.10)
         }
     }
 
     private func calendarAgendaFill(_ tint: Color) -> Color {
         switch selection.calendarAgenda {
-        case "plainList": return .clear
-        case "groupedCards": return tint.opacity(0.12)
-        default: return palette.controlFill
+        case "plainList": .clear
+        case "groupedCards": tint.opacity(0.12)
+        default: palette.controlFill
         }
     }
 }

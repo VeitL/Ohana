@@ -5,8 +5,8 @@
 //  B67: 噗噗快捷打卡半屏 Sheet
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct QuickPottySheet: View {
     let pet: Pet
@@ -67,8 +67,8 @@ struct QuickPottySheet: View {
                             }
                             .frame(maxWidth: .infinity).padding(.vertical, 16)
                             .background(selectedType == type ? Color.goYellow : .white.opacity(0.07),
-                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                                 .strokeBorder(selectedType == type ? Color.goYellow.opacity(0.6) : .white.opacity(0.1), lineWidth: 1))
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -118,7 +118,7 @@ struct QuickPottySheet: View {
     private func savePotty() {
         guard !isSaving else { return }
         let eid = appServices.activeHumanSelection.currentHumanId
-        let isLitter = ["猫","兔子","仓鼠","龙猫","豚鼠"].contains(pet.species)
+        let isLitter = ["猫", "兔子", "仓鼠", "龙猫", "豚鼠"].contains(pet.species)
         let action = isLitter ? CareType.litter.rawValue : selectedType.rawValue
         isSaving = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()

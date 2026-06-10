@@ -45,7 +45,7 @@ struct OasisRewardCommandExecutor {
         let allAchievements = pets.flatMap { AchievementManager.compute(for: $0) }
         let unlockedCount = allAchievements.filter(\.isUnlocked).count
         let totalCount = allAchievements.count
-        let activeCritterCount = electronicPets.filter { !$0.isArchived }.count
+        let activeCritterCount = electronicPets.count(where: { !$0.isArchived })
 
         return OasisBentoSnapshot(
             shopMetric: "\(activeCoconutBalance)",

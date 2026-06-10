@@ -47,14 +47,14 @@ struct FunctionMenuDestinationRouter: View {
                 progressToNextLevel: appServices.oasisTree.progressToNextLevel,
                 appLanguage: appLanguage
             )
-        case .featureGroup(let group):
+        case let .featureGroup(group):
             FeatureGroupDashboardView(
                 group: group,
                 parentPath: $parentPath,
                 pets: pets,
                 humans: humans
             )
-        case .featureAggregate(let feature):
+        case let .featureAggregate(feature):
             FeatureAggregateView(
                 feature: feature,
                 parentPath: $parentPath,
@@ -62,39 +62,39 @@ struct FunctionMenuDestinationRouter: View {
                 humans: humans,
                 showsEntityChips: false
             )
-        case .petHealth(let id):
+        case let .petHealth(id):
             if let pet = pet(for: id) { PetHealthDetailView(pet: pet, isModal: false) }
-        case .petMedications(let id):
+        case let .petMedications(id):
             if let pet = pet(for: id) { PetMedicationView(pet: pet) }
-        case .petFood(let id):
+        case let .petFood(id):
             if let pet = pet(for: id) { PetFoodManagementView(pet: pet) }
-        case .petHygiene(let id):
+        case let .petHygiene(id):
             if let pet = pet(for: id) { PetHygieneDetailView(pet: pet) }
-        case .petWalks(let id):
+        case let .petWalks(id):
             if let pet = pet(for: id) { WalkSummarySheet(pet: pet) }
-        case .petPotty(let id):
+        case let .petPotty(id):
             if let pet = pet(for: id) { QuickPottyDetailRouteContainer(id: pet.id, onRemove: {}) }
-        case .petBasicInfo(let id):
+        case let .petBasicInfo(id):
             if let pet = pet(for: id) { PetBasicInfoDetailView(pet: pet) }
-        case .petDocuments(let id):
+        case let .petDocuments(id):
             if let pet = pet(for: id) { DocumentsListView(pet: pet) }
-        case .petInsurance(let id):
+        case let .petInsurance(id):
             if let pet = pet(for: id) { PetInsuranceView(pet: pet) }
-        case .petMoments(let id):
+        case let .petMoments(id):
             if let pet = pet(for: id) { PetMomentsHubView(pet: pet) }
-        case .petTimeline(let id):
+        case let .petTimeline(id):
             if let pet = pet(for: id) { PetMomentsHubView(pet: pet) }
-        case .petAchievements(let id):
+        case let .petAchievements(id):
             if let pet = pet(for: id) { AchievementWallView(pet: pet) }
-        case .petRetention(let id):
+        case let .petRetention(id):
             if let pet = pet(for: id) { PetRetentionHubView(pet: pet) }
-        case .petWeight(let id):
+        case let .petWeight(id):
             if let pet = pet(for: id) { WeightHistoryView(pet: pet) }
-        case .petExpense(let id):
+        case let .petExpense(id):
             if let pet = pet(for: id) { ExpenseHistoryView(pet: pet) }
-        case .humanWeight(let id):
+        case let .humanWeight(id):
             if let human = human(for: id) { HumanWeightHistoryView(human: human) }
-        case .humanExpense(let id):
+        case let .humanExpense(id):
             if let human = human(for: id) { HumanExpenseDetailView(human: human) }
         case .plantsDashboard:
             PlantDashboardView(
@@ -103,7 +103,7 @@ struct FunctionMenuDestinationRouter: View {
                     parentPath.append(FMDest.plantDetail(plantID))
                 }
             )
-        case .plantDetail(let id):
+        case let .plantDetail(id):
             if let plant = plant(for: id) {
                 PlantDetailView(plant: plant)
             }

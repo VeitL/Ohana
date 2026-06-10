@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct HumanBasicInfoDetailContentView: View {
     let human: Human
@@ -163,7 +163,7 @@ struct HumanBasicInfoDetailContentView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
         .padding(.horizontal, 16)
-        .goIslandModuleCard(cornerRadius: 28)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.hero)
     }
 
     private func humanAvatarImage(data: Data?, fallbackEmoji: String, accent: Color, size: CGFloat) -> some View {
@@ -229,7 +229,7 @@ struct HumanBasicInfoDetailContentView: View {
 
             infoSection(title: "主题色", icon: "paintpalette.fill", iconColor: Color(hex: human.safeThemeColorHex)) {
                 HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: OhanaRadius.icon)
                         .fill(Color(hex: human.safeThemeColorHex))
                         .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     Text("#\(human.safeThemeColorHex.uppercased())")
@@ -311,7 +311,7 @@ struct HumanBasicInfoDetailContentView: View {
                 Toggle(isOn: Binding(
                     get: { eShouldShowOnHome },
                     set: { visible in
-                        if visible && !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
+                        if visible, !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
                             showingHomeStackFullAlert = true
                             return
                         }
@@ -356,7 +356,7 @@ struct HumanBasicInfoDetailContentView: View {
                     .frame(minHeight: 90)
                     .scrollContentBackground(.hidden)
                     .padding(10)
-                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
             }
         }
     }
@@ -372,23 +372,23 @@ struct HumanBasicInfoDetailContentView: View {
                     .foregroundStyle(Color.goRed)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color.goRed.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Color.goRed.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             }
             .disabled(isDeleting)
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.control)
     }
 
-    private func infoSection<Content: View>(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> Content) -> some View {
+    private func infoSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(iconColor)
                     .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(iconColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(iconColor.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous))
                 Text(title)
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -396,10 +396,10 @@ struct HumanBasicInfoDetailContentView: View {
             VStack(spacing: 10) { content() }
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.control)
     }
 
-    private func editSection<Content: View>(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> Content) -> some View {
+    private func editSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
         infoSection(title: title, icon: icon, iconColor: iconColor, content: content)
     }
 
@@ -425,7 +425,7 @@ struct HumanBasicInfoDetailContentView: View {
     private func editField(_ title: String, text: Binding<String>) -> some View {
         HStack {
             editLabel(title)
-            TextField(title, text: text)
+            TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .multilineTextAlignment(.trailing)
         }
@@ -483,7 +483,7 @@ struct HumanBasicInfoDetailContentView: View {
                     get: { Int(heightValue > 0 ? heightValue : 170) },
                     set: { eHeightText = "\($0)" }
                 ),
-                in: 80...230,
+                in: 80 ... 230,
                 step: 1
             ) {
                 Text("微调 80-230 cm")
@@ -609,7 +609,7 @@ struct HumanBasicInfoDetailContentView: View {
     }
 
     private func saveChanges() {
-        if eShouldShowOnHome && !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
+        if eShouldShowOnHome, !HomeCardVisibility.canShowHuman(human, pets: allPets, humans: allHumans, raw: hiddenHomePetIDsRaw) {
             showingHomeStackFullAlert = true
             return
         }
@@ -703,7 +703,7 @@ private struct HumanDeleteConfirmationSheet: View {
                         .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("删除成员 \(humanName)")
                             .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -732,15 +732,15 @@ private struct HumanDeleteConfirmationSheet: View {
                         .foregroundStyle(Color.goRed.opacity(0.8))
                 }
 
-                TextField("成员名字", text: $confirmName)
+                TextField("成员名字", text: $confirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 13)
-                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .strokeBorder(canDelete ? Color.goRed.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1))
 
                 HStack(spacing: 10) {
@@ -750,7 +750,7 @@ private struct HumanDeleteConfirmationSheet: View {
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
-                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
 
@@ -760,7 +760,7 @@ private struct HumanDeleteConfirmationSheet: View {
                             .foregroundStyle(canDelete ? Color.white : Color.ohanaTertiaryText) // ui-v4: allow destructive red button needs white contrast
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
-                            .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(!canDelete)

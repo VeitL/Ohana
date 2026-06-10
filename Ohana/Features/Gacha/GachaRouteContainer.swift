@@ -14,8 +14,8 @@ struct GachaRouteContainer: View {
     @Query(sort: \GachaDrawLog.drawDate, order: .reverse) private var drawLogs: [GachaDrawLog]
 
     var drawsBackground: Bool = true
-    var onClose: (() -> Void)? = nil
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onClose: (() -> Void)?
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     var body: some View {
         GachaView(

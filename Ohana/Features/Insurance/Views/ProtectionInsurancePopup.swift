@@ -5,8 +5,8 @@
 //  Inline V4 popup for creating and editing pet insurance policies.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct ProtectionInsurancePopup: View {
     let pet: Pet
@@ -43,6 +43,7 @@ struct ProtectionInsurancePopup: View {
         let raw = CountryDecimalInput.parse(premiumInput, countryCode: AppCountry.code) ?? 0
         return premiumMode == .monthly ? raw * 12 : raw
     }
+
     private var coverageAmount: Double {
         hasCoverage ? (CountryDecimalInput.parse(coverageInput, countryCode: AppCountry.code) ?? 0) : 0
     }
@@ -67,7 +68,7 @@ struct ProtectionInsurancePopup: View {
                             .font(OhanaFont.adaptive(size: 18, weight: .black))
                             .foregroundStyle(Color.arkInk)
                             .frame(width: 48, height: 48)
-                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(isEdit ? "编辑保险" : "添加保险")
                                 .font(OhanaFont.title3(.black))
@@ -90,9 +91,9 @@ struct ProtectionInsurancePopup: View {
                             dateBlock
                             optionsBlock
                             popupBlock {
-                                TextField("备注", text: $notes, axis: .vertical)
+                                TextField("备注", text: $notes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.subheadline(.bold))
-                                    .lineLimit(2...4)
+                                    .lineLimit(2 ... 4)
                                     .foregroundStyle(Color.ohanaPrimaryText)
                             }
                         }
@@ -116,8 +117,8 @@ struct ProtectionInsurancePopup: View {
                     .padding(.bottom, 22)
                 }
                 .frame(maxWidth: .infinity)
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.54), radius: 46, x: 0, y: -16) // ui-v4: allow popup liftedAlert shadow
                 .shadow(color: Color(hex: "0B102C").opacity(0.38), radius: 26, x: 0, y: 12) // ui-v4: allow popup liftedAlert shadow
                 .padding(.horizontal, 6)
@@ -147,17 +148,17 @@ struct ProtectionInsurancePopup: View {
 
     private var basicBlock: some View {
         popupBlock {
-            TextField("产品名称", text: $productName)
+            TextField("产品名称", text: $productName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.subheadline(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            TextField("保险公司", text: $companyName)
+            TextField("保险公司", text: $companyName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.subheadline(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Toggle("保单号", isOn: $hasPolicyNumber)
                 .font(OhanaFont.caption(.bold))
                 .tint(Color.goPrimary)
             if hasPolicyNumber {
-                TextField("保单号", text: $policyNumber)
+                TextField("保单号", text: $policyNumber) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
@@ -221,7 +222,7 @@ struct ProtectionInsurancePopup: View {
                             .foregroundStyle(paymentFrequency == frequency ? Color.arkInk : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 42)
-                            .background(paymentFrequency == frequency ? Color.goPrimary : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .background(paymentFrequency == frequency ? Color.goPrimary : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -286,13 +287,13 @@ struct ProtectionInsurancePopup: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
-    private func popupBlock<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func popupBlock(@ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             content()
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func prefill() {

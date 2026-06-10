@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import Foundation
 import CoreLocation
+import Foundation
 import Observation
 import UIKit
 
@@ -22,7 +22,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         case walkForeground
         case walkBackground
     }
-    
+
     private let manager = CLLocationManager()
     private var backgroundSession: AnyObject?
     private var isBackgroundDeliveryEnabled = false
@@ -65,7 +65,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         UserDefaults.standard.set(false, forKey: Self.backgroundWalkTrackingEnabledKey)
         stopAllLocationActivity()
     }
-    
+
     // MARK: - Permission
     func requestPermission() {
         if authorizationStatus == .notDetermined {
@@ -140,7 +140,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         UserDefaults.standard.set(true, forKey: Self.backgroundUpgradePromptedKey)
         manager.requestAlwaysAuthorization()
     }
-    
+
     // MARK: - Tracking
     func startTracking() {
         startWalkSession()
@@ -152,7 +152,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
             requestPermission()
             return
         }
-        
+
         collectedLocations.removeAll()
         lastAcceptedLocation = nil
         isTracking = true
@@ -165,7 +165,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
 
         manager.startUpdatingLocation()
     }
-    
+
     func stopTracking() {
         stopWalkSession()
     }
@@ -179,7 +179,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         endBackgroundTracking()
         activePurpose = .none
     }
-    
+
     func pauseTracking() {
         pauseWalkSession()
     }
@@ -191,7 +191,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         endBackgroundTracking()
         activePurpose = .none
     }
-    
+
     func resumeTracking() {
         resumeWalkSession()
     }
@@ -214,12 +214,12 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         }
 
         #if !targetEnvironment(simulator)
-        if #available(iOS 17.0, *) {
-            (backgroundSession as? CLBackgroundActivitySession)?.invalidate()
-            backgroundSession = nil
-        }
-        manager.allowsBackgroundLocationUpdates = true
-        manager.showsBackgroundLocationIndicator = false
+            if #available(iOS 17.0, *) {
+                (backgroundSession as? CLBackgroundActivitySession)?.invalidate()
+                backgroundSession = nil
+            }
+            manager.allowsBackgroundLocationUpdates = true
+            manager.showsBackgroundLocationIndicator = false
         #endif
         isBackgroundDeliveryEnabled = true
         activePurpose = .walkBackground
@@ -267,19 +267,19 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
 
     private func endBackgroundTracking() {
         #if !targetEnvironment(simulator)
-        if #available(iOS 17.0, *) {
-            (backgroundSession as? CLBackgroundActivitySession)?.invalidate()
-            backgroundSession = nil
-        }
-        manager.allowsBackgroundLocationUpdates = false
-        manager.showsBackgroundLocationIndicator = false
+            if #available(iOS 17.0, *) {
+                (backgroundSession as? CLBackgroundActivitySession)?.invalidate()
+                backgroundSession = nil
+            }
+            manager.allowsBackgroundLocationUpdates = false
+            manager.showsBackgroundLocationIndicator = false
         #endif
         isBackgroundDeliveryEnabled = false
         if activePurpose == .walkBackground {
             activePurpose = isTracking ? .walkForeground : .none
         }
     }
-    
+
     // MARK: - CLLocationManagerDelegate
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         if let handler = oneShotLocationHandler, let location = locations.last {
@@ -343,7 +343,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         result.reserveCapacity(maxCount)
 
         var lastIndex = -1
-        for i in 0..<maxCount {
+        for i in 0 ..< maxCount {
             let index = min(locations.count - 1, Int((Double(i) * step).rounded()))
             if index != lastIndex {
                 result.append(locations[index])
@@ -355,7 +355,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         }
         return result
     }
-    
+
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
 
@@ -363,7 +363,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
             UserDefaults.standard.set(false, forKey: Self.backgroundWalkTrackingEnabledKey)
             stopAllLocationActivity()
         }
-        
+
         if pendingStart && (authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways) {
             pendingStart = false
             startWalkSession()
@@ -384,7 +384,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
             handler?(.failure(LocationManagerOneShotError.unauthorized))
         }
     }
-    
+
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         if let handler = oneShotLocationHandler {
             oneShotLocationHandler = nil
@@ -398,15 +398,15 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         }
 
         #if DEBUG
-        print("⚠️ LocationManager error: \(error.localizedDescription)")
+            OhanaLog.warning("LocationManager error: \(error.localizedDescription)", category: "Location")
         #endif
     }
-    
+
     // MARK: - Computed
     var totalDistance: Double {
         guard collectedLocations.count > 1 else { return 0 }
         var total: Double = 0
-        for i in 1..<collectedLocations.count {
+        for i in 1 ..< collectedLocations.count {
             total += collectedLocations[i].distance(from: collectedLocations[i - 1])
         }
         return total
@@ -433,8 +433,8 @@ private enum LocationManagerOneShotError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unauthorized: return "Location permission is not available."
-        case .unavailable: return "Location is not available."
+        case .unauthorized: "Location permission is not available."
+        case .unavailable: "Location is not available."
         }
     }
 }

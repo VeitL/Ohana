@@ -71,7 +71,7 @@ struct AddWizardThreePanelLayout<Preview: View, Content: View, Footer: View>: Vi
 struct AddWizardStageProgress: View {
     let stages: [AddWizardStageItem]
     let currentIndex: Int
-    var accent: Color = Color.goPrimary
+    var accent: Color = .goPrimary
     var onSelect: (Int) -> Void
 
     var body: some View {
@@ -158,7 +158,7 @@ struct AddWizardThemeMatrixCell<Fill: ShapeStyle>: View {
                 )
             Rectangle()
                 .strokeBorder(Color.ohanaCardStroke.opacity(0.24), lineWidth: 0.35)
-            if showsPaletteIcon && !isSelected {
+            if showsPaletteIcon, !isSelected {
                 Image(systemName: "plus").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 16, weight: .black))
                     .symbolRenderingMode(.monochrome)
@@ -192,7 +192,6 @@ struct AddWizardThemeMatrixCell<Fill: ShapeStyle>: View {
         .animation(GoMotion.selection, value: isSelected)
         .accessibilityLabel(accessibilityTitle)
     }
-
 }
 
 enum AddWizardPlainAvatarPlaceholderKind {
@@ -202,7 +201,7 @@ enum AddWizardPlainAvatarPlaceholderKind {
 
 struct AddWizardPlainAvatarPlaceholder: View {
     let kind: AddWizardPlainAvatarPlaceholderKind
-    var tint: Color = Color.goPrimary
+    var tint: Color = .goPrimary
 
     var body: some View {
         GeometryReader { geo in
@@ -240,9 +239,9 @@ struct AddWizardPlainAvatarPlaceholder: View {
     private var symbolName: String {
         switch kind {
         case .human:
-            return "person.crop.circle"
-        case .pet(let symbol):
-            return symbol
+            "person.crop.circle"
+        case let .pet(symbol):
+            symbol
         }
     }
 }
@@ -309,7 +308,7 @@ struct AddWizardPagedCardCarousel: View {
             let step = pageWidth + spacing
             let displayedDrag = rubberBanded(dragOffset)
             HStack(spacing: spacing) {
-                ForEach(0..<pageCount, id: \.self) { index in
+                ForEach(0 ..< pageCount, id: \.self) { index in
                     page(index)
                         .allowsHitTesting(!isHorizontalDragActive)
                         .frame(width: pageWidth, height: geo.size.height)
@@ -393,7 +392,7 @@ struct AddWizardPagedCardCarousel: View {
 struct AddWizardStatusBadge: View {
     let title: String
     let systemImage: String
-    var tint: Color = Color.goPrimary
+    var tint: Color = .goPrimary
 
     var body: some View {
         Label(title, systemImage: systemImage)
@@ -438,7 +437,7 @@ struct AddWizardJoinCelebrationOverlay: View {
     let title: String
     let subtitle: String
     let systemImage: String
-    var accent: Color = Color.goPrimary
+    var accent: Color = .goPrimary
 
     var body: some View {
         ZStack {
@@ -468,9 +467,9 @@ struct AddWizardJoinCelebrationOverlay: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 26)
             .frame(maxWidth: min(ScreenCompat.width - 42, 360))
-            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous)
                     .strokeBorder(accent.opacity(0.22), lineWidth: 1)
             )
             .transition(.scale(scale: 0.92).combined(with: .opacity))

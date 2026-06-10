@@ -113,8 +113,8 @@ enum AppResetService {
         try delete(Human.self, in: context)
     }
 
-    private static func delete<T: PersistentModel>(_ model: T.Type, in context: ModelContext) throws {
-        let values = try context.fetch(FetchDescriptor<T>())
+    private static func delete<T: PersistentModel>(_: T.Type, in context: ModelContext) throws {
+        let values = try context.fetch(FetchDescriptor<T>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         for value in values {
             context.delete(value)
         }
@@ -130,7 +130,7 @@ enum AppResetService {
             "appThemePreference",
             AppCountry.storageKey,
             AppMeasurementSystem.storageKey,
-            AppCurrency.storageKey,
+            AppCurrency.storageKey
         ]
         return preservedKeys.reduce(into: [:]) { values, key in
             if let value = defaults.object(forKey: key) {
@@ -180,7 +180,7 @@ enum AppResetService {
         "lastTreeHarvestDate",
         "petBondVaultRevision",
         "purchasedShopItems",
-        "quickActionItems_v2",
+        "quickActionItems_v2"
     ]
 
     private static let resetDefaultPrefixes = [
@@ -207,6 +207,6 @@ enum AppResetService {
         "shop_",
         "streakRewards_",
         "today_focus_",
-        "water_operating_mode_",
+        "water_operating_mode_"
     ]
 }

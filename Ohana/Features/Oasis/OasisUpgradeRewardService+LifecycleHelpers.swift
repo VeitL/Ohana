@@ -45,7 +45,7 @@ extension OasisUpgradeRewardService {
         var mood = critter.mood
         var health = critter.health
 
-        for index in 0..<ticks {
+        for index in 0 ..< ticks {
             let tickDate = start.addingTimeInterval(Double(index + 1) * lifecycleCareTick)
             let idleHours = hoursBetween(critter.lastInteractionAt, tickDate)
 
@@ -59,7 +59,7 @@ extension OasisUpgradeRewardService {
                 health = max(0, health - 2)
             } else if hunger < needsCareThreshold || mood < needsCareThreshold {
                 health = max(0, health - 1)
-            } else if health < 100 && (index + 1).isMultiple(of: 4) {
+            } else if health < 100, (index + 1).isMultiple(of: 4) {
                 health = min(100, health + 1)
             }
         }
@@ -123,7 +123,7 @@ extension OasisUpgradeRewardService {
     static func recommendedCareAction(for critter: OasisElectronicPet) -> OasisCritterAction? {
         guard critter.lifeState != .dead else { return nil }
         if critter.health < 70 { return .rest }
-        if critter.hunger < needsCareThreshold && critter.hunger <= critter.mood { return .feed }
+        if critter.hunger < needsCareThreshold, critter.hunger <= critter.mood { return .feed }
         if critter.mood < needsCareThreshold { return .play }
         if critter.hunger < needsCareThreshold { return .feed }
         return nil
@@ -133,7 +133,7 @@ extension OasisUpgradeRewardService {
         if critter.health <= 0 || (critter.health < sickHealthThreshold && critter.hunger < atRiskThreshold && critter.mood < atRiskThreshold) {
             return .sick
         }
-        if critter.hunger < atRiskThreshold && critter.hunger <= critter.mood {
+        if critter.hunger < atRiskThreshold, critter.hunger <= critter.mood {
             return .hungry
         }
         if critter.mood < atRiskThreshold {
@@ -164,15 +164,15 @@ extension OasisUpgradeRewardService {
     }
 
     static func dailyActionCount(for action: OasisCritterAction, critter: OasisElectronicPet, context: ModelContext) -> Int {
-        actionLogs(for: critter, context: context).filter { $0.action == action }.count
+        actionLogs(for: critter, context: context).count(where: { $0.action == action })
     }
 
     static func actionLogs(for critter: OasisElectronicPet, context: ModelContext) -> [OasisCritterActionLog] {
         let startOfDay = Calendar.current.startOfDay(for: Date())
-        let logs = (try? context.fetch(FetchDescriptor<OasisCritterActionLog>())) ?? []
+        let logs = (try? context.fetch(FetchDescriptor<OasisCritterActionLog>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return logs.filter {
             $0.critterId == critter.id &&
-            $0.createdAt >= startOfDay
+                $0.createdAt >= startOfDay
         }
     }
 

@@ -2,7 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct AddEventView: View {
-    var onClose: (() -> Void)? = nil
+    var onClose: (() -> Void)?
 
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]

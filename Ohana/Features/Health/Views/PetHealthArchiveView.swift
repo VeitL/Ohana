@@ -26,23 +26,23 @@ struct PetHealthArchiveItem: Identifiable {
 
     var recordID: UUID {
         switch source {
-        case .health(let log):
-            return log.id
-        case .symptom(let log):
-            return log.id
-        case .heat(let log):
-            return log.id
+        case let .health(log):
+            log.id
+        case let .symptom(log):
+            log.id
+        case let .heat(log):
+            log.id
         }
     }
 
     var commandKind: String {
         switch source {
         case .health:
-            return "health"
+            "health"
         case .symptom:
-            return "symptom"
+            "symptom"
         case .heat:
-            return "heat"
+            "heat"
         }
     }
 }
@@ -158,7 +158,7 @@ struct PetHealthArchiveView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 48)
-        .goIslandModuleCard(cornerRadius: 20)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.input)
     }
 
     private func archiveRow(_ item: PetHealthArchiveItem) -> some View {
@@ -166,7 +166,7 @@ struct PetHealthArchiveView: View {
             Image(systemName: item.icon)
                 .font(OhanaFont.adaptive(size: 17, weight: .black))
                 .foregroundStyle(item.tint)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
                 .background(item.tint.opacity(isDark ? 0.20 : 0.12), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
@@ -195,7 +195,7 @@ struct PetHealthArchiveView: View {
             }
         }
         .padding(14)
-        .goIslandModuleCard(cornerRadius: 18)
+        .goIslandModuleCard(cornerRadius: OhanaRadius.controlLarge)
     }
 
     private func archiveDetail(for log: PetHealthLog) -> String {
@@ -213,71 +213,71 @@ struct PetHealthArchiveView: View {
 
     private func filterTitle(_ filter: PetHealthArchiveFilter) -> String {
         switch filter {
-        case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
-        case .health: return l.tr(zh: "记录", en: "Records", de: "Einträge")
-        case .symptom: return l.tr(zh: "异常", en: "Symptoms", de: "Symptome")
-        case .heat: return l.tr(zh: "生理", en: "Heat", de: "Läufigkeit")
+        case .all: l.tr(zh: "全部", en: "All", de: "Alle")
+        case .health: l.tr(zh: "记录", en: "Records", de: "Einträge")
+        case .symptom: l.tr(zh: "异常", en: "Symptoms", de: "Symptome")
+        case .heat: l.tr(zh: "生理", en: "Heat", de: "Läufigkeit")
         }
     }
 
     private func healthIcon(for type: HealthLogType) -> String {
         switch type {
-        case .general: return "clipboard.fill"
-        case .vaccine: return "syringe.fill"
-        case .medication: return "pill.fill"
-        case .dewormingInternal: return "pills.fill"
-        case .dewormingExternal: return "shield.lefthalf.filled"
-        case .surgery: return "cross.case.fill"
-        case .dental: return "mouth.fill"
-        case .checkup: return "stethoscope"
-        case .emergency: return "cross.circle.fill"
-        case .other: return "doc.text.fill"
+        case .general: "clipboard.fill"
+        case .vaccine: "syringe.fill"
+        case .medication: "pill.fill"
+        case .dewormingInternal: "pills.fill"
+        case .dewormingExternal: "shield.lefthalf.filled"
+        case .surgery: "cross.case.fill"
+        case .dental: "mouth.fill"
+        case .checkup: "stethoscope"
+        case .emergency: "cross.circle.fill"
+        case .other: "doc.text.fill"
         }
     }
 
     private func healthTitle(for type: HealthLogType) -> String {
         switch type {
-        case .general: return l.tr(zh: "常规记录", en: "General", de: "Allgemein")
-        case .vaccine: return l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
-        case .medication: return l.tr(zh: "用药", en: "Medication", de: "Medikament")
-        case .dewormingInternal: return l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
-        case .dewormingExternal: return l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
-        case .surgery: return l.tr(zh: "手术", en: "Surgery", de: "Operation")
-        case .dental: return l.tr(zh: "牙科", en: "Dental", de: "Zahnmedizin")
-        case .checkup: return l.tr(zh: "体检", en: "Checkup", de: "Check-up")
-        case .emergency: return l.tr(zh: "急诊", en: "Emergency", de: "Notfall")
-        case .other: return l.tr(zh: "其他", en: "Other", de: "Andere")
+        case .general: l.tr(zh: "常规记录", en: "General", de: "Allgemein")
+        case .vaccine: l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+        case .medication: l.tr(zh: "用药", en: "Medication", de: "Medikament")
+        case .dewormingInternal: l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .dewormingExternal: l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
+        case .surgery: l.tr(zh: "手术", en: "Surgery", de: "Operation")
+        case .dental: l.tr(zh: "牙科", en: "Dental", de: "Zahnmedizin")
+        case .checkup: l.tr(zh: "体检", en: "Checkup", de: "Check-up")
+        case .emergency: l.tr(zh: "急诊", en: "Emergency", de: "Notfall")
+        case .other: l.tr(zh: "其他", en: "Other", de: "Andere")
         }
     }
 
     private func symptomIcon(for category: SymptomCategory) -> String {
         switch category {
-        case .digestive: return "stomach.fill"
-        case .respiratory: return "lungs.fill"
-        case .mobility: return "figure.walk"
-        case .appetite: return "fork.knife"
-        case .skin: return "bandage.fill"
-        case .behavior: return "moon.zzz.fill"
-        case .other: return "magnifyingglass"
+        case .digestive: "stomach.fill"
+        case .respiratory: "lungs.fill"
+        case .mobility: "figure.walk"
+        case .appetite: "fork.knife"
+        case .skin: "bandage.fill"
+        case .behavior: "moon.zzz.fill"
+        case .other: "magnifyingglass"
         }
     }
 
     private func severityTitle(_ severity: SymptomSeverity) -> String {
         switch severity {
-        case .mild: return l.tr(zh: "轻微", en: "Mild", de: "Leicht")
-        case .moderate: return l.tr(zh: "中度", en: "Moderate", de: "Mittel")
-        case .severe: return l.tr(zh: "严重", en: "Severe", de: "Schwer")
-        case .critical: return l.tr(zh: "紧急", en: "Critical", de: "Kritisch")
+        case .mild: l.tr(zh: "轻微", en: "Mild", de: "Leicht")
+        case .moderate: l.tr(zh: "中度", en: "Moderate", de: "Mittel")
+        case .severe: l.tr(zh: "严重", en: "Severe", de: "Schwer")
+        case .critical: l.tr(zh: "紧急", en: "Critical", de: "Kritisch")
         }
     }
 
     private func color(for type: HealthLogType) -> Color {
         switch type {
-        case .vaccine: return accent
-        case .dewormingInternal, .dewormingExternal, .medication: return Color.goTeal
-        case .surgery, .emergency: return Color.goRed
-        case .checkup: return Color.goYellow
-        default: return Color.goBlue
+        case .vaccine: accent
+        case .dewormingInternal, .dewormingExternal, .medication: Color.goTeal
+        case .surgery, .emergency: Color.goRed
+        case .checkup: Color.goYellow
+        default: Color.goBlue
         }
     }
 
@@ -294,11 +294,11 @@ struct PetHealthArchiveView: View {
         commandQueue.enqueue(command) {
             let executor = PetHealthCommandExecutor(context: modelContext, services: appServices)
             switch item.source {
-            case .health(let log):
+            case let .health(log):
                 executor.deleteHealthLog(log, pet: pet, note: "pet.health.archive.delete.health")
-            case .symptom(let log):
+            case let .symptom(log):
                 executor.deleteSymptomLog(log, pet: pet, note: "pet.health.archive.delete.symptom")
-            case .heat(let log):
+            case let .heat(log):
                 executor.deleteHeatCycleLog(log, pet: pet, note: "pet.health.archive.delete.heat")
             }
             deletingItemIDs.remove(item.id)

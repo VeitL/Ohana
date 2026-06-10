@@ -291,7 +291,7 @@ struct QuickFeedHomePresenter {
 
     private var stockCardValue: String {
         let grams = [viewState.metrics.dryStockRemainingGrams, viewState.metrics.wetStockRemainingGrams]
-            .compactMap { $0 }
+            .compactMap(\.self)
             .reduce(0, +)
         if grams > 0, let days = viewState.stockBadge.remainingDays {
             return "\(formattedFoodCardWeight(grams)) · \(days)\(localization.tr(zh: "天", en: "d", de: "T"))"
@@ -379,44 +379,44 @@ extension FeedOperatingMode {
     func feedShortTitle(_ localization: L10n) -> String {
         switch self {
         case .manual:
-            return localization.tr(zh: "手动", en: "Manual", de: "Manuell")
+            localization.tr(zh: "手动", en: "Manual", de: "Manuell")
         case .manualReminder:
-            return localization.tr(zh: "计划", en: "Plan", de: "Plan")
+            localization.tr(zh: "计划", en: "Plan", de: "Plan")
         case .autoFeeder:
-            return localization.tr(zh: "自动", en: "Auto", de: "Auto")
+            localization.tr(zh: "自动", en: "Auto", de: "Auto")
         }
     }
 
     func feedTitle(_ localization: L10n) -> String {
         switch self {
         case .manual:
-            return localization.tr(zh: "手动打卡", en: "Manual logging", de: "Manuell")
+            localization.tr(zh: "手动打卡", en: "Manual logging", de: "Manuell")
         case .manualReminder:
-            return localization.tr(zh: "喂食计划", en: "Reminder plan", de: "Fütterungsplan")
+            localization.tr(zh: "喂食计划", en: "Reminder plan", de: "Fütterungsplan")
         case .autoFeeder:
-            return localization.tr(zh: "自动猫粮机", en: "Auto feeder", de: "Futterautomat")
+            localization.tr(zh: "自动猫粮机", en: "Auto feeder", de: "Futterautomat")
         }
     }
 
     var feedIconName: String {
         switch self {
         case .manual:
-            return "hand.tap.fill"
+            "hand.tap.fill"
         case .manualReminder:
-            return FeedRuleKind.manualReminder.iconName
+            FeedRuleKind.manualReminder.iconName
         case .autoFeeder:
-            return FeedRuleKind.autoFeeder.iconName
+            FeedRuleKind.autoFeeder.iconName
         }
     }
 
     var feedTint: Color {
         switch self {
         case .manual:
-            return Color.goOrange
+            Color.goOrange
         case .manualReminder:
-            return Color.goPurple
+            Color.goPurple
         case .autoFeeder:
-            return Color.goTeal
+            Color.goTeal
         }
     }
 }

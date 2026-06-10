@@ -6,8 +6,8 @@
 //  展示所有负反馈信号、连击状态、今日全家族活跃家人列表。
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct IslandSummarySheet: View {
     let pets: [Pet]
@@ -38,23 +38,23 @@ struct IslandSummarySheet: View {
 
     private var moodEmoji: String {
         switch mood {
-        case .celebrate: return "🎉"
-        case .plantBreeze: return "🌿"
-        case .breezy: return "🌤"
-        case .calm: return "☀️"
-        case .cloudy: return "⛅"
-        case .storm: return "⛈"
+        case .celebrate: "🎉"
+        case .plantBreeze: "🌿"
+        case .breezy: "🌤"
+        case .calm: "☀️"
+        case .cloudy: "⛅"
+        case .storm: "⛈"
         }
     }
 
     private var moodText: String {
         switch mood {
-        case .celebrate:   return "岛屿庆典日"
-        case .plantBreeze: return "植物刚喝饱水"
-        case .breezy:      return "岛屿微风"
-        case .calm:        return "岛屿晴朗"
-        case .cloudy:      return "岛屿阴天"
-        case .storm:       return "岛屿风暴 · 注意紧急事项"
+        case .celebrate: "岛屿庆典日"
+        case .plantBreeze: "植物刚喝饱水"
+        case .breezy: "岛屿微风"
+        case .calm: "岛屿晴朗"
+        case .cloudy: "岛屿阴天"
+        case .storm: "岛屿风暴 · 注意紧急事项"
         }
     }
 
@@ -114,7 +114,7 @@ struct IslandSummarySheet: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .fill(Color.ohanaCardSurface)
         )
     }
@@ -138,7 +138,7 @@ struct IslandSummarySheet: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .fill(Color.ohanaCardSurface)
         )
     }
@@ -168,11 +168,11 @@ struct IslandSummarySheet: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                 .fill(Color.ohanaCardSurface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                 .strokeBorder(
                     s.severity == .critical ? Color.goRed.opacity(0.3) : Color.goYellow.opacity(0.28),
                     lineWidth: 1
@@ -192,7 +192,7 @@ struct IslandSummarySheet: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                 .fill(Color.goPrimary.opacity(0.1))
         )
     }

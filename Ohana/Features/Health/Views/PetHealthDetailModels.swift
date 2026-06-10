@@ -13,30 +13,30 @@ enum HealthPlusDestination: Identifiable {
     case guided(HealthRecordEntryMode)
     case direct(HealthLogType)
     case medications
-    case symptom     // 新增
-    case heatCycle   // 新增
+    case symptom // 新增
+    case heatCycle // 新增
 
     var id: String {
         switch self {
-        case .guided(let m):
-            return m == .preventive ? "guide_p" : "guide_v"
-        case .direct(let t):
-            return "dir_\(t.rawValue)"
+        case let .guided(m):
+            m == .preventive ? "guide_p" : "guide_v"
+        case let .direct(t):
+            "dir_\(t.rawValue)"
         case .medications:
-            return "meds"
+            "meds"
         case .symptom:
-            return "symptom"
+            "symptom"
         case .heatCycle:
-            return "heat"
+            "heat"
         }
     }
 
     var usesInlineRecordPopup: Bool {
         switch self {
         case .guided, .direct:
-            return true
+            true
         case .medications, .symptom, .heatCycle:
-            return false
+            false
         }
     }
 }
@@ -65,9 +65,9 @@ enum ActiveHealthSheet: Identifiable {
 
     var id: String {
         switch self {
-        case .preventiveOverview: return "preventiveOverview"
-        case .medicationOverview: return "medicationOverview"
-        case .symptomVisitOverview: return "symptomVisitOverview"
+        case .preventiveOverview: "preventiveOverview"
+        case .medicationOverview: "medicationOverview"
+        case .symptomVisitOverview: "symptomVisitOverview"
         }
     }
 }
@@ -86,37 +86,37 @@ enum HealthFabActionKind: String, Identifiable {
 
     var icon: String {
         switch self {
-        case .preventive: return "shield.checkered"
-        case .visit: return "cross.case.fill"
-        case .medication: return "pill.fill"
-        case .vaccinePassport: return "syringe.fill"
-        case .archive: return "folder.fill"
-        case .pdf: return "doc.richtext"
-        case .symptom: return "exclamationmark.triangle.fill"
-        case .heatCycle: return "heart.text.square.fill"
+        case .preventive: "shield.checkered"
+        case .visit: "cross.case.fill"
+        case .medication: "pill.fill"
+        case .vaccinePassport: "syringe.fill"
+        case .archive: "folder.fill"
+        case .pdf: "doc.richtext"
+        case .symptom: "exclamationmark.triangle.fill"
+        case .heatCycle: "heart.text.square.fill"
         }
     }
 
     func label(_ l: L10n, isRenderingPDF: Bool = false) -> String {
         switch self {
         case .preventive:
-            return l.tr(zh: "预防护理", en: "Preventive care", de: "Vorsorge")
+            l.tr(zh: "预防护理", en: "Preventive care", de: "Vorsorge")
         case .visit:
-            return l.tr(zh: "就诊记录", en: "Visit record", de: "Besuchseintrag")
+            l.tr(zh: "就诊记录", en: "Visit record", de: "Besuchseintrag")
         case .medication:
-            return l.tr(zh: "添加药物", en: "Add medication", de: "Medikament")
+            l.tr(zh: "添加药物", en: "Add medication", de: "Medikament")
         case .vaccinePassport:
-            return l.tr(zh: "疫苗本", en: "Vaccine passport", de: "Impfpass")
+            l.tr(zh: "疫苗本", en: "Vaccine passport", de: "Impfpass")
         case .archive:
-            return l.tr(zh: "完整档案", en: "Full archive", de: "Vollständige Akte")
+            l.tr(zh: "完整档案", en: "Full archive", de: "Vollständige Akte")
         case .pdf:
-            return isRenderingPDF
+            isRenderingPDF
                 ? l.tr(zh: "PDF 生成中", en: "Rendering PDF", de: "PDF wird erstellt")
                 : l.tr(zh: "导出 PDF", en: "Export PDF", de: "PDF exportieren")
         case .symptom:
-            return l.tr(zh: "记录异常", en: "Log symptom", de: "Symptom")
+            l.tr(zh: "记录异常", en: "Log symptom", de: "Symptom")
         case .heatCycle:
-            return l.tr(zh: "生理期", en: "Heat cycle", de: "Läufigkeit")
+            l.tr(zh: "生理期", en: "Heat cycle", de: "Läufigkeit")
         }
     }
 }

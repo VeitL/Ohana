@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 // MARK: - Schema V1（v4.5.0，首个版本化 Schema）
 // 重命名/删除字段时：使用 .custom(fromVersion:toVersion:willMigrate:didMigrate:)
@@ -31,7 +31,7 @@ enum ArkSchemaV1: VersionedSchema {
             PetExpenseLog.self,
             PetFoodRecord.self,
             PetMilestone.self,
-            WaterLog.self,
+            WaterLog.self
         ]
     }
 }
@@ -57,7 +57,7 @@ enum ArkSchemaV2: VersionedSchema {
             PetExpenseLog.self,
             PetFoodRecord.self,
             PetMilestone.self,
-            WaterLog.self,
+            WaterLog.self
         ]
     }
 }
@@ -83,7 +83,7 @@ enum ArkSchemaV3: VersionedSchema {
             PetExpenseLog.self,
             PetFoodRecord.self,
             PetMilestone.self,
-            WaterLog.self,
+            WaterLog.self
         ]
     }
 }
@@ -111,7 +111,7 @@ enum ArkSchemaV4: VersionedSchema {
             PetFoodRecord.self,
             PetMilestone.self,
             WaterLog.self,
-            PetRelationship.self,
+            PetRelationship.self
         ]
     }
 }
@@ -138,7 +138,7 @@ enum ArkSchemaV5: VersionedSchema {
             PetFoodRecord.self,
             PetMilestone.self,
             WaterLog.self,
-            PetRelationship.self,
+            PetRelationship.self
         ]
     }
 }
@@ -152,7 +152,7 @@ enum ArkSchemaV6: VersionedSchema {
             Pet.self, Human.self, Plant.self, Household.self, Event.self, Reminder.self,
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
-            PetMilestone.self, WaterLog.self, PetRelationship.self,
+            PetMilestone.self, WaterLog.self, PetRelationship.self
         ]
     }
 }
@@ -166,7 +166,7 @@ enum ArkSchemaV7: VersionedSchema {
             Pet.self, Human.self, Plant.self, Household.self, Event.self, Reminder.self,
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
-            PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
+            PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self
         ]
     }
 }
@@ -181,7 +181,7 @@ enum ArkSchemaV8: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self,
+            HumanWeightLog.self
         ]
     }
 }
@@ -196,7 +196,7 @@ enum ArkSchemaV9: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self,
+            HumanWeightLog.self, HumanWorkoutLog.self
         ]
     }
 }
@@ -211,7 +211,7 @@ enum ArkSchemaV10: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self,
+            HumanWeightLog.self, HumanWorkoutLog.self
         ]
     }
 }
@@ -226,7 +226,7 @@ enum ArkSchemaV11: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self,
+            HumanWeightLog.self, HumanWorkoutLog.self
         ]
     }
 }
@@ -241,7 +241,7 @@ enum ArkSchemaV12: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self
         ]
     }
 }
@@ -256,7 +256,7 @@ enum ArkSchemaV13: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self
         ]
     }
 }
@@ -271,7 +271,7 @@ enum ArkSchemaV14: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self
         ]
     }
 }
@@ -286,7 +286,7 @@ enum ArkSchemaV15: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self
         ]
     }
 }
@@ -301,7 +301,7 @@ enum ArkSchemaV16: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self
         ]
     }
 }
@@ -316,7 +316,7 @@ enum ArkSchemaV17: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self
         ]
     }
 }
@@ -331,7 +331,7 @@ enum ArkSchemaV18: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self
         ]
     }
 }
@@ -346,7 +346,7 @@ enum ArkSchemaV19: VersionedSchema {
             PetPottyLog.self, PetWalkLog.self, PetHygieneLog.self, PetWeightLog.self,
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
-            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
+            HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self
         ]
     }
 }
@@ -362,7 +362,7 @@ enum ArkSchemaV20: VersionedSchema {
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
-            PetDocumentAttachment.self,
+            PetDocumentAttachment.self
         ]
     }
 }
@@ -378,7 +378,7 @@ enum ArkSchemaV21: VersionedSchema {
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
-            PetDocumentAttachment.self, HumanMedication.self,
+            PetDocumentAttachment.self, HumanMedication.self
         ]
     }
 }
@@ -394,7 +394,7 @@ enum ArkSchemaV22: VersionedSchema {
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
-            PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
+            PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self
         ]
     }
 }
@@ -410,7 +410,7 @@ enum ArkSchemaV23: VersionedSchema {
             PetHealthLog.self, PetDocument.self, PetExpenseLog.self, PetFoodRecord.self,
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
-            PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
+            PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self
         ]
     }
 }
@@ -427,7 +427,7 @@ enum ArkSchemaV24: VersionedSchema {
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
-            PetMedication.self,
+            PetMedication.self
         ]
     }
 }
@@ -444,7 +444,7 @@ enum ArkSchemaV25: VersionedSchema {
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
-            PetMedication.self, PetInsurance.self, PetPhotoLog.self,
+            PetMedication.self, PetInsurance.self, PetPhotoLog.self
         ]
     }
 }
@@ -461,7 +461,7 @@ enum ArkSchemaV26: VersionedSchema {
             PetMilestone.self, WaterLog.self, PetRelationship.self, PetCareLog.self,
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
-            PetMedication.self, PetInsurance.self, PetPhotoLog.self,
+            PetMedication.self, PetInsurance.self, PetPhotoLog.self
         ]
     }
 }
@@ -479,7 +479,7 @@ enum ArkSchemaV27: VersionedSchema {
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
             PetMedication.self, PetInsurance.self, PetPhotoLog.self,
-            PlantCareLog.self,
+            PlantCareLog.self
         ]
     }
 }
@@ -497,7 +497,7 @@ enum ArkSchemaV28: VersionedSchema {
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
             PetMedication.self, PetInsurance.self, PetPhotoLog.self,
-            PlantCareLog.self,
+            PlantCareLog.self
         ]
     }
 }
@@ -505,7 +505,7 @@ enum ArkSchemaV28: VersionedSchema {
 // MARK: - Schema V29（SymptomLog, HeatCycleLog 异常症状与生理期支持）
 enum ArkSchemaV29: VersionedSchema {
     static var versionIdentifier = Schema.Version(29, 0, 0)
-    
+
     static var models: [any PersistentModel.Type] {
         [
             Pet.self, Human.self, Plant.self, Household.self, Event.self, Reminder.self,
@@ -515,7 +515,7 @@ enum ArkSchemaV29: VersionedSchema {
             HumanWeightLog.self, HumanWorkoutLog.self, WishlistItem.self,
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
             PetMedication.self, PetInsurance.self, PetPhotoLog.self,
-            PlantCareLog.self, SymptomLog.self, HeatCycleLog.self,
+            PlantCareLog.self, SymptomLog.self, HeatCycleLog.self
         ]
     }
 }
@@ -534,7 +534,7 @@ enum ArkSchemaV30: VersionedSchema {
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
             PetMedication.self, PetInsurance.self, PetPhotoLog.self,
             PlantCareLog.self, SymptomLog.self, HeatCycleLog.self,
-            InsuranceClaim.self,
+            InsuranceClaim.self
         ]
     }
 }
@@ -553,7 +553,7 @@ enum ArkSchemaV31: VersionedSchema {
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
             PetMedication.self, PetInsurance.self, PetPhotoLog.self,
             PlantCareLog.self, SymptomLog.self, HeatCycleLog.self,
-            InsuranceClaim.self,
+            InsuranceClaim.self
         ]
     }
 }
@@ -572,7 +572,7 @@ enum ArkSchemaV32: VersionedSchema {
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
             PetMedication.self, PetInsurance.self, PetPhotoLog.self,
             PlantCareLog.self, SymptomLog.self, HeatCycleLog.self,
-            InsuranceClaim.self,
+            InsuranceClaim.self
         ]
     }
 }
@@ -591,7 +591,7 @@ enum ArkSchemaV33: VersionedSchema {
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
             PetMedication.self, PetInsurance.self, PetPhotoLog.self,
             PlantCareLog.self, SymptomLog.self, HeatCycleLog.self,
-            InsuranceClaim.self,
+            InsuranceClaim.self
         ]
     }
 }
@@ -610,7 +610,7 @@ enum ArkSchemaV34: VersionedSchema {
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
             PetMedication.self, PetInsurance.self, PetPhotoLog.self,
             PlantCareLog.self, SymptomLog.self, HeatCycleLog.self,
-            InsuranceClaim.self, HumanMedicationLog.self,
+            InsuranceClaim.self, HumanMedicationLog.self
         ]
     }
 }
@@ -629,7 +629,7 @@ enum ArkSchemaV35: VersionedSchema {
             PetDocumentAttachment.self, HumanMedication.self, HumanHealthReport.self,
             PetMedication.self, PetInsurance.self, PetPhotoLog.self,
             PlantCareLog.self, SymptomLog.self, HeatCycleLog.self,
-            InsuranceClaim.self, HumanMedicationLog.self,
+            InsuranceClaim.self, HumanMedicationLog.self
         ]
     }
 }
@@ -878,7 +878,7 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
 /// 1. **内存库降级**：若两次磁盘打开失败，旧逻辑会退回 `isStoredInMemoryOnly`，进程一结束 SwiftData 全丢；`ohana_has_onboarded` 等仍在 UserDefaults，表现像「又要建岛 / 数据没了」。
 /// 2. **模拟器**：换了一台 Simulator、Reset Content、或删掉 App，会换沙盒路径，数据自然空。
 /// 3. **重复 ModelContainer**：后台任务若再 `make()` 出新容器，可能与主进程争用同一 SQLite，行为异常；现改为**单例**。
-struct SharedModelContainer {
+enum SharedModelContainer {
     /// 与 `Ohana.entitlements` 中 App Group **完全一致**（旧代码误写为 `group.com.guanchen.li.Ark`）
     static let appGroupID = "group.com.guanchen.li.Ohana"
 
@@ -910,13 +910,13 @@ struct SharedModelContainer {
             )
             DatabaseFallbackPreferenceStore.clearFallbackActive()
             #if DEBUG
-            print("✅ SwiftData: 主存储已打开（含 migrationPlan）")
+                OhanaLog.info("SwiftData: primary store opened with migrationPlan", category: "SwiftData")
             #endif
             return container
         } catch {
             #if DEBUG
-            print("⚠️ SwiftData: migrationPlan 打开失败 — \(error)")
-            print("⚠️ SwiftData: 尝试无迁移计划打开同一默认库…")
+                OhanaLog.warning("SwiftData: migrationPlan open failed - \(error)", category: "SwiftData")
+                OhanaLog.warning("SwiftData: retrying default store without migrationPlan", category: "SwiftData")
             #endif
         }
 
@@ -927,12 +927,12 @@ struct SharedModelContainer {
             )
             DatabaseFallbackPreferenceStore.clearFallbackActive()
             #if DEBUG
-            print("✅ SwiftData: 默认库已打开（无 migrationPlan）")
+                OhanaLog.info("SwiftData: default store opened without migrationPlan", category: "SwiftData")
             #endif
             return container
         } catch {
             #if DEBUG
-            print("⚠️ SwiftData: 无迁移计划仍失败 — \(error)")
+                OhanaLog.warning("SwiftData: default store without migrationPlan failed - \(error)", category: "SwiftData")
             #endif
         }
 
@@ -946,18 +946,18 @@ struct SharedModelContainer {
             let container = try ModelContainer(for: schema, configurations: [diskFallback])
             DatabaseFallbackPreferenceStore.clearFallbackActive()
             #if DEBUG
-            print("⚠️ SwiftData: 已使用备用磁盘库 `ohana_disk_fallback`（主 default 无法打开时）")
+                OhanaLog.warning("SwiftData: using disk fallback store ohana_disk_fallback", category: "SwiftData")
             #endif
             return container
         } catch {
             #if DEBUG
-            print("⚠️ SwiftData: 备用磁盘库失败 — \(error)")
+                OhanaLog.warning("SwiftData: disk fallback store failed - \(error)", category: "SwiftData")
             #endif
         }
 
         DatabaseFallbackPreferenceStore.markFallbackActive()
         #if DEBUG
-        print("🚨 SwiftData: 磁盘全部失败，最后使用内存库（**退出 App 后数据不保留**）")
+            OhanaLog.error("SwiftData: all disk stores failed; falling back to in-memory store", category: "SwiftData")
         #endif
         let memoryConfig = ModelConfiguration(
             isStoredInMemoryOnly: true,
@@ -967,7 +967,7 @@ struct SharedModelContainer {
             return try ModelContainer(for: schema, configurations: [memoryConfig])
         } catch {
             #if DEBUG
-            print("🚨 SwiftData: 连内存库也创建失败 — \(error)")
+                OhanaLog.error("SwiftData: in-memory fallback failed - \(error)", category: "SwiftData")
             #endif
             fatalError("Could not create ModelContainer: \(error)")
         }

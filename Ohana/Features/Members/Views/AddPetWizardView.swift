@@ -10,8 +10,8 @@ import SwiftUI
 
 struct AddPetWizardContentView: View {
     let onComplete: () -> Void
-    var onCancel: (() -> Void)? = nil
-    var onPetSaved: ((Pet) -> Void)? = nil
+    var onCancel: (() -> Void)?
+    var onPetSaved: ((Pet) -> Void)?
 
     @State private var memberCreationSessionId = UUID()
 

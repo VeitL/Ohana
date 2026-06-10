@@ -3,10 +3,10 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
-import PhotosUI
 import Foundation
+import PhotosUI
+import SwiftData
+import SwiftUI
 
 extension PetBasicInfoDetailView {
     var vetVisitSummaryCard: some View {
@@ -42,7 +42,7 @@ extension PetBasicInfoDetailView {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     func compactSummaryRow(_ label: String, _ value: String) -> some View {

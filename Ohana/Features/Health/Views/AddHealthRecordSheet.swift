@@ -5,8 +5,8 @@
 //  T10: 健康记录添加页，含有效期输入
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 /// 健康记录添加入口：菜单「预防护理 / 就诊记录」进入后在表单内再选细分类型
 enum HealthRecordEntryMode: Hashable {
@@ -26,8 +26,8 @@ struct AddHealthRecordSheet: View {
 
     @State private var selectedType: HealthLogType
 
-    @State private var date: Date = Date()
-    @State private var name: String = ""   // N9: 疫苗/驱虫専用名称字段
+    @State private var date: Date = .init()
+    @State private var name: String = "" // N9: 疫苗/驱虫専用名称字段
     @State private var note: String = ""
     @State private var vetName: String = ""
     @State private var cost: String = ""
@@ -48,21 +48,21 @@ struct AddHealthRecordSheet: View {
     private func defaultExpirationDate(from base: Date) -> Date {
         let cal = Calendar.current
         switch selectedType {
-        case .vaccine:           return cal.date(byAdding: .year,  value: 1, to: base) ?? base
+        case .vaccine: return cal.date(byAdding: .year, value: 1, to: base) ?? base
         case .dewormingInternal: return cal.date(byAdding: .month, value: 3, to: base) ?? base
         case .dewormingExternal: return cal.date(byAdding: .month, value: 1, to: base) ?? base
-        case .medication:        return cal.date(byAdding: .month, value: 1, to: base) ?? base
-        default:                 return cal.date(byAdding: .year,  value: 1, to: base) ?? base
+        case .medication: return cal.date(byAdding: .month, value: 1, to: base) ?? base
+        default: return cal.date(byAdding: .year, value: 1, to: base) ?? base
         }
     }
 
     private var expirationHint: String {
         switch selectedType {
-        case .vaccine:           return "推荐：1 年"
-        case .dewormingInternal: return "推荐：3 个月"
-        case .dewormingExternal: return "推荐：1 个月"
-        case .medication:        return "推荐：1 个月"
-        default:                 return ""
+        case .vaccine: "推荐：1 年"
+        case .dewormingInternal: "推荐：3 个月"
+        case .dewormingExternal: "推荐：1 个月"
+        case .medication: "推荐：1 个月"
+        default: ""
         }
     }
 
@@ -73,19 +73,19 @@ struct AddHealthRecordSheet: View {
 
     // Bug8: 使用 needsExpiration 属性
     private var showsExpiration: Bool { selectedType.needsExpiration }
-    
+
     // 体检记录显示下次提醒日期
     private var showsNextCheckup: Bool { selectedType == .checkup }
 
     private var typeLabel: String {
         switch selectedType {
-        case .vaccine:           return "疫苗接种"
-        case .medication:        return "驱虫用药"
-        case .dewormingInternal: return "体内驱虫"
-        case .dewormingExternal: return "体外驱虫"
-        case .checkup:           return "体检记录"
-        case .surgery:           return "就诊记录"
-        default:                 return selectedType.rawValue
+        case .vaccine: "疫苗接种"
+        case .medication: "驱虫用药"
+        case .dewormingInternal: "体内驱虫"
+        case .dewormingExternal: "体外驱虫"
+        case .checkup: "体检记录"
+        case .surgery: "就诊记录"
+        default: selectedType.rawValue
         }
     }
 
@@ -121,7 +121,7 @@ struct AddHealthRecordSheet: View {
                             Text(selectedType.emoji).font(OhanaFont.adaptive(size: 32)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         .padding(16)
-                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                         if let mode = entryMode {
                             healthSubtypeCapsules(mode: mode)
@@ -135,7 +135,7 @@ struct AddHealthRecordSheet: View {
                                         .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.goPrimary)
                                         .frame(width: 22)
-                                    TextField("名称（如：狂犬疫苗三联苗）", text: $name)
+                                    TextField("名称（如：狂犬疫苗三联苗）", text: $name) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                         .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                 }
@@ -181,7 +181,7 @@ struct AddHealthRecordSheet: View {
                                 }
                             }
                         }
-                        
+
                         // 下次体检提醒（体检记录才显示）
                         if showsNextCheckup {
                             fieldCard {
@@ -213,7 +213,7 @@ struct AddHealthRecordSheet: View {
                                     .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.goTeal)
                                     .frame(width: 22)
-                                TextField("医生 / 诊所（可选）", text: $vetName)
+                                TextField("医生 / 诊所（可选）", text: $vetName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                             }
@@ -235,7 +235,7 @@ struct AddHealthRecordSheet: View {
                                     valueFont: .system(size: 15, weight: .medium, design: .rounded),
                                     valueAlignment: .leading,
                                     fill: Color.clear,
-                                    cornerRadius: 12,
+                                    cornerRadius: OhanaRadius.chip,
                                     horizontalPadding: 4,
                                     verticalPadding: 0
                                 )
@@ -250,10 +250,10 @@ struct AddHealthRecordSheet: View {
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                     .frame(width: 22)
                                     .padding(.top, 2)
-                                TextField("备注 / 笔记（可选）", text: $note, axis: .vertical)
+                                TextField("备注 / 笔记（可选）", text: $note, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
-                                    .lineLimit(3...6)
+                                    .lineLimit(3 ... 6)
                             }
                         }
 
@@ -270,7 +270,7 @@ struct AddHealthRecordSheet: View {
                             .padding(.vertical, 16)
                             .background(
                                 isSaving ? Color.ohanaControlFill : Color.goPrimary,
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                             )
                         }
                         .buttonStyle(ScaleButtonStyle())
@@ -311,22 +311,20 @@ struct AddHealthRecordSheet: View {
 
     @ViewBuilder
     private func healthSubtypeCapsules(mode: HealthRecordEntryMode) -> some View {
-        let options: [(HealthLogType, String)] = {
-            switch mode {
-            case .preventive:
-                return [
-                    (.vaccine, "💉 疫苗"),
-                    (.dewormingInternal, "🐛 体内驱虫"),
-                    (.dewormingExternal, "🛡️ 体外驱虫"),
-                    (.checkup, "🩺 体检"),
-                ]
-            case .visit:
-                return [
-                    (.surgery, "🏥 就诊"),
-                    (.general, "📋 常规记录"),
-                ]
-            }
-        }()
+        let options: [(HealthLogType, String)] = switch mode {
+        case .preventive:
+            [
+                (.vaccine, "💉 疫苗"),
+                (.dewormingInternal, "🐛 体内驱虫"),
+                (.dewormingExternal, "🛡️ 体外驱虫"),
+                (.checkup, "🩺 体检")
+            ]
+        case .visit:
+            [
+                (.surgery, "🏥 就诊"),
+                (.general, "📋 常规记录")
+            ]
+        }
 
         VStack(alignment: .leading, spacing: 10) {
             Text("记录类型")
@@ -352,7 +350,7 @@ struct AddHealthRecordSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func applyDefaultsForSelectedType() {
@@ -370,11 +368,11 @@ struct AddHealthRecordSheet: View {
         }
     }
 
-    private func fieldCard<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+    private func fieldCard(@ViewBuilder content: @escaping () -> some View) -> some View {
         content()
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func save() {

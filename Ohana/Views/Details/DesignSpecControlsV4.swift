@@ -113,7 +113,7 @@ struct DesignSpecControlsPanelV4: View {
             }
         }
         .padding(13)
-        .background(glass(cornerRadius: 22))
+        .background(glass(cornerRadius: OhanaRadius.cardSoft))
     }
 
     private func optionRow(_ title: String, keyPath: WritableKeyPath<DesignSpecSelectionV4, String>, options: [DesignSpecOptionV4], showsDescription: Bool = true) -> some View {
@@ -211,7 +211,7 @@ struct DesignSpecAuditPanelV4: View {
                     .font(DesignSpecUIV4.typeFont(13, weight: .black, selection: selection))
                     .foregroundStyle(palette.primaryText)
                 Spacer()
-                Text("\(results.filter { $0.status == .pass }.count)/\(results.count)")
+                Text("\(results.count(where: { $0.status == .pass }))/\(results.count)")
                     .font(DesignSpecUIV4.typeFont(11, weight: .black, selection: selection))
                     .foregroundStyle(palette.accent)
             }
@@ -223,7 +223,7 @@ struct DesignSpecAuditPanelV4: View {
             }
         }
         .padding(13)
-        .background(glass(cornerRadius: 22))
+        .background(glass(cornerRadius: OhanaRadius.cardSoft))
     }
 
     private func auditCell(_ result: DesignSpecAuditResultV4) -> some View {
@@ -254,9 +254,9 @@ struct DesignSpecAuditPanelV4: View {
 
     private func tint(for status: DesignSpecAuditResultV4.Status) -> Color {
         switch status {
-        case .pass: return Color.goTeal
-        case .warning: return Color.goYellow
-        case .fail: return Color.goRed
+        case .pass: Color.goTeal
+        case .warning: Color.goYellow
+        case .fail: Color.goRed
         }
     }
 

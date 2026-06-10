@@ -5,9 +5,9 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 // MARK: - Event Types
 enum EventType: String, Codable, CaseIterable, Identifiable {
@@ -38,51 +38,51 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
     case insurancePremium = "保险缴费"
 
     var id: String { rawValue }
-    
+
     var emoji: String {
         switch self {
-        case .birthday: return "🎂"
-        case .anniversary: return "💝"
-        case .daily: return "📋"
-        case .health: return "❤️"
-        case .task: return "✅"
-        case .shoppingList: return "🛒"
-        case .chore: return "🏠"
-        case .vaccine: return "💉"
-        case .externalDeworming: return "🛡️"
-        case .internalDeworming: return "💊"
-        case .grooming: return "🛁"
-        case .vetVisit: return "🏥"
-        case .foodChange: return "🍽️"
-        case .litterBox: return "🧹"
-        case .watering: return "💧"
-        case .fertilizing: return "🌿"
-        case .medication: return "💊"
-        case .petMedicationDose: return "💊"
-        case .insurancePremium: return "🛡️"
+        case .birthday: "🎂"
+        case .anniversary: "💝"
+        case .daily: "📋"
+        case .health: "❤️"
+        case .task: "✅"
+        case .shoppingList: "🛒"
+        case .chore: "🏠"
+        case .vaccine: "💉"
+        case .externalDeworming: "🛡️"
+        case .internalDeworming: "💊"
+        case .grooming: "🛁"
+        case .vetVisit: "🏥"
+        case .foodChange: "🍽️"
+        case .litterBox: "🧹"
+        case .watering: "💧"
+        case .fertilizing: "🌿"
+        case .medication: "💊"
+        case .petMedicationDose: "💊"
+        case .insurancePremium: "🛡️"
         }
     }
 
     /// 日历周条 / 事件行：纯色剪影 SF Symbol
     var silhouetteSymbol: String {
         switch self {
-        case .birthday: return "gift.fill"
-        case .anniversary: return "heart.fill"
-        case .daily: return "calendar"
-        case .health: return "heart.text.square.fill"
-        case .task: return "checkmark.circle.fill"
-        case .shoppingList: return "cart.fill"
-        case .chore: return "house.fill"
-        case .vaccine: return "syringe.fill"
-        case .externalDeworming, .internalDeworming: return "pills.fill"
-        case .grooming: return "shower.fill"
-        case .vetVisit: return "cross.case.fill"
-        case .foodChange: return "fork.knife"
-        case .litterBox: return "trash.fill"
-        case .watering: return "drop.fill"
-        case .fertilizing: return "leaf.fill"
-        case .medication, .petMedicationDose: return "pill.fill"
-        case .insurancePremium: return "shield.fill"
+        case .birthday: "gift.fill"
+        case .anniversary: "heart.fill"
+        case .daily: "calendar"
+        case .health: "heart.text.square.fill"
+        case .task: "checkmark.circle.fill"
+        case .shoppingList: "cart.fill"
+        case .chore: "house.fill"
+        case .vaccine: "syringe.fill"
+        case .externalDeworming, .internalDeworming: "pills.fill"
+        case .grooming: "shower.fill"
+        case .vetVisit: "cross.case.fill"
+        case .foodChange: "fork.knife"
+        case .litterBox: "trash.fill"
+        case .watering: "drop.fill"
+        case .fertilizing: "leaf.fill"
+        case .medication, .petMedicationDose: "pill.fill"
+        case .insurancePremium: "shield.fill"
         }
     }
 }
@@ -102,13 +102,13 @@ final class Event {
     var isCompleted: Bool
     var completedOccurrences: [String]
     var createdAt: Date
-    var assigneeId: String?        // 模块4：指派给谁 (Human.id.uuidString)
+    var assigneeId: String? // 模块4：指派给谁 (Human.id.uuidString)
     var feedRuleKindRaw: String = ""
     var foodKindRaw: String = FeedFoodKind.dry.rawValue
     var feedAmountGrams: Double = 0
 
     @Relationship(deleteRule: .cascade) var reminders: [Reminder]
-    
+
     init(
         title: String = "",
         startDate: Date = Date(),
@@ -137,7 +137,7 @@ final class Event {
         self.feedAmountGrams = 0
         self.reminders = []
     }
-    
+
     var eventTypeEnum: EventType? {
         EventType(rawValue: eventType)
     }
@@ -149,7 +149,7 @@ final class Event {
     var foodKind: FeedFoodKind {
         FeedFoodKind(rawValue: foodKindRaw) ?? .dry
     }
-    
+
     var emoji: String {
         eventTypeEnum?.emoji ?? "📌"
     }

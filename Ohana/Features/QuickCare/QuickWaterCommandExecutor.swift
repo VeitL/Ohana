@@ -362,13 +362,12 @@ struct QuickWaterCommandExecutor {
     }
 
     func deleteLog(_ log: PetCareLog) -> QuickWaterDeletedLogKind {
-        let kind: QuickWaterDeletedLogKind
-        if log.type == CareType.waterChange.rawValue {
-            kind = .waterChange
+        let kind: QuickWaterDeletedLogKind = if log.type == CareType.waterChange.rawValue {
+            .waterChange
         } else if log.type == CareType.filterClean.rawValue {
-            kind = .filterClean
+            .filterClean
         } else {
-            kind = .other
+            .other
         }
         context.delete(log)
         context.safeSave()

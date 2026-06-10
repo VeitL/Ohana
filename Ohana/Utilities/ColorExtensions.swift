@@ -9,7 +9,7 @@ import SwiftUI
 
 extension View {
     @ViewBuilder
-    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+    func `if`(_ condition: Bool, transform: (Self) -> some View) -> some View {
         if condition { transform(self) } else { self }
     }
 }
@@ -45,7 +45,7 @@ extension Color {
             opacity: Double(a) / 255
         )
     }
-    
+
     // MARK: - Ohana Brand Colors (Legacy)
     static let arkCoral = Color(hex: "FF5E3A")
     static let arkOrange = Color(hex: "FF9500")
@@ -55,16 +55,16 @@ extension Color {
     static let arkHotPink = Color(hex: "FF69B4")
     static let arkMint = Color(hex: "00D4AA")
     static let arkCyan = Color(hex: "00BCD4")
-    
+
     // MARK: - Background Gradient Colors (Legacy)
     static let ohanaLavender = Color(hex: "e0c3fc")
     static let ohanaSky = Color(hex: "8ec5fc")
     static let ohanaPeach = Color(hex: "f5d0c5")
-    
+
     // MARK: - Accent Gradients (Legacy)
     static let ohanaAccentStart = Color(hex: "8ec5fc")
     static let ohanaAccentEnd = Color(hex: "e0c3fc")
-    
+
     // MARK: - Go UI Color Palette
     static let goLime = Color(hex: "C8FF00")
     static let goBackground = Color(hex: "4338FF")
@@ -167,9 +167,9 @@ extension Color {
         dark: Color(red: 0.576, green: 0.773, blue: 0.992))
 
     // MARK: - Figma Token: Button Colors
-    static let tokenButtonPrimaryBg     = Color(red: 0.259, green: 0.220, blue: 1.000)
-    static let tokenButtonPrimaryText   = Color.white // ui-v4: allow imported Figma token source
-    static let tokenButtonSecondaryBg   = Color(red: 0.784, green: 1.000, blue: 0.000)
+    static let tokenButtonPrimaryBg = Color(red: 0.259, green: 0.220, blue: 1.000)
+    static let tokenButtonPrimaryText = Color.white // ui-v4: allow imported Figma token source
+    static let tokenButtonSecondaryBg = Color(red: 0.784, green: 1.000, blue: 0.000)
     static let tokenButtonSecondaryText = Color.black // ui-v4: allow imported Figma token source
     static let tokenButtonDisabledBg = Color(light:
         Color(red: 0.961, green: 0.961, blue: 0.961),
@@ -180,28 +180,28 @@ extension Color {
 
     // MARK: - Figma Token: Form Colors
     static let tokenFormInputBg = Color(light: Color.white, // ui-v4: allow imported Figma token source
-        dark: Color(red: 0.039, green: 0.039, blue: 0.039))
+                                        dark: Color(red: 0.039, green: 0.039, blue: 0.039))
     static let tokenFormInputBorder = Color(light:
         Color(red: 0.898, green: 0.898, blue: 0.898),
         dark: Color(red: 0.165, green: 0.165, blue: 0.165))
 
     // MARK: - Pet Theme Colors (16 non-primary, distinct, high-contrast colors)
-    static let petThemeCrimson   = Color(light: Color(hex: "C23616"), dark: Color(hex: "FF5252"))
+    static let petThemeCrimson = Color(light: Color(hex: "C23616"), dark: Color(hex: "FF5252"))
     static let petThemeVermilion = Color(light: Color(hex: "E15F41"), dark: Color(hex: "FF793F"))
-    static let petThemeOrange    = Color(light: Color(hex: "E67E22"), dark: Color(hex: "FF9F43"))
-    static let petThemeAmber     = Color(light: Color(hex: "F39C12"), dark: Color(hex: "FDCB6E"))
-    static let petThemeYellow    = Color(light: Color(hex: "F1C40F"), dark: Color(hex: "FFEAA7"))
-    static let petThemeBrown     = Color(light: Color(hex: "8D6E63"), dark: Color(hex: "A1887F"))
-    static let petThemeRust      = Color(light: Color(hex: "D35400"), dark: Color(hex: "E67E22"))
-    static let petThemeBurgundy  = Color(light: Color(hex: "833471"), dark: Color(hex: "B33771"))
-    static let petThemeMagenta   = Color(light: Color(hex: "C71585"), dark: Color(hex: "FF66CC"))
-    static let petThemePink      = Color(light: Color(hex: "E84393"), dark: Color(hex: "FD79A8"))
-    static let petThemePurple    = Color(light: Color(hex: "8A2BE2"), dark: Color(hex: "D980FA"))
-    static let petThemeIndigo    = Color(light: Color(hex: "3C40C6"), dark: Color(hex: "575FCF"))
-    static let petThemeViolet    = Color(light: Color(hex: "4834D4"), dark: Color(hex: "686DE0"))
-    static let petThemeNavy      = Color(light: Color(hex: "192A56"), dark: Color(hex: "273C75"))
-    static let petThemeBlue      = Color(light: Color(hex: "475569"), dark: Color(hex: "94A3B8"))
-    static let petThemeSkyBlue   = Color(light: Color(hex: "BE185D"), dark: Color(hex: "F472B6"))
+    static let petThemeOrange = Color(light: Color(hex: "E67E22"), dark: Color(hex: "FF9F43"))
+    static let petThemeAmber = Color(light: Color(hex: "F39C12"), dark: Color(hex: "FDCB6E"))
+    static let petThemeYellow = Color(light: Color(hex: "F1C40F"), dark: Color(hex: "FFEAA7"))
+    static let petThemeBrown = Color(light: Color(hex: "8D6E63"), dark: Color(hex: "A1887F"))
+    static let petThemeRust = Color(light: Color(hex: "D35400"), dark: Color(hex: "E67E22"))
+    static let petThemeBurgundy = Color(light: Color(hex: "833471"), dark: Color(hex: "B33771"))
+    static let petThemeMagenta = Color(light: Color(hex: "C71585"), dark: Color(hex: "FF66CC"))
+    static let petThemePink = Color(light: Color(hex: "E84393"), dark: Color(hex: "FD79A8"))
+    static let petThemePurple = Color(light: Color(hex: "8A2BE2"), dark: Color(hex: "D980FA"))
+    static let petThemeIndigo = Color(light: Color(hex: "3C40C6"), dark: Color(hex: "575FCF"))
+    static let petThemeViolet = Color(light: Color(hex: "4834D4"), dark: Color(hex: "686DE0"))
+    static let petThemeNavy = Color(light: Color(hex: "192A56"), dark: Color(hex: "273C75"))
+    static let petThemeBlue = Color(light: Color(hex: "475569"), dark: Color(hex: "94A3B8"))
+    static let petThemeSkyBlue = Color(light: Color(hex: "BE185D"), dark: Color(hex: "F472B6"))
 
     // MARK: - Hex extraction
     func toHex() -> String? {

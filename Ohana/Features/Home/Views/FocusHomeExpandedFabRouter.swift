@@ -48,15 +48,15 @@ enum FocusHomeExpandedFabRouter {
             if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
                 actions.showHumanAllFeatures(human)
             }
-        case .quick(let actionType):
+        case let .quick(actionType):
             if let pet = pet(for: card, in: pets) {
                 openPetShortcut(actionType, pet: pet, actions: actions)
             }
-        case .detail(let feature):
+        case let .detail(feature):
             if let pet = pet(for: card, in: pets) {
                 openPetDetail(feature, pet: pet, actions: actions)
             }
-        case .humanQuick(let actionType):
+        case let .humanQuick(actionType):
             if let human = humans.first(where: { $0.id == card.id }) {
                 openHumanShortcut(actionType, human: human, activeHumanId: activeHumanId, privacy: privacy, actions: actions)
             }

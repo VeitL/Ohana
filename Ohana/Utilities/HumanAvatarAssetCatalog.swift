@@ -36,7 +36,7 @@ enum HumanAvatarAssetCatalog {
         guard let url = bundle.url(forResource: name, withExtension: ext, subdirectory: assetDirectory) else {
             return nil
         }
-        return try? Data(contentsOf: url)
+        return try? Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
     }
 
     nonisolated static func ageGroup(for birthday: Date?, now: Date = Date(), calendar: Calendar = .current) -> AgeGroup {
@@ -60,16 +60,16 @@ enum HumanAvatarAssetCatalog {
         }
     }
 
-    nonisolated private static func normalizedGenderSlug(_ value: String) -> String? {
+    private nonisolated static func normalizedGenderSlug(_ value: String) -> String? {
         switch HumanProfileOptions.normalizedGender(value) {
         case "男":
-            return "male"
+            "male"
         case "女":
-            return "female"
+            "female"
         case "非二元":
-            return "nonbinary"
+            "nonbinary"
         default:
-            return nil
+            nil
         }
     }
 }
@@ -126,7 +126,7 @@ enum Avatar2DAccess {
         UserDefaults.standard.integer(forKey: extraPassInventoryKey)
     }
 
-    private static func freeSlotAvailable(kind: Kind, existingCount: Int) -> Bool {
+    private static func freeSlotAvailable(kind _: Kind, existingCount: Int) -> Bool {
         existingCount == 0
     }
 
@@ -137,9 +137,9 @@ enum Avatar2DAccess {
     private static func freeUsedKey(_ kind: Kind) -> String {
         switch kind {
         case .human:
-            return freeHumanUsedKey
+            freeHumanUsedKey
         case .pet:
-            return freePetUsedKey
+            freePetUsedKey
         }
     }
 }

@@ -1052,7 +1052,7 @@ enum PetAvatarAssetCatalog {
             speciesSlug: normalizedSpecies(species),
             breedSlug: normalizedBreed(breed)
         ),
-              coatColor == "自定义" || appearances.contains(where: { $0.matches(coatColor: coatColor) }) else { return nil }
+            coatColor == "自定义" || appearances.contains(where: { $0.matches(coatColor: coatColor) }) else { return nil }
         return [EyeColor(name: "黑色", hex: "111111")]
     }
 
@@ -1060,7 +1060,7 @@ enum PetAvatarAssetCatalog {
         breedAppearances(speciesSlug: normalizedSpecies(species), breedSlug: normalizedBreed(breed))?.first
     }
 
-    static func avatarFilename(species: String, breed: String, gender: String, coatColor: String, eyeColor: String) -> String? {
+    static func avatarFilename(species: String, breed: String, gender: String, coatColor: String, eyeColor _: String) -> String? {
         let speciesSlug = normalizedSpecies(species)
         let genderSlug = normalizedGender(gender)
 
@@ -1080,9 +1080,9 @@ enum PetAvatarAssetCatalog {
 
     private static func breedAppearances(speciesSlug: String, breedSlug: String) -> [Appearance]? {
         switch speciesSlug {
-        case "cat": return catBreedAppearances[breedSlug]
-        case "dog": return dogBreedAppearances[breedSlug]
-        default: return nil
+        case "cat": catBreedAppearances[breedSlug]
+        case "dog": dogBreedAppearances[breedSlug]
+        default: nil
         }
     }
 
@@ -1108,20 +1108,20 @@ enum PetAvatarAssetCatalog {
 
     static func avatarData(filename: String, bundle: Bundle = .main) -> Data? {
         guard let url = avatarURL(filename: filename, bundle: bundle) else { return nil }
-        return try? Data(contentsOf: url)
+        return try? Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
     }
 
     private static func normalizedSpecies(_ value: String) -> String {
         switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-        case "猫", "cat", "cats": return "cat"
-        case "狗", "dog", "dogs": return "dog"
-        case "鱼", "fish", "fishes": return "fish"
-        case "鸟", "bird", "birds": return "bird"
-        case "兔", "兔子", "rabbit", "rabbits", "bunny", "bunnies": return "rabbit"
-        case "爬宠", "爬虫", "爬行动物", "reptile", "reptiles", "lizard", "gecko": return "reptile"
-        case "仓鼠", "hamster", "hamsters": return "hamster"
-        case "其他", "other", "others": return "other"
-        default: return "pet"
+        case "猫", "cat", "cats": "cat"
+        case "狗", "dog", "dogs": "dog"
+        case "鱼", "fish", "fishes": "fish"
+        case "鸟", "bird", "birds": "bird"
+        case "兔", "兔子", "rabbit", "rabbits", "bunny", "bunnies": "rabbit"
+        case "爬宠", "爬虫", "爬行动物", "reptile", "reptiles", "lizard", "gecko": "reptile"
+        case "仓鼠", "hamster", "hamsters": "hamster"
+        case "其他", "other", "others": "other"
+        default: "pet"
         }
     }
 
@@ -1317,8 +1317,8 @@ enum PetAvatarAssetCatalog {
 
     private static func normalizedGender(_ value: String) -> String {
         switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-        case "female", "girl", "女", "女孩", "母": return "girl"
-        default: return "boy"
+        case "female", "girl", "女", "女孩", "母": "girl"
+        default: "boy"
         }
     }
 }

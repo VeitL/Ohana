@@ -90,7 +90,7 @@ struct ImageCutoutPreviewSheet: View {
                 Spacer(minLength: 20)
 
                 // ── 底部提示
-                if !isProcessing && cutoutImage == nil {
+                if !isProcessing, cutoutImage == nil {
                     Label("无法识别主体，仅提供原图", systemImage: "exclamationmark.triangle")
                         .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
@@ -106,7 +106,7 @@ struct ImageCutoutPreviewSheet: View {
                     .padding(.bottom, 24)
             }
         }
-        .presentationDetents([.height(520)])
+        .presentationDetents(OhanaSheetDetents.overview)
         .presentationDragIndicator(.hidden)
         .task { await runCutout() }
     }
@@ -120,29 +120,29 @@ struct ImageCutoutPreviewSheet: View {
         sublabel: String,
         icon: String,
         isSelected: Bool,
-        isLoading: Bool
+        isLoading _: Bool
     ) -> some View {
         VStack(spacing: 10) {
             ZStack {
                 // 棋盘格背景（透明区域可见）
                 CheckerboardPattern()
                     .opacity(0.15)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     .padding(8)
             }
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
             .background(
                 isSelected ? Color.goPrimary.opacity(0.15) : Color.white.opacity(0.06), // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .strokeBorder(
                         isSelected ? Color.goPrimary : Color.white.opacity(0.1), // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                         lineWidth: isSelected ? 2 : 1
@@ -169,7 +169,7 @@ struct ImageCutoutPreviewSheet: View {
             ZStack {
                 CheckerboardPattern()
                     .opacity(0.1)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 VStack(spacing: 10) {
                     ProgressView()
                         .tint(Color.goPrimary)
@@ -181,9 +181,9 @@ struct ImageCutoutPreviewSheet: View {
             }
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
-            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .strokeBorder(.white.opacity(0.08), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             )
 
@@ -212,9 +212,9 @@ struct ImageCutoutPreviewSheet: View {
             }
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .strokeBorder(.white.opacity(0.08), lineWidth: 1) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
             )
 
@@ -250,7 +250,9 @@ struct ImageCutoutPreviewSheet: View {
     }
 
     private func confirmCutout(_ img: UIImage) {
-        guard let data = img.pngData() else { confirmOriginal(); return }
+        guard let data = img.pngData() else { confirmOriginal()
+            return
+        }
         selectedSide = .cutout
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
@@ -266,8 +268,8 @@ private struct CheckerboardPattern: View {
         Canvas { context, size in
             let cols = Int(size.width / tileSize) + 1
             let rows = Int(size.height / tileSize) + 1
-            for row in 0..<rows {
-                for col in 0..<cols {
+            for row in 0 ..< rows {
+                for col in 0 ..< cols {
                     if (row + col) % 2 == 0 {
                         let rect = CGRect(
                             x: CGFloat(col) * tileSize,

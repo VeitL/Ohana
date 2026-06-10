@@ -33,7 +33,7 @@ extension OasisUpgradeRewardService {
         } else if critter.mood < 45 {
             action = .play
         } else {
-            let day = Calendar.current.ordinality(of: .day, in: .era, for: now) ?? Int(now.timeIntervalSince1970 / 86_400)
+            let day = Calendar.current.ordinality(of: .day, in: .era, for: now) ?? Int(now.timeIntervalSince1970 / 86400)
             let catalogScore = critter.catalogId.unicodeScalars.reduce(0) { $0 + Int($1.value) }
             let index = abs(day + catalogScore + critter.level * 17 + critter.starLevel * 31) % 3
             action = [.feed, .play, .rest][index]
@@ -55,16 +55,16 @@ extension OasisUpgradeRewardService {
 
     static func appearanceStage(forLevel level: Int) -> Int {
         switch max(1, min(maxCritterLevel, level)) {
-        case 1...2:
-            return 1
-        case 3...5:
-            return 2
-        case 6...8:
-            return 3
-        case 9...11:
-            return 4
+        case 1 ... 2:
+            1
+        case 3 ... 5:
+            2
+        case 6 ... 8:
+            3
+        case 9 ... 11:
+            4
         default:
-            return maxCritterAppearanceStage
+            maxCritterAppearanceStage
         }
     }
 

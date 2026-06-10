@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension CoconutShopView {
     func purchaseConfirmation(item: ShopItem) -> some View {
@@ -31,7 +31,7 @@ extension CoconutShopView {
                 }
             }
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
 
             Button {
                 confirmPurchase(item)
@@ -77,7 +77,7 @@ extension CoconutShopView {
             VStack(spacing: 8) {
                 if Avatar2DAccess.extraPassCount <= 0 {
                     emptyPickerText(l.tr(zh: "暂无可用头像券。", en: "No avatar passes available.", de: "Keine Avatarpässe verfügbar."))
-                } else if humans.isEmpty && pets.isEmpty {
+                } else if humans.isEmpty, pets.isEmpty {
                     emptyPickerText(l.tr(zh: "请先创建一个人类或宠物成员。", en: "Create a human or pet first.", de: "Erstelle zuerst einen Menschen oder ein Tier."))
                 } else {
                     ForEach(humans) { human in
@@ -163,20 +163,20 @@ extension CoconutShopView {
                             .padding(12)
                             .background(
                                 exchangeOptionId == option.id || (exchangeOptionId.isEmpty && selectedExchangeOption?.id == option.id)
-                                ? Color.goPrimary.opacity(colorScheme == .dark ? 0.2 : 0.14)
-                                : Color.ohanaCardSurface,
-                                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    ? Color.goPrimary.opacity(colorScheme == .dark ? 0.2 : 0.14)
+                                    : Color.ohanaCardSurface,
+                                in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                             )
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
                 }
 
-                TextField(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"), text: $exchangeNote, axis: .vertical)
+                TextField(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"), text: $exchangeNote, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.callout(.bold))
                     .foregroundStyle(primaryText)
                     .padding(14)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                 Button {
                     createExchange()
@@ -245,7 +245,7 @@ extension CoconutShopView {
                     .foregroundStyle(tertiaryText)
             }
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -256,13 +256,13 @@ extension CoconutShopView {
             .foregroundStyle(secondaryText)
             .frame(maxWidth: .infinity)
             .padding(20)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     func popupHeader(icon: String, sfSymbol: String?, title: String, subtitle: String, close: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .fill(Color.ohanaControlFill)
                 if let sfSymbol {
                     Image(systemName: sfSymbol)
@@ -288,7 +288,7 @@ extension CoconutShopView {
         }
     }
 
-    func inlinePopup<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
+    func inlinePopup(@ViewBuilder content: @escaping () -> some View) -> some View {
         GeometryReader { proxy in
             OhanaMotionScene(role: .sheet, alignment: .bottom, isActive: pendingPurchaseItem != nil || activePicker != nil) {
                 LinearGradient(
@@ -323,7 +323,7 @@ extension CoconutShopView {
                     .padding(.bottom, 22)
                 }
                 .frame(maxWidth: .infinity)
-                .background { OhanaPopupGlassSurface(cornerRadius: 54) }
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.42 : 0.22), radius: 34, x: 0, y: -10) // ui-v4: allow lifted overlay shadow
                 .padding(.horizontal, 6)
                 .padding(.bottom, max(8, proxy.safeAreaInsets.bottom + 2))

@@ -223,7 +223,7 @@ struct FocusHomeHeaderView: View {
         }
     }
 
-    private func limePill<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func limePill(@ViewBuilder content: () -> some View) -> some View {
         HStack(spacing: 3) {
             content()
         }
@@ -263,9 +263,9 @@ struct FocusHomeHeaderView: View {
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }

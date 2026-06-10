@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ExpenseHistoryView: View {
     let pet: Pet
-    var onRemove: (() -> Void)? = nil
+    var onRemove: (() -> Void)?
     var showsCloseButton: Bool = true
 
     @Query(sort: \Human.createdAt) private var allHumans: [Human]

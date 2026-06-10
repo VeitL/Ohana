@@ -5,7 +5,7 @@
 
 import SwiftUI
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 struct DesignSpecPaletteV4 {
@@ -16,49 +16,49 @@ struct DesignSpecPaletteV4 {
 
     var accent: Color {
         switch selection.accent {
-        case "blue": return Color.goBlue
-        case "coral": return Color.goOrange
-        case "violet": return Color.goPurple
-        default: return isDark ? Color.goPrimary : Color.goBlue
+        case "blue": Color.goBlue
+        case "coral": Color.goOrange
+        case "violet": Color.goPurple
+        default: isDark ? Color.goPrimary : Color.goBlue
         }
     }
 
     var secondaryAccent: Color {
         switch selection.accent {
-        case "blue": return Color.goTeal
-        case "coral": return Color.goYellow
-        case "violet": return Color.goBlue
-        default: return isDark ? Color.goTeal : Color.goTeal
+        case "blue": Color.goTeal
+        case "coral": Color.goYellow
+        case "violet": Color.goBlue
+        default: isDark ? Color.goTeal : Color.goTeal
         }
     }
 
     var accentText: Color {
         if selection.accent == "blue" || selection.accent == "violet" { return .white }
-        if selection.accent == "lime" && !isDark { return .white }
+        if selection.accent == "lime", !isDark { return .white }
         return Color.arkInk
     }
 
     var resolvedAccentName: String {
         switch selection.accent {
-        case "blue": return "blue"
-        case "coral": return "coral"
-        case "violet": return "violet"
-        default: return isDark ? "lime" : "blue"
+        case "blue": "blue"
+        case "coral": "coral"
+        case "violet": "violet"
+        default: isDark ? "lime" : "blue"
         }
     }
 
     var background: Color {
         if isDark {
             switch selection.background {
-            case "deep": return Color(hex: "100B2E")
-            case "plain": return Color(hex: "10131A")
-            default: return Color.goDeepNavy
+            case "deep": Color(hex: "100B2E")
+            case "plain": Color(hex: "10131A")
+            default: Color.goDeepNavy
             }
         } else {
             switch selection.background {
-            case "soft": return Color(hex: "F4F7FF")
-            case "plain": return Color(hex: "F7F8FB")
-            default: return Color(hex: "EEF2FF")
+            case "soft": Color(hex: "F4F7FF")
+            case "plain": Color(hex: "F7F8FB")
+            default: Color(hex: "EEF2FF")
             }
         }
     }
@@ -129,17 +129,17 @@ struct DesignSpecTokenButtonStyleV4: ButtonStyle {
 
     private var radius: CGFloat {
         switch selection.button {
-        case "round": return 14
-        case "square": return 10
-        default: return 999
+        case "round": 14
+        case "square": 10
+        default: 999
         }
     }
 
     private var pressScale: CGFloat {
         switch selection.tap {
-        case "tiny": return 0.985
-        case "deep": return 0.93
-        default: return 0.96
+        case "tiny": 0.985
+        case "deep": 0.93
+        default: 0.96
         }
     }
 
@@ -149,46 +149,45 @@ struct DesignSpecTokenButtonStyleV4: ButtonStyle {
 
     private var buttonAnimation: Animation {
         switch selection.tap {
-        case "tiny": return .easeOut(duration: 0.12)
-        case "deep": return .spring(response: 0.22, dampingFraction: 0.66)
-        default: return .spring(response: 0.2, dampingFraction: 0.72)
+        case "tiny": .easeOut(duration: 0.12)
+        case "deep": .spring(response: 0.22, dampingFraction: 0.66)
+        default: .spring(response: 0.2, dampingFraction: 0.72)
         }
     }
 
     private var foreground: Color {
         switch kind {
-        case .primary: return palette.accentText
-        case .destructive: return Color.goRed
-        default: return palette.primaryText
+        case .primary: palette.accentText
+        case .destructive: Color.goRed
+        default: palette.primaryText
         }
     }
 
     private var background: Color {
         switch kind {
-        case .primary: return palette.accent
-        case .destructive: return Color.goRed.opacity(0.12)
-        case .ghost: return .clear
-        default: return palette.controlFill
+        case .primary: palette.accent
+        case .destructive: Color.goRed.opacity(0.12)
+        case .ghost: .clear
+        default: palette.controlFill
         }
     }
 
     private var stroke: Color {
         switch kind {
-        case .primary: return .clear
-        case .destructive: return Color.goRed.opacity(0.26)
-        case .ghost: return .clear
-        default: return palette.stroke
+        case .primary: .clear
+        case .destructive: Color.goRed.opacity(0.26)
+        case .ghost: .clear
+        default: palette.stroke
         }
     }
 }
 
 enum DesignSpecUIV4 {
     static func typeFont(_ size: CGFloat, weight: Font.Weight, selection: DesignSpecSelectionV4) -> Font {
-        let adjusted: CGFloat
-        switch selection.type {
-        case "compact": adjusted = size * 0.96
-        case "editorial": adjusted = size * 1.06
-        default: adjusted = size
+        let adjusted: CGFloat = switch selection.type {
+        case "compact": size * 0.96
+        case "editorial": size * 1.06
+        default: size
         }
         let design: Font.Design = selection.type == "mono" ? .monospaced : .rounded
         return .system(size: adjusted, weight: weight, design: design)
@@ -196,9 +195,9 @@ enum DesignSpecUIV4 {
 
     static func density(_ compact: CGFloat, _ balanced: CGFloat, _ airy: CGFloat, selection: DesignSpecSelectionV4) -> CGFloat {
         switch selection.density {
-        case "compact": return compact
-        case "airy": return airy
-        default: return balanced
+        case "compact": compact
+        case "airy": airy
+        default: balanced
         }
     }
 
@@ -212,28 +211,28 @@ enum DesignSpecUIV4 {
 
     static func motionAnimation(_ selection: DesignSpecSelectionV4) -> Animation {
         switch selection.motion {
-        case "reduced": return .easeOut(duration: 0.12)
-        case "quick": return .easeOut(duration: 0.18)
-        case "playful": return .spring(response: 0.34, dampingFraction: 0.58)
-        default: return .spring(response: 0.28, dampingFraction: 0.72)
+        case "reduced": .easeOut(duration: 0.12)
+        case "quick": .easeOut(duration: 0.18)
+        case "playful": .spring(response: 0.34, dampingFraction: 0.58)
+        default: .spring(response: 0.28, dampingFraction: 0.72)
         }
     }
 
     static func controlChangeAnimation(_ selection: DesignSpecSelectionV4) -> Animation {
         switch selection.motion {
-        case "reduced": return .easeInOut(duration: 0.14)
-        case "quick": return .spring(response: 0.20, dampingFraction: 0.82)
-        case "playful": return .spring(response: 0.34, dampingFraction: 0.56)
-        default: return .spring(response: 0.26, dampingFraction: 0.74)
+        case "reduced": .easeInOut(duration: 0.14)
+        case "quick": .spring(response: 0.20, dampingFraction: 0.82)
+        case "playful": .spring(response: 0.34, dampingFraction: 0.56)
+        default: .spring(response: 0.26, dampingFraction: 0.74)
         }
     }
 
     static func cardRadius(_ selection: DesignSpecSelectionV4) -> CGFloat {
         switch selection.card {
-        case "solid": return 17
-        case "flat": return 16
-        case "elevated": return 24
-        default: return 21
+        case "solid": 17
+        case "flat": 16
+        case "elevated": 24
+        default: 21
         }
     }
 
@@ -243,54 +242,54 @@ enum DesignSpecUIV4 {
 
     static func glassOpacity(_ selection: DesignSpecSelectionV4) -> Double {
         switch selection.glass {
-        case "refractive": return 0.08
-        case "nativeRegular": return 0.0
-        case "calendarWidget": return 0.46
-        case "clear": return 0.0
-        case "edgePrism": return 0.12
-        default: return 0.72
+        case "refractive": 0.08
+        case "nativeRegular": 0.0
+        case "calendarWidget": 0.46
+        case "clear": 0.0
+        case "edgePrism": 0.12
+        default: 0.72
         }
     }
 
     static func sheetOpacity(_ selection: DesignSpecSelectionV4) -> Double {
         switch selection.sheetTransparency {
-        case "clear": return 0.58
-        case "frosted": return 0.92
-        case "solid": return 1
-        default: return 0.78
+        case "clear": 0.58
+        case "frosted": 0.92
+        case "solid": 1
+        default: 0.78
         }
     }
 
     static func fieldRadius(_ selection: DesignSpecSelectionV4) -> CGFloat {
         switch selection.input {
-        case "underline": return 7
-        case "compact": return 12
-        case "flat": return 14
-        default: return innerRadius(selection)
+        case "underline": 7
+        case "compact": 12
+        case "flat": 14
+        default: innerRadius(selection)
         }
     }
 
     static func fieldFill(selection: DesignSpecSelectionV4, palette: DesignSpecPaletteV4) -> Color {
         switch selection.input {
-        case "filled": return palette.controlFill
-        case "flat": return palette.flatField
-        case "underline": return .clear
-        default: return palette.fieldFill
+        case "filled": palette.controlFill
+        case "flat": palette.flatField
+        case "underline": .clear
+        default: palette.fieldFill
         }
     }
 
     static func triggerHaptic(_ selection: DesignSpecSelectionV4) {
         #if canImport(UIKit)
-        switch selection.haptic {
-        case "off":
-            break
-        case "rigid":
-            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-        case "success":
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-        default:
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        }
+            switch selection.haptic {
+            case "off":
+                break
+            case "rigid":
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            case "success":
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            default:
+                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            }
         #endif
     }
 }

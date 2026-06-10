@@ -98,7 +98,7 @@ enum FocusWalletAvatarCache {
         guard !decodePayloads.isEmpty else { return didChange }
 
         let decodeStartedAt = CFAbsoluteTimeGetCurrent()
-        let decoded = await Task.detached(priority: .userInitiated) {
+        let decoded = await Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
             decodePayloads.map { id, data, signature, inFlightKey in
                 let entry = decodedEntry(from: data, signature: signature)
                 let previewData = entry.image.flatMap { previewPNGData(from: $0) }
@@ -151,47 +151,47 @@ enum FocusWalletAvatarCache {
         evictionGeneration &+= 1
     }
 
-#if DEBUG
-    static func resetForTesting() {
-        entries.removeAll(keepingCapacity: false)
-        inFlightKeys.removeAll(keepingCapacity: false)
-        evictionGeneration &+= 1
-    }
-#endif
+    #if DEBUG
+        static func resetForTesting() {
+            entries.removeAll(keepingCapacity: false)
+            inFlightKeys.removeAll(keepingCapacity: false)
+            evictionGeneration &+= 1
+        }
+    #endif
 
-    nonisolated private static func previewEntry(for cardId: UUID, signature: String) -> Entry? {
+    private nonisolated static func previewEntry(for cardId: UUID, signature: String) -> Entry? {
         let url = previewURL(cardId: cardId, signature: signature)
-        guard let data = try? Data(contentsOf: url),
-              let image = UIImage(data: data) else { return nil }
+        guard let data = try? Data(contentsOf: url), // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
+              let image = UIImage(data: data) else { return nil } // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
         let isTransparent = ImageCutoutService.imageHasTransparentPixels(image)
         return Entry(image: image, isTransparent: isTransparent, signature: signature, isFinal: false)
     }
 
-    nonisolated private static func writePreviewData(_ data: Data, cardId: UUID, signature: String) {
+    private nonisolated static func writePreviewData(_ data: Data, cardId: UUID, signature: String) {
         let directory = previewDirectory()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try? data.write(to: previewURL(cardId: cardId, signature: signature), options: [.atomic])
     }
 
-    nonisolated private static func previewURL(cardId: UUID, signature: String) -> URL {
+    private nonisolated static func previewURL(cardId: UUID, signature: String) -> URL {
         previewDirectory()
             .appendingPathComponent("\(cardId.uuidString)-\(signature).png", isDirectory: false)
     }
 
-    nonisolated private static func previewDirectory() -> URL {
+    private nonisolated static func previewDirectory() -> URL {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         return base.appendingPathComponent("Ohana/HomeAvatarPreviewsV2", isDirectory: true)
     }
 
-    nonisolated private static func decodedEntry(from data: Data, signature: String) -> Entry {
+    private nonisolated static func decodedEntry(from data: Data, signature: String) -> Entry {
         let image = decodedImage(from: data)
         let isTransparent = image.map { ImageCutoutService.imageHasTransparentPixels($0) } ?? false
         let displayImage = isTransparent ? image.flatMap { ImageCutoutService.trimmedTransparentSubjectImage(from: $0) } ?? image : image
         return Entry(image: displayImage, isTransparent: isTransparent, signature: signature, isFinal: true)
     }
 
-    nonisolated private static func previewPNGData(from image: UIImage, maxPixel: CGFloat = 1_600) -> Data? {
+    private nonisolated static func previewPNGData(from image: UIImage, maxPixel: CGFloat = 1600) -> Data? {
         let longest = max(image.size.width, image.size.height)
         guard longest > 0 else { return image.pngData() }
         let scale = min(1, maxPixel / longest)
@@ -206,10 +206,10 @@ enum FocusWalletAvatarCache {
         return preview.pngData()
     }
 
-    nonisolated private static func decodedImage(from data: Data, maxPixel: CGFloat = 2_200) -> UIImage? {
+    private nonisolated static func decodedImage(from data: Data, maxPixel: CGFloat = 2200) -> UIImage? {
         let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
         guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
-            return UIImage(data: data)
+            return UIImage(data: data) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
         }
         let thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -218,7 +218,7 @@ enum FocusWalletAvatarCache {
             kCGImageSourceThumbnailMaxPixelSize: Int(maxPixel)
         ]
         guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary) else {
-            return UIImage(data: data)
+            return UIImage(data: data) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
         }
         return UIImage(cgImage: cgImage)
     }

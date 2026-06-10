@@ -82,7 +82,7 @@ struct HygieneTodoSheet: View {
                 .font(OhanaFont.adaptive(size: 18, weight: .black))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(accent)
-                .frame(width: 42, height: 42)
+                .frame(width: 42, height: 42) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
                 .background(accent.opacity(0.14), in: Circle())
 
             VStack(alignment: .leading, spacing: 3) {
@@ -120,14 +120,14 @@ struct HygieneTodoSheet: View {
         }
         .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private var recurrenceSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("重复")
 
-            Stepper(value: $repeatDays, in: 0...365) {
+            Stepper(value: $repeatDays, in: 0 ... 365) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(recurrenceLabel)
                         .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
@@ -139,22 +139,22 @@ struct HygieneTodoSheet: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private var noteSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("备注")
 
-            TextField("可选", text: $customNote, axis: .vertical)
-                .lineLimit(2...4)
+            TextField("可选", text: $customNote, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                .lineLimit(2 ... 4)
                 .textFieldStyle(.plain)
                 .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                 .padding(12)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -165,12 +165,12 @@ struct HygieneTodoSheet: View {
 
     private var recurrenceLabel: String {
         switch repeatDays {
-        case 0: return "不重复"
-        case 1: return "每天"
-        case 7: return "每周"
-        case 14: return "每两周"
-        case 30: return "每月"
-        default: return "每 \(repeatDays) 天"
+        case 0: "不重复"
+        case 1: "每天"
+        case 7: "每周"
+        case 14: "每两周"
+        case 30: "每月"
+        default: "每 \(repeatDays) 天"
         }
     }
 

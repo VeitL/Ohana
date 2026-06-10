@@ -1,7 +1,7 @@
 import Foundation
-@testable import Ohana
 import SwiftData
 import Testing
+@testable import Ohana
 
 @MainActor
 struct HomeReadModelStoreTests {
@@ -170,5 +170,4 @@ struct HomeReadModelStoreTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
-
 }

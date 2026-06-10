@@ -167,7 +167,7 @@ extension QuickFeedDetailContent {
                         .foregroundStyle(selection.wrappedValue == treatKind ? Color.arkInk : treatTint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(selection.wrappedValue == treatKind ? treatTint : treatTint.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .background(selection.wrappedValue == treatKind ? treatTint : treatTint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -272,7 +272,7 @@ extension QuickFeedDetailContent {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .feedFlatBlockSurface(cornerRadius: 18)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
 
             feedInlineNumberPad(field: field, text: text, tint: tint, maxFractionDigits: 0)
             quickGramChips(values: quickValues, text: text, tint: tint)
@@ -325,7 +325,7 @@ extension QuickFeedDetailContent {
             feedInlineNumberPad(field: field, text: text, tint: tint, maxFractionDigits: 0)
         }
         .padding(10)
-        .feedFlatBlockSurface(cornerRadius: 14)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
     }
 
     func adjustGramText(_ text: Binding<String>, delta: Double) {
@@ -347,7 +347,7 @@ extension QuickFeedDetailContent {
         }
         .tint(mainFoodTint)
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 16)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
     }
 
     func gramInputCompact(
@@ -376,7 +376,7 @@ extension QuickFeedDetailContent {
                     .foregroundStyle(tint)
             }
             .padding(12)
-            .feedFlatBlockSurface(cornerRadius: 16)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
             feedInlineNumberPad(field: field, text: text, tint: tint, maxFractionDigits: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -446,11 +446,11 @@ extension QuickFeedDetailContent {
         }
     }
 
-    func planStepperCard<Control: View>(
+    func planStepperCard(
         title: String,
         value: String,
         tint: Color,
-        @ViewBuilder control: () -> Control
+        @ViewBuilder control: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -464,7 +464,7 @@ extension QuickFeedDetailContent {
                 control()
             }
             .padding(12)
-            .feedFlatBlockSurface(cornerRadius: 16)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -482,7 +482,7 @@ extension QuickFeedDetailContent {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 16)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
     }
 
     func errorText(_ text: String) -> some View {
@@ -490,6 +490,6 @@ extension QuickFeedDetailContent {
             .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
             .foregroundStyle(Color.goRed)
             .padding(12)
-            .feedFlatBlockSurface(cornerRadius: 14)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
     }
 }

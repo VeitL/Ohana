@@ -5,8 +5,8 @@
 //  Island Stats 横向卡片 + 专属图表组件 (C4)
 //
 
-import SwiftUI
 import Observation
+import SwiftUI
 
 private let legacyChartBaseDate = Date(timeIntervalSinceReferenceDate: 0)
 
@@ -14,7 +14,7 @@ private func legacyTrendPoints(_ values: [Double], idPrefix: String) -> [OhanaMi
     values.enumerated().compactMap { index, value in
         guard value.isFinite else { return nil }
         return OhanaMinimalChartPoint(
-            date: legacyChartBaseDate.addingTimeInterval(Double(index) * 86_400),
+            date: legacyChartBaseDate.addingTimeInterval(Double(index) * 86400),
             value: value,
             id: "\(idPrefix)-\(index)-\(Int((value * 1000).rounded()))"
         )
@@ -26,7 +26,7 @@ private func legacyBarPoints(_ values: [Double], labels: [String]) -> [OhanaMini
         guard value.isFinite else { return nil }
         let label = index < labels.count ? labels[index] : nil
         return OhanaMinimalChartPoint(
-            date: legacyChartBaseDate.addingTimeInterval(Double(index) * 86_400),
+            date: legacyChartBaseDate.addingTimeInterval(Double(index) * 86400),
             value: max(0, value),
             label: label,
             id: "legacy-bar-\(index)-\(Int((value * 1000).rounded()))-\(label ?? "")"
@@ -86,7 +86,7 @@ struct IslandStatCard<Chart: View>: View {
     let subtitle: String
     let accentColor: Color
     var avatarEmojis: [String] = []
-    var onTap: (() -> Void)? = nil
+    var onTap: (() -> Void)?
     @ViewBuilder let chart: () -> Chart
 
     var body: some View {
@@ -218,7 +218,7 @@ struct MultiPetExpenseBar: View {
     let series: [(String, Double, Color)]
     @State private var animPhase: CGFloat = 0.0
 
-    private var maxAmount: Double { series.map { $0.1 }.max() ?? 1 }
+    private var maxAmount: Double { series.map(\.1).max() ?? 1 }
 
     private var animationKey: String {
         series
@@ -255,7 +255,7 @@ struct MultiPetExpenseBar: View {
                         let barH = max(4, CGFloat(amount / maxAmount) * chartH * animPhase)
                         VStack(spacing: 2) {
                             Spacer(minLength: 0)
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            RoundedRectangle(cornerRadius: OhanaRadius.micro, style: .continuous)
                                 .fill(color)
                                 .frame(width: barW, height: barH)
                             Text(name)
@@ -278,10 +278,10 @@ struct MultiPetExpenseBar: View {
 /// 数据模型：一条简报快报
 struct SynergyBrief: Identifiable {
     let id = UUID()
-    let emojis: [String]      // 左侧头像组
-    let headline: String      // 大标题（可含 \n）
-    let subtext: String       // 副文案
-    let accentColor: Color    // 高亮色
+    let emojis: [String] // 左侧头像组
+    let headline: String // 大标题（可含 \n）
+    let subtext: String // 副文案
+    let accentColor: Color // 高亮色
 }
 
 /// 简报生成引擎（后台计算，主线程安全更新）
@@ -305,7 +305,7 @@ final class SynergyEngine {
         let humanSnapshots: [(id: String, avatarEmoji: String, name: String, coconutBalance: Int)] =
             humans.map { ($0.id.uuidString, $0.avatarEmoji, $0.name, $0.coconutBalance) }
 
-        Task.detached(priority: .utility) {
+        Task.detached(priority: .utility) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
             let result = Self.computeFromSnapshots(pets: petSnapshots, humans: humanSnapshots)
             await MainActor.run {
                 self.briefs = result
@@ -315,9 +315,9 @@ final class SynergyEngine {
 
     // 快照类型别名（纯值，可安全跨线程传递）
     private typealias PetSnap = (avatarEmoji: String, name: String, coconutBalance: Int,
-                                  careLogs: [(type: String, executorId: String?, date: Date)],
-                                  walkLogs: [(executorId: String?, distanceMeters: Double, startDate: Date)],
-                                  expenseLogs: [(executorId: String?, amount: Double, date: Date)])
+                                 careLogs: [(type: String, executorId: String?, date: Date)],
+                                 walkLogs: [(executorId: String?, distanceMeters: Double, startDate: Date)],
+                                 expenseLogs: [(executorId: String?, amount: Double, date: Date)])
     private typealias HumanSnap = (id: String, avatarEmoji: String, name: String, coconutBalance: Int)
 
     private nonisolated static func rgb(_ red: Double, _ green: Double, _ blue: Double) -> Color {
@@ -331,16 +331,17 @@ final class SynergyEngine {
 
         // ── 1. 铲屎战况（本月各人执行者对比）
         if humans.count >= 2 {
-            let allLitters = pets.flatMap { $0.careLogs }
+            let allLitters = pets.flatMap(\.careLogs)
                 .filter { $0.type == CareType.litter.rawValue && $0.date >= monthStart }
             let counts: [(HumanSnap, Int)] = humans.map { h in
-                (h, allLitters.filter { $0.executorId == h.id }.count)
+                (h, allLitters.count(where: { $0.executorId == h.id }))
             }.filter { $0.1 > 0 }
             if counts.count >= 2 {
                 let sorted = counts.sorted { $0.1 > $1.1 }
-                let winner = sorted[0]; let loser = sorted[1]
+                let winner = sorted[0]
+                let loser = sorted[1]
                 results.append(SynergyBrief(
-                    emojis: [winner.0.avatarEmoji, loser.0.avatarEmoji] + pets.prefix(1).map { $0.avatarEmoji },
+                    emojis: [winner.0.avatarEmoji, loser.0.avatarEmoji] + pets.prefix(1).map(\.avatarEmoji),
                     headline: "\(winner.0.name) 铲了 \(winner.1) 次",
                     subtext: "本月铲屎战况 \(winner.1):\(loser.1)，\(loser.0.name) 加油！🧹",
                     accentColor: Self.rgb(255, 244, 79)
@@ -370,7 +371,7 @@ final class SynergyEngine {
             } else {
                 let totalKm = allWalks.reduce(0.0) { $0 + $1.1.distanceMeters / 1000 }
                 results.append(SynergyBrief(
-                    emojis: Array(pets.prefix(3).map { $0.avatarEmoji }),
+                    emojis: Array(pets.prefix(3).map(\.avatarEmoji)),
                     headline: String(format: "本月探索 %.1f km", totalKm),
                     subtext: "全岛宠物集体出征 🐾",
                     accentColor: Self.rgb(200, 255, 0)
@@ -379,7 +380,7 @@ final class SynergyEngine {
         }
 
         // ── 3. 首席提款机（本月花费最多的执行者）
-        let allExpenses = pets.flatMap { $0.expenseLogs }.filter { $0.date >= monthStart }
+        let allExpenses = pets.flatMap(\.expenseLogs).filter { $0.date >= monthStart }
         if !allExpenses.isEmpty {
             var humanSpend: [String: (HumanSnap, Double)] = [:]
             for exp in allExpenses {
@@ -413,7 +414,7 @@ final class SynergyEngine {
         // 安全降级
         if results.isEmpty {
             results.append(SynergyBrief(
-                emojis: (pets.prefix(2).map { $0.avatarEmoji } + humans.prefix(2).map { $0.avatarEmoji }),
+                emojis: pets.prefix(2).map(\.avatarEmoji) + humans.prefix(2).map(\.avatarEmoji),
                 headline: "欢迎来到欧哈纳！",
                 subtext: "多打卡，解锁家庭故事 🌴",
                 accentColor: Self.rgb(0, 212, 170)
@@ -464,7 +465,7 @@ struct SynergyFlashCard: View {
                         Spacer()
                         // 分页点
                         HStack(spacing: 4) {
-                            ForEach(0..<engine.briefs.count, id: \.self) { i in
+                            ForEach(0 ..< engine.briefs.count, id: \.self) { i in
                                 Circle()
                                     .fill(i == currentIndex % engine.briefs.count ? brief.accentColor : .white.opacity(0.2))
                                     .frame(width: 4, height: 4) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
@@ -546,7 +547,7 @@ struct SynergyFlashCard: View {
 struct CoconutWealthRankingCard: View {
     let pets: [Pet]
     let humans: [Human]
-    var onTap: (() -> Void)? = nil
+    var onTap: (() -> Void)?
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
@@ -572,10 +573,10 @@ struct CoconutWealthRankingCard: View {
 
     private var leaderboard: [RankEntry] {
         var all: [RankEntry] = []
-        all += pets.map   { RankEntry(emoji: $0.avatarEmoji, name: $0.name,  balance: $0.coconutBalance) }
-        all += visibleWealthHumans.map { RankEntry(emoji: $0.avatarEmoji, name: $0.name,  balance: $0.coconutBalance) }
+        all += pets.map { RankEntry(emoji: $0.avatarEmoji, name: $0.name, balance: $0.coconutBalance) }
+        all += visibleWealthHumans.map { RankEntry(emoji: $0.avatarEmoji, name: $0.name, balance: $0.coconutBalance) }
         // Bug11: 即使 balance=0 也展示所有成员，按余额降序，最多显示前3名
-        return all.sorted { $0.balance > $1.balance }.prefix(3).map { $0 }
+        return all.sorted { $0.balance > $1.balance }.prefix(3).map(\.self)
     }
 
     private let rankEmojis = ["🥇", "🥈", "🥉", "4️⃣"]
@@ -607,43 +608,43 @@ struct CoconutWealthRankingCard: View {
                         .font(OhanaFont.adaptive(size: 18))
                 }
 
-            OhanaDashedDivider(color: Color.ohanaCardStroke).padding(.vertical, 4)
+                OhanaDashedDivider(color: Color.ohanaCardStroke).padding(.vertical, 4)
 
-            // 排行榜
-            if leaderboard.isEmpty {
-                Text("完成打卡即可解锁财富榜 ✨")
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(Array(leaderboard.enumerated()), id: \.element.id) { i, entry in
-                        HStack(spacing: 10) {
-                            Text(rankEmojis[i])
-                                .font(OhanaFont.adaptive(size: 14))
-                                .frame(width: 20)
-                            ZStack {
-                                Circle()
-                                    .fill(Color.goPrimary.mix(with: .black, by: 0.35))
-                                    .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                                Text(entry.emoji)
+                // 排行榜
+                if leaderboard.isEmpty {
+                    Text("完成打卡即可解锁财富榜 ✨")
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(Array(leaderboard.enumerated()), id: \.element.id) { i, entry in
+                            HStack(spacing: 10) {
+                                Text(rankEmojis[i])
                                     .font(OhanaFont.adaptive(size: 14))
+                                    .frame(width: 20)
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.goPrimary.mix(with: .black, by: 0.35))
+                                        .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
+                                    Text(entry.emoji)
+                                        .font(OhanaFont.adaptive(size: 14))
+                                }
+                                Text(entry.name)
+                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                                    .foregroundStyle(Color.ohanaPrimaryText)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text("\(entry.balance) 🥥")
+                                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                                    .foregroundStyle(i == 0 ? Color.goPrimary : Color.ohanaSecondaryText)
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(i == 0 ? Color.goPrimary.opacity(0.15) : Color.ohanaControlFill,
+                                                in: Capsule())
+                                    .ohanaNumericMotion(entry.balance)
                             }
-                            Text(entry.name)
-                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                                .lineLimit(1)
-                            Spacer()
-                            Text("\(entry.balance) 🥥")
-                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                                .foregroundStyle(i == 0 ? Color.goPrimary : Color.ohanaSecondaryText)
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(i == 0 ? Color.goPrimary.opacity(0.15) : Color.ohanaControlFill,
-                                            in: Capsule())
-                                .ohanaNumericMotion(entry.balance)
                         }
                     }
                 }
-            }
             }
         }
         .padding(16)

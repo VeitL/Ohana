@@ -11,7 +11,7 @@ import SwiftUI
 
 enum PetBondVaultItemKind: String, CaseIterable, Hashable {
     case cardBorder = "card_border"
-    case nameplate = "nameplate"
+    case nameplate
     case storyStyle = "story_style"
     case oasisNest = "oasis_nest"
     case memorialFrame = "memorial_frame"
@@ -36,11 +36,11 @@ struct PetBondVaultItem: Identifiable, Hashable {
     var id: String { kind.rawValue }
     var previewKind: PetBondVaultPreviewKind {
         switch kind {
-        case .cardBorder: return .cardBorder
-        case .nameplate: return .nameplate
-        case .storyStyle: return .storyStyleAnimation
-        case .oasisNest: return .oasisNest
-        case .memorialFrame: return .memorialFrame
+        case .cardBorder: .cardBorder
+        case .nameplate: .nameplate
+        case .storyStyle: .storyStyleAnimation
+        case .oasisNest: .oasisNest
+        case .memorialFrame: .memorialFrame
         }
     }
 }

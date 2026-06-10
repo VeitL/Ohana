@@ -5,8 +5,8 @@
 //  植物 Tab 主面板：展示植物卡片网格 + 快捷浇水/施肥 + 空态引导
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PlantDashboardView: View {
     let plants: [Plant]
@@ -32,11 +32,11 @@ struct PlantDashboardView: View {
     private var commandExecutor: HomeCommandExecutor { HomeCommandExecutor(modelContext: modelContext, services: appServices) }
 
     private var plantsNeedingWater: [Plant] {
-        plants.filter { $0.needsWatering }
+        plants.filter(\.needsWatering)
     }
 
     private var plantsNeedingFertilizer: [Plant] {
-        plants.filter { $0.needsFertilizing }
+        plants.filter(\.needsFertilizing)
     }
 
     var body: some View {
@@ -59,7 +59,7 @@ struct PlantDashboardView: View {
             }
         }
         .sheet(isPresented: $showingAddPlant) {
-            AddPlantView { }
+            AddPlantView {}
         }
         .onDisappear {
             commandQueue.cancelAll()
@@ -84,10 +84,10 @@ struct PlantDashboardView: View {
                 en: "Add your first plant and start tracking watering and fertilizing",
                 de: "Füge deine erste Pflanze hinzu und tracke Gießen und Düngen"
             ))
-                .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
+            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 40)
 
             Button {
                 showingAddPlant = true
@@ -143,7 +143,7 @@ struct PlantDashboardView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func urgentPlantChip(_ plant: Plant) -> some View {
@@ -161,8 +161,8 @@ struct PlantDashboardView: View {
                         en: "\(days)d overdue",
                         de: "\(days) T. überfällig"
                     ))
-                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(.red.opacity(0.8))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .foregroundStyle(.red.opacity(0.8))
                 }
             }
             Button {
@@ -236,7 +236,7 @@ struct PlantDashboardView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -303,7 +303,7 @@ struct PlantDashboardView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(Color.ohanaCardSurface.opacity(0.5), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface.opacity(0.5), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }

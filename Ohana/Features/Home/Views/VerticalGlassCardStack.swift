@@ -152,7 +152,7 @@ struct VerticalGlassCardStack<Card: Identifiable, CardContent: View>: View {
         }
         let lower = max(0, currentIndex - 1)
         let upper = min(cards.count - 1, currentIndex + visibleBackCardCount)
-        return (lower...upper)
+        return (lower ... upper)
             .map { ($0, CGFloat($0 - currentIndex) - dragProgress, cards[$0]) }
             .sorted { lhs, rhs in
                 abs(lhs.depth) > abs(rhs.depth)
@@ -161,7 +161,7 @@ struct VerticalGlassCardStack<Card: Identifiable, CardContent: View>: View {
 
     private var wrappedVisibleCards: [(index: Int, depth: CGFloat, card: Card)] {
         let deepest = min(visibleBackCardCount, max(cards.count - 1, 0))
-        let positions = [-1] + Array(0...deepest)
+        let positions = [-1] + Array(0 ... deepest)
 
         var used = Set<Int>()
         var output: [(index: Int, depth: CGFloat, card: Card)] = []
@@ -183,14 +183,12 @@ struct VerticalGlassCardStack<Card: Identifiable, CardContent: View>: View {
                 let translation = value.translation.height
                 let shouldAdvance = translation < -swipeThreshold || predicted < -swipeThreshold * 1.35
                 let shouldGoBack = translation > swipeThreshold || predicted > swipeThreshold * 1.35
-                let nextIndex: Int
-
-                if shouldAdvance {
-                    nextIndex = wraps ? currentIndex + 1 : min(currentIndex + 1, cards.count - 1)
+                let nextIndex: Int = if shouldAdvance {
+                    wraps ? currentIndex + 1 : min(currentIndex + 1, cards.count - 1)
                 } else if shouldGoBack {
-                    nextIndex = wraps ? currentIndex - 1 : max(currentIndex - 1, 0)
+                    wraps ? currentIndex - 1 : max(currentIndex - 1, 0)
                 } else {
-                    nextIndex = currentIndex
+                    currentIndex
                 }
 
                 guard nextIndex != currentIndex else { return }
@@ -209,13 +207,12 @@ struct VerticalGlassCardStack<Card: Identifiable, CardContent: View>: View {
     private func metrics(forDepth depth: CGFloat) -> CardMetrics {
         let clampedDepth = min(max(depth, -1), CGFloat(visibleBackCardCount))
         let depthMagnitude = abs(clampedDepth)
-        let incomingBias: Double
-        if dragProgress > 0.001 {
-            incomingBias = clampedDepth > 0 ? 0.06 : 0
+        let incomingBias: Double = if dragProgress > 0.001 {
+            clampedDepth > 0 ? 0.06 : 0
         } else if dragProgress < -0.001 {
-            incomingBias = clampedDepth < 0 ? 0.06 : 0
+            clampedDepth < 0 ? 0.06 : 0
         } else {
-            incomingBias = depthMagnitude < 0.001 ? 0.08 : 0
+            depthMagnitude < 0.001 ? 0.08 : 0
         }
 
         return CardMetrics(

@@ -5,7 +5,7 @@ nonisolated protocol ActiveHumanSelecting {
     var currentHumanIdRaw: String { get }
 }
 
-nonisolated final class UserDefaultsActiveHumanSelection: ActiveHumanSelecting {
+final nonisolated class UserDefaultsActiveHumanSelection: ActiveHumanSelecting {
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {

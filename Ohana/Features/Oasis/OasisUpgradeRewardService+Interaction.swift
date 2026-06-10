@@ -210,6 +210,6 @@ extension OasisUpgradeRewardService {
 
     static func todayInteractionCount(for critter: OasisElectronicPet, context: ModelContext) -> Int {
         let activeActions: Set<OasisCritterAction> = [.feed, .play, .rest]
-        return actionLogs(for: critter, context: context).filter { activeActions.contains($0.action) }.count
+        return actionLogs(for: critter, context: context).count(where: { activeActions.contains($0.action) })
     }
 }

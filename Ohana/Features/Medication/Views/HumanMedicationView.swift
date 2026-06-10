@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Main View
 
@@ -13,7 +13,7 @@ struct HumanMedicationContentView: View {
     let allMeds: [HumanMedication]
     let allLogs: [HumanMedicationLog]
     var showsDoneButton: Bool = true
-    var onDoseTaken: (() -> Void)? = nil
+    var onDoseTaken: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -21,7 +21,6 @@ struct HumanMedicationContentView: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-
     @State private var showAddSheet = false
     @State private var editingMed: HumanMedication? = nil
     @State private var showToast = false
@@ -48,6 +47,7 @@ struct HumanMedicationContentView: View {
     private var myMeds: [HumanMedication] {
         allMeds
     }
+
     private var currentMeds: [HumanMedication] { meds(in: .current) }
     private var manualMeds: [HumanMedication] { meds(in: .manual) }
     private var notStartedMeds: [HumanMedication] { meds(in: .notStarted) }
@@ -79,14 +79,14 @@ struct HumanMedicationContentView: View {
         weekdayFormatter.locale = AppLanguage.effectiveLocale
         weekdayFormatter.dateFormat = "E"
 
-        return (0..<7).reversed().compactMap { offset in
+        return (0 ..< 7).reversed().compactMap { offset in
             guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { return nil }
             let planned = plannedDoseCount(on: day)
-            let taken = allLogs.filter {
+            let taken = allLogs.count(where: {
                 $0.humanId == human.id.uuidString &&
-                $0.status == .taken &&
-                calendar.isDate($0.scheduledTime, inSameDayAs: day)
-            }.count
+                    $0.status == .taken &&
+                    calendar.isDate($0.scheduledTime, inSameDayAs: day)
+            })
 
             return MedicationAdherenceDay(
                 date: day,
@@ -103,7 +103,7 @@ struct HumanMedicationContentView: View {
         let taken = adherenceDays.reduce(0) { $0 + $1.taken }
         return Int((Double(taken) / Double(planned) * 100).rounded())
     }
-    
+
     private var todayScheduleItems: [DailyDoseItem] {
         HumanMedicationSchedulePlan
             .doses(on: Date(), medications: myMeds)
@@ -298,7 +298,7 @@ struct HumanMedicationContentView: View {
             onClose: { dismiss() }
         ) {
             let todayTotal = todayScheduleItems.count
-            let todayDone  = todayScheduleItems.filter { $0.log?.status == .taken }.count
+            let todayDone = todayScheduleItems.count(where: { $0.log?.status == .taken })
             if todayTotal > 0 {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(todayDone)/\(todayTotal)")
@@ -430,8 +430,8 @@ struct HumanMedicationContentView: View {
     }
 
     private var todayPlannedCount: Int { todayScheduleItems.count }
-    private var todayTakenCount: Int { todayScheduleItems.filter { $0.log?.status == .taken }.count }
-    private var todaySkippedCount: Int { todayScheduleItems.filter { $0.log?.status == .skipped }.count }
+    private var todayTakenCount: Int { todayScheduleItems.count(where: { $0.log?.status == .taken }) }
+    private var todaySkippedCount: Int { todayScheduleItems.count(where: { $0.log?.status == .skipped }) }
     private var todayResolvedCount: Int { todayTakenCount + todaySkippedCount }
     private var todayCompletion: Double {
         guard todayPlannedCount > 0 else { return 0 }
@@ -475,14 +475,14 @@ struct HumanMedicationContentView: View {
     }
 
     private var endingSoonCount: Int {
-        activeMeds.filter {
+        activeMeds.count(where: {
             if let days = $0.daysRemaining { return days <= 7 }
             return false
-        }.count
+        })
     }
 
     private var longTermCount: Int {
-        activeMeds.filter { $0.endDate == nil }.count
+        activeMeds.count(where: { $0.endDate == nil })
     }
 
     private func plannedDoseCount(on day: Date) -> Int {
@@ -580,9 +580,9 @@ struct HumanMedicationContentView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -605,7 +605,7 @@ struct HumanMedicationContentView: View {
         let isResolved = isTaken || isSkipped
         let isOverdue = !isResolved && item.scheduledTime < Date()
         let tint = isTaken ? Color.goTeal : (isSkipped ? Color.goOrange : (isOverdue ? Color.goRed : Color.goPrimary))
-        
+
         return HStack(spacing: 16) {
             VStack(alignment: .trailing, spacing: 4) {
                 Text(item.scheduledTime, style: .time)
@@ -616,7 +616,7 @@ struct HumanMedicationContentView: View {
                     .foregroundStyle(tint)
             }
             .frame(width: 62, alignment: .trailing)
-            
+
             ZStack {
                 Circle()
                     .fill(tint.opacity(0.14))
@@ -625,7 +625,7 @@ struct HumanMedicationContentView: View {
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(tint)
             }
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.medication.name)
                     .font(OhanaFont.headline(.semibold))
@@ -637,7 +637,7 @@ struct HumanMedicationContentView: View {
                         .foregroundStyle(tertiaryText)
                 }
             }
-            
+
             Spacer()
 
             HStack(spacing: 8) {
@@ -677,11 +677,11 @@ struct HumanMedicationContentView: View {
     private func doseStatusText(_ item: DailyDoseItem, status: HumanMedicationStatus?) -> String {
         switch status {
         case .taken:
-            return l.tr(zh: "已服", en: "Taken", de: "Genommen")
+            l.tr(zh: "已服", en: "Taken", de: "Genommen")
         case .skipped:
-            return l.tr(zh: "已跳过", en: "Skipped", de: "Überspr.")
+            l.tr(zh: "已跳过", en: "Skipped", de: "Überspr.")
         default:
-            return item.scheduledTime < Date()
+            item.scheduledTime < Date()
                 ? l.tr(zh: "已超时", en: "Overdue", de: "Überfällig")
                 : l.tr(zh: "待记录", en: "Pending", de: "Offen")
         }
@@ -694,11 +694,11 @@ struct HumanMedicationContentView: View {
     private func doseStatusIcon(_ item: DailyDoseItem, status: HumanMedicationStatus?) -> String {
         switch status {
         case .taken:
-            return "checkmark"
+            "checkmark"
         case .skipped:
-            return "minus"
+            "minus"
         default:
-            return item.scheduledTime < Date() ? "exclamationmark" : "clock"
+            item.scheduledTime < Date() ? "exclamationmark" : "clock"
         }
     }
 
@@ -741,9 +741,9 @@ struct HumanMedicationContentView: View {
 
     private func doseStatusColor(_ status: HumanMedicationStatus?) -> Color {
         switch status {
-        case .taken: return Color.goTeal
-        case .skipped: return Color.goOrange
-        default: return dividerColor.opacity(0.9)
+        case .taken: Color.goTeal
+        case .skipped: Color.goOrange
+        default: dividerColor.opacity(0.9)
         }
     }
 
@@ -852,7 +852,7 @@ struct HumanMedicationContentView: View {
                             Text(l.tr(zh: "· 剩 \(max(0, days)) 天", en: "· \(max(0, days)) d left", de: "· \(max(0, days)) T übrig"))
                                 .font(OhanaFont.caption())
                                 .foregroundStyle(days <= 3 ? Color.goRed : tertiaryText)
-                        } else if med.endDate == nil && displayGroup(for: med) == .current {
+                        } else if med.endDate == nil, displayGroup(for: med) == .current {
                             Text(l.tr(zh: "· 长期", en: "· long-term", de: "· langfristig"))
                                 .font(OhanaFont.caption())
                                 .foregroundStyle(tertiaryText)
@@ -1028,11 +1028,11 @@ struct HumanMedicationContentView: View {
             .padding(.horizontal, 20)
     }
 
-    private func medicationSurface<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func medicationSurface(@ViewBuilder content: () -> some View) -> some View {
         content()
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
     }

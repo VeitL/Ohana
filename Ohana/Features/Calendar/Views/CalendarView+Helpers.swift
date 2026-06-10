@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension CalendarView {
     // MARK: - Calendar Helpers
@@ -13,16 +13,16 @@ extension CalendarView {
         let components = cal.dateComponents([.year, .month], from: selectedDate)
         guard let firstOfMonth = cal.date(from: components),
               let range = cal.range(of: .day, in: .month, for: firstOfMonth) else { return [] }
-        
+
         let weekday = cal.component(.weekday, from: firstOfMonth)
         var days: [Date?] = Array(repeating: nil, count: weekday - 1)
-        
+
         for day in range {
             if let date = cal.date(byAdding: .day, value: day - 1, to: firstOfMonth) {
                 days.append(date)
             }
         }
-        
+
         return days
     }
 

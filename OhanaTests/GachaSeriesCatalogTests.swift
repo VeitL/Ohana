@@ -8,12 +8,12 @@ struct GachaSeriesCatalogTests {
         #expect(GachaSeriesCatalog.validateProbabilities())
         #expect(GachaSeriesCatalog.allSeries.count >= 2)
         for series in GachaSeriesCatalog.allSeries {
-            #expect(series.probabilityTotalBasisPoints == 10_000)
+            #expect(series.probabilityTotalBasisPoints == 10000)
             #expect(series.commonItems.count == 8)
             #expect(series.items.filter(\.isHidden).count == 1)
-            #expect(series.commonProbabilityBasisPoints == 2_000)
+            #expect(series.commonProbabilityBasisPoints == 2000)
             #expect(series.hiddenProbabilityBasisPoints == 200)
-            #expect(series.instantResultProbabilityBasisPoints == 7_800)
+            #expect(series.instantResultProbabilityBasisPoints == 7800)
             #expect(series.instantResults.first { $0.id == GachaSeriesCatalog.coconutGrandBundleResultId }?.probabilityBasisPoints == 500)
             #expect(series.instantResults.first { $0.id == GachaSeriesCatalog.coconutGrandBundleResultId }?.coconutDelta == 500)
         }
@@ -41,12 +41,12 @@ struct GachaSeriesCatalogTests {
         #expect(GachaDrawService.roll(in: series, forcedRoll: 199).item?.rarity == .hidden)
         #expect(GachaDrawService.roll(in: series, forcedRoll: 0, allowsHidden: false).kind != .collectible)
         #expect(GachaDrawService.roll(in: series, forcedRoll: 200).item?.rarity == .common)
-        #expect(GachaDrawService.roll(in: series, forcedRoll: 2_199).item?.rarity == .common)
-        #expect(GachaDrawService.roll(in: series, forcedRoll: 2_200).kind != .collectible)
-        #expect(GachaDrawService.roll(in: series, forcedRoll: 5_000).instantResult?.id == GachaSeriesCatalog.coconutGrandBundleResultId)
-        #expect(GachaDrawService.roll(in: series, forcedRoll: 5_499).instantResult?.id == GachaSeriesCatalog.coconutGrandBundleResultId)
-        #expect(GachaDrawService.roll(in: series, forcedRoll: 5_500).instantResult?.id != GachaSeriesCatalog.coconutGrandBundleResultId)
-        #expect(GachaDrawService.roll(in: series, forcedRoll: 9_999).kind != .collectible)
+        #expect(GachaDrawService.roll(in: series, forcedRoll: 2199).item?.rarity == .common)
+        #expect(GachaDrawService.roll(in: series, forcedRoll: 2200).kind != .collectible)
+        #expect(GachaDrawService.roll(in: series, forcedRoll: 5000).instantResult?.id == GachaSeriesCatalog.coconutGrandBundleResultId)
+        #expect(GachaDrawService.roll(in: series, forcedRoll: 5499).instantResult?.id == GachaSeriesCatalog.coconutGrandBundleResultId)
+        #expect(GachaDrawService.roll(in: series, forcedRoll: 5500).instantResult?.id != GachaSeriesCatalog.coconutGrandBundleResultId)
+        #expect(GachaDrawService.roll(in: series, forcedRoll: 9999).kind != .collectible)
     }
 
     @Test func consecutiveBasicBandRollsRemainIndependent() {
@@ -85,7 +85,7 @@ struct GachaSeriesCatalogTests {
         context.insert(human)
         try context.save()
 
-        for index in 0..<4 {
+        for index in 0 ..< 4 {
             _ = try GachaDrawService.draw(
                 seriesId: series.id,
                 human: human,
@@ -144,7 +144,7 @@ struct GachaSeriesCatalogTests {
             human: human,
             context: context,
             now: Date(timeIntervalSince1970: 300),
-            forcedRoll: 2_500
+            forcedRoll: 2500
         )
         #expect(instant.item == nil)
         #expect(instant.ownedItem == nil)
@@ -169,7 +169,7 @@ struct GachaSeriesCatalogTests {
             human: human,
             context: context,
             now: Date(timeIntervalSince1970: 400),
-            forcedRoll: 2_500
+            forcedRoll: 2500
         )
 
         #expect(outcome.log.instantCoconutDelta == 5)
@@ -199,7 +199,7 @@ struct GachaSeriesCatalogTests {
             human: human,
             context: context,
             now: Date(timeIntervalSince1970: 450),
-            forcedRoll: 5_000
+            forcedRoll: 5000
         )
 
         #expect(outcome.item == nil)

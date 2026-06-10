@@ -7,7 +7,7 @@
 
 import SwiftUI
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 struct UIGuidelinesView: View {
@@ -97,7 +97,7 @@ struct UIGuidelinesView: View {
                     }
                     .frame(minHeight: 44)
                     .padding(13)
-                    .background(glass(cornerRadius: 20))
+                    .background(glass(cornerRadius: OhanaRadius.input))
                 }
                 .buttonStyle(ScaleButtonStyle()) // ui-v4: developer flow test entry
 
@@ -187,7 +187,7 @@ struct UIGuidelinesView: View {
                     .rotationEffect(.degrees(isExpanded.wrappedValue ? 180 : 0))
             }
             .padding(13)
-            .background(glass(cornerRadius: 20))
+            .background(glass(cornerRadius: OhanaRadius.input))
         }
         .buttonStyle(ScaleButtonStyle()) // ui-v4: allow custom disclosure row animation
     }
@@ -235,7 +235,7 @@ struct UIGuidelinesView: View {
             }
         }
         .padding(13)
-        .background(glass(cornerRadius: 22))
+        .background(glass(cornerRadius: OhanaRadius.cardSoft))
     }
 
     private func loadSelection() {
@@ -295,7 +295,7 @@ struct UIGuidelinesView: View {
 
     private func copy(_ value: String, message: String) {
         #if canImport(UIKit)
-        UIPasteboard.general.string = value
+            UIPasteboard.general.string = value
         #endif
         withAnimation(DesignSpecUIV4.controlChangeAnimation(selection)) { toast = message }
     }

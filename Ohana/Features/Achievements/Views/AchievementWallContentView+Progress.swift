@@ -9,7 +9,7 @@ extension AchievementWallContentView {
     func humanAchievements(for human: Human) -> [Achievement] {
         let profileScore = humanProfileScore(human)
         let medicationCount = medications(for: human).count
-        let takenMedicationCount = medicationLogs(for: human).filter { $0.status == .taken }.count
+        let takenMedicationCount = medicationLogs(for: human).count(where: { $0.status == .taken })
         let expenseCount = expenses(for: human).count
         let accountDays = Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0
 
@@ -171,13 +171,13 @@ extension AchievementWallContentView {
         case "weight_manager":
             return .init(current: Double(activePet.weightLogs.count), target: 7, unit: "条", actionTitle: "记录体重")
         case "hydration_buddy":
-            return .init(current: Double(activePet.careLogs.filter { $0.careType == .watering }.count), target: 14, unit: "次", actionTitle: "累计喂水")
+            return .init(current: Double(activePet.careLogs.count(where: { $0.careType == .watering })), target: 14, unit: "次", actionTitle: "累计喂水")
         case "play_champion":
-            return .init(current: Double(activePet.careLogs.filter { $0.careType == .play }.count), target: 20, unit: "次", actionTitle: "累计陪玩")
+            return .init(current: Double(activePet.careLogs.count(where: { $0.careType == .play })), target: 20, unit: "次", actionTitle: "累计陪玩")
         case "clean_keeper":
             return .init(current: Double(cleaningRecordCount()), target: 20, unit: "次", actionTitle: "累计清洁照护")
         case "treat_scout":
-            return .init(current: Double(activePet.careLogs.filter { FeedLogMetadata.isTreatLog($0) }.count), target: 10, unit: "次", actionTitle: "累计记录零食")
+            return .init(current: Double(activePet.careLogs.count(where: { FeedLogMetadata.isTreatLog($0) })), target: 10, unit: "次", actionTitle: "累计记录零食")
         case "food_kind_explorer":
             return .init(current: Double(recordedFoodKindCount()), target: 2, unit: "种", actionTitle: "干粮湿粮都记录")
         case "auto_feeder_pilot":
@@ -213,7 +213,7 @@ extension AchievementWallContentView {
         case "global_critter_star":
             return .init(current: Double(electronicPets.map(\.starLevel).max() ?? 0), target: 2, unit: "星", actionTitle: "电子宠物升星")
         case "global_critter_caretaker":
-            return .init(current: Double(critterActionLogs.filter { $0.action != .careEcho }.count), target: 10, unit: "次", actionTitle: "电子宠物互动")
+            return .init(current: Double(critterActionLogs.count(where: { $0.action != .careEcho })), target: 10, unit: "次", actionTitle: "电子宠物互动")
         case "global_first_blind_box":
             return .init(current: Double(gachaDrawLogs.count), target: 1, unit: "抽", actionTitle: "使用扭蛋机")
         case "global_blind_box_collector":
@@ -244,7 +244,7 @@ extension AchievementWallContentView {
         case "human_medication_setup":
             return .init(current: Double(medications(for: human).count), target: 1, unit: "个", actionTitle: "添加用药计划")
         case "human_medication_keeper":
-            return .init(current: Double(medicationLogs(for: human).filter { $0.status == .taken }.count), target: 7, unit: "次", actionTitle: "完成用药打卡")
+            return .init(current: Double(medicationLogs(for: human).count(where: { $0.status == .taken })), target: 7, unit: "次", actionTitle: "完成用药打卡")
         case "human_workout_starter":
             return .init(current: Double(human.workoutLogs.count), target: 1, unit: "条", actionTitle: "记录运动")
         case "human_workout_rhythm":
@@ -291,7 +291,7 @@ extension AchievementWallContentView {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         var count = 0
-        for offset in 0..<30 {
+        for offset in 0 ..< 30 {
             guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { break }
             if hasRecord(day) { count += 1 } else { break }
         }
@@ -315,19 +315,19 @@ extension AchievementWallContentView {
 
     func hasAnyRecord() -> Bool {
         !activePet.healthLogs.isEmpty || !activePet.pottyLogs.isEmpty || !activePet.walkLogs.isEmpty
-        || !activePet.hygieneLogs.isEmpty || !activePet.careLogs.isEmpty || !activePet.foodRecords.isEmpty
-        || !activePet.expenseLogs.isEmpty || !activePet.weightLogs.isEmpty || !activePet.photoLogs.isEmpty
-        || !activePet.milestones.isEmpty
+            || !activePet.hygieneLogs.isEmpty || !activePet.careLogs.isEmpty || !activePet.foodRecords.isEmpty
+            || !activePet.expenseLogs.isEmpty || !activePet.weightLogs.isEmpty || !activePet.photoLogs.isEmpty
+            || !activePet.milestones.isEmpty
     }
 
     func hasAnyTodayRecord() -> Bool {
         let calendar = Calendar.current
         return activePet.healthLogs.contains { calendar.isDateInToday($0.date) }
-        || activePet.hygieneLogs.contains { calendar.isDateInToday($0.date) }
-        || activePet.pottyLogs.contains { calendar.isDateInToday($0.date) }
-        || activePet.walkLogs.contains { calendar.isDateInToday($0.startDate) }
-        || activePet.careLogs.contains { calendar.isDateInToday($0.date) }
-        || activePet.weightLogs.contains { calendar.isDateInToday($0.date) }
+            || activePet.hygieneLogs.contains { calendar.isDateInToday($0.date) }
+            || activePet.pottyLogs.contains { calendar.isDateInToday($0.date) }
+            || activePet.walkLogs.contains { calendar.isDateInToday($0.startDate) }
+            || activePet.careLogs.contains { calendar.isDateInToday($0.date) }
+            || activePet.weightLogs.contains { calendar.isDateInToday($0.date) }
     }
 
     func mainFeedLogs() -> [PetCareLog] {
@@ -335,9 +335,9 @@ extension AchievementWallContentView {
     }
 
     func cleaningRecordCount() -> Int {
-        let careCount = activePet.careLogs.filter {
+        let careCount = activePet.careLogs.count(where: {
             [.litter, .waterChange, .filterClean, .cageCleaning, .substrateChange].contains($0.careType)
-        }.count
+        })
         return activePet.hygieneLogs.count + careCount
     }
 
@@ -348,10 +348,10 @@ extension AchievementWallContentView {
     func hasVaccineRecord() -> Bool {
         activePet.healthLogs.contains {
             $0.type == "vaccine"
-            || $0.type == "vaccination"
-            || $0.note.localizedCaseInsensitiveContains("疫苗")
-            || $0.note.localizedCaseInsensitiveContains("vaccine")
-            || $0.note.localizedCaseInsensitiveContains("impf")
+                || $0.type == "vaccination"
+                || $0.note.localizedCaseInsensitiveContains("疫苗")
+                || $0.note.localizedCaseInsensitiveContains("vaccine")
+                || $0.note.localizedCaseInsensitiveContains("impf")
         }
     }
 
@@ -366,7 +366,7 @@ extension AchievementWallContentView {
             !human.bloodType.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             !human.mbti.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             !human.nationality.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !human.city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        ].filter { $0 }.count
+        ].count(where: { $0 })
     }
 
     func medications(for human: Human) -> [HumanMedication] {
@@ -383,9 +383,9 @@ extension AchievementWallContentView {
 
     func hasAnyHumanRecord(_ human: Human) -> Bool {
         !human.weightLogs.isEmpty
-        || !human.workoutLogs.isEmpty
-        || !medications(for: human).isEmpty
-        || !medicationLogs(for: human).isEmpty
-        || !expenses(for: human).isEmpty
+            || !human.workoutLogs.isEmpty
+            || !medications(for: human).isEmpty
+            || !medicationLogs(for: human).isEmpty
+            || !expenses(for: human).isEmpty
     }
 }

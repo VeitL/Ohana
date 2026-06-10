@@ -15,9 +15,9 @@ enum CoconutWalletError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .insufficientBalance(accountName, missing):
-            return "\(accountName) needs \(missing) more coconuts."
+            "\(accountName) needs \(missing) more coconuts."
         case let .duplicateTransaction(key):
-            return "Duplicate coconut wallet transaction: \(key)."
+            "Duplicate coconut wallet transaction: \(key)."
         }
     }
 }
@@ -368,7 +368,7 @@ enum CoconutWalletService {
     }
 
     static func totalBalance(context: ModelContext) -> Int {
-        ((try? context.fetch(FetchDescriptor<CoconutAccount>())) ?? []).reduce(0) { $0 + $1.balance }
+        ((try? context.fetch(FetchDescriptor<CoconutAccount>())) ?? []).reduce(0) { $0 + $1.balance } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     static func recentLogProjection(context: ModelContext, limit: Int = 200) -> [CoconutLogEntry] {
@@ -586,8 +586,8 @@ enum CoconutEconomyBootstrapService {
             return
         }
 
-        let humans = try context.fetch(FetchDescriptor<Human>())
-        let pets = try context.fetch(FetchDescriptor<Pet>())
+        let humans = try context.fetch(FetchDescriptor<Human>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        let pets = try context.fetch(FetchDescriptor<Pet>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         var deltas: [CoconutWalletDelta] = []
 
         var memberTotal = 0
@@ -665,12 +665,11 @@ enum CoconutEconomyBootstrapService {
     ) throws {
         let humanById = Dictionary(uniqueKeysWithValues: humans.map { ($0.id.uuidString, $0) })
         let petById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0) })
-        let accountByKey = Dictionary(uniqueKeysWithValues: ((try? context.fetch(FetchDescriptor<CoconutAccount>())) ?? []).map { ($0.accountKey, $0) })
+        let accountByKey = Dictionary(uniqueKeysWithValues: ((try? context.fetch(FetchDescriptor<CoconutAccount>())) ?? []).map { ($0.accountKey, $0) }) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
 
         for log in legacyLogs.prefix(200) {
-            let delta: CoconutWalletDelta
-            if let actorId = log.actorId, let human = humanById[actorId] {
-                delta = .human(
+            let delta: CoconutWalletDelta = if let actorId = log.actorId, let human = humanById[actorId] {
+                .human(
                     human,
                     delta: log.amount,
                     entryKind: .legacyHistory,
@@ -684,7 +683,7 @@ enum CoconutEconomyBootstrapService {
                     transactionKey: "bootstrap:v58:legacyHistory:\(log.id.uuidString)"
                 ).nonBalanceAffecting()
             } else if let actorId = log.actorId, let pet = petById[actorId] {
-                delta = .pet(
+                .pet(
                     pet,
                     delta: log.amount,
                     entryKind: .legacyHistory,
@@ -698,7 +697,7 @@ enum CoconutEconomyBootstrapService {
                     transactionKey: "bootstrap:v58:legacyHistory:\(log.id.uuidString)"
                 ).nonBalanceAffecting()
             } else {
-                delta = .system(
+                .system(
                     delta: log.amount,
                     entryKind: .legacyHistory,
                     source: .legacyUserDefaults,

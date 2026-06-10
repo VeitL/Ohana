@@ -16,7 +16,7 @@ extension QuickFeedDetailContent {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
     }
 
     func overviewSectionHeader(_ title: String) -> some View {
@@ -155,7 +155,7 @@ extension QuickFeedDetailContent {
         let start = calendar.startOfDay(for: date)
         let today = calendar.startOfDay(for: Date())
         let days = calendar.dateComponents([.day], from: start, to: today).day ?? 0
-        if days > 1 && days < 7 {
+        if days > 1, days < 7 {
             return l.tr(
                 zh: "上次 \(days) 天前",
                 en: "Last \(days)d ago",

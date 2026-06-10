@@ -4,7 +4,7 @@ import SwiftUI
 struct HumanMedicationView: View {
     let human: Human
     var showsDoneButton: Bool = true
-    var onDoseTaken: (() -> Void)? = nil
+    var onDoseTaken: (() -> Void)?
 
     @Query private var allMeds: [HumanMedication]
     @Query private var allLogs: [HumanMedicationLog]

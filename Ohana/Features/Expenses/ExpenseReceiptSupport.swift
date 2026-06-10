@@ -88,7 +88,7 @@ enum InsurancePaymentSchedule {
         var dates: [Date] = []
         var current = firstDate
         var guardCount = 0
-        while current <= renewalDate && guardCount < 600 {
+        while current <= renewalDate, guardCount < 600 {
             dates.append(current)
             guard let next = calendar.date(byAdding: component, value: value, to: current), next > current else {
                 break

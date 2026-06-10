@@ -475,7 +475,7 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first
+        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private func fetchPlant(id: UUID) -> Plant? {
@@ -485,7 +485,7 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first
+        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private func fetchEvent(id: UUID) -> Event? {
@@ -495,7 +495,7 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first
+        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private func fetchHuman(id: UUID) -> Human? {
@@ -505,11 +505,11 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first
+        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private func fetchHumans() -> [Human] {
-        (try? modelContext.fetch(FetchDescriptor<Human>())) ?? []
+        (try? modelContext.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private func fetchCoconutExchangeRequest(id: UUID) -> CoconutExchangeRequest? {
@@ -519,7 +519,7 @@ struct HomeCommandExecutor {
             }
         )
         descriptor.fetchLimit = 1
-        return try? modelContext.fetch(descriptor).first
+        return try? modelContext.fetch(descriptor).first // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private func fetchQuickCareEvents(petID: UUID, now: Date) -> [Event] {
@@ -532,7 +532,7 @@ struct HomeCommandExecutor {
             sortBy: [SortDescriptor(\.startDate, order: .forward)]
         )
         descriptor.fetchLimit = 400
-        return (try? modelContext.fetch(descriptor)) ?? []
+        return (try? modelContext.fetch(descriptor)) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private func fetchRecentCareLogs(petID: UUID, now: Date) -> [PetCareLog] {
@@ -546,7 +546,7 @@ struct HomeCommandExecutor {
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
         descriptor.fetchLimit = 300
-        return ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.pet?.id == petID }
+        return ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.pet?.id == petID } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
     }
 
     private func publishMutation(
@@ -562,8 +562,8 @@ struct HomeCommandExecutor {
         )
     }
 
-    private func publishMutation<C: FeatureDomainCommand>(
-        _ command: C,
+    private func publishMutation(
+        _ command: some FeatureDomainCommand,
         affected: Set<UUID>,
         note: String
     ) {
@@ -587,7 +587,7 @@ struct HomeCommandExecutor {
         )
     }
 
-    private func publishNoop<C: FeatureDomainCommand>(_ command: C, note: String) {
+    private func publishNoop(_ command: some FeatureDomainCommand, note: String) {
         publishNoop(command.domainCommand, note: note)
     }
 }

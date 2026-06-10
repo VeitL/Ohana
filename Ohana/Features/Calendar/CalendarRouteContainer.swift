@@ -2,17 +2,17 @@ import SwiftData
 import SwiftUI
 
 struct CalendarRouteContainer: View {
-    var preselectedPetId: String? = nil
-    var preselectedHumanId: String? = nil
+    var preselectedPetId: String?
+    var preselectedHumanId: String?
     var hideToolbar: Bool = false
     var showsEmbeddedControls: Bool = false
     var addEventTrigger: Int = 0
     var isEmbeddedPrepared: Bool = true
     var isEmbeddedVisible: Bool = true
     var isEmbeddedActive: Bool = true
-    var onRequestAddEvent: (() -> Void)? = nil
-    var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)? = nil
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onRequestAddEvent: (() -> Void)?
+    var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)?
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @Query(sort: \Event.startDate, order: .reverse) private var events: [Event]
     @Query(sort: \Pet.createdAt) private var pets: [Pet]

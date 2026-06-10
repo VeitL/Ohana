@@ -147,7 +147,7 @@ extension VerticalSolidHomeView {
 
         growthUnlockToastPresentationTask?.cancel()
         growthUnlockToastDismissTask?.cancel()
-        growthUnlockToastPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: showGrowthOnboarding ? 1_800 : 520) {
+        growthUnlockToastPresentationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: showGrowthOnboarding ? 1800 : 520) {
             guard !showGrowthOnboarding else {
                 growthUnlockToastPresentationTask = nil
                 return
@@ -156,7 +156,7 @@ extension VerticalSolidHomeView {
                 growthUnlockToastStatus = GrowthUnlockStatus(step: step, currentLevel: currentLevel)
             }
             growthUnlockToastPresentationTask = nil
-            growthUnlockToastDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3_800) {
+            growthUnlockToastDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3800) {
                 dismissGrowthUnlockToast()
             }
         }
@@ -241,7 +241,7 @@ extension VerticalSolidHomeView {
                 progressPercent: progressPercent
             )
         }
-        growthLoopPulseDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 2_600) {
+        growthLoopPulseDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 2600) {
             dismissGrowthLoopPulse()
         }
     }

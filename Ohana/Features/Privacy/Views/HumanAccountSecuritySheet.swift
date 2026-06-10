@@ -21,7 +21,7 @@ struct HumanAccountSecuritySheet: View {
     }
 
     private var privateCount: Int {
-        HumanPrivateField.allCases.filter { human.privateFields.contains($0.rawValue) }.count
+        HumanPrivateField.allCases.count(where: { human.privateFields.contains($0.rawValue) })
     }
 
     var body: some View {
@@ -75,7 +75,7 @@ struct HumanAccountSecuritySheet: View {
                     .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(hasPasscode ? Color.goYellow : Color.goPrimary)
                     .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background((hasPasscode ? Color.goYellow : Color.goPrimary).opacity(0.14), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .background((hasPasscode ? Color.goYellow : Color.goPrimary).opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text("账户密码")
                         .font(OhanaFont.callout(.black))
@@ -101,12 +101,12 @@ struct HumanAccountSecuritySheet: View {
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     private var privacyCard: some View {
@@ -150,7 +150,7 @@ struct HumanAccountSecuritySheet: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     private func privacyToggleRow(_ field: HumanPrivateField) -> some View {
@@ -171,7 +171,7 @@ struct HumanAccountSecuritySheet: View {
                     .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow)
                     .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(field.title)
                         .font(OhanaFont.callout(.black))
@@ -207,12 +207,12 @@ struct HumanAccountSecuritySheet: View {
 
     private func icon(for field: HumanPrivateField) -> String {
         switch field {
-        case .weight: return "scalemass.fill"
-        case .workout: return "figure.run"
-        case .medication: return "pills.fill"
-        case .wishlist: return "gift.fill"
-        case .expense: return "creditcard.fill"
-        case .note: return "note.text"
+        case .weight: "scalemass.fill"
+        case .workout: "figure.run"
+        case .medication: "pills.fill"
+        case .wishlist: "gift.fill"
+        case .expense: "creditcard.fill"
+        case .note: "note.text"
         }
     }
 
@@ -220,5 +220,4 @@ struct HumanAccountSecuritySheet: View {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty ? "未命名成员" : name
     }
-
 }

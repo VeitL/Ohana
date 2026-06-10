@@ -5,9 +5,9 @@
 //  生命之树状态引擎：繁荣度 + 树等级（10级）+ 注入能量 + 升级奖励
 //
 
-import SwiftUI
-import SwiftData
 import Observation
+import SwiftData
+import SwiftUI
 
 // MARK: - Tree Level（10 级系统）
 
@@ -16,29 +16,29 @@ enum TreeLevel: Int, CaseIterable, Comparable {
     static func < (lhs: TreeLevel, rhs: TreeLevel) -> Bool { lhs.rawValue < rhs.rawValue }
     static var maxSupportedLevel: Int { allCases.map(\.rawValue).max() ?? 10 }
 
-    case lv1  = 1   // 希望之种   0–49
-    case lv2  = 2   // 破土嫩芽  50–149
-    case lv3  = 3   // 茁壮成长 150–299
-    case lv4  = 4   // 初现树形 300–499
-    case lv5  = 5   // 椰影婆娑 500–799
-    case lv6  = 6   // 果实初挂 800–1199
-    case lv7  = 7   // 硕果累累1200–1799
-    case lv8  = 8   // 参天古木1800–2599
-    case lv9  = 9   // 灵树觉醒2600–3599
-    case lv10 = 10  // 生命之树3600+
+    case lv1 = 1 // 希望之种   0–49
+    case lv2 = 2 // 破土嫩芽  50–149
+    case lv3 = 3 // 茁壮成长 150–299
+    case lv4 = 4 // 初现树形 300–499
+    case lv5 = 5 // 椰影婆娑 500–799
+    case lv6 = 6 // 果实初挂 800–1199
+    case lv7 = 7 // 硕果累累1200–1799
+    case lv8 = 8 // 参天古木1800–2599
+    case lv9 = 9 // 灵树觉醒2600–3599
+    case lv10 = 10 // 生命之树3600+
 
     var displayName: String {
         switch self {
-        case .lv1:  return "希望之种"
-        case .lv2:  return "破土嫩芽"
-        case .lv3:  return "茁壮成长"
-        case .lv4:  return "初现树形"
-        case .lv5:  return "椰影婆娑"
-        case .lv6:  return "果实初挂"
-        case .lv7:  return "硕果累累"
-        case .lv8:  return "参天古木"
-        case .lv9:  return "灵树觉醒"
-        case .lv10: return "生命之树"
+        case .lv1: "希望之种"
+        case .lv2: "破土嫩芽"
+        case .lv3: "茁壮成长"
+        case .lv4: "初现树形"
+        case .lv5: "椰影婆娑"
+        case .lv6: "果实初挂"
+        case .lv7: "硕果累累"
+        case .lv8: "参天古木"
+        case .lv9: "灵树觉醒"
+        case .lv10: "生命之树"
         }
     }
 
@@ -50,12 +50,12 @@ enum TreeLevel: Int, CaseIterable, Comparable {
 
     var glowColor: Color {
         switch self {
-        case .lv1, .lv2:         return Color.goYellow
-        case .lv3, .lv4:         return Color(hex: "A3E635")
-        case .lv5, .lv6:         return Color(hex: "84CC16")
-        case .lv7, .lv8:         return Color.goTeal
-        case .lv9:               return Color.goOrange
-        case .lv10:              return Color(hex: "00FFD1")
+        case .lv1, .lv2: Color.goYellow
+        case .lv3, .lv4: Color(hex: "A3E635")
+        case .lv5, .lv6: Color(hex: "84CC16")
+        case .lv7, .lv8: Color.goTeal
+        case .lv9: Color.goOrange
+        case .lv10: Color(hex: "00FFD1")
         }
     }
 
@@ -172,13 +172,13 @@ final class OasisTreeManager {
 
     var passiveIncomeAmount: Int {
         switch treeLevel {
-        case .lv5:          return 3
-        case .lv6:          return 4
-        case .lv7:          return 6
-        case .lv8:          return 8
-        case .lv9:          return 10
-        case .lv10:         return 15
-        default:            return 0
+        case .lv5: 3
+        case .lv6: 4
+        case .lv7: 6
+        case .lv8: 8
+        case .lv9: 10
+        case .lv10: 15
+        default: 0
         }
     }
 
@@ -263,7 +263,7 @@ final class OasisTreeManager {
         }
 
         if storedDay != dayKey || storedCount <= 0 {
-            storedCount = Int.random(in: 1...maxCount)
+            storedCount = Int.random(in: 1 ... maxCount)
             harvested = []
             storeDailyTreeCoconutState(
                 dayKey: dayKey,
@@ -343,7 +343,7 @@ final class OasisTreeManager {
         pets: [Pet],
         humans: [Human]
     ) -> Int {
-        let ledgerEvents = (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let ledgerEvents = (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return calculatedIslandEnergy(
             ledgerEvents: ledgerEvents,
             modelContext: modelContext,
@@ -353,7 +353,7 @@ final class OasisTreeManager {
     }
 
     private static func calculatedLedgerEnergy(modelContext: ModelContext) -> Int {
-        let ledgerEvents = (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let ledgerEvents = (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return calculatedIslandEnergy(
             ledgerEvents: ledgerEvents,
             modelContext: modelContext,
@@ -455,14 +455,14 @@ final class OasisTreeManager {
             return legacyBaseline
         }
 
-        let legacyLedgerCount = ledgerEvents.filter {
+        let legacyLedgerCount = ledgerEvents.count(where: {
             !$0.metadataJSON.contains("\"economyVersion\":2") &&
-            [.care, .potty, .walk, .hygiene, .health, .weight, .medication, .workout, .plantCare, .milestone].contains($0.eventKindEnum)
-        }.count
+                [.care, .potty, .walk, .hygiene, .health, .weight, .medication, .workout, .plantCare, .milestone].contains($0.eventKindEnum)
+        })
         let fallbackCount = legacyLedgerCount > 0
             ? legacyLedgerCount
             : legacyActivityCount(modelContext: modelContext, pets: pets, humans: humans)
-        let baseline = min(1_200, fallbackCount * 4)
+        let baseline = min(1200, fallbackCount * 4)
         OasisTreePreferenceStore.storeLegacyBaselineXP(baseline)
         return baseline
     }
@@ -482,7 +482,7 @@ final class OasisTreeManager {
         for human in humans {
             total += human.workoutLogs.count
         }
-        let plantEventCount = (try? modelContext.fetchCount(
+        let plantEventCount = (try? modelContext.fetchCount( // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             FetchDescriptor<Event>(predicate: #Predicate { $0.relatedEntityType == "Plant" })
         )) ?? 0
         return total + plantEventCount

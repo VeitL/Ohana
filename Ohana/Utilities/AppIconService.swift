@@ -9,9 +9,9 @@ enum AppIconService {
         var errorDescription: String? {
             switch self {
             case .unsupported:
-                return "This device does not support changing the app icon inside the app."
-            case .system(let error):
-                return error.localizedDescription
+                "This device does not support changing the app icon inside the app."
+            case let .system(error):
+                error.localizedDescription
             }
         }
     }

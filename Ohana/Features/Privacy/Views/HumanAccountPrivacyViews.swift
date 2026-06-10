@@ -5,15 +5,15 @@
 //  Local account switching, passcode management, and privacy test helpers.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct HumanAccountSwitcherSheet: View {
     let humans: [Human]
-    var homePets: [Pet]? = nil
-    var homeHumans: [Human]? = nil
-    var homeElectronicPets: [OasisElectronicPet]? = nil
-    var onSwitched: (() -> Void)? = nil
+    var homePets: [Pet]?
+    var homeHumans: [Human]?
+    var homeElectronicPets: [OasisElectronicPet]?
+    var onSwitched: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -37,9 +37,9 @@ struct HumanAccountSwitcherSheet: View {
         var prompt: String {
             switch self {
             case .switchAccount:
-                return "验证通过后会切换到该账户"
+                "验证通过后会切换到该账户"
             case .manageSecurity:
-                return "验证通过后打开密码与隐私设置"
+                "验证通过后打开密码与隐私设置"
             }
         }
     }
@@ -84,7 +84,7 @@ struct HumanAccountSwitcherSheet: View {
                 .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text("切换人类账户")
                     .font(OhanaFont.title3(.black))
@@ -124,7 +124,7 @@ struct HumanAccountSwitcherSheet: View {
                 lockButton(for: activeHuman)
             }
             .padding(14)
-            .goTranslucentCard(cornerRadius: 18)
+            .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
         }
     }
 
@@ -165,9 +165,9 @@ struct HumanAccountSwitcherSheet: View {
             lockButton(for: human)
         }
         .padding(13)
-        .background(pendingHuman?.id == human.id ? Color.goPrimary.opacity(0.16) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .background(pendingHuman?.id == human.id ? Color.goPrimary.opacity(0.16) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                 .strokeBorder(pendingHuman?.id == human.id ? Color.goPrimary.opacity(0.44) : Color.clear, lineWidth: 1)
         }
     }
@@ -206,7 +206,7 @@ struct HumanAccountSwitcherSheet: View {
                 .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(appServices.passcodes.hasPasscode(human) ? Color.goYellow : Color.ohanaTertiaryText)
                 .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel("密码与隐私")
@@ -232,9 +232,9 @@ struct HumanAccountSwitcherSheet: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -295,12 +295,12 @@ struct HumanAccountSwitcherSheet: View {
         switch HumanPrivacyCommandExecutor(context: modelContext, services: appServices).verifyPasscode(pin, for: human, now: now) {
         case .success:
             completePendingAccess(for: human)
-        case .incorrect(let remaining):
+        case let .incorrect(remaining):
             pin = ""
             isError = true
             statusMessage = "密码不正确，还可尝试 \(remaining) 次"
             UINotificationFeedbackGenerator().notificationOccurred(.error)
-        case .locked(let until):
+        case let .locked(until):
             pin = ""
             isError = true
             statusMessage = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"

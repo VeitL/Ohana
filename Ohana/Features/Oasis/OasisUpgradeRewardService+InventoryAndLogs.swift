@@ -8,13 +8,13 @@ import SwiftData
 
 extension OasisUpgradeRewardService {
     static func ownsCritter(_ catalogId: String, context: ModelContext) -> Bool {
-        let all = (try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []
+        let all = (try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return all.contains { $0.catalogId == catalogId && !$0.isArchived }
     }
 
     static func addFragments(critterId: String, amount: Int, context: ModelContext) {
         guard amount > 0 else { return }
-        let balances = (try? context.fetch(FetchDescriptor<OasisCritterFragmentBalance>())) ?? []
+        let balances = (try? context.fetch(FetchDescriptor<OasisCritterFragmentBalance>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         if let balance = balances.first(where: { $0.catalogId == critterId }) {
             balance.amount += amount
             balance.updatedAt = Date()
@@ -24,12 +24,12 @@ extension OasisUpgradeRewardService {
     }
 
     static func fragmentBalance(critterId: String, context: ModelContext) -> OasisCritterFragmentBalance? {
-        let balances = (try? context.fetch(FetchDescriptor<OasisCritterFragmentBalance>())) ?? []
+        let balances = (try? context.fetch(FetchDescriptor<OasisCritterFragmentBalance>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return balances.first { $0.catalogId == critterId }
     }
 
     static func unlock(id: String, kind: OasisUpgradeRewardKind, sourceLevel: Int, context: ModelContext) {
-        let unlocks = (try? context.fetch(FetchDescriptor<OasisUnlock>())) ?? []
+        let unlocks = (try? context.fetch(FetchDescriptor<OasisUnlock>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         guard !unlocks.contains(where: { $0.unlockId == id && $0.unlockKindRaw == kind.rawValue }) else { return }
         context.insert(OasisUnlock(unlockId: id, unlockKind: kind, sourceLevel: sourceLevel))
     }
@@ -37,7 +37,7 @@ extension OasisUpgradeRewardService {
     static func dailyWish(for action: OasisCritterAction) -> OasisCritterDailyWish {
         switch action {
         case .feed:
-            return OasisCritterDailyWish(
+            OasisCritterDailyWish(
                 id: "daily_feed",
                 action: .feed,
                 icon: "fork.knife",
@@ -53,7 +53,7 @@ extension OasisUpgradeRewardService {
                 rewardCoconuts: 3
             )
         case .play:
-            return OasisCritterDailyWish(
+            OasisCritterDailyWish(
                 id: "daily_play",
                 action: .play,
                 icon: "sparkles",
@@ -69,7 +69,7 @@ extension OasisUpgradeRewardService {
                 rewardCoconuts: 3
             )
         case .rest:
-            return OasisCritterDailyWish(
+            OasisCritterDailyWish(
                 id: "daily_rest",
                 action: .rest,
                 icon: "moon.fill",
@@ -85,7 +85,7 @@ extension OasisUpgradeRewardService {
                 rewardCoconuts: 3
             )
         case .rescue:
-            return OasisCritterDailyWish(
+            OasisCritterDailyWish(
                 id: "daily_rescue",
                 action: .rescue,
                 icon: "cross.case.fill",
@@ -101,7 +101,7 @@ extension OasisUpgradeRewardService {
                 rewardCoconuts: 0
             )
         case .levelUpgrade, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
-            return dailyWish(for: .play)
+            dailyWish(for: .play)
         }
     }
 
@@ -180,18 +180,17 @@ extension OasisUpgradeRewardService {
             )
         }
 
-        let message: (zh: String, en: String, de: String)
-        switch action {
+        let message: (zh: String, en: String, de: String) = switch action {
         case .feed:
-            message = ("它抱着小碗眯起眼，精神多了一点。", "It hugs the little bowl and perks up.", "Es umarmt die kleine Schale und wirkt munterer.")
+            ("它抱着小碗眯起眼，精神多了一点。", "It hugs the little bowl and perks up.", "Es umarmt die kleine Schale und wirkt munterer.")
         case .play:
-            message = ("它追着小星星转了一圈，心情亮起来。", "It chases a tiny star and brightens up.", "Es jagt einen kleinen Stern und strahlt mehr.")
+            ("它追着小星星转了一圈，心情亮起来。", "It chases a tiny star and brightens up.", "Es jagt einen kleinen Stern und strahlt mehr.")
         case .rest:
-            message = ("它缩进小窝，睡出一朵软软的梦。", "It curls into the nest and dreams softly.", "Es rollt sich im Nest ein und träumt sanft.")
+            ("它缩进小窝，睡出一朵软软的梦。", "It curls into the nest and dreams softly.", "Es rollt sich im Nest ein und träumt sanft.")
         case .rescue:
-            message = ("你轻轻照顾了一下，它从椰壳里探出头。", "You gave gentle care, and it peeks out.", "Du hast sanft geholfen, und es schaut heraus.")
+            ("你轻轻照顾了一下，它从椰壳里探出头。", "You gave gentle care, and it peeks out.", "Du hast sanft geholfen, und es schaut heraus.")
         case .levelUpgrade, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
-            message = ("互动完成。", "Interaction complete.", "Interaktion abgeschlossen.")
+            ("互动完成。", "Interaction complete.", "Interaktion abgeschlossen.")
         }
         return OasisCritterInteractionOutcome(
             success: true,
@@ -226,15 +225,14 @@ extension OasisUpgradeRewardService {
             )
         }
 
-        let emoji: String
-        switch coconut.rewardKind {
-        case .electronicPet: emoji = OasisUpgradeRewardCatalog.critter(id: coconut.guaranteedCritterId ?? "")?.emoji ?? "✨"
-        case .decoration: emoji = "🪴"
-        case .fragments: emoji = "◇"
-        case .storyStyle: emoji = "📖"
-        case .treeEnergy: emoji = "⚡"
-        case .temporaryEffect: emoji = "✦"
-        case .coconuts: emoji = "🥥"
+        let emoji: String = switch coconut.rewardKind {
+        case .electronicPet: OasisUpgradeRewardCatalog.critter(id: coconut.guaranteedCritterId ?? "")?.emoji ?? "✨"
+        case .decoration: "🪴"
+        case .fragments: "◇"
+        case .storyStyle: "📖"
+        case .treeEnergy: "⚡"
+        case .temporaryEffect: "✦"
+        case .coconuts: "🥥"
         }
         return OasisOpenedUpgradeReward(
             level: coconut.level,
@@ -258,30 +256,29 @@ extension OasisUpgradeRewardService {
         fragmentDelta: Int = 0,
         xpDelta: Int = 0
     ) -> OasisCritterActionLog {
-        let note: (zh: String, en: String, de: String)
-        switch action {
+        let note: (zh: String, en: String, de: String) = switch action {
         case .feed:
-            note = ("喂养伙伴", "Fed companion", "Begleiter gefüttert")
+            ("喂养伙伴", "Fed companion", "Begleiter gefüttert")
         case .play:
-            note = ("陪伙伴玩耍", "Played with companion", "Mit Begleiter gespielt")
+            ("陪伙伴玩耍", "Played with companion", "Mit Begleiter gespielt")
         case .rest:
-            note = ("伙伴休息", "Companion rested", "Begleiter hat geruht")
+            ("伙伴休息", "Companion rested", "Begleiter hat geruht")
         case .rescue:
-            note = ("温柔救回伙伴", "Gently rescued companion", "Begleiter sanft gerettet")
+            ("温柔救回伙伴", "Gently rescued companion", "Begleiter sanft gerettet")
         case .levelUpgrade:
-            note = ("伙伴升级", "Companion level up", "Begleiter-Levelaufstieg")
+            ("伙伴升级", "Companion level up", "Begleiter-Levelaufstieg")
         case .starUpgrade:
-            note = ("伙伴升星", "Companion star upgrade", "Begleiter-Sternupgrade")
+            ("伙伴升星", "Companion star upgrade", "Begleiter-Sternupgrade")
         case .unlock:
-            note = ("伙伴解锁", "Companion unlocked", "Begleiter freigeschaltet")
+            ("伙伴解锁", "Companion unlocked", "Begleiter freigeschaltet")
         case .fragmentAwaken:
-            note = ("碎片唤醒", "Fragment awakening", "Fragment-Weckung")
+            ("碎片唤醒", "Fragment awakening", "Fragment-Weckung")
         case .feature:
-            note = ("设为主页展示", "Featured on home", "Auf Start gezeigt")
+            ("设为主页展示", "Featured on home", "Auf Start gezeigt")
         case .careEcho:
-            note = ("照护共鸣", "Care echo", "Pflege-Echo")
+            ("照护共鸣", "Care echo", "Pflege-Echo")
         case .death:
-            note = ("伙伴进入纪念册", "Companion entered the memorial album", "Begleiter kam ins Erinnerungsalbum")
+            ("伙伴进入纪念册", "Companion entered the memorial album", "Begleiter kam ins Erinnerungsalbum")
         }
         return OasisCritterActionLog(
             critterId: critter.id,

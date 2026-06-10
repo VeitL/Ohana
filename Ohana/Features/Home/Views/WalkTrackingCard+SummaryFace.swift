@@ -3,9 +3,9 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
 import MapKit
+import SwiftData
+import SwiftUI
 
 extension WalkTrackingCard {
     // MARK: - Finished Back Face
@@ -52,9 +52,9 @@ extension WalkTrackingCard {
             summaryRouteMap(walk: walk)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(false)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                         .strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 1)
                 }
                 .clipped()
@@ -100,14 +100,14 @@ extension WalkTrackingCard {
 
     var summaryCloseButton: some View {
         Button { closeSummaryBack() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goCardWhite)
-                    .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.arkInk.opacity(0.42), in: Circle())
-                    .overlay {
-                        Circle().strokeBorder(Color.goCardWhite.opacity(0.18), lineWidth: 1)
-                    }
+            Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
+                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .foregroundStyle(Color.goCardWhite)
+                .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                .background(Color.arkInk.opacity(0.42), in: Circle())
+                .overlay {
+                    Circle().strokeBorder(Color.goCardWhite.opacity(0.18), lineWidth: 1)
+                }
         }
         .frame(width: 44, height: 44)
         .contentShape(Circle())
@@ -159,7 +159,7 @@ extension WalkTrackingCard {
                 title: coords.count >= 2 ? "本次轨迹" : "本次定位"
             )
         } else {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                 .fill(Color.goCardWhite.opacity(0.08))
                 .overlay {
                     VStack(spacing: 5) {
@@ -176,7 +176,7 @@ extension WalkTrackingCard {
     }
 
     @ViewBuilder
-    func summaryGoalOverlay(distance: Double) -> some View {
+    func summaryGoalOverlay(distance _: Double) -> some View {
         if pet.weeklyWalkGoalKm > 0 {
             let progress = weeklyProgress
             goalOverlayContainer {
@@ -218,13 +218,13 @@ extension WalkTrackingCard {
         }
     }
 
-    func goalOverlayContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    func goalOverlayContainer(@ViewBuilder content: () -> some View) -> some View {
         content()
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(Color.arkInk.opacity(0.48), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.arkInk.opacity(0.48), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .strokeBorder(Color.goCardWhite.opacity(0.16), lineWidth: 1)
             }
     }
@@ -330,12 +330,12 @@ extension WalkTrackingCard {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 showingGoalSetter = false
             } label: {
-                    Text(goalDraft == 0 ? "清除目标" : "保存目标")
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.arkInk)
+                Text(goalDraft == 0 ? "清除目标" : "保存目标")
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
             }
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 24)
@@ -357,7 +357,7 @@ extension WalkTrackingCard {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 9)
-        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.goCardWhite.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     var latestWalk: PetWalkLog? {
@@ -365,14 +365,14 @@ extension WalkTrackingCard {
     }
 
     var finishedElapsed: TimeInterval {
-        if case .finished(let elapsed, _) = mgr.phase, mgr.currentPet?.id == pet.id {
+        if case let .finished(elapsed, _) = mgr.phase, mgr.currentPet?.id == pet.id {
             return elapsed
         }
         return latestWalk?.durationSeconds ?? 0
     }
 
     var finishedPoopCount: Int {
-        if case .finished(_, let poopCount) = mgr.phase, mgr.currentPet?.id == pet.id {
+        if case let .finished(_, poopCount) = mgr.phase, mgr.currentPet?.id == pet.id {
             return poopCount
         }
         return mgr.poopCount
@@ -402,7 +402,7 @@ extension WalkTrackingCard {
         var result: [CLLocationCoordinate2D] = []
         result.reserveCapacity(maxCount)
         var lastIndex = -1
-        for i in 0..<maxCount {
+        for i in 0 ..< maxCount {
             let index = min(locations.count - 1, Int((Double(i) * step).rounded()))
             if index != lastIndex {
                 result.append(locations[index].coordinate)

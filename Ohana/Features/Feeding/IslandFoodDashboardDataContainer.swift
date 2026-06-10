@@ -10,7 +10,7 @@ import SwiftUI
 
 struct IslandFoodDashboard: View {
     var standalone: Bool = true
-    var onOpenPet: ((Pet) -> Void)? = nil
+    var onOpenPet: ((Pet) -> Void)?
 
     @Query(sort: \Pet.name) private var pets: [Pet]
     @Query(sort: \Event.startDate) private var allEvents: [Event]

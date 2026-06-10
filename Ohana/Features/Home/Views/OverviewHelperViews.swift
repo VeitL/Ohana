@@ -5,8 +5,8 @@
 //  首页辅助视图组件
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Floating Dock Nav（iOS 26 Liquid Glass + GlassEffectContainer morphing）
 struct FloatingDockNav: View {
@@ -26,7 +26,7 @@ struct FloatingDockNav: View {
             ("house.fill", l.tabHome, 0),
             ("camera.macro", l.tabPlant, 1),
             ("calendar", l.tabCalendar, 2),
-            ("leaf.fill", l.tabOasis, 3),
+            ("leaf.fill", l.tabOasis, 3)
         ]
     }
 
@@ -65,7 +65,7 @@ struct FloatingDockNav: View {
             }
         }
         .padding(.horizontal, 8)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
         .padding(.horizontal, 32)
     }
 }
@@ -83,7 +83,7 @@ struct CompactTaskRow: View {
             Text(reminder.event?.emoji ?? "📌")
                 .font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 8))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.icon))
             VStack(alignment: .leading, spacing: 1) {
                 Text(reminder.event?.title ?? "提醒")
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -140,7 +140,7 @@ struct CompactTaskRow: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color.ohanaControlFill.opacity(isDone ? 0.55 : 1.0), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill.opacity(isDone ? 0.55 : 1.0), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .animation(GoMotion.feedback, value: isDone)
     }
 }
@@ -158,6 +158,7 @@ struct SwipeableReminderCard: View {
     private var tiltAngle: Angle {
         .degrees(Double(max(-300, min(300, dragX))) / 300.0 * 8.0)
     }
+
     private var actionColor: Color {
         if dragX > 40 { return Color.goTeal }
         if dragX < -40 { return Color.goOrange }
@@ -191,7 +192,7 @@ struct SwipeableReminderCard: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(actionColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(actionColor, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             .opacity(min(1.0, Double(abs(dragX)) / 60.0))
 
             HStack(spacing: 12) {
@@ -211,7 +212,7 @@ struct SwipeableReminderCard: View {
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(14)
-            .goCard(color: Color.ohanaCardSurface, cornerRadius: 16)
+            .goCard(color: Color.ohanaCardSurface, cornerRadius: OhanaRadius.control)
             .offset(x: dragX)
             .rotationEffect(tiltAngle, anchor: UnitPoint(x: 0.5, y: 1.0))
             .gesture(
@@ -338,7 +339,7 @@ struct PlantGardenCard: View {
             }
             .frame(width: 92)
             .padding(.vertical, 12)
-            .goTranslucentCard(cornerRadius: 18)
+            .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -431,10 +432,10 @@ struct HomeSectionManageSheet: View {
                         .padding(.vertical, 6)
                         .padding(.horizontal, 4)
                         .listRowBackground(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                                 .fill(Color.goDarkBlue.opacity(0.6))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                                         .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
                                 )
                                 .padding(.vertical, 3)
@@ -463,7 +464,7 @@ struct HomeSectionManageSheet: View {
             let insertIdx = order.firstIndex(where: { legacyGroup.contains($0) }) ?? 0
             order.removeAll { legacyGroup.contains($0) }
             if !order.contains("batchCheckIn") { order.insert("batchCheckIn", at: min(insertIdx + 1, order.count)) }
-            if !order.contains("quickActions") { order.insert("quickActions",  at: min(insertIdx,     order.count)) }
+            if !order.contains("quickActions") { order.insert("quickActions", at: min(insertIdx, order.count)) }
             sectionOrderRaw = order.joined(separator: ",")
         }
         // Also drop old batchCheckIn if it was already there separately (dedup)
@@ -472,8 +473,13 @@ struct HomeSectionManageSheet: View {
         let hidden = Set(hiddenRaw.split(separator: ",").map(String.init))
         let allSections = HomeSectionEntry.defaults
         var sorted: [HomeSectionEntry] = order.compactMap { id in allSections.first(where: { $0.id == id }) }
-        for s in allSections where !sorted.contains(where: { $0.id == s.id }) { sorted.append(s) }
-        sections = sorted.map { var s = $0; s.isVisible = !hidden.contains(s.id) && !hidden.contains("todayActions"); return s }
+        for s in allSections where !sorted.contains(where: { $0.id == s.id }) {
+            sorted.append(s)
+        }
+        sections = sorted.map { var s = $0
+            s.isVisible = !hidden.contains(s.id) && !hidden.contains("todayActions")
+            return s
+        }
     }
 
     private func saveState() {
@@ -492,13 +498,13 @@ struct HomeSectionEntry: Identifiable {
     var isVisible: Bool = true
 
     static let defaults: [HomeSectionEntry] = [
-        HomeSectionEntry(id: "islandHeader",    title: "岛屿天气胶囊",  subtitle: "首页顶部 60pt 天气/情绪/负反馈汇总",       icon: "cloud.sun.fill",         colorHex: "FFD93D"),
-        HomeSectionEntry(id: "familyStripMini", title: "家庭活动胶囊",  subtitle: "宠物卡下方 Mini 家人活动条，点击展开",     icon: "person.2.fill",          colorHex: "8E6DFF"),
-        HomeSectionEntry(id: "todayFocus",      title: "今日聚焦",     subtitle: "智能推送当前最该做的事情（单卡）",          icon: "sparkles",               colorHex: "FF8C42"),
-        HomeSectionEntry(id: "quickActions",    title: "快捷操作",     subtitle: "按宠物物种自定义的快捷打卡卡片网格",        icon: "bolt.fill",              colorHex: "FF8C42"),
-        HomeSectionEntry(id: "batchCheckIn",    title: "一键打卡",     subtitle: "多宠物同时喂食/喂水，一键全员打卡",         icon: "checkmark.circle.fill",  colorHex: "34C759"),
-        HomeSectionEntry(id: "memoryDrop",      title: "记忆碎片",     subtitle: "折叠到更多区 · 回忆片段",                icon: "heart.text.square.fill", colorHex: "FF6B9D"),
-        HomeSectionEntry(id: "islandStats",     title: "岛屿统计",     subtitle: "折叠到更多区 · 体重/步数/花费/粮仓",      icon: "chart.bar.fill",         colorHex: "00D4AA"),
+        HomeSectionEntry(id: "islandHeader", title: "岛屿天气胶囊", subtitle: "首页顶部 60pt 天气/情绪/负反馈汇总", icon: "cloud.sun.fill", colorHex: "FFD93D"),
+        HomeSectionEntry(id: "familyStripMini", title: "家庭活动胶囊", subtitle: "宠物卡下方 Mini 家人活动条，点击展开", icon: "person.2.fill", colorHex: "8E6DFF"),
+        HomeSectionEntry(id: "todayFocus", title: "今日聚焦", subtitle: "智能推送当前最该做的事情（单卡）", icon: "sparkles", colorHex: "FF8C42"),
+        HomeSectionEntry(id: "quickActions", title: "快捷操作", subtitle: "按宠物物种自定义的快捷打卡卡片网格", icon: "bolt.fill", colorHex: "FF8C42"),
+        HomeSectionEntry(id: "batchCheckIn", title: "一键打卡", subtitle: "多宠物同时喂食/喂水，一键全员打卡", icon: "checkmark.circle.fill", colorHex: "34C759"),
+        HomeSectionEntry(id: "memoryDrop", title: "记忆碎片", subtitle: "折叠到更多区 · 回忆片段", icon: "heart.text.square.fill", colorHex: "FF6B9D"),
+        HomeSectionEntry(id: "islandStats", title: "岛屿统计", subtitle: "折叠到更多区 · 体重/步数/花费/粮仓", icon: "chart.bar.fill", colorHex: "00D4AA")
     ]
 }
 
@@ -538,8 +544,8 @@ struct BentoStatCard: View {
             }
             if showMiniBar > 0 || barMax > 0 && showMiniBar >= 0 {
                 HStack(spacing: 3) {
-                    ForEach(0..<min(7, barMax), id: \.self) { i in
-                        RoundedRectangle(cornerRadius: 2)
+                    ForEach(0 ..< min(7, barMax), id: \.self) { i in
+                        RoundedRectangle(cornerRadius: OhanaRadius.hairline)
                             .fill(i < showMiniBar ? accentColor : accentColor.opacity(0.18))
                             .frame(width: 6, height: i < showMiniBar ? 14 : 8)
                     }
@@ -558,7 +564,7 @@ struct BentoStatCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(height: 130)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 }
 
@@ -661,8 +667,8 @@ struct AllPetsFoodOverviewSheet: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.ohanaGlassStroke, lineWidth: 0.5))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control))
+            .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control).stroke(Color.ohanaGlassStroke, lineWidth: 0.5))
         }
         .buttonStyle(ScaleButtonStyle())
     }

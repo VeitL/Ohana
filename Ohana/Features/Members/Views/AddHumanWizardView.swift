@@ -9,8 +9,8 @@ import SwiftUI
 
 struct AddHumanWizardContentView: View {
     let onComplete: () -> Void
-    var onCancel: (() -> Void)? = nil
-    var onHumanSaved: ((Human) -> Void)? = nil
+    var onCancel: (() -> Void)?
+    var onHumanSaved: ((Human) -> Void)?
 
     @State private var memberCreationSessionId = UUID()
 

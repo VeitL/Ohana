@@ -19,13 +19,13 @@ struct FeatureGroupDashboardView: View {
     @State private var selectedItemID: String?
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome } }
+    private var visibleHumans: [Human] { humans.filter(\.shouldShowOnHome) }
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
 
     private var hasDogs: Bool {
         activePets.contains {
             $0.species.localizedCaseInsensitiveContains("狗") ||
-            $0.species.localizedCaseInsensitiveContains("dog")
+                $0.species.localizedCaseInsensitiveContains("dog")
         }
     }
 
@@ -56,7 +56,7 @@ struct FeatureGroupDashboardView: View {
     var body: some View {
         ZStack {
             OhanaAppBackground()
-            .ignoresSafeArea()
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 pageHeader
@@ -151,7 +151,7 @@ struct FeatureGroupDashboardView: View {
     @ViewBuilder
     private func allowedContent(for item: FeatureGroupItem) -> some View {
         switch item.destination {
-        case .featureAggregate(let feature):
+        case let .featureAggregate(feature):
             FeatureAggregateView(
                 feature: feature,
                 parentPath: $parentPath,

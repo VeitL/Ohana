@@ -19,29 +19,29 @@ enum MotionPreviewCategory: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .number: return "number"
-        case .progress: return "chart.bar.fill"
-        case .chart: return "chart.line.uptrend.xyaxis"
-        case .switching: return "person.2.fill"
-        case .sheetOpen: return "rectangle.bottomthird.inset.filled"
-        case .sheetContent: return "list.bullet.rectangle"
+        case .number: "number"
+        case .progress: "chart.bar.fill"
+        case .chart: "chart.line.uptrend.xyaxis"
+        case .switching: "person.2.fill"
+        case .sheetOpen: "rectangle.bottomthird.inset.filled"
+        case .sheetContent: "list.bullet.rectangle"
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
         case .number:
-            return l.tr(zh: "数字", en: "Numbers", de: "Zahlen")
+            l.tr(zh: "数字", en: "Numbers", de: "Zahlen")
         case .progress:
-            return l.tr(zh: "进度条", en: "Progress", de: "Fortschritt")
+            l.tr(zh: "进度条", en: "Progress", de: "Fortschritt")
         case .chart:
-            return l.tr(zh: "Chart", en: "Chart", de: "Chart")
+            l.tr(zh: "Chart", en: "Chart", de: "Chart")
         case .switching:
-            return l.tr(zh: "切换", en: "Switching", de: "Wechsel")
+            l.tr(zh: "切换", en: "Switching", de: "Wechsel")
         case .sheetOpen:
-            return l.tr(zh: "Sheet 打开", en: "Sheet Opening", de: "Sheet-Oeffnung")
+            l.tr(zh: "Sheet 打开", en: "Sheet Opening", de: "Sheet-Oeffnung")
         case .sheetContent:
-            return l.tr(zh: "Sheet 内容加载", en: "Sheet Content Loading", de: "Sheet-Inhaltsladen")
+            l.tr(zh: "Sheet 内容加载", en: "Sheet Content Loading", de: "Sheet-Inhaltsladen")
         }
     }
 }
@@ -55,312 +55,312 @@ enum MotionPreviewSystem: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .flow: return "water.waves"
-        case .capsule: return "circle.hexagongrid.fill"
-        case .signal: return "sparkles"
+        case .flow: "water.waves"
+        case .capsule: "circle.hexagongrid.fill"
+        case .signal: "sparkles"
         }
     }
 
     var numberScale: CGFloat {
         switch self {
-        case .flow: return 1.035
-        case .capsule: return 1.105
-        case .signal: return 1.12
+        case .flow: 1.035
+        case .capsule: 1.105
+        case .signal: 1.12
         }
     }
 
     var secondaryNumberScale: CGFloat {
         switch self {
-        case .flow: return 1.012
-        case .capsule: return 1.035
-        case .signal: return 1.045
+        case .flow: 1.012
+        case .capsule: 1.035
+        case .signal: 1.045
         }
     }
 
     var numberDeltaOffset: CGFloat {
         switch self {
-        case .flow: return -18
-        case .capsule: return -23
-        case .signal: return -28
+        case .flow: -18
+        case .capsule: -23
+        case .signal: -28
         }
     }
 
     var numberSettleDelay: Double {
         switch self {
-        case .flow: return 0.18
-        case .capsule: return 0.24
-        case .signal: return 0.30
+        case .flow: 0.18
+        case .capsule: 0.24
+        case .signal: 0.30
         }
     }
 
     var numberDeltaLife: Double {
         switch self {
-        case .flow: return 0.82
-        case .capsule: return 1.05
-        case .signal: return 1.14
+        case .flow: 0.82
+        case .capsule: 1.05
+        case .signal: 1.14
         }
     }
 
     var progressStep: Double {
         switch self {
-        case .flow: return 0.14
-        case .capsule: return 0.18
-        case .signal: return 0.22
+        case .flow: 0.14
+        case .capsule: 0.18
+        case .signal: 0.22
         }
     }
 
     var progressLabelScale: CGFloat {
         switch self {
-        case .flow: return 1.01
-        case .capsule: return 1.035
-        case .signal: return 1.05
+        case .flow: 1.01
+        case .capsule: 1.035
+        case .signal: 1.05
         }
     }
 
     var progressCapScale: CGFloat {
         switch self {
-        case .flow: return 1.08
-        case .capsule: return 1.20
-        case .signal: return 1.30
+        case .flow: 1.08
+        case .capsule: 1.20
+        case .signal: 1.30
         }
     }
 
     var progressCapOpacity: Double {
         switch self {
-        case .flow: return 0.38
-        case .capsule: return 0.62
-        case .signal: return 0.74
+        case .flow: 0.38
+        case .capsule: 0.62
+        case .signal: 0.74
         }
     }
 
     var progressStagger: Double {
         switch self {
-        case .flow: return 0.012
-        case .capsule: return 0.026
-        case .signal: return 0.038
+        case .flow: 0.012
+        case .capsule: 0.026
+        case .signal: 0.038
         }
     }
 
     var progressPulseLife: Double {
         switch self {
-        case .flow: return 0.16
-        case .capsule: return 0.22
-        case .signal: return 0.26
+        case .flow: 0.16
+        case .capsule: 0.22
+        case .signal: 0.26
         }
     }
 
     var chartAreaStartScale: CGFloat {
         switch self {
-        case .flow: return 1.0
-        case .capsule: return 0.84
-        case .signal: return 0.74
+        case .flow: 1.0
+        case .capsule: 0.84
+        case .signal: 0.74
         }
     }
 
     var chartDotStartScale: CGFloat {
         switch self {
-        case .flow: return 0.96
-        case .capsule: return 0.70
-        case .signal: return 0.55
+        case .flow: 0.96
+        case .capsule: 0.70
+        case .signal: 0.55
         }
     }
 
     var chartDotStagger: Double {
         switch self {
-        case .flow: return 0.045
-        case .capsule: return 0.026
-        case .signal: return 0.040
+        case .flow: 0.045
+        case .capsule: 0.026
+        case .signal: 0.040
         }
     }
 
     var switchInitialScale: CGFloat {
         switch self {
-        case .flow: return 0.998
-        case .capsule: return 0.990
-        case .signal: return 0.984
+        case .flow: 0.998
+        case .capsule: 0.990
+        case .signal: 0.984
         }
     }
 
     var sheetContentStartDelay: Double {
         switch self {
-        case .flow: return 0.08
-        case .capsule: return 0.10
-        case .signal: return 0.12
+        case .flow: 0.08
+        case .capsule: 0.10
+        case .signal: 0.12
         }
     }
 
     var contentRowOffset: CGFloat {
         switch self {
-        case .flow: return 6
-        case .capsule: return 12
-        case .signal: return 16
+        case .flow: 6
+        case .capsule: 12
+        case .signal: 16
         }
     }
 
     var contentRowScale: CGFloat {
         switch self {
-        case .flow: return 0.996
-        case .capsule: return 0.982
-        case .signal: return 0.970
+        case .flow: 0.996
+        case .capsule: 0.982
+        case .signal: 0.970
         }
     }
 
     var contentStagger: Double {
         switch self {
-        case .flow: return 0.018
-        case .capsule: return 0.035
-        case .signal: return 0.052
+        case .flow: 0.018
+        case .capsule: 0.035
+        case .signal: 0.052
         }
     }
 
     var numberDeltaTransition: AnyTransition {
         switch self {
         case .flow:
-            return .opacity.combined(with: .offset(y: -10))
+            .opacity.combined(with: .offset(y: -10))
         case .capsule:
-            return .scale(scale: 0.72, anchor: .bottom).combined(with: .opacity)
+            .scale(scale: 0.72, anchor: .bottom).combined(with: .opacity)
         case .signal:
-            return .scale(scale: 0.58, anchor: .bottom).combined(with: .opacity).combined(with: .offset(y: -8))
+            .scale(scale: 0.58, anchor: .bottom).combined(with: .opacity).combined(with: .offset(y: -8))
         }
     }
 
     var switchTransition: AnyTransition {
         switch self {
         case .flow:
-            return .opacity
+            .opacity
         case .capsule:
-            return .opacity.combined(with: .scale(scale: 0.988, anchor: .top))
+            .opacity.combined(with: .scale(scale: 0.988, anchor: .top))
         case .signal:
-            return .opacity.combined(with: .scale(scale: 0.976, anchor: .top))
+            .opacity.combined(with: .scale(scale: 0.976, anchor: .top))
         }
     }
 
     var sheetTransition: AnyTransition {
         switch self {
         case .flow:
-            return .move(edge: .bottom).combined(with: .opacity)
+            .move(edge: .bottom).combined(with: .opacity)
         case .capsule:
-            return .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.985, anchor: .bottom))
+            .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.985, anchor: .bottom))
         case .signal:
-            return .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.960, anchor: .bottom))
+            .move(edge: .bottom).combined(with: .opacity).combined(with: .scale(scale: 0.960, anchor: .bottom))
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
         case .flow:
-            return l.tr(zh: "A. Flow", en: "A. Flow", de: "A. Flow")
+            l.tr(zh: "A. Flow", en: "A. Flow", de: "A. Flow")
         case .capsule:
-            return l.tr(zh: "B. Capsule", en: "B. Capsule", de: "B. Capsule")
+            l.tr(zh: "B. Capsule", en: "B. Capsule", de: "B. Capsule")
         case .signal:
-            return l.tr(zh: "C. Signal", en: "C. Signal", de: "C. Signal")
+            l.tr(zh: "C. Signal", en: "C. Signal", de: "C. Signal")
         }
     }
 
     func shortName(_ l: L10n) -> String {
         switch self {
         case .flow:
-            return l.tr(zh: "Flow", en: "Flow", de: "Flow")
+            l.tr(zh: "Flow", en: "Flow", de: "Flow")
         case .capsule:
-            return l.tr(zh: "Capsule", en: "Capsule", de: "Capsule")
+            l.tr(zh: "Capsule", en: "Capsule", de: "Capsule")
         case .signal:
-            return l.tr(zh: "Signal", en: "Signal", de: "Signal")
+            l.tr(zh: "Signal", en: "Signal", de: "Signal")
         }
     }
 
     func badge(_ l: L10n) -> String {
         switch self {
         case .flow:
-            return l.tr(zh: "日常", en: "Daily", de: "Alltag")
+            l.tr(zh: "日常", en: "Daily", de: "Alltag")
         case .capsule:
-            return l.tr(zh: "推荐", en: "Pick", de: "Favorit")
+            l.tr(zh: "推荐", en: "Pick", de: "Favorit")
         case .signal:
-            return l.tr(zh: "奖励", en: "Reward", de: "Belohnung")
+            l.tr(zh: "奖励", en: "Reward", de: "Belohnung")
         }
     }
 
     func summary(_ l: L10n) -> String {
         switch self {
         case .flow:
-            return l.tr(zh: "最克制，数字像流水，切换几乎无位移。适合日历、表单、长列表。", en: "The quietest system: fluid numbers and nearly no movement for switching. Good for calendars, forms, and long lists.", de: "Am ruhigsten: fliessende Zahlen, kaum Bewegung beim Wechsel. Gut fuer Kalender, Formulare und Listen.")
+            l.tr(zh: "最克制，数字像流水，切换几乎无位移。适合日历、表单、长列表。", en: "The quietest system: fluid numbers and nearly no movement for switching. Good for calendars, forms, and long lists.", de: "Am ruhigsten: fliessende Zahlen, kaum Bewegung beim Wechsel. Gut fuer Kalender, Formulare und Listen.")
         case .capsule:
-            return l.tr(zh: "接近你喜欢的椰子胶囊：轻弹、numeric motion、反馈清晰但不夸张。", en: "Closest to the coconut capsule feel: light spring, numeric motion, clear but restrained feedback.", de: "Nahe am Kokos-Kapsel-Gefuehl: leichte Federung, Zahlenbewegung, klares aber dezentes Feedback.")
+            l.tr(zh: "接近你喜欢的椰子胶囊：轻弹、numeric motion、反馈清晰但不夸张。", en: "Closest to the coconut capsule feel: light spring, numeric motion, clear but restrained feedback.", de: "Nahe am Kokos-Kapsel-Gefuehl: leichte Federung, Zahlenbewegung, klares aber dezentes Feedback.")
         case .signal:
-            return l.tr(zh: "更适合打卡/财富/奖励瞬间，普通切换仍压低幅度。", en: "Best for check-ins, wealth, and reward moments while normal switching stays controlled.", de: "Gut fuer Check-ins, Vermoegen und Belohnungen, normale Wechsel bleiben kontrolliert.")
+            l.tr(zh: "更适合打卡/财富/奖励瞬间，普通切换仍压低幅度。", en: "Best for check-ins, wealth, and reward moments while normal switching stays controlled.", de: "Gut fuer Check-ins, Vermoegen und Belohnungen, normale Wechsel bleiben kontrolliert.")
         }
     }
 
     func positioning(_ l: L10n) -> String {
         switch self {
         case .flow:
-            return l.tr(zh: "像水一样顺，不吸引注意。", en: "Smooth like water, without asking for attention.", de: "Fliessend wie Wasser, ohne Aufmerksamkeit zu fordern.")
+            l.tr(zh: "像水一样顺，不吸引注意。", en: "Smooth like water, without asking for attention.", de: "Fliessend wie Wasser, ohne Aufmerksamkeit zu fordern.")
         case .capsule:
-            return l.tr(zh: "全局默认候选：高级、轻弹、可长期使用。", en: "Global default candidate: premium, lightly elastic, usable everywhere.", de: "Kandidat fuer den Standard: hochwertig, leicht elastisch, ueberall nutzbar.")
+            l.tr(zh: "全局默认候选：高级、轻弹、可长期使用。", en: "Global default candidate: premium, lightly elastic, usable everywhere.", de: "Kandidat fuer den Standard: hochwertig, leicht elastisch, ueberall nutzbar.")
         case .signal:
-            return l.tr(zh: "强调成功和奖励，不用于高频普通切换。", en: "Emphasizes success and rewards, not for frequent ordinary switching.", de: "Betont Erfolg und Belohnung, nicht fuer haeufige normale Wechsel.")
+            l.tr(zh: "强调成功和奖励，不用于高频普通切换。", en: "Emphasizes success and rewards, not for frequent ordinary switching.", de: "Betont Erfolg und Belohnung, nicht fuer haeufige normale Wechsel.")
         }
     }
 
     func spec(for category: MotionPreviewCategory, _ l: L10n) -> String {
         switch (self, category) {
         case (.flow, .number):
-            return l.tr(zh: "numericText + 1.035 scale + 0.82s delta fade", en: "numericText + 1.035 scale + 0.82s delta fade", de: "numericText + 1.035 Skalierung + 0.82s Delta")
+            l.tr(zh: "numericText + 1.035 scale + 0.82s delta fade", en: "numericText + 1.035 scale + 0.82s delta fade", de: "numericText + 1.035 Skalierung + 0.82s Delta")
         case (.flow, .progress):
-            return l.tr(zh: "0.42/0.96 spring，几乎无弹跳", en: "0.42/0.96 spring, almost no bounce", de: "0.42/0.96 Feder, fast kein Bounce")
+            l.tr(zh: "0.42/0.96 spring，几乎无弹跳", en: "0.42/0.96 spring, almost no bounce", de: "0.42/0.96 Feder, fast kein Bounce")
         case (.flow, .chart):
-            return l.tr(zh: "0.72s 线条延长 + area 轻淡入，点位轻显", en: "0.72s slow line draw + soft area fade, quiet dots", de: "0.72s langsamer Linienaufbau + weiche Flaeche")
+            l.tr(zh: "0.72s 线条延长 + area 轻淡入，点位轻显", en: "0.72s slow line draw + soft area fade, quiet dots", de: "0.72s langsamer Linienaufbau + weiche Flaeche")
         case (.flow, .switching):
-            return l.tr(zh: "opacity handoff，0.998 snapshot scale", en: "opacity handoff, 0.998 snapshot scale", de: "Opacity-Handoff, 0.998 Snapshot")
+            l.tr(zh: "opacity handoff，0.998 snapshot scale", en: "opacity handoff, 0.998 snapshot scale", de: "Opacity-Handoff, 0.998 Snapshot")
         case (.flow, .sheetOpen):
-            return l.tr(zh: "bottom slide + fade，无明显 pop", en: "bottom slide + fade, no obvious pop", de: "Bottom-Slide + Fade")
+            l.tr(zh: "bottom slide + fade，无明显 pop", en: "bottom slide + fade, no obvious pop", de: "Bottom-Slide + Fade")
         case (.flow, .sheetContent):
-            return l.tr(zh: "18ms row stagger，6pt 上浮", en: "18ms row stagger, 6pt lift", de: "18ms Zeilen-Stagger, 6pt Lift")
+            l.tr(zh: "18ms row stagger，6pt 上浮", en: "18ms row stagger, 6pt lift", de: "18ms Zeilen-Stagger, 6pt Lift")
         case (.capsule, .number):
-            return l.tr(zh: "numericText + 1.105 capsule pulse + floating delta", en: "numericText + 1.105 capsule pulse + floating delta", de: "numericText + 1.105 Kapsel-Puls")
+            l.tr(zh: "numericText + 1.105 capsule pulse + floating delta", en: "numericText + 1.105 capsule pulse + floating delta", de: "numericText + 1.105 Kapsel-Puls")
         case (.capsule, .progress):
-            return l.tr(zh: "进度尾点轻弹，26ms 分段 stagger", en: "elastic trailing cap, 26ms segment stagger", de: "Elastische Kappe, 26ms Stagger")
+            l.tr(zh: "进度尾点轻弹，26ms 分段 stagger", en: "elastic trailing cap, 26ms segment stagger", de: "Elastische Kappe, 26ms Stagger")
         case (.capsule, .chart):
-            return l.tr(zh: "area grow + line trim + 点位依次弹出", en: "area grow + line trim + staged dot pop", de: "Flaeche waechst + Punkte poppen")
+            l.tr(zh: "area grow + line trim + 点位依次弹出", en: "area grow + line trim + staged dot pop", de: "Flaeche waechst + Punkte poppen")
         case (.capsule, .switching):
-            return l.tr(zh: "opacity + 0.988 scale，像快照换气", en: "opacity + 0.988 scale, snapshot breath", de: "Opacity + 0.988 Snapshot-Atmen")
+            l.tr(zh: "opacity + 0.988 scale，像快照换气", en: "opacity + 0.988 scale, snapshot breath", de: "Opacity + 0.988 Snapshot-Atmen")
         case (.capsule, .sheetOpen):
-            return l.tr(zh: "bottomSpringScaleFade，轻弹落位", en: "bottomSpringScaleFade, lightly settles", de: "BottomSpringScaleFade")
+            l.tr(zh: "bottomSpringScaleFade，轻弹落位", en: "bottomSpringScaleFade, lightly settles", de: "BottomSpringScaleFade")
         case (.capsule, .sheetContent):
-            return l.tr(zh: "35ms row stagger，12pt/0.982 进入", en: "35ms row stagger, 12pt/0.982 entrance", de: "35ms Stagger, 12pt/0.982")
+            l.tr(zh: "35ms row stagger，12pt/0.982 进入", en: "35ms row stagger, 12pt/0.982 entrance", de: "35ms Stagger, 12pt/0.982")
         case (.signal, .number):
-            return l.tr(zh: "奖励数字 1.12 pop，delta 更高更快", en: "reward number 1.12 pop, higher faster delta", de: "Belohnungszahl 1.12 Pop")
+            l.tr(zh: "奖励数字 1.12 pop，delta 更高更快", en: "reward number 1.12 pop, higher faster delta", de: "Belohnungszahl 1.12 Pop")
         case (.signal, .progress):
-            return l.tr(zh: "尾点更亮，38ms 阶段推进", en: "brighter cap, 38ms staged push", de: "Hellere Kappe, 38ms Stufen")
+            l.tr(zh: "尾点更亮，38ms 阶段推进", en: "brighter cap, 38ms staged push", de: "Hellere Kappe, 38ms Stufen")
         case (.signal, .chart):
-            return l.tr(zh: "chart reveal 更强，但只一次", en: "stronger one-shot chart reveal", de: "Staerkeres einmaliges Reveal")
+            l.tr(zh: "chart reveal 更强，但只一次", en: "stronger one-shot chart reveal", de: "Staerkeres einmaliges Reveal")
         case (.signal, .switching):
-            return l.tr(zh: "0.976 scale，仍禁止横跳", en: "0.976 scale, still no lateral jump", de: "0.976 Skalierung, kein Seitensprung")
+            l.tr(zh: "0.976 scale，仍禁止横跳", en: "0.976 scale, still no lateral jump", de: "0.976 Skalierung, kein Seitensprung")
         case (.signal, .sheetOpen):
-            return l.tr(zh: "更明显的 bottom pop，只给奖励/确认", en: "more visible bottom pop for rewards/confirm", de: "Staerkerer Bottom-Pop")
+            l.tr(zh: "更明显的 bottom pop，只给奖励/确认", en: "more visible bottom pop for rewards/confirm", de: "Staerkerer Bottom-Pop")
         case (.signal, .sheetContent):
-            return l.tr(zh: "52ms staged reveal，适合奖品列表", en: "52ms staged reveal, for reward lists", de: "52ms gestaffeltes Reveal")
+            l.tr(zh: "52ms staged reveal，适合奖品列表", en: "52ms staged reveal, for reward lists", de: "52ms gestaffeltes Reveal")
         }
     }
 
     func chartLabel(_ l: L10n) -> String {
         switch self {
         case .flow:
-            return l.tr(zh: "线条生长", en: "Line draw", de: "Linienaufbau")
+            l.tr(zh: "线条生长", en: "Line draw", de: "Linienaufbau")
         case .capsule:
-            return l.tr(zh: "点位轻弹", en: "Dot pop", de: "Punkt-Pop")
+            l.tr(zh: "点位轻弹", en: "Dot pop", de: "Punkt-Pop")
         case .signal:
-            return l.tr(zh: "奖励强调", en: "Reward emphasis", de: "Belohnungsfokus")
+            l.tr(zh: "奖励强调", en: "Reward emphasis", de: "Belohnungsfokus")
         }
     }
 
     func contentLabel(_ l: L10n) -> String {
         switch self {
         case .flow:
-            return l.tr(zh: "轻淡入", en: "Soft fade", de: "Weicher Fade")
+            l.tr(zh: "轻淡入", en: "Soft fade", de: "Weicher Fade")
         case .capsule:
-            return l.tr(zh: "轻弹加载", en: "Elastic load", de: "Elastisches Laden")
+            l.tr(zh: "轻弹加载", en: "Elastic load", de: "Elastisches Laden")
         case .signal:
-            return l.tr(zh: "分段揭示", en: "Staged reveal", de: "Gestaffeltes Reveal")
+            l.tr(zh: "分段揭示", en: "Staged reveal", de: "Gestaffeltes Reveal")
         }
     }
 
@@ -418,21 +418,21 @@ enum MotionPreviewAccent: String, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
-        case .primary: return Color.goPrimary
-        case .blue: return Color.goBlue
-        case .teal: return Color.goTeal
-        case .purple: return Color.goPurple
-        case .orange: return Color.goOrange
+        case .primary: Color.goPrimary
+        case .blue: Color.goBlue
+        case .teal: Color.goTeal
+        case .purple: Color.goPurple
+        case .orange: Color.goOrange
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .primary: return l.tr(zh: "主色", en: "Primary", de: "Primaer")
-        case .blue: return l.tr(zh: "蓝", en: "Blue", de: "Blau")
-        case .teal: return l.tr(zh: "青", en: "Teal", de: "Tuerkis")
-        case .purple: return l.tr(zh: "紫", en: "Purple", de: "Violett")
-        case .orange: return l.tr(zh: "橙", en: "Orange", de: "Orange")
+        case .primary: l.tr(zh: "主色", en: "Primary", de: "Primaer")
+        case .blue: l.tr(zh: "蓝", en: "Blue", de: "Blau")
+        case .teal: l.tr(zh: "青", en: "Teal", de: "Tuerkis")
+        case .purple: l.tr(zh: "紫", en: "Purple", de: "Violett")
+        case .orange: l.tr(zh: "橙", en: "Orange", de: "Orange")
         }
     }
 }
@@ -462,9 +462,9 @@ struct MotionPreviewPanel<Content: View>: View {
             content
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -639,9 +639,9 @@ struct MotionPreviewSheetShell: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
                 .strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
         }
         .shadow(color: Color.arkInk.opacity(0.18), radius: 24, x: 0, y: 14) // ui-v4: allow short sheet preview depth
@@ -686,7 +686,7 @@ struct MotionPreviewContentLoadingRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 48)
-        .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .opacity(visible ? 1 : 0)
         .offset(y: visible ? 0 : system.contentRowOffset)
         .scaleEffect(visible ? 1 : system.contentRowScale, anchor: .top)
@@ -706,7 +706,7 @@ struct MotionPreviewContext {
             items: [
                 MotionPreviewLocalizedText(zh: "08:30 喂食", en: "08:30 Feed", de: "08:30 Fuettern"),
                 MotionPreviewLocalizedText(zh: "13:00 遛弯", en: "13:00 Walk", de: "13:00 Spaziergang"),
-                MotionPreviewLocalizedText(zh: "21:00 刷牙", en: "21:00 Teeth", de: "21:00 Zaehne"),
+                MotionPreviewLocalizedText(zh: "21:00 刷牙", en: "21:00 Teeth", de: "21:00 Zaehne")
             ]
         ),
         MotionPreviewContext(
@@ -715,7 +715,7 @@ struct MotionPreviewContext {
             items: [
                 MotionPreviewLocalizedText(zh: "09:00 换水", en: "09:00 Water", de: "09:00 Wasser"),
                 MotionPreviewLocalizedText(zh: "16:30 梳毛", en: "16:30 Brush", de: "16:30 Buersten"),
-                MotionPreviewLocalizedText(zh: "20:40 体重", en: "20:40 Weight", de: "20:40 Gewicht"),
+                MotionPreviewLocalizedText(zh: "20:40 体重", en: "20:40 Weight", de: "20:40 Gewicht")
             ]
         ),
         MotionPreviewContext(
@@ -724,9 +724,9 @@ struct MotionPreviewContext {
             items: [
                 MotionPreviewLocalizedText(zh: "07:45 用药", en: "07:45 Meds", de: "07:45 Medizin"),
                 MotionPreviewLocalizedText(zh: "12:15 喝水", en: "12:15 Water", de: "12:15 Wasser"),
-                MotionPreviewLocalizedText(zh: "19:30 复盘", en: "19:30 Review", de: "19:30 Review"),
+                MotionPreviewLocalizedText(zh: "19:30 复盘", en: "19:30 Review", de: "19:30 Review")
             ]
-        ),
+        )
     ]
 }
 
@@ -754,7 +754,7 @@ struct MotionPreviewLoadingRow {
             title: MotionPreviewLocalizedText(zh: "提醒状态", en: "Reminder state", de: "Erinnerungsstatus"),
             subtitle: MotionPreviewLocalizedText(zh: "不在动画帧里重新同步", en: "No resync inside the animation frame", de: "Keine Resyncs im Animationsframe"),
             value: "3"
-        ),
+        )
     ]
 }
 
@@ -772,7 +772,7 @@ enum MotionPreviewChartFixtures {
     static let points: [[CGFloat]] = [
         [0.30, 0.44, 0.38, 0.58, 0.62, 0.74, 0.82],
         [0.48, 0.36, 0.54, 0.50, 0.68, 0.64, 0.88],
-        [0.22, 0.34, 0.45, 0.42, 0.61, 0.76, 0.72],
+        [0.22, 0.34, 0.45, 0.42, 0.61, 0.76, 0.72]
     ]
 }
 

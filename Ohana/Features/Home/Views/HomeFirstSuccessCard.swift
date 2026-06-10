@@ -51,10 +51,10 @@ struct HomeFirstSuccessCard: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.goPrimary.opacity(0.28), lineWidth: 1)
         )
     }

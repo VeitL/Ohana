@@ -16,22 +16,22 @@ nonisolated enum FeedFoodKind: String, CaseIterable, Identifiable, Codable {
 
     var systemIconName: String {
         switch self {
-        case .dry: return "circle.hexagongrid.fill"
-        case .wet: return "takeoutbag.and.cup.and.straw.fill"
+        case .dry: "circle.hexagongrid.fill"
+        case .wet: "takeoutbag.and.cup.and.straw.fill"
         }
     }
 
     var assetName: String {
         switch self {
-        case .dry: return "feed_dry_bowl"
-        case .wet: return "feed_wet_tray"
+        case .dry: "feed_dry_bowl"
+        case .wet: "feed_wet_tray"
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .dry: return l.tr(zh: "干粮", en: "Dry food", de: "Trockenfutter")
-        case .wet: return l.tr(zh: "湿粮", en: "Wet food", de: "Nassfutter")
+        case .dry: l.tr(zh: "干粮", en: "Dry food", de: "Trockenfutter")
+        case .wet: l.tr(zh: "湿粮", en: "Wet food", de: "Nassfutter")
         }
     }
 }
@@ -48,23 +48,23 @@ nonisolated enum FeedTreatKind: String, CaseIterable, Identifiable, Codable {
 
     var systemIconName: String {
         switch self {
-        case .canned: return "cylinder.fill"
-        case .lickable: return "waterbottle.fill"
-        case .freezeDried: return "snowflake"
-        case .dentalNeck: return "bone.fill"
-        case .jerky: return "leaf.fill"
-        case .other: return "birthday.cake.fill"
+        case .canned: "cylinder.fill"
+        case .lickable: "waterbottle.fill"
+        case .freezeDried: "snowflake"
+        case .dentalNeck: "bone.fill"
+        case .jerky: "leaf.fill"
+        case .other: "birthday.cake.fill"
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .canned: return l.tr(zh: "罐头", en: "Can", de: "Dose")
-        case .lickable: return l.tr(zh: "猫条", en: "Lickable", de: "Schlecksnack")
-        case .freezeDried: return l.tr(zh: "冻干", en: "Freeze-dried", de: "Gefriergetrocknet")
-        case .dentalNeck: return l.tr(zh: "磨牙鸡脖", en: "Dental neck", de: "Kau-Hals")
-        case .jerky: return l.tr(zh: "肉干", en: "Jerky", de: "Trockenfleisch")
-        case .other: return l.tr(zh: "其他", en: "Other", de: "Andere")
+        case .canned: l.tr(zh: "罐头", en: "Can", de: "Dose")
+        case .lickable: l.tr(zh: "猫条", en: "Lickable", de: "Schlecksnack")
+        case .freezeDried: l.tr(zh: "冻干", en: "Freeze-dried", de: "Gefriergetrocknet")
+        case .dentalNeck: l.tr(zh: "磨牙鸡脖", en: "Dental neck", de: "Kau-Hals")
+        case .jerky: l.tr(zh: "肉干", en: "Jerky", de: "Trockenfleisch")
+        case .other: l.tr(zh: "其他", en: "Other", de: "Andere")
         }
     }
 }
@@ -91,36 +91,36 @@ nonisolated enum PetFoodBrandCatalog {
     private static let brandMap: [String: [FeedFoodKind: [String]]] = [
         "CN": [
             .dry: ["皇家", "冠能", "渴望", "爱肯拿", "纽顿", "素力高", "网易严选", "鲜朗", "伯纳天纯", "麦富迪", "高爷家", "蓝氏", "比瑞吉", "耐威克", "海洋之星"],
-            .wet: ["巅峰", "K9 Natural", "希宝", "珍致", "麦富迪", "高爷家", "鲜朗", "尾巴生活", "网易严选", "小佩", "蓝氏", "喵达", "红狗"],
+            .wet: ["巅峰", "K9 Natural", "希宝", "珍致", "麦富迪", "高爷家", "鲜朗", "尾巴生活", "网易严选", "小佩", "蓝氏", "喵达", "红狗"]
         ],
         "US": [
             .dry: ["Royal Canin", "Purina Pro Plan", "Hill's Science Diet", "Blue Buffalo", "Wellness", "Orijen", "Acana", "Taste of the Wild", "Instinct", "Iams", "Merrick", "Nutro", "Natural Balance"],
-            .wet: ["Fancy Feast", "Friskies", "Sheba", "Weruva", "Tiki Cat", "Wellness", "Hill's Science Diet", "Royal Canin", "Blue Buffalo", "Purina Pro Plan", "Instinct", "Merrick"],
+            .wet: ["Fancy Feast", "Friskies", "Sheba", "Weruva", "Tiki Cat", "Wellness", "Hill's Science Diet", "Royal Canin", "Blue Buffalo", "Purina Pro Plan", "Instinct", "Merrick"]
         ],
         "DE": [
             .dry: ["Royal Canin", "Purina Pro Plan", "Hill's Science Plan", "Josera", "Animonda", "Mera", "Wild Freedom", "Happy Cat", "Sanabelle", "Concept for Life", "Leonardo", "Bosch"],
-            .wet: ["Animonda", "Mjamjam", "Feringa", "Wild Freedom", "Catz Finefood", "Leonardo", "Royal Canin", "Purina Gourmet", "Sheba", "Whiskas", "MAC's"],
+            .wet: ["Animonda", "Mjamjam", "Feringa", "Wild Freedom", "Catz Finefood", "Leonardo", "Royal Canin", "Purina Gourmet", "Sheba", "Whiskas", "MAC's"]
         ],
         "GB": [
             .dry: ["Royal Canin", "Purina Pro Plan", "Hill's Science Plan", "James Wellbeloved", "Iams", "Lily's Kitchen", "Applaws", "Wellness CORE", "Scrumbles", "Harringtons", "Burns"],
-            .wet: ["Felix", "Sheba", "Gourmet", "Whiskas", "Lily's Kitchen", "Applaws", "Encore", "Blink!", "Untamed", "Royal Canin", "Hill's Science Plan"],
+            .wet: ["Felix", "Sheba", "Gourmet", "Whiskas", "Lily's Kitchen", "Applaws", "Encore", "Blink!", "Untamed", "Royal Canin", "Hill's Science Plan"]
         ],
         "JP": [
             .dry: ["Royal Canin", "Purina ONE", "Hill's Science Diet", "Unicharm", "Iams", "Medyfas", "Nisshin Petfood", "Aixia", "Kanematsu", "Orijen", "Acana"],
-            .wet: ["CIAO", "Aixia", "MonPetit", "Sheba", "Kal Kan", "Royal Canin", "Hill's Science Diet", "Unicharm", "Medyfas", "Neko Genki"],
+            .wet: ["CIAO", "Aixia", "MonPetit", "Sheba", "Kal Kan", "Royal Canin", "Hill's Science Diet", "Unicharm", "Medyfas", "Neko Genki"]
         ],
         "HK": [
             .dry: ["Royal Canin", "Hill's Science Diet", "Purina Pro Plan", "Orijen", "Acana", "Ziwi Peak", "Farmina", "Wellness", "Instinct", "Taste of the Wild"],
-            .wet: ["Ziwi Peak", "Kakato", "Applaws", "Tiki Cat", "Weruva", "Sheba", "Fancy Feast", "Royal Canin", "Hill's Science Diet", "CIAO"],
+            .wet: ["Ziwi Peak", "Kakato", "Applaws", "Tiki Cat", "Weruva", "Sheba", "Fancy Feast", "Royal Canin", "Hill's Science Diet", "CIAO"]
         ],
         "TW": [
             .dry: ["皇家", "希爾思", "冠能", "渴望", "愛肯拿", "紐頓", "汪喵星球", "怪獸部落", "法米納", "耐吉斯", "莫比"],
-            .wet: ["汪喵星球", "怪獸部落", "凱特鮮廚", "巔峰", "CIAO", "Sheba", "Fancy Feast", "皇家", "希爾思", "陪心寵糧"],
+            .wet: ["汪喵星球", "怪獸部落", "凱特鮮廚", "巔峰", "CIAO", "Sheba", "Fancy Feast", "皇家", "希爾思", "陪心寵糧"]
         ],
         "GLOBAL": [
             .dry: ["Royal Canin", "Purina Pro Plan", "Hill's Science Diet", "Orijen", "Acana", "Farmina", "Ziwi Peak", "Wellness"],
-            .wet: ["Royal Canin", "Hill's Science Diet", "Sheba", "Fancy Feast", "Ziwi Peak", "Tiki Cat", "Weruva", "Applaws"],
-        ],
+            .wet: ["Royal Canin", "Hill's Science Diet", "Sheba", "Fancy Feast", "Ziwi Peak", "Tiki Cat", "Weruva", "Applaws"]
+        ]
     ]
 }
 
@@ -208,15 +208,15 @@ enum FeedRuleKind: String, CaseIterable {
 
     var iconName: String {
         switch self {
-        case .manualReminder: return "bell.badge.fill"
-        case .autoFeeder: return "dot.radiowaves.left.and.right"
+        case .manualReminder: "bell.badge.fill"
+        case .autoFeeder: "dot.radiowaves.left.and.right"
         }
     }
 }
 
 enum FeedPlanCatchUpPolicy {
     static let catchUpWindowHours = 6
-    static let catchUpWindow: TimeInterval = TimeInterval(catchUpWindowHours * 60 * 60)
+    static let catchUpWindow: TimeInterval = .init(catchUpWindowHours * 60 * 60)
 
     static func isCatchUpEligible(scheduledAt: Date, now: Date) -> Bool {
         scheduledAt < now && now.timeIntervalSince(scheduledAt) <= catchUpWindow
@@ -283,7 +283,7 @@ enum FeedRuleMetadata {
     static let autoFeederEntityType = "pet_auto_feeder"
 
     static func isManualReminderEvent(_ event: Event, pet: Pet) -> Bool {
-        guard (event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet"),
+        guard event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet",
               event.relatedEntityId == pet.id.uuidString,
               event.eventType == EventType.foodChange.rawValue
         else { return false }
@@ -315,8 +315,7 @@ enum FeedRuleMetadata {
         if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
             let range = NSRange(event.title.startIndex ..< event.title.endIndex, in: event.title)
             if let match = regex.firstMatch(in: event.title, options: [], range: range),
-               let capture = Range(match.range(at: 1), in: event.title)
-            {
+               let capture = Range(match.range(at: 1), in: event.title) {
                 let raw = String(event.title[capture]).replacingOccurrences(of: ",", with: ".")
                 if let value = Double(raw) { return value }
             }

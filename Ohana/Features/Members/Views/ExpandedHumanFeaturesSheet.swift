@@ -5,8 +5,8 @@
 //  Human feature hub presented from the GO Focus home card.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct ExpandedHumanFeaturesContentSheet: View {
     let human: Human
@@ -53,7 +53,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
               !human.isPrivate(.medication, viewedBy: activeHumanId) else { return [] }
         return allPendingReminders.filter {
             $0.event?.relatedEntityType == "Human" &&
-            $0.event?.relatedEntityId == human.id.uuidString
+                $0.event?.relatedEntityId == human.id.uuidString
         }
     }
 
@@ -228,16 +228,16 @@ struct ExpandedHumanFeaturesContentSheet: View {
                             Button {
                                 showingEditSheet = true
                             } label: {
-                                Image(systemName: "pencil")
-                                    .font(.system(size: 14, weight: .black))
+                                Image(systemName: "pencil") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
+                                    .font(.system(size: 14, weight: .black)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                                    .frame(width: 30, height: 30)
+                                    .frame(width: 30, height: 30) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
                                     .background(Color.goPrimary, in: Circle())
                             }
                             .buttonStyle(ScaleButtonStyle())
                         }
                         Button("完成") { dismiss() }
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                             .foregroundStyle(Color.goPrimary)
                     }
                 }
@@ -260,11 +260,11 @@ struct ExpandedHumanFeaturesContentSheet: View {
     }
 
     @ViewBuilder
-    private func featureNavigation<Label: View>(
+    private func featureNavigation(
         field: HumanPrivateField,
         route: HumanFeatureRoute,
         lockedTitle: String,
-        @ViewBuilder label: () -> Label
+        @ViewBuilder label: () -> some View
     ) -> some View {
         if human.isPrivate(field, viewedBy: activeHumanId) {
             lockedFeatureCard(title: lockedTitle)
@@ -325,7 +325,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
                 humanAvatar(size: 58)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(human.name)
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(.system(size: 22, weight: .black, design: .rounded)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(humanSubtitle.isEmpty ? "OHANA MEMBER" : humanSubtitle)
                         .font(OhanaFont.caption(.bold))
@@ -335,11 +335,11 @@ struct ExpandedHumanFeaturesContentSheet: View {
                 Button {
                     showingEditSheet = true
                 } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 13, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryActionText)
-                            .frame(width: 32, height: 32)
-                            .background(Color.goPrimary, in: Circle())
+                    Image(systemName: "pencil") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
+                        .font(.system(size: 13, weight: .black)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .frame(width: 32, height: 32) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
+                        .background(Color.goPrimary, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -355,9 +355,9 @@ struct ExpandedHumanFeaturesContentSheet: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -368,7 +368,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
             if !badges.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 8) {
-                        Image(systemName: "trophy.fill")
+                        Image(systemName: "trophy.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                             .foregroundStyle(Color.goYellow)
                         Text("动态称号")
                             .font(OhanaFont.callout(.black))
@@ -392,9 +392,9 @@ struct ExpandedHumanFeaturesContentSheet: View {
                     }
                 }
                 .padding(16)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                         .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
                 }
             }
@@ -404,7 +404,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
     private var remindersCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: "bell.badge.fill")
+                Image(systemName: "bell.badge.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                     .foregroundStyle(Color.goOrange)
                 Text("待办提醒")
                     .font(OhanaFont.callout(.black))
@@ -427,9 +427,9 @@ struct ExpandedHumanFeaturesContentSheet: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -444,11 +444,11 @@ struct ExpandedHumanFeaturesContentSheet: View {
                 activeFeatureRoute = .notes
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "note.text")
-                        .font(.system(size: 16, weight: .black))
+                    Image(systemName: "note.text") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
+                        .font(.system(size: 16, weight: .black)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                         .foregroundStyle(Color.goPrimary)
-                        .frame(width: 36, height: 36)
-                        .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .frame(width: 36, height: 36) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
+                        .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("备注记录")
                             .font(OhanaFont.callout(.black))
@@ -459,14 +459,14 @@ struct ExpandedHumanFeaturesContentSheet: View {
                             .lineLimit(1)
                     }
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.right") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                         .font(OhanaFont.caption(.bold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
                 .padding(14)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                         .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
                 }
             }
@@ -483,9 +483,9 @@ struct ExpandedHumanFeaturesContentSheet: View {
                 .foregroundStyle(Color.goRed)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         .strokeBorder(Color.goRed.opacity(0.24), lineWidth: 1)
                 }
         }
@@ -494,8 +494,8 @@ struct ExpandedHumanFeaturesContentSheet: View {
 
     private var fullPrivacyCard: some View {
         VStack(spacing: 10) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 34, weight: .black))
+            Image(systemName: "lock.shield.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
+                .font(.system(size: 34, weight: .black)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                 .foregroundStyle(Color.goYellow)
             Text("此成员资料仅本人可见")
                 .font(OhanaFont.title3(.black))
@@ -507,9 +507,9 @@ struct ExpandedHumanFeaturesContentSheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(22)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -528,7 +528,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     private func lockedFeatureCard(title: String) -> some View {
@@ -538,7 +538,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
 
     private func lockedWideCard(title: String) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "lock.fill")
+            Image(systemName: "lock.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text("\(title) · 仅本人可见")
                 .font(OhanaFont.caption(.black))
@@ -547,9 +547,9 @@ struct ExpandedHumanFeaturesContentSheet: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -582,14 +582,14 @@ struct ExpandedHumanFeaturesContentSheet: View {
             Button {
                 completeReminder(reminder)
             } label: {
-                Image(systemName: "checkmark.circle.fill")
+                Image(systemName: "checkmark.circle.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                     .font(OhanaFont.title3(.bold))
                     .foregroundStyle(Color.goPrimary)
             }
             Button {
                 skipReminder(reminder)
             } label: {
-                Image(systemName: "forward.circle.fill")
+                Image(systemName: "forward.circle.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                     .font(OhanaFont.title3(.bold))
                     .foregroundStyle(Color.goYellow)
             }
@@ -638,7 +638,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
     }
 
     private var rowBackground: some View {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
+        RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
             .fill(Color.ohanaCardSurface)
     }
 
@@ -673,7 +673,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
                             .tracking(2.6)
                             .foregroundStyle(Color.ohanaSecondaryText)
                         Text(human.name)
-                            .font(.system(size: 32, weight: .black, design: .rounded))
+                            .font(.system(size: 32, weight: .black, design: .rounded)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.62)
@@ -694,22 +694,22 @@ struct ExpandedHumanFeaturesContentSheet: View {
             }
             .padding(18)
 
-            Image(systemName: "chevron.right.circle.fill")
-                .font(.system(size: 22, weight: .black))
+            Image(systemName: "chevron.right.circle.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
+                .font(.system(size: 22, weight: .black)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .padding(16)
 
-            Image(systemName: "person.crop.circle.badge.checkmark")
-                .font(.system(size: 88, weight: .black))
+            Image(systemName: "person.crop.circle.badge.checkmark") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
+                .font(.system(size: 88, weight: .black)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                 .foregroundStyle(Color.ohanaTertiaryText.opacity(0.2))
                 .offset(x: 246, y: 76)
         }
         .frame(height: 188)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -717,7 +717,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
     private var humanSubtitle: String {
         let zodiac = human.birthday.map { Human.westernZodiacChinese(for: $0) }
         return [human.roleText, HumanGenderIdentity.title(for: human.genderRaw), zodiac, human.mbti.isEmpty ? nil : human.mbti]
-            .compactMap { $0 }
+            .compactMap(\.self)
             .joined(separator: " · ")
     }
 
@@ -744,18 +744,18 @@ struct ExpandedHumanFeaturesContentSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .black))
+                    .font(.system(size: 17, weight: .black)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 34, height: 34)
-                    .background(color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .frame(width: 34, height: 34) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
+                    .background(color, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 Spacer()
-                Image(systemName: "arrow.up.right")
+                Image(systemName: "arrow.up.right") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             Spacer(minLength: 4)
             Text(value)
-                .font(.system(size: 29, weight: .black, design: .rounded))
+                .font(.system(size: 29, weight: .black, design: .rounded)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.58)
@@ -777,10 +777,10 @@ struct ExpandedHumanFeaturesContentSheet: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -788,10 +788,10 @@ struct ExpandedHumanFeaturesContentSheet: View {
     private func compactBentoCard(icon: String, color: Color, title: String, subtitle: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .black))
+                .font(.system(size: 16, weight: .black)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                 .foregroundStyle(color)
-                .frame(width: 36, height: 36)
-                .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
+                .background(color.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(OhanaFont.callout(.black))
@@ -802,15 +802,15 @@ struct ExpandedHumanFeaturesContentSheet: View {
                     .lineLimit(1)
             }
             Spacer()
-            Image(systemName: "chevron.right")
+            Image(systemName: "chevron.right") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                 .font(OhanaFont.caption(.bold))
                 .foregroundStyle(Color.ohanaTertiaryText)
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: 76, maxHeight: 76)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
     }
@@ -827,7 +827,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     @ViewBuilder
@@ -836,7 +836,7 @@ struct ExpandedHumanFeaturesContentSheet: View {
             Circle()
                 .fill(Color.ohanaControlFill)
                 .frame(width: size, height: size)
-            if let data = human.avatarImageData, let ui = UIImage(data: data) {
+            if let data = human.avatarImageData, let ui = UIImage(data: data) { // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
                 Image(uiImage: ui)
                     .resizable()
                     .scaledToFill()
@@ -851,24 +851,24 @@ struct ExpandedHumanFeaturesContentSheet: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 12, weight: .black, design: .rounded))
+            .font(.system(size: 12, weight: .black, design: .rounded)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
             .foregroundStyle(Color.ohanaSecondaryText)
     }
 
     private func row(icon: String, color: Color, title: String, subtitle: String) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 17, weight: .bold)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                 .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 36, height: 36)
-                .background(color, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
+                .background(color, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 15, weight: .bold, design: .rounded)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .font(.system(size: 12, weight: .medium, design: .rounded)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }

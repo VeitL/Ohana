@@ -40,7 +40,7 @@ private struct QuickMomentMissingRouteEntityView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "exclamationmark.magnifyingglass") // a11y: decorative icon; surrounding text carries the message.
+            Image(systemName: "exclamationmark.magnifyingglass") // a11y: decorative icon; surrounding text carries the message. // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                 .font(OhanaFont.title(.bold))
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)

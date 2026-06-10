@@ -10,16 +10,16 @@ import SwiftUI
 struct InlineNumericInput: View {
     @Binding var text: String
     let placeholder: String
-    var unit: String? = nil
+    var unit: String?
     var countryCode: String = AppCountry.code
     var maxFractionDigits: Int = 0
     var accent: Color = .goPrimary
-    var step: Double? = nil
+    var step: Double?
     var minValue: Double = 0
     var valueFont: Font = OhanaFont.title3(.black)
     var unitFont: Font = OhanaFont.callout(.black)
     var valueAlignment: Alignment = .center
-    var fill: Color = Color.ohanaCardSurface
+    var fill: Color = .ohanaCardSurface
     var cornerRadius: CGFloat = 18
     var horizontalPadding: CGFloat = 12
     var verticalPadding: CGFloat = 10

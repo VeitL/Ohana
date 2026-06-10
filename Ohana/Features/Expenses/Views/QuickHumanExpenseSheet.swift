@@ -5,8 +5,8 @@
 //  V4 quick human expense popup.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct QuickHumanExpenseContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -18,8 +18,8 @@ private struct QuickHumanExpenseContentHeightKey: PreferenceKey {
 
 struct QuickHumanExpenseSheet: View {
     let human: Human
-    var onSaved: (() -> Void)? = nil
-    var onDismiss: (() -> Void)? = nil
+    var onSaved: (() -> Void)?
+    var onDismiss: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -98,8 +98,8 @@ struct QuickHumanExpenseSheet: View {
 
                     saveBar
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow short popup liftedAlert shadow token
                 .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow short popup liftedAlert shadow token
                 .padding(.horizontal, 6)
@@ -182,7 +182,7 @@ struct QuickHumanExpenseSheet: View {
     private var header: some View {
         HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.goPrimary.opacity(0.18))
                 Image(systemName: AppCurrency.systemIconName)
                     .font(OhanaFont.adaptive(size: 18, weight: .black))
@@ -224,9 +224,9 @@ struct QuickHumanExpenseSheet: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                     .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
             }
         }
@@ -238,15 +238,15 @@ struct QuickHumanExpenseSheet: View {
             Text(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"))
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
-            TextField(l.tr(zh: "例如：咖啡、药品、交通", en: "Coffee, meds, transit", de: "Kaffee, Medikamente, Fahrt"), text: $note)
+            TextField(l.tr(zh: "例如：咖啡、药品、交通", en: "Coffee, meds, transit", de: "Kaffee, Medikamente, Fahrt"), text: $note) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.callout(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .textInputAutocapitalization(.sentences)
                 .padding(.horizontal, 16)
                 .frame(height: 52)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                         .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
                 }
         }
@@ -267,9 +267,9 @@ struct QuickHumanExpenseSheet: View {
                 .tint(Color.goPrimary)
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
         }
         .padding(.horizontal, 22)
@@ -284,7 +284,7 @@ struct QuickHumanExpenseSheet: View {
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存花费", en: "Save Expense", de: "Ausgabe speichern")
                 )
-                    .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)

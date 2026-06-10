@@ -27,7 +27,7 @@ extension AchievementWallContentView {
             return Calendar.current.date(byAdding: .day, value: 7, to: activePet.createdAt)
         case "long_runner":
             return activePet.walkLogs
-                .filter { $0.distanceMeters >= 5_000 }
+                .filter { $0.distanceMeters >= 5000 }
                 .map(\.startDate)
                 .min()
         case "medication_complete":
@@ -58,10 +58,10 @@ extension AchievementWallContentView {
             return activePet.healthLogs
                 .filter {
                     $0.type == "vaccine"
-                    || $0.type == "vaccination"
-                    || $0.note.localizedCaseInsensitiveContains("疫苗")
-                    || $0.note.localizedCaseInsensitiveContains("vaccine")
-                    || $0.note.localizedCaseInsensitiveContains("impf")
+                        || $0.type == "vaccination"
+                        || $0.note.localizedCaseInsensitiveContains("疫苗")
+                        || $0.note.localizedCaseInsensitiveContains("vaccine")
+                        || $0.note.localizedCaseInsensitiveContains("impf")
                 }
                 .map(\.date)
                 .min()
@@ -119,38 +119,38 @@ extension AchievementWallContentView {
     func humanAchievementCompletionDate(for badge: Achievement, human: Human) -> Date? {
         switch badge.id {
         case "human_profile_ready":
-            return human.createdAt
+            human.createdAt
         case "human_first_record":
-            return earliestDate(from: humanRecordDates(human))
+            earliestDate(from: humanRecordDates(human))
         case "human_weight_starter":
-            return human.weightLogs.map(\.date).min()
+            human.weightLogs.map(\.date).min()
         case "human_weight_keeper":
-            return thresholdDate(from: human.weightLogs.map(\.date), target: 7)
+            thresholdDate(from: human.weightLogs.map(\.date), target: 7)
         case "human_expense_tracker":
-            return thresholdDate(from: expenses(for: human).map(\.date), target: 5)
+            thresholdDate(from: expenses(for: human).map(\.date), target: 5)
         case "human_medication_setup":
-            return medications(for: human).map(\.createdAt).min()
+            medications(for: human).map(\.createdAt).min()
         case "human_medication_keeper":
-            return thresholdDate(
+            thresholdDate(
                 from: medicationLogs(for: human)
                     .filter { $0.status == .taken }
                     .map { $0.recordedTime ?? $0.createdAt },
                 target: 7
             )
         case "human_workout_starter":
-            return human.workoutLogs.map(\.date).min()
+            human.workoutLogs.map(\.date).min()
         case "human_workout_rhythm":
-            return thresholdDate(from: human.workoutLogs.map(\.date), target: 10)
+            thresholdDate(from: human.workoutLogs.map(\.date), target: 10)
         case "human_workout_hero":
-            return thresholdDate(from: human.workoutLogs.map(\.date), target: 30)
+            thresholdDate(from: human.workoutLogs.map(\.date), target: 30)
         case "human_coconut_elite":
-            return nil
+            nil
         case "human_old_friend":
-            return Calendar.current.date(byAdding: .day, value: 7, to: human.createdAt)
+            Calendar.current.date(byAdding: .day, value: 7, to: human.createdAt)
         case "human_year_friend":
-            return Calendar.current.date(byAdding: .day, value: 365, to: human.createdAt)
+            Calendar.current.date(byAdding: .day, value: 365, to: human.createdAt)
         default:
-            return nil
+            nil
         }
     }
 
@@ -193,27 +193,27 @@ extension AchievementWallContentView {
 
     func petRecordDates() -> [Date] {
         activePet.healthLogs.map(\.date)
-        + activePet.pottyLogs.map(\.date)
-        + activePet.walkLogs.map(\.startDate)
-        + activePet.hygieneLogs.map(\.date)
-        + activePet.careLogs.map(\.date)
-        + activePet.foodRecords.map(\.startDate)
-        + activePet.expenseLogs.map(\.date)
-        + activePet.weightLogs.map(\.date)
-        + activePet.photoLogs.map(\.date)
-        + activePet.milestones.map(\.date)
+            + activePet.pottyLogs.map(\.date)
+            + activePet.walkLogs.map(\.startDate)
+            + activePet.hygieneLogs.map(\.date)
+            + activePet.careLogs.map(\.date)
+            + activePet.foodRecords.map(\.startDate)
+            + activePet.expenseLogs.map(\.date)
+            + activePet.weightLogs.map(\.date)
+            + activePet.photoLogs.map(\.date)
+            + activePet.milestones.map(\.date)
     }
 
     func feedingRecordDates() -> [Date] {
         activePet.foodRecords.map(\.startDate)
-        + activePet.careLogs.filter { $0.careType == .feeding }.map(\.date)
+            + activePet.careLogs.filter { $0.careType == .feeding }.map(\.date)
     }
 
     func cleaningRecordDates() -> [Date] {
         activePet.hygieneLogs.map(\.date)
-        + activePet.careLogs.filter {
-            [.litter, .waterChange, .filterClean, .cageCleaning, .substrateChange].contains($0.careType)
-        }.map(\.date)
+            + activePet.careLogs.filter {
+                [.litter, .waterChange, .filterClean, .cageCleaning, .substrateChange].contains($0.careType)
+            }.map(\.date)
     }
 
     func waterCareRecordDates() -> [Date] {
@@ -222,9 +222,9 @@ extension AchievementWallContentView {
 
     func humanRecordDates(_ human: Human) -> [Date] {
         human.weightLogs.map(\.date)
-        + human.workoutLogs.map(\.date)
-        + medications(for: human).map(\.createdAt)
-        + medicationLogs(for: human).map { $0.recordedTime ?? $0.createdAt }
-        + expenses(for: human).map(\.date)
+            + human.workoutLogs.map(\.date)
+            + medications(for: human).map(\.createdAt)
+            + medicationLogs(for: human).map { $0.recordedTime ?? $0.createdAt }
+            + expenses(for: human).map(\.date)
     }
 }

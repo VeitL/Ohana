@@ -6,16 +6,16 @@
 //  深色背景 + ScrollView卡片 + Swift Charts
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct PetHealthDetailContentView: View {
     let pet: Pet
     let allEvents: [Event]
     var isModal: Bool = false
-    var initialSection: PetHealthInitialSection? = nil
+    var initialSection: PetHealthInitialSection?
     /// D4: 关闭时额外回调（如需一并关闭父级）
-    var onFullDismiss: (() -> Void)? = nil
+    var onFullDismiss: (() -> Void)?
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
@@ -69,13 +69,13 @@ struct PetHealthDetailContentView: View {
             return nextCheckupDate
         }
         switch type {
-        case .vaccine:    return Calendar.current.date(byAdding: .year,  value: 1, to: last.date)
+        case .vaccine: return Calendar.current.date(byAdding: .year, value: 1, to: last.date)
         case .medication, .dewormingExternal:
-                          return Calendar.current.date(byAdding: .month, value: 1, to: last.date)
+            return Calendar.current.date(byAdding: .month, value: 1, to: last.date)
         case .dewormingInternal:
-                          return Calendar.current.date(byAdding: .month, value: 3, to: last.date)
-        case .checkup:    return Calendar.current.date(byAdding: .year,  value: 1, to: last.date)
-        default:          return nil
+            return Calendar.current.date(byAdding: .month, value: 3, to: last.date)
+        case .checkup: return Calendar.current.date(byAdding: .year, value: 1, to: last.date)
+        default: return nil
         }
     }
 
@@ -141,84 +141,84 @@ struct PetHealthDetailContentView: View {
 
     func colorForType(_ type: HealthLogType) -> Color {
         switch type {
-        case .vaccine: return themeColor
+        case .vaccine: themeColor
         case .medication, .dewormingInternal, .dewormingExternal:
-            return isDark ? Color.goPrimary.opacity(0.92) : Color.goTeal
+            isDark ? Color.goPrimary.opacity(0.92) : Color.goTeal
         case .checkup:
-            return isDark ? themeColor.opacity(0.9) : Color.goYellow
+            isDark ? themeColor.opacity(0.9) : Color.goYellow
         case .surgery, .emergency:
-            return isDark ? Color.goPrimary.opacity(0.85) : Color.goRed
+            isDark ? Color.goPrimary.opacity(0.85) : Color.goRed
         default:
-            return isDark ? Color.goPrimary.opacity(0.78) : Color.goCardCyan
+            isDark ? Color.goPrimary.opacity(0.78) : Color.goCardCyan
         }
     }
 
     func healthIcon(for type: HealthLogType) -> String {
         switch type {
-        case .general: return "clipboard.fill"
-        case .vaccine: return "syringe.fill"
-        case .medication: return "pill.fill"
-        case .dewormingInternal: return "pills.fill"
-        case .dewormingExternal: return "shield.lefthalf.filled"
-        case .surgery: return "cross.case.fill"
-        case .dental: return "mouth.fill"
-        case .checkup: return "stethoscope"
-        case .emergency: return "cross.circle.fill"
-        case .other: return "doc.text.fill"
+        case .general: "clipboard.fill"
+        case .vaccine: "syringe.fill"
+        case .medication: "pill.fill"
+        case .dewormingInternal: "pills.fill"
+        case .dewormingExternal: "shield.lefthalf.filled"
+        case .surgery: "cross.case.fill"
+        case .dental: "mouth.fill"
+        case .checkup: "stethoscope"
+        case .emergency: "cross.circle.fill"
+        case .other: "doc.text.fill"
         }
     }
 
     func healthTypeTitle(_ type: HealthLogType) -> String {
         switch type {
-        case .general: return l.tr(zh: "常规记录", en: "General", de: "Allgemein")
-        case .vaccine: return l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
-        case .medication: return l.tr(zh: "用药", en: "Medication", de: "Medikament")
-        case .dewormingInternal: return l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
-        case .dewormingExternal: return l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
-        case .surgery: return l.tr(zh: "手术", en: "Surgery", de: "Operation")
-        case .dental: return l.tr(zh: "牙科", en: "Dental", de: "Zahnmedizin")
-        case .checkup: return l.tr(zh: "体检", en: "Checkup", de: "Check-up")
-        case .emergency: return l.tr(zh: "急诊", en: "Emergency", de: "Notfall")
-        case .other: return l.tr(zh: "其他", en: "Other", de: "Andere")
+        case .general: l.tr(zh: "常规记录", en: "General", de: "Allgemein")
+        case .vaccine: l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+        case .medication: l.tr(zh: "用药", en: "Medication", de: "Medikament")
+        case .dewormingInternal: l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .dewormingExternal: l.tr(zh: "体外驱虫", en: "External deworming", de: "Äußere Entwurmung")
+        case .surgery: l.tr(zh: "手术", en: "Surgery", de: "Operation")
+        case .dental: l.tr(zh: "牙科", en: "Dental", de: "Zahnmedizin")
+        case .checkup: l.tr(zh: "体检", en: "Checkup", de: "Check-up")
+        case .emergency: l.tr(zh: "急诊", en: "Emergency", de: "Notfall")
+        case .other: l.tr(zh: "其他", en: "Other", de: "Andere")
         }
     }
 
     func symptomCategoryIcon(_ category: SymptomCategory) -> String {
         switch category {
-        case .digestive: return "stomach.fill"
-        case .respiratory: return "lungs.fill"
-        case .mobility: return "figure.walk"
-        case .appetite: return "fork.knife"
-        case .skin: return "bandage.fill"
-        case .behavior: return "moon.zzz.fill"
-        case .other: return "magnifyingglass"
+        case .digestive: "stomach.fill"
+        case .respiratory: "lungs.fill"
+        case .mobility: "figure.walk"
+        case .appetite: "fork.knife"
+        case .skin: "bandage.fill"
+        case .behavior: "moon.zzz.fill"
+        case .other: "magnifyingglass"
         }
     }
 
     func localizedSeverityLabel(_ severity: SymptomSeverity) -> String {
         switch severity {
-        case .mild: return l.tr(zh: "轻微", en: "Mild", de: "Leicht")
-        case .moderate: return l.tr(zh: "中度", en: "Moderate", de: "Mittel")
-        case .severe: return l.tr(zh: "严重", en: "Severe", de: "Schwer")
-        case .critical: return l.tr(zh: "紧急", en: "Critical", de: "Kritisch")
+        case .mild: l.tr(zh: "轻微", en: "Mild", de: "Leicht")
+        case .moderate: l.tr(zh: "中度", en: "Moderate", de: "Mittel")
+        case .severe: l.tr(zh: "严重", en: "Severe", de: "Schwer")
+        case .critical: l.tr(zh: "紧急", en: "Critical", de: "Kritisch")
         }
     }
 
     func alertIcon(for type: HealthAlert.AlertType) -> String {
         switch type {
-        case .vaccineExpired, .vaccineExpiringSoon: return "syringe.fill"
-        case .dewormingDue: return "pills.fill"
-        case .weightGainAlert, .weightLossAlert: return "scalemass.fill"
-        case .noCheckIn: return "calendar.badge.exclamationmark"
-        case .noPotty: return "toilet.fill"
-        case .noWalk: return "figure.walk"
-        case .checkupOverdue: return "stethoscope"
-        case .documentExpiringSoon: return "doc.text.fill"
-        case .activeSymptom: return "waveform.path.ecg"
-        case .heatCycleAlert: return "heart.text.square.fill"
-        case .pregnancyCountdown: return "cross.case.fill"
-        case .drinkingWeightAlert: return "drop.fill"
-        case .lowActivityAlert: return "chart.line.downtrend.xyaxis"
+        case .vaccineExpired, .vaccineExpiringSoon: "syringe.fill"
+        case .dewormingDue: "pills.fill"
+        case .weightGainAlert, .weightLossAlert: "scalemass.fill"
+        case .noCheckIn: "calendar.badge.exclamationmark"
+        case .noPotty: "toilet.fill"
+        case .noWalk: "figure.walk"
+        case .checkupOverdue: "stethoscope"
+        case .documentExpiringSoon: "doc.text.fill"
+        case .activeSymptom: "waveform.path.ecg"
+        case .heatCycleAlert: "heart.text.square.fill"
+        case .pregnancyCountdown: "cross.case.fill"
+        case .drinkingWeightAlert: "drop.fill"
+        case .lowActivityAlert: "chart.line.downtrend.xyaxis"
         }
     }
 
@@ -228,19 +228,20 @@ struct PetHealthDetailContentView: View {
         return pet.healthLogs
             .filter { $0.date >= cutoff }
             .map { HealthScatterPoint(date: $0.date, typeName: $0.type,
-                                     typeEnum: HealthLogType(rawValue: $0.type) ?? .general) }
+                                      typeEnum: HealthLogType(rawValue: $0.type) ?? .general) }
     }
 
     // 图表 X 轴范围
     var chartXDomain: ClosedRange<Date> {
         let start = Calendar.current.date(byAdding: .month, value: -12, to: Date())!
-        return start...Date()
+        return start ... Date()
     }
 
     // 颜色映射 domain / range（固定顺序供 chartColorScale 使用）
     var colorDomain: [String] {
         HealthLogType.allCases.map(\.rawValue)
     }
+
     var colorRange: [Color] {
         HealthLogType.allCases.map { colorForType($0) }
     }
@@ -261,7 +262,7 @@ struct PetHealthDetailContentView: View {
     var medicationDoseEvents: [Event] {
         allEvents.filter {
             $0.eventType == EventType.petMedicationDose.rawValue
-            && $0.relatedEntityType == PetMedicationDoseLogging.relatedEntityTypeMedication
+                && $0.relatedEntityType == PetMedicationDoseLogging.relatedEntityTypeMedication
         }
     }
 
@@ -272,7 +273,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var takenMedicationDosesToday: Int {
-        let _ = medicationDoseRefreshToken
+        _ = medicationDoseRefreshToken
         return activeMedications.reduce(0) { total, med in
             let need = PetMedicationDoseLogging.requiredDoses(on: Date(), for: med)
             let count = PetMedicationDoseLogging.todayDoseCount(events: medicationDoseEvents, medicationId: med.id)
@@ -320,9 +321,9 @@ struct PetHealthDetailContentView: View {
             .sorted { $0.scheduledAt < $1.scheduledAt }
             .first
             ?? todayMedicationDoseItems
-                .filter { !$0.isCompleted }
-                .sorted { $0.scheduledAt < $1.scheduledAt }
-                .first
+            .filter { !$0.isCompleted }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+            .first
     }
 
     var nextMedicationDoseText: String {
@@ -365,16 +366,16 @@ struct PetHealthDetailContentView: View {
             return days
         }).min() {
             return overdue == 0
-            ? l.tr(zh: "今天", en: "Today", de: "Heute")
-            : l.tr(zh: "逾期 \(abs(overdue)) 天", en: "\(abs(overdue)) days overdue", de: "\(abs(overdue)) Tage überfällig")
+                ? l.tr(zh: "今天", en: "Today", de: "Heute")
+                : l.tr(zh: "逾期 \(abs(overdue)) 天", en: "\(abs(overdue)) days overdue", de: "\(abs(overdue)) Tage überfällig")
         }
         if items.contains(where: { $0.1 == nil }) {
             return l.tr(zh: "待补录", en: "Missing", de: "Fehlt")
         }
         if let next = items.compactMap(\.1).min() {
             return next <= 0
-            ? l.tr(zh: "今天", en: "Today", de: "Heute")
-            : l.tr(zh: "\(next) 天", en: "\(next) days", de: "\(next) Tage")
+                ? l.tr(zh: "今天", en: "Today", de: "Heute")
+                : l.tr(zh: "\(next) 天", en: "\(next) days", de: "\(next) Tage")
         }
         return l.tr(zh: "正常", en: "OK", de: "OK")
     }
@@ -392,8 +393,8 @@ struct PetHealthDetailContentView: View {
         if Calendar.current.isDateInToday(symptom.date) { return symptom.severity.label }
         let days = Calendar.current.dateComponents([.day], from: symptom.date, to: Date()).day ?? 0
         return days <= 0
-        ? symptom.severity.label
-        : l.tr(zh: "\(days) 天前", en: "\(days)d ago", de: "vor \(days) Tagen")
+            ? symptom.severity.label
+            : l.tr(zh: "\(days) 天前", en: "\(days)d ago", de: "vor \(days) Tagen")
     }
 
     var archiveStatusText: String {
@@ -528,7 +529,7 @@ struct PetHealthDetailContentView: View {
         return (logItems + symptomItems + heatItems)
             .sorted { $0.date > $1.date }
             .prefix(5)
-            .map { $0 }
+            .map(\.self)
     }
 
     func handleMedicationPrimaryAction() {
@@ -563,14 +564,14 @@ struct PetHealthDetailContentView: View {
         let dayCount = max(0, calendar.dateComponents([.day], from: startDay, to: endDay).day ?? 0)
         var items: [PetHealthMedicationDoseItem] = []
 
-        for offset in 0...dayCount {
+        for offset in 0 ... dayCount {
             guard let day = calendar.date(byAdding: .day, value: offset, to: startDay) else { continue }
             for medication in activeMedications {
                 let required = PetMedicationDoseLogging.requiredDoses(on: day, for: medication)
                 guard required > 0 else { continue }
                 let completedCount = medicationDoseCount(on: day, for: medication)
                 let minutes = PetMedicationSchedulePlan.doseMinutes(for: medication, required: required)
-                for index in 0..<required {
+                for index in 0 ..< required {
                     let minute = minutes.indices.contains(index) ? minutes[index] : 8 * 60
                     guard let scheduled = calendar.date(byAdding: .minute, value: minute, to: day) else { continue }
                     items.append(
@@ -589,10 +590,10 @@ struct PetHealthDetailContentView: View {
 
     func medicationDoseCount(on day: Date, for medication: PetMedication) -> Int {
         let calendar = Calendar.current
-        return medicationDoseEvents.filter {
+        return medicationDoseEvents.count(where: {
             $0.relatedEntityId == medication.id.uuidString
-            && calendar.isDate($0.startDate, inSameDayAs: day)
-        }.count
+                && calendar.isDate($0.startDate, inSameDayAs: day)
+        })
     }
 
     func relativeDoseTime(_ date: Date) -> String {
@@ -632,7 +633,7 @@ struct PetHealthDetailContentView: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    if healthPlusDestination == nil && !showingMedicationPopup {
+                    if healthPlusDestination == nil, !showingMedicationPopup {
                         healthAddMenu
                             .padding(.trailing, 18)
                             .padding(.bottom, 24)

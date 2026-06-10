@@ -122,9 +122,9 @@ enum HumanPrivacyCommandService {
     private static func shouldSaveVerificationResult(_ result: HumanPasscodeVerification) -> Bool {
         switch result {
         case .success, .incorrect, .locked:
-            return true
+            true
         case .invalidFormat, .noPasscode:
-            return false
+            false
         }
     }
 }

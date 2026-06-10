@@ -3,18 +3,18 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 /// 谷歌日历风格滑动行：左滑完成 + 右滑删除 + 点击详情
 /// 三种视觉状态：Pending / Completed / Overdue
 struct SwipeableEventRow: View {
     let event: Event
-    var occurrenceDate: Date = Date()
-    var petThemeColor: Color? = nil
+    var occurrenceDate: Date = .init()
+    var petThemeColor: Color?
     let onComplete: () -> Void
     let onDelete: () -> Void
-    var onOpenRelated: (() -> Bool)? = nil
+    var onOpenRelated: (() -> Bool)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
@@ -43,12 +43,13 @@ struct SwipeableEventRow: View {
         case horizontal
         case vertical
     }
+
     private var shouldReduceWork: Bool {
         powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
     }
 
-    private var leftProgress:  CGFloat { max(0, -offsetX) / triggerThreshold }
-    private var rightProgress: CGFloat { max(0,  offsetX) / triggerThreshold }
+    private var leftProgress: CGFloat { max(0, -offsetX) / triggerThreshold }
+    private var rightProgress: CGFloat { max(0, offsetX) / triggerThreshold }
 
     // MARK: - Row State（重复序列按「本次发生日」判断完成/逾期，避免整串共用一个 isCompleted / startDate）
     private enum RowState { case pending, completed, overdue }
@@ -69,7 +70,7 @@ struct SwipeableEventRow: View {
     private struct CoconutFloat: Identifiable {
         let id = UUID()
         var offsetY: CGFloat = 0
-        var opacity: Double  = 1.0
+        var opacity: Double = 1.0
     }
 
     var body: some View {
@@ -94,7 +95,7 @@ struct SwipeableEventRow: View {
             }
 
             // 左滑背景（完成，仅行动任务才可完成）
-            if offsetX < 0 && event.isActionableTask {
+            if offsetX < 0, event.isActionableTask {
                 HStack {
                     Spacer()
                     VStack(spacing: 4) {
@@ -110,7 +111,7 @@ struct SwipeableEventRow: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.goTeal.opacity(0.2 + leftProgress * 0.7)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)))
             }
 
             // 右滑背景（删除）
@@ -130,7 +131,7 @@ struct SwipeableEventRow: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.goRed.opacity(0.2 + rightProgress * 0.7)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)))
             }
 
             // 主卡片
@@ -162,8 +163,8 @@ struct SwipeableEventRow: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text(event.recurrenceDays > 0
-                 ? "这是一个重复事件，请选择删除方式"
-                 : "确定要删除「\(event.title)」吗？此操作不可撤回。")
+                ? "这是一个重复事件，请选择删除方式"
+                : "确定要删除「\(event.title)」吗？此操作不可撤回。")
         }
         .onAppear {
             guard rowState == .overdue, !shouldReduceWork else {
@@ -190,9 +191,9 @@ struct SwipeableEventRow: View {
     // MARK: - Event Card
 
     private var eventCard: some View {
-        let titlePrimary: Color = Color.ohanaPrimaryText
-        let titleMuted: Color = Color.ohanaTertiaryText
-        let timeSecondary: Color = Color.ohanaSecondaryText.opacity(0.72)
+        let titlePrimary = Color.ohanaPrimaryText
+        let titleMuted = Color.ohanaTertiaryText
+        let timeSecondary = Color.ohanaSecondaryText.opacity(0.72)
         // Squish scale: card compresses as left-swipe deepens
         let squishX = 1.0 - leftProgress * 0.04
         let squishY = 1.0 + leftProgress * 0.02
@@ -326,10 +327,10 @@ struct SwipeableEventRow: View {
         if let themeColor = petThemeColor { return themeColor }
         let t = event.eventType.lowercased() + event.title.lowercased()
         if t.contains("排泄") || t.contains("potty") || t.contains("便") || t.contains("铲") { return .goTeal }
-        if t.contains("喂食") || t.contains("食") || t.contains("feed")                      { return .goYellow }
-        if t.contains("遛")   || t.contains("walk")                                          { return .goPrimary }
-        if t.contains("医")   || t.contains("疫苗") || t.contains("health")                  { return .goRed }
-        if t.contains("清洁") || t.contains("洗澡") || t.contains("hygiene")                 { return Color(hex: "C084FC") }
+        if t.contains("喂食") || t.contains("食") || t.contains("feed") { return .goYellow }
+        if t.contains("遛") || t.contains("walk") { return .goPrimary }
+        if t.contains("医") || t.contains("疫苗") || t.contains("health") { return .goRed }
+        if t.contains("清洁") || t.contains("洗澡") || t.contains("hygiene") { return Color(hex: "C084FC") }
         return .goCardBlue
     }
 
@@ -384,7 +385,7 @@ struct SwipeableEventRow: View {
                     return
                 }
 
-                if dx < -triggerThreshold && event.isActionableTask { triggerComplete() }
+                if dx < -triggerThreshold, event.isActionableTask { triggerComplete() }
                 else if dx < -triggerThreshold { withAnimation(GoMotion.feedback) { offsetX = 0 } }
                 else if dx > triggerThreshold { pendingDelete() }
                 else {
@@ -468,12 +469,12 @@ struct SwipeableEventRow: View {
 
     private func launchCelebrationParticles() {
         let emojis = equipFxStars ? ["✨", "⭐️", "🌟", "💫", "💛"] : ["⭐️", "✨", "💛", "🎉", "🐾"]
-        celebrationParticles = (0..<6).map { i in
+        celebrationParticles = (0 ..< 6).map { i in
             CelebrationParticle(
                 emoji: emojis[i % emojis.count],
-                offsetX: CGFloat.random(in: -80...80),
+                offsetX: CGFloat.random(in: -80 ... 80),
                 offsetY: CGFloat.random(in: -120 ... -40),
-                rotation: Double.random(in: -30...30)
+                rotation: Double.random(in: -30 ... 30)
             )
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { celebrationParticles.removeAll() }
@@ -520,7 +521,7 @@ private struct EventDetailSheet: View {
                     // 标题行
                     HStack(spacing: 14) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                                 .fill(nodeColor.opacity(0.15))
                                 .frame(width: 52, height: 52)
                             Image(systemName: event.silhouetteListSymbol)
@@ -588,7 +589,7 @@ private struct EventDetailSheet: View {
                                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                    .background(Color.goTeal, in: RoundedRectangle(cornerRadius: 14))
+                                    .background(Color.goTeal, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
                             }
                             .buttonStyle(ScaleButtonStyle())
                         }
@@ -600,7 +601,7 @@ private struct EventDetailSheet: View {
                                 .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .frame(maxWidth: .infinity).padding(.vertical, 14)
-                                .background(Color.goRed, in: RoundedRectangle(cornerRadius: 14))
+                                .background(Color.goRed, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
                         }
                         .buttonStyle(ScaleButtonStyle())
                         .confirmationDialog("确认删除", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
@@ -630,7 +631,7 @@ private struct EventDetailSheet: View {
                 Color.goPrimary.opacity(0.15)
             }
         }
-        .presentationCornerRadius(28)
+        .presentationCornerRadius(OhanaRadius.hero)
     }
 
     private func infoRow(icon: String, label: String, value: String) -> some View {
@@ -653,20 +654,20 @@ private struct EventDetailSheet: View {
 
     private func recurrenceLabel(_ days: Int) -> String {
         switch days {
-        case 1:  return "每天"
-        case 7:  return "每周"
-        case 14: return "每两周"
-        case 30: return "每月"
-        default: return "每\(days)天"
+        case 1: "每天"
+        case 7: "每周"
+        case 14: "每两周"
+        case 30: "每月"
+        default: "每\(days)天"
         }
     }
 
     private var nodeColor: Color {
         let t = event.eventType.lowercased()
-        if t.contains("排泄") || t.contains("potty")  { return .goTeal }
-        if t.contains("喂食") || t.contains("feed")   { return .goYellow }
-        if t.contains("遛")   || t.contains("walk")   { return .goPrimary }
-        if t.contains("医")   || t.contains("疫苗")   { return .goRed }
+        if t.contains("排泄") || t.contains("potty") { return .goTeal }
+        if t.contains("喂食") || t.contains("feed") { return .goYellow }
+        if t.contains("遛") || t.contains("walk") { return .goPrimary }
+        if t.contains("医") || t.contains("疫苗") { return .goRed }
         return .goCardBlue
     }
 }

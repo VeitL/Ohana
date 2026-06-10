@@ -65,11 +65,11 @@ enum CoconutAccountKey {
     static func key(ownerKind: CoconutWalletOwnerKind, ownerId: String) -> String {
         switch ownerKind {
         case .human:
-            return human(ownerId)
+            human(ownerId)
         case .pet:
-            return pet(ownerId)
+            pet(ownerId)
         case .system:
-            return system(ownerId.isEmpty ? "legacy" : ownerId)
+            system(ownerId.isEmpty ? "legacy" : ownerId)
         }
     }
 }

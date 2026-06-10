@@ -9,8 +9,8 @@
 //  点击展开完整摘要 Sheet。
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct IslandMoodHeaderStrip: View {
     let pets: [Pet]
@@ -53,24 +53,24 @@ struct IslandMoodHeaderStrip: View {
     /// 显示的 emoji（跟天气/情绪映射）
     private var moodEmoji: String {
         switch mood {
-        case .celebrate:   return "🎉"
-        case .plantBreeze: return "🌿"
-        case .breezy:      return "🌤"
-        case .calm:        return "☀️"
-        case .cloudy:      return "⛅"
-        case .storm:       return "⛈"
+        case .celebrate: "🎉"
+        case .plantBreeze: "🌿"
+        case .breezy: "🌤"
+        case .calm: "☀️"
+        case .cloudy: "⛅"
+        case .storm: "⛈"
         }
     }
 
     /// 主色（与严重度/情绪联动）
     private var accentColor: Color {
         switch mood {
-        case .celebrate:   return Color.goYellow
-        case .plantBreeze: return Color.goLime
-        case .breezy:      return Color.goPrimary
-        case .calm:        return Color.goPrimary
-        case .cloudy:      return Color.goYellow
-        case .storm:       return Color.goRed
+        case .celebrate: Color.goYellow
+        case .plantBreeze: Color.goLime
+        case .breezy: Color.goPrimary
+        case .calm: Color.goPrimary
+        case .cloudy: Color.goYellow
+        case .storm: Color.goRed
         }
     }
 
@@ -189,11 +189,11 @@ struct IslandMoodHeaderStrip: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .fill(Color.ohanaCardSurface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .strokeBorder(accentColor.opacity(0.22), lineWidth: 1)
             )
         }
@@ -244,16 +244,16 @@ struct IslandMoodHeaderStrip: View {
 
 // MARK: - Preview
 #if DEBUG
-#Preview {
-    ZStack {
-        Color(.systemBackground).ignoresSafeArea()
-        IslandMoodHeaderStrip(
-            pets: [],
-            plants: [],
-            pendingReminders: [],
-            activePet: nil,
-            checkInStreak: 7
-        )
+    #Preview {
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
+            IslandMoodHeaderStrip(
+                pets: [],
+                plants: [],
+                pendingReminders: [],
+                activePet: nil,
+                checkInStreak: 7
+            )
+        }
     }
-}
 #endif

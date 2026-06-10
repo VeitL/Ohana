@@ -1,15 +1,15 @@
 //
-//  DailyQuestsCard.swift
+//  IslandQuestEngine.swift
 //  Ohana
 //
 //  今日岛屿委托：3个动态任务 + 全部完成后解锁椰子盲盒
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Quest Model
 nonisolated struct IslandQuest: Identifiable, Equatable, Sendable {
-    let id: String          // 稳定 ID，用于持久化完成状态
+    let id: String // 稳定 ID，用于持久化完成状态
     let emoji: String
     let title: String
     let subtitle: String
@@ -21,7 +21,7 @@ nonisolated struct IslandQuest: Identifiable, Equatable, Sendable {
 }
 
 // MARK: - Quest Engine
-nonisolated struct IslandQuestEngine {
+nonisolated enum IslandQuestEngine {
     private static let initialHumanWeightRecordedPrefix = "ohana.initialHumanWeightRecorded."
     static let oasisPetWizardQuestId = "q_oasis_pet_wizard"
     static let oasisFirstMealQuestId = "q_oasis_first_meal"
@@ -175,8 +175,8 @@ nonisolated struct IslandQuestEngine {
         // ── 今日提醒（仅在有真实提醒时显示）
         let todayReminders = reminders.filter { cal.isDateInToday($0.scheduledAt) }
         if quests.count < 3, !todayReminders.isEmpty {
-            let allDone = todayReminders.allSatisfy { $0.isCompleted }
-            let pending = todayReminders.filter { !$0.isCompleted }.count
+            let allDone = todayReminders.allSatisfy(\.isCompleted)
+            let pending = todayReminders.count(where: { !$0.isCompleted })
             quests.append(IslandQuest(
                 id: "q_reminder",
                 emoji: allDone ? "✅" : "📅",
@@ -267,7 +267,7 @@ nonisolated struct IslandQuestEngine {
         var quests: [IslandQuest] = []
         let hasAnyMember = !activePets.isEmpty || !humans.isEmpty
 
-        if !manager.isPetWizardCompleted && activePets.isEmpty {
+        if !manager.isPetWizardCompleted, activePets.isEmpty {
             let needsFirstHuman = humans.isEmpty
             quests.append(IslandQuest(
                 id: oasisPetWizardQuestId,
@@ -280,7 +280,7 @@ nonisolated struct IslandQuestEngine {
             ))
         }
 
-        if !manager.isFirstMealRecorded && !activePets.isEmpty {
+        if !manager.isFirstMealRecorded, !activePets.isEmpty {
             quests.append(IslandQuest(
                 id: oasisFirstMealQuestId,
                 emoji: "🍗",
@@ -292,7 +292,7 @@ nonisolated struct IslandQuestEngine {
             ))
         }
 
-        if !manager.isThemeColorSet && hasAnyMember {
+        if !manager.isThemeColorSet, hasAnyMember {
             quests.append(IslandQuest(
                 id: oasisThemeQuestId,
                 emoji: "🎨",
@@ -313,10 +313,10 @@ nonisolated struct IslandQuestEngine {
         now: Date
     ) -> Human? {
         humans
-            .filter { $0.shouldShowOnHome }
+            .filter(\.shouldShowOnHome)
             .first { human in
                 !hasInitialHumanWeightRecordedToday(humanId: human.id, calendar: calendar, now: now) &&
-                !human.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
+                    !human.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
             }
     }
 
@@ -428,31 +428,31 @@ nonisolated struct IslandQuestEngine {
     private static func questId(for kind: RoutineKind, event: Event, pet: Pet) -> String {
         switch kind {
         case .feeding:
-            return "q_feed_\(pet.id.uuidString)"
+            "q_feed_\(pet.id.uuidString)"
         case .watering:
-            return "q_water_\(pet.id.uuidString)"
+            "q_water_\(pet.id.uuidString)"
         case .walk:
-            return "q_walk"
+            "q_walk"
         case .potty:
-            return "q_potty"
+            "q_potty"
         case .play:
-            return "q_play_\(pet.id.uuidString)"
+            "q_play_\(pet.id.uuidString)"
         case .weight:
-            return "q_weight_\(pet.id.uuidString)"
+            "q_weight_\(pet.id.uuidString)"
         case .generic:
-            return "q_event_\(event.id.uuidString)"
+            "q_event_\(event.id.uuidString)"
         }
     }
 
     private static func emoji(for kind: RoutineKind, event: Event) -> String {
         switch kind {
-        case .feeding: return "🍽️"
-        case .watering: return "💧"
-        case .walk: return "🚶"
-        case .potty: return "🧹"
-        case .play: return "🎾"
-        case .weight: return "⚖️"
-        case .generic: return event.emoji
+        case .feeding: "🍽️"
+        case .watering: "💧"
+        case .walk: "🚶"
+        case .potty: "🧹"
+        case .play: "🎾"
+        case .weight: "⚖️"
+        case .generic: event.emoji
         }
     }
 
@@ -468,20 +468,20 @@ nonisolated struct IslandQuestEngine {
     private static func isRoutineDoneToday(_ kind: RoutineKind, pet: Pet, calendar: Calendar, now: Date) -> Bool {
         switch kind {
         case .feeding:
-            return pet.careLogs.contains { $0.careType == .feeding && calendar.isDate($0.date, inSameDayAs: now) }
+            pet.careLogs.contains { $0.careType == .feeding && calendar.isDate($0.date, inSameDayAs: now) }
         case .watering:
-            return pet.careLogs.contains { $0.careType == .watering && calendar.isDate($0.date, inSameDayAs: now) }
+            pet.careLogs.contains { $0.careType == .watering && calendar.isDate($0.date, inSameDayAs: now) }
         case .walk:
-            return pet.walkLogs.contains { calendar.isDate($0.startDate, inSameDayAs: now) }
+            pet.walkLogs.contains { calendar.isDate($0.startDate, inSameDayAs: now) }
         case .potty:
-            return pet.pottyLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
+            pet.pottyLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
                 || pet.careLogs.contains { $0.careType == .litter && calendar.isDate($0.date, inSameDayAs: now) }
         case .play:
-            return pet.careLogs.contains { $0.careType == .play && calendar.isDate($0.date, inSameDayAs: now) }
+            pet.careLogs.contains { $0.careType == .play && calendar.isDate($0.date, inSameDayAs: now) }
         case .weight:
-            return pet.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
+            pet.weightLogs.contains { calendar.isDate($0.date, inSameDayAs: now) }
         case .generic:
-            return false
+            false
         }
     }
 
@@ -492,15 +492,14 @@ nonisolated struct IslandQuestEngine {
         calendar: Calendar,
         now: Date
     ) -> String {
-        let fallback: String
-        switch kind {
-        case .feeding: fallback = "今天还缺喂食"
-        case .watering: fallback = "今天还缺饮水记录"
-        case .walk: fallback = "今天还缺遛狗"
-        case .potty: fallback = "今天还缺厕所/便便记录"
-        case .play: fallback = "今天还缺互动陪伴"
-        case .weight: fallback = "今天还缺体重记录"
-        case .generic: fallback = "按计划完成后，家人都能看到状态"
+        let fallback = switch kind {
+        case .feeding: "今天还缺喂食"
+        case .watering: "今天还缺饮水记录"
+        case .walk: "今天还缺遛狗"
+        case .potty: "今天还缺厕所/便便记录"
+        case .play: "今天还缺互动陪伴"
+        case .weight: "今天还缺体重记录"
+        case .generic: "按计划完成后，家人都能看到状态"
         }
 
         guard let last = lastRoutineActor(for: kind, pet: pet) else { return fallback }
@@ -563,20 +562,20 @@ nonisolated struct IslandQuestEngine {
     }
 
     static func allCompleted(quests: [IslandQuest]) -> Bool {
-        !quests.isEmpty && quests.allSatisfy { $0.isCompleted }
+        !quests.isEmpty && quests.allSatisfy(\.isCompleted)
     }
 
     /// 委托完成时椰子粒子数量
     static func coconutReward(forQuestId id: String) -> Int {
         switch id {
-        case "q_water_plant":     return 1
+        case "q_water_plant": return 1
         case "q_fertilize_plant": return 1
-        case "q_reminder":        return 2
+        case "q_reminder": return 2
         default:
-            if id.hasPrefix("q_med_")   { return 2 }
-            if id.hasPrefix("q_feed_")  { return 2 }
+            if id.hasPrefix("q_med_") { return 2 }
+            if id.hasPrefix("q_feed_") { return 2 }
             if id.hasPrefix("q_water_") { return 1 }
-            if id.hasPrefix("q_play_")  { return 2 }
+            if id.hasPrefix("q_play_") { return 2 }
             if id.hasPrefix("q_weight_") { return 2 }
             if id.hasPrefix("q_human_weight_") { return 2 }
             if id.hasPrefix("q_moment_") { return 1 }
@@ -606,13 +605,14 @@ struct CoconutDropSheet: View {
         ("🌺", "今日解锁：繁花岛限定卡片"),
         ("⭐️", "你的宠物今天特别可爱"),
         ("🍀", "幸运签：今天出门一定艳阳天"),
-        ("🐠", "冷知识：猫咪平均每天睡 14 小时"),
+        ("🐠", "冷知识：猫咪平均每天睡 14 小时")
     ]
     private var reward: (emoji: String, text: String) {
         // 用今日日期做种子，保证同天拿到同一个奖励
         let day = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 1
         return rewards[day % rewards.count]
     }
+
     private var shouldAnimate: Bool {
         workloadPolicy.shouldAnimate(isVisible: isVisible)
     }

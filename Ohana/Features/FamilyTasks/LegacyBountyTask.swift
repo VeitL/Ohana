@@ -82,9 +82,9 @@ struct BountyTask: Identifiable, Codable {
 
     static func pendingAssignedCount(for humanIdString: String) -> Int {
         guard !humanIdString.isEmpty else { return 0 }
-        return loadAll().filter {
+        return loadAll().count(where: {
             !$0.isCompleted && $0.assignedToId == humanIdString
-        }.count
+        })
     }
 }
 

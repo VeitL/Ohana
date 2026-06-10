@@ -48,23 +48,28 @@ struct PetVetSummaryPDFView: View {
 
     private var themeColor: Color { pet.themeColor.color }
     private var recentHealthLogs: [PetHealthLog] {
-        pet.healthLogs.sorted { $0.date > $1.date }.prefix(8).map { $0 }
+        pet.healthLogs.sorted { $0.date > $1.date }.prefix(8).map(\.self)
     }
+
     private var activeMedications: [PetMedication] {
         pet.medications.filter(\.isActiveToday).sorted { $0.createdAt > $1.createdAt }
     }
+
     private var recentSymptoms: [SymptomLog] {
-        pet.symptomLogs.sorted { $0.date > $1.date }.prefix(3).map { $0 }
+        pet.symptomLogs.sorted { $0.date > $1.date }.prefix(3).map(\.self)
     }
+
     private var activeInsurance: PetInsurance? {
         pet.insurances.filter(\.isActive).sorted { $0.renewalDate < $1.renewalDate }.first
     }
+
     private var keyDocuments: [PetDocument] {
         pet.documents
             .sorted { ($0.expiryDate ?? .distantFuture) < ($1.expiryDate ?? .distantFuture) }
             .prefix(3)
-            .map { $0 }
+            .map(\.self)
     }
+
     private var weightLogs3Mo: [PetWeightLog] {
         let cutoff = Calendar.current.date(byAdding: .month, value: -3, to: Date())!
         return pet.weightLogs.filter { $0.date >= cutoff }.sorted { $0.date < $1.date }
@@ -140,7 +145,7 @@ struct PetVetSummaryPDFView: View {
             ("年龄", pet.ageText.isEmpty ? "未知" : pet.ageText),
             ("体重", pet.weightLogs.sorted { $0.date > $1.date }.first.map { String(format: "%.1f kg", $0.weight) } ?? "未记录"),
             ("归家日期", pet.homeDate.map { $0.formatted(.dateTime.year().month().day()) } ?? "未知"),
-            ("芯片号", pet.microchipID.isEmpty ? "未登记" : pet.microchipID),
+            ("芯片号", pet.microchipID.isEmpty ? "未登记" : pet.microchipID)
         ]
         return VStack(alignment: .leading, spacing: 6) {
             Text("基础信息")
@@ -155,7 +160,7 @@ struct PetVetSummaryPDFView: View {
                             .lineLimit(1).minimumScaleFactor(0.7)
                     }
                     .padding(8)
-                    .background(Color.gray.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+                    .background(Color.gray.opacity(0.05), in: RoundedRectangle(cornerRadius: OhanaRadius.icon))
                 }
             }
         }
@@ -163,7 +168,7 @@ struct PetVetSummaryPDFView: View {
 
     // MARK: - 过敏 & 备注
     private var pdfAllergyNotes: some View {
-        return VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("就诊速览")
                 .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 6) {
@@ -190,7 +195,7 @@ struct PetVetSummaryPDFView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 38, alignment: .topLeading)
         .padding(7)
-        .background(Color.gray.opacity(0.045), in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.gray.opacity(0.045), in: RoundedRectangle(cornerRadius: OhanaRadius.icon))
     }
 
     private var medicationSummaryText: String {
@@ -271,14 +276,14 @@ struct PetVetSummaryPDFView: View {
                         .foregroundStyle(Color(hex: "1A1A2E").opacity(0.8))
                         .padding(.horizontal, 8).padding(.vertical, 5)
                         .background(recentHealthLogs.firstIndex(where: { $0.id == log.id })?.isMultiple(of: 2) == true
-                                    ? Color.gray.opacity(0.025) : Color.clear)
+                            ? Color.gray.opacity(0.025) : Color.clear)
 
                         Divider().opacity(0.3)
                     }
                 }
-                .overlay(RoundedRectangle(cornerRadius: 8)
+                .overlay(RoundedRectangle(cornerRadius: OhanaRadius.icon)
                     .strokeBorder(Color.gray.opacity(0.15), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.icon))
             }
         }
     }
@@ -331,7 +336,7 @@ struct PetVetPDFShareSheet: View {
                 VStack(spacing: 20) {
                     // 预览缩略图
                     ZStack {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                             .fill(Color.ohanaCardSurface)
                             .frame(maxWidth: .infinity)
                             .frame(height: 200)
@@ -361,7 +366,7 @@ struct PetVetPDFShareSheet: View {
                         .foregroundStyle(.black) // ui-v4: allow ink on PDF action preview
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .padding(.horizontal, 20)

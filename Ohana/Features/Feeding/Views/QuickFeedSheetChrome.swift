@@ -45,7 +45,7 @@ struct TreatCelebrationOverlay: View {
 
             VStack(spacing: 10) {
                 ZStack {
-                    ForEach(0..<10, id: \.self) { index in
+                    ForEach(0 ..< 10, id: \.self) { index in
                         Image(systemName: index.isMultiple(of: 2) ? "heart.fill" : "sparkle")
                             .font(.system(size: index.isMultiple(of: 2) ? 13 : 10, weight: .black))
                             .foregroundStyle(index.isMultiple(of: 2) ? tint : Color(hex: "FF69B4"))
@@ -75,7 +75,7 @@ struct TreatCelebrationOverlay: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .padding(24)
-            .feedGlassSurface(cornerRadius: 28, tint: tint, tintOpacity: 0.045)
+            .feedGlassSurface(cornerRadius: OhanaRadius.hero, tint: tint, tintOpacity: 0.045)
         }
     }
 }
@@ -111,7 +111,7 @@ struct FeedInlineSheetScrollTopPreferenceKey: PreferenceKey {
 struct FeedScrollBounceConfigurator: UIViewRepresentable {
     let isBouncingEnabled: Bool
 
-    func makeUIView(context: Context) -> UIView {
+    func makeUIView(context _: Context) -> UIView {
         let view = UIView(frame: .zero)
         view.isUserInteractionEnabled = false
         DispatchQueue.main.async {
@@ -120,7 +120,7 @@ struct FeedScrollBounceConfigurator: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: UIView, context: Context) {
+    func updateUIView(_ uiView: UIView, context _: Context) {
         DispatchQueue.main.async {
             configureScrollView(from: uiView)
         }
@@ -240,12 +240,12 @@ extension View {
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
-    func feedingTextFieldStyle(tint: Color) -> some View {
+    func feedingTextFieldStyle(tint _: Color) -> some View {
         self
             .font(OhanaFont.headline(.bold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .padding(14)
-            .feedFlatBlockSurface(cornerRadius: 16)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
     }
 }
 

@@ -71,7 +71,7 @@ struct WaterRuleState {
     }
 
     var completedTodayPlanReminders: [Reminder] {
-        todayPlanReminders.filter { $0.isCompleted }
+        todayPlanReminders.filter(\.isCompleted)
     }
 
     var nextPendingReminder: Reminder? {
@@ -93,14 +93,13 @@ enum WaterPlanWriter {
 
     static func suggestedTimes(count: Int, now: Date = Date(), calendar: Calendar = .current) -> [Date] {
         let clamped = min(max(count, 1), 6)
-        let hours: [Int]
-        switch clamped {
-        case 1: hours = [10]
-        case 2: hours = [10, 18]
-        case 3: hours = [9, 14, 20]
-        case 4: hours = [8, 12, 16, 21]
-        case 5: hours = [7, 11, 15, 18, 22]
-        default: hours = [7, 10, 13, 16, 19, 22]
+        let hours: [Int] = switch clamped {
+        case 1: [10]
+        case 2: [10, 18]
+        case 3: [9, 14, 20]
+        case 4: [8, 12, 16, 21]
+        case 5: [7, 11, 15, 18, 22]
+        default: [7, 10, 13, 16, 19, 22]
         }
         return hours.prefix(clamped).map {
             calendar.date(bySettingHour: $0, minute: 0, second: 0, of: now) ?? now
@@ -160,7 +159,7 @@ enum WaterPlanWriter {
             deleteEvent(event, context: context)
             didDelete = true
         }
-        if save && didDelete {
+        if save, didDelete {
             context.safeSave()
         }
     }

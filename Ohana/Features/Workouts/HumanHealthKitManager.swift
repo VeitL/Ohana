@@ -24,10 +24,10 @@ final class HumanHealthKitManager: ObservableObject {
     }
 
     func requestAuthorization() async {
-        print("HealthKit is mocked as under development")
+        OhanaLog.info("HealthKit is mocked as under development", category: "HealthKit")
     }
 
-    func fetchTodayStats(pets: [Pet] = []) async {
+    func fetchTodayStats(pets _: [Pet] = []) async {
         todaySteps = 0
         todayCalories = 0
         todayDistanceKm = 0
@@ -37,15 +37,15 @@ final class HumanHealthKitManager: ObservableObject {
         recentWorkouts = []
     }
 
-    func workoutTypeName(_ workout: String) -> String {
+    func workoutTypeName(_: String) -> String {
         "运动"
     }
 
-    func workoutIcon(_ workout: String) -> String {
+    func workoutIcon(_: String) -> String {
         "sparkles"
     }
 
-    func workoutColorHex(_ workout: String) -> String {
+    func workoutColorHex(_: String) -> String {
         "FFF44F"
     }
 }

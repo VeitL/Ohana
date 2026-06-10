@@ -129,7 +129,7 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(16)
-        .feedFlatBlockSurface(cornerRadius: 24)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardLarge)
     }
 
     func embeddedPlanSettingsCard(_ kind: FeedRuleKind) -> some View {
@@ -204,7 +204,7 @@ extension QuickFeedDetailContent {
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
-                        .feedFlatBlockSurface(cornerRadius: 16)
+                        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(draftStore.isSavingFeedPlan)
@@ -212,7 +212,7 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(16)
-        .feedFlatBlockSurface(cornerRadius: 24)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardLarge)
     }
 
     func embeddedPlanMealEditor(index: Int, tint: Color) -> some View {
@@ -240,7 +240,7 @@ extension QuickFeedDetailContent {
             planMealGramEditor(index: index, tint: tint)
         }
         .padding(10)
-        .feedFlatBlockSurface(cornerRadius: 16)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
     }
 
     var embeddedTreatAddCard: some View {
@@ -270,7 +270,7 @@ extension QuickFeedDetailContent {
             }
         }
         .padding(16)
-        .feedFlatBlockSurface(cornerRadius: 24)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardLarge)
     }
 
     var manualDefaultEnabledToggle: some View {
@@ -281,7 +281,7 @@ extension QuickFeedDetailContent {
         }
         .tint(mainFoodTint)
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 16)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
     }
 
     func embeddedPanelHeader(icon: String, title: String, tint: Color) -> some View {
@@ -290,7 +290,7 @@ extension QuickFeedDetailContent {
                 .font(OhanaFont.adaptive(size: 16, weight: .black))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(tint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             Text(title)
                 .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)

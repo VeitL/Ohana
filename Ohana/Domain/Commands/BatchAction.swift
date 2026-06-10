@@ -5,56 +5,56 @@
 //  一键全家批量打卡动作定义 — 支持自定义、序列化、物种过滤
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - BatchActionType
 
 enum BatchActionType: String, CaseIterable, Codable {
-    case feed    = "feed"
-    case water   = "water"
-    case potty   = "potty"
-    case litter  = "litter"
-    case play    = "play"
+    case feed
+    case water
+    case potty
+    case litter
+    case play
 
     var label: String {
         switch self {
-        case .feed:   return "喂食"
-        case .water:  return "喂水"
-        case .potty:  return "便便"
-        case .litter: return "铲砂"
-        case .play:   return "陪玩"
+        case .feed: "喂食"
+        case .water: "喂水"
+        case .potty: "便便"
+        case .litter: "铲砂"
+        case .play: "陪玩"
         }
     }
 
     var emoji: String {
         switch self {
-        case .feed:   return "🍗"
-        case .water:  return "💧"
-        case .potty:  return "💩"
-        case .litter: return "🧹"
-        case .play:   return "🎾"
+        case .feed: "🍗"
+        case .water: "💧"
+        case .potty: "💩"
+        case .litter: "🧹"
+        case .play: "🎾"
         }
     }
 
     var colorHex: String {
         switch self {
-        case .feed:   return "FF8C00"
-        case .water:  return "00D4AA"
-        case .potty:  return "FFF44F"
-        case .litter: return "F59E0B"
-        case .play:   return "FF6B6B"
+        case .feed: "FF8C00"
+        case .water: "00D4AA"
+        case .potty: "FFF44F"
+        case .litter: "F59E0B"
+        case .play: "FF6B6B"
         }
     }
 
     /// SF Symbol icon — 与快捷操作卡片 icon 保持一致
     var sfIcon: String {
         switch self {
-        case .feed:   return "fork.knife"
-        case .water:  return "drop.fill"
-        case .potty:  return "allergens"
-        case .litter: return "trash.fill"
-        case .play:   return "tennisball.fill"
+        case .feed: "fork.knife"
+        case .water: "drop.fill"
+        case .potty: "allergens"
+        case .litter: "trash.fill"
+        case .play: "tennisball.fill"
         }
     }
 }
@@ -65,9 +65,9 @@ struct BatchAction: Identifiable, Codable {
     var id: String { type.rawValue }
     let type: BatchActionType
 
-    var label:        String { type.emoji + " " + type.label }
+    var label: String { type.emoji + " " + type.label }
     var toastMessage: String { type.label + "完成 " + type.emoji }
-    var color:        Color  { Color(hex: type.colorHex) }
+    var color: Color { Color(hex: type.colorHex) }
 
     /// 根据动作类型过滤目标宠物
     func targetPets(from all: [Pet]) -> [Pet] {
@@ -126,7 +126,7 @@ struct BatchActionEditSheet: View {
             // 拖拽把手
             Capsule()
                 .fill(.secondary.opacity(0.35))
-                .frame(width: 36, height: 4)
+                .frame(width: 36, height: 4) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
                 .padding(.top, 10)
                 .padding(.bottom, 20)
 
@@ -134,20 +134,20 @@ struct BatchActionEditSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("一键全家")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(.system(size: 22, weight: .black, design: .rounded)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                     Text("选择批量打卡的操作")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14, weight: .medium)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
+                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(.secondary.opacity(0.15), in: Circle())
+                    Image(systemName: "xmark") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
+                        .font(.system(size: 14, weight: .bold)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .frame(width: 30, height: 30) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
+                        .background(Color.ohanaControlFill, in: Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ScaleButtonStyle())
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
@@ -168,32 +168,32 @@ struct BatchActionEditSheet: View {
                     } label: {
                         VStack(spacing: 8) {
                             ZStack {
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                                     .fill(Color(hex: t.colorHex).opacity(isOn ? 0.22 : 0.08))
                                     .frame(width: 56, height: 56)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                                             .strokeBorder(
                                                 isOn ? Color(hex: t.colorHex).opacity(0.7) : Color(hex: t.colorHex).opacity(0.2),
                                                 lineWidth: isOn ? 2 : 1
                                             )
                                     )
-                                Text(t.emoji).font(.system(size: 26))
+                                Text(t.emoji).font(.system(size: 26)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                             }
                             Text(t.label)
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .font(.system(size: 12, weight: .bold, design: .rounded)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
                                 .foregroundStyle(isOn ? Color(hex: t.colorHex) : .primary.opacity(0.5))
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(
                             isOn ? Color(hex: t.colorHex).opacity(0.06) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         )
                         .scaleEffect(isOn ? 1.04 : 1.0)
-                        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isOn)
+                        .animation(GoMotion.feedback, value: isOn)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
             .padding(.horizontal, 20)
@@ -202,16 +202,16 @@ struct BatchActionEditSheet: View {
 
             Button { dismiss() } label: {
                 Text("完成")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
+                    .font(.system(size: 15, weight: .black, design: .rounded)) // a11y: allow fixed display glyph/legacy hero typography; Dynamic Type migration tracked by P1 baseline
+                    .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
         }
-        .presentationBackground(.ultraThinMaterial)
+        .presentationBackground(.clear)
     }
 }

@@ -5,12 +5,12 @@
 //  体重历史页 (C8a) - 上部图表 + 下部前置layer记录列表
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct WeightHistoryView: View {
     let pet: Pet
-    var onRemove: (() -> Void)? = nil
+    var onRemove: (() -> Void)?
     var showsCloseButton: Bool = true
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -34,8 +34,9 @@ struct WeightHistoryView: View {
 
     // MARK: - Feeding data helpers
     private var recentFoodRecords: [PetFoodRecord] {
-        pet.foodRecords.sorted { $0.startDate > $1.startDate }.prefix(7).map { $0 }
+        pet.foodRecords.sorted { $0.startDate > $1.startDate }.prefix(7).map(\.self)
     }
+
     private var avgDailyGrams: Double? {
         let precise = recentFoodRecords.filter { $0.dailyGrams > 0 }
         guard !precise.isEmpty else { return nil }
@@ -55,7 +56,7 @@ struct WeightHistoryView: View {
         let base = latestKg ?? (pet.species.lowercased().contains("cat") || pet.species.contains("猫") ? 4.0 : 10.0)
         return [base - 0.2, base, base + 0.2]
             .filter { $0 > 0 }
-            .map { (($0 * 10).rounded() / 10) }
+            .map { ($0 * 10).rounded() / 10 }
     }
 
     var body: some View {
@@ -124,7 +125,7 @@ struct WeightHistoryView: View {
             // 变化标签
             if chartLogs.count >= 2 {
                 let first = chartLogs.first!.weightInKg
-                let last  = chartLogs.last!.weightInKg
+                let last = chartLogs.last!.weightInKg
                 let delta = last - first
                 HStack(spacing: 6) {
                     Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
@@ -176,7 +177,7 @@ struct WeightHistoryView: View {
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                 .foregroundStyle(Color.goOrange)
                 .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                .background(Color.goOrange.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(Color.goOrange.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("饮食 · 体重关联")
@@ -202,10 +203,10 @@ struct WeightHistoryView: View {
 
             // Mini bar showing last few food records
             HStack(alignment: .bottom, spacing: 3) {
-                let maxG = recentFoodRecords.map { $0.dailyGrams }.max() ?? 1
+                let maxG = recentFoodRecords.map(\.dailyGrams).max() ?? 1
                 ForEach(Array(recentFoodRecords.prefix(5).enumerated()), id: \.offset) { i, rec in
                     let h = max(6, CGFloat(rec.dailyGrams / maxG) * 28)
-                    RoundedRectangle(cornerRadius: 3)
+                    RoundedRectangle(cornerRadius: OhanaRadius.micro)
                         .fill(i == 0 ? Color.goOrange : Color.goOrange.opacity(0.35))
                         .frame(width: 6, height: h)
                 }
@@ -213,13 +214,13 @@ struct WeightHistoryView: View {
             .frame(height: 28)
         }
         .padding(12)
-        .goTranslucentCard(cornerRadius: 14)
+        .goTranslucentCard(cornerRadius: OhanaRadius.row)
     }
 
     // MARK: - Record List Layer
     private var recordListLayer: some View {
         ZStack(alignment: .top) {
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous)
                 .fill(Color.ohanaCardSurface)
                 .ignoresSafeArea(edges: .bottom)
 
@@ -276,7 +277,7 @@ struct WeightHistoryView: View {
                     .font(OhanaFont.adaptive(size: 17, weight: .black))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("记录体重")
                         .font(OhanaFont.title3(.black))
@@ -315,7 +316,7 @@ struct WeightHistoryView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
                 EmbeddedDecimalKeypad(
                     text: $newWeightText,
@@ -361,7 +362,7 @@ struct WeightHistoryView: View {
                     .labelsHidden()
             }
             .padding(12)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
             Button(action: saveInlineWeight) {
                 HStack(spacing: 8) {
@@ -378,15 +379,15 @@ struct WeightHistoryView: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 
     private func bcsColor(_ score: Int) -> Color {
         switch score {
-        case 1...3: return Color(hex: "4ECDC4")
-        case 4...5: return Color.goPrimary
-        case 6...7: return Color(hex: "FFD93D")
-        default:    return Color(hex: "FF6B6B")
+        case 1 ... 3: Color(hex: "4ECDC4")
+        case 4 ... 5: Color.goPrimary
+        case 6 ... 7: Color(hex: "FFD93D")
+        default: Color(hex: "FF6B6B")
         }
     }
 

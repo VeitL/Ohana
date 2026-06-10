@@ -161,7 +161,7 @@ extension CareLedgerService: CareLedgerRecording {
         coconutDelta: Int,
         metadataJSON: String,
         context: ModelContext,
-        save: Bool
+        save _: Bool
     ) {
         CareLedgerService.recordPetCare(
             log: log,
@@ -182,7 +182,7 @@ extension CareLedgerService: CareLedgerRecording {
         coconutDelta: Int,
         metadataJSON: String,
         context: ModelContext,
-        save: Bool
+        save _: Bool
     ) {
         CareLedgerService.recordPetPotty(
             log: log,
@@ -264,13 +264,13 @@ extension CareLedgerService: CareLedgerRecording {
     private func subjectKind(for event: Event) -> CareLedgerSubjectKind {
         switch event.relatedEntityType {
         case EntityKind.pet.rawValue, "pet":
-            return .pet
+            .pet
         case EntityKind.human.rawValue, "human":
-            return .human
+            .human
         case EntityKind.plant.rawValue, "plant":
-            return .plant
+            .plant
         default:
-            return event.relatedEntityId.isEmpty ? .system : .unknown
+            event.relatedEntityId.isEmpty ? .system : .unknown
         }
     }
 }

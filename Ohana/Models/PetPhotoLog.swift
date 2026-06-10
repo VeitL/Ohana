@@ -5,15 +5,15 @@
 //  ArkSchemaV25：宠物照片相册模型
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 @Model
 final class PetPhotoLog {
     var id: UUID
-    @Attribute(.externalStorage) var imageData: Data    // 原图（externalStorage 防止 db 膨胀）
+    @Attribute(.externalStorage) var imageData: Data // 原图（externalStorage 防止 db 膨胀）
     var date: Date
-    var note: String        // 可选备注（最多 140 字）
+    var note: String // 可选备注（最多 140 字）
     var createdAt: Date
     /// 记录位置（0,0 表示未记录）
     var locationLatitude: Double

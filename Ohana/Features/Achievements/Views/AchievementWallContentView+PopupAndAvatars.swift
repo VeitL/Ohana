@@ -114,10 +114,10 @@ extension AchievementWallContentView {
                     }
                     .padding(12)
                 }
-            .frame(maxWidth: achievementPopupMaxImageWidth)
-            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-            .padding(.horizontal, 12)
-            .transition(.scale(scale: 0.94).combined(with: .opacity))
+                .frame(maxWidth: achievementPopupMaxImageWidth)
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous))
+                .padding(.horizontal, 12)
+                .transition(.scale(scale: 0.94).combined(with: .opacity))
         }
     }
 
@@ -202,7 +202,7 @@ extension AchievementWallContentView {
             .padding(22)
             .shadow(color: Color.arkInk.opacity(0.48), radius: 6, x: 0, y: 2) // ui-v4: allow exported artwork text readability without image wash
         }
-        .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous))
     }
 
     func closePopup() {
@@ -222,7 +222,7 @@ extension AchievementWallContentView {
                 Text(badge.emoji)
                     .font(OhanaFont.adaptive(size: 44)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .frame(width: 70, height: 70)
-                    .background(badge.color.opacity(0.18), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .background(badge.color.opacity(0.18), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
 
                 VStack(spacing: 5) {
                     Text(badge.title)
@@ -268,7 +268,7 @@ extension AchievementWallContentView {
             }
             .padding(18)
             .frame(maxWidth: 300)
-            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous))
             .shadow(color: Color.ohanaPrimaryText.opacity(0.16), radius: 24, x: 0, y: 14) // ui-v4: allow centered confirmation popup needs lifted overlay
             .transition(.scale(scale: 0.94).combined(with: .opacity))
         }
@@ -277,7 +277,7 @@ extension AchievementWallContentView {
     @ViewBuilder
     func activeMemberAvatar(size: CGFloat) -> some View {
         switch activeSubject {
-        case .human(let id):
+        case let .human(id):
             if let human = humans.first(where: { $0.id == id }) {
                 humanAvatar(human, size: size, isSelected: true)
             }
@@ -295,7 +295,7 @@ extension AchievementWallContentView {
     @ViewBuilder
     func memberAvatar(for subject: AchievementSubject, size: CGFloat, isSelected: Bool) -> some View {
         switch subject {
-        case .pet(let id):
+        case let .pet(id):
             if let item = pets.first(where: { $0.id == id }) {
                 PetAvatarPortraitView(
                     pet: item,
@@ -305,7 +305,7 @@ extension AchievementWallContentView {
                     transparentYOffset: 0.04
                 )
             }
-        case .human(let id):
+        case let .human(id):
             if let human = humans.first(where: { $0.id == id }) {
                 humanAvatar(human, size: size, isSelected: isSelected)
             }
@@ -314,10 +314,10 @@ extension AchievementWallContentView {
 
     func memberName(for subject: AchievementSubject) -> String {
         switch subject {
-        case .pet(let id):
-            return pets.first(where: { $0.id == id })?.name ?? ""
-        case .human(let id):
-            return humans.first(where: { $0.id == id })?.name ?? ""
+        case let .pet(id):
+            pets.first(where: { $0.id == id })?.name ?? ""
+        case let .human(id):
+            humans.first(where: { $0.id == id })?.name ?? ""
         }
     }
 

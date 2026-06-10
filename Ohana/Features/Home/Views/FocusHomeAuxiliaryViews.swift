@@ -171,23 +171,21 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             calendar: .current,
             now: Date()
         )
-        let assignedTasks: [FamilyCollaborationTask]
-        if activeHumanId.isEmpty {
-            assignedTasks = []
+        let assignedTasks: [FamilyCollaborationTask] = if activeHumanId.isEmpty {
+            []
         } else {
-            assignedTasks = familyTasks
+            familyTasks
                 .filter {
                     !$0.isFinished &&
-                    (($0.status == .pendingReview && $0.createdById == activeHumanId) ||
-                     ($0.status != .pendingReview && ($0.assignedToId == activeHumanId || $0.claimedById == activeHumanId)))
+                        (($0.status == .pendingReview && $0.createdById == activeHumanId) ||
+                            ($0.status != .pendingReview && ($0.assignedToId == activeHumanId || $0.claimedById == activeHumanId)))
                 }
                 .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
         }
-        let pendingExchanges: [CoconutExchangeRequest]
-        if activeHumanId.isEmpty {
-            pendingExchanges = []
+        let pendingExchanges: [CoconutExchangeRequest] = if activeHumanId.isEmpty {
+            []
         } else {
-            pendingExchanges = exchangeRequests
+            exchangeRequests
                 .filter { $0.status == .pending && $0.receiverId == activeHumanId }
                 .sorted { $0.createdAt < $1.createdAt }
         }
@@ -242,23 +240,21 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
             now: Date(),
             questManager: questManager
         )
-        let assignedTasks: [FamilyCollaborationTask]
-        if activeHumanId.isEmpty {
-            assignedTasks = []
+        let assignedTasks: [FamilyCollaborationTask] = if activeHumanId.isEmpty {
+            []
         } else {
-            assignedTasks = familyTasks
+            familyTasks
                 .filter {
                     !$0.isFinished &&
-                    (($0.status == .pendingReview && $0.createdById == activeHumanId) ||
-                     ($0.status != .pendingReview && ($0.assignedToId == activeHumanId || $0.claimedById == activeHumanId)))
+                        (($0.status == .pendingReview && $0.createdById == activeHumanId) ||
+                            ($0.status != .pendingReview && ($0.assignedToId == activeHumanId || $0.claimedById == activeHumanId)))
                 }
                 .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
         }
-        let pendingExchanges: [CoconutExchangeRequest]
-        if activeHumanId.isEmpty {
-            pendingExchanges = []
+        let pendingExchanges: [CoconutExchangeRequest] = if activeHumanId.isEmpty {
+            []
         } else {
-            pendingExchanges = exchangeRequests
+            exchangeRequests
                 .filter { $0.status == .pending && $0.receiverId == activeHumanId }
                 .sorted { $0.createdAt < $1.createdAt }
         }
@@ -350,7 +346,7 @@ struct TodayFocusQuestCardHost: View {
             allowsAmbientMotion: isLive && presentation == .board
         )
         .task(id: snapshotTaskKey) {
-            guard case .live(let key) = snapshotTaskKey else { return }
+            guard case let .live(key) = snapshotTaskKey else { return }
             await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 96)
             guard !Task.isCancelled else { return }
             refreshSnapshotIfNeeded(for: key)

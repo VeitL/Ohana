@@ -83,7 +83,7 @@ enum DesignSpecAuditEngineV4 {
         )
     }
 
-    private static func hardcodedColorRisk(_ selection: DesignSpecSelectionV4) -> DesignSpecAuditResultV4 {
+    private static func hardcodedColorRisk(_: DesignSpecSelectionV4) -> DesignSpecAuditResultV4 {
         DesignSpecAuditResultV4(
             id: "hardcodedColorRisk",
             titleZh: "深浅色安全",

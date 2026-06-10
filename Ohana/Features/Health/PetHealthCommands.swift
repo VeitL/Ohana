@@ -279,13 +279,13 @@ enum PetHealthCommandService {
     private static func expirationEventType(for type: HealthLogType) -> EventType? {
         switch type {
         case .vaccine:
-            return .vaccine
+            .vaccine
         case .dewormingInternal:
-            return .internalDeworming
+            .internalDeworming
         case .dewormingExternal:
-            return .externalDeworming
+            .externalDeworming
         default:
-            return nil
+            nil
         }
     }
 }

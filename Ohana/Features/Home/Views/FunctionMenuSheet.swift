@@ -50,9 +50,9 @@ struct FunctionMenuSheet: View {
         NavigationStack(path: $path) {
             if let landing = directLandingDestination {
                 directLandingShell(landing)
-                .navigationDestination(for: FMDest.self) { dest in
-                    navigationDestinationView(dest)
-                }
+                    .navigationDestination(for: FMDest.self) { dest in
+                        navigationDestinationView(dest)
+                    }
             } else {
                 FunctionMenuRootRouteContainer(
                     appLanguage: appLanguage,
@@ -190,9 +190,9 @@ struct FunctionMenuSheet: View {
              .careLedgerAnalysis,
              .reminderObservability,
              .bountyBoard:
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 
@@ -218,30 +218,30 @@ struct FunctionMenuSheet: View {
 
     private func destinationChrome(for destination: FMDest) -> (title: String, icon: String) {
         switch destination {
-        case .featureGroup(let group):
-            return (group.title, group.icon)
-        case .featureAggregate(let feature):
-            return (feature.title, feature.icon)
+        case let .featureGroup(group):
+            (group.title, group.icon)
+        case let .featureAggregate(feature):
+            (feature.title, feature.icon)
         case .calendar:
-            return (L10n(appLanguage).tr(zh: "日历", en: "Calendar", de: "Kalender"), "calendar")
+            (L10n(appLanguage).tr(zh: "日历", en: "Calendar", de: "Kalender"), "calendar")
         case .familyWeeklyReport:
-            return (L10n(appLanguage).tr(zh: "家庭周报", en: "Weekly Report", de: "Wochenbericht"), "chart.bar.xaxis")
+            (L10n(appLanguage).tr(zh: "家庭周报", en: "Weekly Report", de: "Wochenbericht"), "chart.bar.xaxis")
         case .careLedgerAnalysis:
-            return (L10n(appLanguage).tr(zh: "照护账本", en: "Care Ledger", de: "Pflegebuch"), "list.bullet.rectangle.fill")
+            (L10n(appLanguage).tr(zh: "照护账本", en: "Care Ledger", de: "Pflegebuch"), "list.bullet.rectangle.fill")
         case .reminderObservability:
-            return (L10n(appLanguage).tr(zh: "提醒观测", en: "Reminder Monitor", de: "Erinnerungen"), "bell.badge.fill")
+            (L10n(appLanguage).tr(zh: "提醒观测", en: "Reminder Monitor", de: "Erinnerungen"), "bell.badge.fill")
         case .coconutShop:
-            return (L10n(appLanguage).tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokos-Shop"), "bag.fill")
+            (L10n(appLanguage).tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokos-Shop"), "bag.fill")
         case .gacha:
-            return (L10n(appLanguage).tr(zh: "扭蛋机", en: "Gacha", de: "Gacha"), "circle.grid.cross.fill")
+            (L10n(appLanguage).tr(zh: "扭蛋机", en: "Gacha", de: "Gacha"), "circle.grid.cross.fill")
         case .wealthDashboard:
-            return (L10n(appLanguage).tr(zh: "Ohana 财富", en: "Ohana Wealth", de: "Ohana Vermögen"), "chart.pie.fill")
+            (L10n(appLanguage).tr(zh: "Ohana 财富", en: "Ohana Wealth", de: "Ohana Vermögen"), "chart.pie.fill")
         case .growthRoadmap:
-            return (L10n(appLanguage).tr(zh: "椰子树路线", en: "Tree Roadmap", de: "Baum-Roadmap"), "tree.fill")
+            (L10n(appLanguage).tr(zh: "椰子树路线", en: "Tree Roadmap", de: "Baum-Roadmap"), "tree.fill")
         case .plantsDashboard:
-            return (L10n(appLanguage).tr(zh: "植物", en: "Plants", de: "Pflanzen"), "leaf.fill")
+            (L10n(appLanguage).tr(zh: "植物", en: "Plants", de: "Pflanzen"), "leaf.fill")
         default:
-            return (L10n(appLanguage).tr(zh: "详情", en: "Details", de: "Details"), "square.grid.2x2.fill")
+            (L10n(appLanguage).tr(zh: "详情", en: "Details", de: "Details"), "square.grid.2x2.fill")
         }
     }
 }

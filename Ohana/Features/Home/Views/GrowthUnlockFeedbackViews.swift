@@ -62,7 +62,7 @@ struct StarterGiftCeremonyOverlay: View {
                 }
                 .padding(18)
                 .frame(maxWidth: 340)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
                 .padding(.horizontal, 24)
                 .padding(.top, max(16, proxy.safeAreaInsets.top))
                 .padding(.bottom, max(16, proxy.safeAreaInsets.bottom))
@@ -81,9 +81,9 @@ struct StarterGiftCeremonyOverlay: View {
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }
@@ -157,7 +157,7 @@ struct GrowthDailyLoopStrip: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private var iconName: String {
@@ -235,9 +235,9 @@ struct GrowthDailyLoopStrip: View {
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }
@@ -283,10 +283,10 @@ struct GrowthLoopPulseToastView: View {
                     en: "Life Tree Lv.\(status.currentLevel) · +\(status.energyDelta) energy",
                     de: "Lebensbaum Lv.\(status.currentLevel) · +\(status.energyDelta) Energie"
                 ))
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
+                .font(OhanaFont.callout(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
                 Text(detailText)
                     .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -306,7 +306,7 @@ struct GrowthLoopPulseToastView: View {
         .padding(.leading, 12)
         .padding(.trailing, 8)
         .padding(.vertical, 10)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
@@ -327,9 +327,9 @@ struct GrowthLoopPulseToastView: View {
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }
@@ -394,7 +394,7 @@ struct GrowthUnlockToastView: View {
         .padding(.leading, 14)
         .padding(.trailing, 4)
         .padding(.vertical, 12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .shadow(color: Color.ohanaPrimaryText.opacity(0.14), radius: 18, x: 0, y: 8) // ui-v4: allow short unlock toast liftedAlert overlay
     }
 
@@ -408,9 +408,9 @@ struct GrowthUnlockToastView: View {
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }

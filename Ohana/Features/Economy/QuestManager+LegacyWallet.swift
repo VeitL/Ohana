@@ -13,7 +13,7 @@ extension QuestManager {
 
     /// 仅更新全岛总库（用于无实体关联的全局奖励）
     func addCoconuts(_ amount: Int, emoji: String = "🥥", title: String = "打卡奖励", reason: String? = nil,
-                      actorId: String? = nil, actorName: String? = nil) {
+                     actorId: String? = nil, actorName: String? = nil) {
         let finalTitle = reason ?? title
         let context = ModelContext(SharedModelContainer.make())
         addCoconuts(
@@ -61,7 +61,7 @@ extension QuestManager {
                 coconutCount = max(0, coconutCount + amount)
             }
             #if DEBUG
-            print("❌ [QuestManager] coconut wallet add failed: \(error.localizedDescription)")
+                OhanaLog.error("[QuestManager] coconut wallet add failed: \(error.localizedDescription)", category: "Economy")
             #endif
             return 0
         }
@@ -105,7 +105,7 @@ extension QuestManager {
                 postsRewardFeedback: postsRewardFeedback
             )
             #if DEBUG
-            print("❌ [QuestManager] coconut wallet delta failed: \(error.localizedDescription)")
+                OhanaLog.error("[QuestManager] coconut wallet delta failed: \(error.localizedDescription)", category: "Economy")
             #endif
         }
     }
@@ -119,7 +119,7 @@ extension QuestManager {
         allHumans: [Human] = []
     ) {
         let human: Human? = humanId.flatMap { hid in allHumans.first { $0.id.uuidString == hid } }
-        let aId   = human?.id.uuidString ?? pet?.id.uuidString
+        let aId = human?.id.uuidString ?? pet?.id.uuidString
         let aName = human?.name ?? pet?.name
 
         // 映射旧规则：全岛总库只加「实际到账」部分
@@ -127,25 +127,28 @@ extension QuestManager {
         let petGet: Int
         switch type {
         case .walk, .feed, .water:
-            humanGet = amount; petGet = amount
+            humanGet = amount
+            petGet = amount
         case .litter:
-            humanGet = amount; petGet = 0
+            humanGet = amount
+            petGet = 0
         case .potty, .general:
-            humanGet = 0; petGet = 0
+            humanGet = 0
+            petGet = 0
         }
 
         let islandDelta = (petGet > 0 && pet != nil ? petGet : 0)
-                        + (humanGet > 0 && human != nil ? humanGet : 0)
-        let fallback    = (islandDelta == 0) ? amount : 0  // potty/general 无实体时保底给全岛
+            + (humanGet > 0 && human != nil ? humanGet : 0)
+        let fallback = (islandDelta == 0) ? amount : 0 // potty/general 无实体时保底给全岛
 
         let titleStr: String
         let emojiStr = type.emoji
         switch type {
-        case .walk:    titleStr = "\(pet?.name ?? "") 遛狗奖励"
-        case .feed:    titleStr = "\(pet?.name ?? "") 喂食奖励"
-        case .litter:  titleStr = "\(pet?.name ?? "") 铲屎奖励"
-        case .potty:   titleStr = "\(pet?.name ?? "") 便便打卡"
-        case .water:   titleStr = "\(pet?.name ?? "") 喂水奖励"
+        case .walk: titleStr = "\(pet?.name ?? "") 遛狗奖励"
+        case .feed: titleStr = "\(pet?.name ?? "") 喂食奖励"
+        case .litter: titleStr = "\(pet?.name ?? "") 铲屎奖励"
+        case .potty: titleStr = "\(pet?.name ?? "") 便便打卡"
+        case .water: titleStr = "\(pet?.name ?? "") 喂水奖励"
         case .general: titleStr = "打卡奖励"
         }
         let context = ModelContext(SharedModelContainer.make())
@@ -203,7 +206,7 @@ extension QuestManager {
                                       actorId: aId, actorName: aName))
             coconutCount = max(0, coconutCount + islandDelta + fallback)
             #if DEBUG
-            print("❌ [QuestManager] legacy award wallet write failed: \(error.localizedDescription)")
+                OhanaLog.error("[QuestManager] legacy award wallet write failed: \(error.localizedDescription)", category: "Economy")
             #endif
         }
     }

@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension FamilyCollaborationDashboardView {
     var taskDrawer: some View {
@@ -48,40 +48,40 @@ extension FamilyCollaborationDashboardView {
 
     var drawerIcon: String {
         switch selectedTaskScope {
-        case .mine: return "person.crop.circle.badge.clock"
-        case .pet: return "pawprint.fill"
-        case .bounty: return "target"
+        case .mine: "person.crop.circle.badge.clock"
+        case .pet: "pawprint.fill"
+        case .bounty: "target"
         }
     }
 
     var drawerTint: Color {
         switch selectedTaskScope {
-        case .mine: return Color.goPurple
-        case .pet: return Color.goYellow
-        case .bounty: return Color.goTeal
+        case .mine: Color.goPurple
+        case .pet: Color.goYellow
+        case .bounty: Color.goTeal
         }
     }
 
     var drawerTitle: String {
         switch selectedTaskScope {
         case .mine:
-            return l.tr(zh: "发给我的任务", en: "Assigned to me", de: "Meine Aufgaben")
+            l.tr(zh: "发给我的任务", en: "Assigned to me", de: "Meine Aufgaben")
         case .pet:
-            return selectedPet.map { l.tr(zh: "\($0.name) 的待办", en: "\($0.name)'s tasks", de: "\($0.name): Aufgaben") }
+            selectedPet.map { l.tr(zh: "\($0.name) 的待办", en: "\($0.name)'s tasks", de: "\($0.name): Aufgaben") }
                 ?? l.tr(zh: "宠物待办", en: "Pet tasks", de: "Tieraufgaben")
         case .bounty:
-            return l.tr(zh: "奖励悬赏", en: "Reward bounties", de: "Prämien")
+            l.tr(zh: "奖励悬赏", en: "Reward bounties", de: "Prämien")
         }
     }
 
     var emptyDrawerText: String {
         switch selectedTaskScope {
         case .mine:
-            return l.tr(zh: "已清空", en: "All clear", de: "Alles klar")
+            l.tr(zh: "已清空", en: "All clear", de: "Alles klar")
         case .pet:
-            return l.tr(zh: "已照顾", en: "Covered", de: "Versorgt")
+            l.tr(zh: "已照顾", en: "Covered", de: "Versorgt")
         case .bounty:
-            return l.tr(zh: "暂无悬赏", en: "No bounty", de: "Keine Prämie")
+            l.tr(zh: "暂无悬赏", en: "No bounty", de: "Keine Prämie")
         }
     }
 
@@ -91,8 +91,8 @@ extension FamilyCollaborationDashboardView {
 
         var id: String {
             switch self {
-            case .reminder(let reminder): return "reminder-\(reminder.id.uuidString)"
-            case .task(let task): return "task-\(task.id.uuidString)"
+            case let .reminder(reminder): "reminder-\(reminder.id.uuidString)"
+            case let .task(task): "task-\(task.id.uuidString)"
             }
         }
     }
@@ -107,7 +107,7 @@ extension FamilyCollaborationDashboardView {
             guard let pet = selectedPet else { return [] }
             let taskRows = familyTasks(for: pet).map { CollaborationRow.task($0) }
             let assignedReminderIds = Set(taskRows.compactMap { row -> String? in
-                if case .task(let task) = row { return task.relatedReminderId }
+                if case let .task(task) = row { return task.relatedReminderId }
                 return nil
             })
             let reminderRows = openReminders(for: pet)
@@ -119,9 +119,9 @@ extension FamilyCollaborationDashboardView {
 
     func collaborationTaskRow(_ row: CollaborationRow) -> some View {
         switch row {
-        case .reminder(let reminder):
+        case let .reminder(reminder):
             return AnyView(reminderAssignmentRow(reminder))
-        case .task(let task):
+        case let .task(task):
             return AnyView(familyTaskRow(task))
         }
     }
@@ -159,8 +159,8 @@ extension FamilyCollaborationDashboardView {
             .accessibilityLabel(assignTitle)
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .onTapGesture {
             presentEditor(.assignReminder(reminder.id))
         }
@@ -194,13 +194,13 @@ extension FamilyCollaborationDashboardView {
                         accent: Color.goYellow,
                         isEnabled: task.status == .pendingReview
                     )
-                    .ohanaShine(trigger: task.statusRaw, cornerRadius: 14, isEnabled: task.status == .pendingReview)
+                    .ohanaShine(trigger: task.statusRaw, cornerRadius: OhanaRadius.row, isEnabled: task.status == .pendingReview)
             }
             taskPrimaryAction(task)
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .onTapGesture {
             presentEditor(.editTask(task.id))
         }

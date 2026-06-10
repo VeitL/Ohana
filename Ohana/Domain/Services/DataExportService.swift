@@ -17,7 +17,7 @@ final class DataExportService {
     /// 将 SwiftData 数据库文件 + 外部图片目录打包为 ZIP，返回临时文件 URL
     /// - Returns: zip 文件 URL（置于 tmp/）；失败返回 nil
     func exportZip() async -> URL? {
-        return await Task.detached(priority: .userInitiated) {
+        await Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
             let fm = FileManager.default
             let tmpDir = fm.temporaryDirectory
                 .appendingPathComponent("ohana_backup_\(Int(Date().timeIntervalSince1970))", isDirectory: true)
@@ -61,7 +61,7 @@ final class DataExportService {
             } catch {
                 try? fm.removeItem(at: tmpDir)
                 #if DEBUG
-                print("❌ [DataExportService] exportZip 失败: \(error)")
+                    OhanaLog.error("[DataExportService] exportZip failed: \(error)", category: "DataExport")
                 #endif
                 return nil
             }
@@ -79,8 +79,8 @@ final class DataExportService {
         // SwiftData 数据库通常在 Application Support 下以 .store 后缀命名
         let storeDir = appSupport
         if let contents = try? fm.contentsOfDirectory(at: storeDir,
-                                                       includingPropertiesForKeys: nil,
-                                                       options: .skipsHiddenFiles) {
+                                                      includingPropertiesForKeys: nil,
+                                                      options: .skipsHiddenFiles) {
             for url in contents where ["sqlite", "sqlite-shm", "sqlite-wal", "store"].contains(url.pathExtension) {
                 candidates.append(url)
             }

@@ -131,24 +131,24 @@ struct TodayFocusCard: View {
 
     var focusStatusText: String {
         switch content {
-        case .quest(let quest):
-            return indexedStatus(
+        case let .quest(quest):
+            indexedStatus(
                 current: pendingQuests.firstIndex { questSkipKey($0) == questSkipKey(quest) },
                 total: pendingQuests.count,
                 zh: "个任务",
                 en: "tasks",
                 de: "Aufgaben"
             )
-        case .familyTask(let task):
-            return indexedStatus(
+        case let .familyTask(task):
+            indexedStatus(
                 current: assignedFamilyTasks.firstIndex { familyTaskSkipKey($0) == familyTaskSkipKey(task) },
                 total: assignedFamilyTasks.count,
                 zh: "协作",
                 en: "collab",
                 de: "Team"
             )
-        case .coconutExchange(let request):
-            return indexedStatus(
+        case let .coconutExchange(request):
+            indexedStatus(
                 current: pendingExchangeRequests.firstIndex { exchangeSkipKey($0) == exchangeSkipKey(request) },
                 total: pendingExchangeRequests.count,
                 zh: "待收款",
@@ -156,7 +156,7 @@ struct TodayFocusCard: View {
                 de: "offen"
             )
         case .negative, .memory, .celebrate, .welcome:
-            return content.statusText
+            content.statusText
         }
     }
 
@@ -222,7 +222,7 @@ struct TodayFocusFrozenBackPlate: View {
     }
 
     private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 20, style: .continuous)
+        RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
     }
 
     var body: some View {

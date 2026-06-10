@@ -5,13 +5,13 @@
 //  Water management sheet: feed water, water changes, and filter care.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct QuickWaterDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
-    var onClose: (() -> Void)? = nil
+    var onClose: (() -> Void)?
     let allEvents: [Event]
     let allPets: [Pet]
     let waterCareLogs: [PetCareLog]
@@ -21,9 +21,8 @@ struct QuickWaterDetailSheet: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppServices.self) var appServices
     @StateObject var workloadPolicy = AppWorkloadPolicy.shared
-
     @State var waterIntervalDays: Int = 3
-    @State var waterChangeAnchorDate: Date = Date()
+    @State var waterChangeAnchorDate: Date = .init()
     @State var filterCleanIntervalDays: Int = 14
     @State var filterReplaceIntervalDays: Int = 90
     @State var waterAmountEnabled = true
@@ -69,9 +68,7 @@ struct QuickWaterDetailSheet: View {
     @State var overviewChartReplayTask: Task<Void, Never>?
     @State var selectedSharedWaterPetIds: Set<UUID> = []
     @Namespace var waterModeSelectionNamespace
-
     typealias ActiveSheet = QuickWaterActiveSheet
-
     init(
         pet: Pet,
         onRemove: @escaping () -> Void,
@@ -104,19 +101,23 @@ struct QuickWaterDetailSheet: View {
                 return lhs.createdAt < rhs.createdAt
             }
     }
+
     var selectedWaterTargets: [Pet] {
         let targets = sameSpeciesWaterPets.filter { selectedSharedWaterPetIds.contains($0.id) }
         return targets.isEmpty ? [pet] : targets
     }
+
     var waterChangeTint: Color { Color(hex: CareType.waterChange.accentColorHex) }
     var filterTint: Color { Color(hex: CareType.filterClean.accentColorHex) }
     var waterRuleState: QuickWaterRuleSnapshot {
         waterSnapshot.rule
     }
+
     var waterMode: WaterOperatingMode {
         _ = waterModeStorageTick
         return isAquatic ? .manual : displayedWaterMode
     }
+
     var commandExecutor: QuickWaterCommandExecutor {
         QuickWaterCommandExecutor(
             context: modelContext,
@@ -126,6 +127,7 @@ struct QuickWaterDetailSheet: View {
             reminderScheduling: appServices.reminderScheduling
         )
     }
+
     var systemSheetBinding: Binding<ActiveSheet?> {
         Binding(
             get: { activeSheet?.usesInlineOverlay == true ? nil : activeSheet },
@@ -184,7 +186,6 @@ struct QuickWaterDetailSheet: View {
     var isFilterOverdue: Bool { isFilterCleanOverdue || isFilterReplaceOverdue }
     var waterChangeStatusTint: Color { isWaterChangeOverdue ? Color.goRed : waterChangeTint }
     var filterStatusTint: Color { isFilterOverdue ? Color.goRed : filterTint }
-
     var body: some View {
         NavigationStack {
             ZStack {
@@ -230,7 +231,6 @@ struct QuickWaterDetailSheet: View {
                                 .padding(.horizontal, 20)
                                 .padding(.top, 12)
                                 .padding(.bottom, 4)
-
                             sheetContent(sheet)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                                 .allowsHitTesting(nestedInlineSheet == nil)
@@ -288,15 +288,15 @@ struct QuickWaterDetailSheet: View {
             if activeSheet?.usesInlineOverlay != true {
                 inlineSheetVisible = false
             }
-                        if activeSheet == .waterOverview || activeSheet == .waterChangeOverview || activeSheet == .filterOverview {
-                            overviewChartProgress = 0
-                            scheduleOverviewChartReplay(milliseconds: 90)
-                        }
-                    }
+            if activeSheet == .waterOverview || activeSheet == .waterChangeOverview || activeSheet == .filterOverview {
+                overviewChartProgress = 0
+                scheduleOverviewChartReplay(milliseconds: 90)
+            }
+        }
         .onChange(of: nestedInlineSheet?.id) { _, _ in
             adaptiveSheetHeight = nestedInlineSheet?.inlineHeight ?? activeSheet?.inlineHeight ?? 430
             inlineSheetDragOffset = 0
-            if nestedInlineSheet == nil && activeSheet?.usesInlineOverlay != true {
+            if nestedInlineSheet == nil, activeSheet?.usesInlineOverlay != true {
                 inlineSheetVisible = false
             }
         }
@@ -611,9 +611,9 @@ struct QuickWaterDetailSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(isWarning ? Color.goRed.opacity(0.16) : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(isWarning ? Color.goRed.opacity(0.16) : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                 .strokeBorder(isWarning ? Color.goRed.opacity(0.62) : Color.clear, lineWidth: 1)
         )
     }
@@ -768,7 +768,7 @@ struct QuickWaterDetailSheet: View {
             }
         }
         .padding(14)
-        .background(sheetSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(sheetSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     var toastView: some View {

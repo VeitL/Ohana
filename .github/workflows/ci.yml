@@ -9,11 +9,10 @@ name: CI
 #     and a scanned-file floor proves no directory refactor silently shrank an
 #     audit's scope (this happened once: 88% of files dropped out of three
 #     "whole repo" gates after the Features/ refactor).
-#   - UI V4 / accessibility / smoothness run as a full-scope RATCHET against
-#     docs/governance/manifests/full-scope-audit-baseline.json: any new or
-#     increased per-file/per-rule debt fails; reductions are locked in with
-#     --update-baseline. When the baseline reaches zero again, promote back to
-#     direct `--all` strict gates (see docs/governance/full-scope-ratchet-policy.md).
+#   - UI V4 / accessibility / smoothness run as direct full-scope strict
+#     zero-warning gates. The historical zero baseline remains in
+#     docs/governance/manifests/full-scope-audit-baseline.json as promotion
+#     evidence, not as a debt allowance.
 #   - Tool versions are pinned via scripts/ci-tool-versions.env so brew updates
 #     cannot silently change lint/audit behavior. A pin mismatch is a deliberate
 #     one-line bump, not an emergency.
@@ -53,10 +52,14 @@ jobs:
       # collapsed scan scope), every later "passed" line is meaningless.
       - name: Audit self-tests (fixtures + scope floor)
         run: scripts/tests/run-audit-fixture-tests.sh
-      # Full-scope ratchet for UI V4 + accessibility + smoothness. Fails on any
-      # new or increased per-file/per-rule debt vs the committed baseline.
-      - name: UI/accessibility/smoothness full-scope ratchet
-        run: scripts/audit-full-scope-ratchet.sh
+      # Full-scope strict gates for UI V4 + accessibility + smoothness. The
+      # ratchet baseline is now zero; keep these direct `--all` scans required.
+      - name: UI V4 audit (whole repo, strict)
+        run: scripts/audit-ui-v4.sh --all
+      - name: Accessibility audit (whole repo, strict)
+        run: scripts/audit-accessibility.sh --all
+      - name: Smoothness audit (whole repo, strict)
+        run: scripts/audit-smoothness-risk.sh --all
       # Whole-repo hard gates for mature-app invariants (baseline already zero).
       - name: Runtime guardrails audit (whole repo, strict)
         run: scripts/audit-runtime-guardrails.sh --all
@@ -87,17 +90,11 @@ jobs:
         run: brew install swiftlint swiftformat
       - name: Tool version pins
         run: scripts/check-tool-versions.sh swiftlint swiftformat
-      # SwiftLint runs as a real gate: .swiftlint.yml is tuned lenient, so this
-      # fails only on error-severity rules (no --strict yet — flip to --strict
-      # once the warning baseline is cleaned; deadline tracked in
-      # docs/release-hardening-plan.md).
+      # SwiftLint runs as a strict gate after the P1 warning baseline cleanup.
       - name: SwiftLint
-        run: swiftlint lint --reporter github-actions-logging
-      # SwiftFormat starts report-only. After one baseline pass (`swiftformat .`
-      # then commit), remove continue-on-error to enforce. Deadline tracked in
-      # docs/release-hardening-plan.md.
+        run: swiftlint lint --strict --reporter github-actions-logging
+      # SwiftFormat is enforced after the P1 formatting baseline pass.
       - name: SwiftFormat (lint only)
-        continue-on-error: true
         run: swiftformat --lint .
 
   # ----------------------------------------------------------------------------

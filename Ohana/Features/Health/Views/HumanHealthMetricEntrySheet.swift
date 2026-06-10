@@ -5,8 +5,8 @@
 //  Inline popup for one human checkup metric value.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct HealthMetricEntryScrollHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -20,7 +20,7 @@ struct HumanHealthMetricEntrySheet: View {
     let human: Human
     let metric: HealthMetric
     var initialUnitCode: String
-    var onSaved: ((HumanHealthMetricLog) -> Void)? = nil
+    var onSaved: ((HumanHealthMetricLog) -> Void)?
     var onDismiss: () -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -142,8 +142,8 @@ struct HumanHealthMetricEntrySheet: View {
 
                     saveBar
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow confirmed inline popup lifted shadow
                 .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow confirmed inline popup lifted shadow
                 .padding(.horizontal, 6)
@@ -302,7 +302,7 @@ struct HumanHealthMetricEntrySheet: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             .padding(.horizontal, 20)
         }
     }
@@ -377,15 +377,15 @@ struct HumanHealthMetricEntrySheet: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                 }
-                TextField(l.tr(zh: "医院、空腹状态或报告说明", en: "Lab, fasting state, or report note", de: "Labor, nüchtern oder Berichtshinweis"), text: $notes, axis: .vertical)
+                TextField(l.tr(zh: "医院、空腹状态或报告说明", en: "Lab, fasting state, or report note", de: "Labor, nüchtern oder Berichtshinweis"), text: $notes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2...4)
+                    .lineLimit(2 ... 4)
                     .textInputAutocapitalization(.sentences)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             .padding(.horizontal, 20)
         }
     }
@@ -408,7 +408,7 @@ struct HumanHealthMetricEntrySheet: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .padding(.horizontal, 20)
     }
 
@@ -421,7 +421,7 @@ struct HumanHealthMetricEntrySheet: View {
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存指标", en: "Save metric", de: "Wert speichern")
                 )
-                    .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)
@@ -436,10 +436,10 @@ struct HumanHealthMetricEntrySheet: View {
         .padding(.bottom, 14)
     }
 
-    private func infoRow<Trailing: View>(
+    private func infoRow(
         icon: String,
         label: String,
-        @ViewBuilder trailing: () -> Trailing
+        @ViewBuilder trailing: () -> some View
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
@@ -453,7 +453,7 @@ struct HumanHealthMetricEntrySheet: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .padding(.horizontal, 20)
     }
 

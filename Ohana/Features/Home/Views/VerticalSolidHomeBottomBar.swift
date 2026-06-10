@@ -321,7 +321,7 @@ private struct HomeBottomNavigationTabButton: View {
 
     @ViewBuilder
     private var tabContent: some View {
-        if isSelected && showsSelectedLabel {
+        if isSelected, showsSelectedLabel {
             HStack(spacing: 5) {
                 icon
                 Text(tab.title(localization))
@@ -422,12 +422,12 @@ private struct VerticalSolidHomeFabShortcutButton: View {
 
     private var iconActionType: String {
         switch shortcut.action {
-        case .quick(let actionType), .humanQuick(let actionType):
-            return actionType
-        case .detail(let feature):
-            return feature.rawValue
+        case let .quick(actionType), let .humanQuick(actionType):
+            actionType
+        case let .detail(feature):
+            feature.rawValue
         case .allFeatures, .humanAllFeatures:
-            return shortcut.id
+            shortcut.id
         }
     }
 }

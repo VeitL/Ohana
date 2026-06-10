@@ -8,7 +8,7 @@ import SwiftUI
 extension OasisRewardView {
     // MARK: - Star positions (deterministic)
     var starPositions: [(CGFloat, CGFloat)] {
-        (0..<24).map { i in
+        (0 ..< 24).map { i in
             let x = CGFloat((i * 53) % 320) - 160
             let y = CGFloat((i * 37) % 220) - 160
             return (x, y)

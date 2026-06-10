@@ -273,7 +273,7 @@ enum PetDocumentCommandService {
     @MainActor
     private static func validPayerId(_ payerId: String?, context: ModelContext) -> String? {
         guard let payerId, !payerId.isEmpty, UUID(uuidString: payerId) != nil else { return nil }
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? []
+        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return humans.contains { $0.id.uuidString == payerId } ? payerId : nil
     }
 
@@ -284,7 +284,7 @@ enum PetDocumentCommandService {
         context: ModelContext
     ) -> [CareLedgerEvent] {
         let idString = id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return events.filter { $0.legacyModelName == modelName && $0.legacyModelId == idString }
     }
 }

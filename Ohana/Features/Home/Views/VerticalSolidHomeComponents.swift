@@ -33,7 +33,7 @@ enum VerticalHomeTabMountPolicy {
         for tab: VerticalSolidHomeTab,
         active: VerticalSolidHomeTab,
         outgoing: VerticalSolidHomeTab?,
-        selected: VerticalSolidHomeTab,
+        selected _: VerticalSolidHomeTab,
         prepared: Set<VerticalSolidHomeTab> = [],
         preparing: VerticalSolidHomeTab? = nil
     ) -> VerticalSolidHomePageLifecycle {
@@ -84,7 +84,7 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
     private func page(for tab: VerticalSolidHomeTab) -> some View {
         let lifecycle = lifecycle(for: tab)
 
-        if lifecycle.isPreparingForDisplay && tab != .oasis {
+        if lifecycle.isPreparingForDisplay, tab != .oasis {
             VerticalSolidHomePreparedPlaceholder()
         } else if lifecycle.isVisible {
             switch tab {
@@ -155,7 +155,7 @@ struct VerticalSolidHomeDashboardPage: View {
     @State private var heroGeneration = 0
     @State private var collapseCleanupTask: Task<Void, Never>?
     var body: some View {
-        GeometryReader { proxy in
+        GeometryReader { _ in
             ZStack(alignment: .top) {
                 if snapshot.cards.isEmpty {
                     EmptyStateWelcomeCard(
@@ -487,7 +487,7 @@ struct VerticalSolidHomePlantsPage: View {
                                 }
                             }
                             .padding(14)
-                            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
@@ -545,7 +545,7 @@ struct VerticalSolidHomeEmptyAction: View {
                 Spacer()
             }
             .padding(16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }

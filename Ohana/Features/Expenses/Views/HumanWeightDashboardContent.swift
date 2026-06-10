@@ -157,7 +157,7 @@ struct HumanWeightDashboardContent: View {
                             .buttonStyle(ScaleButtonStyle())
                         }
                         .padding(14)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                     }
                 }
             }
@@ -197,6 +197,6 @@ struct HumanWeightDashboardContent: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 }

@@ -107,7 +107,7 @@ enum CheckInStreakStore {
         guard !sorted.isEmpty else { return 0 }
         var longest = 1
         var current = 1
-        for index in 1..<sorted.count {
+        for index in 1 ..< sorted.count {
             if let expected = calendar.date(byAdding: .day, value: 1, to: sorted[index - 1]),
                calendar.isDate(expected, inSameDayAs: sorted[index]) {
                 current += 1

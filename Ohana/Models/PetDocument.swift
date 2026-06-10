@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 enum DocumentCategory: String, Codable, CaseIterable {
     case passport = "护照"
@@ -19,15 +19,15 @@ enum DocumentCategory: String, Codable, CaseIterable {
     static var protectionDocumentCases: [DocumentCategory] {
         [.passport, .medical, .registration, .other]
     }
-    
+
     var emoji: String {
         switch self {
-        case .passport: return "🛂"
-        case .vaccine: return "💉"
-        case .insurance: return "🛡️"
-        case .medical: return "📋"
-        case .registration: return "📄"
-        case .other: return "📎"
+        case .passport: "🛂"
+        case .vaccine: "💉"
+        case .insurance: "🛡️"
+        case .medical: "📋"
+        case .registration: "📄"
+        case .other: "📎"
         }
     }
 }
@@ -62,12 +62,12 @@ final class PetDocument {
     var cost: Double
     @Attribute(.externalStorage) var attachmentData: Data? // Keeping for backward compatibility temporarily
     var attachmentFilename: String // Keeping for backward compatibility temporarily
-    
+
     @Relationship(deleteRule: .cascade)
     var attachments: [PetDocumentAttachment] = []
-    
+
     var pet: Pet?
-    
+
     init(title: String = "", category: DocumentCategory = .other, pet: Pet? = nil) {
         self.id = UUID()
         self.title = title
@@ -83,16 +83,16 @@ final class PetDocument {
         self.attachments = []
         self.pet = pet
     }
-    
+
     var documentCategory: DocumentCategory {
         DocumentCategory(rawValue: category) ?? .other
     }
-    
+
     var isExpired: Bool {
         guard let expiryDate else { return false }
         return expiryDate < Date()
     }
-    
+
     var isExpiringSoon: Bool {
         guard let expiryDate else { return false }
         let daysUntilExpiry = Calendar.current.dateComponents([.day], from: Date(), to: expiryDate).day ?? 0

@@ -5,10 +5,10 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
-import SwiftData
-import UIKit
 import Combine
+import SwiftData
+import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -23,7 +23,7 @@ struct ContentView: View {
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId: String = ""
     @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.code
     @Namespace private var heroNS
-    
+
     var body: some View {
         ZStack {
             if !hasOnboarded {
@@ -33,36 +33,36 @@ struct ContentView: View {
             }
             NavigationStack(path: $appRoutes.path) {
                 selectedHomeView
-                .navigationDestination(for: AppRoute.self) { route in
-                    AppDeferredRouteContent(
-                        routeID: route.id,
-                        policy: AppPresentationPolicyProvider.policy(for: route)
-                    ) {
-                        AppRouteDestination(
-                            route: route,
-                            onPresentCoconutLog: { subject in
-                                appRoutes.presentCoconutLog(subject)
-                            }
-                        )
+                    .navigationDestination(for: AppRoute.self) { route in
+                        AppDeferredRouteContent(
+                            routeID: route.id,
+                            policy: AppPresentationPolicyProvider.policy(for: route)
+                        ) {
+                            AppRouteDestination(
+                                route: route,
+                                onPresentCoconutLog: { subject in
+                                    appRoutes.presentCoconutLog(subject)
+                                }
+                            )
+                        }
+                        .navigationTransition(.zoom(sourceID: route.sourceID, in: heroNS))
                     }
-                    .navigationTransition(.zoom(sourceID: route.sourceID, in: heroNS))
-                }
-                .toolbar {
-                    ToolbarItemGroup(placement: .keyboard) {
-                        Spacer()
-                        Button {
-                            dismissKeyboard()
-                        } label: {
-                            Label("隐藏键盘", systemImage: "keyboard.chevron.compact.down")
-                                .font(OhanaFont.callout(.semibold))
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button {
+                                dismissKeyboard()
+                            } label: {
+                                Label("隐藏键盘", systemImage: "keyboard.chevron.compact.down")
+                                    .font(OhanaFont.callout(.semibold))
+                            }
                         }
                     }
-                }
             }
             .id(appRoutes.rootIdentity)
             .ignoresSafeArea(.keyboard, edges: .bottom)
 
-            if hasOnboarded && !appRoutes.suppressesGlobalWalkBanner {
+            if hasOnboarded, !appRoutes.suppressesGlobalWalkBanner {
                 GlobalWalkBanner()
                     .zIndex(80)
             }
@@ -224,7 +224,7 @@ struct ContentView: View {
                 )
             } catch {
                 #if DEBUG
-                print("❌ [ContentView] coconut wallet bootstrap failed: \(error.localizedDescription)")
+                    OhanaLog.error("[ContentView] coconut wallet bootstrap failed: \(error.localizedDescription)", category: "Startup")
                 #endif
             }
         }
@@ -276,7 +276,6 @@ struct ContentView: View {
             for: nil
         )
     }
-
 }
 
 #Preview {

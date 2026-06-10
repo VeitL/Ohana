@@ -5,8 +5,8 @@
 //  打卡连击详情页 — 打卡日历 + 连击排行
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct DailyStreakAvatarIndex {
     let signatures: [UUID: String]
@@ -18,11 +18,9 @@ private struct DailyStreakAvatarIndex {
         payloads: [],
         cacheKey: "daily-streak-empty"
     )
-
     static func make(humans: [Human]) -> DailyStreakAvatarIndex {
         var signatures: [UUID: String] = [:]
         var payloads: [FocusWalletAvatarCache.Payload] = []
-
         for human in humans {
             guard let data = human.avatarImageData else { continue }
             let signature = FocusWalletAvatarCache.signature(for: data)
@@ -56,9 +54,9 @@ struct DailyStreakDetailView: View {
     let pets: [Pet]
     let humans: [Human]
     let ledgerEvents: [CareLedgerEvent]
-    var onClose: (() -> Void)? = nil
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
-    var onPresentCoconutShop: ((ShopItem.ShopCategory) -> Void)? = nil
+    var onClose: (() -> Void)?
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+    var onPresentCoconutShop: ((ShopItem.ShopCategory) -> Void)?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -83,9 +81,11 @@ struct DailyStreakDetailView: View {
             shopInventory: appServices.shopInventory
         )
     }
+
     private var activeHuman: Human? {
         humans.first { $0.id.uuidString == currentActiveHumanId } ?? humans.first
     }
+
     private var activeHumanIdForStreak: String {
         activeHuman?.id.uuidString ?? currentActiveHumanId
     }
@@ -173,7 +173,7 @@ struct DailyStreakDetailView: View {
 
     // MARK: - 我的连击卡片
     private var myStreakCard: some View {
-        return VStack(spacing: 16) {
+        VStack(spacing: 16) {
             HStack(spacing: 14) {
                 ZStack {
                     if let activeHuman {
@@ -230,10 +230,10 @@ struct DailyStreakDetailView: View {
                     }
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: OhanaRadius.micro)
                                 .fill(Color.ohanaPrimaryText.opacity(0.1))
                                 .frame(height: 8)
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: OhanaRadius.micro)
                                 .fill(LinearGradient(colors: [Color.goOrange, Color.goYellow], startPoint: .leading, endPoint: .trailing))
                                 .frame(width: geo.size.width * CGFloat(max(0, min(1, progress))), height: 8)
                         }
@@ -243,9 +243,9 @@ struct DailyStreakDetailView: View {
             }
         }
         .padding(18)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         }
     }
@@ -293,14 +293,14 @@ struct DailyStreakDetailView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(index == 0 ? Color.goPrimary.opacity(0.14) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(index == 0 ? Color.goPrimary.opacity(0.14) : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                 }
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         }
     }
@@ -358,8 +358,8 @@ struct DailyStreakDetailView: View {
                         .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(
                             cal.isDate(selectedMonth, equalTo: Date(), toGranularity: .month)
-                            ? Color.ohanaPrimaryText.opacity(0.15)
-                            : Color.ohanaPrimaryText.opacity(0.5)
+                                ? Color.ohanaPrimaryText.opacity(0.15)
+                                : Color.ohanaPrimaryText.opacity(0.5)
                         )
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.ohanaControlFill, in: Circle())
@@ -368,7 +368,7 @@ struct DailyStreakDetailView: View {
             }
 
             HStack(spacing: 0) {
-                ForEach(["日","一","二","三","四","五","六"], id: \.self) { d in
+                ForEach(["日", "一", "二", "三", "四", "五", "六"], id: \.self) { d in
                     Text(d)
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
@@ -420,9 +420,9 @@ struct DailyStreakDetailView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
         }
         .contentShape(Rectangle())
@@ -452,7 +452,7 @@ struct DailyStreakDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     private var checkInMilestoneRow: some View {
@@ -493,7 +493,7 @@ struct DailyStreakDetailView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -518,12 +518,12 @@ struct DailyStreakDetailView: View {
         let daysInMonth = cal.range(of: .day, in: .month, for: firstOfMonth)?.count ?? 30
 
         var cells: [CalendarCell] = []
-        for _ in 0..<weekdayOfFirst {
+        for _ in 0 ..< weekdayOfFirst {
             cells.append(CalendarCell(dateStr: "", day: 0, isToday: false, isChecked: false, isMakeup: false, isFuture: false))
         }
 
         let todayString = fmt.string(from: Date())
-        for day in 1...daysInMonth {
+        for day in 1 ... daysInMonth {
             var dc = DateComponents()
             dc.year = comps.year
             dc.month = comps.month
@@ -571,7 +571,7 @@ struct DailyStreakDetailView: View {
             Color.clear.frame(height: 40)
         } else {
             Button {
-                if !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0 {
+                if !cell.isChecked, !cell.isToday, !cell.isFuture, makeupPackCount > 0 {
                     showMakeupConfirm = cell.dateStr
                 }
             } label: {
@@ -600,8 +600,8 @@ struct DailyStreakDetailView: View {
                             .font(OhanaFont.adaptive(size: 13, weight: cell.isToday ? .black : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(
                                 cell.isFuture ? Color.ohanaPrimaryText.opacity(0.2) :
-                                cell.isToday ? Color.goPrimary :
-                                Color.ohanaPrimaryText.opacity(0.7)
+                                    cell.isToday ? Color.goPrimary :
+                                    Color.ohanaPrimaryText.opacity(0.7)
                             )
                     }
                 }
@@ -613,14 +613,14 @@ struct DailyStreakDetailView: View {
     }
 
     private func cellFillColor(_ cell: CalendarCell) -> Color {
-        if cell.isChecked && cell.isMakeup {
-            return Color.goYellow.opacity(0.85)
+        if cell.isChecked, cell.isMakeup {
+            Color.goYellow.opacity(0.85)
         } else if cell.isChecked {
-            return Color.goPrimary
+            Color.goPrimary
         } else if cell.isToday {
-            return Color.goPrimary.opacity(0.22)
+            Color.goPrimary.opacity(0.22)
         } else {
-            return Color.ohanaControlFill
+            Color.ohanaControlFill
         }
     }
 
@@ -746,7 +746,7 @@ struct DailyStreakDetailView: View {
         guard let firstOfMonth = cal.date(from: comps) else { return 0 }
         let dayOfMonth = cal.component(.day, from: today)
         var count = 0
-        for day in 0..<dayOfMonth {
+        for day in 0 ..< dayOfMonth {
             if let date = cal.date(byAdding: .day, value: day, to: firstOfMonth) {
                 let value = fmt.string(from: date)
                 if checkedInDates.contains(value) {

@@ -53,4 +53,3 @@ struct FocusHomeFrozenAvatarSource {
         cached(for: card) ?? .placeholder
     }
 }
-

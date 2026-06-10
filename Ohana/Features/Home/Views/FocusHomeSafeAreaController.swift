@@ -97,5 +97,4 @@ final class FocusHomeSafeAreaController: ObservableObject {
         (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
             .keyWindow?.safeAreaInsets.bottom ?? 0
     }
-
 }

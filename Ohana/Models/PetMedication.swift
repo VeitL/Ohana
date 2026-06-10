@@ -6,31 +6,31 @@
 //  参考 HumanMedication.swift 设计，去除 humanId，关联 Pet
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 /// 宠物用药频率
 enum PetMedicationFrequency: String, Codable, CaseIterable, Identifiable {
-    case daily          = "每天"
-    case twiceDaily     = "每天两次"
+    case daily = "每天"
+    case twiceDaily = "每天两次"
     case threeTimesDaily = "每天三次"
-    case everyOtherDay  = "隔天"
-    case weekly         = "每周"
-    case asNeeded       = "按需"
-    case custom         = "自定义"
+    case everyOtherDay = "隔天"
+    case weekly = "每周"
+    case asNeeded = "按需"
+    case custom = "自定义"
 
     var id: String { rawValue }
 
     var emoji: String {
         switch self {
-        case .daily:             return "☀️"
-        case .twiceDaily:        return "🌅"
-        case .threeTimesDaily:   return "🕐"
-        case .everyOtherDay:     return "📆"
-        case .weekly:            return "📅"
-        case .asNeeded:          return "⚡"
-        case .custom:            return "⚙️"
+        case .daily: "☀️"
+        case .twiceDaily: "🌅"
+        case .threeTimesDaily: "🕐"
+        case .everyOtherDay: "📆"
+        case .weekly: "📅"
+        case .asNeeded: "⚡"
+        case .custom: "⚙️"
         }
     }
 }
@@ -41,26 +41,26 @@ enum PetMedicationSchedulePlan {
     static func dosesPerDay(for frequency: PetMedicationFrequency) -> Int {
         switch frequency {
         case .daily, .everyOtherDay, .weekly:
-            return 1
+            1
         case .twiceDaily:
-            return 2
+            2
         case .threeTimesDaily:
-            return 3
+            3
         case .asNeeded, .custom:
-            return 0
+            0
         }
     }
 
     static func defaultDoseMinutes(for frequency: PetMedicationFrequency) -> [Int] {
         switch frequency {
         case .daily, .everyOtherDay, .weekly:
-            return [8 * 60]
+            [8 * 60]
         case .twiceDaily:
-            return [8 * 60, 20 * 60]
+            [8 * 60, 20 * 60]
         case .threeTimesDaily:
-            return [8 * 60, 14 * 60, 20 * 60]
+            [8 * 60, 14 * 60, 20 * 60]
         case .asNeeded, .custom:
-            return []
+            []
         }
     }
 
@@ -113,13 +113,13 @@ enum PetMedicationSchedulePlan {
 @Model
 final class PetMedication {
     var id: UUID
-    var name: String            // 药品名称，如"阿莫西林"
-    var dosage: String          // 剂量，如"1 片"、"5ml"
-    var frequencyRaw: String    // PetMedicationFrequency.rawValue
-    var customFrequencyNote: String  // 自定义频率说明
+    var name: String // 药品名称，如"阿莫西林"
+    var dosage: String // 剂量，如"1 片"、"5ml"
+    var frequencyRaw: String // PetMedicationFrequency.rawValue
+    var customFrequencyNote: String // 自定义频率说明
     var startDate: Date
-    var endDate: Date?          // nil = 长期服药
-    var colorHex: String        // 卡片颜色标签
+    var endDate: Date? // nil = 长期服药
+    var colorHex: String // 卡片颜色标签
     var notes: String
     var isActive: Bool
     var createdAt: Date

@@ -177,10 +177,10 @@ struct SitterCardPreviewSheet: View {
                 colors: [Color(hex: "2A1F6B"), Color(hex: "1A0E4B")],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(Color(hex: pet.themeColorHex).opacity(0.3), lineWidth: 1.5)
         )
         .shadow(color: .black.opacity(0.3), radius: 16, x: 0, y: 8) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
@@ -190,7 +190,7 @@ struct SitterCardPreviewSheet: View {
     private func sitterRow(icon: String, color: Color, label: String, value: String) -> some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous)
                     .fill(color.opacity(0.15))
                     .frame(width: 32, height: 32) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 Image(systemName: icon)

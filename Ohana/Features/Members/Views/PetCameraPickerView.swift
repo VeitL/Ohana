@@ -42,7 +42,7 @@ struct PetCameraPickerView: UIViewControllerRepresentable {
     let onCancel: () -> Void
 
     init(
-        maxPixel: CGFloat = 2_200,
+        maxPixel: CGFloat = 2200,
         onCapture: @escaping (UIImage) -> Void,
         onCancel: @escaping () -> Void = {}
     ) {
@@ -63,7 +63,7 @@ struct PetCameraPickerView: UIViewControllerRepresentable {
 }
 
 final class OhanaCameraViewController: UIViewController {
-    var maxCapturePixel: CGFloat = 2_200
+    var maxCapturePixel: CGFloat = 2200
     var onCapture: (UIImage) -> Void = { _ in }
     var onCancel: () -> Void = {}
 
@@ -71,6 +71,8 @@ final class OhanaCameraViewController: UIViewController {
     private let photoOutput = AVCapturePhotoOutput()
     private let sessionQueue = DispatchQueue(label: "ohana.camera.session", qos: .userInitiated)
     private var didConfigureSession = false
+    // AVCapturePhotoOutput does not retain the delegate; this keeps capture callbacks alive.
+    // swiftlint:disable:next weak_delegate
     private var captureDelegate: PhotoCaptureDelegate?
     private lazy var previewLayer = AVCaptureVideoPreviewLayer(session: session)
     private let closeButton = UIButton(type: .system)
@@ -111,7 +113,7 @@ final class OhanaCameraViewController: UIViewController {
 
     private func configureControls() {
         closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal) // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
         closeButton.tintColor = UIColor(Color.goCardWhite)
         closeButton.backgroundColor = UIColor(Color.arkInk).withAlphaComponent(0.36)
         closeButton.layer.cornerRadius = 22
@@ -162,7 +164,7 @@ final class OhanaCameraViewController: UIViewController {
             unavailableLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             unavailableLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             unavailableLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            unavailableLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
+            unavailableLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24)
         ])
     }
 

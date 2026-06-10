@@ -63,19 +63,19 @@ enum SharedCareMetadata {
     static func prefix(for actionKind: SharedCareActionKind) -> String {
         switch actionKind {
         case .feeding:
-            return feedNotePrefix
+            feedNotePrefix
         case .watering:
-            return waterNotePrefix
+            waterNotePrefix
         case .litterScoop, .litterChange:
-            return litterNotePrefix
+            litterNotePrefix
         case .pottyUnknown:
-            return unknownPottyNotePrefix
+            unknownPottyNotePrefix
         case .walk:
-            return walkNotePrefix
+            walkNotePrefix
         case .expense:
-            return expenseNotePrefix
+            expenseNotePrefix
         case .waterChange, .filterClean, .cageCleaning, .freeFlight, .misting, .substrateChange, .play:
-            return "\(careNotePrefix)\(actionKind.rawValue):"
+            "\(careNotePrefix)\(actionKind.rawValue):"
         }
     }
 }

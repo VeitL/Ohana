@@ -14,7 +14,7 @@ struct PetExpenseDashboardContent: View {
     var showsCloseButton = true
     var onClose: () -> Void
     var onAdd: () -> Void
-    var onRemove: (() -> Void)? = nil
+    var onRemove: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -33,11 +33,14 @@ struct PetExpenseDashboardContent: View {
             return rangeOK && categoryOK
         }
     }
+
     private var positiveLogs: [PetExpenseLog] { filteredLogs.filter { $0.amount > 0 } }
     private var total: Double { positiveLogs.reduce(0) { $0 + $1.amount } }
     private var categoryBreakdown: [(ExpenseCategory, Double)] {
         var dict: [ExpenseCategory: Double] = [:]
-        for log in positiveLogs { dict[log.expenseCategory, default: 0] += log.amount }
+        for log in positiveLogs {
+            dict[log.expenseCategory, default: 0] += log.amount
+        }
         return dict.sorted { $0.value > $1.value }
     }
 
@@ -199,7 +202,7 @@ struct PetExpenseDashboardContent: View {
             .buttonStyle(ScaleButtonStyle())
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private func rowSubtitle(_ log: PetExpenseLog) -> String {
@@ -220,7 +223,6 @@ struct PetExpenseDashboardContent: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
-
 }

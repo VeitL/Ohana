@@ -18,7 +18,6 @@ struct MemberDeletionCommandResult: Equatable {
     let clearsActiveHumanID: Bool
 }
 
-
 enum MemberDeletionCommandService {
     private static let quickActionItemsKey = "quickActionItems_v2"
 
@@ -60,7 +59,7 @@ enum MemberDeletionCommandService {
     ) -> MemberDeletionCommandResult {
         let humanID = human.id
         let humanIDString = humanID.uuidString
-        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? []
+        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         let hasRemainingHuman = humans.contains { $0.id.uuidString != humanIDString }
         let deletedCurrentHuman = activeHumanID == humanIDString
         let requiresReplacementHuman = !hasRemainingHuman

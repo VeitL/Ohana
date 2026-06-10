@@ -120,7 +120,7 @@ extension QuestManager {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: self)
             #if DEBUG
-            print("❌ [QuestManager] SwiftData save 失败，已回滚: \(error.localizedDescription)")
+                OhanaLog.error("[QuestManager] SwiftData save failed; rolled back: \(error.localizedDescription)", category: "Economy")
             #endif
         }
         return (finalHuman, finalPet)
@@ -223,7 +223,7 @@ extension QuestManager {
                 actorId: human?.id.uuidString ?? livePets.first?.id.uuidString,
                 actorName: human?.name ?? livePets.first?.name
             )
-            livePets.forEach { pet in
+            for pet in livePets {
                 if !isOnCooldown(petId: pet.id, type: type) {
                     recordCooldown(petId: pet.id, type: type)
                 }
@@ -233,7 +233,7 @@ extension QuestManager {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: self)
             #if DEBUG
-            print("❌ [QuestManager] shared care save failed: \(error.localizedDescription)")
+                OhanaLog.error("[QuestManager] shared care save failed: \(error.localizedDescription)", category: "Economy")
             #endif
         }
 

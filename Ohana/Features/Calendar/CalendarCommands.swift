@@ -14,7 +14,6 @@ struct EventCompletionRewardResult: Equatable {
     let coconutDelta: Int
 }
 
-
 struct CalendarEventPlanCommandInput: Equatable {
     let title: String
     let startDate: Date
@@ -100,7 +99,7 @@ enum CalendarEventPlanCommandService {
             var reminders: [Reminder] = []
             var cursor = input.startDate
             var safetyCount = 0
-            while cursor <= recurrenceEndDate && safetyCount < maxReminderOccurrences {
+            while cursor <= recurrenceEndDate, safetyCount < maxReminderOccurrences {
                 let scheduled = calendar.date(byAdding: .minute, value: -leadMinutes, to: cursor) ?? cursor
                 let reminder = Reminder(event: event, scheduledAt: scheduled)
                 context.insert(reminder)
@@ -223,13 +222,13 @@ enum EventCompletionCommandService {
     private static func subjectKind(for event: Event) -> CareLedgerSubjectKind {
         switch event.relatedEntityType {
         case EntityKind.pet.rawValue, "pet":
-            return .pet
+            .pet
         case EntityKind.human.rawValue, "human":
-            return .human
+            .human
         case EntityKind.plant.rawValue, "plant":
-            return .plant
+            .plant
         default:
-            return event.relatedEntityId.isEmpty ? .system : .unknown
+            event.relatedEntityId.isEmpty ? .system : .unknown
         }
     }
 }
@@ -323,11 +322,11 @@ enum CalendarEventDeletionScope: Equatable {
     var revisionActionKey: String {
         switch self {
         case .wholeEvent:
-            return "wholeEvent"
+            "wholeEvent"
         case .singleOccurrence:
-            return "singleOccurrence"
+            "singleOccurrence"
         case .thisAndFuture:
-            return "thisAndFuture"
+            "thisAndFuture"
         }
     }
 }
@@ -341,18 +340,18 @@ enum CalendarEventDeletionOutcome: Equatable {
     var primaryEventID: UUID {
         switch self {
         case let .deletedEvent(id), let .advancedStart(id), let .truncated(id):
-            return id
+            id
         case let .split(originalID, _):
-            return originalID
+            originalID
         }
     }
 
     var affectedEventIDs: Set<UUID> {
         switch self {
         case let .deletedEvent(id), let .advancedStart(id), let .truncated(id):
-            return [id]
+            [id]
         case let .split(originalID, newEventID):
-            return [originalID, newEventID]
+            [originalID, newEventID]
         }
     }
 }

@@ -40,7 +40,7 @@ extension VerticalSolidHomeView {
     }
 
     static func growthLoopPendingCount(from snapshot: TodayFocusSnapshot) -> Int {
-        let pendingQuests = snapshot.refreshedQuests.filter { !$0.isCompleted }.count
+        let pendingQuests = snapshot.refreshedQuests.count(where: { !$0.isCompleted })
         return pendingQuests
             + snapshot.assignedFamilyTasks.count
             + snapshot.pendingExchangeRequests.count

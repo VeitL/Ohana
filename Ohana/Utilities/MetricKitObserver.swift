@@ -10,218 +10,218 @@
 
 import Foundation
 #if canImport(MetricKit)
-import MetricKit
+    import MetricKit
 #endif
 
 #if canImport(MetricKit)
 
-@MainActor
-protocol MetricKitObserving {
-    func start()
-}
-
-@MainActor
-final class MetricKitObserver: NSObject, MetricKitObserving {
-    private let store = MetricDiagnosticsStore()
-    private var didStart = false
-
-    override init() {
-        super.init()
+    @MainActor
+    protocol MetricKitObserving {
+        func start()
     }
 
-    /// Registers the subscriber and replays any persisted diagnostics from the
-    /// previous session (crashes arrive on the next launch).
-    func start() {
-        guard !didStart else { return }
-        didStart = true
+    @MainActor
+    final class MetricKitObserver: NSObject, MetricKitObserving {
+        private let store = MetricDiagnosticsStore()
+        private var didStart = false
 
-        replayPersistedDiagnostics()
-        MXMetricManager.shared.add(self)
-    }
-
-    private func replayPersistedDiagnostics() {
-        let pending = store.drainUnreported()
-        guard !pending.isEmpty else { return }
-        for entry in pending {
-            AppPerformanceMonitor.shared.record(
-                "metrickit_diagnostic_replay",
-                valueMS: entry.valueMS,
-                note: entry.note
-            )
+        override init() {
+            super.init()
         }
-    }
 
-    private func ingest(name: String, valueMS: Double, note: String, persist: Bool) {
-        AppPerformanceMonitor.shared.record(name, valueMS: valueMS, note: note)
-        if persist {
-            store.append(MetricDiagnosticEntry(valueMS: valueMS, note: "\(name): \(note)"))
+        /// Registers the subscriber and replays any persisted diagnostics from the
+        /// previous session (crashes arrive on the next launch).
+        func start() {
+            guard !didStart else { return }
+            didStart = true
+
+            replayPersistedDiagnostics()
+            MXMetricManager.shared.add(self)
         }
-    }
-}
 
-// MARK: - MXMetricManagerSubscriber
-
-extension MetricKitObserver: MXMetricManagerSubscriber {
-    nonisolated func didReceive(_ payloads: [MXMetricPayload]) {
-        let summaries = payloads.map { MetricKitSummarizer.summarize($0) }
-        Task { @MainActor in
-            for summary in summaries {
-                self.ingest(
-                    name: "metrickit_metrics",
-                    valueMS: summary.hangTimeMS,
-                    note: summary.note,
-                    persist: false
+        private func replayPersistedDiagnostics() {
+            let pending = store.drainUnreported()
+            guard !pending.isEmpty else { return }
+            for entry in pending {
+                AppPerformanceMonitor.shared.record(
+                    "metrickit_diagnostic_replay",
+                    valueMS: entry.valueMS,
+                    note: entry.note
                 )
+            }
+        }
+
+        private func ingest(name: String, valueMS: Double, note: String, persist: Bool) {
+            AppPerformanceMonitor.shared.record(name, valueMS: valueMS, note: note)
+            if persist {
+                store.append(MetricDiagnosticEntry(valueMS: valueMS, note: "\(name): \(note)"))
             }
         }
     }
 
-    nonisolated func didReceive(_ payloads: [MXDiagnosticPayload]) {
-        let summaries = payloads.flatMap { MetricKitSummarizer.summarize($0) }
-        Task { @MainActor in
-            for summary in summaries {
-                self.ingest(
-                    name: summary.name,
-                    valueMS: summary.valueMS,
-                    note: summary.note,
-                    persist: true
-                )
-            }
-        }
-    }
-}
+    // MARK: - MXMetricManagerSubscriber
 
-// MARK: - Summarizers
-
-nonisolated private enum MetricKitSummarizer {
-    struct MetricSummary {
-        let hangTimeMS: Double
-        let note: String
-    }
-
-    struct DiagnosticSummary {
-        let name: String
-        let valueMS: Double
-        let note: String
-    }
-
-    static func summarize(_ payload: MXMetricPayload) -> MetricSummary {
-        var parts: [String] = []
-        var hangMS = 0.0
-
-        if let launch = payload.applicationLaunchMetrics {
-            let firstDraw = averageDurationMS(launch.histogrammedTimeToFirstDraw)
-            if firstDraw > 0 {
-                parts.append("firstDraw≈\(Int(firstDraw))ms")
-            }
-            let resume = averageDurationMS(launch.histogrammedApplicationResumeTime)
-            if resume > 0 {
-                parts.append("resume≈\(Int(resume))ms")
+    extension MetricKitObserver: MXMetricManagerSubscriber {
+        nonisolated func didReceive(_ payloads: [MXMetricPayload]) {
+            let summaries = payloads.map { MetricKitSummarizer.summarize($0) }
+            Task { @MainActor in
+                for summary in summaries {
+                    self.ingest(
+                        name: "metrickit_metrics",
+                        valueMS: summary.hangTimeMS,
+                        note: summary.note,
+                        persist: false
+                    )
+                }
             }
         }
 
-        if let responsiveness = payload.applicationResponsivenessMetrics {
-            hangMS = averageDurationMS(responsiveness.histogrammedApplicationHangTime)
-            if hangMS > 0 {
-                parts.append("hang≈\(Int(hangMS))ms")
+        nonisolated func didReceive(_ payloads: [MXDiagnosticPayload]) {
+            let summaries = payloads.flatMap { MetricKitSummarizer.summarize($0) }
+            Task { @MainActor in
+                for summary in summaries {
+                    self.ingest(
+                        name: summary.name,
+                        valueMS: summary.valueMS,
+                        note: summary.note,
+                        persist: true
+                    )
+                }
             }
         }
+    }
 
-        if let memory = payload.memoryMetrics {
-            let peak = memory.peakMemoryUsage.converted(to: .megabytes).value
-            parts.append("peakMem≈\(Int(peak))MB")
+    // MARK: - Summarizers
+
+    private nonisolated enum MetricKitSummarizer {
+        struct MetricSummary {
+            let hangTimeMS: Double
+            let note: String
         }
 
-        if let exits = payload.applicationExitMetrics {
-            let abnormal = exits.backgroundExitData.cumulativeAbnormalExitCount
-            if abnormal > 0 {
-                parts.append("bgAbnormalExits=\(abnormal)")
+        struct DiagnosticSummary {
+            let name: String
+            let valueMS: Double
+            let note: String
+        }
+
+        static func summarize(_ payload: MXMetricPayload) -> MetricSummary {
+            var parts: [String] = []
+            var hangMS = 0.0
+
+            if let launch = payload.applicationLaunchMetrics {
+                let firstDraw = averageDurationMS(launch.histogrammedTimeToFirstDraw)
+                if firstDraw > 0 {
+                    parts.append("firstDraw≈\(Int(firstDraw))ms")
+                }
+                let resume = averageDurationMS(launch.histogrammedApplicationResumeTime)
+                if resume > 0 {
+                    parts.append("resume≈\(Int(resume))ms")
+                }
             }
+
+            if let responsiveness = payload.applicationResponsivenessMetrics {
+                hangMS = averageDurationMS(responsiveness.histogrammedApplicationHangTime)
+                if hangMS > 0 {
+                    parts.append("hang≈\(Int(hangMS))ms")
+                }
+            }
+
+            if let memory = payload.memoryMetrics {
+                let peak = memory.peakMemoryUsage.converted(to: .megabytes).value
+                parts.append("peakMem≈\(Int(peak))MB")
+            }
+
+            if let exits = payload.applicationExitMetrics {
+                let abnormal = exits.backgroundExitData.cumulativeAbnormalExitCount
+                if abnormal > 0 {
+                    parts.append("bgAbnormalExits=\(abnormal)")
+                }
+            }
+
+            let note = parts.isEmpty ? "no notable metrics" : parts.joined(separator: ", ")
+            return MetricSummary(hangTimeMS: hangMS, note: note)
         }
 
-        let note = parts.isEmpty ? "no notable metrics" : parts.joined(separator: ", ")
-        return MetricSummary(hangTimeMS: hangMS, note: note)
+        static func summarize(_ payload: MXDiagnosticPayload) -> [DiagnosticSummary] {
+            var summaries: [DiagnosticSummary] = []
+
+            for crash in payload.crashDiagnostics ?? [] {
+                let reason = crash.terminationReason ?? "unknown"
+                let signal = crash.signal?.stringValue ?? "—"
+                let exception = crash.exceptionType?.stringValue ?? "—"
+                summaries.append(
+                    DiagnosticSummary(
+                        name: "metrickit_crash",
+                        valueMS: 0,
+                        note: "reason=\(reason), signal=\(signal), exception=\(exception)"
+                    )
+                )
+            }
+
+            for hang in payload.hangDiagnostics ?? [] {
+                let ms = hang.hangDuration.converted(to: .milliseconds).value
+                summaries.append(
+                    DiagnosticSummary(
+                        name: "metrickit_hang",
+                        valueMS: ms,
+                        note: "hangDuration≈\(Int(ms))ms"
+                    )
+                )
+            }
+
+            for cpu in payload.cpuExceptionDiagnostics ?? [] {
+                let seconds = cpu.totalCPUTime.converted(to: .seconds).value
+                summaries.append(
+                    DiagnosticSummary(
+                        name: "metrickit_cpu_exception",
+                        valueMS: seconds * 1000,
+                        note: "totalCPU≈\(String(format: "%.1f", seconds))s"
+                    )
+                )
+            }
+
+            for disk in payload.diskWriteExceptionDiagnostics ?? [] {
+                let mb = disk.totalWritesCaused.converted(to: .megabytes).value
+                summaries.append(
+                    DiagnosticSummary(
+                        name: "metrickit_disk_write_exception",
+                        valueMS: 0,
+                        note: "totalWrites≈\(Int(mb))MB"
+                    )
+                )
+            }
+
+            return summaries
+        }
     }
 
-    static func summarize(_ payload: MXDiagnosticPayload) -> [DiagnosticSummary] {
-        var summaries: [DiagnosticSummary] = []
-
-        for crash in payload.crashDiagnostics ?? [] {
-            let reason = crash.terminationReason ?? "unknown"
-            let signal = crash.signal?.stringValue ?? "—"
-            let exception = crash.exceptionType?.stringValue ?? "—"
-            summaries.append(
-                DiagnosticSummary(
-                    name: "metrickit_crash",
-                    valueMS: 0,
-                    note: "reason=\(reason), signal=\(signal), exception=\(exception)"
-                )
-            )
+    /// Average of bucket midpoints weighted by sample count, converted to ms.
+    private nonisolated func averageDurationMS(_ histogram: MXHistogram<UnitDuration>) -> Double {
+        let enumerator = histogram.bucketEnumerator
+        var totalCount = 0
+        var weightedSum = 0.0
+        while let bucket = enumerator.nextObject() as? MXHistogramBucket<UnitDuration> {
+            let mid = (bucket.bucketStart.converted(to: .milliseconds).value
+                + bucket.bucketEnd.converted(to: .milliseconds).value) / 2
+            weightedSum += mid * Double(bucket.bucketCount)
+            totalCount += bucket.bucketCount
         }
-
-        for hang in payload.hangDiagnostics ?? [] {
-            let ms = hang.hangDuration.converted(to: .milliseconds).value
-            summaries.append(
-                DiagnosticSummary(
-                    name: "metrickit_hang",
-                    valueMS: ms,
-                    note: "hangDuration≈\(Int(ms))ms"
-                )
-            )
-        }
-
-        for cpu in payload.cpuExceptionDiagnostics ?? [] {
-            let seconds = cpu.totalCPUTime.converted(to: .seconds).value
-            summaries.append(
-                DiagnosticSummary(
-                    name: "metrickit_cpu_exception",
-                    valueMS: seconds * 1_000,
-                    note: "totalCPU≈\(String(format: "%.1f", seconds))s"
-                )
-            )
-        }
-
-        for disk in payload.diskWriteExceptionDiagnostics ?? [] {
-            let mb = disk.totalWritesCaused.converted(to: .megabytes).value
-            summaries.append(
-                DiagnosticSummary(
-                    name: "metrickit_disk_write_exception",
-                    valueMS: 0,
-                    note: "totalWrites≈\(Int(mb))MB"
-                )
-            )
-        }
-
-        return summaries
+        return totalCount > 0 ? weightedSum / Double(totalCount) : 0
     }
-}
-
-/// Average of bucket midpoints weighted by sample count, converted to ms.
-nonisolated private func averageDurationMS(_ histogram: MXHistogram<UnitDuration>) -> Double {
-    let enumerator = histogram.bucketEnumerator
-    var totalCount = 0
-    var weightedSum = 0.0
-    while let bucket = enumerator.nextObject() as? MXHistogramBucket<UnitDuration> {
-        let mid = (bucket.bucketStart.converted(to: .milliseconds).value
-            + bucket.bucketEnd.converted(to: .milliseconds).value) / 2
-        weightedSum += mid * Double(bucket.bucketCount)
-        totalCount += bucket.bucketCount
-    }
-    return totalCount > 0 ? weightedSum / Double(totalCount) : 0
-}
 
 #else
 
-@MainActor
-protocol MetricKitObserving {
-    func start()
-}
+    @MainActor
+    protocol MetricKitObserving {
+        func start()
+    }
 
-@MainActor
-final class MetricKitObserver: MetricKitObserving {
-    init() {}
-    func start() {}
-}
+    @MainActor
+    final class MetricKitObserver: MetricKitObserving {
+        init() {}
+        func start() {}
+    }
 
 #endif
 

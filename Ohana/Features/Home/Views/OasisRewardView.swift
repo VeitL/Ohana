@@ -5,8 +5,8 @@
 //  绿洲圣地 — 生命之树动态进化 + 注入能量 + Bento 功能区
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct OasisRewardRuntimeModifier: ViewModifier {
     let shouldRunAmbientMotion: Bool
@@ -120,49 +120,49 @@ struct OasisRewardView: View {
     var isEmbeddedPrepared: Bool = true
     var isEmbeddedVisible: Bool = true
     var isEmbeddedActive: Bool = true
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
     @StateObject var liveDataStore = OasisRewardLiveDataStore()
 
-    @State var treeScale: CGFloat   = 1.0
-    @State var treeGlow: CGFloat    = 0.4
+    @State var treeScale: CGFloat = 1.0
+    @State var treeGlow: CGFloat = 0.4
     @State var activeSheetRoute: OasisSheetRoute?
     @State var activeFullScreenRoute: OasisFullScreenRoute?
     @State var activeOverlayRoute: OasisOverlayRoute?
     @State var confirmationRoute: OasisConfirmationRoute?
-    @State var showCritterNest      = false
+    @State var showCritterNest = false
     @State var critterNestPopupProgress: CGFloat = 0
     @State var energyParticles: [EnergyParticle] = []
     // 模块六：打卡日历
-    @State var checkedInDates: Set<String> = []   // "yyyy-MM-dd" 格式
-    @State var makeupPackCount: Int = 0            // 补签包数量
-    @State var makeupDates: Set<String> = []       // 补签过的日期集合
+    @State var checkedInDates: Set<String> = [] // "yyyy-MM-dd" 格式
+    @State var makeupPackCount: Int = 0 // 补签包数量
+    @State var makeupDates: Set<String> = [] // 补签过的日期集合
     @State var lastClaimedMilestone: Int = 0
-    @State var calendarDisplayMonth: Date = Date()
+    @State var calendarDisplayMonth: Date = .init()
     @AppStorage("currentActiveHumanId") var currentActiveHumanId = ""
     @Environment(\.colorScheme) var colorScheme
     @StateObject var workloadPolicy = AppWorkloadPolicy.shared
 
     var isMaterial: Bool { false }
-    var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
+    var matBg: Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
-    var matAccent:  Color { Color(hex: "FF5A00") }
+    var matAccent: Color { Color(hex: "FF5A00") }
     @State var lastLevel: TreeLevel = .lv1
     @State var isInjecting: Bool = false
     @State var treeInjectionProgress: CGFloat = 0
     @State var treeInjectionBoost: CGFloat = 0.026
     @State var injectionPulseToken = 0
-    @State var levelUpPulse         = false
-    @State var levelUpBadgeVisible  = false
+    @State var levelUpPulse = false
+    @State var levelUpBadgeVisible = false
     @State var openingUpgradeCoconutId: UUID?
     @State var critterActionPulseId: UUID?
     @State var lastCritterInteractionOutcome: OasisCritterInteractionOutcome?
     @State var rescuingCritterId: UUID?
     // 任务7：环境光晕 + 树上每日椰子
-    @State var glowBreathing: Bool  = false
+    @State var glowBreathing: Bool = false
     @State var dailyTreeCoconutCount = 0
     @State var harvestedCoconutIndices: Set<Int> = []
     @State var treeVisualEnergyOverride: Int?
@@ -207,12 +207,15 @@ struct OasisRewardView: View {
             shopInventory: appServices.shopInventory
         )
     }
+
     var shopUnlockLevel: Int {
         GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
     }
+
     var gachaUnlockLevel: Int {
         GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
     }
+
     var critterUnlockLevel: Int {
         OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId)?.sourceLevel ?? 10
     }
@@ -232,13 +235,13 @@ struct OasisRewardView: View {
     func lockedLevel(for route: OasisSheetRoute) -> Int? {
         switch route {
         case .coconutShop:
-            return lockedLevel(requiredLevel: shopUnlockLevel)
+            lockedLevel(requiredLevel: shopUnlockLevel)
         case .gacha:
-            return lockedLevel(requiredLevel: gachaUnlockLevel)
+            lockedLevel(requiredLevel: gachaUnlockLevel)
         case .critterCodex:
-            return lockedLevel(requiredLevel: critterUnlockLevel)
+            lockedLevel(requiredLevel: critterUnlockLevel)
         case .coconutRules, .achievements, .inventory, .checkInDetail:
-            return nil
+            nil
         }
     }
 
@@ -358,9 +361,9 @@ struct OasisRewardView: View {
 
     struct EnergyParticle: Identifiable {
         let id = UUID()
-        var offsetX: CGFloat = CGFloat.random(in: -80...80)
+        var offsetX: CGFloat = .random(in: -80 ... 80)
         var offsetY: CGFloat = 0
-        var opacity: Double  = 1.0
+        var opacity: Double = 1.0
     }
 }
 

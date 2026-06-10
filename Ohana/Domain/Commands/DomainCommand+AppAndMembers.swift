@@ -33,7 +33,7 @@ extension DomainCommand {
         command("members", "homeVisibility", [
             "entityID": entityID.uuidString,
             "kind": kind,
-            "visible": String(visible),
+            "visible": String(visible)
         ])
     }
 
@@ -48,7 +48,7 @@ extension DomainCommand {
     static func settingsCoconutBalance(humanID: UUID?, amount: Int) -> DomainCommand {
         command("settings", "coconutBalance", [
             "humanID": humanID?.uuidString ?? "legacy",
-            "amount": String(amount),
+            "amount": String(amount)
         ])
     }
 
@@ -59,7 +59,7 @@ extension DomainCommand {
     static func calendarEventCompletion(eventID: UUID, isCompleted: Bool) -> DomainCommand {
         command("calendar", "eventCompletion", [
             "eventID": eventID.uuidString,
-            "isCompleted": String(isCompleted),
+            "isCompleted": String(isCompleted)
         ])
     }
 

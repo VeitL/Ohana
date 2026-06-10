@@ -5,21 +5,21 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct CalendarView: View {
-    var preselectedPetId: String? = nil
-    var preselectedHumanId: String? = nil
+    var preselectedPetId: String?
+    var preselectedHumanId: String?
     var hideToolbar: Bool = false
     var showsEmbeddedControls: Bool = false
     var addEventTrigger: Int = 0
     var isEmbeddedPrepared: Bool = true
     var isEmbeddedVisible: Bool = true
     var isEmbeddedActive: Bool = true
-    var onRequestAddEvent: (() -> Void)? = nil
-    var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)? = nil
-    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
+    var onRequestAddEvent: (() -> Void)?
+    var onOpenEventDestination: ((FocusHomeReminderDestination) -> Void)?
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     var events: [Event] = []
     var pets: [Pet] = []
     var humans: [Human] = []
@@ -27,11 +27,11 @@ struct CalendarView: View {
     var insurances: [PetInsurance] = []
     var petMedications: [PetMedication] = []
     var humanMedications: [HumanMedication] = []
-    
+
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
-    
+
     @State var selectedDate = Date()
     @AppStorage("calendar_filterPetId") var calendarFilterPetId: String = ""
     @AppStorage("calendar_filterHumanId") var calendarFilterHumanId: String = ""
@@ -65,10 +65,10 @@ struct CalendarView: View {
     @State var addEventFlowStartedAt: CFAbsoluteTime?
 
     var isMaterial: Bool { false }
-    var matBg:      Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
+    var matBg: Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     var chipAccent: Color { Color.goPrimary }
-    var chipSelFg:  Color { Color.arkInk }
+    var chipSelFg: Color { Color.arkInk }
     // 独立日历页下自适应 light/dark 的文字颜色辅助
     var classicSoftText: Color { colorScheme == .dark ? .white.opacity(0.4) : .secondary }
     var classicPrimaryText: Color { colorScheme == .dark ? .white.opacity(0.85) : .primary }
@@ -122,7 +122,7 @@ struct CalendarView: View {
     var calendarCoconutBalance: Int {
         activeHuman?.coconutBalance ?? humans.reduce(0) { $0 + $1.coconutBalance }
     }
-    
+
     /// 从宠物详情进入时固定为该宠物；否则使用 AppStorage 筛选
     var effectivePetFilterId: String? {
         if let p = preselectedPetId { return p }
@@ -187,102 +187,44 @@ struct CalendarView: View {
         preselectedPetId == nil && preselectedHumanId == nil && (!hideToolbar || showsEmbeddedControls || isMaterial)
     }
 
-    // D1: 展开重复事件 → 生成虚拟 (Event, occurrenceDate) 对，用于列表视图分组
-    struct EventOccurrence: Identifiable {
-        let id: String          // event.id + date
-        let event: Event
-        let occurrenceDate: Date
-    }
+    typealias EventOccurrence = CalendarEventOccurrence
+    typealias TimelineDateSection = CalendarTimelineDateSection
 
-    struct TimelineDateSection: Identifiable {
-        let date: Date
-        let occurrences: [EventOccurrence]
-
-        var id: Date { date }
+    var calendarTimelineSnapshot: CalendarTimelineSnapshot {
+        CalendarSnapshotBuilder.buildTimeline(
+            events: filteredEvents,
+            allEvents: events,
+            pets: pets
+        )
     }
 
     var expandedOccurrences: [EventOccurrence] {
-        let cal = Calendar.current
-        let cutoff = cal.date(byAdding: .month, value: -3, to: Date()) ?? Date() // 只展开近3个月
-        let future = cal.date(byAdding: .month, value: 3, to: Date()) ?? Date()  // 及未来3个月
-        var result: [EventOccurrence] = []
-        for event in filteredEvents {
-            let eStart = cal.startOfDay(for: event.startDate)
-            if event.recurrenceDays > 0 {
-                let hardCap: Date
-                if let recEnd = event.recurrenceEndDate {
-                    hardCap = min(recEnd, future)
-                } else {
-                    hardCap = future
-                }
-                var cursor = max(eStart, cutoff)
-                // 对齐到第一个重复发生日
-                if cursor > eStart {
-                    let diff = cal.dateComponents([.day], from: eStart, to: cursor).day ?? 0
-                    let steps = Int(ceil(Double(diff) / Double(event.recurrenceDays)))
-                    cursor = cal.date(byAdding: .day, value: steps * event.recurrenceDays, to: eStart) ?? eStart
-                }
-                var safety = 0
-                while cursor <= hardCap && safety < 200 {
-                    if shouldShowEventOccurrence(event, occurrenceDate: cursor) {
-                        result.append(EventOccurrence(
-                            id: "\(event.id.uuidString)-\(cursor.timeIntervalSince1970)",
-                            event: event,
-                            occurrenceDate: cursor
-                        ))
-                    }
-                    cursor = cal.date(byAdding: .day, value: event.recurrenceDays, to: cursor) ?? cursor
-                    safety += 1
-                }
-            } else {
-                if eStart >= cutoff && eStart <= future && shouldShowEventOccurrence(event, occurrenceDate: eStart) {
-                    result.append(EventOccurrence(
-                        id: event.id.uuidString,
-                        event: event,
-                        occurrenceDate: eStart
-                    ))
-                }
-            }
-        }
-        return result.sorted { $0.occurrenceDate < $1.occurrenceDate }
+        calendarTimelineSnapshot.expandedOccurrences
     }
 
     var timelineSections: [TimelineDateSection] {
-        let today = Calendar.current.startOfDay(for: Date())
-        let occurrencesByDay = Dictionary(grouping: expandedOccurrences) { occ in
-            Calendar.current.startOfDay(for: occ.occurrenceDate)
-        }
-        .mapValues { occurrences in
-            occurrences.sorted {
-                if $0.occurrenceDate == $1.occurrenceDate {
-                    return $0.event.startDate < $1.event.startDate
-                }
-                return $0.occurrenceDate < $1.occurrenceDate
-            }
-        }
-
-        return Array(Set(occurrencesByDay.keys).union([today]))
-            .sorted()
-            .map { TimelineDateSection(date: $0, occurrences: occurrencesByDay[$0] ?? []) }
+        calendarTimelineSnapshot.sections
     }
 
     var timelineDates: [Date] {
-        timelineSections.map(\.date)
+        calendarTimelineSnapshot.dates
     }
 
     var timelineDateSignature: String {
-        timelineDates.map(timelineDateID).joined(separator: "|")
+        calendarTimelineSnapshot.dateSignature
     }
 
     var timelineDateIDs: Set<String> {
-        Set(timelineDates.map(timelineDateID))
+        calendarTimelineSnapshot.dateIDs
     }
-    
+
     var eventsForSelectedDate: [Event] {
-        filteredEvents.filter {
-            eventOccursOnDate($0, date: selectedDate) &&
-                shouldShowEventOccurrence($0, occurrenceDate: selectedDate)
-        }
+        CalendarSnapshotBuilder.eventsForDate(
+            filteredEvents,
+            date: selectedDate,
+            allEvents: events,
+            pets: pets
+        )
     }
 
     func shouldShowEventOccurrence(_ event: Event, occurrenceDate: Date) -> Bool {
@@ -296,29 +238,9 @@ struct CalendarView: View {
 
     /// 判断事件是否出现在指定日期（支持多日事件 + 重复事件展开）
     func eventOccursOnDate(_ event: Event, date: Date) -> Bool {
-        let cal = Calendar.current
-        let dayStart = cal.startOfDay(for: date)
-        guard let dayEnd = cal.date(byAdding: .day, value: 1, to: dayStart) else { return false }
-        let eStart = cal.startOfDay(for: event.startDate)
-
-        // 重复事件：检查 date 是否是某个重复发生日
-        if event.recurrenceDays > 0 {
-            // date 不能早于事件开始日
-            guard dayStart >= eStart else { return false }
-            // 不能超过重复结束日（如果设置了）
-            if let recEnd = event.recurrenceEndDate {
-                guard dayStart <= cal.startOfDay(for: recEnd) else { return false }
-            }
-            // date 距 startDate 的天数必须是 recurrenceDays 的整数倍
-            let diff = cal.dateComponents([.day], from: eStart, to: dayStart).day ?? 0
-            return diff % event.recurrenceDays == 0
-        }
-
-        // 单次事件：事件范围与当天范围有交集
-        let eEnd = event.endDate.map { cal.startOfDay(for: $0) } ?? eStart
-        return eStart < dayEnd && eEnd >= dayStart
+        CalendarSnapshotBuilder.eventOccursOnDate(event, date: date)
     }
-    
+
     // 本周 7 天
     var thisWeekDays: [Date] {
         let cal = Calendar.current
@@ -326,9 +248,9 @@ struct CalendarView: View {
         let weekday = cal.component(.weekday, from: today)
         let daysFromSunday = weekday - 1
         guard let sunday = cal.date(byAdding: .day, value: -daysFromSunday, to: today) else { return [] }
-        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: sunday) }
+        return (0 ..< 7).compactMap { cal.date(byAdding: .day, value: $0, to: sunday) }
     }
-    
+
     var body: some View {
         Group {
             if hideToolbar {

@@ -19,19 +19,19 @@ enum TodayFocusContent {
     var statusText: String {
         switch self {
         case .quest:
-            return "去打卡"
+            "去打卡"
         case .familyTask:
-            return "发给你"
+            "发给你"
         case .coconutExchange:
-            return "待确认"
-        case .negative(let signal):
-            return signal.severity == .critical ? "紧急" : "需要关注"
+            "待确认"
+        case let .negative(signal):
+            signal.severity == .critical ? "紧急" : "需要关注"
         case .memory:
-            return "轻量回顾"
+            "轻量回顾"
         case .celebrate:
-            return "今日已清空"
+            "今日已清空"
         case .welcome:
-            return "3分钟开始"
+            "3分钟开始"
         }
     }
 }
@@ -86,7 +86,7 @@ nonisolated enum TodayFocusService {
         walkLogs: [PetWalkLog],
         pottyLogs: [PetPottyLog],
         humanWeightLogs: [HumanWeightLog] = [],
-        memory: MemoryFragment? = nil,
+        memory _: MemoryFragment? = nil,
         calendar: Calendar = .current,
         now: Date = Date(),
         questManager: QuestManager = QuestManager()
@@ -148,7 +148,7 @@ nonisolated enum TodayFocusService {
         if quest.id.hasPrefix("q_feed_"), let petId = quest.targetPetId {
             return careLogs.contains { $0.careType == .feeding && $0.pet?.id == petId && calendar.isDate($0.date, inSameDayAs: now) }
         }
-        if quest.id.hasPrefix("q_water_") && !quest.id.hasPrefix("q_water_plant"), let petId = quest.targetPetId {
+        if quest.id.hasPrefix("q_water_"), !quest.id.hasPrefix("q_water_plant"), let petId = quest.targetPetId {
             return careLogs.contains {
                 ($0.careType == .watering || $0.careType == .waterChange)
                     && $0.pet?.id == petId

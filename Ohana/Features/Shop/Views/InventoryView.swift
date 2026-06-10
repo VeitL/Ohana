@@ -5,8 +5,8 @@
 //  椰子百宝箱 — 查看并装备已拥有的道具/特效/称号
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct InventoryContentView: View {
     let pets: [Pet]
@@ -17,7 +17,7 @@ struct InventoryContentView: View {
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = "zh"
     @AppStorage("purchasedShopItems") private var purchasedRaw: String = ""
-    
+
     // Equip states
     @AppStorage("shop_equipped_title") private var equippedTitle: String = ""
     @AppStorage("shop_equip_fx_lime_glow") private var equipFxLimeGlow: Bool = false
@@ -27,7 +27,7 @@ struct InventoryContentView: View {
     @AppStorage("shop_equip_fx_stars") private var equipFxStars: Bool = false
     @AppStorage("shop_equip_fx_firework") private var equipFxFirework: Bool = false
     @AppStorage(AppIconCatalog.selectedIconKey) private var selectedAppIcon: String = AppIconCatalog.defaultItemId
-    
+
     // Inventory states
     @State private var backdatePacks: Int = 0
     @State private var doubleBoostActive: Bool = false
@@ -36,22 +36,22 @@ struct InventoryContentView: View {
     @State private var showPetPickerForPopout = false
     @State private var showAvatarTargetPicker = false
     @State private var equipPopoutPet: Pet? = nil
-    
+
     // All items reference (shared with CoconutShopView)
     private var allEffectsAndTitles: [ShopItem] {
         ShopCatalog.allItems(purchasedSet: purchasedSet)
     }
-    
+
     private var purchasedSet: Set<String> {
         Set(purchasedRaw.split(separator: ",").map(String.init))
     }
 
     private var l: L10n { L10n(appLanguage) }
-    
+
     private var myEffects: [ShopItem] {
         allEffectsAndTitles.filter { $0.category == .effect && purchasedSet.contains($0.id) }
     }
-    
+
     private var myTitles: [ShopItem] {
         allEffectsAndTitles.filter { $0.category == .title_ && purchasedSet.contains($0.id) }
     }
@@ -59,12 +59,12 @@ struct InventoryContentView: View {
     private var myAppIcons: [ShopItem] {
         allEffectsAndTitles.filter { $0.category == .appIcon && $0.isPurchased }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 OhanaAppBackground()
-                
+
                 ScrollView {
                     VStack(spacing: 24) {
                         if !myAppIcons.isEmpty {
@@ -89,7 +89,7 @@ struct InventoryContentView: View {
                                 }
                             }
                         }
-                        
+
                         // 2. 特效区
                         if !myEffects.isEmpty {
                             inventorySection(title: "外观与特效", icon: "wand.and.stars") {
@@ -98,7 +98,7 @@ struct InventoryContentView: View {
                                 }
                             }
                         }
-                        
+
                         // 3. 消耗区
                         let isShieldActive = streakShieldExpiry.map { Date() < $0 } ?? false
                         if backdatePacks > 0 || isShieldActive || doubleBoostActive {
@@ -114,8 +114,8 @@ struct InventoryContentView: View {
                                 }
                             }
                         }
-                        
-                        if myAppIcons.isEmpty && myTitles.isEmpty && myEffects.isEmpty && Avatar2DAccess.extraPassCount == 0 && backdatePacks == 0 && !isShieldActive && !doubleBoostActive {
+
+                        if myAppIcons.isEmpty, myTitles.isEmpty, myEffects.isEmpty, Avatar2DAccess.extraPassCount == 0, backdatePacks == 0, !isShieldActive, !doubleBoostActive {
                             VStack(spacing: 12) {
                                 Image(systemName: "shippingbox").accessibilityHidden(true)
                                     .font(OhanaFont.adaptive(size: 40))
@@ -231,7 +231,7 @@ struct InventoryContentView: View {
             Divider().background(Color.ohanaPrimaryText.opacity(0.1)).padding(.leading, 60)
         }
     }
-    
+
     // MARK: - Section Helper
     private func inventorySection(title: String, icon: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -243,22 +243,22 @@ struct InventoryContentView: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .padding(.horizontal, 4)
-            
+
             VStack(spacing: 0) {
                 content()
             }
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous).strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1))
         }
     }
-    
+
     // MARK: - Title Row
     private func titleRow(_ item: ShopItem) -> some View {
         let isEquipped = (equippedTitle == item.id)
         return HStack(spacing: 14) {
             Text(item.emoji)
                 .font(OhanaFont.adaptive(size: 28))
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
@@ -268,7 +268,7 @@ struct InventoryContentView: View {
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()
-            
+
             Toggle("", isOn: Binding(
                 get: { isEquipped },
                 set: { val in
@@ -284,19 +284,19 @@ struct InventoryContentView: View {
             Divider().background(Color.ohanaPrimaryText.opacity(0.1)).padding(.leading, 60)
         }
     }
-    
+
     // MARK: - Effect Row
     private func effectRow(_ item: ShopItem) -> some View {
         let isActive = Binding<Bool>(
             get: {
                 switch item.id {
-                case "fx_lime_glow": return equipFxLimeGlow
-                case "fx_rainbow": return equipFxRainbow
-                case "fx_rainbow_poop": return equipFxRainbowPoop
-                case "fx_popout_card": return equipFxPopoutCard
-                case "fx_stars": return equipFxStars
-                case "fx_firework": return equipFxFirework
-                default: return false
+                case "fx_lime_glow": equipFxLimeGlow
+                case "fx_rainbow": equipFxRainbow
+                case "fx_rainbow_poop": equipFxRainbowPoop
+                case "fx_popout_card": equipFxPopoutCard
+                case "fx_stars": equipFxStars
+                case "fx_firework": equipFxFirework
+                default: false
                 }
             },
             set: { val in
@@ -307,7 +307,7 @@ struct InventoryContentView: View {
                 case "fx_rainbow_poop": equipFxRainbowPoop = val
                 case "fx_popout_card":
                     equipFxPopoutCard = val
-                    if val && !pets.contains(where: { $0.cardStyleRaw == "popout" }) {
+                    if val, !pets.contains(where: { $0.cardStyleRaw == "popout" }) {
                         if pets.count == 1 {
                             equipPopoutPet = pets.first
                         } else if pets.count > 1 {
@@ -320,11 +320,11 @@ struct InventoryContentView: View {
                 }
             }
         )
-        
+
         return HStack(spacing: 14) {
             Text(item.emoji)
                 .font(OhanaFont.adaptive(size: 28))
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
@@ -334,7 +334,7 @@ struct InventoryContentView: View {
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
             Spacer()
-            
+
             HStack(spacing: 10) {
                 if item.id == "fx_popout_card" {
                     Button {
@@ -364,7 +364,7 @@ struct InventoryContentView: View {
             Divider().background(Color.ohanaPrimaryText.opacity(0.1)).padding(.leading, 60)
         }
     }
-    
+
     // MARK: - Consumable Row
     private func consumableRow(emoji: String, name: String, count: Int, suffix: String? = nil) -> some View {
         HStack(spacing: 14) {
@@ -454,7 +454,7 @@ private struct AppIconInventoryPreview: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                 .fill(
                     LinearGradient(
                         colors: descriptor.gradientHex.map { Color(hex: $0) },
@@ -466,6 +466,6 @@ private struct AppIconInventoryPreview: View {
                 .font(OhanaFont.adaptive(size: 20, weight: .black))
                 .foregroundStyle(descriptor.itemId == "appicon_minimal_o" ? Color.arkInk : Color.white) // ui-v4: allow asset-specific icon ink
         }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 }

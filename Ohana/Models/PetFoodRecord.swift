@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 @Model
 final class PetFoodRecord {
@@ -20,9 +20,9 @@ final class PetFoodRecord {
     var remainingCorrectionGrams: Double?
     var remainingCorrectionDate: Date?
     var notes: String
-    var executorId: String?  // ArkSchemaV11: 执行该动作的 Human.id.uuidString
+    var executorId: String? // ArkSchemaV11: 执行该动作的 Human.id.uuidString
     var pet: Pet?
-    
+
     init(
         brand: String = "",
         dailyGrams: Double = 0,

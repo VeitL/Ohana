@@ -5,8 +5,8 @@
 //  欧哈纳财富中心 — 全页可滚动，收支分开展示
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Content View
 struct IslandWealthDashboardContentView: View {
@@ -55,6 +55,7 @@ struct IslandWealthDashboardContentView: View {
         (UIApplication.shared.connectedScenes.first as? UIWindowScene)?
             .keyWindow?.safeAreaInsets.top ?? 52
     }
+
     private var navBarHeight: CGFloat { safeTop + 46 }
 
     var body: some View {
@@ -76,7 +77,7 @@ struct IslandWealthDashboardContentView: View {
                     incomeVsSpendingRow
 
                     // 图表
-                    if vm.displayedAssets == 0 && vm.periodIncome == 0 && vm.periodSpending == 0 {
+                    if vm.displayedAssets == 0, vm.periodIncome == 0, vm.periodSpending == 0 {
                         emptyChart
                     } else {
                         chartSection
@@ -96,7 +97,7 @@ struct IslandWealthDashboardContentView: View {
             syncVM()
             replayChartAnimation()
         }
-        .onChange(of: pets.count)   { syncVM() }
+        .onChange(of: pets.count) { syncVM() }
         .onChange(of: humans.count) { syncVM() }
         .onChange(of: walletAccounts.count) { syncVM() }
         .onChange(of: walletLedgerEntries.count) { syncVM() }
@@ -229,7 +230,7 @@ struct IslandWealthDashboardContentView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     // MARK: - Chart
@@ -239,7 +240,7 @@ struct IslandWealthDashboardContentView: View {
             incomeSpendingTrendChart
         }
         .padding(16)
-        .background(Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private var incomeSpendingTrendChart: some View {
@@ -316,7 +317,7 @@ struct IslandWealthDashboardContentView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
-        .background(Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     // MARK: - Leaderboard
@@ -334,7 +335,7 @@ struct IslandWealthDashboardContentView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 32)
-                .background(Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             } else {
                 VStack(spacing: 10) {
                     HStack {
@@ -370,9 +371,9 @@ struct IslandWealthDashboardContentView: View {
                 ZStack {
                     Circle()
                         .fill(rank == 1 ? Color.goPrimary :
-                              rank == 2 ? Color(hex: "FFF44F").opacity(0.55) :
-                              rank == 3 ? Color.goTeal.opacity(0.5) :
-                              Color.ohanaCardSurface.opacity(0.74))
+                            rank == 2 ? Color(hex: "FFF44F").opacity(0.55) :
+                            rank == 3 ? Color.goTeal.opacity(0.5) :
+                            Color.ohanaCardSurface.opacity(0.74))
                         .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     Text("\(rank)")
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
@@ -426,10 +427,10 @@ struct IslandWealthDashboardContentView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(isSelected ? Color.goPrimary.opacity(0.16) : Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(isSelected ? Color.goPrimary.opacity(0.16) : Color.ohanaCardSurface.opacity(0.74), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             .overlay {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                         .stroke(Color.goPrimary.opacity(0.85), lineWidth: 1.2)
                 }
             }
@@ -445,7 +446,6 @@ struct IslandWealthDashboardContentView: View {
             .minimumScaleFactor(0.7)
             .ohanaNumericMotion(text)
     }
-
 }
 
 #Preview {

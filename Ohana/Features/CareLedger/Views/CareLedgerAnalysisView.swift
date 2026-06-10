@@ -5,8 +5,8 @@
 //  Analysis surface for the unified care ledger.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct CareLedgerAnalysisContentView: View {
     let ledgerEvents: [CareLedgerEvent]
@@ -65,7 +65,7 @@ struct CareLedgerAnalysisContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var filterCard: some View {
@@ -90,7 +90,7 @@ struct CareLedgerAnalysisContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var kindBreakdownCard: some View {
@@ -105,7 +105,7 @@ struct CareLedgerAnalysisContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var actorBreakdownCard: some View {
@@ -120,7 +120,7 @@ struct CareLedgerAnalysisContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var latestEventsCard: some View {
@@ -154,7 +154,7 @@ struct CareLedgerAnalysisContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private func kindChip(title: String, kind: CareLedgerEventKind?) -> some View {
@@ -198,7 +198,7 @@ struct CareLedgerAnalysisContentView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func sectionHeader(_ title: String, icon: String) -> some View {
@@ -216,56 +216,55 @@ struct CareLedgerAnalysisContentView: View {
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
-
 }
 
 private extension CareLedgerEventKind {
     var displayName: String {
         switch self {
-        case .care: return "照护"
-        case .potty: return "便便"
-        case .walk: return "遛狗"
-        case .hygiene: return "护理"
-        case .health: return "健康"
-        case .weight: return "体重"
-        case .medication: return "吃药"
-        case .workout: return "运动"
-        case .expense: return "花费"
-        case .reminder: return "提醒"
-        case .plantCare: return "植物"
-        case .coconut: return "椰子"
-        case .milestone: return "里程碑"
-        case .unknown: return "未知"
+        case .care: "照护"
+        case .potty: "便便"
+        case .walk: "遛狗"
+        case .hygiene: "护理"
+        case .health: "健康"
+        case .weight: "体重"
+        case .medication: "吃药"
+        case .workout: "运动"
+        case .expense: "花费"
+        case .reminder: "提醒"
+        case .plantCare: "植物"
+        case .coconut: "椰子"
+        case .milestone: "里程碑"
+        case .unknown: "未知"
         }
     }
 
     var icon: String {
         switch self {
-        case .care: return "pawprint.fill"
-        case .potty: return "drop.fill"
-        case .walk: return "figure.walk"
-        case .hygiene: return "sparkles"
-        case .health: return "cross.fill"
-        case .weight: return "scalemass.fill"
-        case .medication: return "pills.fill"
-        case .workout: return "figure.run"
-        case .expense: return "creditcard.fill"
-        case .reminder: return "bell.fill"
-        case .plantCare: return "leaf.fill"
-        case .coconut: return "circle.hexagongrid.fill"
-        case .milestone: return "flag.fill"
-        case .unknown: return "questionmark.circle"
+        case .care: "pawprint.fill"
+        case .potty: "drop.fill"
+        case .walk: "figure.walk"
+        case .hygiene: "sparkles"
+        case .health: "cross.fill"
+        case .weight: "scalemass.fill"
+        case .medication: "pills.fill"
+        case .workout: "figure.run"
+        case .expense: "creditcard.fill"
+        case .reminder: "bell.fill"
+        case .plantCare: "leaf.fill"
+        case .coconut: "circle.hexagongrid.fill"
+        case .milestone: "flag.fill"
+        case .unknown: "questionmark.circle"
         }
     }
 
     var color: Color {
         switch self {
-        case .expense: return .goYellow
-        case .reminder: return .goOrange
-        case .coconut: return .goLime
-        case .health, .medication: return .goRed
-        case .walk, .workout: return .goTeal
-        default: return .goPrimary
+        case .expense: .goYellow
+        case .reminder: .goOrange
+        case .coconut: .goLime
+        case .health, .medication: .goRed
+        case .walk, .workout: .goTeal
+        default: .goPrimary
         }
     }
 }

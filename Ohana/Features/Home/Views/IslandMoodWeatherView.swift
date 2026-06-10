@@ -11,9 +11,9 @@ enum IslandMood: Equatable {
     case calm
     case breezy
     case storm
-    case celebrate   // 解锁成就 / 今日遛狗 >5km / 里程碑日
+    case celebrate // 解锁成就 / 今日遛狗 >5km / 里程碑日
     case plantBreeze // 植物浇水后的生态联动特效
-    case cloudy      // 适度焦虑：连断打卡 / 漏药 / 多日未护理
+    case cloudy // 适度焦虑：连断打卡 / 漏药 / 多日未护理
 }
 
 struct WeatherParticle: Identifiable {
@@ -28,7 +28,7 @@ struct WeatherParticle: Identifiable {
 
 struct IslandMoodWeatherView: View {
     let mood: IslandMood
-    
+
     @State private var particles: [WeatherParticle] = []
     @State private var timer: Timer?
     @State private var isVisible = false
@@ -38,10 +38,10 @@ struct IslandMoodWeatherView: View {
 
     private var shouldRunParticles: Bool {
         mood != .calm &&
-        !reduceMotion &&
-        workloadPolicy.ambientMotionBudget(isVisible: isVisible).allowsMotion
+            !reduceMotion &&
+            workloadPolicy.ambientMotionBudget(isVisible: isVisible).allowsMotion
     }
-    
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -80,10 +80,10 @@ struct IslandMoodWeatherView: View {
         guard shouldRunParticles else { return }
         startParticles(in: size)
     }
-    
+
     private func startParticles(in size: CGSize) {
         guard shouldRunParticles, timer == nil else { return }
-        
+
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { _ in
             withAnimation(.linear(duration: 3)) { // ui-v4: allow AppWorkloadPolicy-gated particle drift uses constant falling motion.
                 addParticle(in: size)
@@ -91,50 +91,50 @@ struct IslandMoodWeatherView: View {
             }
         }
     }
-    
+
     private func stopParticles() {
         timer?.invalidate()
         timer = nil
     }
-    
+
     private func addParticle(in size: CGSize) {
         guard particles.count < 20 else { return }
-        
+
         let emojis: [String]
         switch mood {
         case .calm: return
-        case .breezy:      emojis = ["✨", "🌸", "🌺", "🌼"]
-        case .storm:       emojis = ["⚡️", "🌩️", "💧"]
-        case .celebrate:   emojis = ["🎉", "🌟", "✨", "🎊", "⭐️", "💫"]
+        case .breezy: emojis = ["✨", "🌸", "🌺", "🌼"]
+        case .storm: emojis = ["⚡️", "🌩️", "💧"]
+        case .celebrate: emojis = ["🎉", "🌟", "✨", "🎊", "⭐️", "💫"]
         case .plantBreeze: emojis = ["🍃", "🌿", "🌱", "🍀", "🌸", "💚"]
-        case .cloudy:      emojis = ["🌥️", "🌫", "☁️", "💭"]
+        case .cloudy: emojis = ["🌥️", "🌫", "☁️", "💭"]
         }
-        
+
         let particle = WeatherParticle(
-            x: CGFloat.random(in: 0...size.width),
+            x: CGFloat.random(in: 0 ... size.width),
             y: -20,
             emoji: emojis.randomElement() ?? "✨",
-            opacity: Double.random(in: 0.3...0.7),
-            scale: CGFloat.random(in: 0.6...1.2),
-            speed: CGFloat.random(in: 1...3)
+            opacity: Double.random(in: 0.3 ... 0.7),
+            scale: CGFloat.random(in: 0.6 ... 1.2),
+            speed: CGFloat.random(in: 1 ... 3)
         )
         particles.append(particle)
-        
+
         // 动画移动到底部
         if let index = particles.firstIndex(where: { $0.id == particle.id }) {
             particles[index].y = size.height + 20
-            particles[index].x += CGFloat.random(in: -50...50)
+            particles[index].x += CGFloat.random(in: -50 ... 50)
             particles[index].opacity = 0
         }
     }
-    
+
     private func removeOldParticles() {
         particles.removeAll { $0.opacity <= 0.05 }
     }
 }
 
 // MARK: - Mood Calculator
-struct IslandMoodCalculator {
+enum IslandMoodCalculator {
     static func calculate(
         pets: [Pet],
         pendingReminders: [Reminder],
@@ -143,20 +143,20 @@ struct IslandMoodCalculator {
     ) -> IslandMood {
         // 紧急食物不足 → storm
         for pet in pets {
-            if pet.dailyPortionGrams > 0 && pet.remainingFoodDays <= 3 && pet.remainingFoodDays > 0 {
+            if pet.dailyPortionGrams > 0, pet.remainingFoodDays <= 3, pet.remainingFoodDays > 0 {
                 return .storm
             }
         }
 
         // 证件即将到期 → storm
         for pet in pets {
-            if pet.documents.contains(where: { $0.isExpired }) {
+            if pet.documents.contains(where: \.isExpired) {
                 return .storm
             }
         }
 
         // 今日遛狗距离 >= 5km → celebrate
-        let todayWalkKm = pets.flatMap { $0.walkLogs }.filter {
+        let todayWalkKm = pets.flatMap(\.walkLogs).filter {
             Calendar.current.isDateInToday($0.startDate)
         }.reduce(0.0) { $0 + $1.distanceMeters }
         if todayWalkKm >= 5000 {
@@ -172,7 +172,7 @@ struct IslandMoodCalculator {
         }
 
         // 今天刚有第一次遛狗记录 → celebrate
-        let firstEverWalk = pets.flatMap { $0.walkLogs }
+        let firstEverWalk = pets.flatMap(\.walkLogs)
             .sorted(by: { $0.startDate < $1.startDate })
             .first
         if let first = firstEverWalk, Calendar.current.isDateInToday(first.startDate) {
@@ -185,8 +185,8 @@ struct IslandMoodCalculator {
         for pet in pets {
             if let homeDate = pet.homeDate {
                 let homeComps = Calendar.current.dateComponents([.month, .day], from: homeDate)
-                if homeComps.month == todayComps.month && homeComps.day == todayComps.day
-                    && pet.daysTogether > 0 {
+                if homeComps.month == todayComps.month, homeComps.day == todayComps.day,
+                   pet.daysTogether > 0 {
                     return .celebrate
                 }
             }
@@ -197,7 +197,7 @@ struct IslandMoodCalculator {
         let todayReminders = allReminders.filter {
             Calendar.current.isDateInToday($0.scheduledAt)
         }
-        if !todayReminders.isEmpty && todayReminders.allSatisfy({ $0.isCompleted }) {
+        if !todayReminders.isEmpty, todayReminders.allSatisfy(\.isCompleted) {
             return .celebrate
         }
 
@@ -234,8 +234,8 @@ struct IslandMoodCalculator {
 //
 nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
     let id = UUID()
-    let iconName: String      // SF Symbol
-    let emoji: String         // fallback emoji
+    let iconName: String // SF Symbol
+    let emoji: String // fallback emoji
     let title: String
     let detail: String
     let severity: Severity
@@ -243,8 +243,8 @@ nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
     let healthAlertType: HealthAlert.AlertType?
 
     enum Severity: Sendable {
-        case warning       // 黄色 - 可缓冲
-        case critical      // 红色 - 紧急
+        case warning // 黄色 - 可缓冲
+        case critical // 红色 - 紧急
     }
 
     init(
@@ -266,7 +266,7 @@ nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
     }
 }
 
-struct IslandNegativeFeedback {
+enum IslandNegativeFeedback {
     /// 返回所有负反馈信号，按严重程度排序（critical 在前）
     static func signals(
         pets: [Pet],
@@ -294,9 +294,9 @@ struct IslandNegativeFeedback {
             .filter { alert in
                 switch alert.type {
                 case .noCheckIn, .noWalk, .noPotty:
-                    return false
+                    false
                 default:
-                    return true
+                    true
                 }
             }
         for alert in filteredClinicalAlerts.prefix(2) {
@@ -348,7 +348,7 @@ struct IslandNegativeFeedback {
                 let taken = MedicationDoseProgressStore.dosesTakenToday(for: med.id)
                 let hour = cal.component(.hour, from: now)
                 // 过了晚上 22:00 还未吃完 → 视为今日漏药
-                if hour >= 22 && taken < need {
+                if hour >= 22, taken < need {
                     result.append(IslandNegativeSignal(
                         iconName: "pills.fill",
                         emoji: "💊",
@@ -432,33 +432,33 @@ struct IslandNegativeFeedback {
     private static func iconName(for alert: HealthAlert) -> String {
         switch alert.type {
         case .vaccineExpired, .vaccineExpiringSoon:
-            return "syringe.fill"
+            "syringe.fill"
         case .dewormingDue:
-            return "pills.fill"
+            "pills.fill"
         case .weightGainAlert, .weightLossAlert:
-            return "scalemass.fill"
+            "scalemass.fill"
         case .checkupOverdue, .activeSymptom:
-            return "cross.case.fill"
+            "cross.case.fill"
         case .documentExpiringSoon:
-            return "doc.badge.clock.fill"
+            "doc.badge.clock.fill"
         case .drinkingWeightAlert:
-            return "drop.triangle.fill"
+            "drop.triangle.fill"
         case .lowActivityAlert:
-            return "chart.line.downtrend.xyaxis"
+            "chart.line.downtrend.xyaxis"
         case .heatCycleAlert:
-            return "heart.text.square.fill"
+            "heart.text.square.fill"
         case .pregnancyCountdown:
-            return "figure.2.and.child.holdinghands"
+            "figure.2.and.child.holdinghands"
         case .noCheckIn, .noPotty, .noWalk:
-            return "exclamationmark.triangle.fill"
+            "exclamationmark.triangle.fill"
         }
     }
 
     private static func appetiteTrendSignal(for pet: Pet, calendar: Calendar, now: Date) -> IslandNegativeSignal? {
         let feedLogs = pet.careLogs.filter { $0.careType == .feeding && $0.amountGrams > 0 }
         guard feedLogs.count >= 4 else { return nil }
-        let recent = dailyAverageAmount(feedLogs, amount: \.amountGrams, daysAgo: 0..<3, calendar: calendar, now: now)
-        let previous = dailyAverageAmount(feedLogs, amount: \.amountGrams, daysAgo: 3..<6, calendar: calendar, now: now)
+        let recent = dailyAverageAmount(feedLogs, amount: \.amountGrams, daysAgo: 0 ..< 3, calendar: calendar, now: now)
+        let previous = dailyAverageAmount(feedLogs, amount: \.amountGrams, daysAgo: 3 ..< 6, calendar: calendar, now: now)
         guard previous > 0, recent > 0, recent < previous * 0.65 else { return nil }
         return IslandNegativeSignal(
             iconName: "fork.knife.circle.fill",
@@ -487,8 +487,8 @@ struct IslandNegativeFeedback {
     private static func drinkingTrendSignal(for pet: Pet, calendar: Calendar, now: Date) -> IslandNegativeSignal? {
         let waterLogs = pet.careLogs.filter { $0.careType == .watering && $0.amountMl > 0 }
         guard waterLogs.count >= 4 else { return nil }
-        let recent = dailyAverageAmount(waterLogs, amount: \.amountMl, daysAgo: 0..<3, calendar: calendar, now: now)
-        let previous = dailyAverageAmount(waterLogs, amount: \.amountMl, daysAgo: 3..<6, calendar: calendar, now: now)
+        let recent = dailyAverageAmount(waterLogs, amount: \.amountMl, daysAgo: 0 ..< 3, calendar: calendar, now: now)
+        let previous = dailyAverageAmount(waterLogs, amount: \.amountMl, daysAgo: 3 ..< 6, calendar: calendar, now: now)
         guard previous > 0, recent > 0 else { return nil }
         if recent > previous * 1.7 {
             return IslandNegativeSignal(

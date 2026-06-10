@@ -36,40 +36,40 @@ enum MemberCreationKind: String, Identifiable {
 
     var avatarKind: Avatar2DAccess.Kind {
         switch self {
-        case .pet: return .pet
-        case .human: return .human
+        case .pet: .pet
+        case .human: .human
         }
     }
 
     var fallbackThemeHex: String {
         switch self {
-        case .pet: return OhanaThemeColorPolicy.petFallbackHex
-        case .human: return OhanaThemeColorPolicy.humanFallbackHex
+        case .pet: OhanaThemeColorPolicy.petFallbackHex
+        case .human: OhanaThemeColorPolicy.humanFallbackHex
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
         case .pet:
-            return l.tr(zh: "制作宠物卡", en: "Create Pet Card", de: "Tierkarte erstellen")
+            l.tr(zh: "制作宠物卡", en: "Create Pet Card", de: "Tierkarte erstellen")
         case .human:
-            return l.tr(zh: "制作家人卡", en: "Create Member Card", de: "Mitgliedskarte erstellen")
+            l.tr(zh: "制作家人卡", en: "Create Member Card", de: "Mitgliedskarte erstellen")
         }
     }
 
     func typeLabel(_ l: L10n) -> String {
         switch self {
         case .pet:
-            return l.tr(zh: "宠物", en: "Pet", de: "Tier")
+            l.tr(zh: "宠物", en: "Pet", de: "Tier")
         case .human:
-            return l.tr(zh: "家人", en: "Member", de: "Mitglied")
+            l.tr(zh: "家人", en: "Member", de: "Mitglied")
         }
     }
 
     var fallbackSymbol: String {
         switch self {
-        case .pet: return "pawprint.fill"
-        case .human: return "person.fill"
+        case .pet: "pawprint.fill"
+        case .human: "person.fill"
         }
     }
 }
@@ -268,23 +268,22 @@ enum MemberCreationStep: String, Identifiable, Hashable {
     static func steps(for kind: MemberCreationKind) -> [MemberCreationStep] {
         switch kind {
         case .human:
-            return [.basicInfo, .avatar, .theme]
+            [.basicInfo, .avatar, .theme]
         case .pet:
-            return [.basicInfo, .petProfile, .avatar, .theme]
+            [.basicInfo, .petProfile, .avatar, .theme]
         }
     }
 
     func title(kind _: MemberCreationKind, l: L10n) -> String {
         switch self {
         case .basicInfo:
-            return l.tr(zh: "基础信息", en: "Basic info", de: "Basisdaten")
+            l.tr(zh: "基础信息", en: "Basic info", de: "Basisdaten")
         case .petProfile:
-            return l.tr(zh: "品种与性格", en: "Breed & vibe", de: "Rasse & Charakter")
+            l.tr(zh: "品种与性格", en: "Breed & vibe", de: "Rasse & Charakter")
         case .avatar:
-            return l.tr(zh: "头像", en: "Avatar", de: "Avatar")
+            l.tr(zh: "头像", en: "Avatar", de: "Avatar")
         case .theme:
-            return l.tr(zh: "主题色", en: "Theme color", de: "Themenfarbe")
+            l.tr(zh: "主题色", en: "Theme color", de: "Themenfarbe")
         }
     }
 }
-

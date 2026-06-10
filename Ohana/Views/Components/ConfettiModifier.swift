@@ -15,7 +15,7 @@ private struct ConfettiParticle: Identifiable {
     let size: CGFloat
     let delay: Double
     let speed: Double
-    let shape: Int   // 0=rect, 1=circle, 2=star
+    let shape: Int // 0=rect, 1=circle, 2=star
 }
 
 // MARK: - Confetti View
@@ -35,15 +35,15 @@ struct ConfettiView: View {
                 }
             }
             .onAppear {
-                particles = (0..<80).map { _ in
+                particles = (0 ..< 80).map { _ in
                     ConfettiParticle(
-                        xStart: CGFloat.random(in: 0...geo.size.width),
+                        xStart: CGFloat.random(in: 0 ... geo.size.width),
                         color: colors.randomElement()!,
-                        rotation: Double.random(in: 0...360),
-                        size: CGFloat.random(in: 6...14),
-                        delay: Double.random(in: 0...0.8),
-                        speed: Double.random(in: 1.2...2.4),
-                        shape: Int.random(in: 0...2)
+                        rotation: Double.random(in: 0 ... 360),
+                        size: CGFloat.random(in: 6 ... 14),
+                        delay: Double.random(in: 0 ... 0.8),
+                        speed: Double.random(in: 1.2 ... 2.4),
+                        shape: Int.random(in: 0 ... 2)
                     )
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -86,7 +86,7 @@ private struct ConfettiPiece: View {
         .opacity(animating ? 0 : 1)
         .animation(
             .easeIn(duration: particle.speed)
-            .delay(particle.delay),
+                .delay(particle.delay),
             value: animating
         )
     }

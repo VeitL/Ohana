@@ -119,10 +119,10 @@ struct QuickFeedTreatSnapshotRevision: Equatable {
         )
     }
 
-    private static func revisionHash<S: Sequence, Element>(
-        _ values: S,
+    private static func revisionHash<Element>(
+        _ values: some Sequence<Element>,
         combine: (inout Hasher, Element) -> Void
-    ) -> Int where S.Element == Element {
+    ) -> Int {
         var hasher = Hasher()
         var count = 0
         for value in values {

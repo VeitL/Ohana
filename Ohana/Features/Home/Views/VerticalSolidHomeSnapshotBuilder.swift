@@ -215,8 +215,8 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
     private static func greetingText(_ l: L10n, now: Date) -> String {
         let hour = Calendar.current.component(.hour, from: now)
         switch hour {
-        case 5..<11: return l.tr(zh: "早安", en: "Good morning", de: "Guten Morgen")
-        case 11..<18: return l.tr(zh: "今天", en: "Today", de: "Heute")
+        case 5 ..< 11: return l.tr(zh: "早安", en: "Good morning", de: "Guten Morgen")
+        case 11 ..< 18: return l.tr(zh: "今天", en: "Today", de: "Heute")
         default: return l.tr(zh: "晚上好", en: "Good evening", de: "Guten Abend")
         }
     }
@@ -261,10 +261,10 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
 
     private static func equippedTitleBadgeText(for raw: String) -> String? {
         switch raw {
-        case "title_guardian": return "🛡️ 守护者"
-        case "title_pioneer": return "🚀 先行者"
-        case "title_chef": return "👨‍🍳 首席厨师"
-        default: return nil
+        case "title_guardian": "🛡️ 守护者"
+        case "title_pioneer": "🚀 先行者"
+        case "title_chef": "👨‍🍳 首席厨师"
+        default: nil
         }
     }
 

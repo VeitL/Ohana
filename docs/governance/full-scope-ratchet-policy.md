@@ -1,39 +1,31 @@
-# Full-Scope Ratchet Policy
+# Full-Scope Audit Policy
 
 > Date: 2026-06-08; updated 2026-06-10.
 >
-> Status: RE-ACTIVATED on 2026-06-10. The 2026-06-09 promotion to direct strict
-> gates was based on a scan scope of `Ohana/Views` + `Ohana/Utilities` (91
-> files). The Features/ directory refactor had silently moved ~88% of Swift
-> files outside that scope, so the "zero baseline" was zero over a shrinking
-> subset. On 2026-06-10 the three audits were widened to the whole `Ohana/`
-> tree (~760 files), new smoothness rules were added (main-actor aggregation,
-> imperative view fetch, detached view tasks), and construction-consistency
-> UI rules followed the same day (raw-textfield, hardcoded-corner-radius,
-> hardcoded-detent-height). The surfaced debt (1381 warnings: ui-v4 1309 —
-> dominated by legacy radius literals — accessibility 60, smoothness 12) was
-> captured back into the ratchet baseline. `scripts/tests/run-audit-fixture-tests.sh`
-> now enforces a scanned-file floor so scope can never silently collapse again.
+> Status: PROMOTED TO STRICT ZERO on 2026-06-10. UI V4, accessibility, and
+> smoothness now run as direct full-repo `--all` gates in CI and in
+> `scripts/release-hardening-check.sh`.
 
 ## Active Gate
 
-CI runs `scripts/audit-full-scope-ratchet.sh`:
+CI runs these commands directly:
 
-- Any NEW or INCREASED per-file/per-rule warning count fails CI.
-- Reductions pass and are locked in with `--update-baseline`.
-- When the baseline reaches zero again (target tracked in
-  `docs/release-hardening-plan.md`), promote CI back to direct
-  `--all` strict audits and update this policy.
+- `scripts/audit-ui-v4.sh --all`
+- `scripts/audit-accessibility.sh --all`
+- `scripts/audit-smoothness-risk.sh --all`
 
-## Ratchet Rules
+All three must report zero warnings. The zero baseline remains in
+`docs/governance/manifests/full-scope-audit-baseline.json` as promotion evidence
+and a historical guardrail, not as a debt allowance.
 
-- Never increase the baseline to absorb newly introduced debt; fix the new
-  warning or use a documented inline allow comment instead.
-- `--update-baseline` may only be run after intentional cleanup, and the
-  baseline diff must ship in the same commit as the cleanup.
+## Scope Rules
+
 - Do not reintroduce changed-file-only gates for these audit families in CI.
 - Do not narrow audit scan scope below the whole `Ohana/` tree; the fixture
-  tests' scope floor is the enforcement for this rule.
+  tests' scope floor enforces this.
+- Do not use `scripts/audit-full-scope-ratchet.sh --update-baseline` to absorb
+  new debt. If any direct `--all` gate fails, fix the warning or add a narrow,
+  documented inline allow comment for an intentional exception.
 
 ## Baseline History
 
@@ -45,11 +37,12 @@ Measured on 2026-06-08:
 | Accessibility | 4275 | `scripts/audit-accessibility.sh --all` |
 | Smoothness | 191 | `scripts/audit-smoothness-risk.sh --all` |
 
-The high accessibility count is mostly historical fixed-font and unlabeled SF
-Symbol debt. The smoothness count includes broad `@Query`, sync image decoding,
-and runtime loops that should be retired feature-by-feature.
+On 2026-06-10 the audit scope was widened to the whole `Ohana/` tree after the
+Features refactor moved most Swift files outside the previous scan scope. That
+surfaced legacy debt into the ratchet baseline. The P1 cleanup then drove the
+baseline back to zero and promoted CI to strict direct gates.
 
-Promoted on 2026-06-09:
+Promoted on 2026-06-10:
 
 | Audit | Current warnings | Active command |
 |---|---:|---|
@@ -59,8 +52,9 @@ Promoted on 2026-06-09:
 
 ## Validation
 
-Passed on 2026-06-09:
+Passed on 2026-06-10:
 
 - `scripts/audit-ui-v4.sh --all`
 - `scripts/audit-accessibility.sh --all`
 - `scripts/audit-smoothness-risk.sh --all`
+- `scripts/release-hardening-check.sh --skip-build`

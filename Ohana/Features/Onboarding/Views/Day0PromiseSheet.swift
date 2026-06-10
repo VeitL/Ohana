@@ -6,8 +6,8 @@
 //  把用户勾选的承诺自动生成 BountyTask，让家庭协作从 Day 0 就开始
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct Day0PromiseContentSheet: View {
     let petName: String
@@ -31,20 +31,20 @@ struct Day0PromiseContentSheet: View {
 
     private var promises: [Promise] {
         let base: [Promise] = [
-            Promise(id: "photo",   emoji: "📸", title: "今晚给 \(petName) 拍张照片留念",       reward: 10),
-            Promise(id: "play",    emoji: "🎾", title: "今晚陪 \(petName) 玩 10 分钟",         reward: 15),
-            Promise(id: "record",  emoji: "📝", title: "今晚记录 \(petName) 的一个小习惯",     reward: 10),
-            Promise(id: "weight",  emoji: "⚖️", title: "这周给 \(petName) 称一次体重",         reward: 15)
+            Promise(id: "photo", emoji: "📸", title: "今晚给 \(petName) 拍张照片留念", reward: 10),
+            Promise(id: "play", emoji: "🎾", title: "今晚陪 \(petName) 玩 10 分钟", reward: 15),
+            Promise(id: "record", emoji: "📝", title: "今晚记录 \(petName) 的一个小习惯", reward: 10),
+            Promise(id: "weight", emoji: "⚖️", title: "这周给 \(petName) 称一次体重", reward: 15)
         ]
 
         // 物种差异化
         if species.contains("狗") {
             return base + [
-                Promise(id: "walk",  emoji: "🦮", title: "明天带 \(petName) 出去走 15 分钟",   reward: 20)
+                Promise(id: "walk", emoji: "🦮", title: "明天带 \(petName) 出去走 15 分钟", reward: 20)
             ]
         } else if species.contains("猫") {
             return base + [
-                Promise(id: "groom", emoji: "🪮", title: "今晚给 \(petName) 梳毛放松一下",      reward: 15)
+                Promise(id: "groom", emoji: "🪮", title: "今晚给 \(petName) 梳毛放松一下", reward: 15)
             ]
         }
         return base
@@ -138,11 +138,11 @@ struct Day0PromiseContentSheet: View {
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                     .fill(isOn ? Color.goPrimary.opacity(0.08) : Color.primary.opacity(0.04))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                     .strokeBorder(
                         isOn ? Color.goPrimary.opacity(0.35) : Color.primary.opacity(0.08),
                         lineWidth: 1

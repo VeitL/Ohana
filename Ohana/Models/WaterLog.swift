@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftData
 import Foundation
+import SwiftData
 
 @Model
 final class WaterLog {
@@ -14,7 +14,7 @@ final class WaterLog {
     var date: Date
     var amountMl: Double
     var note: String
-    
+
     init(date: Date = Date(), amountMl: Double = 0, note: String = "") {
         self.id = UUID()
         self.date = date

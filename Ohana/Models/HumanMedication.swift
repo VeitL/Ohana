@@ -3,9 +3,9 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 /// 服药频率
 enum MedicationFrequency: String, Codable, CaseIterable, Identifiable {
@@ -24,29 +24,29 @@ enum MedicationFrequency: String, Codable, CaseIterable, Identifiable {
 
     nonisolated var emoji: String {
         switch self {
-        case .daily: return "☀️"
-        case .twiceDaily: return "🌅"
-        case .threeTimesDaily: return "🕐"
-        case .weekly: return "📅"
-        case .asNeeded: return "⚡"
-        case .custom: return "⚙️"
+        case .daily: "☀️"
+        case .twiceDaily: "🌅"
+        case .threeTimesDaily: "🕐"
+        case .weekly: "📅"
+        case .asNeeded: "⚡"
+        case .custom: "⚙️"
         }
     }
 
     nonisolated func displayTitle(l: L10n) -> String {
         switch self {
         case .daily:
-            return l.tr(zh: "每天", en: "Daily", de: "Täglich")
+            l.tr(zh: "每天", en: "Daily", de: "Täglich")
         case .twiceDaily:
-            return l.tr(zh: "每天两次", en: "Twice daily", de: "Zweimal täglich")
+            l.tr(zh: "每天两次", en: "Twice daily", de: "Zweimal täglich")
         case .threeTimesDaily:
-            return l.tr(zh: "每天三次", en: "Three times daily", de: "Dreimal täglich")
+            l.tr(zh: "每天三次", en: "Three times daily", de: "Dreimal täglich")
         case .weekly:
-            return l.tr(zh: "每周", en: "Weekly", de: "Wöchentlich")
+            l.tr(zh: "每周", en: "Weekly", de: "Wöchentlich")
         case .asNeeded:
-            return l.tr(zh: "按需", en: "As needed", de: "Nach Bedarf")
+            l.tr(zh: "按需", en: "As needed", de: "Nach Bedarf")
         case .custom:
-            return l.tr(zh: "自定义", en: "Custom", de: "Benutzerdefiniert")
+            l.tr(zh: "自定义", en: "Custom", de: "Benutzerdefiniert")
         }
     }
 }
@@ -60,7 +60,7 @@ nonisolated struct HumanMedicationScheduleMetadata: Hashable {
 
     init(doseMinutes: [Int], weeklyWeekday: Int? = nil) {
         self.doseMinutes = Self.normalizedDoseMinutes(doseMinutes)
-        self.weeklyWeekday = weeklyWeekday.flatMap { (1...7).contains($0) ? $0 : nil }
+        self.weeklyWeekday = weeklyWeekday.flatMap { (1 ... 7).contains($0) ? $0 : nil }
     }
 
     static func normalizedDoseMinutes(_ values: [Int]) -> [Int] {
@@ -90,7 +90,7 @@ nonisolated struct HumanMedicationScheduleMetadata: Hashable {
             let start = line.index(line.startIndex, offsetBy: markerPrefix.count)
             let end = line.index(line.endIndex, offsetBy: -markerSuffix.count)
             guard start <= end else { continue }
-            let payload = String(line[start..<end])
+            let payload = String(line[start ..< end])
             return Self.parsePayload(payload)
         }
         return nil
@@ -159,13 +159,13 @@ nonisolated enum HumanMedicationSchedulePlan {
     static func defaultDoseMinutes(for frequency: MedicationFrequency) -> [Int] {
         switch frequency {
         case .daily, .weekly:
-            return [8 * 60]
+            [8 * 60]
         case .twiceDaily:
-            return [8 * 60, 20 * 60]
+            [8 * 60, 20 * 60]
         case .threeTimesDaily:
-            return [8 * 60, 14 * 60, 20 * 60]
+            [8 * 60, 14 * 60, 20 * 60]
         case .asNeeded, .custom:
-            return []
+            []
         }
     }
 
@@ -174,7 +174,7 @@ nonisolated enum HumanMedicationSchedulePlan {
         guard dosesPerDay > 0 else { return [] }
         let firstMinute = minuteOfDay(from: medication.firstDoseTime, calendar: calendar)
         let interval = 1440 / dosesPerDay
-        return HumanMedicationScheduleMetadata.normalizedDoseMinutes((0..<dosesPerDay).map { firstMinute + $0 * interval })
+        return HumanMedicationScheduleMetadata.normalizedDoseMinutes((0 ..< dosesPerDay).map { firstMinute + $0 * interval })
     }
 
     static func doseMinutes(for medication: HumanMedication, calendar: Calendar = .current) -> [Int] {
@@ -220,7 +220,7 @@ nonisolated enum HumanMedicationSchedulePlan {
     static func futureDoses(for medication: HumanMedication, from now: Date = Date(), days: Int = 14, calendar: Calendar = .current) -> [HumanMedicationScheduleDose] {
         guard days > 0 else { return [] }
         let start = calendar.startOfDay(for: now)
-        return (0..<days).flatMap { offset -> [HumanMedicationScheduleDose] in
+        return (0 ..< days).flatMap { offset -> [HumanMedicationScheduleDose] in
             guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return [] }
             return doses(on: day, for: medication, calendar: calendar)
         }

@@ -5,8 +5,8 @@
 //  Shared V4 dashboards for weight trends and expense records.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct WeightTrendPoint: Identifiable, Hashable {
     let date: Date
@@ -78,7 +78,7 @@ struct UnifiedWeightTrendChart: View {
         let minValue = values.min() ?? 0
         let maxValue = values.max() ?? 1
         let padding = max((maxValue - minValue) * 0.18, 0.25)
-        return max(0, minValue - padding)...(maxValue + padding)
+        return max(0, minValue - padding) ... (maxValue + padding)
     }
 
     var body: some View {
@@ -125,23 +125,23 @@ struct ExpenseDashboardRange: CaseIterable, Hashable {
 
     func title(_ l: L10n) -> String {
         switch kind {
-        case .week: return l.tr(zh: "7天", en: "7D", de: "7T")
-        case .month: return l.tr(zh: "30天", en: "30D", de: "30T")
-        case .quarter: return l.tr(zh: "90天", en: "90D", de: "90T")
-        case .all: return l.tr(zh: "全部", en: "All", de: "Alle")
+        case .week: l.tr(zh: "7天", en: "7D", de: "7T")
+        case .month: l.tr(zh: "30天", en: "30D", de: "30T")
+        case .quarter: l.tr(zh: "90天", en: "90D", de: "90T")
+        case .all: l.tr(zh: "全部", en: "All", de: "Alle")
         }
     }
 
     func startDate(now: Date = Date(), calendar: Calendar = .current) -> Date? {
         switch kind {
         case .week:
-            return calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
+            calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now))
         case .month:
-            return calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
+            calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
         case .quarter:
-            return calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
+            calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
         case .all:
-            return nil
+            nil
         }
     }
 }
@@ -218,7 +218,7 @@ func makeExpenseBuckets(from logs: [PetExpenseLog], range: ExpenseDashboardRange
     switch range.kind {
     case .week:
         dateFormatter.setLocalizedDateFormatFromTemplate("E")
-        return (0..<7).compactMap { offset in
+        return (0 ..< 7).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: offset - 6, to: calendar.startOfDay(for: now)) else { return nil }
             let amount = logs
                 .filter { calendar.isDate($0.date, inSameDayAs: date) }
@@ -227,7 +227,7 @@ func makeExpenseBuckets(from logs: [PetExpenseLog], range: ExpenseDashboardRange
         }
     case .month:
         dateFormatter.setLocalizedDateFormatFromTemplate("d")
-        return (0..<30).compactMap { offset in
+        return (0 ..< 30).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: offset - 29, to: calendar.startOfDay(for: now)) else { return nil }
             let amount = logs
                 .filter { calendar.isDate($0.date, inSameDayAs: date) }
@@ -247,7 +247,7 @@ func makeExpenseBuckets(from logs: [PetExpenseLog], range: ExpenseDashboardRange
         }
     case .all:
         dateFormatter.setLocalizedDateFormatFromTemplate("MMM")
-        return (0..<12).compactMap { offset in
+        return (0 ..< 12).compactMap { offset in
             guard let date = calendar.date(byAdding: .month, value: offset - 11, to: now) else { return nil }
             let amount = logs
                 .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .month) }

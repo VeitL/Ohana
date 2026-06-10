@@ -105,9 +105,9 @@ struct FocusHomeWalletCardStackItem<Content: View, PulseOverlay: View, BurstOver
             progress: heroProgress,
             direction: heroDirection
         )) *
-        (isTransitioningCard && !isExpanded ? 1.012 : 1.0) *
-        (isReorderingCard ? 1.015 : 1.0) *
-        (isActionPulsing ? 1.025 : 1.0)
+            (isTransitioningCard && !isExpanded ? 1.012 : 1.0) *
+            (isReorderingCard ? 1.015 : 1.0) *
+            (isActionPulsing ? 1.025 : 1.0)
     }
 
     private var shadowOpacity: Double {

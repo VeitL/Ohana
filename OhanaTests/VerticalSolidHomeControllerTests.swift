@@ -1,5 +1,5 @@
-@testable import Ohana
 import Testing
+@testable import Ohana
 
 @MainActor
 struct VerticalSolidHomeControllerTests {

@@ -916,7 +916,6 @@ struct PetAvatarAssetCatalogTests {
         }
     }
 
-
     @Test func devonRexAvatarFilenameFallsBackToGenderStandardForCustomColors() {
         #expect(
             PetAvatarAssetCatalog.avatarFilename(

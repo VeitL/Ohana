@@ -112,7 +112,7 @@ extension ReadModelRevisionCenter {
                     scheduledMinute: scheduledMinute,
                     status: result.status.rawValue
                 ),
-                affectedEntityIDs: Set([result.subjectID, result.medicationID, result.logID].compactMap { $0 }),
+                affectedEntityIDs: Set([result.subjectID, result.medicationID, result.logID].compactMap(\.self)),
                 wroteBusinessFact: result.didChange,
                 note: note
             )

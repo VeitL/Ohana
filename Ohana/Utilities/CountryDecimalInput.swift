@@ -10,13 +10,13 @@ import Foundation
 enum CountryDecimalInput {
     static func localeIdentifier(for countryCode: String = AppCountry.code) -> String {
         switch AppCountry.normalize(countryCode) {
-        case "US": return "en_US"
-        case "DE": return "de_DE"
-        case "GB": return "en_GB"
-        case "JP": return "ja_JP"
-        case "HK": return "zh_HK"
-        case "TW": return "zh_TW"
-        default: return "zh_CN"
+        case "US": "en_US"
+        case "DE": "de_DE"
+        case "GB": "en_GB"
+        case "JP": "ja_JP"
+        case "HK": "zh_HK"
+        case "TW": "zh_TW"
+        default: "zh_CN"
         }
     }
 

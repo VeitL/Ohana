@@ -9,7 +9,7 @@ extension OasisRewardView {
     // MARK: - Life Tree Stage
 
     var treeSceneCard: some View {
-        let stageShape = RoundedRectangle(cornerRadius: 34, style: .continuous)
+        let stageShape = RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
         return ZStack {
             stageBackground(shape: stageShape)
 
@@ -84,9 +84,9 @@ extension OasisRewardView {
                         }
                     }
                 )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                    .padding(.horizontal, 22)
-                    .transition(.scale(scale: 0.94).combined(with: .opacity))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .padding(.horizontal, 22)
+                .transition(.scale(scale: 0.94).combined(with: .opacity))
             }
 
             if levelUpBadgeVisible {
@@ -135,7 +135,7 @@ extension OasisRewardView {
 
     var stageStars: some View {
         ZStack {
-            ForEach(0..<24, id: \.self) { i in
+            ForEach(0 ..< 24, id: \.self) { i in
                 let size = CGFloat([1.5, 2.0, 2.5, 1.8][i % 4])
                 Circle()
                     .fill(Color.ohanaPrimaryText.opacity(Double([0.28, 0.44, 0.24, 0.5][i % 4])))
@@ -186,8 +186,8 @@ extension OasisRewardView {
                 .scaleEffect(glowBreathing ? 1.08 : 0.94)
                 .animation(
                     shouldRunAmbientMotion
-                    ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage glow; smoothness: allow visible-only ambient tree glow
-                    : nil,
+                        ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage glow; smoothness: allow visible-only ambient tree glow
+                        : nil,
                     value: glowBreathing
                 )
 
@@ -197,8 +197,8 @@ extension OasisRewardView {
                 .blur(radius: glowBreathing ? 7 : 2)
                 .animation(
                     shouldRunAmbientMotion
-                    ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage ring; smoothness: allow visible-only ambient tree ring
-                    : nil,
+                        ? .easeInOut(duration: 2.4).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated stage ring; smoothness: allow visible-only ambient tree ring
+                        : nil,
                     value: glowBreathing
                 )
         }
@@ -245,7 +245,7 @@ extension OasisRewardView {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
-            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
 
             Spacer(minLength: 4)
         }
@@ -311,7 +311,7 @@ extension OasisRewardView {
                     .offset(y: 13)
             }
             .frame(width: 82, height: 88)
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(

@@ -2,8 +2,8 @@ import SwiftUI
 
 struct AddHumanWizardView: View {
     let onComplete: () -> Void
-    var onCancel: (() -> Void)? = nil
-    var onHumanSaved: ((Human) -> Void)? = nil
+    var onCancel: (() -> Void)?
+    var onHumanSaved: ((Human) -> Void)?
 
     var body: some View {
         AddHumanWizardContentView(

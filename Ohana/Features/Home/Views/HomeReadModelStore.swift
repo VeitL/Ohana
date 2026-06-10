@@ -119,7 +119,7 @@ final class HomeReadModelStore: ObservableObject {
             revision: HomeRevision(),
             preparedAt: Date(),
             title: "home"
-        ),
+        )
     ]
     @Published private(set) var payload = HomeReadModelPayload.empty
 
@@ -472,7 +472,7 @@ actor HomeReadModelActor {
     }
 }
 
-nonisolated private struct HomeReadModelFetches {
+private nonisolated struct HomeReadModelFetches {
     let context: ModelContext
     private let calendar = Calendar.current
 
@@ -609,8 +609,8 @@ nonisolated private struct HomeReadModelFetches {
         var descriptor = FetchDescriptor<FamilyCollaborationTask>(
             predicate: #Predicate<FamilyCollaborationTask> { task in
                 task.statusRaw == activeStatus ||
-                task.statusRaw == claimedStatus ||
-                task.statusRaw == pendingReviewStatus
+                    task.statusRaw == claimedStatus ||
+                    task.statusRaw == pendingReviewStatus
             },
             sortBy: [SortDescriptor(\FamilyCollaborationTask.updatedAt, order: .reverse)]
         )

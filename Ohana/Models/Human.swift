@@ -5,9 +5,9 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 enum HumanPrivateField: String, CaseIterable, Identifiable {
     case weight
@@ -21,12 +21,12 @@ enum HumanPrivateField: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .weight: return "体重"
-        case .workout: return "运动"
-        case .medication: return "吃药提醒"
-        case .wishlist: return "椰子资产与心愿"
-        case .expense: return "花费"
-        case .note: return "备注"
+        case .weight: "体重"
+        case .workout: "运动"
+        case .medication: "吃药提醒"
+        case .wishlist: "椰子资产与心愿"
+        case .expense: "花费"
+        case .note: "备注"
         }
     }
 }
@@ -51,17 +51,17 @@ nonisolated enum HumanProfileOptions {
     static func normalizedGender(_ raw: String) -> String {
         switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "male", "man", "boy", "男":
-            return "男"
+            "男"
         case "female", "woman", "girl", "女":
-            return "女"
+            "女"
         case "nonbinary", "non-binary", "nb", "非二元":
-            return "非二元"
+            "非二元"
         case "prefer not to say", "private", "unknown", "不透露", "未知":
-            return "不透露"
+            "不透露"
         case "":
-            return ""
+            ""
         default:
-            return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            raw.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }
 
@@ -89,27 +89,27 @@ nonisolated enum HumanPermissionRole {
     static func title(for raw: String) -> String {
         switch HumanProfileOptions.normalizedRole(raw) {
         case "owner":
-            return "管理者"
+            "管理者"
         default:
-            return "成员"
+            "成员"
         }
     }
 
     static func description(for raw: String) -> String {
         switch HumanProfileOptions.normalizedRole(raw) {
         case "owner":
-            return "可管理家庭资料与核心设置"
+            "可管理家庭资料与核心设置"
         default:
-            return "可进行日常记录与照护打卡"
+            "可进行日常记录与照护打卡"
         }
     }
 
     static func icon(for raw: String) -> String {
         switch HumanProfileOptions.normalizedRole(raw) {
         case "owner":
-            return "crown.fill"
+            "crown.fill"
         default:
-            return "person.fill"
+            "person.fill"
         }
     }
 }
@@ -128,24 +128,24 @@ nonisolated enum HumanGenderIdentity {
     static func icon(for raw: String) -> String {
         switch HumanProfileOptions.normalizedGender(raw) {
         case "女":
-            return "♀"
+            "♀"
         case "男":
-            return "♂"
+            "♂"
         case "非二元":
-            return "⚧"
+            "⚧"
         default:
-            return "•"
+            "•"
         }
     }
 
     static func fallbackAvatarEmoji(for raw: String) -> String {
         switch HumanProfileOptions.normalizedGender(raw) {
         case "女":
-            return "👩"
+            "👩"
         case "男":
-            return "👨"
+            "👨"
         default:
-            return "👤"
+            "👤"
         }
     }
 }
@@ -166,7 +166,7 @@ final class Human {
     var nationality: String
     var city: String
     // ArkSchemaV11 独立椰子账户
-    var coconutBalance: Int        // 该人类成员的椰子余额
+    var coconutBalance: Int // 该人类成员的椰子余额
     // ArkSchemaV13 首页卡堆显示开关
     var shouldShowOnHome: Bool
     // ArkSchemaV15：正式主题色字段（迁移自 notes 字段 hack）
@@ -180,9 +180,9 @@ final class Human {
     var pinHash: String = ""
     var pinSalt: String = ""
     var pinFailedAttempts: Int = 0
-    var pinLockedUntil: Date? = nil
+    var pinLockedUntil: Date?
     // ArkSchemaV43：人类纪念模式生命周期；nil = 在世
-    var passedAwayDate: Date? = nil
+    var passedAwayDate: Date?
     // Relationships
     @Relationship(deleteRule: .cascade) var weightLogs: [HumanWeightLog]
     @Relationship(deleteRule: .cascade) var workoutLogs: [HumanWorkoutLog]
@@ -228,7 +228,7 @@ final class Human {
     var safeThemeColorHex: String {
         OhanaThemeColorPolicy.normalizedMemberThemeHex(themeColorHex, fallback: OhanaThemeColorPolicy.humanFallbackHex)
     }
-    
+
     var ageText: String {
         guard let birthday else { return "未知" }
         let years = Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0
@@ -322,14 +322,14 @@ final class Human {
     static func westernZodiacDisplay(for date: Date, l: L10n) -> String {
         switch l.languageCode {
         case "de":
-            return westernZodiacGerman(for: date)
+            westernZodiacGerman(for: date)
         case "en":
-            return westernZodiacEnglish(for: date)
+            westernZodiacEnglish(for: date)
         default:
-            return westernZodiacChinese(for: date)
+            westernZodiacChinese(for: date)
         }
     }
-    
+
     var roleText: String {
         HumanPermissionRole.title(for: role)
     }

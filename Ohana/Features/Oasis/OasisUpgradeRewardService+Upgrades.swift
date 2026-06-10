@@ -23,10 +23,10 @@ extension OasisUpgradeRewardService {
         guard let balance = fragmentBalance(critterId: critter.catalogId, context: context),
               balance.amount >= cost.fragments,
               OasisCritterEconomyService.canSpendCurrentHumanCoconuts(
-                cost.coconuts,
-                context: context,
-                activeHumanSelection: activeHumanSelection,
-                questManager: questManager
+                  cost.coconuts,
+                  context: context,
+                  activeHumanSelection: activeHumanSelection,
+                  questManager: questManager
               ) else {
             return false
         }
@@ -84,10 +84,10 @@ extension OasisUpgradeRewardService {
         guard let balance = fragmentBalance(critterId: catalogId, context: context),
               balance.amount >= cost.fragments,
               OasisCritterEconomyService.canSpendCurrentHumanCoconuts(
-                cost.coconuts,
-                context: context,
-                activeHumanSelection: activeHumanSelection,
-                questManager: questManager
+                  cost.coconuts,
+                  context: context,
+                  activeHumanSelection: activeHumanSelection,
+                  questManager: questManager
               ) else {
             return nil
         }
@@ -108,7 +108,7 @@ extension OasisUpgradeRewardService {
             return nil
         }
 
-        let hasFeatured = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [])
+        let hasFeatured = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             .contains { $0.isFeaturedOnOasis && !$0.isArchived }
         let critter = OasisElectronicPet(
             catalogId: entry.id,
@@ -141,7 +141,7 @@ extension OasisUpgradeRewardService {
     static func setFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws {
         normalizeLifecycle(for: critter, context: context)
         guard critter.lifeState != .dead else { return }
-        let all = (try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []
+        let all = (try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         for item in all {
             item.isFeaturedOnOasis = item.id == critter.id
             if item.id == critter.id {
@@ -163,8 +163,8 @@ extension OasisUpgradeRewardService {
     }
 
     static func rewardFeaturedCritterFromCare(type: QuestManager.OhanaActionType, context: ModelContext) {
-        let candidates = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? [])
-            .filter({ !$0.isArchived })
+        let candidates = ((try? context.fetch(FetchDescriptor<OasisElectronicPet>())) ?? []) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+            .filter { !$0.isArchived }
             .sorted(by: {
                 if $0.isFeaturedOnOasis != $1.isFeaturedOnOasis { return $0.isFeaturedOnOasis && !$1.isFeaturedOnOasis }
                 if $0.habitatSlot != $1.habitatSlot { return $0.habitatSlot < $1.habitatSlot }
@@ -201,41 +201,41 @@ extension OasisUpgradeRewardService {
     static func careEchoGain(for type: QuestManager.OhanaActionType) -> (xp: Int, bond: Int, mood: Int, health: Int) {
         switch type {
         case .walk:
-            return (2, 3, 3, 4)
+            (2, 3, 3, 4)
         case .health, .care:
-            return (2, 3, 2, 8)
+            (2, 3, 2, 8)
         case .feed, .water:
-            return (1, 2, 2, 4)
+            (1, 2, 2, 4)
         case .potty, .weight:
-            return (1, 1, 1, 3)
+            (1, 1, 1, 3)
         case .expense:
-            return (0, 1, 0, 1)
+            (0, 1, 0, 1)
         case .milestone:
-            return (3, 5, 4, 6)
+            (3, 5, 4, 6)
         case .dailyFocusCompletion, .general:
-            return (1, 2, 1, 2)
+            (1, 2, 1, 2)
         }
     }
 
     static func interactionCost(for critter: OasisElectronicPet, action: OasisCritterAction, context: ModelContext) -> Int {
         switch action {
         case .feed:
-            return dailyActionCount(for: action, critter: critter, context: context) == 0 ? 0 : 5
+            dailyActionCount(for: action, critter: critter, context: context) == 0 ? 0 : 5
         case .play:
-            return dailyActionCount(for: action, critter: critter, context: context) == 0 ? 0 : 3
+            dailyActionCount(for: action, critter: critter, context: context) == 0 ? 0 : 3
         case .rest:
-            return dailyActionCount(for: action, critter: critter, context: context) == 0 ? 0 : 2
+            dailyActionCount(for: action, critter: critter, context: context) == 0 ? 0 : 2
         case .rescue, .levelUpgrade, .starUpgrade, .unlock, .fragmentAwaken, .feature, .careEcho, .death:
-            return 0
+            0
         }
     }
 
     static func awakeningCost(for rarity: OasisElectronicPetRarity) -> (fragments: Int, coconuts: Int) {
         switch rarity {
-        case .common: return (120, 80)
-        case .rare: return (180, 120)
-        case .epic: return (300, 220)
-        case .legendary: return (520, 420)
+        case .common: (120, 80)
+        case .rare: (180, 120)
+        case .epic: (300, 220)
+        case .legendary: (520, 420)
         }
     }
 

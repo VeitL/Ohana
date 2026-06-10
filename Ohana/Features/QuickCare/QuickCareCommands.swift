@@ -22,17 +22,17 @@ enum QuickCareCommand: FeatureDomainCommand {
     var domainCommand: DomainCommand {
         switch self {
         case let .action(petID, action):
-            return .quickCare(entityID: petID, action: action)
+            .quickCare(entityID: petID, action: action)
         case let .plannedFeed(petID, _):
-            return .quickCare(entityID: petID, action: "plannedFeed")
+            .quickCare(entityID: petID, action: "plannedFeed")
         case let .potty(petID, type):
-            return .quickCare(entityID: petID, action: "potty:\(type)")
+            .quickCare(entityID: petID, action: "potty:\(type)")
         case let .grooming(petID, type):
-            return .quickCare(entityID: petID, action: "groom:\(type)")
+            .quickCare(entityID: petID, action: "groom:\(type)")
         case let .health(petID, type):
-            return .quickCare(entityID: petID, action: "health:\(type)")
+            .quickCare(entityID: petID, action: "health:\(type)")
         case let .medicationDose(petID, medicationID):
-            return .medicationDose(petID: petID, medicationID: medicationID)
+            .medicationDose(petID: petID, medicationID: medicationID)
         }
     }
 
@@ -42,28 +42,28 @@ enum QuickCareCommand: FeatureDomainCommand {
              let .potty(petID, _),
              let .grooming(petID, _),
              let .health(petID, _):
-            return [petID]
+            [petID]
         case let .plannedFeed(petID, reminderID):
-            return [petID, reminderID]
+            [petID, reminderID]
         case let .medicationDose(petID, medicationID):
-            return [petID, medicationID]
+            [petID, medicationID]
         }
     }
 
     var revisionNote: String {
         switch self {
         case .action:
-            return "home.quickCare"
+            "home.quickCare"
         case .plannedFeed:
-            return "home.plannedFeed"
+            "home.plannedFeed"
         case .potty:
-            return "home.potty"
+            "home.potty"
         case .grooming:
-            return "home.groom"
+            "home.groom"
         case .health:
-            return "home.health"
+            "home.health"
         case .medicationDose:
-            return "home.medicationDose"
+            "home.medicationDose"
         }
     }
 }

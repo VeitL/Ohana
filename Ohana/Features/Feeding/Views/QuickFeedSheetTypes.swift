@@ -26,110 +26,110 @@ enum ActiveFeedSheet: Identifiable, Equatable {
 
     var id: String {
         switch self {
-        case .manual: return "manual"
-        case .treat: return "treat"
-        case .plan(let kind): return "plan-\(kind.rawValue)"
-        case .stock: return "stock"
-        case .stockManage: return "stockManage"
-        case .manage: return "manage"
-        case .history: return "history"
-        case .stockRecords: return "stockRecords"
-        case .editLog: return "editLog"
-        case .feedingOverview: return "feedingOverview"
-        case .feedModeHistory: return "feedModeHistory"
-        case .stockOverview: return "stockOverview"
-        case .treatOverview: return "treatOverview"
+        case .manual: "manual"
+        case .treat: "treat"
+        case let .plan(kind): "plan-\(kind.rawValue)"
+        case .stock: "stock"
+        case .stockManage: "stockManage"
+        case .manage: "manage"
+        case .history: "history"
+        case .stockRecords: "stockRecords"
+        case .editLog: "editLog"
+        case .feedingOverview: "feedingOverview"
+        case .feedModeHistory: "feedModeHistory"
+        case .stockOverview: "stockOverview"
+        case .treatOverview: "treatOverview"
         }
     }
 
     var defaultAdaptiveHeight: CGFloat {
         switch self {
         case .manual:
-            return 390
+            390
         case .treat:
-            return 420
+            420
         case .stockManage:
-            return 620
+            620
         case .manage:
-            return 360
+            360
         case .editLog:
-            return 390
+            390
         case .stock:
-            return 620
+            620
         case .plan:
-            return 620
+            620
         case .history, .stockRecords:
-            return 720
+            720
         case .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
-            return 720
+            720
         }
     }
 
     var usesInlineOverlay: Bool {
         switch self {
         case .manual, .treat, .plan, .stock, .stockManage, .manage, .editLog:
-            return true
+            true
         case .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
-            return false
+            false
         }
     }
 
     var needsFullCareLogs: Bool {
         switch self {
         case .manage, .history, .feedingOverview, .feedModeHistory, .treatOverview, .stockOverview, .stockManage, .stockRecords, .editLog:
-            return true
+            true
         case .manual, .treat, .plan, .stock:
-            return false
+            false
         }
     }
 
     var needsFullFoodRecords: Bool {
         switch self {
         case .manage, .stock, .stockManage, .stockRecords, .stockOverview:
-            return true
+            true
         case .manual, .treat, .plan, .history, .editLog, .feedingOverview, .feedModeHistory, .treatOverview:
-            return false
+            false
         }
     }
 
     var inlineOverlayMinHeight: CGFloat {
         switch self {
         case .manual, .manage, .editLog:
-            return 300
+            300
         case .treat:
-            return 330
+            330
         case .stock, .stockManage:
-            return 430
+            430
         case .plan:
-            return 500
+            500
         case .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
-            return defaultAdaptiveHeight
+            defaultAdaptiveHeight
         }
     }
 
     var inlineOverlayMaxHeight: CGFloat {
         switch self {
         case .manual, .treat, .editLog:
-            return 580
+            580
         case .manage:
-            return 520
+            520
         case .stock, .stockManage:
-            return 820
+            820
         case .plan:
-            return 860
+            860
         case .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
-            return 780
+            780
         }
     }
 
     var inlineOverlayChromeReduction: CGFloat {
         switch self {
         case .stock, .stockManage, .plan:
-            return 58
+            58
         case .manual, .treat, .manage, .editLog:
-            return 50
+            50
         case .history, .stockRecords, .feedingOverview, .feedModeHistory, .stockOverview, .treatOverview:
-            return 0
+            0
         }
     }
 
@@ -162,17 +162,17 @@ enum FeedOverviewRange: String, CaseIterable, Identifiable {
 
     var days: Int {
         switch self {
-        case .days7: return 7
-        case .days30: return 30
-        case .days90: return 90
+        case .days7: 7
+        case .days30: 30
+        case .days90: 90
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .days7: return l.tr(zh: "7 天", en: "7 days", de: "7 Tage")
-        case .days30: return l.tr(zh: "30 天", en: "30 days", de: "30 Tage")
-        case .days90: return l.tr(zh: "90 天", en: "90 days", de: "90 Tage")
+        case .days7: l.tr(zh: "7 天", en: "7 days", de: "7 Tage")
+        case .days30: l.tr(zh: "30 天", en: "30 days", de: "30 Tage")
+        case .days90: l.tr(zh: "90 天", en: "90 days", de: "90 Tage")
         }
     }
 }
@@ -308,19 +308,19 @@ struct FeedPlanMonthlyCalendarView: View {
     private func markerColor(_ status: FeedPlanCalendarMarker.Status) -> Color {
         switch status {
         case .completed:
-            return Color.goPrimary
+            Color.goPrimary
         case .missed:
-            return Color.goRed
+            Color.goRed
         case .pending:
-            return secondaryTextColor.opacity(0.34)
+            secondaryTextColor.opacity(0.34)
         case .planned:
-            return secondaryTextColor.opacity(0.22)
+            secondaryTextColor.opacity(0.22)
         }
     }
 }
 
 struct FeedStockTrendPoint: Identifiable {
-    var id: String { "\(foodKind.rawValue)-\(Int(date.timeIntervalSinceReferenceDate / 86_400))" }
+    var id: String { "\(foodKind.rawValue)-\(Int(date.timeIntervalSinceReferenceDate / 86400))" }
     let date: Date
     let value: Double
     let foodKind: FeedFoodKind

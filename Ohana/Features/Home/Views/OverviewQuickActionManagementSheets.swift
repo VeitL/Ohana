@@ -14,10 +14,10 @@ struct QAManageSheet: View {
     let pets: [Pet]
     let defaultPetId: UUID?
     @Binding var savedItems: [QuickActionItem]
-    
+
     @Environment(\.dismiss) private var dismiss
     @State private var showingAddSheet = false
-    
+
     var body: some View {
         NavigationStack {
             List {
@@ -105,13 +105,14 @@ struct AddQuickActionSheet: View {
     private var liveItems: [QuickActionItem] {
         (try? JSONDecoder().decode([QuickActionItem].self, from: Data(quickActionItemsJSON.utf8))) ?? []
     }
+
     private var selectedPetItemCount: Int {
         guard let pet = selectedPet else { return 0 }
         return QuickActionLimit.count(for: pet, in: liveItems)
     }
 
     private func availableActions(for pet: Pet) -> [QuickActionPickerCatalog.Option] {
-        let existingTypes = Set(liveItems.filter { $0.petId == pet.id }.map { $0.actionType })
+        let existingTypes = Set(liveItems.filter { $0.petId == pet.id }.map(\.actionType))
         return QuickActionPickerCatalog.available(for: pet, existingActionTypes: existingTypes)
     }
 
@@ -193,7 +194,7 @@ struct AddQuickActionSheet: View {
                                 .foregroundStyle(Color(hex: pet.themeColorHex))
                         }
                         .padding(.horizontal, 16).padding(.vertical, 12)
-                        .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
@@ -298,7 +299,7 @@ struct AddQuickActionSheet: View {
                                 .padding(.vertical, 12)
                                 .background(
                                     isPressed ? accentColor.opacity(0.1) : Color.clear,
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                                 )
                                 .scaleEffect(isPressed ? 0.90 : 1.0)
                                 .animation(GoMotion.tap, value: isPressed)
@@ -308,7 +309,7 @@ struct AddQuickActionSheet: View {
                             .simultaneousGesture(
                                 DragGesture(minimumDistance: 0)
                                     .onChanged { _ in pressedActionId = action.id }
-                                    .onEnded   { _ in pressedActionId = nil }
+                                    .onEnded { _ in pressedActionId = nil }
                             )
                         }
                     }
@@ -425,7 +426,6 @@ struct QuickFeedSheet: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
-
         }
     }
 
@@ -446,7 +446,7 @@ struct QuickFeedSheet: View {
                         valueFont: OhanaFont.metric(size: 32),
                         unitFont: OhanaFont.title3(.bold),
                         fill: Color.ohanaControlFill,
-                        cornerRadius: 16,
+                        cornerRadius: OhanaRadius.control,
                         horizontalPadding: 12,
                         verticalPadding: 10
                     )
@@ -473,18 +473,17 @@ struct QuickFeedSheet: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
-
         }
     }
 
     private var casualCopyText: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<10:  return "早餐时间到了！\n主子今天胃口好吗？🌅"
-        case 10..<14: return "午饭打卡！\n记得让 \(pet.name) 多喝水哦 💦"
-        case 14..<18: return "下午喂食 ☀️\n\(pet.name) 今天乖吗？"
-        case 18..<22: return "晚餐时间！\n今天辛苦啦，\(pet.name) 也一样 🌙"
-        default:       return "\(pet.name) 的宵夜时间？\n记录一下也没关系 😄"
+        case 5 ..< 10: return "早餐时间到了！\n主子今天胃口好吗？🌅"
+        case 10 ..< 14: return "午饭打卡！\n记得让 \(pet.name) 多喝水哦 💦"
+        case 14 ..< 18: return "下午喂食 ☀️\n\(pet.name) 今天乖吗？"
+        case 18 ..< 22: return "晚餐时间！\n今天辛苦啦，\(pet.name) 也一样 🌙"
+        default: return "\(pet.name) 的宵夜时间？\n记录一下也没关系 😄"
         }
     }
 

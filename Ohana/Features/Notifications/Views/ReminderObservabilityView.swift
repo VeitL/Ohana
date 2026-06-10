@@ -5,8 +5,8 @@
 //  Operational health panel for reminders and notification scheduling.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UserNotifications
 
 struct ReminderObservabilityContentView: View {
@@ -27,6 +27,7 @@ struct ReminderObservabilityContentView: View {
         let cutoff = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
         return reminders.filter { $0.statusEnum == .completed && ($0.completedAt ?? .distantPast) >= cutoff }
     }
+
     private var reminderLedgerEvents: [CareLedgerEvent] {
         ledgerEvents.filter { $0.eventKindEnum == .reminder }
     }
@@ -71,7 +72,7 @@ struct ReminderObservabilityContentView: View {
                 .tint(score.color)
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var notificationPermissionCard: some View {
@@ -82,14 +83,14 @@ struct ReminderObservabilityContentView: View {
                 metric("系统待发", "\(pendingNotificationCount)", .goPrimary)
                 metric("App 待办", "\(pending.count)", .goTeal)
             }
-            if authorizationStatus != .authorized && authorizationStatus != .provisional {
+            if authorizationStatus != .authorized, authorizationStatus != .provisional {
                 Text("通知权限未开启或状态异常，提醒可能只能在 App 内补偿。")
                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.goOrange)
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var statusBreakdownCard: some View {
@@ -106,7 +107,7 @@ struct ReminderObservabilityContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var schedulingLedgerCard: some View {
@@ -132,7 +133,7 @@ struct ReminderObservabilityContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var riskListCard: some View {
@@ -162,15 +163,15 @@ struct ReminderObservabilityContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var reminderHealthScore: (value: Int, color: Color, message: String) {
         var score = 100
-        if authorizationStatus != .authorized && authorizationStatus != .provisional { score -= 35 }
+        if authorizationStatus != .authorized, authorizationStatus != .provisional { score -= 35 }
         score -= min(overdue.count * 8, 32)
         score -= min(failed.count * 10, 30)
-        if pendingNotificationCount == 0 && !upcoming.isEmpty { score -= 12 }
+        if pendingNotificationCount == 0, !upcoming.isEmpty { score -= 12 }
         let final = max(0, score)
         if final >= 85 { return (final, .goTeal, "提醒系统运行良好") }
         if final >= 60 { return (final, .goOrange, "提醒系统有少量风险") }
@@ -190,9 +191,9 @@ struct ReminderObservabilityContentView: View {
 
     private var authorizationStatusColor: Color {
         switch authorizationStatus {
-        case .authorized, .provisional: return .goTeal
-        case .denied: return .goRed
-        default: return .goOrange
+        case .authorized, .provisional: .goTeal
+        case .denied: .goRed
+        default: .goOrange
         }
     }
 
@@ -216,7 +217,7 @@ struct ReminderObservabilityContentView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func sectionHeader(_ title: String, icon: String) -> some View {
@@ -237,15 +238,15 @@ struct ReminderObservabilityContentView: View {
 
     private func actionDisplayName(_ action: String) -> String {
         switch action {
-        case "scheduleSuccess", "scheduled": return "调度成功"
-        case "scheduleFailed", "failed", "refillFailed": return "调度失败"
-        case "scheduleSkippedDuplicate", "skippedDuplicate", "refillSkippedExisting": return "重复跳过"
-        case "scheduleSkippedPastDue", "skippedPastDue", "refillSkippedPastDue": return "过期跳过"
-        case "refillSuccess": return "补注册成功"
-        case "compensateFailed": return "过期失败补偿"
-        case "compensateSkipped": return "过期跳过补偿"
-        case "dedupeRemoved": return "重复提醒清理"
-        default: return action
+        case "scheduleSuccess", "scheduled": "调度成功"
+        case "scheduleFailed", "failed", "refillFailed": "调度失败"
+        case "scheduleSkippedDuplicate", "skippedDuplicate", "refillSkippedExisting": "重复跳过"
+        case "scheduleSkippedPastDue", "skippedPastDue", "refillSkippedPastDue": "过期跳过"
+        case "refillSuccess": "补注册成功"
+        case "compensateFailed": "过期失败补偿"
+        case "compensateSkipped": "过期跳过补偿"
+        case "dedupeRemoved": "重复提醒清理"
+        default: action
         }
     }
 

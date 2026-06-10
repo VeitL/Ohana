@@ -3,26 +3,38 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
-import PhotosUI
 import Foundation
+import PhotosUI
+import SwiftData
+import SwiftUI
 
 extension PetBasicInfoDetailView {
     func loadEditState() {
-        eName = pet.name; eSpecies = pet.species; eBreed = pet.breed
-        eGender = pet.gender; eIsNeutered = pet.isNeutered
-        eHasBirthday = pet.birthday != nil; eBirthday = pet.birthday ?? Date()
-        eHasHomeDate = pet.homeDate != nil; eHomeDate = pet.homeDate ?? Date()
-        eCoatColor = pet.coatColor; eEyeColor = pet.eyeColor
-        eMicrochipID = pet.microchipID; eVetContact = pet.vetContact
-        eVetClinicName = pet.vetClinicName; eVetDoctorName = pet.vetDoctorName; eVetAddress = pet.vetAddress
+        eName = pet.name
+        eSpecies = pet.species
+        eBreed = pet.breed
+        eGender = pet.gender
+        eIsNeutered = pet.isNeutered
+        eHasBirthday = pet.birthday != nil
+        eBirthday = pet.birthday ?? Date()
+        eHasHomeDate = pet.homeDate != nil
+        eHomeDate = pet.homeDate ?? Date()
+        eCoatColor = pet.coatColor
+        eEyeColor = pet.eyeColor
+        eMicrochipID = pet.microchipID
+        eVetContact = pet.vetContact
+        eVetClinicName = pet.vetClinicName
+        eVetDoctorName = pet.vetDoctorName
+        eVetAddress = pet.vetAddress
         eAllergies = pet.allergies
         ePassportNumber = pet.passportNumber
         eHasPassportExpiry = pet.passportExpiryDate != nil
         ePassportExpiry = pet.passportExpiryDate ?? Calendar.current.date(byAdding: .year, value: 1, to: Date())!
-        eFormerName = pet.formerName; eBirthCountry = pet.birthCountry; eBirthCity = pet.birthCity
-        eLineageInfo = pet.lineageInfo; eNotes = pet.notes
+        eFormerName = pet.formerName
+        eBirthCountry = pet.birthCountry
+        eBirthCity = pet.birthCity
+        eLineageInfo = pet.lineageInfo
+        eNotes = pet.notes
         eThemeColorHex = pet.safeThemeColorHex
         eAvatarImageData = pet.avatarImageData
     }

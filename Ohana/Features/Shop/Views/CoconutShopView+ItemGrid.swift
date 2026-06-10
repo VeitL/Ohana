@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension CoconutShopView {
     func shopItemCard(_ item: ShopItem) -> some View {
@@ -57,13 +57,13 @@ extension CoconutShopView {
             }
             .padding(12)
             .frame(maxWidth: .infinity, minHeight: item.category == .appIcon ? 214 : 198, alignment: .topLeading)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                     .strokeBorder(state.isEquipped ? Color.goPrimary.opacity(0.52) : Color.clear, lineWidth: 1.5)
             }
-            .ohanaMarchingBorder(accent: state.tint, cornerRadius: 22, isActive: state.isEquipped)
-            .ohanaShine(trigger: state.isEquipped, cornerRadius: 22, isEnabled: state.isEquipped)
+            .ohanaMarchingBorder(accent: state.tint, cornerRadius: OhanaRadius.cardSoft, isActive: state.isEquipped)
+            .ohanaShine(trigger: state.isEquipped, cornerRadius: OhanaRadius.cardSoft, isEnabled: state.isEquipped)
             .opacity(state.isDisabled ? 0.58 : 1)
         }
         .buttonStyle(ScaleButtonStyle())
@@ -88,11 +88,11 @@ extension CoconutShopView {
     func previewHeight(for item: ShopItem) -> CGFloat {
         switch item.category {
         case .appIcon:
-            return 108
+            108
         case .avatar2d, .effect, .title_, .boost:
-            return 96
+            96
         case .cashExchange:
-            return 92
+            92
         }
     }
 
@@ -106,7 +106,7 @@ extension CoconutShopView {
 
     func itemState(_ item: ShopItem) -> ItemState {
         if let appIcon = item.appIcon {
-            if !appIcon.isDefault && !appServices.appIcons.supportsAlternateIcons {
+            if !appIcon.isDefault, !appServices.appIcons.supportsAlternateIcons {
                 return .init(label: l.tr(zh: "设备不支持", en: "Unsupported", de: "Nicht unterstützt"), tint: tertiaryText, isDisabled: true)
             }
             let isCurrent = appServices.appIcons.currentDescriptor.itemId == appIcon.itemId

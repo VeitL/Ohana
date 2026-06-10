@@ -36,13 +36,13 @@ private struct QuickActionWaterDropWithWaves: View {
                     let h = size.height
                     let yMin = h * 0.48
                     let bandH = max(4, h - yMin)
-                    for i in 0..<5 {
+                    for i in 0 ..< 5 {
                         var path = Path()
                         let row = CGFloat(i)
                         let yBase = yMin + bandH * (0.12 + row * 0.17)
                         path.move(to: CGPoint(x: -1, y: yBase))
                         let steps = max(12, Int(w / 2))
-                        for s in 0...steps {
+                        for s in 0 ... steps {
                             let px = CGFloat(s) / CGFloat(steps) * (w + 2)
                             let phase = CGFloat(t * 1.75) + row * 0.55
                             let wave = sin((px / 6.8 + phase) * .pi / 2.2) * 2.4
@@ -221,7 +221,7 @@ struct QAEditModeDragLayer: View {
 
     var body: some View {
         Color.clear
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
             .onDrag {
                 OhanaFeedback.light()
                 withAnimation(GoMotion.selection) {
@@ -240,7 +240,7 @@ struct QADropDelegate: DropDelegate {
     @Binding var draggingItemId: String?
     @Binding var lastDropTargetId: String?
 
-    func performDrop(info: DropInfo) -> Bool {
+    func performDrop(info _: DropInfo) -> Bool {
         draggingItemId = nil
         lastDropTargetId = nil
         return true
@@ -265,11 +265,11 @@ struct QADropDelegate: DropDelegate {
         }
     }
 
-    func dropUpdated(info: DropInfo) -> DropProposal? {
+    func dropUpdated(info _: DropInfo) -> DropProposal? {
         DropProposal(operation: .move)
     }
 
-    func dropExited(info: DropInfo) {
+    func dropExited(info _: DropInfo) {
         if lastDropTargetId == targetItem.id {
             lastDropTargetId = nil
         }

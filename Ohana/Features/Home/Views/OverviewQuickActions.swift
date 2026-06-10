@@ -5,40 +5,40 @@
 //  首页快速动作组件
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Go Quick Action Card (毛玻璃正方形)
 struct GoQuickActionCard: View {
     let item: QuickActionItem
     let isPressed: Bool
     let petAvatar: UIImage?
-    var petThemeColorHex: String? = nil
+    var petThemeColorHex: String?
     /// 覆盖 `item.icon`（如喂水卡按「换水」模式显示不同 SF Symbol）
-    var displayIcon: String? = nil
+    var displayIcon: String?
     /// 覆盖主标题（如首页喂水快捷项在「换水」模式下显示「换水」）
-    var titleLabelOverride: String? = nil
-    var pendingReminder: Reminder? = nil
+    var titleLabelOverride: String?
+    var pendingReminder: Reminder?
     var showsAttentionDot: Bool = false
-    var countText: String? = nil
-    var privacyBadgeText: String? = nil
-    var privacyIconName: String? = nil
-    var privacyIconTint: Color = Color.goYellow
+    var countText: String?
+    var privacyBadgeText: String?
+    var privacyIconName: String?
+    var privacyIconTint: Color = .goYellow
     var isPrivacyLocked: Bool = false
     var isCompletedToday: Bool = false
     var prefersLightForeground: Bool = false
     let onTap: () -> Void
-    var onLongPress: (() -> Void)? = nil
-    var onDoubleTap: (() -> Void)? = nil
-    var onDelete: (() -> Void)? = nil
+    var onLongPress: (() -> Void)?
+    var onDoubleTap: (() -> Void)?
+    var onDelete: (() -> Void)?
     /// 护理卡：点击后由外部执行打卡（传入 HygieneType raw string）
-    var onGroomCheckIn: ((String) -> Void)? = nil
+    var onGroomCheckIn: ((String) -> Void)?
     /// 便便卡：点击后弹出类型选择（传入 PottyType raw string）
-    var onPottySelect: ((String) -> Void)? = nil
+    var onPottySelect: ((String) -> Void)?
     /// 健康卡：点击后弹出健康快速记录选项（传入 HealthQuickAction raw string）
-    var onHealthSelect: ((String) -> Void)? = nil
+    var onHealthSelect: ((String) -> Void)?
     /// 长按→添加待办 sheet 回调
-    var onAddReminder: (() -> Void)? = nil
+    var onAddReminder: (() -> Void)?
 
     @State private var showDeleteConfirm = false
     @State private var showGroomMenu = false
@@ -64,9 +64,9 @@ struct GoQuickActionCard: View {
         ]
         return map[item.actionType] ?? item.label
     }
-    
+
     // 高级极简的规则圆角，取代不规则圆角
-    private let premiumShape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+    private let premiumShape = RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
 
     private var cardBgColor: Color {
         if isCompletedToday { return Color.goPrimary.opacity(0.18) }
@@ -76,6 +76,7 @@ struct GoQuickActionCard: View {
         let base = petThemeColorHex.map { Color(hex: $0) } ?? Color(hex: item.colorHex)
         return pendingReminder != nil ? base.opacity(0.16) : Color.ohanaCardSurface
     }
+
     private var cardBorderColor: Color {
         if isCompletedToday { return Color.goPrimary.opacity(0.68) }
         if isWarningState { return Color.goRed.opacity(0.72) }
@@ -107,10 +108,11 @@ struct GoQuickActionCard: View {
         if isCompletedToday { return Color.goPrimary }
         return Color.ohanaPrimaryText.opacity(usesLightForeground ? 0.9 : 0.75)
     }
+
     private var subtitleForeground: Color {
         Color.ohanaSecondaryText.opacity(usesLightForeground ? 1.0 : 0.72)
     }
-    
+
     @State private var animateGlow = false
     @State private var pendingSingleTapWorkItem: DispatchWorkItem? = nil
     @State private var lastTapDate: Date? = nil
@@ -246,7 +248,7 @@ struct GoQuickActionCard: View {
                 GroomPopoverContent(onSelect: { raw in
                     onGroomCheckIn?(raw)
                 }, themeColor: petThemeColorHex.map { Color(hex: $0) } ?? Color.goPrimary)
-                .presentationCompactAdaptation(.popover)
+                    .presentationCompactAdaptation(.popover)
             }
             .popover(isPresented: $showPottyMenu, arrowEdge: .top) {
                 PottyPopoverContent(onSelect: { raw in
@@ -258,7 +260,7 @@ struct GoQuickActionCard: View {
                 HealthPopoverContent(onSelect: { raw in
                     onHealthSelect?(raw)
                 }, petThemeColorHex: petThemeColorHex)
-                .presentationCompactAdaptation(.popover)
+                    .presentationCompactAdaptation(.popover)
             }
 
             // 文字
@@ -331,13 +333,13 @@ struct GoQuickActionCard: View {
     }
 
     private func handlePrimaryTap() {
-        if isGroom && onGroomCheckIn != nil {
+        if isGroom, onGroomCheckIn != nil {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showGroomMenu = true
-        } else if isPotty && onPottySelect != nil {
+        } else if isPotty, onPottySelect != nil {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showPottyMenu = true
-        } else if isHealth && onHealthSelect != nil {
+        } else if isHealth, onHealthSelect != nil {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             showHealthMenu = true
         } else {

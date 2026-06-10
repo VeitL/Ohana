@@ -25,7 +25,7 @@ struct WalletCardTrailingReadabilityOverlay: View {
                 .init(color: .white.opacity(0.06), location: 0.34),
                 .init(color: .white.opacity(0.42), location: 0.48),
                 .init(color: .white.opacity(0.88), location: 0.66),
-                .init(color: .white, location: 1),
+                .init(color: .white, location: 1)
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -39,7 +39,7 @@ struct WalletCardTrailingReadabilityOverlay: View {
                 .init(color: .black.opacity(0), location: 0),
                 .init(color: .black.opacity(reduceTransparency ? 0.12 : 0.06), location: 0.38),
                 .init(color: .black.opacity(reduceTransparency ? 0.52 : 0.28), location: 0.72),
-                .init(color: .black.opacity(reduceTransparency ? 0.82 : 0.58), location: 1),
+                .init(color: .black.opacity(reduceTransparency ? 0.82 : 0.58), location: 1)
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -142,7 +142,7 @@ struct WalletCardVerticalPhotoBlendLayer: View {
                     .init(color: .black.opacity(0.14 * shadowDepth), location: 0.52),
                     .init(color: .black.opacity(0.34 * shadowDepth), location: 0.70),
                     .init(color: .black.opacity(0.56 * shadowDepth), location: 0.88),
-                    .init(color: .black.opacity(0.70 * shadowDepth), location: 1.00),
+                    .init(color: .black.opacity(0.70 * shadowDepth), location: 1.00)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -155,7 +155,7 @@ struct WalletCardVerticalPhotoBlendLayer: View {
                     .init(color: themeTop.opacity(0.10), location: 0.54),
                     .init(color: themeTop.opacity(0.34), location: 0.66),
                     .init(color: themeBottom.opacity(0.74), location: 0.82),
-                    .init(color: themeBottom, location: 1.00),
+                    .init(color: themeBottom, location: 1.00)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -178,7 +178,7 @@ private struct WalletCardCompactPhotoMask: View {
                 .init(color: .white, location: 0.46),
                 .init(color: .white.opacity(0.72), location: 0.60),
                 .init(color: .white.opacity(0.18), location: 0.76),
-                .init(color: .clear, location: 0.92),
+                .init(color: .clear, location: 0.92)
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -199,7 +199,7 @@ private struct WalletCardBottomRightTextShadow: View {
                     .init(color: .clear, location: 0.0),
                     .init(color: .black.opacity(isExpanded ? 0.18 : 0.10), location: 0.38),
                     .init(color: .black.opacity(isExpanded ? 0.44 : 0.32), location: 0.76),
-                    .init(color: .black.opacity(isExpanded ? 0.62 : 0.46), location: 1.0),
+                    .init(color: .black.opacity(isExpanded ? 0.62 : 0.46), location: 1.0)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -208,7 +208,7 @@ private struct WalletCardBottomRightTextShadow: View {
                 colors: [
                     .black.opacity(isExpanded ? 0.56 : 0.42),
                     .black.opacity(isExpanded ? 0.28 : 0.20),
-                    .clear,
+                    .clear
                 ],
                 center: .bottomTrailing,
                 startRadius: 8,
@@ -230,7 +230,7 @@ struct WalletPetCardDraftFront: View {
     var breedFootnote: String
     var avatarImageData: Data?
     /// 父视图异步解码，避免每次重绘时重复 `UIImage(data:)` / 透明检测 // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
-    var decodedAvatar: UIImage? = nil
+    var decodedAvatar: UIImage?
     var decodedAvatarIsTransparent: Bool = false
     var coatColor: Color
     var eyeColor: Color
@@ -258,8 +258,7 @@ struct WalletPetCardDraftFront: View {
     private var footnote: String {
         var parts: [String] = []
         if hasBirthday, !ageFootnote.isEmpty { parts.append(ageFootnote) }
-        if !breedFootnote.isEmpty { parts.append(breedFootnote) }
-        else if !species.isEmpty { parts.append(species) }
+        if !breedFootnote.isEmpty { parts.append(breedFootnote) } else if !species.isEmpty { parts.append(species) }
         if parts.isEmpty { parts.append("Ohana PET ID") }
         return parts.joined(separator: " · ")
     }
@@ -292,7 +291,7 @@ struct WalletPetCardDraftFront: View {
                     points: [
                         SIMD2(0.0, 0.0), SIMD2(0.5, 0.0), SIMD2(1.0, 0.0),
                         SIMD2(0.0, 0.5), SIMD2(0.52, 0.38), SIMD2(1.0, 0.5),
-                        SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0),
+                        SIMD2(0.0, 1.0), SIMD2(0.5, 1.0), SIMD2(1.0, 1.0)
                     ],
                     colors: WalletPetCardTheme.meshColors(for: themeColorHex)
                 )
@@ -304,7 +303,7 @@ struct WalletPetCardDraftFront: View {
                                 .clear,
                                 useDarkText
                                     ? Color.goCardWhite.opacity(0.20)
-                                    : Color.arkInk.opacity(usesFullBleedPhoto ? 0.12 : 0.22),
+                                    : Color.arkInk.opacity(usesFullBleedPhoto ? 0.12 : 0.22)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -414,7 +413,7 @@ struct WalletPetCardDraftFront: View {
         return VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .bottom, spacing: 2) {
                 ForEach(Array(pattern.enumerated()), id: \.offset) { _, height in
-                    RoundedRectangle(cornerRadius: 1.2, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.hairline, style: .continuous)
                         .fill(foreground.opacity(0.95))
                         .frame(width: 2, height: height)
                 }
@@ -431,7 +430,7 @@ struct WalletPetCardDraftFront: View {
 
 struct HumanSilhouetteView: View {
     let gender: String
-    var accent: Color = Color.goCardWhite.opacity(0.8)
+    var accent: Color = .goCardWhite.opacity(0.8)
 
     private var normalizedGender: String {
         HumanProfileOptions.normalizedGender(gender)
@@ -532,9 +531,9 @@ struct WalletHumanCardDraftFront: View {
     var decodedAvatarTransparent: Bool
     var themeColorHex: String
     /// 阳历星座（有生日时由父视图传入）
-    var zodiacText: String? = nil
+    var zodiacText: String?
     /// MBTI（可选，由父视图传入）
-    var mbtiText: String? = nil
+    var mbtiText: String?
     /// 卡面底部一句摘要（关系 / 国籍 / 现居地 / 年龄等，由父视图拼好）
     var subtitle: String
     let cornerRadius: CGFloat
@@ -634,7 +633,7 @@ struct WalletHumanCardDraftFront: View {
                         .contentTransition(.numericText())
                     HStack(alignment: .bottom, spacing: 2) {
                         ForEach([14, 8, 12, 6, 10, 16, 5, 11, 9, 13], id: \.self) { bh in
-                            RoundedRectangle(cornerRadius: 1.2)
+                            RoundedRectangle(cornerRadius: OhanaRadius.hairline)
                                 .fill(primaryText.opacity(0.85))
                                 .frame(width: 2, height: CGFloat(bh))
                         }

@@ -5,8 +5,8 @@
 //  Human checkup metric catalog and recent logs.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct HumanHealthCheckupView: View {
     let human: Human
@@ -36,12 +36,12 @@ struct HumanHealthCheckupView: View {
     }
 
     private var abnormalLogCount: Int {
-        human.healthMetricLogs.filter { log in
+        human.healthMetricLogs.count(where: { log in
             guard let metric = HealthMetricCatalog.metric(forKey: log.metricKey),
                   let unit = metric.unit(for: log.unitCode) else { return false }
             let status = unit.status(for: log.value)
             return status == .low || status == .high
-        }.count
+        })
     }
 
     private var trackedMetrics: [HealthMetric] {
@@ -170,7 +170,7 @@ struct HumanHealthCheckupView: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func trackedMetricChartCard(_ metric: HealthMetric) -> some View {
@@ -237,7 +237,7 @@ struct HumanHealthCheckupView: View {
             }
             .padding(14)
             .frame(width: 226, height: 156, alignment: .topLeading)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .accessibilityLabel(l.tr(
@@ -307,7 +307,7 @@ struct HumanHealthCheckupView: View {
                     .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 32, height: 32) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(category.color, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .background(category.color, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(category.displayName(l))
                         .font(OhanaFont.callout(.black))
@@ -414,7 +414,7 @@ struct HumanHealthCheckupView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func recentLogRow(_ log: HumanHealthMetricLog) -> some View {
@@ -466,7 +466,7 @@ struct HumanHealthCheckupView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .frame(minHeight: 62)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
         )
@@ -487,7 +487,7 @@ struct HumanHealthCheckupView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 26)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var privacyLockedView: some View {
@@ -513,7 +513,7 @@ struct HumanHealthCheckupView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 13)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -541,11 +541,10 @@ struct HumanHealthCheckupView: View {
     }
 
     private func latestStatusDot(metric: HealthMetric, log: HumanHealthMetricLog?) -> some View {
-        let color: Color
-        if let log, let unit = metric.unit(for: log.unitCode) {
-            color = unit.status(for: log.value).color
+        let color: Color = if let log, let unit = metric.unit(for: log.unitCode) {
+            unit.status(for: log.value).color
         } else {
-            color = metric.category.color.opacity(0.46)
+            metric.category.color.opacity(0.46)
         }
         return Circle()
             .fill(color)

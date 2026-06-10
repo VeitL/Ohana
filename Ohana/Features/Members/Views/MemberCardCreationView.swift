@@ -14,7 +14,6 @@ import SwiftData
 import SwiftUI
 import UIKit
 
-
 struct MemberCardCreationContentView: View {
     let kind: MemberCreationKind
     let onComplete: () -> Void
@@ -273,7 +272,7 @@ struct MemberCardCreationContentView: View {
                 media.route = nil
                 Task {
                     let normalizeID = MemberCreationPerformance.begin("Camera Image Normalize")
-                    let prepared = await Task.detached(priority: .userInitiated) {
+                    let prepared = await Task.detached(priority: .userInitiated) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
                         MemberAvatarImageProcessor.normalized(image)
                     }.value
                     MemberCreationPerformance.end("Camera Image Normalize", normalizeID)

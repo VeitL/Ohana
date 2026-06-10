@@ -50,7 +50,7 @@ enum FeedHomeSnapshotBuilder {
         let todayLogs = careLogs
             .filter {
                 $0.careType == .feeding &&
-                calendar.isDate($0.date, inSameDayAs: now)
+                    calendar.isDate($0.date, inSameDayAs: now)
             }
             .sorted { $0.date > $1.date }
         let mainTodayLogs = todayLogs.filter { FeedLogMetadata.isMainFoodLog($0) }
@@ -74,7 +74,7 @@ enum FeedHomeSnapshotBuilder {
         let nextActionablePlanReminder = expiredMissedPlanReminders.isEmpty
             ? (catchUpPlanReminders.first ?? pendingTodayPlanReminders.first)
             : nil
-        let completedPlanReminders = todayPlanReminders.filter { $0.isCompleted }
+        let completedPlanReminders = todayPlanReminders.filter(\.isCompleted)
         let planTotal = max(todayPlanReminders.count, manualPlanEvents.count, 1)
         let planCompleted = min(completedPlanReminders.count, planTotal)
 
@@ -129,7 +129,7 @@ enum FeedHomeSnapshotBuilder {
             todayWetFoodGrams: todayWetFoodGrams,
             todayTreatGrams: treatTodayLogs.reduce(0) { $0 + max(0, $1.amountGrams) },
             todayTreatCount: treatTodayLogs.count,
-            todayAutoFeedCount: mainTodayLogs.filter { FeedLogMetadata.source(for: $0) == .autoMain }.count,
+            todayAutoFeedCount: mainTodayLogs.count(where: { FeedLogMetadata.source(for: $0) == .autoMain }),
             hasNextManualReminder: nextActionablePlanReminder != nil,
             hasMissedManualPlan: expiredMissedPlanReminders.isEmpty && !catchUpPlanReminders.isEmpty,
             todayManualPlanMissedCount: expiredMissedPlanReminders.isEmpty ? catchUpPlanReminders.count : 0,
@@ -161,7 +161,7 @@ enum FeedHomeSnapshotBuilder {
             .mapValues { logs in
                 logs.reduce(0) { $0 + FeedStockCalculator.effectiveMainFoodAmount(for: $1, pet: pet) }
             }
-        return (0..<7).map { offset in
+        return (0 ..< 7).map { offset in
             let day = calendar.date(byAdding: .day, value: offset, to: start) ?? start
             let total = totalsByDay[calendar.startOfDay(for: day)] ?? 0
             return OhanaMinimalChartPoint(

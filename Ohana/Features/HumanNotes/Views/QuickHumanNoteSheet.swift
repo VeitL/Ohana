@@ -5,11 +5,11 @@
 //  V4 quick human record popup.
 //
 
-import SwiftUI
-import SwiftData
 import PhotosUI
-import UniformTypeIdentifiers
+import SwiftData
+import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 private struct QuickHumanNoteContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -28,8 +28,8 @@ private struct QuickHumanFileAttachmentDraft: Identifiable {
 
 struct QuickHumanNoteSheet: View {
     let human: Human
-    var onSaved: (() -> Void)? = nil
-    var onDismiss: (() -> Void)? = nil
+    var onSaved: (() -> Void)?
+    var onDismiss: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -102,8 +102,8 @@ struct QuickHumanNoteSheet: View {
 
                     saveBar
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow short popup liftedAlert shadow token
                 .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow short popup liftedAlert shadow token
                 .padding(.horizontal, 6)
@@ -177,7 +177,7 @@ struct QuickHumanNoteSheet: View {
             allowedContentTypes: [UTType.pdf, UTType.image, UTType.data],
             allowsMultipleSelection: true
         ) { result in
-            if case .success(let urls) = result {
+            if case let .success(urls) = result {
                 attachedFiles.append(contentsOf: loadFileDrafts(from: urls))
             }
         }
@@ -222,7 +222,7 @@ struct QuickHumanNoteSheet: View {
     private var header: some View {
         HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.goPrimary.opacity(0.18))
                 Image(systemName: "note.text") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -257,7 +257,7 @@ struct QuickHumanNoteSheet: View {
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 110)
                 .padding(12)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
                 .overlay(alignment: .topLeading) {
                     if noteText.isEmpty {
                         Text(l.tr(zh: "记录此刻、想法或要跟进的事……", en: "Write a thought, moment, or follow-up…", de: "Gedanke, Moment oder To-do notieren…"))
@@ -296,7 +296,7 @@ struct QuickHumanNoteSheet: View {
             }
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .padding(.horizontal, 22)
     }
 
@@ -325,7 +325,7 @@ struct QuickHumanNoteSheet: View {
                                 .resizable()
                                 .scaledToFill()
                                 .frame(width: 54, height: 54)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                                 .overlay(alignment: .topTrailing) {
                                     Button {
                                         selectedImages.remove(at: index)
@@ -390,11 +390,11 @@ struct QuickHumanNoteSheet: View {
                         .tint(Color.goPrimary)
                 }
                 .padding(14)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         .padding(.horizontal, 22)
     }
 
@@ -412,7 +412,7 @@ struct QuickHumanNoteSheet: View {
                 .tint(Color.goPrimary)
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .padding(.horizontal, 22)
     }
 
@@ -425,7 +425,7 @@ struct QuickHumanNoteSheet: View {
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern")
                 )
-                    .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)

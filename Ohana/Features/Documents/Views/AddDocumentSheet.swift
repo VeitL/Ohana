@@ -5,9 +5,9 @@
 //  R10: 添加/编辑证件 — ArkBackgroundView + glassEffect 字段卡；导航栏磨砂；Sheet presentationBackground(.bar)
 //
 
-import SwiftUI
-import SwiftData
 import PhotosUI
+import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
 
 // MARK: - 附件数据模型
@@ -21,7 +21,6 @@ private struct DocAttachment: Identifiable {
 private struct AttachmentFullScreenPreview: View {
     let data: Data
     let onClose: () -> Void
-
     var body: some View {
         ZStack {
             Color.arkInk.ignoresSafeArea()
@@ -53,15 +52,13 @@ private struct AttachmentFullScreenPreview: View {
 struct AddDocumentContentSheet: View {
     let pet: Pet
     let humans: [Human]
-
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
-
     @State private var title: String = ""
     @State private var selectedCategory: DocumentCategory = .other
     @State private var hasIssueDate = false
-    @State private var issueDate: Date = Date()
+    @State private var issueDate: Date = .init()
     @State private var hasExpiryDate = false
     @State private var expiryDate: Date = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var issuingAuthority: String = ""
@@ -115,159 +112,32 @@ struct AddDocumentContentSheet: View {
                                 .font(OhanaFont.adaptive(size: 36)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         .padding(16)
-                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
-
-                    // ── 证件类型（Chip 横滚）
-                    fieldCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "tag.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    .foregroundStyle(petThemeColor)
-                                Text("证件类型")
-                                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            }
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { cat in
-                                        Button { selectedCategory = cat } label: {
-                                            HStack(spacing: 5) {
-                                                Text(cat.emoji)
-                                                Text(cat.rawValue)
-                                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            }
-                                            .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
-                                            .padding(.horizontal, 14).padding(.vertical, 8)
-                                            .background(
-                                                selectedCategory == cat ? petThemeColor : Color.primary.opacity(0.08),
-                                                in: Capsule()
-                                            )
-                                        }
-                                        .buttonStyle(ScaleButtonStyle())
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // ── 证件名称
-                    docRow(icon: "doc.text.fill", iconColor: .goTeal, label: "证件名称") {
-                        GoDraftTextField(
-                            autoTitle,
-                            text: $title,
-                            capitalization: .words
-                        )
-                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .tint(Color.goTeal)
-                    }
-
-                    // ── 颁发机构
-                    docRow(icon: "building.2.fill", iconColor: .goCardCyan, label: "颁发机构") {
-                        GoDraftTextField(
-                            "动物检疫站、宠物医院…",
-                            text: $issuingAuthority,
-                            capitalization: .words
-                        )
-                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .tint(Color.goCardCyan)
-                    }
-
-                    // ── 签发日期
-                    docRow(icon: "calendar.badge.checkmark", iconColor: .goPrimary, label: "签发日期") {
-                        HStack(spacing: 10) {
-                            Toggle("", isOn: $hasIssueDate).tint(Color.goPrimary).labelsHidden()
-                            if hasIssueDate {
-                                DatePicker("", selection: $issueDate, displayedComponents: .date)
-                                    .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
-                            }
-                        }
-                    }
-
-                    // ── 有效期
-                    docRow(icon: "clock.badge.exclamationmark", iconColor: Color(hex: "FF3B30"), label: "有效期至") {
-                        HStack(spacing: 10) {
-                            Toggle("", isOn: $hasExpiryDate).tint(Color(hex: "FF3B30")).labelsHidden()
-                            if hasExpiryDate {
-                                DatePicker("", selection: $expiryDate, displayedComponents: .date)
-                                    .datePickerStyle(.compact).tint(Color(hex: "FF3B30")).labelsHidden()
-                            }
-                        }
-                    }
-
-                    docRow(icon: "\(AppCurrency.systemIconName).fill", iconColor: .goPrimary, label: "花费记账") {
-                        HStack(spacing: 8) {
-                            Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
-                            if hasCost {
-                                Text(AppCurrency.symbol).foregroundStyle(Color.ohanaSecondaryText)
-                                GoDraftTextField(
-                                    "0.00",
-                                    text: $costText,
-                                    keyboardType: .decimalPad,
-                                    capitalization: .never
-                                )
-                                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    .tint(Color.goPrimary)
-                                    .frame(maxWidth: 80)
-                            }
-                        }
-                    }
-
-                    // Payer picker (when cost is enabled)
-                    if hasCost && !humans.isEmpty {
+                        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+                        // ── 证件类型（Chip 横滚）
                         fieldCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack(spacing: 6) {
-                                    Image(systemName: "creditcard.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                    Image(systemName: "tag.fill") // a11y: allow decorative icon covered by surrounding text or control
                                         .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(petThemeColor.opacity(0.85))
-                                    Text("谁付的款")
+                                        .foregroundStyle(petThemeColor)
+                                    Text("证件类型")
                                         .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                                 ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 10) {
-                                        Button { selectedPayerId = nil } label: {
-                                            VStack(spacing: 4) {
-                                                ZStack {
-                                                    Circle()
-                                                        .fill(selectedPayerId == nil ? petThemeColor : Color.primary.opacity(0.08))
-                                                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                                                    Image(systemName: "questionmark") // a11y: allow decorative icon covered by surrounding text or control
-                                                        .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                                        .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.5))
+                                    HStack(spacing: 8) {
+                                        ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { cat in
+                                            Button { selectedCategory = cat } label: {
+                                                HStack(spacing: 5) {
+                                                    Text(cat.emoji)
+                                                    Text(cat.rawValue)
+                                                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 }
-                                                Text("未指定")
-                                                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                                    .foregroundStyle(Color.ohanaSecondaryText)
-                                            }
-                                        }
-                                        .buttonStyle(ScaleButtonStyle())
-
-                                        ForEach(humans) { human in
-                                            let hid = human.id.uuidString
-                                            let isSelected = selectedPayerId == hid
-                                            let themeColor = Color(hex: human.safeThemeColorHex)
-                                            Button { selectedPayerId = hid } label: {
-                                                VStack(spacing: 4) {
-                                                    ZStack {
-                                                        Circle()
-                                                            .fill(isSelected ? themeColor : themeColor.opacity(0.2))
-                                                            .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                                                        HumanAvatarPipelineView(
-                                                            human: human,
-                                                            size: 40,
-                                                            showsBackground: false
-                                                        )
-                                                        if isSelected {
-                                                            Circle()
-                                                                .strokeBorder(Color.arkInk, lineWidth: 2)
-                                                                .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                                                        }
-                                                    }
-                                                    Text(human.name)
-                                                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                                        .foregroundStyle(isSelected ? .primary : .secondary)
-                                                        .lineLimit(1)
-                                                }
+                                                .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
+                                                .padding(.horizontal, 14).padding(.vertical, 8)
+                                                .background(
+                                                    selectedCategory == cat ? petThemeColor : Color.primary.opacity(0.08),
+                                                    in: Capsule()
+                                                )
                                             }
                                             .buttonStyle(ScaleButtonStyle())
                                         }
@@ -275,124 +145,250 @@ struct AddDocumentContentSheet: View {
                                 }
                             }
                         }
-                    }
 
-                    // ── 附件区域
-                    fieldCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "paperclip") // a11y: allow decorative icon covered by surrounding text or control
-                                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                                Text("附件" + (attachments.isEmpty ? "" : " (\(attachments.count))"))
-                                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            }
-                            .padding(.horizontal, 4)
+                        // ── 证件名称
+                        docRow(icon: "doc.text.fill", iconColor: .goTeal, label: "证件名称") {
+                            GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                autoTitle,
+                                text: $title,
+                                capitalization: .words
+                            )
+                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .tint(Color.goTeal)
+                        }
 
-                            if !attachments.isEmpty {
-                                VStack(spacing: 6) {
-                                    ForEach(attachments) { att in
-                                        HStack(spacing: 10) {
-                                            if att.isImage {
-                                                Button { previewAttachment = att } label: {
-                                                    AsyncDecodedImageView(data: att.data) { image in
-                                                        Image(uiImage: image).resizable().scaledToFill()
-                                                    } placeholder: {
-                                                        Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                                            .font(OhanaFont.title3(.bold))
-                                                            .foregroundStyle(Color.goTeal)
-                                                    }
-                                                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                                }.buttonStyle(ScaleButtonStyle())
-                                            } else {
-                                                Image(systemName: "doc.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                                    .font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                                    .foregroundStyle(Color.goTeal)
-                                                    .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                                                    .background(Color.goTeal.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
-                                            }
-                                            Text(att.filename.isEmpty ? (att.isImage ? "图片" : "文件") : att.filename)
-                                                .font(OhanaFont.adaptive(size: 14, weight: .medium)).lineLimit(1) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            Spacer()
-                                            Button { attachments.removeAll { $0.id == att.id } } label: {
-                                                Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                                    .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
-                                            }
-                                        }
-                                        .padding(10)
-                                        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-                                    }
-                                }
-                            }
+                        // ── 颁发机构
+                        docRow(icon: "building.2.fill", iconColor: .goCardCyan, label: "颁发机构") {
+                            GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                "动物检疫站、宠物医院…",
+                                text: $issuingAuthority,
+                                capitalization: .words
+                            )
+                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .tint(Color.goCardCyan)
+                        }
 
+                        // ── 签发日期
+                        docRow(icon: "calendar.badge.checkmark", iconColor: .goPrimary, label: "签发日期") {
                             HStack(spacing: 10) {
-                                attachmentBtn(icon: "camera.fill", label: "拍照", color: petThemeColor) { presentCamera() }
-                                PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 10, matching: .images) {
-                                    attachmentBtnLabel(icon: "photo.fill", label: "相册", color: petThemeColor.opacity(0.85))
+                                Toggle("", isOn: $hasIssueDate).tint(Color.goPrimary).labelsHidden()
+                                if hasIssueDate {
+                                    DatePicker("", selection: $issueDate, displayedComponents: .date)
+                                        .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
                                 }
-                                .onChange(of: photoPickerItems) { _, items in
-                                    Task {
-                                        for item in items {
-                                            if let data = try? await item.loadTransferable(type: Data.self) {
-                                                let att = DocAttachment(data: data, filename: "", isImage: true)
-                                                await MainActor.run { attachments.append(att) }
-                                            }
-                                        }
-                                        await MainActor.run { photoPickerItems = [] }
-                                    }
-                                }
-                                attachmentBtn(icon: "doc.fill", label: "文件", color: Color.goOrange) { showingFilePicker = true }
                             }
                         }
-                    }
 
-                    // ── 备注
-                    docRow(icon: "note.text", iconColor: .secondary, label: "备注") {
-                        GoDraftTextField(
-                            "编号、附加信息…",
-                            text: $notes,
-                            axis: .vertical
-                        )
+                        // ── 有效期
+                        docRow(icon: "clock.badge.exclamationmark", iconColor: Color(hex: "FF3B30"), label: "有效期至") {
+                            HStack(spacing: 10) {
+                                Toggle("", isOn: $hasExpiryDate).tint(Color(hex: "FF3B30")).labelsHidden()
+                                if hasExpiryDate {
+                                    DatePicker("", selection: $expiryDate, displayedComponents: .date)
+                                        .datePickerStyle(.compact).tint(Color(hex: "FF3B30")).labelsHidden()
+                                }
+                            }
+                        }
+
+                        docRow(icon: "\(AppCurrency.systemIconName).fill", iconColor: .goPrimary, label: "花费记账") {
+                            HStack(spacing: 8) {
+                                Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
+                                if hasCost {
+                                    Text(AppCurrency.symbol).foregroundStyle(Color.ohanaSecondaryText)
+                                    GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                        "0.00",
+                                        text: $costText,
+                                        keyboardType: .decimalPad,
+                                        capitalization: .never
+                                    )
+                                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .tint(Color.goPrimary)
+                                    .frame(maxWidth: 80)
+                                }
+                            }
+                        }
+
+                        // Payer picker (when cost is enabled)
+                        if hasCost, !humans.isEmpty {
+                            fieldCard {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "creditcard.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(petThemeColor.opacity(0.85))
+                                        Text("谁付的款")
+                                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    }
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 10) {
+                                            Button { selectedPayerId = nil } label: {
+                                                VStack(spacing: 4) {
+                                                    ZStack {
+                                                        Circle()
+                                                            .fill(selectedPayerId == nil ? petThemeColor : Color.primary.opacity(0.08))
+                                                            .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                                                        Image(systemName: "questionmark") // a11y: allow decorative icon covered by surrounding text or control
+                                                            .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                            .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.5))
+                                                    }
+                                                    Text("未指定")
+                                                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                        .foregroundStyle(Color.ohanaSecondaryText)
+                                                }
+                                            }
+                                            .buttonStyle(ScaleButtonStyle())
+
+                                            ForEach(humans) { human in
+                                                let hid = human.id.uuidString
+                                                let isSelected = selectedPayerId == hid
+                                                let themeColor = Color(hex: human.safeThemeColorHex)
+                                                Button { selectedPayerId = hid } label: {
+                                                    VStack(spacing: 4) {
+                                                        ZStack {
+                                                            Circle()
+                                                                .fill(isSelected ? themeColor : themeColor.opacity(0.2))
+                                                                .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                                                            HumanAvatarPipelineView(
+                                                                human: human,
+                                                                size: 40,
+                                                                showsBackground: false
+                                                            )
+                                                            if isSelected {
+                                                                Circle()
+                                                                    .strokeBorder(Color.arkInk, lineWidth: 2)
+                                                                    .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                                                            }
+                                                        }
+                                                        Text(human.name)
+                                                            .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                            .foregroundStyle(isSelected ? .primary : .secondary)
+                                                            .lineLimit(1)
+                                                    }
+                                                }
+                                                .buttonStyle(ScaleButtonStyle())
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── 附件区域
+                        fieldCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "paperclip") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .foregroundStyle(Color.ohanaSecondaryText)
+                                    Text("附件" + (attachments.isEmpty ? "" : " (\(attachments.count))"))
+                                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                }
+                                .padding(.horizontal, 4)
+
+                                if !attachments.isEmpty {
+                                    VStack(spacing: 6) {
+                                        ForEach(attachments) { att in
+                                            HStack(spacing: 10) {
+                                                if att.isImage {
+                                                    Button { previewAttachment = att } label: {
+                                                        AsyncDecodedImageView(data: att.data) { image in
+                                                            Image(uiImage: image).resizable().scaledToFill()
+                                                        } placeholder: {
+                                                            Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                                                .font(OhanaFont.title3(.bold))
+                                                                .foregroundStyle(Color.goTeal)
+                                                        }
+                                                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                                                        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.icon))
+                                                    }.buttonStyle(ScaleButtonStyle())
+                                                } else {
+                                                    Image(systemName: "doc.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                                        .font(OhanaFont.adaptive(size: 18)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                        .foregroundStyle(Color.goTeal)
+                                                        .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                                                        .background(Color.goTeal.opacity(0.1), in: RoundedRectangle(cornerRadius: OhanaRadius.icon))
+                                                }
+                                                Text(att.filename.isEmpty ? (att.isImage ? "图片" : "文件") : att.filename)
+                                                    .font(OhanaFont.adaptive(size: 14, weight: .medium)).lineLimit(1) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                Spacer()
+                                                Button { attachments.removeAll { $0.id == att.id } } label: {
+                                                    Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
+                                                }
+                                            }
+                                            .padding(10)
+                                            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
+                                        }
+                                    }
+                                }
+
+                                HStack(spacing: 10) {
+                                    attachmentBtn(icon: "camera.fill", label: "拍照", color: petThemeColor) { presentCamera() }
+                                    PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 10, matching: .images) {
+                                        attachmentBtnLabel(icon: "photo.fill", label: "相册", color: petThemeColor.opacity(0.85))
+                                    }
+                                    .onChange(of: photoPickerItems) { _, items in
+                                        Task {
+                                            for item in items {
+                                                if let data = try? await item.loadTransferable(type: Data.self) {
+                                                    let att = DocAttachment(data: data, filename: "", isImage: true)
+                                                    await MainActor.run { attachments.append(att) }
+                                                }
+                                            }
+                                            await MainActor.run { photoPickerItems = [] }
+                                        }
+                                    }
+                                    attachmentBtn(icon: "doc.fill", label: "文件", color: Color.goOrange) { showingFilePicker = true }
+                                }
+                            }
+                        }
+
+                        // ── 备注
+                        docRow(icon: "note.text", iconColor: .secondary, label: "备注") {
+                            GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                "编号、附加信息…",
+                                text: $notes,
+                                axis: .vertical
+                            )
                             .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .tint(Color.goPrimary)
-                            .lineLimit(2...4)
-                    }
+                            .lineLimit(2 ... 4)
+                        }
 
-                    // ── 证件号码 (护照/登记证)
-                    if showDocumentNumber {
-                        docRow(icon: "number.circle.fill", iconColor: .goCardCyan, label: selectedCategory == .passport ? "护照号码" : "证件号码") {
-                            GoDraftTextField(
-                                "编号",
-                                text: $documentNumber
-                            )
+                        // ── 证件号码 (护照/登记证)
+                        if showDocumentNumber {
+                            docRow(icon: "number.circle.fill", iconColor: .goCardCyan, label: selectedCategory == .passport ? "护照号码" : "证件号码") {
+                                GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                    "编号",
+                                    text: $documentNumber
+                                )
                                 .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .tint(Color.goCardCyan)
+                            }
                         }
-                    }
 
-                    Spacer(minLength: 28)
+                        Spacer(minLength: 28)
 
-                    Button {
-                        GoKeyboard.dismiss()
-                        saveDocument()
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
-                            Text("保存证件")
+                        Button {
+                            GoKeyboard.dismiss()
+                            saveDocument()
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                                Text("保存证件")
+                            }
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.arkInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(petThemeColor, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                         }
-                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.arkInk)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(petThemeColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .buttonStyle(ScaleButtonStyle())
                     }
-                    .buttonStyle(ScaleButtonStyle())
+                    .padding(16)
                 }
-                .padding(16)
-            }
-            .scrollDismissesKeyboard(.interactively)
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("添加证件")
             .navigationBarTitleDisplayMode(.inline)
@@ -442,7 +438,7 @@ struct AddDocumentContentSheet: View {
         }
         .fileImporter(isPresented: $showingFilePicker,
                       allowedContentTypes: [UTType.pdf, UTType.image, UTType.data]) { result in
-            if case .success(let url) = result {
+            if case let .success(url) = result {
                 Task {
                     if let data = await AttachmentImageDecoder.readFileData(url) {
                         let att = DocAttachment(data: data, filename: url.lastPathComponent, isImage: false)
@@ -479,7 +475,7 @@ struct AddDocumentContentSheet: View {
                 .font(OhanaFont.adaptive(size: 20, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(color)
                 .frame(width: 44, height: 44)
-                .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+                .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
             Text(label)
                 .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
@@ -487,14 +483,14 @@ struct AddDocumentContentSheet: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func fieldCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func fieldCard(@ViewBuilder content: () -> some View) -> some View {
         content()
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
-    private func docRow<Content: View>(icon: String, iconColor: Color, label: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+    private func docRow(icon: String, iconColor: Color, label: String, @ViewBuilder content: @escaping () -> some View) -> some View {
         fieldCard {
             HStack(spacing: 10) {
                 Image(systemName: icon)
@@ -609,162 +605,163 @@ struct EditDocumentSheet: View {
                                 .font(OhanaFont.adaptive(size: 36)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
                         .padding(16)
-                        .goGlassBackground(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
-                    // 证件类型
-                    editFieldCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "tag.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    .foregroundStyle(petThemeColor)
-                                Text("证件类型")
-                                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            }
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { cat in
-                                        Button { selectedCategory = cat } label: {
-                                            HStack(spacing: 5) {
-                                                Text(cat.emoji)
-                                                Text(cat.rawValue)
-                                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        // 证件类型
+                        editFieldCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "tag.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .foregroundStyle(petThemeColor)
+                                    Text("证件类型")
+                                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                }
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { cat in
+                                            Button { selectedCategory = cat } label: {
+                                                HStack(spacing: 5) {
+                                                    Text(cat.emoji)
+                                                    Text(cat.rawValue)
+                                                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                }
+                                                .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
+                                                .padding(.horizontal, 14).padding(.vertical, 8)
+                                                .background(
+                                                    selectedCategory == cat ? petThemeColor : Color.primary.opacity(0.08),
+                                                    in: Capsule()
+                                                )
                                             }
-                                            .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
-                                            .padding(.horizontal, 14).padding(.vertical, 8)
-                                            .background(
-                                                selectedCategory == cat ? petThemeColor : Color.primary.opacity(0.08),
-                                                in: Capsule()
-                                            )
+                                            .buttonStyle(ScaleButtonStyle())
                                         }
-                                        .buttonStyle(ScaleButtonStyle())
                                     }
                                 }
                             }
                         }
-                    }
 
-                    editRow(icon: "doc.text.fill", iconColor: .goTeal, label: "证件名称") {
-                        GoDraftTextField(
-                            "证件名称",
-                            text: $title,
-                            capitalization: .words
-                        )
-                        .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .tint(Color.goTeal)
-                    }
-                    editRow(icon: "building.2.fill", iconColor: .goCardCyan, label: "颁发机构") {
-                        GoDraftTextField(
-                            "颁发机构",
-                            text: $issuingAuthority,
-                            capitalization: .words
-                        )
-                        .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .tint(Color.goCardCyan)
-                    }
-                    editRow(icon: "calendar.badge.checkmark", iconColor: .goPrimary, label: "签发日期") {
-                        HStack(spacing: 10) {
-                            Toggle("", isOn: $hasIssueDate).tint(Color.goPrimary).labelsHidden()
-                            if hasIssueDate {
-                                DatePicker("", selection: $issueDate, displayedComponents: .date)
-                                    .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
+                        editRow(icon: "doc.text.fill", iconColor: .goTeal, label: "证件名称") {
+                            GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                "证件名称",
+                                text: $title,
+                                capitalization: .words
+                            )
+                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .tint(Color.goTeal)
+                        }
+                        editRow(icon: "building.2.fill", iconColor: .goCardCyan, label: "颁发机构") {
+                            GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                "颁发机构",
+                                text: $issuingAuthority,
+                                capitalization: .words
+                            )
+                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .tint(Color.goCardCyan)
+                        }
+                        editRow(icon: "calendar.badge.checkmark", iconColor: .goPrimary, label: "签发日期") {
+                            HStack(spacing: 10) {
+                                Toggle("", isOn: $hasIssueDate).tint(Color.goPrimary).labelsHidden()
+                                if hasIssueDate {
+                                    DatePicker("", selection: $issueDate, displayedComponents: .date)
+                                        .datePickerStyle(.compact).tint(Color.goPrimary).labelsHidden()
+                                }
                             }
                         }
-                    }
-                    editRow(icon: "clock.badge.exclamationmark", iconColor: Color(hex: "FF3B30"), label: "有效期至") {
-                        HStack(spacing: 10) {
-                            Toggle("", isOn: $hasExpiryDate).tint(Color(hex: "FF3B30")).labelsHidden()
-                            if hasExpiryDate {
-                                DatePicker("", selection: $expiryDate, displayedComponents: .date)
-                                    .datePickerStyle(.compact).tint(Color(hex: "FF3B30")).labelsHidden()
+                        editRow(icon: "clock.badge.exclamationmark", iconColor: Color(hex: "FF3B30"), label: "有效期至") {
+                            HStack(spacing: 10) {
+                                Toggle("", isOn: $hasExpiryDate).tint(Color(hex: "FF3B30")).labelsHidden()
+                                if hasExpiryDate {
+                                    DatePicker("", selection: $expiryDate, displayedComponents: .date)
+                                        .datePickerStyle(.compact).tint(Color(hex: "FF3B30")).labelsHidden()
+                                }
                             }
                         }
-                    }
-                    editRow(icon: "\(AppCurrency.systemIconName).fill", iconColor: .goPrimary, label: "花费") {
-                        HStack(spacing: 8) {
-                            Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
-                            if hasCost {
-                                Text(AppCurrency.symbol).foregroundStyle(Color.ohanaSecondaryText)
-                                GoDraftTextField(
-                                    "0",
-                                    text: $costText,
-                                    keyboardType: .decimalPad,
-                                    capitalization: .never
-                                )
-                                .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .tint(Color.goPrimary)
-                                .frame(maxWidth: 80)
+                        editRow(icon: "\(AppCurrency.systemIconName).fill", iconColor: .goPrimary, label: "花费") {
+                            HStack(spacing: 8) {
+                                Toggle("", isOn: $hasCost).tint(Color.goPrimary).labelsHidden()
+                                if hasCost {
+                                    Text(AppCurrency.symbol).foregroundStyle(Color.ohanaSecondaryText)
+                                    GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                        "0",
+                                        text: $costText,
+                                        keyboardType: .decimalPad,
+                                        capitalization: .never
+                                    )
+                                    .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .tint(Color.goPrimary)
+                                    .frame(maxWidth: 80)
+                                }
                             }
                         }
-                    }
-                    editRow(icon: "note.text", iconColor: .secondary, label: "备注") {
-                        GoDraftTextField(
-                            "备注…",
-                            text: $notes,
-                            axis: .vertical
-                        )
-                        .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .tint(Color.goPrimary)
-                        .lineLimit(2...4)
-                    }
+                        editRow(icon: "note.text", iconColor: .secondary, label: "备注") {
+                            GoDraftTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                "备注…",
+                                text: $notes,
+                                axis: .vertical
+                            )
+                            .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .tint(Color.goPrimary)
+                            .lineLimit(2 ... 4)
+                        }
 
-                    // 附件预览/更换
-                    editFieldCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "paperclip") // a11y: allow decorative icon covered by surrounding text or control
-                                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                                Text("附件")
-                                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            }
-                            .padding(.horizontal, 4)
-                            if let img = attachmentImage {
-                                Button { showingPreview = true } label: {
-                                    Image(uiImage: img).resizable().scaledToFill()
-                                        .frame(maxWidth: .infinity).frame(height: 120)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        .overlay(alignment: .topTrailing) {
-                                            Button {
-                                                attachmentImage = nil
-                                                attachmentImageData = nil
-                                            } label: {
-                                                Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                                    .font(OhanaFont.adaptive(size: 20)).foregroundStyle(Color.ohanaPrimaryText).padding(6) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        // 附件预览/更换
+                        editFieldCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "paperclip") // a11y: allow decorative icon covered by surrounding text or control
+                                        .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .foregroundStyle(Color.ohanaSecondaryText)
+                                    Text("附件")
+                                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                }
+                                .padding(.horizontal, 4)
+                                if let img = attachmentImage {
+                                    Button { showingPreview = true } label: {
+                                        Image(uiImage: img).resizable().scaledToFill()
+                                            .frame(maxWidth: .infinity).frame(height: 120)
+                                            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip))
+                                            .overlay(alignment: .topTrailing) {
+                                                Button {
+                                                    attachmentImage = nil
+                                                    attachmentImageData = nil
+                                                } label: {
+                                                    Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                                        .font(OhanaFont.adaptive(size: 20)).foregroundStyle(Color.ohanaPrimaryText).padding(6) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                }
                                             }
-                                        }
-                                }.buttonStyle(ScaleButtonStyle())
-                            } else {
-                                HStack(spacing: 10) {
-                                    Button { presentCamera() } label: {
-                                        VStack(spacing: 6) {
-                                            Image(systemName: "camera.fill").font(OhanaFont.adaptive(size: 20, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                                .foregroundStyle(petThemeColor)
-                                                .frame(width: 44, height: 44)
-                                                .background(petThemeColor.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
-                                            Text("拍照")
-                                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                                .foregroundStyle(Color.ohanaSecondaryText)
-                                        }.frame(maxWidth: .infinity)
                                     }.buttonStyle(ScaleButtonStyle())
-                                    PhotosPicker(selection: $photoPickerItem, matching: .images) {
-                                        VStack(spacing: 6) {
-                                            Image(systemName: "photo.fill").font(OhanaFont.adaptive(size: 20, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                                .foregroundStyle(petThemeColor.opacity(0.9))
-                                                .frame(width: 44, height: 44)
-                                                .background(petThemeColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
-                                            Text("相册")
-                                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                                .foregroundStyle(Color.ohanaSecondaryText)
-                                        }.frame(maxWidth: .infinity)
-                                    }
-                                    .onChange(of: photoPickerItem) { _, item in
-                                        Task {
-                                            if let data = try? await item?.loadTransferable(type: Data.self) {
-                                                let image = await AttachmentImageDecoder.decode(data)
-                                                await MainActor.run {
-                                                    attachmentImageData = data
-                                                    attachmentImage = image
+                                } else {
+                                    HStack(spacing: 10) {
+                                        Button { presentCamera() } label: {
+                                            VStack(spacing: 6) {
+                                                Image(systemName: "camera.fill").font(OhanaFont.adaptive(size: 20, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                    .foregroundStyle(petThemeColor)
+                                                    .frame(width: 44, height: 44)
+                                                    .background(petThemeColor.opacity(0.18), in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
+                                                Text("拍照")
+                                                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                    .foregroundStyle(Color.ohanaSecondaryText)
+                                            }.frame(maxWidth: .infinity)
+                                        }.buttonStyle(ScaleButtonStyle())
+                                        PhotosPicker(selection: $photoPickerItem, matching: .images) {
+                                            VStack(spacing: 6) {
+                                                Image(systemName: "photo.fill").font(OhanaFont.adaptive(size: 20, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                    .foregroundStyle(petThemeColor.opacity(0.9))
+                                                    .frame(width: 44, height: 44)
+                                                    .background(petThemeColor.opacity(0.15), in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
+                                                Text("相册")
+                                                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                    .foregroundStyle(Color.ohanaSecondaryText)
+                                            }.frame(maxWidth: .infinity)
+                                        }
+                                        .onChange(of: photoPickerItem) { _, item in
+                                            Task {
+                                                if let data = try? await item?.loadTransferable(type: Data.self) {
+                                                    let image = await AttachmentImageDecoder.decode(data)
+                                                    await MainActor.run {
+                                                        attachmentImageData = data
+                                                        attachmentImage = image
+                                                    }
                                                 }
                                             }
                                         }
@@ -772,30 +769,29 @@ struct EditDocumentSheet: View {
                                 }
                             }
                         }
-                    }
 
-                    Spacer(minLength: 28)
+                        Spacer(minLength: 28)
 
-                    Button {
-                        GoKeyboard.dismiss()
-                        saveChanges()
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
-                            Text("保存修改")
+                        Button {
+                            GoKeyboard.dismiss()
+                            saveChanges()
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
+                                Text("保存修改")
+                            }
+                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.arkInk)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(petThemeColor, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                         }
-                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.arkInk)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(petThemeColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .buttonStyle(ScaleButtonStyle())
                     }
-                    .buttonStyle(ScaleButtonStyle())
+                    .padding(16)
                 }
-                .padding(16)
-            }
-            .scrollDismissesKeyboard(.interactively)
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("编辑证件")
             .navigationBarTitleDisplayMode(.inline)
@@ -847,9 +843,13 @@ struct EditDocumentSheet: View {
                 ZStack {
                     Color.arkInk.ignoresSafeArea()
                     Image(uiImage: img).resizable().scaledToFit().ignoresSafeArea()
-                    VStack { HStack { Spacer(); Button { showingPreview = false } label: {
-                        Image(systemName: "xmark.circle.fill").font(OhanaFont.adaptive(size: 28)).foregroundStyle(Color.ohanaPrimaryText).padding(16) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    }}; Spacer() }
+                    VStack { HStack { Spacer()
+                        Button { showingPreview = false } label: {
+                            Image(systemName: "xmark.circle.fill").font(OhanaFont.adaptive(size: 28)).foregroundStyle(Color.ohanaPrimaryText).padding(16) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        }
+                    }
+                    Spacer()
+                    }
                 }
             }
         }
@@ -871,14 +871,14 @@ struct EditDocumentSheet: View {
         } message: { Text("此操作不可撤销。") }
     }
 
-    private func editFieldCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func editFieldCard(@ViewBuilder content: () -> some View) -> some View {
         content()
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .goGlassBackground(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
-    private func editRow<Content: View>(icon: String, iconColor: Color, label: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+    private func editRow(icon: String, iconColor: Color, label: String, @ViewBuilder content: @escaping () -> some View) -> some View {
         editFieldCard {
             HStack(spacing: 10) {
                 Image(systemName: icon).font(OhanaFont.adaptive(size: 14, weight: .semibold)).foregroundStyle(iconColor).frame(width: 22) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup

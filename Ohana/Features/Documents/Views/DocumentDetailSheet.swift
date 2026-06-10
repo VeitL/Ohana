@@ -5,8 +5,8 @@
 //  V4 document detail page.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct DocumentDetailSheet: View {
     let doc: PetDocument
@@ -43,7 +43,7 @@ struct DocumentDetailSheet: View {
     }
 
     private var imageAttachments: [Data] {
-        var result = doc.attachments.filter { $0.isImage }.map(\.data)
+        var result = doc.attachments.filter(\.isImage).map(\.data)
         if result.isEmpty, let legacy = doc.attachmentData {
             result.append(legacy)
         }
@@ -124,7 +124,7 @@ struct DocumentDetailSheet: View {
             Text(doc.documentCategory.emoji)
                 .font(OhanaFont.adaptive(size: 26)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .frame(width: 48, height: 48)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(OhanaFont.title3(.black))
@@ -203,7 +203,7 @@ struct DocumentDetailSheet: View {
                 .multilineTextAlignment(.trailing)
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     @ViewBuilder
@@ -236,7 +236,7 @@ struct DocumentDetailSheet: View {
                         Spacer()
                     }
                     .padding(14)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                 }
             }
         }
@@ -321,7 +321,7 @@ private struct DocumentAttachmentThumbnailView: View {
     var body: some View {
         Button(action: onTap) {
             ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.ohanaCardSurface)
 
                 if let image {
@@ -337,8 +337,8 @@ private struct DocumentAttachmentThumbnailView: View {
             }
             .frame(height: 128)
             .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .task(id: imageKey) {

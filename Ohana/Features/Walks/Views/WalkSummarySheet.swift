@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct WalkSummarySheet: View {
     let pet: Pet
@@ -29,11 +29,11 @@ struct WalkSummarySheet: View {
     private var sortedWalks: [PetWalkLog] {
         pet.walkLogs.sorted(by: { $0.startDate > $1.startDate })
     }
-    
+
     private var totalDistance: Double {
         pet.walkLogs.reduce(0) { $0 + $1.distanceMeters }
     }
-    
+
     private var totalDuration: TimeInterval {
         pet.walkLogs.reduce(0) { $0 + $1.durationSeconds }
     }
@@ -41,7 +41,7 @@ struct WalkSummarySheet: View {
     // MARK: - 本周步行距离
     private var weekStartDate: Date {
         var cal = Calendar.current
-        cal.firstWeekday = 2  // 周一为周首
+        cal.firstWeekday = 2 // 周一为周首
         return cal.dateComponents([.calendar, .yearForWeekOfYear, .weekOfYear], from: Date()).date ?? Date()
     }
 
@@ -60,12 +60,12 @@ struct WalkSummarySheet: View {
     private var weeklyGoalColor: Color {
         weeklyProgress >= 1.0 ? Color.goPrimary : Color.goTeal
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 OhanaAppBackground()
-                
+
                 ScrollView {
                     VStack(spacing: 20) {
                         petHeader
@@ -131,9 +131,9 @@ struct WalkSummarySheet: View {
             Spacer(minLength: 0)
         }
         .padding(18)
-        .goTranslucentCard(cornerRadius: 24)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardLarge)
     }
-    
+
     // MARK: - Fresh Walk Helpers
 
     private func isFreshWalk(_ walk: PetWalkLog) -> Bool {
@@ -153,7 +153,7 @@ struct WalkSummarySheet: View {
 
             // 星级评分
             HStack(spacing: 10) {
-                ForEach(1...5, id: \.self) { star in
+                ForEach(1 ... 5, id: \.self) { star in
                     Button {
                         withAnimation(GoMotion.feedback) { draftMoodRating = star }
                     } label: {
@@ -173,11 +173,11 @@ struct WalkSummarySheet: View {
             }
 
             // 备注输入
-            TextField("记录今天发生的趣事... (可选)", text: $draftNotes, axis: .vertical)
+            TextField("记录今天发生的趣事... (可选)", text: $draftNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .lineLimit(1...3)
+                .lineLimit(1 ... 3)
                 .padding(10)
-                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
 
             // 保存按钮
             Button {
@@ -200,13 +200,13 @@ struct WalkSummarySheet: View {
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
             .disabled(draftMoodRating == 0 && draftNotes.isEmpty)
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     // MARK: - Weekly Goal Card
@@ -279,7 +279,7 @@ struct WalkSummarySheet: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
         .sheet(isPresented: $showingGoalSetter) {
             goalSetterSheet
                 .ohanaCompactSheetPresentation(detents: [.height(320)])
@@ -349,7 +349,7 @@ struct WalkSummarySheet: View {
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 14))
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
             }
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 24)
@@ -397,9 +397,9 @@ struct WalkSummarySheet: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 24)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardLarge)
     }
-    
+
     private func statColumn(value: String, label: String, icon: String, accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: icon)
@@ -418,9 +418,9 @@ struct WalkSummarySheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(12)
-        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
-    
+
     // MARK: - Walk List
     private var walkListSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -436,7 +436,7 @@ struct WalkSummarySheet: View {
                     .padding(.vertical, 4)
                     .background(Color.primary.opacity(0.07), in: Capsule())
             }
-            
+
             ForEach(Array(sortedWalks.enumerated()), id: \.element.id) { index, walk in
                 Button { selectedWalk = walk } label: {
                     walkRow(walk)
@@ -444,21 +444,21 @@ struct WalkSummarySheet: View {
                 .buttonStyle(ScaleButtonStyle())
                 .ohanaSmoothAppear(index: index)
             }
-            
+
             if sortedWalks.isEmpty {
                 Text("还没有巡岛记录")
                     .font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
-                    .goTranslucentCard(cornerRadius: 18)
+                    .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
             }
         }
         .sheet(item: $selectedWalk) { walk in
             WalkDetailView(walk: walk, pet: pet)
         }
     }
-    
+
     private func walkRow(_ walk: PetWalkLog) -> some View {
         HStack(spacing: 0) {
             routeArtwork(for: walk)
@@ -516,9 +516,9 @@ struct WalkSummarySheet: View {
             .padding(.trailing, 14)
         }
         .frame(height: 104)
-        .goTranslucentCard(cornerRadius: 20)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
+        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
     }
 
     private var blendedCardSurface: Color {
@@ -557,7 +557,7 @@ struct WalkSummarySheet: View {
         .padding(.vertical, 4)
         .background(Color.goPrimary.opacity(0.12), in: Capsule())
     }
-    
+
     // MARK: - Formatters
     private func distanceFormatted(_ meters: Double) -> String {
         if meters >= 1000 {
@@ -565,7 +565,7 @@ struct WalkSummarySheet: View {
         }
         return String(format: "%.0fm", meters)
     }
-    
+
     private func durationFormatted(_ seconds: TimeInterval) -> String {
         let minutes = Int(seconds / 60)
         if minutes >= 60 {

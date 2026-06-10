@@ -49,7 +49,7 @@ struct HumanPrivacyTestView: View {
                     .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow)
                     .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.goYellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.goYellow.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("人类隐私检查")
                         .font(OhanaFont.title3(.black))
@@ -61,7 +61,7 @@ struct HumanPrivacyTestView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     private var pickerSection: some View {
@@ -70,7 +70,7 @@ struct HumanPrivacyTestView: View {
             pickerRow(title: "目标成员", selection: $targetId)
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     @ViewBuilder
@@ -100,14 +100,14 @@ struct HumanPrivacyTestView: View {
                 }
             }
             .padding(16)
-            .goTranslucentCard(cornerRadius: 20)
+            .goTranslucentCard(cornerRadius: OhanaRadius.input)
         } else {
             Text("请先创建人类成员")
                 .font(OhanaFont.callout(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(20)
-                .goTranslucentCard(cornerRadius: 20)
+                .goTranslucentCard(cornerRadius: OhanaRadius.input)
         }
     }
 
@@ -133,7 +133,7 @@ struct HumanPrivacyTestView: View {
                 .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(isLocked ? Color.goYellow : Color.goPrimary)
                 .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                .background((isLocked ? Color.goYellow : Color.goPrimary).opacity(0.13), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background((isLocked ? Color.goYellow : Color.goPrimary).opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(OhanaFont.callout(.black))

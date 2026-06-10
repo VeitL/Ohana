@@ -3,10 +3,10 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
-import PhotosUI
 import Foundation
+import PhotosUI
+import SwiftData
+import SwiftUI
 
 extension PetBasicInfoDetailView {
     var readContent: some View {
@@ -34,14 +34,14 @@ extension PetBasicInfoDetailView {
             if !pet.coatColor.isEmpty || !pet.eyeColor.isEmpty {
                 infoSection(title: "外貌特征", icon: "eye.fill", iconColor: Color.goCardCyan) {
                     if !pet.coatColor.isEmpty { infoRow(label: "毛色", value: pet.coatColor) }
-                    if !pet.eyeColor.isEmpty  { infoRow(label: "眼色", value: pet.eyeColor) }
+                    if !pet.eyeColor.isEmpty { infoRow(label: "眼色", value: pet.eyeColor) }
                 }
             }
             infoSection(title: "健康与医疗", icon: "cross.circle.fill", iconColor: Color.goRed) {
                 infoRow(label: "芯片号", value: pet.microchipID.isEmpty ? "未登记" : pet.microchipID)
                 infoRow(label: "诊所名称", value: pet.vetClinicName.isEmpty ? "未填写" : pet.vetClinicName)
                 infoRow(label: "主治医生", value: pet.vetDoctorName.isEmpty ? "未填写" : pet.vetDoctorName)
-                infoRow(label: "联系电话", value: pet.vetContact.isEmpty   ? "未填写" : pet.vetContact)
+                infoRow(label: "联系电话", value: pet.vetContact.isEmpty ? "未填写" : pet.vetContact)
                 if !pet.vetAddress.isEmpty {
                     infoRow(label: "诊所地址", value: pet.vetAddress)
                 }
@@ -93,7 +93,7 @@ extension PetBasicInfoDetailView {
                         .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow)
                         .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous))
                     VStack(alignment: .leading, spacing: 1) {
                         Text("\(breed) · 护理贴士")
                             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -128,7 +128,7 @@ extension PetBasicInfoDetailView {
             }
         }
         .padding(14)
-        .goTranslucentCard(cornerRadius: 16)
+        .goTranslucentCard(cornerRadius: OhanaRadius.control)
     }
 
     // MARK: - Edit View

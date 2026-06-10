@@ -5,8 +5,8 @@
 //  Family-wide weekly report across pets, members, and assigned tasks.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct FamilyWeeklyReportDashboardContentView: View {
     let pets: [Pet]
@@ -17,7 +17,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var weekInterval: DateInterval {
         Calendar.current.dateInterval(of: .weekOfYear, for: Date())
-            ?? DateInterval(start: Date().addingTimeInterval(-6 * 86_400), duration: 7 * 86_400)
+            ?? DateInterval(start: Date().addingTimeInterval(-6 * 86400), duration: 7 * 86400)
     }
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
@@ -141,7 +141,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         guard let first = healthAlerts.first else {
             return "健康提醒正常。"
         }
-        let urgentCount = healthAlerts.filter { $0.severity == .urgent }.count
+        let urgentCount = healthAlerts.count(where: { $0.severity == .urgent })
         if urgentCount > 0 {
             return "\(urgentCount) 项紧急健康提醒：\(first.title)。"
         }
@@ -198,12 +198,12 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
             HStack(spacing: 10) {
                 metric("照护", "\(allEntries.count)", .goPrimary)
-                metric("成员", "\(rankedMembers.filter { $0.id != "unknown" }.count)", .goTeal)
+                metric("成员", "\(rankedMembers.count(where: { $0.id != "unknown" }))", .goTeal)
                 metric("椰子", "\(allEntries.reduce(0) { $0 + $1.coconuts })", .goYellow)
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var weeklyStoryCard: some View {
@@ -241,7 +241,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var memberRankingCard: some View {
@@ -268,7 +268,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var memoryAndHealthCard: some View {
@@ -281,13 +281,13 @@ struct FamilyWeeklyReportDashboardContentView: View {
                             .resizable()
                             .scaledToFill()
                             .frame(width: 58, height: 58)
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     } placeholder: {
                         Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.adaptive(size: 20, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                             .frame(width: 58, height: 58)
-                            .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text("\(memory.petName) 的本周回忆")
@@ -316,7 +316,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var petCoverageCard: some View {
@@ -340,7 +340,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var recentActivityCard: some View {
@@ -369,7 +369,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private var previousWeeksCard: some View {
@@ -378,7 +378,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             HStack(alignment: .bottom, spacing: 10) {
                 ForEach(lastFourWeeks(), id: \.label) { week in
                     VStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: OhanaRadius.tiny)
                             .fill(Color.goPrimary.opacity(0.75))
                             .frame(height: CGFloat(max(8, min(90, week.count * 8))))
                         Text(week.label)
@@ -391,7 +391,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
             .frame(height: 120)
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 22)
+        .goTranslucentCard(cornerRadius: OhanaRadius.cardSoft)
     }
 
     private func metric(_ label: String, _ value: String, _ color: Color) -> some View {
@@ -401,7 +401,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func sectionHeader(_ title: String, icon: String) -> some View {
@@ -428,7 +428,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(color.opacity(0.11), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private func statusLine(icon: String, text: String, color: Color) -> some View {
@@ -445,7 +445,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
         }
         .padding(.vertical, 7)
         .padding(.horizontal, 10)
-        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     private func emptyText(_ text: String) -> some View {
@@ -489,7 +489,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
     }
 
     private func lastFourWeeks() -> [(label: String, count: Int)] {
-        (0..<4).map { offset in
+        (0 ..< 4).map { offset in
             let base = Calendar.current.date(byAdding: .weekOfYear, value: -(3 - offset), to: Date()) ?? Date()
             let interval = Calendar.current.dateInterval(of: .weekOfYear, for: base) ?? weekInterval
             let count = activePets.flatMap { entries(for: $0, in: interval) }.count

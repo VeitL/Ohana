@@ -63,7 +63,7 @@ struct GachaCoconutGrandBundlePrizeView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(Color.ohanaCardSurface.opacity(0.86), in: Capsule())
-                .ohanaShine(trigger: trigger, cornerRadius: 22, isEnabled: shouldAnimate && phase == .reveal)
+                .ohanaShine(trigger: trigger, cornerRadius: OhanaRadius.cardSoft, isEnabled: shouldAnimate && phase == .reveal)
             }
         }
         .accessibilityElement(children: .combine)
@@ -86,7 +86,7 @@ struct GachaCoconutGrandBundlePrizeView: View {
                 )
                 .frame(width: 258, height: 258)
 
-            ForEach(0..<14, id: \.self) { index in
+            ForEach(0 ..< 14, id: \.self) { index in
                 Image(systemName: index.isMultiple(of: 3) ? "sparkle" : "plus")
                     .font(.system(size: index.isMultiple(of: 3) ? 17 : 9, weight: .black))
                     .foregroundStyle(index.isMultiple(of: 2) ? Color.goYellow : Color.goCardWhite)
@@ -100,7 +100,7 @@ struct GachaCoconutGrandBundlePrizeView: View {
     }
 
     private var fallingCoconuts: some View {
-        ForEach(0..<8, id: \.self) { index in
+        ForEach(0 ..< 8, id: \.self) { index in
             Text("🥥")
                 .font(.system(size: index.isMultiple(of: 2) ? 20 : 16))
                 .offset(
@@ -122,4 +122,3 @@ struct GachaCoconutGrandBundlePrizeView: View {
         (-78, -74), (-50, -20), (-22, -92), (6, -34), (34, -78), (64, -18), (88, -58), (18, -112)
     ]
 }
-

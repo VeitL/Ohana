@@ -6,8 +6,8 @@
 //  主页轻量提示，可被划走（当日不再显示）
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct IslandNegativeFeedbackBanner: View {
     let signals: [IslandNegativeSignal]
@@ -38,8 +38,8 @@ struct IslandNegativeFeedbackBanner: View {
                 ZStack {
                     Circle()
                         .fill(signal.severity == .critical
-                              ? Color.goRed.opacity(0.18)
-                              : Color.goYellow.opacity(0.18))
+                            ? Color.goRed.opacity(0.18)
+                            : Color.goYellow.opacity(0.18))
                         .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     Image(systemName: signal.iconName)
                         .font(OhanaFont.adaptive(size: 14, weight: .bold))
@@ -82,11 +82,11 @@ struct IslandNegativeFeedbackBanner: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                     .fill(Color.ohanaCardSurface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                     .strokeBorder(
                         signal.severity == .critical
                             ? Color.goRed.opacity(0.35)

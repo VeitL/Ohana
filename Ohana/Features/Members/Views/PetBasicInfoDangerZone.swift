@@ -38,8 +38,8 @@ struct PetBasicInfoDangerZone: View {
                 .foregroundStyle(Color.goOrange)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.goOrange.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .background(Color.goOrange.opacity(0.1), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                     .strokeBorder(Color.goOrange.opacity(0.3), lineWidth: 1))
             }
             .buttonStyle(ScaleButtonStyle())
@@ -56,8 +56,8 @@ struct PetBasicInfoDangerZone: View {
                 .foregroundStyle(Color.goRed)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.goRed.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .background(Color.goRed.opacity(0.1), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                     .strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
             }
             .buttonStyle(ScaleButtonStyle())
@@ -104,7 +104,7 @@ private struct PetDeleteConfirmationSheet: View {
                         .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("彻底删除 \(petName)")
                             .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -133,7 +133,7 @@ private struct PetDeleteConfirmationSheet: View {
                         .foregroundStyle(Color.goRed.opacity(0.8))
                 }
 
-                TextField("宠物名字", text: $confirmName)
+                TextField("宠物名字", text: $confirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -142,8 +142,8 @@ private struct PetDeleteConfirmationSheet: View {
                     .onSubmit { attemptDelete() }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 13)
-                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .strokeBorder(canDelete ? Color.goRed.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1))
 
                 HStack(spacing: 10) {
@@ -153,7 +153,7 @@ private struct PetDeleteConfirmationSheet: View {
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
-                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
 
@@ -163,7 +163,7 @@ private struct PetDeleteConfirmationSheet: View {
                             .foregroundStyle(canDelete ? Color.ohanaPrimaryActionText : Color.primary.opacity(0.32))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
-                            .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(canDelete ? Color.goRed : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(!canDelete)

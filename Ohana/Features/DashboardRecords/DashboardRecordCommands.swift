@@ -57,11 +57,10 @@ enum WeightCommandService {
             executorId: executorId
         )
         context.insert(log)
-        let reward: (humanGot: Int, petGot: Int)?
-        if awardsReward {
-            reward = questManager.awardAction(type: .weight, pet: pet, context: context)
+        let reward: (humanGot: Int, petGot: Int)? = if awardsReward {
+            questManager.awardAction(type: .weight, pet: pet, context: context)
         } else {
-            reward = nil
+            nil
         }
 
         let ledgerEvent = ledgerSource.map { source in
@@ -377,8 +376,8 @@ enum DashboardRecordCommandService {
 
     @discardableResult
     @MainActor
-    private static func deleteRecord<T: PersistentModel>(
-        _ record: T,
+    private static func deleteRecord(
+        _ record: some PersistentModel,
         subjectID: UUID,
         subjectKind: String,
         recordID: UUID,
@@ -407,7 +406,7 @@ enum DashboardRecordCommandService {
         context: ModelContext
     ) -> [CareLedgerEvent] {
         let idString = id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return events.filter { $0.legacyModelName == modelName && $0.legacyModelId == idString }
     }
 }

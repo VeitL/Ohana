@@ -20,9 +20,9 @@ enum Avatar2DCandidateProvider {
     static func candidates(for draft: MemberCreationDraft, l: L10n) -> [Avatar2DCandidate] {
         switch draft.kind {
         case .human:
-            return humanCandidates(for: draft, l: l)
+            humanCandidates(for: draft, l: l)
         case .pet:
-            return petCandidates(for: draft, l: l)
+            petCandidates(for: draft, l: l)
         }
     }
 
@@ -125,9 +125,9 @@ enum Avatar2DCandidateProvider {
 
     private static func humanGenderSlug(_ gender: String) -> String {
         switch HumanProfileOptions.normalizedGender(gender) {
-        case "男": return "male"
-        case "女": return "female"
-        default: return "nonbinary"
+        case "男": "male"
+        case "女": "female"
+        default: "nonbinary"
         }
     }
 
@@ -153,4 +153,3 @@ enum Avatar2DCandidateProvider {
         return parts.dropLast(2).joined(separator: "_") + "_"
     }
 }
-

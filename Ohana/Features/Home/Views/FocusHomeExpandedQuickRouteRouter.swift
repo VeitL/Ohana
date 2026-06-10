@@ -74,7 +74,7 @@ enum FocusHomeExpandedQuickRouteRouter {
 
     static func handlePetTap(_ route: ExpandedPetQuickTapRoute, pet: Pet, actions: Actions) {
         switch route {
-        case .perform(let actionType):
+        case let .perform(actionType):
             actions.performPetAction(actionType, pet)
         case .waterManagement:
             actions.waterManagement(pet)

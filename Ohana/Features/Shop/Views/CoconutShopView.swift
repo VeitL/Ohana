@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct CoconutShopView: View {
     let humans: [Human]
@@ -53,9 +53,9 @@ struct CoconutShopView: View {
 
         var id: String {
             switch self {
-            case .avatarTarget: return "avatarTarget"
-            case .popoutPet: return "popoutPet"
-            case .cashExchange: return "cashExchange"
+            case .avatarTarget: "avatarTarget"
+            case .popoutPet: "popoutPet"
+            case .cashExchange: "cashExchange"
             }
         }
     }

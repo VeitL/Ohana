@@ -74,7 +74,7 @@ enum FeedingPlanWriter {
             deleteEvent(event, context: context)
             didDelete = true
         }
-        if save && didDelete {
+        if save, didDelete {
             context.safeSave()
         }
     }
@@ -137,9 +137,9 @@ enum FeedingPlanWriter {
             .filter {
                 switch kind {
                 case .manualReminder:
-                    return FeedRuleMetadata.isManualReminderEvent($0, pet: pet)
+                    FeedRuleMetadata.isManualReminderEvent($0, pet: pet)
                 case .autoFeeder:
-                    return FeedRuleMetadata.isAutoFeederEvent($0, pet: pet)
+                    FeedRuleMetadata.isAutoFeederEvent($0, pet: pet)
                 }
             }
             .sorted { $0.startDate < $1.startDate }

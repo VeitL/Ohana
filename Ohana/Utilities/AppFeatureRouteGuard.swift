@@ -17,11 +17,11 @@ enum AppFeatureRouteGuard {
         var directDestination: FMDest? {
             switch self {
             case .rootMenu, .suppress:
-                return nil
+                nil
             case let .allow(destination):
-                return destination
+                destination
             case .redirectToRoadmap:
-                return .growthRoadmap
+                .growthRoadmap
             }
         }
     }
@@ -85,18 +85,18 @@ enum AppFeatureRouteGuard {
     static func allowsAppRoute(_ route: AppRoute) -> Bool {
         switch route {
         case .plantProfile:
-            return false
+            false
         case .petProfile, .humanProfile:
-            return true
+            true
         }
     }
 
     static func allowsHomeTab(_ tab: VerticalSolidHomeTab) -> Bool {
         switch tab {
         case .plants:
-            return false
+            false
         case .home, .calendar, .oasis:
-            return true
+            true
         }
     }
 
@@ -124,22 +124,22 @@ enum AppFeatureRouteGuard {
     static func requiredLevel(for sheetRoute: AppSheetRoute) -> Int? {
         switch sheetRoute {
         case .coconutShop:
-            return GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
+            GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
         default:
-            return nil
+            nil
         }
     }
 
     static func requiredLevel(for oasisRoute: OasisSheetRoute) -> Int? {
         switch oasisRoute {
         case .coconutShop:
-            return GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
+            GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
         case .gacha:
-            return GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
+            GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
         case .critterCodex:
-            return critterCodexUnlockLevel
+            critterCodexUnlockLevel
         case .coconutRules, .achievements, .inventory, .checkInDetail:
-            return nil
+            nil
         }
     }
 

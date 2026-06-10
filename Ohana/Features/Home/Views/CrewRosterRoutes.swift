@@ -19,9 +19,9 @@ enum CrewRosterFullScreenRoute: Identifiable, Equatable {
     var id: String {
         switch self {
         case .coconutLog:
-            return "coconut-log"
+            "coconut-log"
         case let .addEntity(type):
-            return "add-\(type.id)"
+            "add-\(type.id)"
         }
     }
 }
@@ -33,9 +33,9 @@ enum CrewRosterSheetRoute: Identifiable, Equatable {
     var id: String {
         switch self {
         case let .familyActivity(id):
-            return "family-activity-\(id.uuidString)"
+            "family-activity-\(id.uuidString)"
         case .familyWeeklyReport:
-            return "family-weekly-report"
+            "family-weekly-report"
         }
     }
 }

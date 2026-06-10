@@ -8,7 +8,7 @@ extension DomainCommand {
     static func petMedicationPlan(petID: UUID, medicationID: UUID?) -> DomainCommand {
         command("petMedication", "plan", [
             "petID": petID.uuidString,
-            "medicationID": medicationID?.uuidString ?? "new",
+            "medicationID": medicationID?.uuidString ?? "new"
         ])
     }
 
@@ -16,7 +16,7 @@ extension DomainCommand {
         command("petMedication", "planActivation", [
             "petID": petID.uuidString,
             "medicationID": medicationID.uuidString,
-            "isActive": String(isActive),
+            "isActive": String(isActive)
         ])
     }
 
@@ -32,7 +32,7 @@ extension DomainCommand {
         command("petHealth", "delete", [
             "petID": petID.uuidString,
             "kind": kind,
-            "recordID": recordID.uuidString,
+            "recordID": recordID.uuidString
         ])
     }
 
@@ -124,7 +124,7 @@ extension DomainCommand {
         command("insurance", "policy", [
             "petID": petID.uuidString,
             "policyID": policyID.uuidString,
-            "action": action,
+            "action": action
         ])
     }
 
@@ -133,7 +133,7 @@ extension DomainCommand {
             "petID": petID.uuidString,
             "policyID": policyID.uuidString,
             "claimID": claimID?.uuidString ?? "new",
-            "action": action,
+            "action": action
         ])
     }
 }

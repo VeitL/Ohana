@@ -3,10 +3,10 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
-import PhotosUI
 import Foundation
+import PhotosUI
+import SwiftData
+import SwiftUI
 
 struct PetBasicInfoDetailView: View {
     let pet: Pet
@@ -19,8 +19,8 @@ struct PetBasicInfoDetailView: View {
     @State var breedTipsExpanded = true
 
     @State var showingRainbowBridgeAlert = false
-    @State var showingUndoPassingAlert   = false
-    @State var rainbowBridgeDate         = Date()
+    @State var showingUndoPassingAlert = false
+    @State var rainbowBridgeDate = Date()
 
     // Edit state mirrors
     @State var eName = ""
@@ -35,7 +35,7 @@ struct PetBasicInfoDetailView: View {
     @State var eCoatColor = ""
     @State var eEyeColor = ""
     @State var eMicrochipID = ""
-    @State var eVetContact = ""      // 电话
+    @State var eVetContact = "" // 电话
     @State var eVetClinicName = ""
     @State var eVetDoctorName = ""
     @State var eVetAddress = ""
@@ -53,9 +53,9 @@ struct PetBasicInfoDetailView: View {
 
     let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
     let themePresets: [(String, String)] = [
-        ("FF6B6B","coral"), ("4ECDC4","ocean"), ("B8A9C9","lavender"),
-        ("95E1D3","mint"), ("F38181","sunset"), ("AA96DA","berry"),
-        ("F472B6","rose"), ("A8E6CF","sage"), ("FFD3B6","peach"), ("95ADBE","slate"),
+        ("FF6B6B", "coral"), ("4ECDC4", "ocean"), ("B8A9C9", "lavender"),
+        ("95E1D3", "mint"), ("F38181", "sunset"), ("AA96DA", "berry"),
+        ("F472B6", "rose"), ("A8E6CF", "sage"), ("FFD3B6", "peach"), ("95ADBE", "slate")
     ]
 
     var body: some View {

@@ -4,8 +4,8 @@
 //
 //  U13: 人类体重记录
 
-import SwiftData
 import Foundation
+import SwiftData
 
 @Model
 final class HumanWeightLog {

@@ -19,20 +19,20 @@ enum ReminderNotificationScheduleResult: Equatable {
 
     var ledgerActionType: String {
         switch self {
-        case .scheduled: return "scheduleSuccess"
-        case .skippedDuplicate: return "scheduleDuplicate"
-        case .skippedPastDue: return "scheduleSkippedPastDue"
-        case .missingEvent: return "scheduleMissingEvent"
-        case .failed: return "scheduleFailed"
+        case .scheduled: "scheduleSuccess"
+        case .skippedDuplicate: "scheduleDuplicate"
+        case .skippedPastDue: "scheduleSkippedPastDue"
+        case .missingEvent: "scheduleMissingEvent"
+        case .failed: "scheduleFailed"
         }
     }
 
     var metadataJSON: String {
         switch self {
-        case .failed(let message):
-            return "{\"error\":\"\(message.replacingOccurrences(of: "\"", with: "\\\""))\"}"
+        case let .failed(message):
+            "{\"error\":\"\(message.replacingOccurrences(of: "\"", with: "\\\""))\"}"
         default:
-            return ""
+            ""
         }
     }
 }
@@ -44,14 +44,14 @@ final class NotificationManager: NSObject, @unchecked Sendable {
     private let center = UNUserNotificationCenter.current()
     private let categoryID = "OHANA_REMINDER"
     private let routeCenter: OhanaNotificationRouteCenter
-    
+
     init(routeCenter: OhanaNotificationRouteCenter) {
         self.routeCenter = routeCenter
         super.init()
         center.delegate = self
         registerActions()
     }
-    
+
     // MARK: - Permission
     func requestPermission() async -> Bool {
         do {
@@ -61,7 +61,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             return false
         }
     }
-    
+
     // MARK: - Register Actions
     private func registerActions() {
         let completeAction = UNNotificationAction(
@@ -79,17 +79,17 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             title: "明天再说 🕐",
             options: []
         )
-        
+
         let category = UNNotificationCategory(
             identifier: categoryID,
             actions: [completeAction, skipAction, snoozeAction],
             intentIdentifiers: [],
             options: []
         )
-        
+
         center.setNotificationCategories([category])
     }
-    
+
     // MARK: - 滚动窗口常量
     /// 单次最多注册未来 N 天的通知（iOS 硬限制 64 条，14 天 × 合理事件数 = 安全阈值）
     private let rollingWindowDays = 14
@@ -188,9 +188,9 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             for reminder in toSchedule {
                 self.schedule(reminder: reminder)
             }
-#if DEBUG
-            print("🔔 refillWindow: existing=\(existingIds.count), added=\(toSchedule.count)")
-#endif
+            #if DEBUG
+                OhanaLog.debug("refillWindow: existing=\(existingIds.count), added=\(toSchedule.count)", category: "Notifications")
+            #endif
         }
     }
 
@@ -265,11 +265,11 @@ final class OhanaNotificationRouteCenter: ObservableObject {
     init() {}
 
     var routeEvents: AnyPublisher<AppRoutePublishedEvent, Never> {
-        $lastRouteEvent.compactMap { $0 }.eraseToAnyPublisher()
+        $lastRouteEvent.compactMap(\.self).eraseToAnyPublisher()
     }
 
     var reminderActionEvents: AnyPublisher<ReminderNotificationActionEvent, Never> {
-        $lastReminderActionEvent.compactMap { $0 }.eraseToAnyPublisher()
+        $lastReminderActionEvent.compactMap(\.self).eraseToAnyPublisher()
     }
 
     func requestReminderRoute(_ payload: [String: Any]) {
@@ -303,7 +303,7 @@ final class OhanaNotificationRouteCenter: ObservableObject {
 // MARK: - UNUserNotificationCenterDelegate
 extension NotificationManager: UNUserNotificationCenterDelegate {
     func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
+        _: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
@@ -332,7 +332,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         if let relatedEntityId = userInfo["relatedEntityId"] as? String {
             payload["relatedEntityId"] = relatedEntityId
         }
-        
+
         switch action {
         case UNNotificationDefaultActionIdentifier:
             DispatchQueue.main.async {
@@ -345,16 +345,16 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         default:
             break
         }
-        
+
         #if DEBUG
-        print("📬 Notification action: \(action)")
+            OhanaLog.debug("Notification action: \(action)", category: "Notifications")
         #endif
         completionHandler()
     }
-    
+
     func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
+        _: UNUserNotificationCenter,
+        willPresent _: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .badge, .sound])

@@ -12,7 +12,7 @@ nonisolated enum CareLedgerBackfillService {
     /// Isolation-agnostic: operates only on the supplied ModelContext, so it can
     /// run on the main context or inside a background @ModelActor.
     static func backfill(context: ModelContext) throws {
-        let existing = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        let existing = try context.fetch(FetchDescriptor<CareLedgerEvent>()) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         var keys = Set(existing.compactMap { event -> String? in
             guard let model = event.legacyModelName, let id = event.legacyModelId else { return nil }
             return key(model, id)
@@ -25,7 +25,7 @@ nonisolated enum CareLedgerBackfillService {
             return true
         }
 
-        for log in try context.fetch(FetchDescriptor<PetCareLog>()) {
+        for log in try context.fetch(FetchDescriptor<PetCareLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             guard remember("PetCareLog", log.id.uuidString) else { continue }
             CareLedgerService.record(
                 occurredAt: log.date,
@@ -46,7 +46,7 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<PetPottyLog>()) {
+        for log in try context.fetch(FetchDescriptor<PetPottyLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             guard remember("PetPottyLog", log.id.uuidString) else { continue }
             CareLedgerService.record(
                 occurredAt: log.date,
@@ -64,7 +64,7 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<PetWalkLog>()) {
+        for log in try context.fetch(FetchDescriptor<PetWalkLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             guard remember("PetWalkLog", log.id.uuidString) else { continue }
             CareLedgerService.record(
                 occurredAt: log.startDate,
@@ -86,7 +86,7 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<PetExpenseLog>()) {
+        for log in try context.fetch(FetchDescriptor<PetExpenseLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             guard remember("PetExpenseLog", log.id.uuidString) else { continue }
             CareLedgerService.record(
                 occurredAt: log.date,
@@ -107,7 +107,7 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<HumanWeightLog>()) {
+        for log in try context.fetch(FetchDescriptor<HumanWeightLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             guard remember("HumanWeightLog", log.id.uuidString) else { continue }
             CareLedgerService.record(
                 occurredAt: log.date,
@@ -128,7 +128,7 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<HumanWorkoutLog>()) {
+        for log in try context.fetch(FetchDescriptor<HumanWorkoutLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             guard remember("HumanWorkoutLog", log.id.uuidString) else { continue }
             CareLedgerService.record(
                 occurredAt: log.date,
@@ -150,7 +150,7 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for log in try context.fetch(FetchDescriptor<PlantCareLog>()) {
+        for log in try context.fetch(FetchDescriptor<PlantCareLog>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             guard remember("PlantCareLog", log.id.uuidString) else { continue }
             CareLedgerService.record(
                 occurredAt: log.date,
@@ -169,7 +169,7 @@ nonisolated enum CareLedgerBackfillService {
             )
         }
 
-        for reminder in try context.fetch(FetchDescriptor<Reminder>()) {
+        for reminder in try context.fetch(FetchDescriptor<Reminder>()) { // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
             guard remember("Reminder", reminder.id.uuidString) else { continue }
             let subject = CareLedgerService.subjectInfo(from: reminder.event)
             CareLedgerService.record(

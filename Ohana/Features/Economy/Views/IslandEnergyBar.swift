@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct IslandEnergyBar: View {
-    let progress: Double     // 0.0 ~ 1.0
-    let levelLabel: String   // e.g. "🌱 希望之种 Lv.1"
+    let progress: Double // 0.0 ~ 1.0
+    let levelLabel: String // e.g. "🌱 希望之种 Lv.1"
     let nextLevelHint: String // e.g. "再完成 2 个任务可升级"
 
     @State private var animatedProgress: Double = 0
@@ -36,12 +36,12 @@ struct IslandEnergyBar: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     // 背景轨道
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.tiny, style: .continuous)
                         .fill(Color.primary.opacity(0.08))
                         .frame(height: 8)
 
                     // 填充进度
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.tiny, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [Color.goPrimary.opacity(0.8), Color.goPrimary],
@@ -62,7 +62,7 @@ struct IslandEnergyBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .goGlassBackground(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .onAppear {
             withAnimation(.easeOut(duration: 0.8).delay(0.1)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
                 animatedProgress = progress

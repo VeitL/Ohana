@@ -20,7 +20,7 @@ struct AddBountyTaskSheet: View {
     @State private var selectedEmoji = "🎯"
     @State private var assignedToId: String? = nil
 
-    private let emojiOptions = ["🎯","🧹","🍳","🛒","📦","🐾","🌱","💊","🚗","📚","🎮","🎂","🧺","💻","🔧","✏️","🎵","🏃"]
+    private let emojiOptions = ["🎯", "🧹", "🍳", "🛒", "📦", "🐾", "🌱", "💊", "🚗", "📚", "🎮", "🎂", "🧺", "💻", "🔧", "✏️", "🎵", "🏃"]
     private let rewardOptions = [10, 20, 30, 50, 80, 100, 150, 200]
 
     private var creator: Human? {
@@ -95,10 +95,10 @@ struct AddBountyTaskSheet: View {
                                     selectedEmoji == emoji
                                         ? Color.goPrimary.opacity(0.25)
                                         : Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.08),
-                                    in: RoundedRectangle(cornerRadius: 14)
+                                    in: RoundedRectangle(cornerRadius: OhanaRadius.row)
                                 )
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 14)
+                                    RoundedRectangle(cornerRadius: OhanaRadius.row)
                                         .strokeBorder(
                                             selectedEmoji == emoji
                                                 ? Color.goPrimary : Color.clear,
@@ -116,7 +116,7 @@ struct AddBountyTaskSheet: View {
 
     private var titleField: some View {
         formField(title: "任务标题") {
-            TextField("", text: $title)
+            TextField("", text: $title) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(primaryText)
                 .tint(Color.goPrimary)
@@ -129,7 +129,7 @@ struct AddBountyTaskSheet: View {
 
     private var descriptionField: some View {
         formField(title: "任务说明（可选）") {
-            TextField("", text: $description, axis: .vertical)
+            TextField("", text: $description, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.callout(.medium))
                 .foregroundStyle(primaryText)
                 .tint(Color.goPrimary)
@@ -164,10 +164,10 @@ struct AddBountyTaskSheet: View {
                             .padding(.horizontal, 14).padding(.vertical, 8)
                             .background(
                                 reward == val ? Color.goPrimary : Color.goYellow.opacity(0.1),
-                                in: RoundedRectangle(cornerRadius: 12)
+                                in: RoundedRectangle(cornerRadius: OhanaRadius.chip)
                             )
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
+                                RoundedRectangle(cornerRadius: OhanaRadius.chip)
                                     .strokeBorder(
                                         reward == val ? Color.clear : Color.goYellow.opacity(0.2),
                                         lineWidth: 1
@@ -229,8 +229,8 @@ struct AddBountyTaskSheet: View {
                     .foregroundStyle(Color.goYellow)
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
-            .background(Color.goYellow.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.goYellow.opacity(0.15), lineWidth: 1))
+            .background(Color.goYellow.opacity(0.07), in: RoundedRectangle(cornerRadius: OhanaRadius.row))
+            .overlay(RoundedRectangle(cornerRadius: OhanaRadius.row).strokeBorder(Color.goYellow.opacity(0.15), lineWidth: 1))
         }
     }
 
@@ -266,7 +266,7 @@ struct AddBountyTaskSheet: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
-    private func formField<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func formField(title: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(OhanaFont.subheadline(.semibold))
@@ -274,10 +274,10 @@ struct AddBountyTaskSheet: View {
             content()
                 .padding(.horizontal, 16).padding(.vertical, 14)
                 .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                         .fill(Color.ohanaCardSurface)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
                                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
                         )
                 )
@@ -306,9 +306,9 @@ struct AddBountyTaskSheet: View {
 
 private extension View {
     @ViewBuilder
-    func placeholder<Content: View>(
+    func placeholder(
         when shouldShow: Bool,
-        @ViewBuilder placeholder: () -> Content
+        @ViewBuilder placeholder: () -> some View
     ) -> some View {
         ZStack(alignment: .leading) {
             if shouldShow { placeholder() }

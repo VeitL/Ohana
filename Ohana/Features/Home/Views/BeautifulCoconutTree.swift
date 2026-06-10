@@ -30,16 +30,16 @@ struct TreeLevelConfig {
 }
 
 private let treeLevelConfigs: [TreeLevelConfig] = [
-    .init(level: 1,  name: "破土新芽", scale: 0.54, leafCount: 2,  coconutCount: 0,  flowerCount: 0,  trunkHeight: 54,  trunkWidth: 14, leafWidth: 50,  leafHeight: 34, crownOffset: 7,  auraTier: 0, rootCount: 0),
-    .init(level: 2,  name: "稚嫩幼苗", scale: 0.60, leafCount: 4,  coconutCount: 0,  flowerCount: 0,  trunkHeight: 86,  trunkWidth: 16, leafWidth: 64,  leafHeight: 40, crownOffset: 5,  auraTier: 0, rootCount: 1),
-    .init(level: 3,  name: "茁壮小树", scale: 0.68, leafCount: 6,  coconutCount: 0,  flowerCount: 3,  trunkHeight: 114, trunkWidth: 20, leafWidth: 76,  leafHeight: 48, crownOffset: 2,  auraTier: 0, rootCount: 2),
-    .init(level: 4,  name: "青葱树冠", scale: 0.76, leafCount: 8,  coconutCount: 0,  flowerCount: 5,  trunkHeight: 136, trunkWidth: 23, leafWidth: 88,  leafHeight: 54, crownOffset: 0,  auraTier: 0, rootCount: 3),
-    .init(level: 5,  name: "初结硕果", scale: 0.84, leafCount: 10, coconutCount: 1,  flowerCount: 6,  trunkHeight: 154, trunkWidth: 27, leafWidth: 98,  leafHeight: 60, crownOffset: -2, auraTier: 0, rootCount: 4),
-    .init(level: 6,  name: "丰收之树", scale: 0.92, leafCount: 13, coconutCount: 3,  flowerCount: 8,  trunkHeight: 168, trunkWidth: 31, leafWidth: 108, leafHeight: 66, crownOffset: -4, auraTier: 1, rootCount: 5),
-    .init(level: 7,  name: "绿洲明珠", scale: 1.00, leafCount: 16, coconutCount: 5,  flowerCount: 10, trunkHeight: 180, trunkWidth: 35, leafWidth: 118, leafHeight: 72, crownOffset: -6, auraTier: 1, rootCount: 6),
-    .init(level: 8,  name: "繁星树冠", scale: 1.07, leafCount: 19, coconutCount: 7,  flowerCount: 12, trunkHeight: 190, trunkWidth: 39, leafWidth: 128, leafHeight: 78, crownOffset: -8, auraTier: 2, rootCount: 7),
-    .init(level: 9,  name: "生命之源", scale: 1.14, leafCount: 21, coconutCount: 10, flowerCount: 15, trunkHeight: 198, trunkWidth: 43, leafWidth: 138, leafHeight: 84, crownOffset: -10, auraTier: 3, rootCount: 8),
-    .init(level: 10, name: "永恒神树", scale: 1.20, leafCount: 22, coconutCount: 12, flowerCount: 18, trunkHeight: 206, trunkWidth: 47, leafWidth: 148, leafHeight: 90, crownOffset: -12, auraTier: 4, rootCount: 9),
+    .init(level: 1, name: "破土新芽", scale: 0.54, leafCount: 2, coconutCount: 0, flowerCount: 0, trunkHeight: 54, trunkWidth: 14, leafWidth: 50, leafHeight: 34, crownOffset: 7, auraTier: 0, rootCount: 0),
+    .init(level: 2, name: "稚嫩幼苗", scale: 0.60, leafCount: 4, coconutCount: 0, flowerCount: 0, trunkHeight: 86, trunkWidth: 16, leafWidth: 64, leafHeight: 40, crownOffset: 5, auraTier: 0, rootCount: 1),
+    .init(level: 3, name: "茁壮小树", scale: 0.68, leafCount: 6, coconutCount: 0, flowerCount: 3, trunkHeight: 114, trunkWidth: 20, leafWidth: 76, leafHeight: 48, crownOffset: 2, auraTier: 0, rootCount: 2),
+    .init(level: 4, name: "青葱树冠", scale: 0.76, leafCount: 8, coconutCount: 0, flowerCount: 5, trunkHeight: 136, trunkWidth: 23, leafWidth: 88, leafHeight: 54, crownOffset: 0, auraTier: 0, rootCount: 3),
+    .init(level: 5, name: "初结硕果", scale: 0.84, leafCount: 10, coconutCount: 1, flowerCount: 6, trunkHeight: 154, trunkWidth: 27, leafWidth: 98, leafHeight: 60, crownOffset: -2, auraTier: 0, rootCount: 4),
+    .init(level: 6, name: "丰收之树", scale: 0.92, leafCount: 13, coconutCount: 3, flowerCount: 8, trunkHeight: 168, trunkWidth: 31, leafWidth: 108, leafHeight: 66, crownOffset: -4, auraTier: 1, rootCount: 5),
+    .init(level: 7, name: "绿洲明珠", scale: 1.00, leafCount: 16, coconutCount: 5, flowerCount: 10, trunkHeight: 180, trunkWidth: 35, leafWidth: 118, leafHeight: 72, crownOffset: -6, auraTier: 1, rootCount: 6),
+    .init(level: 8, name: "繁星树冠", scale: 1.07, leafCount: 19, coconutCount: 7, flowerCount: 12, trunkHeight: 190, trunkWidth: 39, leafWidth: 128, leafHeight: 78, crownOffset: -8, auraTier: 2, rootCount: 7),
+    .init(level: 9, name: "生命之源", scale: 1.14, leafCount: 21, coconutCount: 10, flowerCount: 15, trunkHeight: 198, trunkWidth: 43, leafWidth: 138, leafHeight: 84, crownOffset: -10, auraTier: 3, rootCount: 8),
+    .init(level: 10, name: "永恒神树", scale: 1.20, leafCount: 22, coconutCount: 12, flowerCount: 18, trunkHeight: 206, trunkWidth: 47, leafWidth: 148, leafHeight: 90, crownOffset: -12, auraTier: 4, rootCount: 9)
 ]
 
 // 椰子固定坐标（相对树冠中心）
@@ -64,18 +64,18 @@ private let maxLeafSlots = 22
 // MARK: - BeautifulCoconutTree
 
 struct BeautifulCoconutTree: View {
-    var level: Int           // 1-10
-    var isInjecting: Bool    // 注入能量脉冲
+    var level: Int // 1-10
+    var isInjecting: Bool // 注入能量脉冲
     var growthProgress: Double = 0
     var injectionPulseToken: Int = 0
     var pendingUpgradeCoconutCount: Int = 0
-    var dailyCoconutCount: Int? = nil
+    var dailyCoconutCount: Int?
     var allowsAmbientMotion: Bool = true
-    var harvestedCoconuts: Set<Int> = []        // 已采摘的椰子索引
-    var onHarvest: ((Int) -> Void)? = nil       // 采摘回调
+    var harvestedCoconuts: Set<Int> = [] // 已采摘的椰子索引
+    var onHarvest: ((Int) -> Void)? // 采摘回调
 
     @State private var isSwaying = false
-    @State private var burstKey  = 0            // 升级冲击波触发器
+    @State private var burstKey = 0 // 升级冲击波触发器
     @State private var shockwaveScale: CGFloat = 0
     @State private var shockwaveOpacity: Double = 0
     @State private var vineProgress: CGFloat = 0
@@ -83,6 +83,7 @@ struct BeautifulCoconutTree: View {
     private var cfg: TreeLevelConfig {
         treeLevelConfigs[max(0, min(level - 1, 9))]
     }
+
     private var isMax: Bool { level >= 10 }
     private var glowColor: Color { isMax ? Color(hex: "FBBF24") : Color.goPrimary }
     private var sproutCount: Int { max(1, min(level, 4)) }
@@ -120,9 +121,9 @@ struct BeautifulCoconutTree: View {
                     opacity: shockwaveOpacity,
                     glowColor: glowColor
                 )
-                    .offset(x: bend + trunkW * 0.4,
-                            y: -trunkH + cfg.crownOffset)
-                    .allowsHitTesting(false)
+                .offset(x: bend + trunkW * 0.4,
+                        y: -trunkH + cfg.crownOffset)
+                .allowsHitTesting(false)
             }
 
             // ── 底部光环与阴影（绿洲神池）
@@ -141,7 +142,7 @@ struct BeautifulCoconutTree: View {
 
             if cfg.rootCount > 0 {
                 ZStack {
-                    ForEach(0..<cfg.rootCount, id: \.self) { i in
+                    ForEach(0 ..< cfg.rootCount, id: \.self) { i in
                         let direction: CGFloat = i.isMultiple(of: 2) ? -1 : 1
                         Capsule()
                             .fill(isMax ? Color(hex: "334155") : Color(hex: "4A2B16"))
@@ -160,7 +161,7 @@ struct BeautifulCoconutTree: View {
                 .allowsHitTesting(false)
 
             if level <= 4 {
-                ForEach(0..<sproutCount, id: \.self) { i in
+                ForEach(0 ..< sproutCount, id: \.self) { i in
                     GroundSproutView(color: leafColor(index: i))
                         .scaleEffect(0.58 + CGFloat(i) * 0.14)
                         .offset(
@@ -207,14 +208,14 @@ struct BeautifulCoconutTree: View {
                     size: 184 + CGFloat(cfg.auraTier) * 30,
                     allowsAmbientMotion: allowsAmbientMotion
                 )
-                    .offset(x: bend + trunkW * 0.4, y: -trunkH - 8)
+                .offset(x: bend + trunkW * 0.4, y: -trunkH - 8)
             }
 
             // ── 树冠（树叶 + 椰子，摇摆）
             ZStack {
                 // 后层树叶让高等级树冠更饱满
                 if level >= 6 {
-                    ForEach(0..<maxLeafSlots, id: \.self) { i in
+                    ForEach(0 ..< maxLeafSlots, id: \.self) { i in
                         let isActive = i < cfg.leafCount && i % 2 == 1
                         let angle: Double = cfg.leafCount > 1
                             ? -168 + Double(i) * (336.0 / Double(max(1, cfg.leafCount - 1)))
@@ -235,7 +236,7 @@ struct BeautifulCoconutTree: View {
                 }
 
                 // 树叶（扇形，originX/Y=0 对应 React style.origin）
-                ForEach(0..<maxLeafSlots, id: \.self) { i in
+                ForEach(0 ..< maxLeafSlots, id: \.self) { i in
                     let isActive = i < cfg.leafCount
                     let angle: Double = cfg.leafCount > 1
                         ? -160 + Double(i) * (320.0 / Double(max(1, cfg.leafCount - 1)))
@@ -256,7 +257,7 @@ struct BeautifulCoconutTree: View {
                 }
 
                 // 花朵/能量结晶，3 级后开始出现
-                ForEach(0..<blossomPositions.count, id: \.self) { i in
+                ForEach(0 ..< blossomPositions.count, id: \.self) { i in
                     if i < cfg.flowerCount {
                         let pos = blossomPositions[i]
                         let bloomScale = min(CGFloat(1.18), max(CGFloat(0.62), cfg.leafWidth / 120))
@@ -273,7 +274,7 @@ struct BeautifulCoconutTree: View {
                 }
 
                 // 椰子（固定坐标）
-                ForEach(0..<cocoPositions.count, id: \.self) { i in
+                ForEach(0 ..< cocoPositions.count, id: \.self) { i in
                     if i < displayedCoconutCount {
                         let pos = cocoPositions[i]
                         let isHarvested = harvestedCoconuts.contains(i)
@@ -335,7 +336,7 @@ struct BeautifulCoconutTree: View {
         .onChange(of: level) { oldVal, newVal in
             if newVal > oldVal { triggerShockwave() }
             // 新等级达到 5+ 时重新生长藤蔓
-            if newVal >= 5 && oldVal < 5 {
+            if newVal >= 5, oldVal < 5 {
                 vineProgress = 0
                 OhanaFrameScheduler.runAfterNextFrame(milliseconds: 500) {
                     vineProgress = 1.0
@@ -375,7 +376,7 @@ private struct LevelUpBurstView: View {
 
     var body: some View {
         ZStack {
-            ForEach(0..<3, id: \.self) { i in
+            ForEach(0 ..< 3, id: \.self) { i in
                 Circle()
                     .stroke(
                         glowColor.opacity(0.82 - Double(i) * 0.18),
@@ -386,7 +387,7 @@ private struct LevelUpBurstView: View {
                     .opacity(opacity)
             }
 
-            ForEach(0..<sparkAngles.count, id: \.self) { i in
+            ForEach(0 ..< sparkAngles.count, id: \.self) { i in
                 let radians = sparkAngles[i] * .pi / 180
                 let distance = CGFloat(28 + (i % 4) * 7) + progress * CGFloat(96 + (i % 3) * 18)
                 Capsule()
@@ -450,7 +451,7 @@ private struct PendingUpgradeCoconutHint: View {
 
     var body: some View {
         HStack(spacing: -7) {
-            ForEach(0..<min(count, 3), id: \.self) { index in
+            ForEach(0 ..< min(count, 3), id: \.self) { index in
                 Text("🥥")
                     .font(OhanaFont.adaptive(size: 17))
                     .frame(width: 25, height: 25) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
@@ -509,7 +510,7 @@ private struct BlossomView: View {
 
     var body: some View {
         ZStack {
-            ForEach(0..<5, id: \.self) { i in
+            ForEach(0 ..< 5, id: \.self) { i in
                 Capsule()
                     .fill(petalColor)
                     .frame(width: 5, height: 12) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.

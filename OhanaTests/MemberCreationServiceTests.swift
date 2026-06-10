@@ -1,7 +1,7 @@
 import Foundation
-@testable import Ohana
 import SwiftData
 import Testing
+@testable import Ohana
 
 @MainActor
 @Suite(.serialized)
@@ -468,7 +468,7 @@ struct MemberCreationServiceTests {
             "quest_isFirstMealRecorded",
             "quest_isThemeColorSet",
             "quest_coconutLogs",
-            HomeCardVisibility.hiddenPetIDsKey,
+            HomeCardVisibility.hiddenPetIDsKey
         ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
 
         TestQuestManagerProjection.manager.coconutCount = 0

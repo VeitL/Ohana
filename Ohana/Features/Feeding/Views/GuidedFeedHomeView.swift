@@ -184,7 +184,7 @@ private struct FeedGuidedModeStrip: View {
             .animation(GoMotion.page, value: selectedOptionID)
         }
         .padding(12)
-        .feedFlatBlockSurface(cornerRadius: 22)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardSoft)
     }
 }
 
@@ -338,7 +338,7 @@ private struct FeedPrimaryTaskSurface: View {
         }
         .frame(maxWidth: .infinity)
         .frame(minHeight: 224)
-        .feedFlatBlockSurface(cornerRadius: 26)
+        .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardLarge)
     }
 }
 
@@ -383,7 +383,7 @@ private struct FeedGuidedMiniChartCard: View {
                 }
             }
             .padding(13)
-            .feedFlatBlockSurface(cornerRadius: 22)
+            .feedFlatBlockSurface(cornerRadius: OhanaRadius.cardSoft)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -416,7 +416,7 @@ private struct FeedGuidedMetricPill: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(metric.isHighlighted ? metric.tint : metric.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(metric.isHighlighted ? metric.tint : metric.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .animation(GoMotion.feedback, value: metric.isHighlighted)
     }
 }
@@ -460,7 +460,7 @@ private struct FeedDiscoveryLargeDockCard: View {
                             .font(OhanaFont.adaptive(size: 21, weight: .black))
                             .foregroundStyle(item.tint)
                             .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                            .background(item.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                            .background(item.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                         Spacer(minLength: 0)
                         Text(item.title)
                             .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
@@ -477,8 +477,8 @@ private struct FeedDiscoveryLargeDockCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: 118)
                     .padding(14)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
 
@@ -526,7 +526,7 @@ private struct FeedDiscoveryCompactDockCard: View {
                     .font(OhanaFont.adaptive(size: 15, weight: .black))
                     .foregroundStyle(item.tint)
                     .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(item.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .background(item.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 Text(item.title)
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -539,8 +539,8 @@ private struct FeedDiscoveryCompactDockCard: View {
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(12)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }

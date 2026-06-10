@@ -146,7 +146,7 @@ struct WalletMotionLabView: View {
             .toggleStyle(OhanaPillToggleStyle())
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         }
     }
 
@@ -170,12 +170,12 @@ struct WalletMotionLabView: View {
                         progress = CGFloat(value)
                     }
                 ),
-                in: 0...1
+                in: 0 ... 1
             )
             .tint(Color.goPrimary)
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func selectCard(_ card: WalletMotionLabCard) {
@@ -384,7 +384,7 @@ private struct WalletMotionLabScene: View {
         )
     }
 
-    private func zIndex(for card: WalletMotionLabCard, index: Int, isActive: Bool) -> Double {
+    private func zIndex(for _: WalletMotionLabCard, index: Int, isActive: Bool) -> Double {
         if isActive {
             return heroDirection < 0 ? Double(index) + 0.25 : 40
         }
@@ -409,7 +409,7 @@ private struct WalletMotionLabScene: View {
                         .fill(Color.ohanaPrimaryText.opacity(showDebug ? 0.08 : 0.001))
                         .overlay {
                             if showDebug {
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous)
                                     .strokeBorder(Color.goPrimary.opacity(0.45), lineWidth: 1)
                             }
                         }
@@ -441,7 +441,7 @@ private struct WalletMotionLabScene: View {
         .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
         .foregroundStyle(Color.ohanaPrimaryActionText)
         .padding(10)
-        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         .position(x: layout.centerX, y: layout.expandedFrame.minY - 34)
         .allowsHitTesting(false)
     }
@@ -523,10 +523,10 @@ private struct WalletMotionCardView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(Color.ohanaCardSurface.opacity(0.82), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .background(Color.ohanaCardSurface.opacity(0.82), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
-    private func avatar(w: CGFloat, h: CGFloat, progress: CGFloat) -> some View {
+    private func avatar(w _: CGFloat, h _: CGFloat, progress: CGFloat) -> some View {
         ZStack {
             if card.isBodyAvatar {
                 Image(systemName: card.avatarSymbol)
@@ -578,7 +578,7 @@ private struct WalletMotionQuickActions: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous))
     }
 }
 
@@ -613,9 +613,9 @@ private enum WalletLabMode: String, CaseIterable, Identifiable {
 
     func title(_ l: L10n) -> String {
         switch self {
-        case .normal: return l.tr(zh: "正常", en: "Normal", de: "Normal")
-        case .slow: return l.tr(zh: "0.5x", en: "0.5x", de: "0.5x")
-        case .manual: return l.tr(zh: "手动", en: "Manual", de: "Manuell")
+        case .normal: l.tr(zh: "正常", en: "Normal", de: "Normal")
+        case .slow: l.tr(zh: "0.5x", en: "0.5x", de: "0.5x")
+        case .manual: l.tr(zh: "手动", en: "Manual", de: "Manuell")
         }
     }
 }

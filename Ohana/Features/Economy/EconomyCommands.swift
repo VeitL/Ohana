@@ -15,22 +15,22 @@ enum EconomyCommand: FeatureDomainCommand {
     var domainCommand: DomainCommand {
         switch self {
         case let .coconutExchange(requestID):
-            return .coconutExchange(requestID: requestID)
+            .coconutExchange(requestID: requestID)
         case let .shopPurchase(humanID, itemID):
-            return .shopPurchase(humanID: humanID, itemID: itemID)
+            .shopPurchase(humanID: humanID, itemID: itemID)
         case let .achievementReward(entityID, kind, badgeIDs):
-            return .achievementReward(entityID: entityID, kind: kind, badgeIDs: badgeIDs)
+            .achievementReward(entityID: entityID, kind: kind, badgeIDs: badgeIDs)
         }
     }
 
     var affectedEntityIDs: Set<UUID> {
         switch self {
         case let .coconutExchange(requestID):
-            return [requestID]
+            [requestID]
         case let .shopPurchase(humanID, _):
-            return Set(humanID.map { [$0] } ?? [])
+            Set(humanID.map { [$0] } ?? [])
         case let .achievementReward(entityID, _, _):
-            return [entityID]
+            [entityID]
         }
     }
 }

@@ -5,10 +5,10 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
-import SwiftData
-import Foundation
 import Combine
+import Foundation
+import SwiftData
+import SwiftUI
 import UIKit
 
 let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
@@ -32,8 +32,8 @@ struct OhanaApp: App {
         let services = AppServices()
         appServices = services
         let metricKit = services.metricKit
-        let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1_000
-        let containerDurationMS = (CFAbsoluteTimeGetCurrent() - containerStartedAt) * 1_000
+        let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1000
+        let containerDurationMS = (CFAbsoluteTimeGetCurrent() - containerStartedAt) * 1000
         Task { @MainActor in
             AppPerformanceMonitor.shared.record("SwiftData container ready", valueMS: containerDurationMS, note: "Eager before RootView")
             AppPerformanceMonitor.shared.record("App init", valueMS: initDurationMS, note: "BGTask + eager container")
@@ -41,12 +41,12 @@ struct OhanaApp: App {
             metricKit.start()
         }
     }
-    
+
     private var preferredScheme: ColorScheme? {
         switch appThemePreference {
-        case "light": return .light
-        case "dark":  return .dark
-        default:      return nil  // system
+        case "light": .light
+        case "dark": .dark
+        default: nil // system
         }
     }
 
@@ -55,25 +55,25 @@ struct OhanaApp: App {
             RootView()
                 .modelContainer(modelContainer)
                 .environment(appServices)
-            .tint(Color.goPrimary)
-            .preferredColorScheme(preferredScheme)
-            .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
-            .ignoresSafeArea(.keyboard, edges: .bottom)
-            .onChange(of: appCountry) { _, _ in }
-            .onChange(of: appCurrency) { _, _ in }
-            .onChange(of: appMeasurementSystem) { _, _ in }
-            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
-                appServices.lifecycle.handle(.didEnterBackground)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-                appServices.lifecycle.handle(.willResignActive)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                appServices.lifecycle.handle(.didBecomeActive)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
-                appServices.lifecycle.handle(.willTerminate)
-            }
+                .tint(Color.goPrimary)
+                .preferredColorScheme(preferredScheme)
+                .environment(\.locale, AppLanguage.swiftUIPreferredLocale)
+                .ignoresSafeArea(.keyboard, edges: .bottom)
+                .onChange(of: appCountry) { _, _ in }
+                .onChange(of: appCurrency) { _, _ in }
+                .onChange(of: appMeasurementSystem) { _, _ in }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                    appServices.lifecycle.handle(.didEnterBackground)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                    appServices.lifecycle.handle(.willResignActive)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                    appServices.lifecycle.handle(.didBecomeActive)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willTerminateNotification)) { _ in
+                    appServices.lifecycle.handle(.willTerminate)
+                }
         }
     }
 }

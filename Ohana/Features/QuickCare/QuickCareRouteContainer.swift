@@ -1,5 +1,5 @@
 //
-//  QuickCareRouteContainers.swift
+//  QuickCareRouteContainer.swift
 //  Ohana
 //
 //  Route-scoped SwiftData fetches for quick-care detail sheets.
@@ -79,7 +79,7 @@ struct QuickFeedDetailRouteContainer: View {
             byAdding: .day,
             value: -6,
             to: Calendar.current.startOfDay(for: Date())
-        ) ?? Date().addingTimeInterval(-6 * 86_400)
+        ) ?? Date().addingTimeInterval(-6 * 86400)
 
         _pets = Query(filter: #Predicate<Pet> { pet in
             pet.id == id
@@ -168,8 +168,8 @@ struct QuickWaterDetailRouteContainer: View {
         _waterCareLogs = Query(
             filter: #Predicate<PetCareLog> { log in
                 (log.type == wateringType ||
-                 log.type == waterChangeType ||
-                 log.type == filterCleanType) &&
+                    log.type == waterChangeType ||
+                    log.type == filterCleanType) &&
                     log.pet?.id == id
             },
             sort: \.date,
@@ -244,7 +244,7 @@ private struct QuickCareMissingRouteEntityView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
                 .font(OhanaFont.adaptive(size: 28, weight: .bold))
                 .foregroundStyle(Color.goOrange)
             Text(L10n.current.tr(zh: "找不到对应资料", en: "Missing \(kind)", de: "\(kind) nicht gefunden"))

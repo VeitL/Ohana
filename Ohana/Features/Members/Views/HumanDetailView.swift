@@ -5,8 +5,8 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct HumanDetailView: View {
     let human: Human
@@ -71,7 +71,7 @@ struct HumanDetailView: View {
               !human.isPrivate(.medication, viewedBy: activeHumanId) else { return [] }
         return allPendingReminders.filter {
             $0.event?.relatedEntityType == "Human" &&
-            $0.event?.relatedEntityId == human.id.uuidString
+                $0.event?.relatedEntityId == human.id.uuidString
         }
     }
 
@@ -93,12 +93,12 @@ struct HumanDetailView: View {
     }
 
     var abnormalHealthMetricLogCount: Int {
-        myHealthMetricLogs.filter { log in
+        myHealthMetricLogs.count(where: { log in
             guard let metric = HealthMetricCatalog.metric(forKey: log.metricKey),
                   let unit = metric.unit(for: log.unitCode) else { return false }
             let status = unit.status(for: log.value)
             return status == .low || status == .high
-        }.count
+        })
     }
 
     var themeColor: Color { Color(hex: human.themeColorHex) }

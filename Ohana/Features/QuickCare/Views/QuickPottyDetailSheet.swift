@@ -5,13 +5,13 @@
 //  Unified poop management: potty, scoop, and litter changes.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct QuickPottyDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
-    var onClose: (() -> Void)? = nil
+    var onClose: (() -> Void)?
     let allEvents: [Event]
     let allPets: [Pet]
 
@@ -22,15 +22,14 @@ struct QuickPottyDetailSheet: View {
     @AppStorage("appLanguage") var appLanguage = AppLanguage.fallbackCode
     @StateObject var workloadPolicy = AppWorkloadPolicy.shared
     @StateObject var commandQueue = DeferredDomainCommandQueue()
-
     @State var activeSheet: ActiveSheet?
     @State var nestedInlineSheet: ActiveSheet?
     @State var pottySheetReturnStack: [ActiveSheet] = []
     @State var scoopIntervalDays: Int = 1
-    @State var scoopAnchorDate: Date = Date()
+    @State var scoopAnchorDate: Date = .init()
     @State var scoopReminderOn = false
     @State var litterChangeIntervalDays: Int = 14
-    @State var litterCycleAnchorDate: Date = Date()
+    @State var litterCycleAnchorDate: Date = .init()
     @State var litterReminderOn = false
     @State var showSaveToast = false
     @State var saveToastMessage = ""
@@ -51,7 +50,6 @@ struct QuickPottyDetailSheet: View {
     @State var feedbackClearTask: Task<Void, Never>?
     @State var selectedSharedPottyPetIds: Set<UUID> = []
     @State var isCommittingPottyLog = false
-
     init(
         pet: Pet,
         onRemove: @escaping () -> Void,
@@ -68,7 +66,6 @@ struct QuickPottyDetailSheet: View {
 
     typealias PottyFocus = QuickPottyFocus
     typealias ActiveSheet = QuickPottyActiveSheet
-
     var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
     var isDark: Bool { colorScheme == .dark }
     var petKey: String { pet.id.uuidString }
@@ -83,11 +80,13 @@ struct QuickPottyDetailSheet: View {
             revisions: appServices.domainRevisions
         )
     }
+
     var l: L10n { L10n(appLanguage) }
     var isCatPet: Bool {
         let text = "\(pet.species) \(pet.breed)".lowercased()
         return text.contains("猫") || text.contains("cat")
     }
+
     var sameSpeciesPottyPets: [Pet] {
         let species = normalizedSpecies(pet.species)
         return allPets
@@ -98,10 +97,12 @@ struct QuickPottyDetailSheet: View {
                 return lhs.createdAt < rhs.createdAt
             }
     }
+
     var selectedPottyTargets: [Pet] {
         let targets = sameSpeciesPottyPets.filter { selectedSharedPottyPetIds.contains($0.id) }
         return targets.isEmpty ? [pet] : targets
     }
+
     var availableFocuses: [PottyFocus] {
         isCatPet ? [.potty, .scoop, .litter] : [.potty]
     }
@@ -158,7 +159,6 @@ struct QuickPottyDetailSheet: View {
 
     var lastPottyLog: PetPottyLog? { pottyLogs.first }
     var lastScoopLog: PetCareLog? { litterLogs.first }
-
     var lastFullChange: Date? {
         LitterCareSettingsStore.lastFullChangeDate(petKey: petKey)
     }
@@ -175,9 +175,9 @@ struct QuickPottyDetailSheet: View {
     var daysUntilLitterChange: Int { litterChangeIntervalDays - litterElapsedDays }
 
     var last7DaysCounts: [(date: Date, count: Int)] {
-        (0..<7).map { offset in
+        (0 ..< 7).map { offset in
             let date = Calendar.current.date(byAdding: .day, value: -offset, to: Date()) ?? Date()
-            let count = pet.pottyLogs.filter { Calendar.current.isDate($0.date, inSameDayAs: date) }.count
+            let count = pet.pottyLogs.count(where: { Calendar.current.isDate($0.date, inSameDayAs: date) })
             return (date, count)
         }
         .reversed()
@@ -187,7 +187,7 @@ struct QuickPottyDetailSheet: View {
         let start = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
         let logs = pet.pottyLogs.filter { $0.date >= start }
         guard !logs.isEmpty else { return 0 }
-        let abnormal = logs.filter { $0.pottyType == .softPoop || $0.pottyType == .liquidPoop }.count
+        let abnormal = logs.count(where: { $0.pottyType == .softPoop || $0.pottyType == .liquidPoop })
         return Double(abnormal) / Double(logs.count)
     }
 
@@ -302,7 +302,7 @@ struct QuickPottyDetailSheet: View {
         .onChange(of: nestedInlineSheet?.id) { _, _ in
             adaptiveSheetHeight = nestedInlineSheet?.inlineHeight ?? activeSheet?.inlineHeight ?? 430
             inlineSheetDragOffset = 0
-            if nestedInlineSheet == nil && activeSheet?.usesInlineOverlay != true {
+            if nestedInlineSheet == nil, activeSheet?.usesInlineOverlay != true {
                 inlineSheetVisible = false
             }
         }
@@ -570,11 +570,11 @@ struct QuickPottyDetailSheet: View {
     var pottyDashboardSubtitle: String {
         switch selectedFocus {
         case .potty:
-            return pottySubtitle
+            pottySubtitle
         case .scoop:
-            return scoopSubtitle
+            scoopSubtitle
         case .litter:
-            return litterChangeSubtitle
+            litterChangeSubtitle
         }
     }
 
@@ -624,17 +624,17 @@ struct QuickPottyDetailSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     func tint(for focus: PottyFocus) -> Color {
         switch focus {
         case .potty:
-            return pottyTint
+            pottyTint
         case .scoop:
-            return scoopTint
+            scoopTint
         case .litter:
-            return litterTint
+            litterTint
         }
     }
 
@@ -798,7 +798,7 @@ struct QuickPottyDetailSheet: View {
             }
         }
         .padding(14)
-        .background(sheetSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(sheetSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     var toastView: some View {

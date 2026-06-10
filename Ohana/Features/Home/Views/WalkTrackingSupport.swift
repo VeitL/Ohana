@@ -1,13 +1,13 @@
 //
-//  WalkTrackingCard.swift
+//  WalkTrackingSupport.swift
 //  Ohana
 //
 //  遛狗追踪卡片：地图铺满卡片背景，控制面板以玻璃层叠加。
 //
 
-import SwiftUI
-import SwiftData
 import MapKit
+import SwiftData
+import SwiftUI
 
 struct WalkTrackingSnapshot {
     let latestWalk: PetWalkLog?
@@ -18,28 +18,25 @@ struct WalkTrackingSnapshot {
 
     @MainActor
     static func make(pet: Pet, manager: PetWalkingManaging) -> WalkTrackingSnapshot {
-        let latestWalk: PetWalkLog?
-        if manager.lastCompletedPetId == pet.id, let completed = manager.lastCompletedWalk {
-            latestWalk = completed
+        let latestWalk: PetWalkLog? = if manager.lastCompletedPetId == pet.id, let completed = manager.lastCompletedWalk {
+            completed
         } else {
-            latestWalk = pet.walkLogs.max { $0.startDate < $1.startDate }
+            pet.walkLogs.max { $0.startDate < $1.startDate }
         }
-        let routeCoordinates: [CLLocationCoordinate2D]
-        if manager.lastCompletedPetId == pet.id, !manager.lastCompletedRouteCoordinates.isEmpty {
-            routeCoordinates = manager.lastCompletedRouteCoordinates
+        let routeCoordinates: [CLLocationCoordinate2D] = if manager.lastCompletedPetId == pet.id, !manager.lastCompletedRouteCoordinates.isEmpty {
+            manager.lastCompletedRouteCoordinates
         } else {
-            routeCoordinates = Self.routeCoordinates(from: latestWalk?.routeLocationsData)
+            Self.routeCoordinates(from: latestWalk?.routeLocationsData)
         }
-        let poopMarkers: [WalkPoopMarker]
-        if manager.lastCompletedPetId == pet.id, !manager.lastCompletedPoopMarkers.isEmpty {
-            poopMarkers = manager.lastCompletedPoopMarkers
+        let poopMarkers: [WalkPoopMarker] = if manager.lastCompletedPetId == pet.id, !manager.lastCompletedPoopMarkers.isEmpty {
+            manager.lastCompletedPoopMarkers
         } else if let walkId = latestWalk?.id.uuidString {
-            poopMarkers = pet.pottyLogs
+            pet.pottyLogs
                 .filter { $0.walkLogId == walkId }
                 .sorted { $0.date < $1.date }
                 .map(WalkPoopMarker.init(log:))
         } else {
-            poopMarkers = []
+            []
         }
         let weekDistanceKm = pet.walkLogs
             .filter { $0.startDate >= Self.weekStartDate() }
@@ -90,7 +87,7 @@ struct WalkTrackingCommandExecutor {
 
 struct WalkTrackingCardHost: View {
     let pet: Pet
-    var onCloseSummaryToPetCard: (() -> Void)? = nil
+    var onCloseSummaryToPetCard: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices

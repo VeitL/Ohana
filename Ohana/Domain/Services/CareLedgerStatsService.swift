@@ -80,90 +80,90 @@ struct CareLedgerStatsService {
         pets: [Pet],
         interval: DateInterval
     ) -> Int {
-        let petIds = Set(pets.map { $0.id.uuidString })
-        return events.filter { event in
+        let petIds = Set(pets.map(\.id.uuidString))
+        return events.count(where: { event in
             interval.contains(event.occurredAt)
                 && event.subjectKind == CareLedgerSubjectKind.pet.rawValue
                 && event.subjectId.map { petIds.contains($0) } == true
                 && isReportable(event.eventKindEnum)
-        }.count
+        })
     }
 
     private func isReportable(_ kind: CareLedgerEventKind) -> Bool {
         switch kind {
         case .care, .potty, .walk, .hygiene, .health, .weight, .medication, .expense:
-            return true
+            true
         case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
-            return false
+            false
         }
     }
 
     private func title(for event: CareLedgerEvent) -> String {
         switch event.eventKindEnum {
         case .care:
-            return CareType(rawValue: event.actionType)?.rawValue ?? event.actionType
+            CareType(rawValue: event.actionType)?.rawValue ?? event.actionType
         case .potty:
-            return PottyType(rawValue: event.actionType)?.rawValue ?? event.actionType
+            PottyType(rawValue: event.actionType)?.rawValue ?? event.actionType
         case .walk:
-            return "遛狗"
+            "遛狗"
         case .expense:
-            return ExpenseCategory(rawValue: event.actionType)?.rawValue ?? event.actionType
+            ExpenseCategory(rawValue: event.actionType)?.rawValue ?? event.actionType
         case .hygiene:
-            return HygieneType(rawValue: event.actionType)?.rawValue ?? event.actionType
+            HygieneType(rawValue: event.actionType)?.rawValue ?? event.actionType
         case .health:
-            return "健康"
+            "健康"
         case .weight:
-            return "体重"
+            "体重"
         case .medication:
-            return "吃药"
+            "吃药"
         case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
-            return event.actionType
+            event.actionType
         }
     }
 
     private func icon(for event: CareLedgerEvent) -> String {
         switch event.eventKindEnum {
         case .care:
-            return CareType(rawValue: event.actionType)?.systemIconName ?? "checkmark.circle.fill"
+            CareType(rawValue: event.actionType)?.systemIconName ?? "checkmark.circle.fill"
         case .potty:
-            return PottyType(rawValue: event.actionType)?.systemIconName ?? "allergens"
+            PottyType(rawValue: event.actionType)?.systemIconName ?? "allergens"
         case .walk:
-            return "figure.walk"
+            "figure.walk"
         case .expense:
-            return ExpenseCategory(rawValue: event.actionType)?.systemIconName ?? AppCurrency.systemIconName
+            ExpenseCategory(rawValue: event.actionType)?.systemIconName ?? AppCurrency.systemIconName
         case .hygiene:
-            return HygieneType(rawValue: event.actionType)?.systemIconName ?? "sparkles"
+            HygieneType(rawValue: event.actionType)?.systemIconName ?? "sparkles"
         case .health:
-            return "heart.fill"
+            "heart.fill"
         case .weight:
-            return "scalemass.fill"
+            "scalemass.fill"
         case .medication:
-            return "pills.fill"
+            "pills.fill"
         case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
-            return "circle.grid.2x2.fill"
+            "circle.grid.2x2.fill"
         }
     }
 
     private func color(for event: CareLedgerEvent) -> Color {
         switch event.eventKindEnum {
         case .care:
-            return Color(hex: CareType(rawValue: event.actionType)?.accentColorHex ?? OhanaThemeColorPolicy.petFallbackHex)
+            Color(hex: CareType(rawValue: event.actionType)?.accentColorHex ?? OhanaThemeColorPolicy.petFallbackHex)
         case .potty:
-            return .goOrange
+            .goOrange
         case .walk:
-            return .goTeal
+            .goTeal
         case .expense:
-            return .goYellow
+            .goYellow
         case .hygiene:
-            return .goPrimary
+            .goPrimary
         case .health:
-            return .goRed
+            .goRed
         case .weight:
-            return Color(hex: "80FFEA")
+            Color(hex: "80FFEA")
         case .medication:
-            return Color(hex: "A78BFA")
+            Color(hex: "A78BFA")
         case .reminder, .plantCare, .coconut, .workout, .milestone, .unknown:
-            return .goPrimary
+            .goPrimary
         }
     }
 }

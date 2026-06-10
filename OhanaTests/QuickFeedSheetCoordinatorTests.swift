@@ -1,6 +1,6 @@
 import CoreGraphics
-@testable import Ohana
 import Testing
+@testable import Ohana
 
 @MainActor
 struct QuickFeedSheetCoordinatorTests {

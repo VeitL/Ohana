@@ -16,25 +16,25 @@ enum EntityKind: String, Codable, CaseIterable, Identifiable {
 
     var emoji: String {
         switch self {
-        case .pet: return "🐾"
-        case .human: return "👤"
-        case .plant: return "🌱"
+        case .pet: "🐾"
+        case .human: "👤"
+        case .plant: "🌱"
         }
     }
 
     var displayName: String {
         switch self {
-        case .pet: return "宠物"
-        case .human: return "家人"
-        case .plant: return "植物"
+        case .pet: "宠物"
+        case .human: "家人"
+        case .plant: "植物"
         }
     }
 
     var displayNameEn: String {
         switch self {
-        case .pet: return "Pet"
-        case .human: return "Human"
-        case .plant: return "Plant"
+        case .pet: "Pet"
+        case .human: "Human"
+        case .plant: "Plant"
         }
     }
 }

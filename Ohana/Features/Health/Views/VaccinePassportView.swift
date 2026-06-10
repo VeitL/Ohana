@@ -5,8 +5,8 @@
 //  N1: 疫苗本 — 管理宠物所有疫苗记录，支持添加/到期提醒
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct VaccinePassportView: View {
     let pet: Pet
@@ -39,7 +39,7 @@ struct VaccinePassportView: View {
             .sorted { lhs, rhs in
                 let lhsDays = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: lhs.expirationDate ?? .distantFuture)).day ?? Int.max
                 let rhsDays = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: rhs.expirationDate ?? .distantFuture)).day ?? Int.max
-                if lhsDays < 0 && rhsDays < 0 { return lhsDays > rhsDays }
+                if lhsDays < 0, rhsDays < 0 { return lhsDays > rhsDays }
                 if lhsDays < 0 { return true }
                 if rhsDays < 0 { return false }
                 return lhsDays < rhsDays
@@ -225,7 +225,7 @@ struct VaccinePassportView: View {
                     .background(Color.goPrimary, in: Circle())
             }
             .padding(16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -360,7 +360,7 @@ private struct VaccineRow: View {
                 .background(statusColor.opacity(0.14), in: Capsule())
         }
         .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .contextMenu {
             Button(role: .destructive) { onDelete() } label: {
                 Label(l.tr(zh: "删除记录", en: "Delete record", de: "Eintrag löschen"), systemImage: "trash")
@@ -381,7 +381,7 @@ private struct VaccineRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     private func rowInlineMeta(icon: String, text: String) -> some View {
@@ -407,7 +407,7 @@ struct AddVaccineSheet: View {
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var vaccineName: String = ""
-    @State private var date: Date = Date()
+    @State private var date: Date = .init()
     @State private var hasExpiry: Bool = false
     @State private var expiryDate: Date = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var vetName: String = ""
@@ -534,12 +534,12 @@ struct AddVaccineSheet: View {
                         .font(OhanaFont.adaptive(size: 13, weight: .black))
                         .foregroundStyle(Color.goPrimary)
                         .frame(width: 24)
-                    TextField(l.tr(zh: "自定义疫苗名称", en: "Custom vaccine name", de: "Eigener Impfstoffname"), text: $vaccineName)
+                    TextField(l.tr(zh: "自定义疫苗名称", en: "Custom vaccine name", de: "Eigener Impfstoffname"), text: $vaccineName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                         .font(OhanaFont.subheadline(.bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 .padding(12)
-                .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             }
         }
     }
@@ -633,7 +633,7 @@ struct AddVaccineSheet: View {
         formBlock {
             HStack(spacing: 10) {
                 sectionLabel(l.tr(zh: "诊所", en: "Clinic", de: "Praxis"), icon: "stethoscope", tint: Color.goTeal)
-                TextField(l.tr(zh: "医生 / 诊所（可选）", en: "Vet / clinic (optional)", de: "Tierarzt / Praxis (optional)"), text: $vetName)
+                TextField(l.tr(zh: "医生 / 诊所（可选）", en: "Vet / clinic (optional)", de: "Tierarzt / Praxis (optional)"), text: $vetName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
@@ -655,7 +655,7 @@ struct AddVaccineSheet: View {
                     valueFont: .system(size: 18, weight: .black, design: .rounded),
                     valueAlignment: .leading,
                     fill: Color.ohanaCardSurfaceElevated,
-                    cornerRadius: 18,
+                    cornerRadius: OhanaRadius.controlLarge,
                     horizontalPadding: 12,
                     verticalPadding: 10,
                     usesMiniKeypad: true
@@ -694,13 +694,13 @@ struct AddVaccineSheet: View {
         }
     }
 
-    private func formBlock<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func formBlock(@ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             content()
         }
         .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func save() {

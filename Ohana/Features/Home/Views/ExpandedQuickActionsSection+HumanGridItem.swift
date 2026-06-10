@@ -105,7 +105,7 @@ struct ExpandedHumanQuickActionGridItem: View {
     }
 
     var jiggleAnimation: Animation? {
-        if isEditMode && !isDragging {
+        if isEditMode, !isDragging {
             return shouldReduceWork ? nil : GoMotion.quick.repeatForever(autoreverses: true) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
         }
         return GoMotion.stateChange

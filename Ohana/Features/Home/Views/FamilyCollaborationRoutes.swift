@@ -13,7 +13,7 @@ enum FamilyCollaborationSheetRoute: Identifiable, Equatable {
     var id: String {
         switch self {
         case .moreCollaboration:
-            return "more-collaboration"
+            "more-collaboration"
         }
     }
 }
@@ -26,11 +26,11 @@ enum FamilyCollaborationEditorRoute: Identifiable, Equatable {
     var id: String {
         switch self {
         case let .assignReminder(id):
-            return "assign-\(id.uuidString)"
+            "assign-\(id.uuidString)"
         case let .editTask(id):
-            return "edit-\(id.uuidString)"
+            "edit-\(id.uuidString)"
         case .create:
-            return "create"
+            "create"
         }
     }
 }

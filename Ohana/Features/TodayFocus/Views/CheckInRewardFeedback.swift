@@ -5,9 +5,9 @@
 //  Shared one-shot feedback for check-ins and coconut rewards.
 //
 
+import Combine
 import SwiftUI
 import UIKit
-import Combine
 
 @MainActor
 final class CoconutRewardFeedbackCenter: ObservableObject {
@@ -107,7 +107,7 @@ struct CoconutRewardFeedbackOverlay: View {
     private var rewardAmountText: String {
         let coconutText = center.coalescedAmount > 0 ? "+\(center.coalescedAmount)🥥" : nil
         let xpText = center.coalescedGrowthXP > 0 ? "+\(center.coalescedGrowthXP)XP" : nil
-        return [coconutText, xpText].compactMap { $0 }.joined(separator: " · ")
+        return [coconutText, xpText].compactMap(\.self).joined(separator: " · ")
     }
 }
 
@@ -116,7 +116,7 @@ private struct RewardBurstDots: View {
 
     var body: some View {
         ZStack {
-            ForEach(0..<7, id: \.self) { index in
+            ForEach(0 ..< 7, id: \.self) { index in
                 Circle()
                     .fill(index.isMultiple(of: 2) ? Color.goYellow : Color.goPrimary)
                     .frame(width: CGFloat(4 + index % 3), height: CGFloat(4 + index % 3))

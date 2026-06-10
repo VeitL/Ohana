@@ -236,7 +236,7 @@ enum CarePlanOverdueStatusCalculator {
                     scheduledTime: dose.scheduledTime,
                     calendar: calendar
                 )
-                guard matching?.status != .taken && matching?.status != .skipped else {
+                guard matching?.status != .taken, matching?.status != .skipped else {
                     return nil
                 }
                 return CarePlanOverdueStatus(
@@ -317,7 +317,7 @@ enum CarePlanOverdueStatusCalculator {
                 calendar: calendar
             )
         ]
-        .compactMap { $0 }
+        .compactMap(\.self)
     }
 
     private static func cycleWarning(
@@ -507,42 +507,42 @@ enum CarePlanOverdueStatusCalculator {
 
     private static func warningTitle(for actionType: String) -> String? {
         switch actionType {
-        case "feed": return "喂食"
-        case "water": return "喂水"
-        case "waterChange": return "换水"
-        case "filterClean": return "滤芯"
-        case "litter": return "铲屎"
-        case "play": return "陪玩"
-        case "groom": return "护理"
-        case "medication": return "用药"
-        case "health": return "健康"
-        case "insurance": return "保险"
-        case "cageCleaning": return "清笼"
-        case "freeFlight": return "放飞"
-        case "misting": return "保湿"
-        case "substrateChange": return "换垫"
-        default: return nil
+        case "feed": "喂食"
+        case "water": "喂水"
+        case "waterChange": "换水"
+        case "filterClean": "滤芯"
+        case "litter": "铲屎"
+        case "play": "陪玩"
+        case "groom": "护理"
+        case "medication": "用药"
+        case "health": "健康"
+        case "insurance": "保险"
+        case "cageCleaning": "清笼"
+        case "freeFlight": "放飞"
+        case "misting": "保湿"
+        case "substrateChange": "换垫"
+        default: nil
         }
     }
 
     private static func humanWarningTitle(for actionType: String) -> String? {
         switch actionType {
-        case "humanMedication": return "用药"
-        case "humanHealth": return "健康"
-        case "humanWeight": return "体重"
-        case "humanWorkout": return "运动"
-        case "humanExpense": return "花费"
-        case "humanTask": return "任务"
-        default: return nil
+        case "humanMedication": "用药"
+        case "humanHealth": "健康"
+        case "humanWeight": "体重"
+        case "humanWorkout": "运动"
+        case "humanExpense": "花费"
+        case "humanTask": "任务"
+        default: nil
         }
     }
 
     private static func plantWarningTitle(for actionType: String) -> String? {
         switch actionType {
-        case "plantWatering": return "浇水"
-        case "plantFertilizing": return "施肥"
-        case "plantTask": return "植物"
-        default: return nil
+        case "plantWatering": "浇水"
+        case "plantFertilizing": "施肥"
+        case "plantTask": "植物"
+        default: nil
         }
     }
 
@@ -552,7 +552,7 @@ enum CarePlanOverdueStatusCalculator {
         calendar: Calendar
     ) -> [HumanMedicationScheduleDose] {
         let today = calendar.startOfDay(for: now)
-        return (0...6)
+        return (0 ... 6)
             .compactMap { calendar.date(byAdding: .day, value: -$0, to: today) }
             .flatMap { HumanMedicationSchedulePlan.doses(on: $0, for: medication, calendar: calendar) }
             .sorted { $0.scheduledTime < $1.scheduledTime }
@@ -581,7 +581,7 @@ enum CarePlanOverdueStatusCalculator {
                 calendar: calendar
             )
         ]
-        .compactMap { $0 }
+        .compactMap(\.self)
     }
 
     private static func latestPlantCareDate(for plant: Plant, type: PlantCareType) -> Date? {
@@ -621,13 +621,13 @@ enum CarePlanOverdueStatusCalculator {
     private static func acceptedActionTypes(for quickActionType: String) -> Set<String> {
         switch quickActionType {
         case "water":
-            return ["water"]
+            ["water"]
         case "filterClean":
-            return ["filterClean"]
+            ["filterClean"]
         case "health":
-            return ["health", "insurance"]
+            ["health", "insurance"]
         default:
-            return [quickActionType]
+            [quickActionType]
         }
     }
 

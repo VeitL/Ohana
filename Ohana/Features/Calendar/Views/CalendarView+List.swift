@@ -3,8 +3,8 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 extension CalendarView {
     // MARK: - Go List View（时间轴版）
@@ -200,7 +200,7 @@ extension CalendarView {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        .background(classicSubtleFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(classicSubtleFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
     }
 
     func weekdayShort(_ date: Date) -> String {
@@ -331,7 +331,7 @@ extension CalendarView {
         }
         return formatter.string(from: date)
     }
-    
+
     // MARK: - Go Event Row
     func goEventRow(_ event: Event, occurrenceDate: Date) -> some View {
         let relatedPetColor: Color? = pets.first(where: { $0.id.uuidString == event.relatedEntityId })

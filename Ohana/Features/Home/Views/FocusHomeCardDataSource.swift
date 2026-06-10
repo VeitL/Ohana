@@ -22,10 +22,10 @@ enum FocusHomeCardDataSource {
             pets
                 .filter { !$0.hasPassedAway && HomeCardVisibility.isPetVisible($0, raw: hiddenPetIDsRaw) }
                 .map { FocusCard.from($0, includeAvatarData: false, includeWalkDistance: false) }
-            + humans
-                .filter { $0.shouldShowOnHome }
+                + humans
+                .filter(\.shouldShowOnHome)
                 .map { FocusCard.from($0, includeAvatarData: false) }
-            + electronicPets
+                + electronicPets
                 .filter { !$0.isArchived && $0.lifeState != .dead && $0.isFeaturedOnOasis }
                 .map { FocusCard.from($0) }
         )
@@ -41,7 +41,7 @@ enum FocusHomeCardDataSource {
         }
 
         guard showDummyCards else { return [] }
-        let usedNames = Set(real.map { $0.name })
+        let usedNames = Set(real.map(\.name))
         let extras = FocusCard.dummies.filter { !usedNames.contains($0.name) }
         return orderedByPreference(real + extras, homeCardOrderRaw: homeCardOrderRaw)
     }
@@ -68,7 +68,7 @@ enum FocusHomeCardDataSource {
     }
 
     static func encodedOrder(for cards: [FocusCard]) -> String {
-        cards.map { $0.id.uuidString }.joined(separator: ",")
+        cards.map(\.id.uuidString).joined(separator: ",")
     }
 
     static func promotedOrderRaw(id: UUID, currentRaw: String) -> String {
@@ -142,7 +142,7 @@ enum FocusHomeCardDataSource {
     ) -> [FocusCard] {
         var visible = Array(cards.prefix(maxCardsPerPage))
         if let rosterPreviewCard,
-           (isExpanded || activeCardId == rosterPreviewCard.id),
+           isExpanded || activeCardId == rosterPreviewCard.id,
            !visible.contains(where: { $0.id == rosterPreviewCard.id }) {
             visible.append(rosterPreviewCard)
         }

@@ -141,7 +141,7 @@ enum CarePlanCalendarSync {
             return storedCalendarPlanExists(kind: "waterChange", petKey: petKey, context: context)
         case "filter":
             return storedCalendarPlanExists(kind: "filterClean", petKey: petKey, context: context) ||
-                   storedCalendarPlanExists(kind: "filterReplace", petKey: petKey, context: context)
+                storedCalendarPlanExists(kind: "filterReplace", petKey: petKey, context: context)
         case "play":
             return storedCalendarPlanExists(kind: "play", petKey: petKey, context: context)
         default:
@@ -167,7 +167,7 @@ enum CarePlanCalendarSync {
             }
         )
         descriptor.fetchLimit = 1
-        return ((try? context.fetch(descriptor).isEmpty) == false)
+        return (try? context.fetch(descriptor).isEmpty) == false
     }
 
     private static func hasCustomWaterPlan(petKey: String, context: ModelContext) -> Bool {
@@ -178,7 +178,7 @@ enum CarePlanCalendarSync {
             }
         )
         descriptor.fetchLimit = 1
-        return ((try? context.fetch(descriptor).isEmpty) == false)
+        return (try? context.fetch(descriptor).isEmpty) == false
     }
 
     private static func removeKnownDefaultPlanEvents(kind: String, pet: Pet, context: ModelContext) {
@@ -205,21 +205,21 @@ enum CarePlanCalendarSync {
     private static func defaultPlanTitleCandidates(kind: String, pet: Pet) -> Set<String> {
         switch kind {
         case "feed":
-            return ["\(pet.name) 喂食"]
+            ["\(pet.name) 喂食"]
         case "drink":
-            return ["\(pet.name) 补充饮水", "\(pet.name) 喂水"]
+            ["\(pet.name) 补充饮水", "\(pet.name) 喂水"]
         case "litter":
-            return ["\(pet.name) 铲屎", "\(pet.name) 清理厕所"]
+            ["\(pet.name) 铲屎", "\(pet.name) 清理厕所"]
         case "waterChange":
-            return ["\(pet.name) 换水"]
+            ["\(pet.name) 换水"]
         case "filter":
-            return ["\(pet.name) 过滤检查"]
+            ["\(pet.name) 过滤检查"]
         case "groom":
-            return ["\(pet.name) 毛发护理", "\(pet.name) 毛球/毛发护理"]
+            ["\(pet.name) 毛发护理", "\(pet.name) 毛球/毛发护理"]
         case "play":
-            return ["\(pet.name) 陪玩", "\(pet.name) 互动", "\(pet.name) 放飞互动"]
+            ["\(pet.name) 陪玩", "\(pet.name) 互动", "\(pet.name) 放飞互动"]
         default:
-            return []
+            []
         }
     }
 

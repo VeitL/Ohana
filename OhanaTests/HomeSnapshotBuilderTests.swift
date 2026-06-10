@@ -86,17 +86,17 @@ struct HomeSnapshotBuilderTests {
     }
 
     @Test func snapshotDecoratesOverduePetStatus() throws {
-        let now = Date(timeIntervalSince1970: 10_000)
+        let now = Date(timeIntervalSince1970: 10000)
         let pet = Pet(name: "Momo", species: "猫")
         let event = Event(
             title: "喂食",
-            startDate: now.addingTimeInterval(-3_600),
+            startDate: now.addingTimeInterval(-3600),
             eventType: EventType.foodChange.rawValue,
             relatedEntityType: "pet",
             relatedEntityId: pet.id.uuidString
         )
         event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
-        let reminder = Reminder(event: event, scheduledAt: now.addingTimeInterval(-1_800))
+        let reminder = Reminder(event: event, scheduledAt: now.addingTimeInterval(-1800))
         event.reminders = [reminder]
 
         let card = try #require(HomeSnapshotBuilder.buildCards(
@@ -117,7 +117,7 @@ struct HomeSnapshotBuilderTests {
     }
 
     @Test func verticalSnapshotPrecomputesHeroPreparationRevision() {
-        let now = Date(timeIntervalSince1970: 20_000)
+        let now = Date(timeIntervalSince1970: 20000)
         let pet = Pet(name: "Momo", species: "猫")
 
         let first = makeVerticalSnapshot(
@@ -249,8 +249,8 @@ struct HomeSnapshotBuilderTests {
 
     @Test func focusCardCarriesTogetherHeadlineText() {
         let pet = Pet(name: "Momo", species: "猫")
-        pet.createdAt = Date(timeIntervalSince1970: 1_000)
-        pet.homeDate = Date(timeIntervalSince1970: 1_000)
+        pet.createdAt = Date(timeIntervalSince1970: 1000)
+        pet.homeDate = Date(timeIntervalSince1970: 1000)
 
         let card = FocusCard.from(pet, includeAvatarData: false)
 
@@ -319,43 +319,43 @@ struct HomeSnapshotBuilderTests {
 
 @MainActor
 private final class TestHumanPrivacyManager: HumanPrivacyManaging {
-    func field(forHumanAction actionType: String) -> HumanPrivateField? {
+    func field(forHumanAction _: String) -> HumanPrivateField? {
         nil
     }
 
-    func isLocked(_ field: HumanPrivateField, for human: Human, viewedBy viewerId: UUID?) -> Bool {
+    func isLocked(_: HumanPrivateField, for _: Human, viewedBy _: UUID?) -> Bool {
         false
     }
 
-    func unlockedHumans(for field: HumanPrivateField, from humans: [Human], viewedBy viewerId: UUID?) -> [Human] {
+    func unlockedHumans(for _: HumanPrivateField, from humans: [Human], viewedBy _: UUID?) -> [Human] {
         humans
     }
 
-    func publicHumans(for field: HumanPrivateField, from humans: [Human]) -> [Human] {
+    func publicHumans(for _: HumanPrivateField, from humans: [Human]) -> [Human] {
         humans
     }
 
-    func isPubliclyHidden(_ field: HumanPrivateField, for human: Human) -> Bool {
+    func isPubliclyHidden(_: HumanPrivateField, for _: Human) -> Bool {
         false
     }
 
-    func isPubliclyHidden(_ field: HumanPrivateField, humanId: String?, in humans: [Human]) -> Bool {
+    func isPubliclyHidden(_: HumanPrivateField, humanId _: String?, in _: [Human]) -> Bool {
         false
     }
 
-    func isLocked(_ field: HumanPrivateField, humanId: String?, in humans: [Human], viewedBy viewerId: UUID?) -> Bool {
+    func isLocked(_: HumanPrivateField, humanId _: String?, in _: [Human], viewedBy _: UUID?) -> Bool {
         false
     }
 
-    func isHumanQuickActionLocked(_ item: QuickActionItem, human: Human?, viewedBy viewerId: UUID?) -> Bool {
+    func isHumanQuickActionLocked(_: QuickActionItem, human _: Human?, viewedBy _: UUID?) -> Bool {
         false
     }
 
-    func badgeText(for field: HumanPrivateField, human: Human, viewedBy viewerId: UUID?) -> String {
+    func badgeText(for _: HumanPrivateField, human _: Human, viewedBy _: UUID?) -> String {
         ""
     }
 
-    func lockedMessage(for field: HumanPrivateField) -> String {
+    func lockedMessage(for _: HumanPrivateField) -> String {
         ""
     }
 }
@@ -364,40 +364,40 @@ private final class TestHumanPrivacyManager: HumanPrivacyManaging {
 private final class TestTodayFocusManager: TodayFocusManaging {
     func refreshedQuests(
         _ quests: [IslandQuest],
-        pets: [Pet],
-        humans: [Human],
-        careLogs: [PetCareLog],
-        walkLogs: [PetWalkLog],
-        pottyLogs: [PetPottyLog],
-        humanWeightLogs: [HumanWeightLog],
-        calendar: Calendar,
-        now: Date
+        pets _: [Pet],
+        humans _: [Human],
+        careLogs _: [PetCareLog],
+        walkLogs _: [PetWalkLog],
+        pottyLogs _: [PetPottyLog],
+        humanWeightLogs _: [HumanWeightLog],
+        calendar _: Calendar,
+        now _: Date
     ) -> [IslandQuest] {
         quests
     }
 
-    func quest(_ quest: IslandQuest, matchesCompletedEntity entityId: UUID) -> Bool {
+    func quest(_: IslandQuest, matchesCompletedEntity _: UUID) -> Bool {
         false
     }
 
-    func completeEvent(_ event: Event, on date: Date, context: ModelContext) -> TodayFocusEventCompletionCommandResult {
+    func completeEvent(_ event: Event, on _: Date, context _: ModelContext) -> TodayFocusEventCompletionCommandResult {
         TodayFocusEventCompletionCommandResult(eventID: event.id, isCompleted: true, didChange: true)
     }
 
-    func awardDailyCompletionIfNeeded(context: ModelContext, executorId: String?) -> EconomyRewardResult? {
+    func awardDailyCompletionIfNeeded(context _: ModelContext, executorId _: String?) -> EconomyRewardResult? {
         nil
     }
 
-    func ensureTodayCheckIn(activeHumanId: String, rewardTitle: String) {}
+    func ensureTodayCheckIn(activeHumanId _: String, rewardTitle _: String) {}
 
-    func currentStreak(activeHumanId: String) -> Int {
+    func currentStreak(activeHumanId _: String) -> Int {
         0
     }
 }
 
 @MainActor
 private final class TestPetHealthAlertEngine: PetHealthAlerting {
-    func scanAlerts(pets: [Pet]) -> [HealthAlert] {
+    func scanAlerts(pets _: [Pet]) -> [HealthAlert] {
         []
     }
 }

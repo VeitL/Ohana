@@ -18,15 +18,15 @@ enum HumanWishlistCommandError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .emptyTitle:
-            return "心愿内容不能为空。"
+            "心愿内容不能为空。"
         case .invalidCost:
-            return "心愿兑换费用必须大于 0。"
+            "心愿兑换费用必须大于 0。"
         case .itemOwnershipMismatch:
-            return "这个心愿不属于当前成员。"
+            "这个心愿不属于当前成员。"
         case .alreadyRedeemed:
-            return "这个心愿已经兑换。"
+            "这个心愿已经兑换。"
         case let .insufficientCoconuts(missing):
-            return "椰子余额不足，还差 \(missing) 个。"
+            "椰子余额不足，还差 \(missing) 个。"
         }
     }
 }
@@ -203,7 +203,7 @@ enum HumanWishlistCommandService {
         context: ModelContext
     ) -> [CareLedgerEvent] {
         let idString = item.id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return events.filter { $0.legacyModelName == "WishlistItem" && $0.legacyModelId == idString }
     }
 }

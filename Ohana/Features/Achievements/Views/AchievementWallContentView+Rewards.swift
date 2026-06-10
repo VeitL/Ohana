@@ -15,19 +15,19 @@ extension AchievementWallContentView {
 
     func sortRank(for badge: Achievement) -> Int {
         switch rewardState(for: badge) {
-        case .claimable: return 0
-        case .unlocked: return 1
-        case .claimed: return 2
-        case .locked: return 3
+        case .claimable: 0
+        case .unlocked: 1
+        case .claimed: 2
+        case .locked: 3
         }
     }
 
     func statusTitle(for state: AchievementRewardState) -> String {
         switch state {
-        case .claimable: return l.tr(zh: "可领取", en: "Ready to claim", de: "Bereit")
-        case .claimed: return l.tr(zh: "已领取", en: "Claimed", de: "Abgeholt")
-        case .unlocked: return l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet")
-        case .locked: return l.tr(zh: "进行中", en: "In progress", de: "In Arbeit")
+        case .claimable: l.tr(zh: "可领取", en: "Ready to claim", de: "Bereit")
+        case .claimed: l.tr(zh: "已领取", en: "Claimed", de: "Abgeholt")
+        case .unlocked: l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet")
+        case .locked: l.tr(zh: "进行中", en: "In progress", de: "In Arbeit")
         }
     }
 

@@ -64,7 +64,7 @@ struct HumanQuickSwitchPasscodeSheet: View {
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 10)
             .padding(.horizontal, 12)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             .animation(GoMotion.feedback, value: isError)
     }
 
@@ -84,12 +84,12 @@ struct HumanQuickSwitchPasscodeSheet: View {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onVerified()
             dismiss()
-        case .incorrect(let remaining):
+        case let .incorrect(remaining):
             pin = ""
             isError = true
             message = "密码不正确，还可尝试 \(remaining) 次"
             UINotificationFeedbackGenerator().notificationOccurred(.error)
-        case .locked(let until):
+        case let .locked(until):
             pin = ""
             isError = true
             message = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"

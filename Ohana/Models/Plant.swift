@@ -5,9 +5,9 @@
 //  Created by Guanchenulous on 01.03.26.
 //
 
-import SwiftUI
-import SwiftData
 import Foundation
+import SwiftData
+import SwiftUI
 
 @Model
 final class Plant {
@@ -51,22 +51,22 @@ final class Plant {
         self.createdAt = Date()
         self.careLogs = []
     }
-    
+
     var daysSinceWatered: Int? {
         guard let lastWateredDate else { return nil }
         return Calendar.current.dateComponents([.day], from: lastWateredDate, to: Date()).day
     }
-    
+
     var daysSinceFertilized: Int? {
         guard let lastFertilizedDate else { return nil }
         return Calendar.current.dateComponents([.day], from: lastFertilizedDate, to: Date()).day
     }
-    
+
     var needsWatering: Bool {
         guard let days = daysSinceWatered else { return true }
         return days >= wateringIntervalDays
     }
-    
+
     var needsFertilizing: Bool {
         guard let days = daysSinceFertilized else { return true }
         return days >= fertilizingIntervalDays

@@ -4,10 +4,10 @@
 //
 //  羁绊值管理器：根据每日打卡（遛狗/喂食/便便）更新 currentStreak
 
-import SwiftData
 import Foundation
+import SwiftData
 
-struct StreakManager {
+enum StreakManager {
     /// 检查并更新 pet 的 streak。
     /// 规则：今日有任意一条 pottyLog / walkLog / foodRecord 即视为打卡。
     /// 调用时机：App foreground / 任意记录写入后。
@@ -65,9 +65,9 @@ struct StreakManager {
 
     private static func hasCheckIn(pet: Pet, on day: Date) -> Bool {
         let cal = Calendar.current
-        let hasPotty  = pet.pottyLogs.contains  { cal.isDate($0.date, inSameDayAs: day) }
-        let hasWalk   = pet.walkLogs.contains   { cal.isDate($0.startDate, inSameDayAs: day) }
-        let hasFood   = pet.foodRecords.contains { cal.isDate($0.startDate, inSameDayAs: day) }
+        let hasPotty = pet.pottyLogs.contains { cal.isDate($0.date, inSameDayAs: day) }
+        let hasWalk = pet.walkLogs.contains { cal.isDate($0.startDate, inSameDayAs: day) }
+        let hasFood = pet.foodRecords.contains { cal.isDate($0.startDate, inSameDayAs: day) }
         return hasPotty || hasWalk || hasFood
     }
 

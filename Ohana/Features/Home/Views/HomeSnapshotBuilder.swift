@@ -74,9 +74,8 @@ enum HomeSnapshotBuilder {
             return card
         }
 
-        let warning: CarePlanOverdueStatus?
-        if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
-            warning = CarePlanOverdueStatusCalculator.humanWarning(
+        let warning: CarePlanOverdueStatus? = if card.isHuman, let human = humans.first(where: { $0.id == card.id }) {
+            CarePlanOverdueStatusCalculator.humanWarning(
                 for: human,
                 events: events,
                 medications: humanMedications,
@@ -84,9 +83,9 @@ enum HomeSnapshotBuilder {
                 now: now
             )
         } else if let pet = pets.first(where: { $0.id == card.id }) {
-            warning = CarePlanOverdueStatusCalculator.petWarning(for: pet, events: events, now: now)
+            CarePlanOverdueStatusCalculator.petWarning(for: pet, events: events, now: now)
         } else {
-            warning = nil
+            nil
         }
 
         guard let warning else { return card }

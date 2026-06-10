@@ -19,26 +19,26 @@ extension AddPetWizardContentView {
         return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
     }
 
-    nonisolated static func cropReadyImage(from data: Data, maxPixel: CGFloat = 1_600) -> UIImage? {
+    nonisolated static func cropReadyImage(from data: Data, maxPixel: CGFloat = 1600) -> UIImage? {
         let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
         guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
-            return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) }
+            return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) } // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
         }
 
         let thumbnailOptions: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: Int(maxPixel),
+            kCGImageSourceThumbnailMaxPixelSize: Int(maxPixel)
         ]
         if let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions as CFDictionary) {
             return UIImage(cgImage: cgImage)
         }
 
-        return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) }
+        return UIImage(data: data).map { preparedCropImage($0, maxPixel: maxPixel) } // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
     }
 
-    nonisolated static func preparedCropImage(_ image: UIImage, maxPixel: CGFloat = 1_600) -> UIImage {
+    nonisolated static func preparedCropImage(_ image: UIImage, maxPixel: CGFloat = 1600) -> UIImage {
         let resized = downsample(image, maxDim: maxPixel)
         guard resized.imageOrientation != .up else { return resized }
         let renderer = UIGraphicsImageRenderer(size: resized.size)

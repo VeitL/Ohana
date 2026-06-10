@@ -16,7 +16,7 @@ struct WalkRouteTracePreview: View {
         GeometryReader { geo in
             let points = normalizedPoints(in: geo.size)
             ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
                     .fill(
                         LinearGradient(
                             colors: [
@@ -48,7 +48,7 @@ struct WalkRouteTracePreview: View {
                     routeMarker(at: end, fill: .goRed, size: 18)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             .overlay(alignment: .bottomTrailing) {
                 HStack(spacing: 4) {
                     Image(systemName: "map.fill") // a11y: allow decorative icon covered by surrounding text or control

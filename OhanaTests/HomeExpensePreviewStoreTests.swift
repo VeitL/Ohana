@@ -1,7 +1,7 @@
 import Foundation
-@testable import Ohana
 import SwiftData
 import Testing
+@testable import Ohana
 
 @MainActor
 struct HomeExpensePreviewStoreTests {
@@ -16,20 +16,20 @@ struct HomeExpensePreviewStoreTests {
 
         let calendar = Calendar(identifier: .gregorian)
         let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 7)))
-        let current = PetExpenseLog(
-            date: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 4))),
+        let current = try PetExpenseLog(
+            date: #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 4))),
             amount: 12,
             pet: pet,
             executorId: human.id.uuidString
         )
-        let older = PetExpenseLog(
-            date: try #require(calendar.date(from: DateComponents(year: 2026, month: 5, day: 30))),
+        let older = try PetExpenseLog(
+            date: #require(calendar.date(from: DateComponents(year: 2026, month: 5, day: 30))),
             amount: 20,
             pet: pet,
             executorId: human.id.uuidString
         )
-        let otherExecutor = PetExpenseLog(
-            date: try #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 5))),
+        let otherExecutor = try PetExpenseLog(
+            date: #require(calendar.date(from: DateComponents(year: 2026, month: 6, day: 5))),
             amount: 30,
             pet: pet,
             executorId: otherHuman.id.uuidString
@@ -94,7 +94,7 @@ struct SharedPetActionRecorderTests {
             targets: [first, second],
             context: context,
             executorId: human.id.uuidString,
-            date: Date(timeIntervalSince1970: 1_000)
+            date: Date(timeIntervalSince1970: 1000)
         )
 
         let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
@@ -136,7 +136,7 @@ struct SharedPetActionRecorderTests {
             foodKind: .dry,
             context: context,
             executorId: human.id.uuidString,
-            date: Date(timeIntervalSince1970: 2_000)
+            date: Date(timeIntervalSince1970: 2000)
         )
         _ = CareEventService.recordSharedWatering(
             sourcePet: first,
@@ -144,7 +144,7 @@ struct SharedPetActionRecorderTests {
             totalMl: 300,
             context: context,
             executorId: human.id.uuidString,
-            date: Date(timeIntervalSince1970: 2_100)
+            date: Date(timeIntervalSince1970: 2100)
         )
 
         let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
@@ -157,7 +157,7 @@ struct SharedPetActionRecorderTests {
         #expect(waterLogs.map(\.amountMl).sorted() == [150, 150])
         #expect(Set(feedLogs.map(\.sharedSessionId)).count == 1)
         #expect(Set(waterLogs.map(\.sharedSessionId)).count == 1)
-        #expect(feedLogs.filter { $0.note.contains(SharedCareMetadata.stockOwnerKey) }.count == 1)
+        #expect(feedLogs.count(where: { $0.note.contains(SharedCareMetadata.stockOwnerKey) }) == 1)
     }
 
     @Test func unknownSharedPottyWritesUnknownGroupFactWithoutRewardOrPetProjection() throws {
@@ -177,7 +177,7 @@ struct SharedPetActionRecorderTests {
             targets: [first, second],
             type: .softPoop,
             context: context,
-            date: Date(timeIntervalSince1970: 3_000)
+            date: Date(timeIntervalSince1970: 3000)
         )
 
         let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
@@ -215,13 +215,13 @@ struct SharedPetActionRecorderTests {
             executorId: human.id.uuidString,
             reward: .general(humanReward: 25, petReward: 2, emoji: CareType.filterClean.emoji, title: "共同清理滤材"),
             rewardTitle: "共同清理滤材 · 2只",
-            date: Date(timeIntervalSince1970: 4_000)
+            date: Date(timeIntervalSince1970: 4000)
         )
         _ = ExpenseCommandService.recordSharedPetExpense(
             sourcePet: first,
             targets: [first, second],
             amount: 40,
-            date: Date(timeIntervalSince1970: 4_100),
+            date: Date(timeIntervalSince1970: 4100),
             category: .toys,
             note: "Shared tunnel",
             context: context,
@@ -230,11 +230,11 @@ struct SharedPetActionRecorderTests {
         _ = CareEventService.recordSharedWalk(
             sourcePet: first,
             targets: [first, second],
-            distanceMeters: 1_200,
-            endDate: Date(timeIntervalSince1970: 4_300),
+            distanceMeters: 1200,
+            endDate: Date(timeIntervalSince1970: 4300),
             context: context,
             executorId: human.id.uuidString,
-            startDate: Date(timeIntervalSince1970: 4_200)
+            startDate: Date(timeIntervalSince1970: 4200)
         )
 
         let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
@@ -243,10 +243,10 @@ struct SharedPetActionRecorderTests {
         let walkLogs = try context.fetch(FetchDescriptor<PetWalkLog>())
 
         #expect(Set(sessions.map(\.actionKind)) == Set([.filterClean, .expense, .walk]))
-        #expect(careLogs.filter { $0.careType == .filterClean }.count == 2)
+        #expect(careLogs.count(where: { $0.careType == .filterClean }) == 2)
         #expect(expenseLogs.map(\.amount).sorted() == [20, 20])
         #expect(Set(expenseLogs.map(\.sharedSessionId)).count == 1)
-        #expect(walkLogs.map(\.distanceMeters).sorted() == [1_200, 1_200])
+        #expect(walkLogs.map(\.distanceMeters).sorted() == [1200, 1200])
         #expect(Set(walkLogs.map(\.sharedSessionId)).count == 1)
     }
 
@@ -266,7 +266,7 @@ struct SharedPetActionRecorderTests {
             sourcePet: first,
             targets: [first, second],
             amount: 30,
-            date: Date(timeIntervalSince1970: 5_000),
+            date: Date(timeIntervalSince1970: 5000),
             category: .food,
             note: "Shared food bag",
             context: context
@@ -275,9 +275,9 @@ struct SharedPetActionRecorderTests {
             sourcePet: first,
             targets: [first, second],
             distanceMeters: 900,
-            endDate: Date(timeIntervalSince1970: 5_200),
+            endDate: Date(timeIntervalSince1970: 5200),
             context: context,
-            startDate: Date(timeIntervalSince1970: 5_100)
+            startDate: Date(timeIntervalSince1970: 5100)
         )
 
         let backup = try TestDataBackupManagerProjection.manager.buildBackup(context: context)

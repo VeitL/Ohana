@@ -15,22 +15,22 @@ enum ProtectionSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .documents: return "doc.text.fill"
-        case .insurance: return "shield.lefthalf.filled"
+        case .documents: "doc.text.fill"
+        case .insurance: "shield.lefthalf.filled"
         }
     }
 
     var title: String {
         switch self {
-        case .documents: return "证件"
-        case .insurance: return "保险"
+        case .documents: "证件"
+        case .insurance: "保险"
         }
     }
 
     var tint: Color {
         switch self {
-        case .documents: return Color(hex: "94A3B8")
-        case .insurance: return Color.goPurple
+        case .documents: Color(hex: "94A3B8")
+        case .insurance: Color.goPurple
         }
     }
 }
@@ -43,19 +43,19 @@ enum ProtectionRiskLevel: Equatable {
 
     var color: Color {
         switch self {
-        case .empty: return Color.ohanaSecondaryText
-        case .protected: return Color.goTeal
-        case .soon: return Color.goYellow
-        case .expired: return Color.goRed
+        case .empty: Color.ohanaSecondaryText
+        case .protected: Color.goTeal
+        case .soon: Color.goYellow
+        case .expired: Color.goRed
         }
     }
 
     var label: String {
         switch self {
-        case .empty: return "未建立"
-        case .protected: return "保障中"
-        case .soon: return "即将到期"
-        case .expired: return "已过期"
+        case .empty: "未建立"
+        case .protected: "保障中"
+        case .soon: "即将到期"
+        case .expired: "已过期"
         }
     }
 }
@@ -84,22 +84,22 @@ struct PetProtectionDashboardState {
 
     func count(for section: ProtectionSection) -> Int {
         switch section {
-        case .documents: return documentCount
-        case .insurance: return insuranceCount
+        case .documents: documentCount
+        case .insurance: insuranceCount
         }
     }
 
     func risk(for section: ProtectionSection) -> ProtectionRiskLevel {
         switch section {
-        case .documents: return documentsRisk
-        case .insurance: return insuranceRisk
+        case .documents: documentsRisk
+        case .insurance: insuranceRisk
         }
     }
 
     func nextDate(for section: ProtectionSection) -> Date? {
         switch section {
-        case .documents: return nextDocumentDate
-        case .insurance: return nextInsuranceDate
+        case .documents: nextDocumentDate
+        case .insurance: nextInsuranceDate
         }
     }
 
@@ -166,12 +166,12 @@ struct ProtectionCoreCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
-        .background(isSelected ? Color.ohanaCardSurfaceElevated : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(isSelected ? Color.ohanaCardSurfaceElevated : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .stroke(isSelected ? Color.goPrimary.opacity(0.65) : Color.clear, lineWidth: 1.5)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .onTapGesture(perform: onSelect)
         .buttonStyle(ScaleButtonStyle())
     }
@@ -215,7 +215,7 @@ struct ProtectionEmptyState: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 34)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
     }
 }
 
@@ -285,7 +285,7 @@ struct DocumentDetailRow: View {
                         .resizable()
                         .scaledToFill()
                         .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                         .onTapGesture { showingPreview = true }
                 }
 
@@ -297,7 +297,7 @@ struct DocumentDetailRow: View {
                     .background(expiryColor.opacity(0.14), in: Capsule())
             }
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .task(id: previewDataKey) {
@@ -404,7 +404,7 @@ struct ProtectionInsuranceRow: View {
                     .background(statusColor.opacity(0.14), in: Capsule())
             }
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
         .contextMenu {

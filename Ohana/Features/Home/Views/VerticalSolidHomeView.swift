@@ -321,7 +321,7 @@ struct VerticalSolidHomeView: View {
                             onPresentCoconutLog(subject)
                         }
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
                     .padding(.horizontal, 10)
                     .padding(.top, 4)
                 } oasis: { lifecycle in
@@ -483,7 +483,6 @@ struct VerticalSolidHomeView: View {
                     )
                     .zIndex(70)
                 }
-
             }
             .onAppear {
                 safeAreaController.stabilize(from: proxy)

@@ -47,13 +47,13 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 InputLatencyWarmupService.warmUpOnce()
             }
 
-            await runStep("member_theme_and_auto_feeder", delayMilliseconds: 16_000) {
+            await runStep("member_theme_and_auto_feeder", delayMilliseconds: 16000) {
                 MemberThemeColorMaintenanceService.normalizeReservedColors(context: context)
                 FamilyWeeklyReportService().scheduleWeeklyReminder()
                 self.materializeAutoFeederLogsIfNeeded(context: context)
             }
 
-            await runStep("reminder_refill", delayMilliseconds: 25_000) {
+            await runStep("reminder_refill", delayMilliseconds: 25000) {
                 guard self.shouldRunReminderMaintenance else { return }
                 let result = await ReminderMaintenanceService.runPendingReminderMaintenance(context: context)
                 if result.completed {
@@ -61,11 +61,11 @@ final class StartupMaintenanceCoordinator: ObservableObject {
                 }
             }
 
-            await runStep("care_ledger_backfill", delayMilliseconds: 45_000) {
+            await runStep("care_ledger_backfill", delayMilliseconds: 45000) {
                 await self.runCareLedgerBackfillIfNeeded(context: context)
             }
 
-            await runStep("avatar_asset_compaction", delayMilliseconds: 90_000) {
+            await runStep("avatar_asset_compaction", delayMilliseconds: 90000) {
                 await self.compactAvatarAssetsIfNeeded(context: context)
             }
 
@@ -124,7 +124,7 @@ final class StartupMaintenanceCoordinator: ObservableObject {
             defaults.set(true, forKey: Keys.careLedgerBackfillCompleted)
         } catch {
             #if DEBUG
-            print("CareLedger backfill failed: \(error.localizedDescription)")
+                OhanaLog.error("CareLedger backfill failed: \(error.localizedDescription)", category: "StartupMaintenance")
             #endif
         }
     }
@@ -178,8 +178,8 @@ private enum InputLatencyWarmupService {
         guard UIApplication.shared.applicationState == .active,
               currentFirstResponder() == nil,
               let scene = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive }),
+              .compactMap({ $0 as? UIWindowScene })
+              .first(where: { $0.activationState == .foregroundActive }),
               let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first
         else {
             AppPerformanceMonitor.shared.record(
@@ -190,7 +190,7 @@ private enum InputLatencyWarmupService {
             return
         }
 
-        let textField = UITextField(frame: CGRect(x: -240, y: -240, width: 1, height: 1))
+        let textField = UITextField(frame: CGRect(x: -240, y: -240, width: 1, height: 1)) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         textField.alpha = 0.01
         textField.tintColor = .clear
         textField.textColor = .clear

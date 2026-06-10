@@ -31,7 +31,7 @@ extension TodayFocusCard {
                         .contentTransition(.numericText())
                         .animation(GoMotion.feedback, value: focusStatusText)
                         .todayFocusReadableShadow(strength: 0.75)
-                    if case .quest(let q) = content {
+                    if case let .quest(q) = content {
                         rewardChip(IslandQuestEngine.coconutReward(forQuestId: q.id))
                     }
                 }

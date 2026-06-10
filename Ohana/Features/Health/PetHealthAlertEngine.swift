@@ -30,49 +30,49 @@ nonisolated struct HealthAlert: Identifiable, Equatable, Sendable {
     }
 
     enum AlertType: String, Sendable {
-        case vaccineExpired      = "vaccine_expired"
+        case vaccineExpired = "vaccine_expired"
         case vaccineExpiringSoon = "vaccine_expiring_soon"
-        case dewormingDue        = "deworming_due"
-        case weightGainAlert     = "weight_gain"
-        case weightLossAlert     = "weight_loss"
-        case noCheckIn           = "no_checkin"
-        case noPotty             = "no_potty"
-        case noWalk              = "no_walk"
-        case checkupOverdue      = "checkup_overdue"
+        case dewormingDue = "deworming_due"
+        case weightGainAlert = "weight_gain"
+        case weightLossAlert = "weight_loss"
+        case noCheckIn = "no_checkin"
+        case noPotty = "no_potty"
+        case noWalk = "no_walk"
+        case checkupOverdue = "checkup_overdue"
         case documentExpiringSoon = "document_expiring_soon"
-        
+
         // 新增预警类型
-        case activeSymptom       = "active_symptom"
-        case heatCycleAlert      = "heat_cycle_alert"
-        case pregnancyCountdown  = "pregnancy_countdown"
+        case activeSymptom = "active_symptom"
+        case heatCycleAlert = "heat_cycle_alert"
+        case pregnancyCountdown = "pregnancy_countdown"
         case drinkingWeightAlert = "drinking_weight_alert"
-        case lowActivityAlert    = "low_activity_alert"
+        case lowActivityAlert = "low_activity_alert"
     }
 
     var emoji: String {
         switch type {
-        case .vaccineExpired:       return "💉"
-        case .vaccineExpiringSoon:  return "⚠️"
-        case .dewormingDue:         return "🪱"
-        case .weightGainAlert:      return "⚖️"
-        case .weightLossAlert:      return "⚖️"
-        case .noCheckIn:            return "📅"
-        case .noPotty:              return "🚽"
-        case .noWalk:               return "🐾"
-        case .checkupOverdue:       return "🩺"
-        case .documentExpiringSoon: return "📄"
-        case .activeSymptom:        return "🚨"
-        case .heatCycleAlert:       return "💖"
-        case .pregnancyCountdown:   return "🍼"
-        case .drinkingWeightAlert:  return "💧"
-        case .lowActivityAlert:     return "📉"
+        case .vaccineExpired: "💉"
+        case .vaccineExpiringSoon: "⚠️"
+        case .dewormingDue: "🪱"
+        case .weightGainAlert: "⚖️"
+        case .weightLossAlert: "⚖️"
+        case .noCheckIn: "📅"
+        case .noPotty: "🚽"
+        case .noWalk: "🐾"
+        case .checkupOverdue: "🩺"
+        case .documentExpiringSoon: "📄"
+        case .activeSymptom: "🚨"
+        case .heatCycleAlert: "💖"
+        case .pregnancyCountdown: "🍼"
+        case .drinkingWeightAlert: "💧"
+        case .lowActivityAlert: "📉"
         }
     }
 }
 
 // MARK: - PetHealthAlertEngine
 
-nonisolated final class PetHealthAlertEngine {
+final nonisolated class PetHealthAlertEngine {
     init() {}
 
     // MARK: - 主入口
@@ -92,7 +92,7 @@ nonisolated final class PetHealthAlertEngine {
             alerts += checkWalk(pet: pet, now: now, cal: cal)
             alerts += checkCheckup(pet: pet, now: now, cal: cal)
             alerts += checkDocuments(pet: pet, now: now, cal: cal)
-            
+
             // 新增检查项目
             alerts += checkSymptoms(pet: pet, now: now, cal: cal)
             alerts += checkReproductiveHealth(pet: pet, now: now, cal: cal)
@@ -140,7 +140,7 @@ nonisolated final class PetHealthAlertEngine {
         var alerts: [HealthAlert] = []
         let dewormLogs = pet.healthLogs.filter {
             ($0.healthLogType == .dewormingInternal || $0.healthLogType == .dewormingExternal)
-            && $0.expirationDate != nil
+                && $0.expirationDate != nil
         }
         for log in dewormLogs {
             guard let expiry = log.expirationDate else { continue }
@@ -167,8 +167,7 @@ nonisolated final class PetHealthAlertEngine {
         guard sorted.count >= 2, let latestLog = sorted.first else { return [] }
         let cutoff = cal.date(byAdding: .day, value: -30, to: now) ?? now
         let baselineLog = sorted
-            .filter { $0.date >= cutoff }
-            .last ?? sorted[1]
+            .last { $0.date >= cutoff } ?? sorted[1]
         let latest = latestLog.weightInKg
         let baseline = baselineLog.weightInKg
         guard baseline > 0 else { return [] }
@@ -202,8 +201,8 @@ nonisolated final class PetHealthAlertEngine {
     private func checkCheckIn(pet: Pet, now: Date, cal: Calendar) -> [HealthAlert] {
         let careLogs = pet.careLogs.filter {
             $0.careType == .feeding ||
-            $0.careType == .watering ||
-            $0.careType == .waterChange
+                $0.careType == .watering ||
+                $0.careType == .waterChange
         }
         guard let last = careLogs.map(\.date).max() else {
             return [HealthAlert(
@@ -305,7 +304,7 @@ nonisolated final class PetHealthAlertEngine {
         for doc in pet.documents {
             guard let expiry = doc.expiryDate else { continue }
             let days = cal.dateComponents([.day], from: now, to: expiry).day ?? 0
-            if days <= 30 && expiry >= now {
+            if days <= 30, expiry >= now {
                 alerts.append(HealthAlert(
                     id: UUID(), petId: pet.id, petName: pet.name, petEmoji: pet.avatarEmoji,
                     type: .documentExpiringSoon,
@@ -333,7 +332,7 @@ nonisolated final class PetHealthAlertEngine {
     private func checkSymptoms(pet: Pet, now: Date, cal: Calendar) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
         let recentSymptoms = pet.symptomLogs.filter { cal.dateComponents([.day], from: $0.date, to: now).day ?? 0 <= 3 }
-        
+
         let severeSymptoms = recentSymptoms.filter { $0.severity == .critical || $0.severity == .severe }
         for symptom in severeSymptoms {
             alerts.append(HealthAlert(
@@ -352,14 +351,14 @@ nonisolated final class PetHealthAlertEngine {
         var alerts: [HealthAlert] = []
         // 只对未绝育的宠物生效
         guard !pet.isNeutered else { return alerts }
-        
+
         if let latestCycle = pet.heatCycleLogs.sorted(by: { $0.startDate > $1.startDate }).first {
             let activeHeat = latestCycle.endDate == nil || latestCycle.endDate! > now
-            
+
             // 孕期倒计时
             if latestCycle.status == .pregnant, activeHeat, let expected = latestCycle.expectedDeliveryDate {
                 let daysToDeliver = cal.dateComponents([.day], from: now, to: expected).day ?? 0
-                if daysToDeliver > 0 && daysToDeliver <= 7 {
+                if daysToDeliver > 0, daysToDeliver <= 7 {
                     alerts.append(HealthAlert(
                         id: UUID(), petId: pet.id, petName: pet.name, petEmoji: pet.avatarEmoji,
                         type: .pregnancyCountdown,
@@ -378,7 +377,7 @@ nonisolated final class PetHealthAlertEngine {
                         generatedAt: now
                     ))
                 }
-            } else if (latestCycle.status == .proestrus || latestCycle.status == .estrus) && activeHeat {
+            } else if latestCycle.status == .proestrus || latestCycle.status == .estrus, activeHeat {
                 alerts.append(HealthAlert(
                     id: UUID(), petId: pet.id, petName: pet.name, petEmoji: pet.avatarEmoji,
                     type: .heatCycleAlert,
@@ -394,14 +393,14 @@ nonisolated final class PetHealthAlertEngine {
 
     private func checkCrossCorrelation(pet: Pet, now: Date, cal: Calendar) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
-        
+
         // 饮水激增 + 体重下降 -> 潜在肾脏或糖尿病风险
         let sortedWeights = pet.weightLogs.sorted { $0.date > $1.date }
         if sortedWeights.count >= 2 {
             let lastW = sortedWeights[0]
             let prevW = sortedWeights[1]
             let weightDropped = lastW.weight < prevW.weight * 0.95 // 掉了 5% 以上
-            
+
             if weightDropped {
                 // 检查过去三天的饮水记录总次数，是否超过历史平均很多（这里做一个简化版：近期日均饮水次数>10）
                 let recentWaterLogs = pet.careLogs.filter { $0.type == CareType.watering.rawValue && cal.dateComponents([.day], from: $0.date, to: now).day ?? 0 <= 3 }
@@ -417,7 +416,7 @@ nonisolated final class PetHealthAlertEngine {
                 }
             }
         }
-        
+
         // 连续几天步数严重不达标（狗特有）
         if pet.species.lowercased().contains("dog") || pet.species.lowercased().contains("狗") {
             let past7DaysWalks = pet.walkLogs.filter { cal.dateComponents([.day], from: $0.startDate, to: now).day ?? 0 <= 7 }
@@ -432,7 +431,7 @@ nonisolated final class PetHealthAlertEngine {
                 ))
             }
         }
-        
+
         return alerts
     }
 }

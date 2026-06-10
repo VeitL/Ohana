@@ -142,7 +142,7 @@ final class ReminderCompletionService: ReminderCompleting {
         reminder.completedAt = nil
         reminder.completedBy = humanId ?? ""
         reminder.scheduledAt = Calendar.current.date(byAdding: .day, value: 1, to: reminder.scheduledAt)
-            ?? Date().addingTimeInterval(86_400)
+            ?? Date().addingTimeInterval(86400)
         if reschedule {
             Task { @MainActor in
                 await reminderScheduling.cancelAndReschedule(reminder: reminder, context: context, source: .service)

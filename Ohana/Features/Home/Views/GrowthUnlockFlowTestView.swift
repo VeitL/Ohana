@@ -122,8 +122,8 @@ struct OhanaGrowthOnboardingOverlay: View {
                     }
                 } label: {
                     Text(stepIndex >= steps.count - 1
-                         ? localized(zh: "开始", en: "Start", de: "Start")
-                         : localized(zh: "下一步", en: "Next", de: "Weiter"))
+                        ? localized(zh: "开始", en: "Start", de: "Start")
+                        : localized(zh: "下一步", en: "Next", de: "Weiter"))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -134,15 +134,15 @@ struct OhanaGrowthOnboardingOverlay: View {
         }
         .padding(18)
         .padding(.bottom, max(8, safeBottom + 6))
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
         .padding(.horizontal, 6)
     }
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }
@@ -280,7 +280,7 @@ struct GrowthUnlockFlowTestView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var levelControl: some View {
@@ -298,7 +298,7 @@ struct GrowthUnlockFlowTestView: View {
                     .background(Color.goPrimary, in: Capsule())
             }
 
-            Stepper(value: $simulatedLevel, in: 0...10) {
+            Stepper(value: $simulatedLevel, in: 0 ... 10) {
                 Text(currentStage.title(language: appLanguage))
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(Color(hex: currentStage.tintHex))
@@ -334,7 +334,7 @@ struct GrowthUnlockFlowTestView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var onboardingPreview: some View {
@@ -384,7 +384,7 @@ struct GrowthUnlockFlowTestView: View {
         }
         .foregroundStyle(Color.ohanaPrimaryText)
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     @ViewBuilder
@@ -418,7 +418,7 @@ struct GrowthUnlockFlowTestView: View {
             }
             .frame(minHeight: 64)
             .padding(14)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }
     }
 
@@ -433,7 +433,7 @@ struct GrowthUnlockFlowTestView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private var featureMatrix: some View {
@@ -450,7 +450,7 @@ struct GrowthUnlockFlowTestView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func featureCell(title: String, icon: String, availability: AppFeatureAvailability) -> some View {
@@ -480,7 +480,7 @@ struct GrowthUnlockFlowTestView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
         .padding(12)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
     private var currentStage: GrowthUnlockStep {
@@ -513,68 +513,68 @@ struct GrowthUnlockFlowTestView: View {
     private func featureIcon(defaultIcon: String, availability: AppFeatureAvailability) -> String {
         switch availability {
         case .visible:
-            return defaultIcon
+            defaultIcon
         case .hiddenLocked:
-            return "lock.fill"
+            "lock.fill"
         case .outOfScope:
-            return "eye.slash.fill"
+            "eye.slash.fill"
         }
     }
 
     private func featureTint(_ availability: AppFeatureAvailability) -> Color {
         switch availability {
         case let .visible(status), let .hiddenLocked(status):
-            return Color(hex: status.step.tintHex)
+            Color(hex: status.step.tintHex)
         case .outOfScope:
-            return Color.ohanaSecondaryText
+            Color.ohanaSecondaryText
         }
     }
 
     private func featureBadgeText(_ availability: AppFeatureAvailability) -> String {
         switch availability {
         case .visible:
-            return localized(zh: "可用", en: "Open", de: "Offen")
+            localized(zh: "可用", en: "Open", de: "Offen")
         case let .hiddenLocked(status):
-            return "Lv.\(status.step.requiredLevel)"
+            "Lv.\(status.step.requiredLevel)"
         case .outOfScope:
-            return localized(zh: "隐藏", en: "Hidden", de: "Verborgen")
+            localized(zh: "隐藏", en: "Hidden", de: "Verborgen")
         }
     }
 
     private func featureBadgeForeground(_ availability: AppFeatureAvailability) -> Color {
         switch availability {
         case .visible:
-            return Color.arkInk
+            Color.arkInk
         case let .hiddenLocked(status):
-            return Color(hex: status.step.tintHex)
+            Color(hex: status.step.tintHex)
         case .outOfScope:
-            return Color.ohanaSecondaryText
+            Color.ohanaSecondaryText
         }
     }
 
     private func featureBadgeBackground(_ availability: AppFeatureAvailability) -> Color {
         switch availability {
         case .visible:
-            return Color.goPrimary
+            Color.goPrimary
         case .hiddenLocked, .outOfScope:
-            return Color.ohanaControlFill
+            Color.ohanaControlFill
         }
     }
 
     private func featureStageText(_ availability: AppFeatureAvailability) -> String {
         switch availability {
         case let .visible(status), let .hiddenLocked(status):
-            return status.step.title(language: appLanguage)
+            status.step.title(language: appLanguage)
         case .outOfScope:
-            return localized(zh: "当前版本不纳入范围", en: "Out of current scope", de: "Nicht im aktuellen Umfang")
+            localized(zh: "当前版本不纳入范围", en: "Out of current scope", de: "Nicht im aktuellen Umfang")
         }
     }
 
     private func localized(zh: String, en: String, de: String) -> String {
         switch appLanguage {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 
@@ -634,7 +634,7 @@ struct GrowthUnlockFlowTestView: View {
             growthPulseStatus = nil
             unlockToastStatus = GrowthUnlockStatus(step: step, currentLevel: currentLevel)
         }
-        unlockToastDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3_800) {
+        unlockToastDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3800) {
             dismissUnlockToast()
         }
     }
@@ -663,7 +663,7 @@ struct GrowthUnlockFlowTestView: View {
                 progressPercent: min(100, max(0, Int((progress * 100).rounded())))
             )
         }
-        growthPulseDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 2_600) {
+        growthPulseDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 2600) {
             dismissGrowthPulse()
         }
     }
@@ -696,9 +696,9 @@ private struct OnboardingStep {
 
     private func localized(zh: String, en: String, de: String, language: String) -> String {
         switch language {
-        case "en": return en
-        case "de": return de
-        default: return zh
+        case "en": en
+        case "de": de
+        default: zh
         }
     }
 }

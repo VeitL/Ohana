@@ -3,10 +3,10 @@
 //  Ohana
 //
 
-import SwiftUI
-import SwiftData
-import PhotosUI
 import Foundation
+import PhotosUI
+import SwiftData
+import SwiftUI
 
 extension PetBasicInfoDetailView {
     var editContent: some View {
@@ -22,13 +22,13 @@ extension PetBasicInfoDetailView {
                     Picker("", selection: $eSpecies) {
                         ForEach(speciesOptions, id: \.self) { Text($0) }
                     }.pickerStyle(.menu).tint(Color.goPrimary)
-                    .onChange(of: eSpecies) { _, _ in
-                        let firstBreed = PetBreedDatabase.breeds(for: eSpecies).first
-                        eBreed = firstBreed?.name ?? ""
-                        eCoatColor = firstBreed?.coatColors.first?.name ?? ""
-                        eEyeColor = firstBreed?.eyeColors.first?.name ?? ""
-                        if let hex = firstBreed?.suggestedThemeHex { eThemeColorHex = hex }
-                    }
+                        .onChange(of: eSpecies) { _, _ in
+                            let firstBreed = PetBreedDatabase.breeds(for: eSpecies).first
+                            eBreed = firstBreed?.name ?? ""
+                            eCoatColor = firstBreed?.coatColors.first?.name ?? ""
+                            eEyeColor = firstBreed?.eyeColors.first?.name ?? ""
+                            if let hex = firstBreed?.suggestedThemeHex { eThemeColorHex = hex }
+                        }
                 }
                 Divider().opacity(0.1)
                 optionPickerRow("品种", selection: $eBreed, options: breedOptions)
@@ -72,17 +72,17 @@ extension PetBasicInfoDetailView {
             }
             // 健康
             editSection(title: "健康与医疗", icon: "cross.circle.fill", iconColor: Color.goRed) {
-                editField("芯片号",     text: $eMicrochipID)
+                editField("芯片号", text: $eMicrochipID)
                 Divider().opacity(0.1)
-                editField("诊所名称",   text: $eVetClinicName)
+                editField("诊所名称", text: $eVetClinicName)
                 Divider().opacity(0.1)
-                editField("主治医生",   text: $eVetDoctorName)
+                editField("主治医生", text: $eVetDoctorName)
                 Divider().opacity(0.1)
-                editField("联系电话",   text: $eVetContact)
+                editField("联系电话", text: $eVetContact)
                 Divider().opacity(0.1)
-                editField("诊所地址",   text: $eVetAddress)
+                editField("诊所地址", text: $eVetAddress)
                 Divider().opacity(0.1)
-                editField("过敏原",     text: $eAllergies)
+                editField("过敏原", text: $eAllergies)
             }
             // 证件
             editSection(title: "证件信息", icon: "doc.badge.fill", iconColor: Color.goYellow) {
@@ -98,7 +98,7 @@ extension PetBasicInfoDetailView {
             }
             // 血统
             editSection(title: "血统来源", icon: "list.star", iconColor: Color.goMint) {
-                editField("曾用名",   text: $eFormerName)
+                editField("曾用名", text: $eFormerName)
                 Divider().opacity(0.1)
                 optionPickerRow("出生国家", selection: $eBirthCountry, options: countryOptions)
                 Divider().opacity(0.1)
@@ -124,17 +124,17 @@ extension PetBasicInfoDetailView {
                         get: { Color(hex: eThemeColorHex) },
                         set: { if let h = $0.toHex() { eThemeColorHex = h } }
                     ), supportsOpacity: false)
-                    .labelsHidden().frame(width: 38, height: 38).scaleEffect(1.3).clipShape(Circle()) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .overlay(Circle().strokeBorder(.primary.opacity(0.3), lineWidth: 1))
+                        .labelsHidden().frame(width: 38, height: 38).scaleEffect(1.3).clipShape(Circle()) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                        .overlay(Circle().strokeBorder(.primary.opacity(0.3), lineWidth: 1))
                 }
             }
             // 备注
             editSection(title: "备注", icon: "note.text", iconColor: Color.goOrange) {
-                TextField("备注（可选）", text: $eNotes, axis: .vertical)
+                TextField("备注（可选）", text: $eNotes, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .tint(Color.goOrange)
-                    .lineLimit(3...6)
+                    .lineLimit(3 ... 6)
             }
         }
     }
@@ -186,7 +186,7 @@ extension PetBasicInfoDetailView {
             }
         }
         .padding(16)
-        .goTranslucentCard(cornerRadius: 20)
+        .goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     func profileAvatarImage(data: Data?, fallbackEmoji: String, accent: Color, size: CGFloat) -> some View {
@@ -201,7 +201,7 @@ extension PetBasicInfoDetailView {
     }
 
     // MARK: - Helpers
-    func infoSection<Content: View>(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> Content) -> some View {
+    func infoSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon).font(OhanaFont.adaptive(size: 13, weight: .bold)).foregroundStyle(iconColor) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -209,10 +209,10 @@ extension PetBasicInfoDetailView {
             }
             content()
         }
-        .padding(16).goTranslucentCard(cornerRadius: 20)
+        .padding(16).goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
-    func editSection<Content: View>(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> Content) -> some View {
+    func editSection(title: String, icon: String, iconColor: Color, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon).font(OhanaFont.adaptive(size: 13, weight: .bold)).foregroundStyle(iconColor) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -220,7 +220,7 @@ extension PetBasicInfoDetailView {
             }
             content()
         }
-        .padding(16).goTranslucentCard(cornerRadius: 20)
+        .padding(16).goTranslucentCard(cornerRadius: OhanaRadius.input)
     }
 
     func infoRow(label: String, value: String) -> some View {
@@ -238,7 +238,7 @@ extension PetBasicInfoDetailView {
     func editField(_ label: String, text: Binding<String>) -> some View {
         HStack {
             editLabel(label).frame(width: 70, alignment: .leading)
-            TextField(label, text: text)
+            TextField(label, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)

@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 struct PetAvatarPortraitView: View {
-    var cacheID: UUID? = nil
+    var cacheID: UUID?
     let imageData: Data?
     let fallbackText: String
     let themeColor: Color
@@ -88,7 +88,7 @@ struct PetAvatarPortraitImage: View {
 }
 
 struct PetAvatarPortraitRoundedView: View {
-    var cacheID: UUID? = nil
+    var cacheID: UUID?
     let imageData: Data?
     let fallbackText: String
     let themeColor: Color

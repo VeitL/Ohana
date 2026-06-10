@@ -37,7 +37,7 @@ struct FeatureAggregateView: View {
     @State private var humanAvatarCacheKey = "feature-aggregate-human-avatar-empty"
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var visibleHumans: [Human] { humans.filter { $0.shouldShowOnHome } }
+    private var visibleHumans: [Human] { humans.filter(\.shouldShowOnHome) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
 
     private func isDog(_ pet: Pet) -> Bool {
@@ -55,11 +55,11 @@ struct FeatureAggregateView: View {
     private var humansForFeature: [Human] {
         switch feature {
         case .weight:
-            return appServices.privacy.unlockedHumans(for: .weight, from: visibleHumans, viewedBy: activeHumanId)
+            appServices.privacy.unlockedHumans(for: .weight, from: visibleHumans, viewedBy: activeHumanId)
         case .expense:
-            return appServices.privacy.unlockedHumans(for: .expense, from: visibleHumans, viewedBy: activeHumanId)
+            appServices.privacy.unlockedHumans(for: .expense, from: visibleHumans, viewedBy: activeHumanId)
         default:
-            return visibleHumans
+            visibleHumans
         }
     }
 
@@ -73,7 +73,7 @@ struct FeatureAggregateView: View {
     var body: some View {
         ZStack {
             OhanaAppBackground()
-            .ignoresSafeArea()
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 if showsNavigationChrome {
@@ -150,7 +150,7 @@ struct FeatureAggregateView: View {
     }
 
     @ViewBuilder
-    private func entityChip<A: View>(avatar: () -> A, name: String) -> some View {
+    private func entityChip(avatar: () -> some View, name: String) -> some View {
         HStack(spacing: 6) {
             avatar()
             Text(name)
@@ -272,7 +272,7 @@ struct FeatureAggregateView: View {
                     .padding(.vertical, 4)
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .listRowBackground(RoundedRectangle(cornerRadius: 12).fill(Color.ohanaCardSurface))
+                .listRowBackground(RoundedRectangle(cornerRadius: OhanaRadius.chip).fill(Color.ohanaCardSurface))
                 .listRowSeparatorTint(Color.ohanaDivider)
             }
         }
@@ -284,26 +284,26 @@ struct FeatureAggregateView: View {
 
     private func petDest(_ feature: PetFeature, pet: Pet) -> FMDest {
         switch feature {
-        case .health:        return .petHealth(pet.persistentModelID)
-        case .medications:   return .petMedications(pet.persistentModelID)
-        case .food:          return .petFood(pet.persistentModelID)
-        case .hygiene:       return .petHygiene(pet.persistentModelID)
-        case .walks:         return .petWalks(pet.persistentModelID)
-        case .potty:         return .petPotty(pet.persistentModelID)
-        case .basicInfo:     return .petBasicInfo(pet.persistentModelID)
-        case .documents:     return .petDocuments(pet.persistentModelID)
-        case .moments:       return .petMoments(pet.persistentModelID)
-        case .achievements:  return .petAchievements(pet.persistentModelID)
-        case .retention:     return .petRetention(pet.persistentModelID)
-        case .weight:        return .petWeight(pet.persistentModelID)
-        case .expense:       return .petExpense(pet.persistentModelID)
+        case .health: .petHealth(pet.persistentModelID)
+        case .medications: .petMedications(pet.persistentModelID)
+        case .food: .petFood(pet.persistentModelID)
+        case .hygiene: .petHygiene(pet.persistentModelID)
+        case .walks: .petWalks(pet.persistentModelID)
+        case .potty: .petPotty(pet.persistentModelID)
+        case .basicInfo: .petBasicInfo(pet.persistentModelID)
+        case .documents: .petDocuments(pet.persistentModelID)
+        case .moments: .petMoments(pet.persistentModelID)
+        case .achievements: .petAchievements(pet.persistentModelID)
+        case .retention: .petRetention(pet.persistentModelID)
+        case .weight: .petWeight(pet.persistentModelID)
+        case .expense: .petExpense(pet.persistentModelID)
         }
     }
 
     private func humanDest(_ feature: PetFeature, human: Human) -> FMDest {
         switch feature {
-        case .expense: return .humanExpense(human.persistentModelID)
-        default:       return .humanWeight(human.persistentModelID)
+        case .expense: .humanExpense(human.persistentModelID)
+        default: .humanWeight(human.persistentModelID)
         }
     }
 
@@ -312,20 +312,21 @@ struct FeatureAggregateView: View {
     private func subtitle(for pet: Pet) -> String {
         switch feature {
         case .health:
-            let n = pet.healthLogs.count; return n > 0 ? "\(n)条记录" : "暂无记录"
+            let n = pet.healthLogs.count
+            return n > 0 ? "\(n)条记录" : "暂无记录"
         case .medications:
-            let n = pet.medications.filter { $0.isActiveToday }.count
+            let n = pet.medications.count(where: { $0.isActiveToday })
             return n > 0 ? "当前\(n)种药物" : "暂无用药"
         case .food:
-            let n = pet.careLogs.filter {
+            let n = pet.careLogs.count(where: {
                 $0.careType == .feeding && Calendar.current.isDateInToday($0.date)
-            }.count
+            })
             return n > 0 ? "今日喂食\(n)次" : "今日未喂食"
         case .hygiene:
-            let n = pet.careLogs.filter { $0.careType != .feeding }.count
+            let n = pet.careLogs.count(where: { $0.careType != .feeding })
             return n > 0 ? "\(n)条护理记录" : "暂无记录"
         case .potty:
-            let n = pet.pottyLogs.filter { Calendar.current.isDateInToday($0.date) }.count
+            let n = pet.pottyLogs.count(where: { Calendar.current.isDateInToday($0.date) })
             return n > 0 ? "今日\(n)次" : "今日暂无记录"
         case .basicInfo:
             return pet.breed.isEmpty ? pet.species : pet.breed
@@ -342,7 +343,7 @@ struct FeatureAggregateView: View {
                 !pet.expenseLogs.isEmpty,
                 !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty,
                 pet.currentStreak > 0
-            ].filter { $0 }.count
+            ].count(where: { $0 })
             return "已完善 \(score)/5 个长期模块"
         default:
             return ""

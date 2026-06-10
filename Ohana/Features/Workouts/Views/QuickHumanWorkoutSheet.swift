@@ -5,8 +5,8 @@
 //  Lightweight inline popup for human workout quick records.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 private struct QuickHumanWorkoutHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -18,8 +18,8 @@ private struct QuickHumanWorkoutHeightKey: PreferenceKey {
 
 struct QuickHumanWorkoutSheet: View {
     let human: Human
-    var onSaved: (() -> Void)? = nil
-    var onDismiss: (() -> Void)? = nil
+    var onSaved: (() -> Void)?
+    var onDismiss: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -94,8 +94,8 @@ struct QuickHumanWorkoutSheet: View {
 
                     saveBar
                 }
-                .background { OhanaPopupGlassSurface(cornerRadius: 52) }
-                .clipShape(RoundedRectangle(cornerRadius: 52, style: .continuous))
+                .background { OhanaPopupGlassSurface(cornerRadius: OhanaRadius.inlinePopup) }
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.inlinePopup, style: .continuous))
                 .shadow(color: Color.black.opacity(0.56), radius: 48, x: 0, y: -18) // ui-v4: allow short popup liftedAlert shadow token
                 .shadow(color: Color(hex: "0B102C").opacity(0.46), radius: 28, x: 0, y: 12) // ui-v4: allow short popup liftedAlert shadow token
                 .padding(.horizontal, 6)
@@ -178,7 +178,7 @@ struct QuickHumanWorkoutSheet: View {
     private var header: some View {
         HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(accent.opacity(0.18))
                 Image(systemName: selectedType.icon)
                     .font(OhanaFont.adaptive(size: 19, weight: .black))
@@ -222,7 +222,7 @@ struct QuickHumanWorkoutSheet: View {
                     .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 58)
-                    .background(isSelected ? Color(hex: type.colorHex) : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(isSelected ? Color(hex: type.colorHex) : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -246,7 +246,7 @@ struct QuickHumanWorkoutSheet: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
-            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         }
         .padding(.horizontal, 22)
     }
@@ -281,7 +281,7 @@ struct QuickHumanWorkoutSheet: View {
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存运动", en: "Save Workout", de: "Training speichern")
                 )
-                    .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.black))
             }
             .foregroundStyle(Color.arkInk)
             .frame(maxWidth: .infinity)

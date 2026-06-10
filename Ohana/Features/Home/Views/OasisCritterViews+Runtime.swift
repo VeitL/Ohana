@@ -3,13 +3,13 @@
 //  Ohana
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UIKit
 
 extension OasisCritterCodexView {
     var ownedCount: Int {
-        electronicPets.filter { !$0.isArchived }.count
+        electronicPets.count(where: { !$0.isArchived })
     }
 
     func ownedCritter(_ catalogId: String) -> OasisElectronicPet? {

@@ -10,16 +10,16 @@ import SwiftUI
 struct MemoryFragment: Identifiable {
     let id = UUID()
     let emoji: String
-    let headline: String        // 大标题，如"这是你们相伴的第 500 天"
-    let subline: String         // 副标题
-    let mapSnapshotData: Data?  // 可选地图截图
+    let headline: String // 大标题，如"这是你们相伴的第 500 天"
+    let subline: String // 副标题
+    let mapSnapshotData: Data? // 可选地图截图
     let accentColor: Color
     var rewardCoconuts: Int = 0 // U9: 回忆奖励椰子数
-    var petName: String? = nil  // U9: 关联的宠物名
+    var petName: String? // U9: 关联的宠物名
 }
 
 // MARK: - Memory Engine
-struct MemoryEngine {
+enum MemoryEngine {
     /// 从所有历史数据中随机挖掘一条值得回顾的记忆
     /// - Returns: nil 表示数据太少，不展示
     static func pickFragment(pets: [Pet], plants: [Plant]) -> MemoryFragment? {
@@ -77,7 +77,7 @@ struct MemoryEngine {
                 let homeComps = cal.dateComponents([.month, .day], from: homeDate)
                 let todayComps = cal.dateComponents([.month, .day], from: today)
                 let years = cal.dateComponents([.year], from: homeDate, to: today).year ?? 0
-                if homeComps.month == todayComps.month && homeComps.day == todayComps.day && years > 0 {
+                if homeComps.month == todayComps.month, homeComps.day == todayComps.day, years > 0 {
                     candidates.append(MemoryFragment(
                         emoji: "🏠",
                         headline: "\(pet.name) 来家里整整 \(years) 年了",
@@ -156,13 +156,11 @@ struct MemoryEngine {
 
             if executorIds.count >= 2 {
                 let n = executorIds.count
-                let subline: String = {
-                    switch n {
-                    case 2: return "两位家人一起为 \(pet.name) 奔波，这就是 Ohana 的意义"
-                    case 3: return "三位家人齐上阵，\(pet.name) 今天被满满的爱包围"
-                    default: return "\(n) 位家人一起给了 \(pet.name) 最好的一天"
-                    }
-                }()
+                let subline = switch n {
+                case 2: "两位家人一起为 \(pet.name) 奔波，这就是 Ohana 的意义"
+                case 3: "三位家人齐上阵，\(pet.name) 今天被满满的爱包围"
+                default: "\(n) 位家人一起给了 \(pet.name) 最好的一天"
+                }
                 return MemoryFragment(
                     emoji: "🫂",
                     headline: "全家都在爱 \(pet.name)",
@@ -275,10 +273,10 @@ struct MemoryDropCard: View {
                 ],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
                 .strokeBorder(fragment.accentColor.opacity(0.3), lineWidth: 1)
         )
     }

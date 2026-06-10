@@ -129,9 +129,9 @@ struct FamilyTaskEditorPanel: View {
 
     private var navigationTitle: String {
         switch route {
-        case .assignReminder: return l.tr(zh: "分配待办", en: "Assign task", de: "Aufgabe zuweisen")
-        case .editTask: return l.tr(zh: "任务详情", en: "Task details", de: "Aufgabendetails")
-        case .create: return l.tr(zh: "发布任务", en: "Post task", de: "Aufgabe erstellen")
+        case .assignReminder: l.tr(zh: "分配待办", en: "Assign task", de: "Aufgabe zuweisen")
+        case .editTask: l.tr(zh: "任务详情", en: "Task details", de: "Aufgabendetails")
+        case .create: l.tr(zh: "发布任务", en: "Post task", de: "Aufgabe erstellen")
         }
     }
 
@@ -167,7 +167,7 @@ struct FamilyTaskEditorPanel: View {
             Spacer()
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private func textFieldBlock(title: String, placeholder: String, text: Binding<String>) -> some View {
@@ -175,12 +175,12 @@ struct FamilyTaskEditorPanel: View {
             Text(title)
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color.ohanaSecondaryText)
-            TextField(placeholder, text: text, axis: .vertical)
+            TextField(placeholder, text: text, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.callout(.bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1...3)
+                .lineLimit(1 ... 3)
                 .padding(13)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         }
     }
 
@@ -204,7 +204,7 @@ struct FamilyTaskEditorPanel: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -274,7 +274,7 @@ struct FamilyTaskEditorPanel: View {
             }
         }
         .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
     }
 
     private var emojiPicker: some View {
@@ -341,9 +341,9 @@ struct FamilyTaskEditorPanel: View {
     private var canSave: Bool {
         switch route {
         case .assignReminder:
-            return selectedHuman != nil
+            selectedHuman != nil
         case .create, .editTask:
-            return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedHuman != nil
+            !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedHuman != nil
         }
     }
 

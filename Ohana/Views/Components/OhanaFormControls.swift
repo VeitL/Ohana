@@ -15,18 +15,48 @@ import SwiftUI
 // new steps here without updating ui规范.selection.json and docs/design/ui规范.md.
 
 enum OhanaRadius {
+    /// Tiny geometry such as separators, strokes, and small map/glyph marks.
+    static let hairline: CGFloat = 1
+    /// Micro chip corners and very small decorative fills.
+    static let micro: CGFloat = 4
+    /// Small icon and compact badge surfaces.
+    static let tiny: CGFloat = 6
+    /// Icon tile and thumbnail corners.
+    static let icon: CGFloat = 8
+    /// Dense badge or token chip corners.
+    static let badge: CGFloat = 10
+    /// Embedded chip and compact pill-adjacent control corners.
+    static let chip: CGFloat = 12
+    /// List rows and inset grid cells.
+    static let row: CGFloat = 14
+    /// Segmented controls and compact cards.
+    static let control: CGFloat = 16
+    /// Large controls and compact module surfaces.
+    static let controlLarge: CGFloat = 18
     /// Boxed form input surface (canonical quick-sheet input).
     static let input: CGFloat = 20
     /// Standard business/module card (matches goIslandModuleCard default).
     static let card: CGFloat = 20
+    /// Soft card default from the V4 detail guidance.
+    static let cardSoft: CGFloat = 22
     /// Large hero/summary card surface.
     static let cardLarge: CGFloat = 24
+    /// Hero media, large previews, and prominent summary surfaces.
+    static let hero: CGFloat = 28
+    /// Small custom sheet/overlay chrome.
+    static let sheetMini: CGFloat = 30
     /// Compact system sheet chrome (ohanaCompactSheetPresentation).
     static let sheetCompact: CGFloat = 32
+    /// Roomier sheet chrome used by long forms.
+    static let sheetComfort: CGFloat = 34
     /// Long sheet page chrome (ohanaSheetPagePresentation).
     static let sheetPage: CGFloat = 36
+    /// Extra-large sheet/preview chrome.
+    static let sheetLarge: CGFloat = 38
     /// Inline short popup container (V4 short popup: continuous 52pt).
     static let inlinePopup: CGFloat = 52
+    /// Fully rounded pill/capsule-like numeric fallback for legacy geometry.
+    static let pill: CGFloat = 999
 }
 
 // MARK: - Sheet Detent Presets

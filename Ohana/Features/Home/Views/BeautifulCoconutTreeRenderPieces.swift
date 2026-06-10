@@ -29,15 +29,15 @@ struct TrunkShape: Shape {
         let h = trunkHeight
         let b = bend
 
-        path.move(to: CGPoint(x: cx - w/2, y: by))
+        path.move(to: CGPoint(x: cx - w / 2, y: by))
         path.addQuadCurve(
             to: CGPoint(x: cx + b, y: by - h),
-            control: CGPoint(x: cx + b/2, y: by - h/2)
+            control: CGPoint(x: cx + b / 2, y: by - h / 2)
         )
         path.addLine(to: CGPoint(x: cx + b + w * 0.4, y: by - h))
         path.addQuadCurve(
-            to: CGPoint(x: cx + w/2, y: by),
-            control: CGPoint(x: cx + b/2 + w, y: by - h/2)
+            to: CGPoint(x: cx + w / 2, y: by),
+            control: CGPoint(x: cx + b / 2 + w, y: by - h / 2)
         )
         path.closeSubpath()
         return path
@@ -57,7 +57,7 @@ struct VineShape: Shape {
         let h = trunkHeight
         let b = bend
 
-        path.move(to: CGPoint(x: cx - w/2, y: by))
+        path.move(to: CGPoint(x: cx - w / 2, y: by))
         path.addQuadCurve(
             to: CGPoint(x: cx + b - 10, y: by - h * 0.6),
             control: CGPoint(x: cx + b, y: by - h * 0.3)
@@ -227,7 +227,7 @@ struct RunesView: View {
 
     var body: some View {
         ZStack {
-            ForEach(0..<runes.count, id: \.self) { i in
+            ForEach(0 ..< runes.count, id: \.self) { i in
                 let angle = Double(i) * (360.0 / Double(runes.count))
                 Text(runes[i])
                     .font(OhanaFont.adaptive(size: 14, weight: .bold))
@@ -270,7 +270,7 @@ struct StardustView: View {
 
     var body: some View {
         ZStack {
-            ForEach(0..<dust.count, id: \.self) { i in
+            ForEach(0 ..< dust.count, id: \.self) { i in
                 let item = dust[i]
                 Capsule()
                     .fill(Color.ohanaPrimaryActionText)
@@ -283,8 +283,8 @@ struct StardustView: View {
                     .animation(
                         allowsAmbientMotion
                             ? .linear(duration: item.duration)
-                                .repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated stardust // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
-                                .delay(item.delay)
+                            .repeatForever(autoreverses: false) // runtime-guardrail: allow AppWorkloadPolicy-gated stardust // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
+                            .delay(item.delay)
                             : nil,
                         value: animate
                     )

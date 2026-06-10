@@ -5,8 +5,8 @@
 //  狗狗专属卡片：遛狗 + 陪玩 — 极简双行快捷打卡
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct DogActivityCard: View {
     let pet: Pet
@@ -18,11 +18,11 @@ struct DogActivityCard: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var walkCountToday: Int {
-        pet.walkLogs.filter { Calendar.current.isDateInToday($0.startDate) }.count
+        pet.walkLogs.count(where: { Calendar.current.isDateInToday($0.startDate) })
     }
 
     private var playCountToday: Int {
-        pet.careLogs.filter { $0.type == CareType.play.rawValue && Calendar.current.isDateInToday($0.date) }.count
+        pet.careLogs.count(where: { $0.type == CareType.play.rawValue && Calendar.current.isDateInToday($0.date) })
     }
 
     // 本周（周一起）步行距离 km
@@ -42,11 +42,11 @@ struct DogActivityCard: View {
     private var primaryText: Color {
         Color.ohanaPrimaryText
     }
-    
+
     private var secondaryText: Color {
         Color.ohanaSecondaryText
     }
-    
+
     private var tertiaryText: Color {
         Color.ohanaTertiaryText
     }
@@ -54,85 +54,85 @@ struct DogActivityCard: View {
     var body: some View {
         glassCard {
             VStack(alignment: .leading, spacing: 10) {
-            // ── 标题行
-            HStack(spacing: 6) {
-                Text("🐾").font(OhanaFont.adaptive(size: 14))
-                Text("遛狗 & 陪玩")
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(primaryText)
-                Spacer()
-                Image(systemName: "chevron.right").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
-                    .foregroundStyle(tertiaryText)
-            }
+                // ── 标题行
+                HStack(spacing: 6) {
+                    Text("🐾").font(OhanaFont.adaptive(size: 14))
+                    Text("遛狗 & 陪玩")
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(primaryText)
+                    Spacer()
+                    Image(systemName: "chevron.right").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
+                        .foregroundStyle(tertiaryText)
+                }
 
-            // ── 遛狗快捷行
-            HStack(spacing: 10) {
-                Image(systemName: "figure.walk").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
-                    .foregroundStyle(colorScheme == .dark ? Color.goPrimary : Color.goTeal)
-                Text("遛狗")
-                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(primaryText)
-                Text("今日 \(walkCountToday) 次")
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(tertiaryText)
-                Spacer()
-                // 本周进度胶囊（设置了目标才显示）
-                if weeklyGoalSet {
-                    let capsuleColor = weeklyGoalReached ? Color.goPrimary : Color.goTeal.opacity(0.8)
-                    Text(String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm))
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(weeklyGoalReached ? Color.arkInk : Color.ohanaPrimaryActionText)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(capsuleColor, in: Capsule())
+                // ── 遛狗快捷行
+                HStack(spacing: 10) {
+                    Image(systemName: "figure.walk").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold))
+                        .foregroundStyle(colorScheme == .dark ? Color.goPrimary : Color.goTeal)
+                    Text("遛狗")
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(primaryText)
+                    Text("今日 \(walkCountToday) 次")
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(tertiaryText)
+                    Spacer()
+                    // 本周进度胶囊（设置了目标才显示）
+                    if weeklyGoalSet {
+                        let capsuleColor = weeklyGoalReached ? Color.goPrimary : Color.goTeal.opacity(0.8)
+                        Text(String(format: "%.1f / %.0f km", thisWeekDistanceKm, pet.weeklyWalkGoalKm))
+                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                            .foregroundStyle(weeklyGoalReached ? Color.arkInk : Color.ohanaPrimaryActionText)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(capsuleColor, in: Capsule())
+                    }
+                }
+
+                // ── 陪玩快捷行
+                HStack(spacing: 10) {
+                    Image(systemName: "tennisball.fill").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold))
+                        .foregroundStyle(Color(hex: "FF6B6B"))
+                    Text("陪玩")
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(primaryText)
+                    Text("今日 \(playCountToday) 次")
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(tertiaryText)
+                    Spacer()
+                    Button {
+                        recordPlay()
+                    } label: {
+                        Text("+ 打卡")
+                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.arkInk)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color(hex: "FF6B6B"), in: Capsule())
+                    }
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
-
-            // ── 陪玩快捷行
-            HStack(spacing: 10) {
-                Image(systemName: "tennisball.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold))
-                    .foregroundStyle(Color(hex: "FF6B6B"))
-                Text("陪玩")
-                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(primaryText)
-                Text("今日 \(playCountToday) 次")
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(tertiaryText)
-                Spacer()
-                Button {
-                    recordPlay()
-                } label: {
-                    Text("+ 打卡")
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color(hex: "FF6B6B"), in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-        }
-        .padding(16)
+            .padding(16)
         }
     }
-    
+
     // MARK: - Glass Card Helper
     @ViewBuilder
-    private func glassCard<C: View>(@ViewBuilder content: () -> C) -> some View {
+    private func glassCard(@ViewBuilder content: () -> some View) -> some View {
         if reduceTransparency {
             // 无障碍降级：纯色不透明背景
             content()
                 .background(Color(.systemBackground).opacity(0.95))
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
         } else {
             // 浅色模式下更透明
             if colorScheme == .light {
                 content()
-                    .background(Color.ohanaCardSurface.opacity(0.3), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .background(Color.ohanaCardSurface.opacity(0.3), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             } else {
                 content()
-                    .goGlassBackground(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
             }
         }
     }

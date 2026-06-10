@@ -118,7 +118,7 @@ enum PetCareTrackingCommandService {
     @MainActor
     private static func linkedPottyLog(for log: PetCareLog, pet: Pet, context: ModelContext) -> PetPottyLog? {
         guard log.careType == .litter else { return nil }
-        let logs = (try? context.fetch(FetchDescriptor<PetPottyLog>())) ?? []
+        let logs = (try? context.fetch(FetchDescriptor<PetPottyLog>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return logs
             .filter { candidate in
                 candidate.pet?.id == pet.id
@@ -137,32 +137,32 @@ enum PetCareTrackingCommandService {
         context: ModelContext
     ) -> [CareLedgerEvent] {
         let idString = id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return events.filter { $0.legacyModelName == modelName && $0.legacyModelId == idString }
     }
 
     private static func reward(for type: CareType, pet: Pet) -> QuestManager.OhanaActionType {
         switch type {
         case .feeding:
-            return .feed
+            .feed
         case .watering:
-            return .water
+            .water
         case .litter:
-            return .potty(isLitter: true)
+            .potty(isLitter: true)
         case .play:
-            return .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 互动奖励")
+            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 互动奖励")
         case .filterClean:
-            return .general(humanReward: 25, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理滤材报酬")
+            .general(humanReward: 25, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理滤材报酬")
         case .cageCleaning:
-            return .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理鸟笼奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理鸟笼奖励")
         case .freeFlight:
-            return .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 放飞互动奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 放飞互动奖励")
         case .misting:
-            return .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 保湿打卡奖励")
+            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 保湿打卡奖励")
         case .substrateChange:
-            return .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 环境清洁奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 环境清洁奖励")
         case .waterChange:
-            return .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 换水奖励")
+            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 换水奖励")
         }
     }
 }
@@ -202,7 +202,7 @@ enum PetPottyCommandService {
         context: ModelContext
     ) -> [CareLedgerEvent] {
         let idString = id.uuidString
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
         return events.filter { $0.legacyModelName == modelName && $0.legacyModelId == idString }
     }
 }

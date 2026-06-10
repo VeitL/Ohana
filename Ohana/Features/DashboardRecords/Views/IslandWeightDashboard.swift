@@ -6,8 +6,8 @@
 //  百分比折线图 + 趣味干饭王/自律王 + 全岛总质量 + 个体 Sparkline
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 // MARK: - Sparkline Data
 private struct SparkPoint: Identifiable {
@@ -28,15 +28,15 @@ private enum IslandWeightEntryRoute: Identifiable {
 
     var id: String {
         switch self {
-        case .pet(let pet): return "pet:\(pet.id.uuidString)"
-        case .human(let human): return "human:\(human.id.uuidString)"
+        case let .pet(pet): "pet:\(pet.id.uuidString)"
+        case let .human(human): "human:\(human.id.uuidString)"
         }
     }
 
     var target: GenericWeightEntrySheet.Target {
         switch self {
-        case .pet(let pet): return .pet(pet)
-        case .human(let human): return .human(human)
+        case let .pet(pet): .pet(pet)
+        case let .human(human): .human(human)
         }
     }
 }
@@ -78,9 +78,9 @@ struct IslandWeightDashboardContentView: View {
     let pets: [Pet]
     let humans: [Human]
 
-    @Environment(\.dismiss)       private var dismiss
-    @Environment(\.modelContext)  private var modelContext
-    @Environment(\.colorScheme)   private var colorScheme
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
@@ -91,18 +91,18 @@ struct IslandWeightDashboardContentView: View {
     @State private var activeWeightEntryRoute: IslandWeightEntryRoute? = nil
 
     enum WeightTimeFilter: String, CaseIterable, Identifiable {
-        case days7  = "7"
+        case days7 = "7"
         case days30 = "30"
         case days90 = "90"
-        case all   = "全部"
+        case all = "全部"
         var id: String { rawValue }
 
         var dayCount: Int? {
             switch self {
-            case .days7: return 7
-            case .days30: return 30
-            case .days90: return 90
-            case .all: return nil
+            case .days7: 7
+            case .days30: 30
+            case .days90: 90
+            case .all: nil
             }
         }
     }
@@ -127,7 +127,7 @@ struct IslandWeightDashboardContentView: View {
 
     // 只显示 shouldShowOnHome 的人类
     private var visibleHumans: [Human] {
-        humans.filter { $0.shouldShowOnHome }
+        humans.filter(\.shouldShowOnHome)
     }
 
     private var visiblePets: [Pet] {
@@ -156,11 +156,11 @@ struct IslandWeightDashboardContentView: View {
     private var primaryText: Color {
         colorScheme == .dark ? .white : .black
     }
-    
+
     private var secondaryText: Color {
         colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.6)
     }
-    
+
     private var tertiaryText: Color {
         colorScheme == .dark ? .white.opacity(0.45) : .black.opacity(0.4)
     }
@@ -177,7 +177,7 @@ struct IslandWeightDashboardContentView: View {
            let latest = latestWeight(for: selectedSeriesID) {
             return latest
         }
-        let petWeight  = visiblePets.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weightInKg }.reduce(0, +)
+        let petWeight = visiblePets.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weightInKg }.reduce(0, +)
         let humanWeight = visibleWeightHumans.compactMap { $0.weightLogs.sorted { $0.date > $1.date }.first?.weight }.reduce(0, +)
         return petWeight + humanWeight
     }
@@ -185,12 +185,12 @@ struct IslandWeightDashboardContentView: View {
     // 轻量趣味类比
     private var weightComparison: String {
         let kg = totalIslandWeightKg
-        if      kg <= 0  { return "等待第一条体重" }
-        else if kg < 10  { return "≈ \(max(1, Int(kg / 0.5))) 只兔子" }
-        else if kg < 50  { return "≈ \(max(1, Int(kg / 10))) 只大型犬" }
+        if kg <= 0 { return "等待第一条体重" }
+        else if kg < 10 { return "≈ \(max(1, Int(kg / 0.5))) 只兔子" }
+        else if kg < 50 { return "≈ \(max(1, Int(kg / 10))) 只大型犬" }
         else if kg < 120 { return "≈ \(String(format: "%.1f", kg / 70)) 个成年人" }
         else if kg < 300 { return "≈ \(max(1, Int(kg / 136))) 只大猩猩" }
-        else             { return "≈ 半头大象" }
+        else { return "≈ 半头大象" }
     }
 
     var body: some View {
@@ -347,10 +347,10 @@ struct IslandWeightDashboardContentView: View {
             .padding(.vertical, 12)
             .background(
                 Color.goYellow.opacity(colorScheme == .dark ? 0.12 : 0.18),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .strokeBorder(Color.goYellow.opacity(0.24), lineWidth: 1)
             )
         }
@@ -384,9 +384,9 @@ struct IslandWeightDashboardContentView: View {
         .buttonStyle(ScaleButtonStyle())
     }
 
-    private func weightEntityChip<Avatar: View>(
+    private func weightEntityChip(
         title: String,
-        @ViewBuilder avatar: () -> Avatar,
+        @ViewBuilder avatar: () -> some View,
         tint: Color,
         isSelected: Bool,
         action: @escaping () -> Void
@@ -409,7 +409,7 @@ struct IslandWeightDashboardContentView: View {
             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .lineLimit(1)
             .minimumScaleFactor(0.72)
-        .foregroundStyle(isSelected ? .black : .white)
+            .foregroundStyle(isSelected ? .black : .white)
     }
 
     // MARK: - 首屏：体重星球
@@ -545,7 +545,7 @@ struct IslandWeightDashboardContentView: View {
             }
         }
         .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
     }
 
     private var rangeSelector: some View {
@@ -647,9 +647,9 @@ struct IslandWeightDashboardContentView: View {
         guard let first = chartTrendPoints.first?.date,
               let last = chartTrendPoints.last?.date else { return nil }
         if first == last {
-            return first.addingTimeInterval(-43_200)...last.addingTimeInterval(43_200)
+            return first.addingTimeInterval(-43200) ... last.addingTimeInterval(43200)
         }
-        return first...last
+        return first ... last
     }
 
     private func chartCutoff(from now: Date = Date(), calendar cal: Calendar = .current) -> Date? {
@@ -793,7 +793,7 @@ struct IslandWeightDashboardContentView: View {
             if allEntries.isEmpty {
                 emptyState("还没有体重记录")
                     .frame(minHeight: 86)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
             } else {
                 VStack(spacing: 10) {
                     ForEach(allEntries) { entry in
@@ -807,14 +807,14 @@ struct IslandWeightDashboardContentView: View {
     private struct SparkEntry: Identifiable {
         let id: String
         let seriesID: String
-        let emoji:    String
-        let name:     String
-        let current:  Double
-        let delta:    Double?
-        let isHuman:  Bool
-        let history:  [SparkPoint]
+        let emoji: String
+        let name: String
+        let current: Double
+        let delta: Double?
+        let isHuman: Bool
+        let history: [SparkPoint]
         let accentColor: Color
-        let petRef:   Pet?
+        let petRef: Pet?
         let humanRef: Human?
     }
 
@@ -894,11 +894,11 @@ struct IslandWeightDashboardContentView: View {
         .padding(14)
         .frame(minHeight: 86)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .fill(Color.ohanaCardSurface)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .stroke(entry.accentColor.opacity(0.20), lineWidth: selectedSeriesID == entry.seriesID ? 1.5 : 0)
         }
         .contentShape(Rectangle())
@@ -959,7 +959,7 @@ struct IslandWeightDashboardContentView: View {
 
     private var selectedEntitySubtitle: String {
         guard let selectedSeriesID else { return weightComparison }
-        let count = vm.weightAbsolutes.filter { $0.seriesID == selectedSeriesID }.count
+        let count = vm.weightAbsolutes.count(where: { $0.seriesID == selectedSeriesID })
         return count == 0 ? "还没有体重记录" : "\(count) 条体重记录"
     }
 
