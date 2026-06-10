@@ -6,7 +6,7 @@
 
 ## Added Probe Contract
 
-`AppFlowPerformance` centralizes stable flow names and phase names in `Ohana/Utilities/AppRuntimePolicy.swift`.
+`AppFlowPerformance` centralizes stable flow names and phase names in `Ohana/App/AppRuntimePolicy.swift`.
 
 Probe notes must use low-sensitivity fields only, such as `flow`, `phase`, `action`, `count`, `source`, `from`, `to`, `prepared`, `bytes`, or `errorType`. Do not include pet names, human names, notes, PIN values, health values, precise route text, or raw user text.
 

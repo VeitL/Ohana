@@ -6,11 +6,11 @@
 
 - `App/` owns the app shell, route containers, lifecycle coordinators, startup bootstrap, and `AppServices` dependency container. App startup must stay skinny and must not eagerly initialize feature dashboards.
 - `Models/` contains SwiftData `@Model` types, schema/version declarations, and tiny model-only value helpers. Domain services, managers, command executors, catalogs, databases, localization, and infrastructure adapters must not live directly under `Models/`.
-- `Domain/` contains cross-feature protocols, domain services, command envelopes, event/revision publishing, and persistence-facing services that do not import SwiftUI. Domain services own invariants and write boundaries.
-- `Features/<Feature>/` owns vertical feature modules: commands/executors, data containers, screen models, route-local snapshot builders, and feature views. A feature may depend on `Domain`, `Shared`, `Models`, and `Utilities`, but must not reach into another feature's internal view implementation.
-- `Shared/` contains reusable UI, localization, and shared presentation helpers. Shared render components do not access `ModelContext`, execute commands, or own navigation.
-- `Utilities/` contains cross-module infrastructure such as runtime/energy policy, image processing, calendar sync, route helpers, preference stores, and observability.
-- `ViewModels/` is retained only for legacy shared read models while features migrate to feature-local `XxxScreenModel` / snapshot-store files. SwiftData writes must not be hidden in a ViewModel.
+- `Domain/` contains cross-feature protocols, domain services, command envelopes, event/revision publishing, and persistence-facing services. Domain services own invariants and write boundaries.
+- `Features/<Feature>/` owns vertical feature modules: commands/executors, data containers, screen models, route-local snapshot builders, and feature views. A feature may depend on `Domain`, `Shared`, and `Models`, but must not reach into another feature's internal view implementation.
+- `Shared/` contains localization plus reusable `Components/`, `Design/`, `Media/`, and `Utilities/`. Shared render components do not access `ModelContext`, execute commands, or own navigation.
+- Root-level `Views/`, `ViewModels/`, and `Utilities/` directories are retired. New files must live in the owning app, domain, feature, or shared folder.
+- Screen models are allowed only for one screen's complex read-only aggregation or interaction coordination. They must not hide SwiftData write logic or cross-page business rules.
 - New business behavior enters through an injected service/protocol from `AppServices` or a feature command executor. A View may create a typed command value or call an injected service, but it must not call static `XxxService` write APIs directly.
 
 ## 依赖方向
@@ -26,10 +26,10 @@ Domain Services / Repositories / Snapshot Builders
         ↓
 SwiftData Models / Persistence
         ↓
-Foundation Utilities
+Shared Utilities / Foundation
 ```
 
-Shared UI / Design System is consumed by App Shell and Features. Runtime Policy is consumed by App Shell, Features, and Motion components. Features must not depend on each other's internal Views or ViewModels.
+Shared UI / Design System is consumed by App Shell and Features. Runtime Policy is consumed by App Shell, Features, and Motion components. Features must not depend on each other's internal Views or screen models.
 
 Allowed dependency examples:
 

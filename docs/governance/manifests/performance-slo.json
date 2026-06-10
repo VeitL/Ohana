@@ -91,7 +91,7 @@
       ],
       "paths": [
         "Ohana/OhanaApp.swift",
-        "Ohana/Utilities/MetricKitObserver.swift",
+        "Ohana/App/MetricKitObserver.swift",
         "OhanaTests/AppLifecycleCoordinatorTests.swift"
       ]
     },

@@ -344,7 +344,7 @@
 
 ## 7. 代码映射
 
-- 规范展示页：`Ohana/Views/Details/UIGuidelinesView.swift`
+- 规范展示页：`Ohana/Features/Settings/DesignLab/UIGuidelinesView.swift`
 - 规范选择源：`ui规范.selection.json`
 - 新页面模板：`docs/ui-v4-new-page-template.md`
 - 自动检查脚本：`scripts/audit-ui-v4.sh`

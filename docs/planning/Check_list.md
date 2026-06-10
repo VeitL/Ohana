@@ -19,7 +19,7 @@
 - [x] 数据备份/恢复（`DataBackupManager`）
 
 ### 成熟度工程强化（2026-06-07）
-- [x] **MetricKit 生产可观测性**：新增 `MetricKitObserver`（`Ohana/Utilities/MetricKitObserver.swift`），订阅 `MXMetricManager`，聚合启动耗时 / Hang / 内存峰值指标与崩溃 / Hang / CPU / 磁盘写异常诊断；崩溃诊断（下次启动才送达）持久化到 `MetricDiagnosticsStore`（UserDefaults 环形缓冲，上限 20 条）并在下次启动回放进 `AppPerformanceMonitor`，直接显示在「性能诊断面板」。在 `OhanaApp.init` 的 MainActor 任务中 `MetricKitObserver.shared.start()` 注册
+- [x] **MetricKit 生产可观测性**：新增 `MetricKitObserver`（`Ohana/App/MetricKitObserver.swift`），订阅 `MXMetricManager`，聚合启动耗时 / Hang / 内存峰值指标与崩溃 / Hang / CPU / 磁盘写异常诊断；崩溃诊断（下次启动才送达）持久化到 `MetricDiagnosticsStore`（UserDefaults 环形缓冲，上限 20 条）并在下次启动回放进 `AppPerformanceMonitor`，直接显示在「性能诊断面板」。在 `OhanaApp.init` 的 MainActor 任务中 `MetricKitObserver.shared.start()` 注册
 - [x] **后台 `@ModelActor` SwiftData 读写能力**：新增 `CareLedgerBackfillActor`（`@ModelActor`），把一次性、全表无界的 CareLedger 回填从 MainActor 迁到专属后台 SwiftData context，启动维护改为 `await`，不再阻塞主线程；`CareLedgerService.record` 与 `CareLedgerBackfillService.backfill` 去掉非必要的 `@MainActor`（函数体仅做 ModelContext 写入，隔离无关），所有现有 MainActor 调用方与单测兼容
 - [x] **通知调度可注入依赖接缝**：新增 `ReminderNotificationScheduling` 协议 + `OhanaNotifications.current` 可注入提供者（默认 live = `NotificationManager.shared`，生产行为不变）；域/模型层（`CareEventService`、`ReminderSchedulingService`、`FamilyTaskService`、`FeedManagementSupport`、`Pet`、`RainbowBridgeService`）的调度/取消调用统一走接缝，单测可替换为内存假实现，视图层 `requestPermission` 保持原样
 - [x] **超大文件领域边界拆分**：把 5 个 SwiftData `@Model` 持久化类（`OasisUpgradeCoconut` / `OasisElectronicPet` / `OasisCritterFragmentBalance` / `OasisCritterActionLog` / `OasisUnlock`）从 2237 行的 `OasisUpgradeRewards.swift` 抽到 `OasisUpgradeModels.swift`，持久化层与目录数据 / 服务逻辑分离（同 target，schema 引用类型不受影响）

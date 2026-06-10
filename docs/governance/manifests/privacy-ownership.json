@@ -29,7 +29,7 @@
         "Ohana/PrivacyInfo.xcprivacy",
         "Ohana/Domain/Services/DataBackupManager.swift",
         "Ohana/Domain/Services/DataBackupDTOs.swift",
-        "Ohana/Utilities/AppResetService.swift",
+        "Ohana/App/AppResetService.swift",
         "scripts/audit-release-data-safety.sh"
       ]
     },

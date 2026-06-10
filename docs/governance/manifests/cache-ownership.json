@@ -32,8 +32,8 @@
       "expiry": "Decoded memory entries live only while process memory pressure allows; preview files remain lazy fallback cache data.",
       "recovery": "Render placeholders or preview entries, then rebuild decoded images through the existing deferred AvatarPipeline / FocusWalletAvatarCache preload path after the first frame.",
       "paths": [
-        "Ohana/Utilities/FocusWalletAvatarCache.swift",
-        "Ohana/Utilities/AvatarPipeline.swift",
+        "Ohana/Shared/Media/FocusWalletAvatarCache.swift",
+        "Ohana/Shared/Media/AvatarPipeline.swift",
         "OhanaTests/DecodedImageCacheMemoryWarningTests.swift"
       ]
     },
@@ -46,7 +46,7 @@
       "expiry": "Decoded memory entries live only while process memory pressure allows.",
       "recovery": "Render without the popout image until route-scoped preload rebuilds it through the existing detached decode path.",
       "paths": [
-        "Ohana/Utilities/FocusPopoutImageCache.swift",
+        "Ohana/Shared/Media/FocusPopoutImageCache.swift",
         "OhanaTests/DecodedImageCacheMemoryWarningTests.swift"
       ]
     },

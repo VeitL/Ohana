@@ -96,7 +96,7 @@
         "Ohana/Domain/Services/CareEventService.swift",
         "Ohana/Domain/Services/CareLedgerService.swift",
         "Ohana/Features/Notifications/ReminderSchedulingService.swift",
-        "Ohana/Utilities/ReminderActionCoordinator.swift",
+        "Ohana/Domain/Services/ReminderActionCoordinator.swift",
         "Ohana/Features/Calendar/Views/CalendarView.swift"
       ]
     },

@@ -28,9 +28,9 @@
       "policyGate": "scripts/audit-runtime-guardrails.sh --all plus this manifest audit.",
       "evidence": "AppWorkloadPolicy probes policy changes through AppPerformanceMonitor and is invoked by high-traffic views.",
       "paths": [
-        "Ohana/Utilities/AppRuntimePolicy.swift",
-        "Ohana/Utilities/AppLifecycleCoordinator.swift",
-        "Ohana/Utilities/SurfaceActivityGate.swift"
+        "Ohana/App/AppRuntimePolicy.swift",
+        "Ohana/App/AppLifecycleCoordinator.swift",
+        "Ohana/App/SurfaceActivityGate.swift"
       ]
     },
     {
@@ -101,8 +101,8 @@
       "policyGate": "Runtime guardrails require AppWorkloadPolicy for repeatForever/TimelineView animation files.",
       "evidence": "OhanaStaticAppBackground exists for route opens and ArkBackgroundView consumes AppWorkloadPolicy.",
       "paths": [
-        "Ohana/Views/ArkBackgroundView.swift",
-        "Ohana/Views/OhanaDesignSystem.swift"
+        "Ohana/Shared/Design/ArkBackgroundView.swift",
+        "Ohana/Shared/Design/OhanaDesignSystem.swift"
       ]
     },
     {
@@ -122,7 +122,7 @@
       "policyGate": "Changed-file smoothness audit and performance SLO manifest track high-frequency route handoffs.",
       "evidence": "Calendar add-event, settings sheets, and Oasis host use cancellable OhanaFrameScheduler tasks.",
       "paths": [
-        "Ohana/Utilities/AppRuntimePolicy.swift",
+        "Ohana/App/AppRuntimePolicy.swift",
         "Ohana/Features/Calendar/Views/CalendarView.swift",
         "Ohana/Features/Home/Views/FocusHomeRouteSheetModifier.swift",
         "Ohana/Features/Home/Views/OasisHomeTabHost.swift",
@@ -145,8 +145,8 @@
       "policyGate": "Runtime guardrails and whole-repo smoothness audit catch new TimelineView(.animation) usage.",
       "evidence": "Design preview files are isolated under design/spec and lab views, not startup.",
       "paths": [
-        "Ohana/Views/Details/DesignSpecPreviewCanvasV4.swift",
-        "Ohana/Views/MotionPreviewLabView.swift"
+        "Ohana/Features/Settings/DesignLab/DesignSpecPreviewCanvasV4.swift",
+        "Ohana/Features/Settings/DesignLab/MotionPreviewLabView.swift"
       ]
     }
   ]

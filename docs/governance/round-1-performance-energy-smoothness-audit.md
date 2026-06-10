@@ -67,7 +67,7 @@ None confirmed by this static pass. P0 requires evidence of a current failing us
 
 `scripts/audit-smoothness-risk.sh` scans changed SwiftUI code for:
 
-- Broad `@Query` in `Ohana/Views/Home` and `Ohana/Views/Components`.
+- Broad `@Query` in `Ohana/Features/Home` and `Ohana/Shared/Components`.
 - Synchronous `Data(contentsOf:)`, `UIImage(data:)`, or `UIImage(contentsOfFile:)` in view files.
 - `Timer.publish`, `TimelineView(.animation)`, and `repeatForever` in view files.
 

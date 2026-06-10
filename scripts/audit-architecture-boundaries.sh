@@ -134,20 +134,20 @@ forbidden_patterns() {
 }
 
 view_user_defaults() {
-  local roots=(Ohana/Views Ohana/Features)
+  local roots=(Ohana/Features Ohana/Shared/Components)
   rg -n 'UserDefaults\.standard' "${roots[@]}" --glob '*.swift' \
-    | rg '/Views/' || true
+    | rg '/Views/|Ohana/Shared/Components/' || true
 }
 
 view_command_executors() {
-  local roots=(Ohana/Views Ohana/Features)
+  local roots=(Ohana/Features Ohana/Shared/Components)
   rg -n --pcre2 '\b[A-Za-z0-9_]*CommandExecutor\s*\(\s*context:\s*modelContext\s*\)' "${roots[@]}" --glob '*.swift' || true
 }
 
 view_static_business_calls() {
-  local roots=(Ohana/ContentView.swift Ohana/App/RouteContainers Ohana/Views Ohana/Features)
+  local roots=(Ohana/ContentView.swift Ohana/App/RouteContainers Ohana/Features Ohana/Shared/Components)
   rg -n --pcre2 '\b[A-Z][A-Za-z0-9_]*(Service|Manager|Coordinator|Executor)\.' "${roots[@]}" --glob '*.swift' \
-    | rg '/Views/|RouteContainers/|Ohana/ContentView\.swift:' \
+    | rg '/Views/|Ohana/Shared/Components/|RouteContainers/|Ohana/ContentView\.swift:' \
     | rg -v ':\s*//' \
     | rg -v '\bFileManager\.default\b' \
     | rg -v '\bExpandedQuickActionExecutor\.Feedback\b' || true

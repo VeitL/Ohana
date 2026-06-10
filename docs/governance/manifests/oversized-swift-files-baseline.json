@@ -27,11 +27,11 @@
     { "path": "Ohana/Features/QuickCare/Views/QuickWaterDetailSheet.swift", "lines": 848 },
     { "path": "Ohana/Models/SharedModelContainer.swift", "lines": 975 },
     { "path": "Ohana/Shared/Localization.swift", "lines": 1373 },
-    { "path": "Ohana/Utilities/PetAvatarAssetCatalog.swift", "lines": 1324 },
-    { "path": "Ohana/Views/ArkBackgroundView.swift", "lines": 956 },
-    { "path": "Ohana/Views/Components/PetSilhouetteView.swift", "lines": 1093 },
-    { "path": "Ohana/Views/Details/DesignSpecPreviewCanvasV4.swift", "lines": 1465 },
-    { "path": "Ohana/Views/Details/UIGuidelinesSafePreviewCanvasV4.swift", "lines": 1377 },
-    { "path": "Ohana/Views/OhanaDesignSystem.swift", "lines": 1074 }
+    { "path": "Ohana/Shared/Media/PetAvatarAssetCatalog.swift", "lines": 1324 },
+    { "path": "Ohana/Shared/Design/ArkBackgroundView.swift", "lines": 956 },
+    { "path": "Ohana/Shared/Components/PetSilhouetteView.swift", "lines": 1093 },
+    { "path": "Ohana/Features/Settings/DesignLab/DesignSpecPreviewCanvasV4.swift", "lines": 1465 },
+    { "path": "Ohana/Features/Settings/DesignLab/UIGuidelinesSafePreviewCanvasV4.swift", "lines": 1377 },
+    { "path": "Ohana/Shared/Design/OhanaDesignSystem.swift", "lines": 1082 }
   ]
 }

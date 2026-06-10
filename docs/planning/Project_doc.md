@@ -28,7 +28,7 @@
 ### 2. 架构、能耗与合规边界
 
 - **工程治理源头**：`docs/app-architecture-governance.md`。
-- **运行时策略唯一入口**：`Ohana/Utilities/AppRuntimePolicy.swift` 中的 `AppWorkloadPolicy`。不要在单个 View 里新建平行低功耗、Reduce Motion、scene phase 或后台策略。
+- **运行时策略唯一入口**：`Ohana/App/AppRuntimePolicy.swift` 中的 `AppWorkloadPolicy`。不要在单个 View 里新建平行低功耗、Reduce Motion、scene phase 或后台策略。
 - **定位合规**：只有 running 遛狗可以持续定位和后台定位；paused、finished、无遛狗进程、普通浏览、首页、记录、喂食、协作、商店都必须停止持续定位。
 - **后台/锁屏**：running 遛狗继续记录路线，但 UI timer、地图重绘、装饰动画停止或降频；时长用 elapsed-time 计算，不依赖后台每秒 timer。
 - **重复动画/Timer**：新增 `Timer.publish`、`TimelineView(.animation)`、`repeatForever`、Canvas/粒子循环、Map live update 必须通过 `scripts/audit-runtime-guardrails.sh`。
@@ -53,7 +53,7 @@
 
 ### 2B. 生产可观测性与依赖注入接缝（2026-06-07）
 
-- **MetricKit 可观测性**：`Ohana/Utilities/MetricKitObserver.swift` 是生产遥测的统一入口，`OhanaApp.init` 在 MainActor 任务里 `MetricKitObserver.shared.start()` 注册为 `MXMetricManagerSubscriber`。
+- **MetricKit 可观测性**：`Ohana/App/MetricKitObserver.swift` 是生产遥测的统一入口，`OhanaApp.init` 在 MainActor 任务里 `MetricKitObserver.shared.start()` 注册为 `MXMetricManagerSubscriber`。
   - 聚合每日 `MXMetricPayload`：首帧/恢复耗时、应用 Hang 平均时长、内存峰值、后台异常退出计数（直方图按桶中点加权平均换算成毫秒，见 `averageDurationMS(_:)`）。
   - 聚合 `MXDiagnosticPayload`：崩溃（termination reason / signal / exception）、Hang 时长、CPU 异常、磁盘写异常。
   - 崩溃诊断由系统在**下次启动**才送达，因此诊断摘要持久化到 `MetricDiagnosticsStore`（`UserDefaults` 键 `ohana_metrickit_pending_diagnostics`，JSON 环形缓冲，上限 20 条，`NSLock` 保护），启动时 `drainUnreported()` 回放进 `AppPerformanceMonitor`，直接显示在设置「性能诊断面板」（`PerformanceDiagnosticsView`）。
@@ -854,7 +854,7 @@ Color.petThemeMagenta / Pink / Purple / Indigo / Violet / Navy / Blue / SkyBlue
 
 ## 二十二、宠物剪影（PetSilhouetteView）— Kawaii 风格重设计
 
-**文件**：`Ohana/Views/Components/PetSilhouetteView.swift`
+**文件**：`Ohana/Shared/Components/PetSilhouetteView.swift`
 
 全部5种动物剪影替换为 Kawaii 奶头乐风格，使用纯 SwiftUI 几何形状绘制（`Circle`/`Ellipse`/`Capsule`/`Path`），无 SVG 依赖。
 
