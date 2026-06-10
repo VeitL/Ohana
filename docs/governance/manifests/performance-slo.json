@@ -132,7 +132,7 @@
       "paths": [
         "Ohana/Features/Walks/PetWalkingManager.swift",
         "Ohana/Features/Walks/LocationManager.swift",
-        "Ohana/Features/Home/Views/WalkTrackingCard.swift"
+        "Ohana/Features/Walks/Views/WalkTrackingCard.swift"
       ]
     },
     {
