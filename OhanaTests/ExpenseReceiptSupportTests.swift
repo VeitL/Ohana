@@ -77,6 +77,53 @@ struct ExpenseReceiptSupportTests {
         ))
     }
 
+    @Test func expenseSummaryBuilderUnifiesHumanPetAndReimbursementRollups() {
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "猫")
+        let directHumanExpense = PetExpenseLog(
+            date: date(2026, 3, 1),
+            amount: 30,
+            category: .other,
+            note: "Coffee",
+            executorId: human.id.uuidString
+        )
+        let petExpense = PetExpenseLog(
+            date: date(2026, 3, 2),
+            amount: 70,
+            category: .food,
+            note: "Food",
+            pet: pet,
+            executorId: human.id.uuidString
+        )
+        let reimbursement = PetExpenseLog(
+            date: date(2026, 3, 3),
+            amount: -20,
+            category: .insurancePremium,
+            note: "Claim paid",
+            pet: pet,
+            executorId: human.id.uuidString
+        )
+        let logs = [directHumanExpense, petExpense, reimbursement]
+
+        let totals = ExpenseSummaryBuilder.totals(from: logs)
+        let paidByHuman = ExpenseSummaryBuilder.paidBy(human.id, from: logs)
+        let humanDirect = ExpenseSummaryBuilder.humanDirectExpenses(human.id, from: logs)
+        let linkedToPet = ExpenseSummaryBuilder.linkedToPet(pet.id, from: logs)
+        let categories = ExpenseSummaryBuilder.categoryBreakdown(from: logs)
+
+        #expect(totals.spent == 100)
+        #expect(totals.reimbursed == 20)
+        #expect(totals.net == 80)
+        #expect(totals.recordCount == 3)
+        #expect(totals.spendCount == 2)
+        #expect(totals.reimbursementCount == 1)
+        #expect(paidByHuman.map(\.id) == logs.map(\.id))
+        #expect(humanDirect.map(\.id) == [directHumanExpense.id])
+        #expect(linkedToPet.map(\.id) == [petExpense.id, reimbursement.id])
+        #expect(categories.map(\.category) == [.food, .other])
+        #expect(abs((categories.first?.pct ?? 0) - 0.7) < 0.001)
+    }
+
     @MainActor
     @Test func receiptDocumentStoresAttachmentsAndHidesMetadata() {
         let pet = Pet(name: "Momo", species: "猫")

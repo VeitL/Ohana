@@ -106,12 +106,17 @@ extension OasisRewardView {
             oasisToolbarLayer
 
             critterNestLayer
+
+            bentoFeatureInfoLayer
         }
     }
 
+    @ViewBuilder
     var oasisBackgroundLayer: some View {
-        OhanaAppBackground()
-            .ignoresSafeArea()
+        if !hideToolbar {
+            OhanaAppBackground()
+                .ignoresSafeArea()
+        }
     }
 
     var energyParticleLayer: some View {
@@ -126,19 +131,38 @@ extension OasisRewardView {
         }
     }
 
+    @ViewBuilder
     var oasisScrollContent: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 0) {
-                Spacer().frame(height: contentTopInset)
+        if hideToolbar {
+            GeometryReader { proxy in
+                let metrics = OasisEmbeddedLayoutPolicy.metrics(availableHeight: proxy.size.height)
 
-                treeSceneCard
-                    .padding(.horizontal, 16)
-                    .padding(.top, treeSceneTopPadding)
+                VStack(spacing: metrics.sectionSpacing) {
+                    treeSceneCard(metrics: metrics)
+                        .frame(height: metrics.treeCardHeight)
 
-                oasisBentoGrid
-                    .padding(.horizontal, 16)
-                    .padding(.top, 14)
-                    .padding(.bottom, 140)
+                    oasisBentoGrid
+                        .frame(height: metrics.bentoGridHeight)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, metrics.topPadding)
+                .padding(.bottom, metrics.bottomPadding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+        } else {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 0) {
+                    Spacer().frame(height: contentTopInset)
+
+                    treeSceneCard
+                        .padding(.horizontal, 16)
+                        .padding(.top, treeSceneTopPadding)
+
+                    oasisBentoGrid
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
+                        .padding(.bottom, 140)
+                }
             }
         }
     }
@@ -159,6 +183,21 @@ extension OasisRewardView {
         if showCritterNest || critterNestPopupProgress > 0.001 {
             critterNestPopupOverlay
                 .zIndex(180)
+        }
+    }
+
+    @ViewBuilder
+    var bentoFeatureInfoLayer: some View {
+        if let activeBentoFeatureInfo {
+            OasisBentoFeatureInfoOverlay(
+                info: activeBentoFeatureInfo,
+                localization: l
+            ) {
+                withAnimation(GoMotion.stateChange) {
+                    self.activeBentoFeatureInfo = nil
+                }
+            }
+            .zIndex(190)
         }
     }
 

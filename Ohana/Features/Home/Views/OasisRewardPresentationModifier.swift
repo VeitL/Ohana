@@ -53,13 +53,19 @@ struct OasisRewardPresentationModifier: ViewModifier {
             )
             .ohanaSheetPagePresentation() // ui-v4: allow long growth roadmap overview
         case .achievements:
-            if let pet = pets.first {
-                AchievementWallView(
-                    pet: pet,
-                    allPets: pets,
-                    onPresentCoconutLog: onPresentCoconutLog
-                )
-                .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
+            if AppFeatureRouteGuard.allowsOasisSheetRoute(route, currentLevel: currentFeatureLevel) {
+                if let pet = pets.first {
+                    AchievementWallView(
+                        pet: pet,
+                        allPets: pets,
+                        onPresentCoconutLog: onPresentCoconutLog
+                    )
+                    .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
+                } else {
+                    emptyOasisRoute
+                }
+            } else {
+                lockedOasisRoute(route)
             }
         case .inventory:
             InventoryView()
@@ -97,7 +103,14 @@ struct OasisRewardPresentationModifier: ViewModifier {
             } else {
                 lockedOasisRoute(route)
             }
-        }
+            }
+    }
+
+    private var emptyOasisRoute: some View {
+        Color.clear
+            .onAppear {
+                sheetRoute = nil
+            }
     }
 
     private var currentFeatureLevel: Int {

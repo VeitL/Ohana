@@ -13,19 +13,22 @@ struct ExpandedQuickInlineActionMenu: View {
     var quickAccessibility: String = "快速打卡"
     var detailAccessibility: String = "查看详情"
     let isQuickDisabled: Bool
+    var showsQuickButton: Bool = true
     let onQuick: () -> Void
     let onDetail: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            iconButton(
-                icon: isQuickDisabled ? "checkmark" : quickIcon,
-                tint: isQuickDisabled ? Color.ohanaControlFill : accent,
-                foreground: isQuickDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText,
-                accessibility: isQuickDisabled ? "今日已完成" : quickAccessibility,
-                isDisabled: isQuickDisabled,
-                action: onQuick
-            )
+            if showsQuickButton {
+                iconButton(
+                    icon: isQuickDisabled ? "checkmark" : quickIcon,
+                    tint: isQuickDisabled ? Color.ohanaControlFill : accent,
+                    foreground: isQuickDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText,
+                    accessibility: isQuickDisabled ? "今日已完成" : quickAccessibility,
+                    isDisabled: isQuickDisabled,
+                    action: onQuick
+                )
+            }
 
             iconButton(
                 icon: detailIcon,

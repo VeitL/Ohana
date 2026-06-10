@@ -23,14 +23,20 @@ enum HomeFabShortcutCatalog {
 struct HomeFabActionRow: View {
     var item: HomeFabFunctionShortcut
     var rowHeight: CGFloat
+    @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
     var body: some View {
+        let _ = newFeatureRevision
+        let showsNewFeature = GrowthNewFeatureStore.hasPending(homeShortcut: item)
+
         HStack(spacing: 10) {
             HStack(spacing: 6) {
                 Text(item.label)
                     .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                     .lineLimit(1)
-                if let badge = item.badge {
+                if showsNewFeature {
+                    GrowthNewFeatureDot(size: 8)
+                } else if let badge = item.badge {
                     Text(badge)
                         .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goPrimary)

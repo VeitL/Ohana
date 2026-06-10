@@ -2,7 +2,7 @@
 
 > **Planning / Reference only**：本文档顶部快照可帮助理解历史决策，但不是当前规则源；下方长章节包含旧计划和旧事实。任何冲突都以 `AGENTS.md`、`ui规范.selection.json`、`docs/governance/manifests/`、当前治理文档和源码为准。
 
-> 最后更新: 2026-06-07（成熟度工程强化：MetricKit 可观测性 / 后台 @ModelActor / 通知调度依赖注入接缝 / 持久化模型拆分 / 历史 fetch 安全上限）| Build: ✅ `scripts/build-debug-fast.sh`（默认 iPhone 17 / Xcode installed default iOS 26.5 simulator runtime；在 iCloud 同步目录构建时用 `DERIVED_DATA_PATH=/tmp/OhanaDD` 绕过 CodeSign detritus 失败）| Schema: ArkSchemaV56
+> 最后更新: 2026-06-10（规则同步：根因修复纪律 / AGENTS.md 对齐；当前 schema 摘要核对到 ArkSchemaV60）| Build: 未运行（文档-only 更新）| Schema: ArkSchemaV60
 >
 > **当前事实优先级**：本文件顶部“当前快照”代表 2026-05-25 的实现状态；下方早期长章节保留为历史实现记录，若与当前快照、`AGENTS.md`、`ui规范.selection.json` 或 `docs/app-architecture-governance.md` 冲突，以后四者为准。
 >
@@ -33,6 +33,7 @@
 - **后台/锁屏**：running 遛狗继续记录路线，但 UI timer、地图重绘、装饰动画停止或降频；时长用 elapsed-time 计算，不依赖后台每秒 timer。
 - **重复动画/Timer**：新增 `Timer.publish`、`TimelineView(.animation)`、`repeatForever`、Canvas/粒子循环、Map live update 必须通过 `scripts/audit-runtime-guardrails.sh`。
 - **构建快速入口**：`scripts/build-debug-fast.sh` 默认使用 `platform=iOS Simulator,name=iPhone 17`，不写 `OS=`；让 Xcode 选择本机已安装的默认 iOS 26.5 simulator runtime，避免为旧 runtime 触发下载/解析。
+- **修改纪律同步**：执行实际改动时以 `AGENTS.md` 为准；保持改动聚焦，但不能把聚焦变成 under-fixing。若根因在任务范围内跨 helper、调用点或状态边界，必须果断修根因、更新受影响路径，并补上能防复发的窄护栏；只隐藏症状、留下已知坏路径或制造新的合理故障路径，都不算完成。
 
 ### 2A. 合规、安全、性能与功耗 Audit 待实施计划（2026-05-25）
 
@@ -113,11 +114,11 @@
   - `docs/privacy-compliance.md`：App Store 隐私清单/营养标签/加密出口合规；GDPR 数据导出（复用 `DataBackupManager.exportJSON`）与"删除我的数据"完整路径、数据最小化、无静默收集。
   - `docs/dependency-governance.md`：第三方依赖默认拒绝；新增需理由 + license（MIT/Apache/BSD）+ 供应链 + 版本锁定（提交 `Package.resolved`）；禁分析/广告/外泄 PII 的 SDK。
   - `docs/concurrency-and-error-policy.md`：MainActor vs 后台 `@ModelActor` 边界、`ModelContext` 非 Sendable 不得跨隔离、`@unchecked Sendable` / `nonisolated(unsafe)` 使用约束、错误建模与用户可见失败、`OSLog` 取代 `print` 的隐私安全日志。
-- **`AGENTS.md` 接入**：治理文档清单补全；新增「Continuous Integration & Automated Gates」章节；UI 完成门禁追加无障碍审计要求。
+- **`AGENTS.md` 接入**：治理文档清单补全；新增「Continuous Integration & Automated Gates」章节；UI 完成门禁追加无障碍审计要求。2026-06-10 追加根因修复纪律：避免过度保守导致只修表象，要求在任务范围内果断修根因并验证不会生成新的问题。
 
 ### 3. 当前 SwiftData Schema
 
-当前 schema 链到 **ArkSchemaV56**，`SharedModelContainer` 使用 `Schema(ArkSchemaV56.models)`。
+当前 schema 链到 **ArkSchemaV60**，`SharedModelContainer` 使用 `Schema(ArkSchemaV60.models)`。
 
 近期关键迁移：
 
@@ -141,6 +142,9 @@
 | V54 | 扭蛋非收藏结果与即时奖励记录扩展 |
 | V55 | Oasis 电子宠物低压力生命状态扩展 |
 | V56 | `HumanHealthMetricLog`：人类体检指标单项数值时间序列 |
+| V57 | 同物种共享事实扩展 |
+| V58 | `CoconutAccount` / `CoconutLedgerEntry`：椰子钱包账户与不可变流水 |
+| V59 | `EconomyBudgetUsageEvent`：椰子经济每日预算用量事件 |
 
 备份/恢复已覆盖家庭协作任务、兑换请求、Oasis 电子宠物、喂食结构化字段、余粮字段、破框图等新数据；PIN hash/salt 不应进入备份。
 

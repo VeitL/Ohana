@@ -134,6 +134,7 @@ final class MedicationReminderService {
         let calendar = Calendar.current
         let now = Date()
         let doseMinutes = PetMedicationSchedulePlan.doseMinutes(for: med, required: dosesPerDay)
+        let l = L10n.current
 
         // 起始基准时间：今天 08:00
         var baseComponents = calendar.dateComponents([.year, .month, .day], from: now)
@@ -161,12 +162,17 @@ final class MedicationReminderService {
                 if let endDate = med.endDate, fireDate > endDate { break outerLoop }
 
                 let content = UNMutableNotificationContent()
-                content.title = "💊 \(pet.name)服药提醒"
-                content.body = "\(med.name) · \(med.dosage)"
+                content.title = l.tr(zh: "宠物用药提醒", en: "Pet medication reminder", de: "Medikamentenerinnerung")
+                content.body = "\(pet.name) · \(med.name) · \(med.dosage)"
                 content.sound = .default
                 content.userInfo = [
                     "medicationId": med.id.uuidString,
-                    "petId": pet.id.uuidString
+                    "petId": pet.id.uuidString,
+                    "scheduledAt": fireDate.timeIntervalSince1970,
+                    "doseIndex": doseIdx,
+                    "eventType": EventType.petMedication.rawValue,
+                    "relatedEntityType": MedicationEventLink.petMedicationPlan,
+                    "relatedEntityId": med.id.uuidString
                 ]
                 content.categoryIdentifier = "MED_REMINDER"
 
@@ -208,9 +214,21 @@ final class MedicationReminderService {
         guard alertDate > Date() else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "⏳ \(pet.name)用药即将结束"
-        content.body = "\(med.name) 疗程还剩 3 天，请确认是否续药"
+        let l = L10n.current
+        content.title = l.tr(zh: "用药即将结束", en: "Medication ending soon", de: "Medikation endet bald")
+        content.body = l.tr(
+            zh: "\(pet.name) · \(med.name) 疗程还剩 3 天，请确认是否续药",
+            en: "\(pet.name) · \(med.name) has 3 days left. Check whether to renew.",
+            de: "\(pet.name) · \(med.name) endet in 3 Tagen. Bitte Verlängerung prüfen."
+        )
         content.sound = .default
+        content.userInfo = [
+            "medicationId": med.id.uuidString,
+            "petId": pet.id.uuidString,
+            "eventType": EventType.petMedication.rawValue,
+            "relatedEntityType": MedicationEventLink.petMedicationPlan,
+            "relatedEntityId": med.id.uuidString
+        ]
 
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: alertDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
@@ -277,7 +295,12 @@ final class MedicationReminderService {
             content.sound = .default
             content.userInfo = [
                 "humanMedicationId": med.id.uuidString,
-                "humanId": human.id.uuidString
+                "humanId": human.id.uuidString,
+                "scheduledAt": fireDate.timeIntervalSince1970,
+                "doseIndex": dose.doseIndex,
+                "eventType": EventType.medication.rawValue,
+                "relatedEntityType": MedicationEventLink.humanMedicationPlan,
+                "relatedEntityId": med.id.uuidString
             ]
             content.categoryIdentifier = "HUMAN_MED_REMINDER"
 

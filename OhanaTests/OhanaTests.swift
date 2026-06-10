@@ -1197,6 +1197,7 @@ struct OhanaTests {
 
         let petMedication = PetMedication(name: "Meds", dosage: "1 pill", frequency: .weekly, pet: pet)
         petMedication.customFrequencyNote = "Sunday"
+        petMedication.remainingAmount = 6
         sourceContext.insert(petMedication)
 
         let humanMedication = HumanMedication(humanId: human.id.uuidString, name: "Vitamin", dosage: "1", frequency: .daily)
@@ -1216,6 +1217,7 @@ struct OhanaTests {
         #expect(try targetContext.fetch(FetchDescriptor<PetDocument>()).first?.attachments.first?.data == Data([1, 1, 2]))
         #expect(try targetContext.fetch(FetchDescriptor<PetInsurance>()).first?.claims.first?.approvedAmount == 80)
         #expect(try targetContext.fetch(FetchDescriptor<PetMedication>()).first?.customFrequencyNote == "Sunday")
+        #expect(try targetContext.fetch(FetchDescriptor<PetMedication>()).first?.remainingAmount == 6)
         #expect(try targetContext.fetch(FetchDescriptor<HumanMedication>()).first?.name == "Vitamin")
         #expect(try targetContext.fetch(FetchDescriptor<HumanMedicationLog>()).first?.status == .taken)
         #expect(try targetContext.fetch(FetchDescriptor<SymptomLog>()).first?.photoData == Data([4, 5]))
@@ -3176,6 +3178,40 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func islandQuestEnginePrioritizesFirstPetWhenNoActivePets() async throws {
+        let human = Human(name: "Li")
+        let completedIntroProgress = TodayFocusQuestProgress(
+            isPetWizardCompleted: true,
+            isFirstMealRecorded: true,
+            isThemeColorSet: true
+        )
+
+        let quests = IslandQuestEngine.todayQuests(
+            pets: [],
+            reminders: [],
+            humans: [human],
+            questProgress: completedIntroProgress
+        )
+
+        #expect(quests.first?.id == IslandQuestEngine.oasisPetWizardQuestId)
+        #expect(quests.first?.emoji == "🐾")
+        #expect(quests.first?.isCompleted == false)
+
+        let refreshed = TodayFocusService.refreshedQuests(
+            quests,
+            pets: [],
+            humans: [human],
+            careLogs: [],
+            walkLogs: [],
+            pottyLogs: [],
+            questProgress: completedIntroProgress
+        )
+
+        #expect(refreshed.first?.id == IslandQuestEngine.oasisPetWizardQuestId)
+        #expect(refreshed.first?.isCompleted == false)
+    }
+
+    @MainActor
     @Test func islandQuestEngineDoesNotCreatePlayTaskForEveryPetAfterInteraction() async throws {
         let momo = Pet(name: "Momo", species: "狗")
         let lilo = Pet(name: "Lilo", species: "猫")
@@ -3430,7 +3466,19 @@ struct OhanaTests {
             .first { $0.plantId == plant.id }
 
         #expect(plantSignal?.plantId == plant.id)
+        #expect(plantSignal?.routeHint == .plant)
         #expect(plantSignal.map { TodayFocusCard.negativeSkipKey(for: $0).contains("plant:\(plant.id.uuidString)") } == true)
+    }
+
+    @MainActor
+    @Test func todayFocusNegativeSignalCarriesRouteTargetForMissedCheckIn() async throws {
+        let pet = Pet(name: "Momo", species: "狗")
+
+        let signal = IslandNegativeFeedback.signals(pets: [pet], plants: [], clinicalAlerts: [])
+            .first { $0.iconName == "cloud.fill" }
+
+        #expect(signal?.petId == pet.id)
+        #expect(signal?.routeHint == .petOverview)
     }
 
     @Test func humanMedicationScheduleMetadataRoundTripsAndHidesNotes() async throws {
@@ -3641,7 +3689,7 @@ struct OhanaTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV59.models)
+        let schema = Schema(ArkSchemaV60.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

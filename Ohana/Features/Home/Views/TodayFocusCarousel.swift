@@ -21,7 +21,7 @@ struct TodayFocusCarousel<Content: View>: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             .animation(animation, value: cardWidth)
         }
-        .frame(height: 216)
-        .padding(.top, 12)
+        .frame(height: 144)
+        .padding(.top, 8)
     }
 }

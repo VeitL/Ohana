@@ -253,6 +253,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     }
 
     private func openPetQuickKey(_ key: String, pet: Pet) {
+        GrowthNewFeatureStore.markVisited(quickActionType: key)
         switch key {
         case "feed":
             routes.openSheet(.petFeed(pet.id, opensManualSheet: false))
@@ -284,6 +285,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     }
 
     private func openPetFeature(_ feature: PetFeature, pet: Pet) {
+        GrowthNewFeatureStore.markVisited(feature: feature)
         switch feature {
         case .health:
             routes.openSheet(.petHealth(pet.id, initialSection: nil))

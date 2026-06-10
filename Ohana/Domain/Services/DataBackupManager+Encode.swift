@@ -308,6 +308,7 @@ nonisolated extension DataBackupManager {
             colorHex: m.colorHex,
             notes: m.notes,
             isActive: m.isActive,
+            remainingAmount: m.remainingAmount,
             createdAt: d(m.createdAt),
             petId: m.pet?.id.uuidString
         )

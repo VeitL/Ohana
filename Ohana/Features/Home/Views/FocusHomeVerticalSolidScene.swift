@@ -296,11 +296,11 @@ struct FocusHomeVerticalSolidScene<QuickActions: View, ContextMenuContent: View>
         }
         let p = eased(arrivalProgress)
         return (
-            scale: lerp(0.64, 1, p),
-            rotation: Double(lerp(7, 0, p)),
-            flip: Double(lerp(-76, 0, p)),
-            y: lerp(42, 0, p),
-            opacity: Double(lerp(0.18, 1, p))
+            scale: lerp(HomeJoinHandoffMotion.scale, 1, p),
+            rotation: Double(lerp(HomeJoinHandoffMotion.rotation, 0, p)),
+            flip: Double(lerp(HomeJoinHandoffMotion.flip, 0, p)),
+            y: lerp(HomeJoinHandoffMotion.y, 0, p),
+            opacity: Double(lerp(HomeJoinHandoffMotion.opacity, 1, p))
         )
     }
 

@@ -35,6 +35,14 @@ enum GoMotion {
     }
 }
 
+enum HomeJoinHandoffMotion {
+    static let scale: CGFloat = 0.58
+    static let rotation: CGFloat = 6
+    static let flip: CGFloat = -28
+    static let y: CGFloat = 86
+    static let opacity: CGFloat = 0.72
+}
+
 // MARK: - Global Coconut Balance Capsule
 struct CoconutBalanceCapsule: View {
     @State private var previousCount: Int

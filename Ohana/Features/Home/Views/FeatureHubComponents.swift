@@ -21,6 +21,7 @@ struct FeatureHubTileData: Identifiable, Hashable {
     let subtitle: String
     let icon: String
     let tint: Color
+    var showsNewFeature: Bool = false
 }
 
 struct FeatureHubDestinationItem<Destination: Hashable>: Identifiable {
@@ -243,31 +244,38 @@ private struct FeatureHubTile: View {
     let data: FeatureHubTileData
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: data.icon)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaFunctionalIcon)
-                    .ohanaSymbolPulse(trigger: data.value)
-                Spacer()
-                Text(data.value)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.65)
-                    .ohanaNumericMotion(data.value)
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: data.icon)
+                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaFunctionalIcon)
+                        .ohanaSymbolPulse(trigger: data.value)
+                    Spacer()
+                    Text(data.value)
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .ohanaNumericMotion(data.value)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(data.title)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    Text(data.subtitle)
+                        .font(OhanaFont.caption2(.semibold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
             }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(data.title)
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                Text(data.subtitle)
-                    .font(OhanaFont.caption2(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+
+            if data.showsNewFeature {
+                GrowthNewFeatureDot()
+                    .offset(x: 4, y: -4)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)

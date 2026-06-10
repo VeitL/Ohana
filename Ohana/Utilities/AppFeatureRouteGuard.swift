@@ -134,11 +134,13 @@ enum AppFeatureRouteGuard {
         switch oasisRoute {
         case .coconutShop:
             GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
+        case .achievements:
+            GrowthUnlockPolicy.status(for: PetFeature.achievements, currentLevel: 0).step.requiredLevel
         case .gacha:
             GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
         case .critterCodex:
             critterCodexUnlockLevel
-        case .coconutRules, .growthRoadmap, .achievements, .inventory, .checkInDetail:
+        case .coconutRules, .growthRoadmap, .inventory, .checkInDetail:
             nil
         }
     }

@@ -23,20 +23,18 @@ extension TodayFocusCard {
 
     func questCard(_ q: IslandQuest) -> some View {
         let accent = Color.goPrimary
-        return HStack(spacing: 14) {
+        return HStack(spacing: 10) {
             Button {
                 OhanaFeedback.light()
                 onOpenQuest(q)
             } label: {
-                HStack(spacing: 14) {
-                    iconBubble(emoji: q.emoji, accent: accent)
-
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(q.title)
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(2)
-                            .todayFocusReadableShadow(strength: 1.08)
+                            .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 1.0)
                         questMetaRow(q)
                     }
 
@@ -45,28 +43,19 @@ extension TodayFocusCard {
                 .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(spacing: 6) {
-                Button {
-                    OhanaFeedback.medium()
-                    onCompleteQuest(q)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
-                        Text(l.tr(zh: "打卡", en: "Check in", de: "Abhaken"))
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    }
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(accent, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-
-                skipButton(for: .quest(q), accent: accent)
+            focusActionButton(
+                icon: questActionIcon(for: q),
+                title: questActionTitle(for: q),
+                accent: accent
+            ) {
+                OhanaFeedback.medium()
+                onCompleteQuest(q)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background(cardBackground(accent))
     }
 
@@ -77,25 +66,23 @@ extension TodayFocusCard {
         let actionTitle = task.status == .pendingReview
             ? l.tr(zh: "去确认", en: "Review", de: "Prüfen")
             : l.tr(zh: "去处理", en: "Open", de: "Öffnen")
-        return HStack(spacing: 14) {
+        return HStack(spacing: 10) {
             Button {
                 OhanaFeedback.light()
                 onTapFamilyTask(task)
             } label: {
-                HStack(spacing: 14) {
-                    iconBubble(emoji: task.emoji, accent: accent)
-
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(task.title)
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(2)
-                            .todayFocusReadableShadow(strength: 1.08)
+                            .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 1.0)
                         Text(taskStatusLine(task, performer: performer, rewardText: rewardText))
-                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                             .lineLimit(1)
-                            .todayFocusReadableShadow(strength: 0.82)
+                            .todayFocusReadableShadow(strength: 0.72)
                     }
 
                     Spacer(minLength: 0)
@@ -103,29 +90,19 @@ extension TodayFocusCard {
                 .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(spacing: 6) {
-                Button {
-                    OhanaFeedback.medium()
-                    onTapFamilyTask(task)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.right").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
-                        Text(actionTitle)
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    }
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(accent, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-
-                skipButton(for: .familyTask(task), accent: accent)
+            focusActionButton(
+                icon: task.status == .pendingReview ? "checkmark.seal.fill" : "arrow.right",
+                title: actionTitle,
+                accent: accent
+            ) {
+                OhanaFeedback.medium()
+                onTapFamilyTask(task)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background(cardBackground(accent))
         .ohanaPing(trigger: task.statusRaw, accent: Color.goYellow, isEnabled: task.status == .pendingReview && task.hasReward)
         .ohanaShine(trigger: task.statusRaw, cornerRadius: OhanaRadius.input, isEnabled: task.status == .pendingReview)
@@ -134,45 +111,42 @@ extension TodayFocusCard {
     func exchangeCard(_ request: TodayFocusExchangeRequestSnapshot) -> some View {
         let accent = Color.goYellow
         let amount = CoconutExchangeOption.format(request.localAmount, currencyCode: request.currencyCode)
-        return HStack(spacing: 14) {
-            iconBubble(emoji: "💱", accent: accent)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l.tr(zh: "确认线下收款", en: "Confirm cash received", de: "Zahlung bestätigen"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .todayFocusReadableShadow(strength: 1.08)
-                Text("\(request.senderName) → \(amount) · \(request.coconutCost)🥥")
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-                    .lineLimit(2)
-                    .todayFocusReadableShadow(strength: 0.82)
-            }
-
-            Spacer(minLength: 6)
-
-            VStack(spacing: 6) {
-                Button {
-                    confirmExchange(request)
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
-                        Text(l.tr(zh: "已收到", en: "Received", de: "Erhalten"))
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+        return HStack(spacing: 10) {
+            Button {
+                OhanaFeedback.light()
+                onOpenExchange(request)
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(l.tr(zh: "确认线下收款", en: "Confirm cash received", de: "Zahlung bestätigen"))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 1.0)
+                        Text("\(request.senderName) → \(amount) · \(request.coconutCost)🥥")
+                            .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+                            .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 0.72)
                     }
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(accent, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
 
-                skipButton(for: .coconutExchange(request), accent: accent)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            focusActionButton(
+                icon: "checkmark.seal.fill",
+                title: l.tr(zh: "已收到", en: "Received", de: "Erhalten"),
+                accent: accent
+            ) {
+                confirmExchange(request)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background(cardBackground(accent))
     }
 
@@ -249,50 +223,43 @@ extension TodayFocusCard {
 
     func negativeCard(_ s: IslandNegativeSignal) -> some View {
         let accent = s.severity == .critical ? Color.goRed : Color.goYellow
-        return HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(accent.opacity(0.18))
-                    .frame(width: 52, height: 52)
-                    .scaleEffect(1 + pulse * 0.08)
-                Image(systemName: s.iconName)
-                    .font(OhanaFont.adaptive(size: 22, weight: .bold))
-                    .foregroundStyle(accent)
-            }
+        return HStack(spacing: 10) {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onTapNegativeSignal(s)
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(s.title)
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 1.0)
+                        Text(s.detail.isEmpty ? negativeStatusText(for: s) : s.detail)
+                            .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(s.detail.isEmpty ? accent : Color.ohanaPrimaryText.opacity(0.62))
+                            .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 0.72)
+                    }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(s.title)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .todayFocusReadableShadow(strength: 1.08)
-                Text(s.detail.isEmpty ? negativeStatusText(for: s) : s.detail)
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(s.detail.isEmpty ? accent : Color.ohanaPrimaryText.opacity(0.62))
-                    .lineLimit(2)
-                    .todayFocusReadableShadow(strength: 0.82)
-            }
-
-            Spacer(minLength: 6)
-
-            VStack(spacing: 6) {
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onTapNegativeSignal(s)
-                } label: {
-                    Text(negativeActionTitle(for: s))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
-                        .background(accent, in: Capsule())
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(ScaleButtonStyle())
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-                skipButton(for: .negative(s), accent: accent)
+            focusActionButton(
+                icon: negativeActionIcon(for: s),
+                title: negativeActionTitle(for: s),
+                accent: accent
+            ) {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onTapNegativeSignal(s)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background(cardBackground(accent))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(s.title). \(s.detail.isEmpty ? negativeStatusText(for: s) : s.detail)")
@@ -321,34 +288,43 @@ extension TodayFocusCard {
 
     func memoryCard(_ m: MemoryFragment) -> some View {
         let accent = m.accentColor
-        return HStack(spacing: 14) {
-            iconBubble(emoji: m.emoji, accent: accent)
+        return HStack(spacing: 10) {
+            Button {
+                OhanaFeedback.light()
+                onTapMemory()
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(m.headline)
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 1.0)
+                        Text(m.subline)
+                            .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
+                            .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 0.72)
+                    }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(m.headline)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .todayFocusReadableShadow(strength: 1.08)
-                Text(m.subline)
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
-                    .lineLimit(2)
-                    .todayFocusReadableShadow(strength: 0.82)
-            }
-
-            Spacer(minLength: 6)
-
-            Button { onTapMemory() } label: {
-                Image(systemName: "sparkles").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 18, weight: .bold))
-                    .foregroundStyle(accent)
-                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .background(accent.opacity(0.15), in: Circle())
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            focusActionButton(
+                icon: "sparkles",
+                title: l.tr(zh: "回顾", en: "Review", de: "Ansehen"),
+                accent: accent
+            ) {
+                OhanaFeedback.medium()
+                onTapMemory()
+            }
         }
-        .padding(14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background(cardBackground(accent))
     }
 
@@ -356,47 +332,45 @@ extension TodayFocusCard {
 
     var celebrateCard: some View {
         let accent = Color.goYellow
-        return HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(accent.opacity(0.2))
-                    .frame(width: 52, height: 52)
-                    .scaleEffect(1 + pulse * 0.1)
-                Text("🎉")
-                    .font(OhanaFont.adaptive(size: 30))
-                    .scaleEffect(bounceEmoji ? 1.1 : 1)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(hasNoHiddenFocusCards
-                    ? l.tr(zh: "今日清空", en: "All clear", de: "Alles klar")
-                    : l.tr(zh: "已暂时跳过", en: "Skipped today", de: "Heute übersprungen"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .todayFocusReadableShadow(strength: 1.08)
-            }
-
-            Spacer(minLength: 6)
-
+        return HStack(spacing: 10) {
             Button {
+                OhanaFeedback.light()
+                onTapOasis()
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(hasNoHiddenFocusCards
+                            ? l.tr(zh: "今日清空", en: "All clear", de: "Alles klar")
+                            : l.tr(zh: "已暂时跳过", en: "Skipped today", de: "Heute übersprungen"))
+                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                            .todayFocusReadableShadow(strength: 1.0)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            focusActionButton(
+                icon: hasNoHiddenFocusCards ? "leaf.fill" : "arrow.uturn.backward",
+                title: hasNoHiddenFocusCards
+                    ? l.tr(zh: "绿洲", en: "Oasis", de: "Oase")
+                    : l.tr(zh: "恢复", en: "Restore", de: "Zurück"),
+                accent: accent
+            ) {
                 if hasNoHiddenFocusCards {
                     onTapOasis()
                 } else {
                     restoreSkippedFocusCards()
                 }
-            } label: {
-                Text(hasNoHiddenFocusCards
-                    ? l.tr(zh: "绿洲", en: "Oasis", de: "Oase")
-                    : l.tr(zh: "恢复", en: "Restore", de: "Zurück"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(accent, in: Capsule())
             }
-            .buttonStyle(ScaleButtonStyle())
         }
-        .padding(14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background(cardBackground(accent))
     }
 
@@ -404,32 +378,132 @@ extension TodayFocusCard {
 
     var welcomeCard: some View {
         let accent = Color.goPrimary
-        return HStack(spacing: 14) {
-            iconBubble(emoji: "🏝️", accent: accent)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l.tr(zh: "岛屿欢迎你", en: "Welcome home", de: "Willkommen"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .todayFocusReadableShadow(strength: 1.08)
+        return Button {
+            OhanaFeedback.light()
+            onTapOasis()
+        } label: {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(l.tr(zh: "岛屿欢迎你", en: "Welcome home", de: "Willkommen"))
+                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .todayFocusReadableShadow(strength: 1.0)
+                }
+                Spacer()
             }
-            Spacer()
         }
-        .padding(14)
+        .buttonStyle(ScaleButtonStyle())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background(cardBackground(accent))
     }
 
     // MARK: - Helpers
 
-    @ViewBuilder
-    func iconBubble(emoji: String, accent: Color) -> some View {
-        ZStack {
-            Circle()
-                .fill(accent.opacity(0.2))
-                .frame(width: 52, height: 52)
-                .scaleEffect(1 + pulse * 0.06)
-            Text(emoji)
-                .font(OhanaFont.adaptive(size: 28))
-                .offset(y: pulse * 0.8 - 0.4)
+    func focusActionButton(icon: String, title: String, accent: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+
+                Text(title)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            .foregroundStyle(Color.arkInk)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(accent, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    func questActionIcon(for quest: IslandQuest) -> String {
+        if IslandQuestEngine.medicationId(fromQuestId: quest.id) != nil { return "pills.fill" }
+        if IslandQuestEngine.humanWeightId(fromQuestId: quest.id) != nil || quest.id.hasPrefix("q_weight_") {
+            return "scalemass.fill"
+        }
+        if quest.id.hasPrefix("q_feed_") { return "fork.knife" }
+        if quest.id.hasPrefix("q_water_plant_") || quest.id == "q_water_plant" { return "drop.fill" }
+        if quest.id.hasPrefix("q_water_") { return "drop.fill" }
+        if quest.id.hasPrefix("q_fertilize_plant_") || quest.id == "q_fertilize_plant" { return "leaf.fill" }
+        if quest.id == "q_walk" || quest.id.hasPrefix("q_walk_") { return "figure.walk" }
+        if quest.id == "q_potty" || quest.id.hasPrefix("q_potty_") { return "pawprint.fill" }
+        if quest.id.hasPrefix("q_play_") { return "tennisball.fill" }
+        if quest.id.hasPrefix("q_moment_") { return "camera.fill" }
+        if IslandQuestEngine.eventId(fromQuestId: quest.id) != nil || quest.id == "q_reminder" {
+            return "calendar.badge.checkmark"
+        }
+        if quest.id == IslandQuestEngine.oasisPetWizardQuestId { return "pawprint.circle.fill" }
+        if quest.id == IslandQuestEngine.oasisFirstMealQuestId { return "fork.knife" }
+        if quest.id == IslandQuestEngine.oasisThemeQuestId { return "paintpalette.fill" }
+        return "checkmark"
+    }
+
+    func questActionTitle(for quest: IslandQuest) -> String {
+        if IslandQuestEngine.medicationId(fromQuestId: quest.id) != nil {
+            return l.tr(zh: "服药", en: "Dose", de: "Dosis")
+        }
+        if IslandQuestEngine.humanWeightId(fromQuestId: quest.id) != nil || quest.id.hasPrefix("q_weight_") {
+            return l.tr(zh: "记录", en: "Log", de: "Loggen")
+        }
+        if quest.id.hasPrefix("q_feed_") { return l.tr(zh: "喂食", en: "Feed", de: "Füttern") }
+        if quest.id.hasPrefix("q_water_plant_") || quest.id == "q_water_plant" {
+            return l.tr(zh: "浇水", en: "Water", de: "Gießen")
+        }
+        if quest.id.hasPrefix("q_water_") { return l.tr(zh: "喂水", en: "Water", de: "Wasser") }
+        if quest.id.hasPrefix("q_fertilize_plant_") || quest.id == "q_fertilize_plant" {
+            return l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
+        }
+        if quest.id == "q_walk" || quest.id.hasPrefix("q_walk_") { return l.tr(zh: "开始", en: "Start", de: "Start") }
+        if quest.id == "q_potty" || quest.id.hasPrefix("q_potty_") { return l.tr(zh: "记录", en: "Log", de: "Loggen") }
+        if quest.id.hasPrefix("q_play_") { return l.tr(zh: "陪玩", en: "Play", de: "Spielen") }
+        if quest.id.hasPrefix("q_moment_") { return l.tr(zh: "记录", en: "Log", de: "Loggen") }
+        if quest.id == IslandQuestEngine.oasisPetWizardQuestId { return l.tr(zh: "添加", en: "Add", de: "Hinzufügen") }
+        if IslandQuestEngine.isOasisBuildQuest(quest.id) { return l.tr(zh: "前往", en: "Open", de: "Öffnen") }
+        if IslandQuestEngine.eventId(fromQuestId: quest.id) != nil || quest.id == "q_reminder" {
+            return l.tr(zh: "完成", en: "Done", de: "Fertig")
+        }
+        return l.tr(zh: "打卡", en: "Check in", de: "Abhaken")
+    }
+
+    func negativeActionIcon(for signal: IslandNegativeSignal) -> String {
+        switch signal.routeHint {
+        case .feed:
+            "fork.knife"
+        case .water:
+            "drop.fill"
+        case .potty:
+            "pawprint.fill"
+        case .walk:
+            "figure.walk"
+        case .weight:
+            "scalemass.fill"
+        case .medication:
+            "pills.fill"
+        case .health:
+            signal.severity == .critical ? "cross.case.fill" : "heart.text.square.fill"
+        case .allFeatures:
+            "square.grid.2x2.fill"
+        case .plant:
+            "leaf.fill"
+        case .petOverview:
+            "pawprint.fill"
+        case .none:
+            switch signal.healthAlertType {
+            case .weightGainAlert, .weightLossAlert:
+                "scalemass.fill"
+            case .drinkingWeightAlert:
+                "drop.fill"
+            case .noPotty:
+                "pawprint.fill"
+            case .noWalk:
+                "figure.walk"
+            default:
+                signal.severity == .critical ? "cross.case.fill" : "arrow.right"
+            }
         }
     }
 

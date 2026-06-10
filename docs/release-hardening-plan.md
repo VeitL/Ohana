@@ -1,6 +1,6 @@
 # Ohana Release Hardening Plan
 
-> Current baseline: 2026-06-10, `ArkSchemaV59`, Xcode 26.5, iOS Simulator SDK 26.5.
+> Current baseline: 2026-06-10, `ArkSchemaV60`, Xcode 26.5, iOS Simulator SDK 26.5.
 
 ## Goal
 

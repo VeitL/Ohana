@@ -151,7 +151,9 @@ extension TodayFocusCard {
                     signal.iconName,
                     "\(signal.severity)",
                     signal.petId?.uuidString ?? "",
-                    signal.plantId?.uuidString ?? ""
+                    signal.plantId?.uuidString ?? "",
+                    signal.healthAlertType?.rawValue ?? "",
+                    signal.routeHint?.rawValue ?? ""
                 ].joined(separator: ":")
             }.joined(separator: "|"),
             "pets:\(snapshot.pets.map { "\($0.id.uuidString):\($0.name):\($0.currentStreak):\($0.coconutBalance):\($0.hasPassedAway)" }.joined(separator: "|"))",

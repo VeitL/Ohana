@@ -48,15 +48,7 @@ extension AddExpenseSheet {
     }
 
     func defaultAmounts(for category: ExpenseCategory) -> [Double] {
-        switch category {
-        case .food: [20, 50, 100]
-        case .treats: [10, 20, 50]
-        case .medical: [100, 300, 800]
-        case .grooming: [80, 150, 300]
-        case .toys: [20, 50, 100]
-        case .insurancePremium: [60, 120, 300]
-        case .other: [20, 100, 300]
-        }
+        ExpenseAmountPresets.defaults(for: category)
     }
 
     func appendUniqueAmounts(_ candidates: [Double], into values: inout [Double]) {
@@ -70,7 +62,7 @@ extension AddExpenseSheet {
     }
 
     func roundedCurrency(_ amount: Double) -> Double {
-        (amount * 100).rounded() / 100
+        ExpenseAmountPresets.roundedCurrency(amount)
     }
 
     func displayAmount(_ amount: Double) -> String {

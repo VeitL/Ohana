@@ -453,6 +453,7 @@ nonisolated struct PetMedicationBackup: Codable {
     var colorHex: String
     var notes: String
     var isActive: Bool
+    var remainingAmount: Double?
     var createdAt: String
     var petId: String?
 }

@@ -79,7 +79,7 @@ extension TodayFocusCard {
             if presentation == .compactStack {
                 frozenCompactStackCard(
                     content: frozenFrontContent ?? content,
-                    backCardCount: min(3, max(focusCards.count - 1, 0))
+                    backCardCount: min(2, max(focusCards.count - 1, 0))
                 )
             } else {
                 cardContent(frozenFrontContent ?? content)
@@ -103,8 +103,8 @@ extension TodayFocusCard {
     func frozenCompactStackCard(content frontContent: TodayFocusContent, backCardCount: Int) -> some View {
         GeometryReader { geo in
             let width = max(298, min(geo.size.width, 390))
-            let cardHeight: CGFloat = 92
-            let backSpacing: CGFloat = 9
+            let cardHeight: CGFloat = 62
+            let backSpacing: CGFloat = 6
             let topPeekInset: CGFloat = backSpacing
             ZStack {
                 if backCardCount > 0 {
@@ -130,7 +130,7 @@ extension TodayFocusCard {
                 transaction.disablesAnimations = true
             }
         }
-        .frame(height: 128)
+        .frame(height: 86)
     }
 
     @ViewBuilder
@@ -141,9 +141,9 @@ extension TodayFocusCard {
                 VerticalGlassCardStack(
                     cards: cards,
                     activeIndex: $selectedFocusIndex,
-                    cardSize: CGSize(width: width, height: 92),
-                    visibleBackCardCount: min(3, max(cards.count - 1, 0)),
-                    backCardSpacing: 9,
+                    cardSize: CGSize(width: width, height: 62),
+                    visibleBackCardCount: min(2, max(cards.count - 1, 0)),
+                    backCardSpacing: 6,
                     swipeThreshold: 54,
                     wraps: true,
                     onIndexChanged: { _ in OhanaFeedback.light() }
@@ -152,7 +152,7 @@ extension TodayFocusCard {
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
             }
-            .frame(height: 128)
+            .frame(height: 86)
             .onChange(of: cards.count) { _, count in
                 if selectedFocusIndex >= count {
                     selectedFocusIndex = max(0, count - 1)
@@ -160,7 +160,7 @@ extension TodayFocusCard {
             }
         } else {
             cardContent(cards.first?.content ?? .welcome)
-                .frame(height: 92)
+                .frame(height: 62)
         }
     }
 
@@ -180,7 +180,7 @@ extension TodayFocusCard {
                             .accessibilityHidden(relative != 0)
                     }
                 }
-                .frame(height: 112)
+                .frame(height: 74)
                 .clipped()
                 .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
                 .highPriorityGesture(focusSwipeGesture(count: cards.count))

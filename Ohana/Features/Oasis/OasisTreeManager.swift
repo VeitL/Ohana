@@ -449,7 +449,9 @@ final class OasisTreeManager {
     @MainActor
     private func applyEnergyPackage(_ package: InjectionPackage, recordsCost: Bool, modelContext: ModelContext) -> Bool {
         let previousInjectedEnergy = injectedEnergy
-        let previousUsedPeriod = OasisTreePreferenceStore.injectionUsedPeriod(for: package.limitKey)
+        let previousUsedPeriod = package.enforcesPeriodLimit
+            ? OasisTreePreferenceStore.injectionUsedPeriod(for: package.limitKey)
+            : nil
         injectedEnergy += package.xp
         Self.markInjectionPackageUsed(package)
         careLedger.record(
@@ -481,7 +483,9 @@ final class OasisTreeManager {
         } catch {
             modelContext.rollback()
             injectedEnergy = previousInjectedEnergy
-            OasisTreePreferenceStore.restoreInjectionUsed(limitKey: package.limitKey, previousPeriodKey: previousUsedPeriod)
+            if package.enforcesPeriodLimit {
+                OasisTreePreferenceStore.restoreInjectionUsed(limitKey: package.limitKey, previousPeriodKey: previousUsedPeriod)
+            }
             oasisRewards.refreshCoconutProjection(context: modelContext)
             return false
         }
@@ -546,6 +550,7 @@ final class OasisTreeManager {
         let title: String
         let limitKey: String
         let isAvailable: Bool
+        let enforcesPeriodLimit: Bool
     }
 
     private static func injectionPackage(forRequestedCost cost: Int, currentLevel: TreeLevel) -> InjectionPackage {
@@ -553,28 +558,32 @@ final class OasisTreeManager {
             return InjectionPackage(
                 cost: 220,
                 xp: 60,
-                actionType: "weeklyTreeInjection",
-                title: "生命之树周能量包 +60XP",
+                actionType: "treeInjectionLarge",
+                title: "生命之树能量包 +60XP",
                 limitKey: OasisTreePreferenceStore.weeklyInjectionWeekKey,
-                isAvailable: currentLevel >= .lv5
+                isAvailable: currentLevel >= .lv5,
+                enforcesPeriodLimit: false
             )
         }
         return InjectionPackage(
             cost: 80,
             xp: 20,
-            actionType: "dailyTreeInjection",
+            actionType: "treeInjection",
             title: "注入生命之树能量 +20XP",
             limitKey: OasisTreePreferenceStore.dailyInjectionDayKey,
-            isAvailable: true
+            isAvailable: true,
+            enforcesPeriodLimit: false
         )
     }
 
     private static func canUseInjectionPackage(_ package: InjectionPackage, date: Date = Date()) -> Bool {
+        guard package.enforcesPeriodLimit else { return true }
         let usedKey = OasisTreePreferenceStore.injectionUsedPeriod(for: package.limitKey)
         return usedKey != injectionPeriodKey(for: package, date: date)
     }
 
     private static func markInjectionPackageUsed(_ package: InjectionPackage, date: Date = Date()) {
+        guard package.enforcesPeriodLimit else { return }
         OasisTreePreferenceStore.markInjectionUsed(
             limitKey: package.limitKey,
             periodKey: injectionPeriodKey(for: package, date: date)

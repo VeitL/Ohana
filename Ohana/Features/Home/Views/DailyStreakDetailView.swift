@@ -90,6 +90,17 @@ struct DailyStreakDetailView: View {
         activeHuman?.id.uuidString ?? currentActiveHumanId
     }
 
+    private var currentTreeLevel: Int {
+        appServices.oasisTree.treeLevel.rawValue
+    }
+
+    private var coconutShopLockedLevel: Int? {
+        guard let requiredLevel = AppFeatureRouteGuard.requiredLevel(for: AppSheetRoute.coconutShop(.boost)) else {
+            return nil
+        }
+        return currentTreeLevel >= requiredLevel ? nil : requiredLevel
+    }
+
     var body: some View {
         OhanaSheetPageScaffold(
             title: "打卡连击",
@@ -168,6 +179,13 @@ struct DailyStreakDetailView: View {
     }
 
     private func presentCoconutShop(_ category: ShopItem.ShopCategory) {
+        guard AppFeatureRouteGuard.allowsSheetRoute(.coconutShop(category), currentLevel: currentTreeLevel) else {
+            AppFeatureRouteGuard.recordIntercept(
+                AppFeatureRouteGuard.lockedRouteNote(for: AppSheetRoute.coconutShop(category), currentLevel: currentTreeLevel)
+            )
+            OhanaFeedback.error()
+            return
+        }
         onPresentCoconutShop?(category)
     }
 
@@ -405,6 +423,8 @@ struct DailyStreakDetailView: View {
                     Text("点击灰色日期补签")
                         .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary.opacity(0.7))
+                } else if let coconutShopLockedLevel {
+                    lockedShopLabel(level: coconutShopLockedLevel)
                 } else {
                     Button { presentCoconutShop(.boost) } label: {
                         Text("去商店购买 →")
@@ -453,6 +473,23 @@ struct DailyStreakDetailView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+    }
+
+    private func lockedShopLabel(level: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "lock.fill")
+                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .accessibilityHidden(true)
+            Text("商店 Lv.\(level) 解锁")
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
+        }
+        .foregroundStyle(Color.ohanaSecondaryText)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+        .accessibilityLabel("椰子商店生命之树 Lv.\(level) 解锁")
     }
 
     private var checkInMilestoneRow: some View {

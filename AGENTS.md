@@ -21,7 +21,7 @@ Rule precedence:
 
 - Ohana is an iOS SwiftUI app using SwiftData and Swift Charts.
 - The current app group in code is `group.com.guanchen.li.Ohana`; do not reintroduce older `Ark` app-group identifiers.
-- The latest SwiftData schema is defined in `Ohana/Models/SharedModelContainer.swift`; as of this consolidation it is `ArkSchemaV59`. Always verify the current `ArkSchemaV*` in that file rather than trusting this number — bump this line whenever a schema version lands.
+- The latest SwiftData schema is defined in `Ohana/Models/SharedModelContainer.swift`; as of this consolidation it is `ArkSchemaV60`. Always verify the current `ArkSchemaV*` in that file rather than trusting this number — bump this line whenever a schema version lands.
 - Before changing any SwiftData model field or adding a model, inspect the latest `ArkSchemaV*`, add the next schema version, append it to `ArkMigrationPlan.schemas`, and keep added fields lightweight-migration friendly with defaults when possible.
 - Keep `ArkMigrationPlan.stages` empty for add-only/lightweight changes. Add an explicit migration stage only when there is real custom migration logic.
 - User-facing copy must support the registered app languages (currently Chinese, English, German, Spanish, Portuguese, French, Japanese, Korean, Italian — see `Ohana/Shared/LocalizationSettings.swift`) through the localization rules below. Chinese and English are mandatory at authoring time; the others resolve through the fallback chain.
@@ -106,6 +106,7 @@ Default to fast-change mode unless the user explicitly asks for exhaustive valid
 - Start with one `git status --short` to understand the local change boundary.
 - Read only task-relevant files and avoid broad repository archaeology.
 - Make focused edits and avoid checkpoint builds after every small step.
+- Do not let “focused” become under-fixing. When the root cause crosses helper, call-site, or state boundaries inside the task scope, fix that root cause decisively, update the affected paths, and add or adjust the narrow guardrail that prevents recurrence. A fix is not complete if it merely hides the symptom, leaves a known broken path in place, or creates a plausible new failure mode.
 - Prefer cheap validation first: `rg`, path-specific audits, targeted tests, or a focused compiler check.
 - For pure UI changes, default to no compile/build. Pure UI means copy, spacing, padding, color/token usage, view composition, static layout, icon choice, simple animation parameters, and visual-only SwiftUI modifier changes that do not change data flow, route state, public APIs, model/service calls, generated assets, or shared component contracts. Validate with `rg`, visual reasoning, and `scripts/audit-ui-v4.sh --changed` or a path-specific UI audit instead.
 - Escalate a UI change to compile validation when it introduces or renames Swift types/properties/functions, changes generic/component APIs, touches shared design-system helpers, changes navigation/sheet/route behavior, changes inline overlay or custom sheet presentation, changes safe-area/hit-testing behavior, changes runtime policy/timers/maps/Canvas/TimelineView, changes localization plumbing, or the user explicitly asks for a build.

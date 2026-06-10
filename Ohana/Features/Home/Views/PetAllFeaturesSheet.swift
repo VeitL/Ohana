@@ -46,6 +46,37 @@ extension PetAllFeatureDestination: Identifiable {
         case .bondVault: "bondVault"
         }
     }
+
+    var petFeature: PetFeature? {
+        switch self {
+        case .health:
+            .health
+        case .medications:
+            .medications
+        case .food:
+            .food
+        case .hygiene:
+            .hygiene
+        case .walks:
+            .walks
+        case .potty:
+            .potty
+        case .basicInfo:
+            .basicInfo
+        case .documents:
+            .documents
+        case .moments, .timeline:
+            .moments
+        case .achievements:
+            .achievements
+        case .retention:
+            .retention
+        case .weight:
+            .weight
+        case .expense, .bondVault:
+            .expense
+        }
+    }
 }
 
 struct PetAllFeaturesSheet: View {
@@ -53,6 +84,7 @@ struct PetAllFeaturesSheet: View {
     let onOpenDestination: (PetAllFeatureDestination) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
     init(
         pet: Pet,
@@ -76,6 +108,8 @@ struct PetAllFeaturesSheet: View {
     }
 
     var body: some View {
+        let _ = newFeatureRevision
+
         NavigationStack {
             FeatureHubScaffold {
                 FeatureHubHeader(
@@ -111,6 +145,9 @@ struct PetAllFeaturesSheet: View {
     }
 
     private func open(_ destination: PetAllFeatureDestination) {
+        if let feature = destination.petFeature {
+            GrowthNewFeatureStore.markVisited(feature: feature)
+        }
         onOpenDestination(destination)
     }
 
@@ -284,7 +321,8 @@ struct PetAllFeaturesSheet: View {
                 value: value.isEmpty ? "--" : value,
                 subtitle: subtitle,
                 icon: icon,
-                tint: tint
+                tint: tint,
+                showsNewFeature: destination.petFeature.map { GrowthNewFeatureStore.hasPending(feature: $0) } ?? false
             ),
             destination: destination
         )

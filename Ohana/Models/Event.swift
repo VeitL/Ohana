@@ -32,6 +32,8 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
     case fertilizing = "施肥"
     // 人类专用
     case medication = "吃药"
+    /// 宠物用药计划（关联 `relatedEntityType == "pet_medication_plan"` + medication UUID）
+    case petMedication = "宠物用药"
     /// 宠物用药单次打卡（关联 `relatedEntityType == "pet_medication"` + medication UUID）
     case petMedicationDose = "宠物喂药打卡"
     /// 保险缴费提醒（关联 `relatedEntityType == "pet_insurance"` + insurance UUID）
@@ -58,6 +60,7 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
         case .watering: "💧"
         case .fertilizing: "🌿"
         case .medication: "💊"
+        case .petMedication: "💊"
         case .petMedicationDose: "💊"
         case .insurancePremium: "🛡️"
         }
@@ -81,7 +84,7 @@ enum EventType: String, Codable, CaseIterable, Identifiable {
         case .litterBox: "trash.fill"
         case .watering: "drop.fill"
         case .fertilizing: "leaf.fill"
-        case .medication, .petMedicationDose: "pill.fill"
+        case .medication, .petMedication, .petMedicationDose: "pill.fill"
         case .insurancePremium: "shield.fill"
         }
     }

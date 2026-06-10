@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 nonisolated enum PetMedicationDoseLogging {
-    static let relatedEntityTypeMedication = "pet_medication"
+    static let relatedEntityTypeMedication = MedicationEventLink.petMedicationDose
 
     /// 某日该药应喂次数（`asNeeded` 为 0，不产生委托）
     static func requiredDoses(on date: Date, for med: PetMedication) -> Int {
@@ -117,11 +117,11 @@ nonisolated enum PetMedicationDoseLogging {
                 context: modelContext,
                 save: false
             )
-            try modelContext.save()
             if decrementRemaining {
-                PetMedicationPlanStorageKeys.decrementRemainingAmount(medicationID: medication.id)
+                PetMedicationPlanStorageKeys.decrementRemainingAmount(medication: medication)
             }
             medicationReminders.recordDose(for: medication.id)
+            try modelContext.save()
         } catch {
             modelContext.rollback()
             questManager.wallet.refreshQuestProjection(context: modelContext, manager: questManager)

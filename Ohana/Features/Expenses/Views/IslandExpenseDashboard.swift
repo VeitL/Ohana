@@ -8,27 +8,13 @@
 import SwiftData
 import SwiftUI
 
-private struct CategorySpendBreakdown: Identifiable {
-    var id: String { category.rawValue }
-    let category: ExpenseCategory
-    let total: Double
-    let pct: Double
-}
-
 private struct PetExpenseSummary: Identifiable {
     let id: UUID
     let name: String
     let emoji: String
     let total: Double
     let color: Color
-    let categories: [CategorySpendBreakdown]
-}
-
-private struct CategorySummary: Identifiable {
-    var id: String { category.rawValue }
-    let category: ExpenseCategory
-    let total: Double
-    let pct: Double
+    let categories: [ExpenseCategoryBreakdown]
 }
 
 private struct PayerSummary: Identifiable {
@@ -38,13 +24,14 @@ private struct PayerSummary: Identifiable {
     let total: Double
     let color: Color
     let pct: Double
-    let categories: [CategorySpendBreakdown]
+    let categories: [ExpenseCategoryBreakdown]
 }
 
 struct IslandExpenseDashboardContentView: View {
     var standalone: Bool = true
     let pets: [Pet]
     let humans: [Human]
+    let allExpenseLogs: [PetExpenseLog]
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -63,13 +50,8 @@ struct IslandExpenseDashboardContentView: View {
         appServices.privacy.unlockedHumans(for: .expense, from: humans, viewedBy: activeHumanId)
     }
 
-    private var allExpenseLogs: [PetExpenseLog] {
-        pets.flatMap(\.expenseLogs)
-    }
-
     private var filteredLogs: [PetExpenseLog] {
-        guard let cutoff = selectedRange.startDate() else { return allExpenseLogs }
-        return allExpenseLogs.filter { $0.date >= cutoff }
+        ExpenseSummaryBuilder.logs(allExpenseLogs, in: selectedRange)
     }
 
     private var visibleExpenseLogs: [PetExpenseLog] {
@@ -77,17 +59,19 @@ struct IslandExpenseDashboardContentView: View {
     }
 
     private var positiveExpenseLogs: [PetExpenseLog] {
-        visibleExpenseLogs.filter { $0.amount > 0 }
+        ExpenseSummaryBuilder.positiveLogs(visibleExpenseLogs)
+    }
+
+    private var totals: ExpenseTotals {
+        ExpenseSummaryBuilder.totals(from: visibleExpenseLogs)
     }
 
     private var totalAmount: Double {
-        positiveExpenseLogs.reduce(0) { $0 + $1.amount }
+        totals.spent
     }
 
     private var totalReimbursed: Double {
-        visibleExpenseLogs
-            .filter { $0.amount < 0 }
-            .reduce(0) { $0 + abs($1.amount) }
+        totals.reimbursed
     }
 
     private var periodDelta: Double? {
@@ -103,27 +87,18 @@ struct IslandExpenseDashboardContentView: View {
         return totalAmount - previousTotal
     }
 
-    private var categorySummaries: [CategorySummary] {
-        let total = max(1, totalAmount)
-        var dict: [String: Double] = [:]
-        for log in positiveExpenseLogs {
-            dict[log.category, default: 0] += log.amount
-        }
-        return dict.compactMap { key, value in
-            guard let category = ExpenseCategory(rawValue: key) else { return nil }
-            return CategorySummary(category: category, total: value, pct: value / total)
-        }
-        .sorted { $0.total > $1.total }
+    private var categorySummaries: [ExpenseCategoryBreakdown] {
+        ExpenseSummaryBuilder.categoryBreakdown(from: visibleExpenseLogs)
     }
 
-    private var topCategory: CategorySummary? {
+    private var topCategory: ExpenseCategoryBreakdown? {
         categorySummaries.first
     }
 
     private var petSummaries: [PetExpenseSummary] {
         pets.compactMap { pet in
-            let logs = positiveExpenseLogs.filter { $0.pet?.id == pet.id }
-            let total = logs.reduce(0) { $0 + $1.amount }
+            let logs = ExpenseSummaryBuilder.linkedToPet(pet.id, from: visibleExpenseLogs)
+            let total = ExpenseSummaryBuilder.totals(from: logs).spent
             guard total > 0 else { return nil }
             return PetExpenseSummary(
                 id: pet.id,
@@ -131,7 +106,7 @@ struct IslandExpenseDashboardContentView: View {
                 emoji: pet.avatarEmoji,
                 total: total,
                 color: Color(hex: pet.safeThemeColorHex),
-                categories: categoryBreakdown(for: logs)
+                categories: ExpenseSummaryBuilder.categoryBreakdown(from: logs)
             )
         }
         .sorted { $0.total > $1.total }
@@ -160,7 +135,7 @@ struct IslandExpenseDashboardContentView: View {
                     total: value,
                     color: Color.ohanaSecondaryText,
                     pct: value / total,
-                    categories: categoryBreakdown(for: logsByKey[key] ?? [])
+                    categories: ExpenseSummaryBuilder.categoryBreakdown(from: logsByKey[key] ?? [])
                 )
             }
 
@@ -174,7 +149,7 @@ struct IslandExpenseDashboardContentView: View {
                 total: value,
                 color: humanThemeColor(human),
                 pct: value / total,
-                categories: categoryBreakdown(for: logsByKey[key] ?? [])
+                categories: ExpenseSummaryBuilder.categoryBreakdown(from: logsByKey[key] ?? [])
             )
         }
         .sorted { $0.total > $1.total }
@@ -293,7 +268,7 @@ struct IslandExpenseDashboardContentView: View {
                 if let topCategory {
                     miniMetric(
                         title: l.tr(zh: "最多", en: "Top", de: "Top"),
-                        value: topCategory.category.rawValue,
+                        value: l.expenseCategoryTitle(topCategory.category),
                         icon: topCategory.category.systemIconName,
                         tint: expenseTint(topCategory.category)
                     )
@@ -455,7 +430,7 @@ struct IslandExpenseDashboardContentView: View {
         name: String,
         amount: Double,
         tint: Color,
-        categories: [CategorySpendBreakdown],
+        categories: [ExpenseCategoryBreakdown],
         detailPrefix: String
     ) -> some View {
         VStack(spacing: 10) {
@@ -496,7 +471,7 @@ struct IslandExpenseDashboardContentView: View {
         }
     }
 
-    private func categoryStackedBar(_ categories: [CategorySpendBreakdown]) -> some View {
+    private func categoryStackedBar(_ categories: [ExpenseCategoryBreakdown]) -> some View {
         GeometryReader { proxy in
             HStack(spacing: 3) {
                 ForEach(categories.prefix(5)) { item in
@@ -590,24 +565,11 @@ struct IslandExpenseDashboardContentView: View {
         human.themeColor.count == 6 ? Color(hex: human.themeColor) : Color.goPrimary
     }
 
-    private func categoryBreakdown(for logs: [PetExpenseLog]) -> [CategorySpendBreakdown] {
-        let total = max(1, logs.filter { $0.amount > 0 }.reduce(0) { $0 + $1.amount })
-        var dict: [String: Double] = [:]
-        for log in logs where log.amount > 0 {
-            dict[log.category, default: 0] += log.amount
-        }
-        return dict.compactMap { key, value in
-            guard let category = ExpenseCategory(rawValue: key) else { return nil }
-            return CategorySpendBreakdown(category: category, total: value, pct: value / total)
-        }
-        .sorted { $0.total > $1.total }
-    }
-
-    private func categorySummaryText(_ categories: [CategorySpendBreakdown], prefix: String) -> String {
+    private func categorySummaryText(_ categories: [ExpenseCategoryBreakdown], prefix: String) -> String {
         guard !categories.isEmpty else {
             return l.tr(zh: "暂无分类", en: "No category", de: "Keine Kategorie")
         }
-        let names = categories.prefix(2).map(\.category.rawValue).joined(separator: " · ")
+        let names = categories.prefix(2).map { l.expenseCategoryTitle($0.category) }.joined(separator: " · ")
         return "\(prefix) \(names)"
     }
 

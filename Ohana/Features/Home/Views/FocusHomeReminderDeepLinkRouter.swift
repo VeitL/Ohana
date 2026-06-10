@@ -15,6 +15,10 @@ struct OhanaReminderRoutePayload {
     let eventType: String?
     let relatedEntityType: String?
     let relatedEntityId: String?
+    let petId: UUID?
+    let humanId: UUID?
+    let medicationId: UUID?
+    let humanMedicationId: UUID?
 
     init?(userInfo: [AnyHashable: Any]?) {
         guard let userInfo else { return nil }
@@ -33,8 +37,19 @@ struct OhanaReminderRoutePayload {
         let eventType = value("eventType")
         let relatedEntityType = value("relatedEntityType")
         let relatedEntityId = value("relatedEntityId")
+        let petId = value("petId").flatMap(UUID.init(uuidString:))
+        let humanId = value("humanId").flatMap(UUID.init(uuidString:))
+        let medicationId = value("medicationId").flatMap(UUID.init(uuidString:))
+        let humanMedicationId = value("humanMedicationId").flatMap(UUID.init(uuidString:))
 
-        guard reminderId != nil || notificationId != nil || eventId != nil || relatedEntityId != nil else {
+        guard reminderId != nil ||
+            notificationId != nil ||
+            eventId != nil ||
+            relatedEntityId != nil ||
+            petId != nil ||
+            humanId != nil ||
+            medicationId != nil ||
+            humanMedicationId != nil else {
             return nil
         }
         self.reminderId = reminderId
@@ -43,6 +58,10 @@ struct OhanaReminderRoutePayload {
         self.eventType = eventType
         self.relatedEntityType = relatedEntityType
         self.relatedEntityId = relatedEntityId
+        self.petId = petId
+        self.humanId = humanId
+        self.medicationId = medicationId
+        self.humanMedicationId = humanMedicationId
     }
 }
 
@@ -77,7 +96,13 @@ enum FocusHomeReminderDeepLinkRouter {
                 humanMedications: humanMedications
             )
         }
-        return fallbackDestination(for: payload, pets: pets, humans: humans, plants: plants)
+        return fallbackDestination(
+            for: payload,
+            pets: pets,
+            humans: humans,
+            plants: plants,
+            humanMedications: humanMedications
+        )
     }
 
     private static func reminder(for payload: OhanaReminderRoutePayload, reminders: [Reminder]) -> Reminder? {
@@ -109,7 +134,7 @@ enum FocusHomeReminderDeepLinkRouter {
     ) -> FocusHomeReminderDestination {
         let entityType = event.relatedEntityType.lowercased()
 
-        if entityType == "human_medication",
+        if entityType == MedicationEventLink.humanMedicationPlan,
            let medicationId = UUID(uuidString: event.relatedEntityId),
            let medication = humanMedications.first(where: { $0.id == medicationId }),
            let human = humans.first(where: { $0.id.uuidString == medication.humanId }) {
@@ -142,8 +167,28 @@ enum FocusHomeReminderDeepLinkRouter {
         for payload: OhanaReminderRoutePayload,
         pets: [Pet],
         humans: [Human],
-        plants _: [Plant]
+        plants _: [Plant],
+        humanMedications: [HumanMedication]
     ) -> FocusHomeReminderDestination? {
+        if let humanMedicationId = payload.humanMedicationId,
+           let medication = humanMedications.first(where: { $0.id == humanMedicationId }),
+           let human = humans.first(where: { $0.id.uuidString == medication.humanId }) {
+            return .humanQuick("humanMedication", human)
+        }
+        if let humanId = payload.humanId,
+           let human = humans.first(where: { $0.id == humanId }) {
+            return .humanQuick("humanMedication", human)
+        }
+        if let medicationId = payload.medicationId {
+            for pet in pets where !pet.hasPassedAway && pet.medications.contains(where: { $0.id == medicationId }) {
+                return .petFeature(.medications, pet)
+            }
+        }
+        if let petId = payload.petId,
+           let pet = pets.first(where: { $0.id == petId && !$0.hasPassedAway }) {
+            return .petFeature(.medications, pet)
+        }
+
         let entityType = payload.relatedEntityType?.lowercased() ?? ""
         guard let id = payload.relatedEntityId else { return nil }
 
@@ -175,7 +220,8 @@ enum FocusHomeReminderDeepLinkRouter {
                 return event.relatedEntityId == id || event.relatedEntityId.hasPrefix("\(id):")
             }
         }
-        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication {
+        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication ||
+            entityType == MedicationEventLink.petMedicationPlan {
             guard let medicationId = UUID(uuidString: event.relatedEntityId) else { return nil }
             return pets.first { pet in
                 !pet.hasPassedAway && pet.medications.contains(where: { $0.id == medicationId })
@@ -198,7 +244,10 @@ enum FocusHomeReminderDeepLinkRouter {
         if entityType == "pet_insurance" || eventType == .insurancePremium {
             return .functionMenu(.petInsurance(pet.persistentModelID))
         }
-        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication || eventType == .petMedicationDose {
+        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication ||
+            entityType == MedicationEventLink.petMedicationPlan ||
+            eventType == .petMedication ||
+            eventType == .petMedicationDose {
             return .petFeature(.medications, pet)
         }
         if eventType == .litterBox ||

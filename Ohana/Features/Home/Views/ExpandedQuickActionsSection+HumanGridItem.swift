@@ -61,6 +61,7 @@ struct ExpandedHumanQuickActionGridItem: View {
                 ExpandedQuickInlineActionMenu(
                     accent: Color.goPrimary,
                     isQuickDisabled: false,
+                    showsQuickButton: false,
                     onQuick: onQuick,
                     onDetail: onDetail
                 )

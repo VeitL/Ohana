@@ -159,7 +159,8 @@ struct CalendarView: View {
         if entityType == "pet_insurance" {
             return insurances.first { $0.id.uuidString == event.relatedEntityId }?.pet?.id.uuidString == petId
         }
-        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication.lowercased() {
+        if entityType == PetMedicationDoseLogging.relatedEntityTypeMedication.lowercased() ||
+            entityType == MedicationEventLink.petMedicationPlan.lowercased() {
             return petMedications.first { $0.id.uuidString == event.relatedEntityId }?.pet?.id.uuidString == petId
         }
         return false
@@ -174,7 +175,7 @@ struct CalendarView: View {
             return entityType == EntityKind.human.rawValue.lowercased()
                 || entityType == "human"
         }
-        if entityType == "human_medication" {
+        if entityType == MedicationEventLink.humanMedicationPlan {
             return humanMedications.first { $0.id.uuidString == event.relatedEntityId }?.humanId == humanId
         }
         return false

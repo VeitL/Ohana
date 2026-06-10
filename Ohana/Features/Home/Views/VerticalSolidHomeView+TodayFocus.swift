@@ -164,27 +164,25 @@ extension VerticalSolidHomeView {
     func openTodayFocusNegativeSignal(_ signal: IslandNegativeSignal) {
         if let petId = signal.petId,
            let pet = pets.first(where: { $0.id == petId && !$0.hasPassedAway }) {
-            switch signal.healthAlertType {
-            case .some(.weightGainAlert), .some(.weightLossAlert):
-                routeCoordinator.openSheet(.petWeight(pet.id))
-            case .some(.drinkingWeightAlert):
+            switch todayFocusNegativeRouteHint(for: signal) {
+            case .petOverview:
+                onOpenPet(pet.id, .overview)
+            case .feed:
+                routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
+            case .water:
                 routeCoordinator.openSheet(.petWater(pet.id))
-            case .some(.noPotty):
+            case .potty:
                 routeCoordinator.openSheet(.petPotty(pet.id))
-            case .some(.noWalk):
+            case .walk:
                 routeCoordinator.openSheet(.petWalkSummary(pet.id))
-            case .some(.documentExpiringSoon):
+            case .weight:
+                routeCoordinator.openSheet(.petWeight(pet.id))
+            case .medication:
+                routeCoordinator.openSheet(.petMedication(pet.id))
+            case .allFeatures:
                 routeCoordinator.openSheet(.petAllFeatures(pet.id))
-            default:
-                if signal.iconName.contains("fork.knife") {
-                    routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
-                } else if signal.iconName.contains("drop") {
-                    routeCoordinator.openSheet(.petWater(pet.id))
-                } else if signal.iconName.contains("triangle") {
-                    routeCoordinator.openSheet(.petPotty(pet.id))
-                } else {
-                    routeCoordinator.openSheet(.petHealth(pet.id, initialSection: .preventive))
-                }
+            case .health, .plant:
+                routeCoordinator.openSheet(.petHealth(pet.id, initialSection: .preventive))
             }
             return
         }
@@ -198,8 +196,43 @@ extension VerticalSolidHomeView {
         openFunctionMenu(destination: .featureGroup(.healthBody))
     }
 
+    func todayFocusNegativeRouteHint(for signal: IslandNegativeSignal) -> IslandNegativeSignal.RouteHint {
+        if let routeHint = signal.routeHint {
+            return routeHint
+        }
+        switch signal.healthAlertType {
+        case .some(.weightGainAlert), .some(.weightLossAlert):
+            return .weight
+        case .some(.drinkingWeightAlert):
+            return .water
+        case .some(.noPotty):
+            return .potty
+        case .some(.noWalk):
+            return .walk
+        case .some(.documentExpiringSoon):
+            return .allFeatures
+        default:
+            return .health
+        }
+    }
+
     func openTodayFocusFamilyTask(_: TodayFocusFamilyTaskSnapshot) {
         routeCoordinator.openCrewRoster(mode: .collaboration)
+    }
+
+    func openTodayFocusExchange(_ request: TodayFocusExchangeRequestSnapshot) {
+        if let receiverId = UUID(uuidString: request.receiverId),
+           let receiver = humans.first(where: { $0.id == receiverId }) {
+            routeCoordinator.openCoconutLog(.human(receiver.id))
+            return
+        }
+
+        if let receiver = activeHuman {
+            routeCoordinator.openCoconutLog(.human(receiver.id))
+            return
+        }
+
+        routeCoordinator.openAccountSwitcher()
     }
 
     func confirmTodayFocusExchange(_ request: TodayFocusExchangeRequestSnapshot) {
@@ -226,7 +259,7 @@ extension VerticalSolidHomeView {
         guard IslandQuestEngine.isOasisBuildQuest(quest.id) else { return false }
         switch quest.id {
         case IslandQuestEngine.oasisPetWizardQuestId:
-            routeCoordinator.openAddEntity(humans.isEmpty ? .human : .pet)
+            routeCoordinator.openAddEntity(.pet)
         case IslandQuestEngine.oasisFirstMealQuestId:
             if let pet = pets.first(where: { !$0.hasPassedAway }) {
                 routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))

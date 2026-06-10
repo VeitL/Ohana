@@ -209,11 +209,15 @@ struct OnboardingView: View {
 
     private var introFlow: some View {
         GeometryReader { proxy in
-            let cardWidth = min(proxy.size.width - 32, 390)
+            let cardWidth = MemberCreationCardLayout.cardWidth(in: proxy.size.width)
+            let cardHeight = MemberCreationCardLayout.cardHeight(
+                in: proxy.size.height,
+                includesTopChrome: false
+            )
             VStack(spacing: 12) {
+                Spacer(minLength: 0)
                 onboardingIntroCard(width: cardWidth)
-                    .frame(maxWidth: 390)
-                    .frame(maxHeight: .infinity)
+                    .frame(width: cardWidth, height: cardHeight)
                     .rotation3DEffect(
                         .degrees(introCardFlipAngle),
                         axis: (x: 0, y: 1, z: 0),
@@ -222,8 +226,9 @@ struct OnboardingView: View {
                 onboardingIntroActions(width: cardWidth)
                     .opacity(introSideOpacity)
                     .allowsHitTesting(!isCardFlipActive && step == .intro)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, MemberCreationCardLayout.horizontalPadding)
             .padding(.top, 12)
             .padding(.bottom, 10)
             .frame(width: proxy.size.width, height: proxy.size.height)
@@ -245,7 +250,6 @@ struct OnboardingView: View {
                 .padding(.bottom, 22)
         }
         .frame(width: width)
-        .frame(maxHeight: .infinity)
         .background(OnboardingPalette.panelFill, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)

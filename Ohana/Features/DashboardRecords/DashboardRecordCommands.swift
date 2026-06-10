@@ -273,6 +273,7 @@ struct DashboardRecordCommandExecutor {
         date: Date,
         note expenseNote: String,
         category: ExpenseCategory = .other,
+        source: CareLedgerSource = .quickAction,
         command: DomainCommand,
         revisionNote: String
     ) -> ExpenseCommandResult {
@@ -283,6 +284,7 @@ struct DashboardRecordCommandExecutor {
             note: expenseNote,
             context: context,
             category: category,
+            source: source,
             questManager: questManager,
             careLedger: careLedger
         )

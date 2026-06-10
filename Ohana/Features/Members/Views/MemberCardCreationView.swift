@@ -212,26 +212,37 @@ struct MemberCardCreationContentView: View {
     var body: some View {
         ZStack {
             OhanaAppBackground()
-            VStack(spacing: 12) {
-                if presentationStyle.showsTopChrome {
-                    topChrome
-                        .opacity(isJoinHandoffRunning ? 0.28 : 1)
+            GeometryReader { proxy in
+                let cardHeight = MemberCreationCardLayout.cardHeight(
+                    in: proxy.size.height,
+                    includesTopChrome: presentationStyle.showsTopChrome
+                )
+                VStack(spacing: MemberCreationCardLayout.stackSpacing) {
+                    Spacer(minLength: 0)
+                    if presentationStyle.showsTopChrome {
+                        topChrome
+                            .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
+                            .opacity(isJoinHandoffRunning ? 0.28 : 1)
+                            .allowsHitTesting(!isJoinHandoffRunning)
+                    }
+                    creationCardArea
+                        .frame(height: cardHeight)
+                        .opacity(profileCardFlipOpacity)
+                        .rotation3DEffect(
+                            .degrees(profileCardFlipAngle),
+                            axis: (x: 0, y: 1, z: 0),
+                            perspective: 0.78
+                        )
+                    bottomCTA
+                        .opacity(isJoinHandoffRunning ? 0 : 1)
                         .allowsHitTesting(!isJoinHandoffRunning)
+                    Spacer(minLength: 0)
                 }
-                creationCardArea
-                    .opacity(profileCardFlipOpacity)
-                    .rotation3DEffect(
-                        .degrees(profileCardFlipAngle),
-                        axis: (x: 0, y: 1, z: 0),
-                        perspective: 0.78
-                    )
-                bottomCTA
-                    .opacity(isJoinHandoffRunning ? 0 : 1)
-                    .allowsHitTesting(!isJoinHandoffRunning)
+                .padding(.horizontal, MemberCreationCardLayout.horizontalPadding)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+                .frame(width: proxy.size.width, height: proxy.size.height)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
             if didShowSuccess {
                 AddWizardJoinCelebrationOverlay(
                     title: l.tr(zh: "\(draft.trimmedName) 已加入 Ohana", en: "\(draft.trimmedName) joined Ohana", de: "\(draft.trimmedName) ist bei Ohana"),

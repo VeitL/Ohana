@@ -395,17 +395,12 @@ nonisolated enum IslandQuestEngine {
         var quests: [IslandQuest] = []
         let hasAnyMember = !activePets.isEmpty || !humans.isEmpty
 
-        if !questProgress.isPetWizardCompleted, activePets.isEmpty {
-            let needsFirstHuman = humans.isEmpty
+        if activePets.isEmpty {
             quests.append(IslandQuest(
                 id: oasisPetWizardQuestId,
-                emoji: needsFirstHuman ? "👤" : "🐾",
-                title: needsFirstHuman
-                    ? localized(zh: "先建立你的本人档案", en: "Create your own profile first")
-                    : localized(zh: "迎接第一只宠物", en: "Welcome your first pet"),
-                subtitle: needsFirstHuman
-                    ? localized(zh: "创建主人身份卡", en: "Set up the owner profile card")
-                    : localized(zh: "让第一位伙伴住进岛屿 · +50🥥", en: "Bring your first companion home · +50🥥"),
+                emoji: "🐾",
+                title: localized(zh: "添加第一只宠物", en: "Add your first pet"),
+                subtitle: localized(zh: "先让一位伙伴住进岛屿，Today Focus 才能开始照护 · +50🥥", en: "Bring a companion home first so Today Focus can start care · +50🥥"),
                 isCompleted: false,
                 targetPetId: nil,
                 targetPlantId: nil

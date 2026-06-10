@@ -156,6 +156,7 @@ enum ExpenseCommandService {
         note: String,
         context: ModelContext,
         category: ExpenseCategory = .other,
+        source: CareLedgerSource = .quickAction,
         questManager providedQuestManager: QuestManager? = nil,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> ExpenseCommandResult {
@@ -185,7 +186,7 @@ enum ExpenseCommandService {
             amountValue: amount,
             amountUnit: "currency",
             note: cleanNote,
-            source: .quickAction,
+            source: source,
             sourceEventId: nil,
             sourceReminderId: nil,
             legacyModelName: "PetExpenseLog",

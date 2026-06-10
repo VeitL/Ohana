@@ -322,23 +322,33 @@ struct BeautifulCoconutTree: View {
         .animation(GoMotion.hero, value: cfg.scale)
         .frame(width: 300, height: 348)
         .onAppear {
-            isSwaying = true
+            isSwaying = allowsAmbientMotion
             if level >= 5 {
-                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 300) {
+                if allowsAmbientMotion {
+                    OhanaFrameScheduler.runAfterNextFrame(milliseconds: 300) {
+                        vineProgress = 1.0
+                    }
+                } else {
                     vineProgress = 1.0
                 }
             }
-            isSwaying = allowsAmbientMotion
         }
         .onChange(of: allowsAmbientMotion) { _, shouldAnimate in
             isSwaying = shouldAnimate
+            if !shouldAnimate, level >= 5 {
+                vineProgress = 1.0
+            }
         }
         .onChange(of: level) { oldVal, newVal in
             if newVal > oldVal { triggerShockwave() }
             // 新等级达到 5+ 时重新生长藤蔓
             if newVal >= 5, oldVal < 5 {
-                vineProgress = 0
-                OhanaFrameScheduler.runAfterNextFrame(milliseconds: 500) {
+                if allowsAmbientMotion {
+                    vineProgress = 0
+                    OhanaFrameScheduler.runAfterNextFrame(milliseconds: 500) {
+                        vineProgress = 1.0
+                    }
+                } else {
                     vineProgress = 1.0
                 }
             }

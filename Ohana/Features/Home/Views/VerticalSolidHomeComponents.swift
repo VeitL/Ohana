@@ -98,7 +98,7 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
         if lifecycle.isPreparingForDisplay {
             switch tab {
             case .oasis:
-                VerticalSolidHomeOasisPreparedPreview()
+                oasis(lifecycle)
             case .home, .calendar, .plants:
                 VerticalSolidHomePreparedPlaceholder()
             }
@@ -425,6 +425,7 @@ struct VerticalSolidHomeTodayFocusChrome: View {
     let onCompleteQuest: (IslandQuest) -> Void
     let onTapNegativeSignal: (IslandNegativeSignal) -> Void
     let onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void
+    let onOpenExchange: (TodayFocusExchangeRequestSnapshot) -> Void
     let onConfirmExchange: (TodayFocusExchangeRequestSnapshot) -> Void
 
     var body: some View {
@@ -437,6 +438,7 @@ struct VerticalSolidHomeTodayFocusChrome: View {
             onTapMemory: onOpenOasis,
             onTapOasis: onOpenOasis,
             onTapFamilyTask: onTapFamilyTask,
+            onOpenExchange: onOpenExchange,
             onConfirmExchange: onConfirmExchange,
             freezesToFrontCard: !isLive,
             allowsAmbientMotion: false
@@ -567,102 +569,345 @@ struct VerticalSolidHomePreparedPlaceholder: View {
     }
 }
 
-struct VerticalSolidHomeOasisPreparedPreview: View {
+struct OasisTreeRenderSnapshot: Equatable {
+    let level: Int
+    let progressToNextLevel: Double
+    let totalEnergy: Int
+    let nextLevelThreshold: Int
+    let shopLockedLevel: Int?
+    let crittersLockedLevel: Int?
+    let gachaLockedLevel: Int?
+
+    init(
+        level: Int,
+        progressToNextLevel: Double,
+        totalEnergy: Int = 0,
+        nextLevelThreshold: Int = 0,
+        shopLockedLevel: Int? = nil,
+        crittersLockedLevel: Int? = nil,
+        gachaLockedLevel: Int? = nil
+    ) {
+        self.level = min(max(level, 1), 10)
+        self.progressToNextLevel = Self.clampedProgress(progressToNextLevel)
+        self.totalEnergy = max(0, totalEnergy)
+        self.nextLevelThreshold = max(0, nextLevelThreshold)
+        self.shopLockedLevel = shopLockedLevel
+        self.crittersLockedLevel = crittersLockedLevel
+        self.gachaLockedLevel = gachaLockedLevel
+    }
+
+    static func clampedProgress(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        return min(max(value, 0), 1)
+    }
+}
+
+struct VerticalSolidHomeOasisFrozenTreeStage: View {
+    let snapshot: OasisTreeRenderSnapshot
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         GeometryReader { proxy in
-            let stageHeight = min(540, max(360, proxy.size.height * 0.76))
+            let metrics = OasisEmbeddedLayoutPolicy.metrics(availableHeight: proxy.size.height)
 
-            VStack(spacing: 14) {
-                ZStack(alignment: .bottom) {
-                    RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.goPrimary.opacity(0.14),
-                                    Color.goTeal.opacity(0.12),
-                                    Color.goYellow.opacity(0.10)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
-                                .strokeBorder(Color.goPrimary.opacity(0.18), lineWidth: 1)
-                        }
+            VStack(spacing: metrics.sectionSpacing) {
+                frozenTreeCard(metrics: metrics)
+                    .frame(height: metrics.treeCardHeight)
 
-                    VStack(spacing: 22) {
-                        Spacer(minLength: 0)
-
-                        VerticalSolidHomeOasisPreviewTree()
-                            .frame(width: 188, height: 238)
-
-                        RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
-                            .fill(Color.goPrimary.opacity(0.18))
-                            .frame(width: 220, height: 12)
-                            .padding(.bottom, 28)
-                    }
-                    .padding(.horizontal, 18)
-                }
-                .frame(height: stageHeight)
-
-                HStack(spacing: 10) {
-                    ForEach(0 ..< 3, id: \.self) { index in
-                        RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
-                            .fill(index == 0 ? Color.goPrimary.opacity(0.16) : Color.ohanaControlFill.opacity(0.72))
-                            .frame(height: 52)
-                    }
-                }
+                frozenBentoGrid
+                    .frame(height: metrics.bentoGridHeight)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 4)
-            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+            .padding(.top, metrics.topPadding)
+            .padding(.bottom, metrics.bottomPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
-}
 
-private struct VerticalSolidHomeOasisPreviewTree: View {
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            Ellipse()
-                .fill(Color.arkInk.opacity(0.12))
-                .frame(width: 164, height: 24)
-                .offset(y: 7)
+    private func frozenTreeCard(metrics: OasisEmbeddedLayoutMetrics) -> some View {
+        let stageShape = RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
 
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.goYellow.opacity(0.86), Color.goPrimary.opacity(0.72)],
-                        startPoint: .bottom,
-                        endPoint: .top
-                    )
+        return ZStack {
+            frozenStageBackground(shape: stageShape)
+            frozenStageStars
+            frozenStageSun
+            frozenIslandBase
+            frozenTreeGlow
+
+            VStack(spacing: 0) {
+                frozenStageHUD
+                    .padding(.horizontal, 12)
+                    .padding(.top, 10)
+
+                Spacer(minLength: 0)
+
+                BeautifulCoconutTree(
+                    level: snapshot.level,
+                    isInjecting: false,
+                    growthProgress: snapshot.progressToNextLevel,
+                    pendingUpgradeCoconutCount: 0,
+                    dailyCoconutCount: 0,
+                    allowsAmbientMotion: false,
+                    harvestedCoconuts: []
                 )
-                .frame(width: 18, height: 150)
-                .rotationEffect(.degrees(-4))
-                .offset(y: -22)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+                .frame(height: metrics.treeVisualHeight)
+                .padding(.bottom, 2)
 
-            ZStack {
-                ForEach(0 ..< 6, id: \.self) { index in
+                frozenUpgradeCoconutDock
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 6)
+
+                frozenProgressRail
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 8)
+
+                frozenInjectControl
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 10)
+            }
+        }
+        .frame(height: metrics.treeCardHeight)
+        .clipShape(stageShape)
+        .overlay(stageShape.strokeBorder(Color.goPrimary.opacity(0.22), lineWidth: 1))
+        .contentShape(stageShape)
+    }
+
+    private var frozenBentoGrid: some View {
+        OasisBentoGridView(
+            snapshot: OasisBentoSnapshot(
+                shopMetric: "—",
+                achievementMetric: "—",
+                achievementsLocked: false,
+                critterMetric: "—"
+            ),
+            localization: l,
+            shopLockedLevel: snapshot.shopLockedLevel,
+            crittersLockedLevel: snapshot.crittersLockedLevel,
+            gachaLockedLevel: snapshot.gachaLockedLevel,
+            isCompact: true,
+            isInteractive: false,
+            onOpenShop: {},
+            onOpenAchievements: {},
+            onOpenCritters: {},
+            onOpenGacha: {}
+        )
+    }
+
+    private var treeDisplayName: String {
+        TreeLevel(rawValue: snapshot.level)?.displayName ?? "生命之树"
+    }
+
+    private var treeGlowColor: Color {
+        TreeLevel(rawValue: snapshot.level)?.glowColor ?? Color.goPrimary
+    }
+
+    private var energyRailTitle: String {
+        if snapshot.level >= TreeLevel.lv10.rawValue {
+            return l.tr(zh: "满级", en: "Max", de: "Max")
+        }
+        if snapshot.nextLevelThreshold > 0 {
+            return "\(snapshot.totalEnergy)/\(snapshot.nextLevelThreshold)"
+        }
+        return "\(Int(snapshot.progressToNextLevel * 100))%"
+    }
+
+    private var frozenUpgradeCoconutDock: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .accessibilityHidden(true)
+                Text(nextStageHint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+            .font(OhanaFont.caption(.black))
+            .foregroundStyle(Color.ohanaSecondaryText)
+
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: 44)
+    }
+
+    private var nextStageHint: String {
+        if snapshot.level >= TreeLevel.lv10.rawValue {
+            return l.tr(zh: "树冠已觉醒", en: "Tree awakened", de: "Baum erwacht")
+        }
+        return l.tr(
+            zh: "下一颗升级椰子在树上成长",
+            en: "Next upgrade coconut is growing",
+            de: "Nächste Upgrade-Kokosnuss wächst"
+        )
+    }
+
+    private var frozenInjectControl: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bolt.fill")
+                .font(OhanaFont.subheadline(.black))
+                .accessibilityHidden(true)
+            Text(l.tr(zh: "注入 +20XP", en: "Infuse +20XP", de: "+20XP einspeisen"))
+                .font(OhanaFont.callout(.black))
+            Text("-80🥥")
+                .font(OhanaFont.caption(.black))
+                .opacity(0.66)
+        }
+        .foregroundStyle(Color.ohanaSecondaryText)
+        .frame(maxWidth: .infinity)
+        .frame(height: 48)
+        .background(Color.ohanaControlFill, in: Capsule())
+        .opacity(0.55)
+    }
+
+    private var frozenProgressRail: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Text(energyRailTitle)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .monospacedDigit()
+                Spacer()
+                Text("Lv.5 🥥")
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.goPrimary)
+            }
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(index.isMultiple(of: 2) ? Color.goPrimary.opacity(0.82) : Color.goTeal.opacity(0.72))
-                        .frame(width: 22, height: 118)
-                        .rotationEffect(.degrees(Double(index) * 42 - 105))
-                        .offset(y: -84)
+                        .fill(Color.ohanaControlFill)
+                    Capsule()
+                        .fill(LinearGradient(colors: [Color.goPrimary, Color.goTeal], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: max(8, proxy.size.width * CGFloat(snapshot.progressToNextLevel)))
                 }
             }
-            .offset(y: -106)
+            .frame(height: 8)
+        }
+    }
 
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(Color.goYellow.opacity(0.92))
-                    .frame(width: 24, height: 24)
-                Circle()
-                    .fill(Color.goYellow.opacity(0.78))
-                    .frame(width: 20, height: 20)
+    private func frozenStageBackground(shape: RoundedRectangle) -> some View {
+        shape
+            .fill(
+                LinearGradient(
+                    colors: colorScheme == .light
+                        ? [Color(hex: "D9E8FA"), Color(hex: "BFD1EA"), Color(hex: "8DA8D4")]
+                        : [Color(hex: "081338"), Color(hex: "051027"), Color(hex: "020617")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                shape
+                    .fill(
+                        RadialGradient(
+                            colors: [treeGlowColor.opacity(colorScheme == .light ? 0.22 : 0.32), .clear],
+                            center: .center,
+                            startRadius: 40,
+                            endRadius: 300
+                        )
+                    )
             }
-            .offset(x: 22, y: -128)
+    }
+
+    private var frozenStageStars: some View {
+        ZStack {
+            ForEach(0 ..< 24, id: \.self) { index in
+                let size = CGFloat([1.5, 2.0, 2.5, 1.8][index % 4])
+                Circle()
+                    .fill(Color.ohanaPrimaryText.opacity(Double([0.28, 0.44, 0.24, 0.5][index % 4])))
+                    .frame(width: size, height: size)
+                    .offset(
+                        x: CGFloat((index * 53) % 320) - 160,
+                        y: CGFloat((index * 37) % 220) - 160
+                    )
+            }
+        }
+        .opacity(colorScheme == .light ? 0.45 : 1)
+    }
+
+    private var frozenStageSun: some View {
+        Circle()
+            .fill(Color.goYellow)
+            .frame(width: 26, height: 26)
+            .shadow(color: Color.goYellow.opacity(0.68), radius: 14, x: 0, y: 0) // ui-v4: allow frozen Oasis stage celestial glow
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.top, 24)
+            .padding(.trailing, 28)
+    }
+
+    private var frozenIslandBase: some View {
+        ZStack(alignment: .bottom) {
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: colorScheme == .light
+                            ? [Color(hex: "D4B989"), Color(hex: "B58B55")]
+                            : [Color(hex: "E2A545"), Color(hex: "9A5B22")],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 304, height: 56)
+                .blur(radius: 0.2)
+
+            Ellipse()
+                .fill(Color.black.opacity(colorScheme == .light ? 0.12 : 0.26)) // ui-v4: allow grounded frozen island stage shadow
+                .frame(width: 250, height: 18)
+                .offset(y: 11)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 110)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var frozenTreeGlow: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [treeGlowColor.opacity(0.10), .clear],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 190
+                    )
+                )
+                .frame(width: 340, height: 340)
+                .scaleEffect(0.94)
+
+            Circle()
+                .stroke(Color.goPrimary.opacity(0.05), lineWidth: 2)
+                .frame(width: 250, height: 250)
+                .blur(radius: 2)
+        }
+        .offset(y: -32)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var frozenStageHUD: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Lv.\(snapshot.level)")
+                    .font(OhanaFont.title3(.black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
+                    .monospacedDigit()
+                Text(treeDisplayName)
+                    .font(OhanaFont.caption(.black))
+                    .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+
+            Spacer(minLength: 4)
         }
     }
 }

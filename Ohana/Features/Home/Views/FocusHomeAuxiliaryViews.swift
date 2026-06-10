@@ -319,6 +319,7 @@ struct TodayFocusQuestCardHost: View {
     var onTapNegativeSignal: (IslandNegativeSignal) -> Void
     var onTapOasis: () -> Void
     var onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void
+    var onOpenExchange: (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
     var onConfirmExchange: (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
 
     @State private var renderSnapshot = TodayFocusSnapshot.empty
@@ -333,6 +334,7 @@ struct TodayFocusQuestCardHost: View {
         onTapNegativeSignal: @escaping (IslandNegativeSignal) -> Void,
         onTapOasis: @escaping () -> Void,
         onTapFamilyTask: @escaping (TodayFocusFamilyTaskSnapshot) -> Void,
+        onOpenExchange: @escaping (TodayFocusExchangeRequestSnapshot) -> Void = { _ in },
         onConfirmExchange: @escaping (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
     ) {
         self.snapshot = snapshot
@@ -343,6 +345,7 @@ struct TodayFocusQuestCardHost: View {
         self.onTapNegativeSignal = onTapNegativeSignal
         self.onTapOasis = onTapOasis
         self.onTapFamilyTask = onTapFamilyTask
+        self.onOpenExchange = onOpenExchange
         self.onConfirmExchange = onConfirmExchange
         _renderSnapshot = State(initialValue: snapshot)
         _renderSnapshotRefreshKey = State(initialValue: SnapshotRefreshKey(snapshot: snapshot))
@@ -357,6 +360,7 @@ struct TodayFocusQuestCardHost: View {
             onTapNegativeSignal: onTapNegativeSignal,
             onTapOasis: onTapOasis,
             onTapFamilyTask: onTapFamilyTask,
+            onOpenExchange: onOpenExchange,
             onConfirmExchange: onConfirmExchange,
             freezesToFrontCard: !isLive,
             allowsAmbientMotion: isLive && presentation == .board
@@ -461,7 +465,8 @@ struct TodayFocusQuestCardHost: View {
                     signal.severity.identityToken.hashValue,
                     signal.petId?.hashValue ?? 0,
                     signal.plantId?.hashValue ?? 0,
-                    signal.healthAlertType?.rawValue.hashValue ?? 0
+                    signal.healthAlertType?.rawValue.hashValue ?? 0,
+                    signal.routeHint?.rawValue.hashValue ?? 0
                 )
             }
         }

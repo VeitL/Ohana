@@ -212,12 +212,15 @@ struct PetMedicationPlanCommandResult: Equatable {
     let subjectID: UUID
     let medicationID: UUID
     let created: Bool
+    let calendarEventIDs: [UUID]
+    let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
 }
 
 struct PetMedicationPlanDeleteCommandResult: Equatable {
     let subjectID: UUID
     let medicationID: UUID
+    let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
 }
 
@@ -226,6 +229,8 @@ struct PetMedicationPlanActivationCommandResult: Equatable {
     let medicationID: UUID
     let isActive: Bool
     let didChange: Bool
+    let calendarEventIDs: [UUID]
+    let removedCalendarEventIDs: [UUID]
     let scheduledReminderSync: Bool
 }
 
@@ -238,10 +243,25 @@ enum PetMedicationPlanStorageKeys {
         defaults.double(forKey: remainingAmount(medicationID: medicationID))
     }
 
+    static func remainingAmountValue(medication: PetMedication, defaults: UserDefaults = .standard) -> Double {
+        medication.remainingAmount > 0
+            ? medication.remainingAmount
+            : remainingAmountValue(medicationID: medication.id, defaults: defaults)
+    }
+
     static func decrementRemainingAmount(medicationID: UUID, by amount: Double = 1, defaults: UserDefaults = .standard) {
         let current = remainingAmountValue(medicationID: medicationID, defaults: defaults)
         guard current > 0, amount > 0 else { return }
         defaults.set(max(0, current - amount), forKey: remainingAmount(medicationID: medicationID))
+    }
+
+    static func decrementRemainingAmount(medication: PetMedication, by amount: Double = 1, defaults: UserDefaults = .standard) {
+        guard amount > 0 else { return }
+        let current = remainingAmountValue(medication: medication, defaults: defaults)
+        guard current > 0 else { return }
+        let next = max(0, current - amount)
+        medication.remainingAmount = next
+        defaults.set(next, forKey: remainingAmount(medicationID: medication.id))
     }
 }
 
@@ -280,8 +300,13 @@ enum PetMedicationPlanCommandService {
         }
 
         apply(input, to: medication, pet: pet)
+        let calendarSync = syncCalendarEvents(
+            for: medication,
+            pet: pet,
+            context: context
+        )
+        syncRemainingAmount(input.remainingAmount, medication: medication, userDefaults: userDefaults)
         context.safeSave()
-        syncRemainingAmount(input.remainingAmount, medicationID: medication.id, userDefaults: userDefaults)
 
         if scheduleReminders {
             let medicationReminders = providedMedicationReminders ?? SharedMedicationReminderManager()
@@ -292,6 +317,8 @@ enum PetMedicationPlanCommandService {
             subjectID: pet.id,
             medicationID: medication.id,
             created: created,
+            calendarEventIDs: calendarSync.createdEventIDs,
+            removedCalendarEventIDs: calendarSync.removedEventIDs,
             scheduledReminderSync: scheduleReminders
         )
     }
@@ -307,6 +334,7 @@ enum PetMedicationPlanCommandService {
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> PetMedicationPlanDeleteCommandResult {
         let medicationID = medication.id
+        let removedEventIDs = removeCalendarEvents(for: medicationID, context: context)
         context.delete(medication)
         context.safeSave()
         userDefaults.removeObject(forKey: PetMedicationPlanStorageKeys.remainingAmount(medicationID: medicationID))
@@ -319,6 +347,7 @@ enum PetMedicationPlanCommandService {
         return PetMedicationPlanDeleteCommandResult(
             subjectID: pet.id,
             medicationID: medicationID,
+            removedCalendarEventIDs: removedEventIDs,
             scheduledReminderSync: scheduleReminders
         )
     }
@@ -335,6 +364,11 @@ enum PetMedicationPlanCommandService {
     ) -> PetMedicationPlanActivationCommandResult {
         let didChange = medication.isActive != isActive
         medication.isActive = isActive
+        let calendarSync = syncCalendarEvents(
+            for: medication,
+            pet: pet,
+            context: context
+        )
         context.safeSave()
 
         if scheduleReminders {
@@ -347,6 +381,8 @@ enum PetMedicationPlanCommandService {
             medicationID: medication.id,
             isActive: isActive,
             didChange: didChange,
+            calendarEventIDs: calendarSync.createdEventIDs,
+            removedCalendarEventIDs: calendarSync.removedEventIDs,
             scheduledReminderSync: scheduleReminders
         )
     }
@@ -362,20 +398,109 @@ enum PetMedicationPlanCommandService {
         medication.colorHex = input.colorHex
         medication.notes = input.cleanNotes
         medication.isActive = input.isActive
+        medication.remainingAmount = max(0, input.remainingAmount ?? medication.remainingAmount)
         medication.pet = pet
     }
 
     private static func syncRemainingAmount(
         _ amount: Double?,
-        medicationID: UUID,
+        medication: PetMedication,
         userDefaults: UserDefaults
     ) {
-        let key = PetMedicationPlanStorageKeys.remainingAmount(medicationID: medicationID)
+        let key = PetMedicationPlanStorageKeys.remainingAmount(medicationID: medication.id)
         guard let amount else {
+            medication.remainingAmount = 0
             userDefaults.removeObject(forKey: key)
             return
         }
-        userDefaults.set(max(0, amount), forKey: key)
+        let normalized = max(0, amount)
+        medication.remainingAmount = normalized
+        userDefaults.set(normalized, forKey: key)
+    }
+
+    @MainActor
+    private static func syncCalendarEvents(
+        for medication: PetMedication,
+        pet: Pet,
+        context: ModelContext
+    ) -> (removedEventIDs: [UUID], createdEventIDs: [UUID]) {
+        let removedEventIDs = removeCalendarEvents(for: medication.id, context: context)
+        guard medication.isActive,
+              PetMedicationSchedulePlan.dosesPerDay(for: medication.frequency) > 0 else {
+            return (removedEventIDs, [])
+        }
+
+        let recurrenceDays = recurrenceDays(for: medication.frequency)
+        let firstDay = firstScheduledDay(for: medication)
+        let doseMinutes = PetMedicationSchedulePlan.doseMinutes(for: medication)
+        var createdEventIDs: [UUID] = []
+
+        for (index, minute) in doseMinutes.enumerated() {
+            guard let start = HumanMedicationSchedulePlan.date(on: firstDay, minuteOfDay: minute) else {
+                continue
+            }
+            let event = Event(
+                title: calendarEventTitle(
+                    for: medication,
+                    pet: pet,
+                    doseIndex: index,
+                    totalDoses: doseMinutes.count
+                ),
+                startDate: start,
+                eventType: EventType.petMedication.rawValue,
+                relatedEntityType: MedicationEventLink.petMedicationPlan,
+                relatedEntityId: medication.id.uuidString
+            )
+            event.recurrenceDays = recurrenceDays
+            event.recurrenceEndDate = medication.endDate.map { Calendar.current.startOfDay(for: $0) }
+            context.insert(event)
+            createdEventIDs.append(event.id)
+        }
+
+        return (removedEventIDs, createdEventIDs)
+    }
+
+    private static func recurrenceDays(for frequency: PetMedicationFrequency) -> Int {
+        switch frequency {
+        case .everyOtherDay:
+            2
+        case .weekly:
+            7
+        default:
+            1
+        }
+    }
+
+    private static func firstScheduledDay(for medication: PetMedication, calendar: Calendar = .current) -> Date {
+        calendar.startOfDay(for: medication.startDate)
+    }
+
+    private static func calendarEventTitle(
+        for medication: PetMedication,
+        pet: Pet,
+        doseIndex: Int,
+        totalDoses: Int
+    ) -> String {
+        let doseSuffix = totalDoses > 1 ? " · \(doseIndex + 1)/\(totalDoses)" : ""
+        let dosageSuffix = medication.dosage.isEmpty ? "" : " · \(medication.dosage)"
+        return "💊 \(pet.name) · \(medication.name)\(dosageSuffix)\(doseSuffix)"
+    }
+
+    @MainActor
+    private static func removeCalendarEvents(for medicationID: UUID, context: ModelContext) -> [UUID] {
+        let medicationIDString = medicationID.uuidString
+        let entityType = MedicationEventLink.petMedicationPlan
+        let descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.relatedEntityType == entityType && event.relatedEntityId == medicationIDString
+            }
+        )
+        let events = (try? context.fetch(descriptor)) ?? []
+        let removedEventIDs = events.map(\.id)
+        for event in events {
+            context.delete(event)
+        }
+        return removedEventIDs
     }
 }
 
@@ -529,7 +654,7 @@ struct PetMedicationCommandExecutor {
 }
 
 enum HumanMedicationPlanCommandService {
-    private static let humanMedicationEntityType = "human_medication"
+    private static let humanMedicationEntityType = MedicationEventLink.humanMedicationPlan
 
     @discardableResult
     @MainActor

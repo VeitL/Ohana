@@ -235,7 +235,7 @@ nonisolated enum TodayFocusService {
         if IslandQuestEngine.isOasisBuildQuest(quest.id) {
             switch quest.id {
             case IslandQuestEngine.oasisPetWizardQuestId:
-                return questProgress.isPetWizardCompleted
+                return questProgress.isPetWizardCompleted && pets.contains { !$0.hasPassedAway }
             case IslandQuestEngine.oasisFirstMealQuestId:
                 return questProgress.isFirstMealRecorded
             case IslandQuestEngine.oasisThemeQuestId:

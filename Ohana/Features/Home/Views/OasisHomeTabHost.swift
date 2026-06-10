@@ -13,7 +13,7 @@ enum OasisHomeTabContentPolicy {
         lifecycle.isLive
     }
 
-    static func shouldRenderPreparedShell(for lifecycle: VerticalSolidHomePageLifecycle) -> Bool {
+    static func shouldRenderFrozenTree(for lifecycle: VerticalSolidHomePageLifecycle) -> Bool {
         lifecycle.isPrepared || lifecycle.isPreparingForDisplay || lifecycle.isVisible
     }
 
@@ -24,6 +24,7 @@ enum OasisHomeTabContentPolicy {
 
 struct OasisHomeTabHost: View {
     let lifecycle: VerticalSolidHomePageLifecycle
+    let treeSnapshot: OasisTreeRenderSnapshot
     let injectEnergyTrigger: Int
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
@@ -39,7 +40,7 @@ struct OasisHomeTabHost: View {
 
     var body: some View {
         let rendersTreeContent = showsTreeContent && OasisHomeTabContentPolicy.shouldRenderTreeContent(for: lifecycle)
-        let rendersPreparedShell = OasisHomeTabContentPolicy.shouldRenderPreparedShell(for: lifecycle)
+        let rendersFrozenTree = OasisHomeTabContentPolicy.shouldRenderFrozenTree(for: lifecycle)
 
         Group {
             if rendersTreeContent {
@@ -52,8 +53,8 @@ struct OasisHomeTabHost: View {
                     onPresentCoconutLog: onPresentCoconutLog
                 )
                 .allowsHitTesting(OasisHomeTabContentPolicy.shouldRunActiveWork(for: lifecycle))
-            } else if rendersPreparedShell {
-                VerticalSolidHomeOasisPreparedPreview()
+            } else if rendersFrozenTree {
+                VerticalSolidHomeOasisFrozenTreeStage(snapshot: treeSnapshot)
             } else {
                 Color.clear
                     .allowsHitTesting(false)
@@ -104,12 +105,12 @@ struct OasisHomeTabHost: View {
         }
 
         var startedAtForVisibleShell: CFAbsoluteTime?
-        if OasisHomeTabContentPolicy.shouldRenderPreparedShell(for: lifecycle) {
+        if OasisHomeTabContentPolicy.shouldRenderFrozenTree(for: lifecycle) {
             let startedAt = ensureFlowStarted()
             startedAtForVisibleShell = startedAt
             recordShellReadyIfNeeded(
                 startedAt: startedAt,
-                source: OasisHomeTabContentPolicy.shouldRenderTreeContent(for: lifecycle) ? "live_tree" : "prepared_shell"
+                source: OasisHomeTabContentPolicy.shouldRenderTreeContent(for: lifecycle) ? "live_tree" : "frozen_tree"
             )
             if !didRecordFirstFrame {
                 AppFlowPerformance.mark(
@@ -119,7 +120,7 @@ struct OasisHomeTabHost: View {
                     note: [
                         "source": OasisHomeTabContentPolicy.shouldRenderTreeContent(for: lifecycle)
                             ? "live_tree"
-                            : "prepared_shell"
+                            : "frozen_tree"
                     ]
                 )
                 didRecordFirstFrame = true

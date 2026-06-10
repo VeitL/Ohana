@@ -25,24 +25,17 @@ struct PetExpenseDashboardContent: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
-    private var baseLogs: [PetExpenseLog] { pet.expenseLogs.sorted { $0.date > $1.date } }
+    private var baseLogs: [PetExpenseLog] { ExpenseSummaryBuilder.sortedRecent(pet.expenseLogs) }
     private var filteredLogs: [PetExpenseLog] {
-        baseLogs.filter { log in
-            let rangeOK = selectedRange.startDate().map { log.date >= $0 } ?? true
-            let categoryOK = selectedCategory.map { log.expenseCategory == $0 } ?? true
-            return rangeOK && categoryOK
-        }
+        ExpenseSummaryBuilder.logs(
+            ExpenseSummaryBuilder.logs(baseLogs, in: selectedRange),
+            category: selectedCategory
+        )
     }
 
-    private var positiveLogs: [PetExpenseLog] { filteredLogs.filter { $0.amount > 0 } }
-    private var total: Double { positiveLogs.reduce(0) { $0 + $1.amount } }
-    private var categoryBreakdown: [(ExpenseCategory, Double)] {
-        var dict: [ExpenseCategory: Double] = [:]
-        for log in positiveLogs {
-            dict[log.expenseCategory, default: 0] += log.amount
-        }
-        return dict.sorted { $0.value > $1.value }
-    }
+    private var positiveLogs: [PetExpenseLog] { ExpenseSummaryBuilder.positiveLogs(filteredLogs) }
+    private var totals: ExpenseTotals { ExpenseSummaryBuilder.totals(from: filteredLogs) }
+    private var categoryBreakdown: [ExpenseCategoryBreakdown] { ExpenseSummaryBuilder.categoryBreakdown(from: filteredLogs) }
 
     var body: some View {
         OhanaSheetPageScaffold(
@@ -75,9 +68,13 @@ struct PetExpenseDashboardContent: View {
 
     private var metrics: some View {
         FeatureHubMetricStrip(metrics: [
-            FeatureHubMetric(id: "range", title: l.tr(zh: "本期", en: "Period", de: "Zeitraum"), value: AppCurrency.format(total, fractionDigits: 0)),
-            FeatureHubMetric(id: "count", title: l.tr(zh: "记录", en: "Logs", de: "Einträge"), value: "\(filteredLogs.count)"),
-            FeatureHubMetric(id: "top", title: l.tr(zh: "最多", en: "Top", de: "Top"), value: categoryBreakdown.first.map { l.expenseCategoryTitle($0.0) } ?? "—")
+            FeatureHubMetric(id: "range", title: l.tr(zh: "本期", en: "Period", de: "Zeitraum"), value: AppCurrency.format(totals.spent, fractionDigits: 0)),
+            FeatureHubMetric(
+                id: totals.reimbursed > 0 ? "net" : "count",
+                title: totals.reimbursed > 0 ? l.tr(zh: "净额", en: "Net", de: "Netto") : l.tr(zh: "记录", en: "Logs", de: "Einträge"),
+                value: totals.reimbursed > 0 ? AppCurrency.format(totals.net, fractionDigits: 0) : "\(totals.recordCount)"
+            ),
+            FeatureHubMetric(id: "top", title: l.tr(zh: "最多", en: "Top", de: "Top"), value: categoryBreakdown.first.map { l.expenseCategoryTitle($0.category) } ?? "—")
         ])
     }
 

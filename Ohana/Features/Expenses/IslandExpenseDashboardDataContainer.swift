@@ -6,12 +6,14 @@ struct IslandExpenseDashboard: View {
 
     @Query(sort: \Pet.name) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
+    @Query(sort: \PetExpenseLog.date, order: .reverse) private var allExpenseLogs: [PetExpenseLog]
 
     var body: some View {
         IslandExpenseDashboardContentView(
             standalone: standalone,
             pets: pets,
-            humans: humans
+            humans: humans,
+            allExpenseLogs: allExpenseLogs
         )
     }
 }

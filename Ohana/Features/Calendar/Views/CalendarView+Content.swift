@@ -9,7 +9,9 @@ import SwiftUI
 extension CalendarView {
     var calendarContent: some View {
         ZStack(alignment: .top) {
-            OhanaAppBackground()
+            if !hideToolbar {
+                OhanaAppBackground()
+            }
 
             VStack(spacing: 0) {
                 if isMaterial {

@@ -58,12 +58,25 @@ struct CrewRosterOverlay: View {
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) private var hiddenHomePetIDsRaw = ""
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var isMaterial: Bool { false }
     private var matBg: Color { colorScheme == .light ? Color(hex: "F5F5F7") : Color(hex: "0A0A0C") }
     private var matSurface: Color { colorScheme == .light ? .white : Color(hex: "1C1C1E") }
     private var matAccent: Color { Color(hex: "FF5A00") }
     private var l: L10n { L10n(appLanguage) }
+    private var rosterFabMetrics: HomeBottomNavigationLayoutMetrics {
+        HomeBottomNavigationLayoutPolicy.metrics(
+            tabCount: VerticalSolidHomeTab.visibleTabs.count,
+            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+        )
+    }
+
+    private var rosterFabBottomPadding: CGFloat {
+        let bottomInset = max(safeBottomInset - 2, 4)
+        let centeredHitInset = max((rosterFabMetrics.barHeight - rosterFabMetrics.actionHitSize) / 2, 0)
+        return bottomInset + centeredHitInset
+    }
 
     private var filteredPets: [Pet] { Array(pets) }
     private var filteredHumans: [Human] { Array(humans) }
@@ -137,8 +150,8 @@ struct CrewRosterOverlay: View {
 
                 if shouldShowRosterFab {
                     rosterFloatingActionOverlay
-                        .padding(.trailing, 22)
-                        .padding(.bottom, safeBottomInset + 24)
+                        .padding(.trailing, rosterFabMetrics.horizontalPadding)
+                        .padding(.bottom, rosterFabBottomPadding)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .transition(.scale(scale: 0.86, anchor: .center).combined(with: .opacity))
                 }
@@ -385,14 +398,16 @@ struct CrewRosterOverlay: View {
                 }
             } label: {
                 Image(systemName: selectedRosterMode == .members && memberAddMenuExpanded ? "xmark" : "plus")
-                    .font(OhanaFont.adaptive(size: 20, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 21, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                    .frame(width: 58, height: 58)
+                    .frame(width: rosterFabMetrics.actionDiameter, height: rosterFabMetrics.actionDiameter)
                     .background(Color.goPrimary, in: Circle())
                     .rotationEffect(.degrees(selectedRosterMode == .members && memberAddMenuExpanded ? 90 : 0))
                     .shadow(color: Color.goPrimary.opacity(0.28), radius: 18, x: 0, y: 10) // ui-v4: allow floating FAB lift shadow
             }
             .buttonStyle(ScaleButtonStyle())
+            .frame(width: rosterFabMetrics.actionHitSize, height: rosterFabMetrics.actionHitSize)
+            .contentShape(Circle())
             .accessibilityLabel(fabAccessibilityLabel)
         }
     }

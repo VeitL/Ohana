@@ -21,6 +21,9 @@ struct FunctionMenuDestinationRouter: View {
             EmptyView()
         case .allow:
             destinationView(destination)
+                .onAppear {
+                    GrowthNewFeatureStore.markVisited(destination)
+                }
         case let .redirectToRoadmap(note):
             GrowthUnlockRoadmapView(
                 currentLevel: appServices.oasisTree.treeLevel.rawValue,

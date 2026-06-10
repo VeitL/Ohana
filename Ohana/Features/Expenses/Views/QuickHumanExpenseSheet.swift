@@ -28,9 +28,10 @@ struct QuickHumanExpenseSheet: View {
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
 
     @State private var amountText = ""
+    @State private var selectedCategory: ExpenseCategory = .other
     @State private var note = ""
     @State private var date = Date()
-    @State private var adaptiveSheetHeight: CGFloat = 500
+    @State private var adaptiveSheetHeight: CGFloat = 610
     @State private var contentHeight: CGFloat = 0
     @State private var popupVisible = false
     @State private var isClosing = false
@@ -41,6 +42,10 @@ struct QuickHumanExpenseSheet: View {
     private var l: L10n { L10n(appLanguage) }
     private var amount: Double? { CountryDecimalInput.parse(amountText, countryCode: appCountry) }
     private var isValid: Bool { (amount ?? 0) > 0 }
+    private var quickAmounts: [Double] {
+        ExpenseAmountPresets.defaults(for: selectedCategory)
+    }
+
     private var popupAnimation: Animation {
         .interactiveSpring(response: 0.30, dampingFraction: 0.88, blendDuration: 0.12)
     }
@@ -79,6 +84,8 @@ struct QuickHumanExpenseSheet: View {
                                 }
                             )
                             .padding(.horizontal, 22)
+                            quickAmountBlock
+                            categoryBlock
                             noteBlock
                             dateBlock
                         }
@@ -233,6 +240,56 @@ struct QuickHumanExpenseSheet: View {
         .padding(.horizontal, 22)
     }
 
+    private var quickAmountBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(l.quickExpenseCommonAmounts)
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .padding(.horizontal, 22)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(quickAmounts, id: \.self) { amount in
+                        Button {
+                            amountText = displayAmount(amount)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Text("\(AppCurrency.symbol)\(displayAmount(amount))")
+                                .font(OhanaFont.caption(.black))
+                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.arkInk : Color.ohanaPrimaryText)
+                                .padding(.horizontal, 13)
+                                .frame(height: 34)
+                                .background(
+                                    isQuickAmountSelected(amount) ? Color.goPrimary : Color.ohanaControlFill,
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 22)
+            }
+        }
+    }
+
+    private var categoryBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(l.quickExpenseCategory)
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .padding(.horizontal, 22)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(ExpenseCategory.allCases, id: \.self) { category in
+                        categoryChip(category)
+                    }
+                }
+                .padding(.horizontal, 22)
+            }
+        }
+    }
+
     private var noteBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"))
@@ -298,6 +355,39 @@ struct QuickHumanExpenseSheet: View {
         .padding(.bottom, 16)
     }
 
+    private func categoryChip(_ category: ExpenseCategory) -> some View {
+        let isSelected = selectedCategory == category
+        return Button {
+            withAnimation(GoMotion.feedback) {
+                selectedCategory = category
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: category.systemIconName)
+                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                Text(l.expenseCategoryTitle(category))
+                    .font(OhanaFont.caption(.black))
+            }
+            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+        }
+        .buttonStyle(ScaleButtonStyle())
+    }
+
+    private func displayAmount(_ amount: Double) -> String {
+        let rounded = ExpenseAmountPresets.roundedCurrency(amount)
+        let fractionDigits = abs(rounded - rounded.rounded()) < 0.01 ? 0 : 2
+        return CountryDecimalInput.format(rounded, countryCode: appCountry, maxFractionDigits: fractionDigits)
+    }
+
+    private func isQuickAmountSelected(_ amount: Double) -> Bool {
+        guard let parsed = self.amount else { return false }
+        return abs(ExpenseAmountPresets.roundedCurrency(parsed) - ExpenseAmountPresets.roundedCurrency(amount)) < 0.01
+    }
+
     private func close() {
         guard !isClosing else { return }
         isClosing = true
@@ -321,6 +411,7 @@ struct QuickHumanExpenseSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         let savedNote = note
         let savedDate = date
+        let savedCategory = selectedCategory
         let command = DomainCommand.quickHumanExpense(humanID: human.id)
         commandQueue.enqueue(command) {
             DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordHumanExpense(
@@ -328,6 +419,7 @@ struct QuickHumanExpenseSheet: View {
                 amount: amount,
                 date: savedDate,
                 note: savedNote,
+                category: savedCategory,
                 command: command,
                 revisionNote: "quick.human.expense"
             )

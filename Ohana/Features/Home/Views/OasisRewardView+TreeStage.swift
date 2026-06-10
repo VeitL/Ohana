@@ -9,6 +9,18 @@ extension OasisRewardView {
     // MARK: - Life Tree Stage
 
     var treeSceneCard: some View {
+        treeSceneCard(stageHeight: 540, treeVisualHeight: 300, isCompact: false)
+    }
+
+    func treeSceneCard(metrics: OasisEmbeddedLayoutMetrics) -> some View {
+        treeSceneCard(
+            stageHeight: metrics.treeCardHeight,
+            treeVisualHeight: metrics.treeVisualHeight,
+            isCompact: true
+        )
+    }
+
+    private func treeSceneCard(stageHeight: CGFloat, treeVisualHeight: CGFloat, isCompact: Bool) -> some View {
         let stageShape = RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
         return ZStack {
             stageBackground(shape: stageShape)
@@ -31,8 +43,8 @@ extension OasisRewardView {
 
             VStack(spacing: 0) {
                 stageTopHUD
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .padding(.horizontal, isCompact ? 12 : 16)
+                    .padding(.top, isCompact ? 10 : 16)
 
                 Spacer(minLength: 0)
 
@@ -52,26 +64,26 @@ extension OasisRewardView {
                     .scaleEffect(treeScale * treeInjectionVisualScale)
                     .animation(GoMotion.hero, value: treeScale)
                     .animation(interactionMotionBudget.allowsMotion ? GoMotion.feedback : GoMotion.reduced, value: treeInjectionProgress)
-                    .frame(height: 300)
-                    .padding(.bottom, 16)
+                    .frame(height: treeVisualHeight)
+                    .padding(.bottom, isCompact ? 2 : 16)
 
                     treeCritterEntryButton
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        .offset(x: 78, y: -28)
+                        .offset(x: isCompact ? 66 : 78, y: isCompact ? -18 : -28)
                         .zIndex(5)
                 }
 
                 stageUpgradeCoconutDock
                     .padding(.horizontal, 18)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, isCompact ? 6 : 10)
 
                 stageEnergyRail
                     .padding(.horizontal, 18)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, isCompact ? 8 : 12)
 
                 stageInjectButton
                     .padding(.horizontal, 18)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, isCompact ? 10 : 18)
             }
 
             if let reward = openedUpgradeReward {
@@ -93,7 +105,7 @@ extension OasisRewardView {
                 stageLevelUpBadge
             }
         }
-        .frame(height: 540)
+        .frame(height: stageHeight)
         .clipShape(stageShape)
         .overlay(stageShape.strokeBorder(Color.goPrimary.opacity(0.22), lineWidth: 1))
         .contentShape(stageShape)
@@ -514,18 +526,25 @@ extension OasisRewardView {
 
     var stageInjectButton: some View {
         let canInject = canInjectTreeEnergy
+        let unavailableReason = treeInjectionUnavailableReason
         return Button {
-            injectTreeEnergy()
+            if canInject {
+                injectTreeEnergy()
+            } else {
+                handleBlockedTreeInjectionTap()
+            }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "bolt.fill") // a11y: allow decorative action icon paired with label
                     .font(OhanaFont.subheadline(.black))
                     .accessibilityHidden(true)
-                Text(l.tr(zh: "注入 +20XP", en: "Infuse +20XP", de: "+20XP einspeisen"))
+                Text(unavailableReason ?? l.tr(zh: "注入 +20XP", en: "Infuse +20XP", de: "+20XP einspeisen"))
                     .font(OhanaFont.callout(.black))
-                Text("-80🥥")
-                    .font(OhanaFont.caption(.black))
-                    .opacity(0.66)
+                if unavailableReason == nil {
+                    Text("-80🥥")
+                        .font(OhanaFont.caption(.black))
+                        .opacity(0.66)
+                }
             }
             .foregroundStyle(canInject ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
@@ -533,8 +552,12 @@ extension OasisRewardView {
             .background(canInject ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!canInject)
         .opacity(canInject ? 1 : 0.55)
+        .accessibilityHint(unavailableReason ?? l.tr(
+            zh: "消耗 80 个椰子，为生命之树增加 20 点成长经验",
+            en: "Spend 80 coconuts to add 20 growth XP to the Life Tree",
+            de: "Verbraucht 80 Kokosnüsse für 20 Wachstums-XP"
+        ))
     }
 
     var stageLevelUpBadge: some View {
@@ -666,10 +689,12 @@ extension OasisRewardView {
     }
 
     func injectTreeEnergy() {
-        guard !treeInjectionLocked else { return }
+        guard !treeInjectionLocked else {
+            handleBlockedTreeInjectionTap()
+            return
+        }
         guard hasAvailableTreeInjection else {
-            OhanaFeedback.error()
-            scheduleOasisRenderSnapshotRefresh(milliseconds: 60)
+            handleBlockedTreeInjectionTap()
             return
         }
 
@@ -754,5 +779,10 @@ extension OasisRewardView {
                 injectionResetTask = nil
             }
         }
+    }
+
+    func handleBlockedTreeInjectionTap() {
+        OhanaFeedback.error()
+        scheduleOasisRenderSnapshotRefresh(milliseconds: 60)
     }
 }

@@ -2520,7 +2520,9 @@ struct HomeCommandExecutorTests {
             amount: 12.5,
             date: date,
             note: "coffee",
-            context: context
+            context: context,
+            category: .medical,
+            source: .detail
         )
 
         let expenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
@@ -2530,11 +2532,14 @@ struct HomeCommandExecutorTests {
         #expect(expenses.first?.pet == nil)
         #expect(expenses.first?.executorId == human.id.uuidString)
         #expect(expenses.first?.amount == 12.5)
+        #expect(expenses.first?.expenseCategory == .medical)
         #expect(expenses.first?.note == "coffee")
         #expect(ledgerEvents.count == 1)
         #expect(ledgerEvents.first?.subjectKind == CareLedgerSubjectKind.human.rawValue)
         #expect(ledgerEvents.first?.subjectId == human.id.uuidString)
         #expect(ledgerEvents.first?.eventKind == CareLedgerEventKind.expense.rawValue)
+        #expect(ledgerEvents.first?.actionType == ExpenseCategory.medical.rawValue)
+        #expect(ledgerEvents.first?.source == CareLedgerSource.detail.rawValue)
         #expect(ledgerEvents.first?.legacyModelName == "PetExpenseLog")
         #expect(ledgerEvents.first?.legacyModelId == result.logID.uuidString)
         #expect(ledgerEvents.first?.privacyFieldRaw == HumanPrivateField.expense.rawValue)
@@ -3061,7 +3066,16 @@ struct HomeCommandExecutorTests {
         #expect(medication.colorHex == "FF6B6B")
         #expect(medication.notes == "after meal")
         #expect(medication.isActive == true)
+        #expect(medication.remainingAmount == 12)
         #expect(defaults.double(forKey: remainingKey) == 12)
+        var events = try context.fetch(FetchDescriptor<Event>())
+        #expect(events.count == 2)
+        #expect(created.calendarEventIDs.count == 2)
+        #expect(created.removedCalendarEventIDs.isEmpty)
+        #expect(events.allSatisfy { $0.eventType == EventType.petMedication.rawValue })
+        #expect(events.allSatisfy { $0.relatedEntityType == MedicationEventLink.petMedicationPlan })
+        #expect(events.allSatisfy { $0.relatedEntityId == medication.id.uuidString })
+        #expect(events.allSatisfy { $0.recurrenceDays == 1 })
 
         let updatedEndDate = makeDate(year: 2026, month: 6, day: 22)
         let updated = try #require(PetMedicationPlanCommandService.savePlan(
@@ -3096,7 +3110,12 @@ struct HomeCommandExecutorTests {
         #expect(medication.colorHex == "4ECDC4")
         #expect(medication.notes == "breakfast")
         #expect(medication.isActive == false)
+        #expect(medication.remainingAmount == 0)
         #expect(defaults.object(forKey: remainingKey) == nil)
+        events = try context.fetch(FetchDescriptor<Event>())
+        #expect(events.isEmpty)
+        #expect(updated.removedCalendarEventIDs.count == 2)
+        #expect(updated.calendarEventIDs.isEmpty)
 
         let activated = PetMedicationPlanCommandService.setPlanActive(
             pet: pet,
@@ -3110,6 +3129,10 @@ struct HomeCommandExecutorTests {
         #expect(activated.didChange == true)
         #expect(activated.isActive == true)
         #expect(medication.isActive == true)
+        events = try context.fetch(FetchDescriptor<Event>())
+        #expect(events.count == 1)
+        #expect(activated.calendarEventIDs.count == 1)
+        #expect(activated.removedCalendarEventIDs.isEmpty)
 
         let deleted = PetMedicationPlanCommandService.deletePlan(
             pet: pet,
@@ -3124,6 +3147,8 @@ struct HomeCommandExecutorTests {
         #expect(deleted.medicationID == created.medicationID)
         #expect(medications.isEmpty)
         #expect(defaults.object(forKey: remainingKey) == nil)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(deleted.removedCalendarEventIDs.count == 1)
     }
 
     @MainActor
@@ -3165,7 +3190,11 @@ struct HomeCommandExecutorTests {
         let medication = try #require(try context.fetch(FetchDescriptor<PetMedication>()).first)
         #expect(created.medicationID == medication.id)
         #expect(createMutation.command == .petMedicationPlan(petID: pet.id, medicationID: medication.id))
-        #expect(createMutation.affectedEntityIDs == [pet.id, medication.id])
+        #expect(createMutation.affectedEntityIDs.contains(pet.id))
+        #expect(createMutation.affectedEntityIDs.contains(medication.id))
+        #expect(created.calendarEventIDs.count == 1)
+        let createdEventID = try #require(created.calendarEventIDs.first)
+        #expect(createMutation.affectedEntityIDs.contains(createdEventID))
         #expect(createMutation.note == "test.pet.medication.create")
 
         let activation = executor.setPlanActive(
@@ -3183,6 +3212,9 @@ struct HomeCommandExecutorTests {
             medicationID: medication.id,
             isActive: false
         ))
+        #expect(activation.removedCalendarEventIDs.count == 1)
+        let removedEventID = try #require(activation.removedCalendarEventIDs.first)
+        #expect(activationMutation.affectedEntityIDs.contains(removedEventID))
         #expect(activationMutation.note == "test.pet.medication.activation")
 
         let deleted = executor.deletePlan(
@@ -3243,7 +3275,7 @@ struct HomeCommandExecutorTests {
         #expect(medications.first?.isActive == true)
         #expect(events.count == 2)
         #expect(events.allSatisfy { $0.eventType == EventType.medication.rawValue })
-        #expect(events.allSatisfy { $0.relatedEntityType == "human_medication" })
+        #expect(events.allSatisfy { $0.relatedEntityType == MedicationEventLink.humanMedicationPlan })
         #expect(events.allSatisfy { $0.relatedEntityId == result.medicationID.uuidString })
         #expect(events.allSatisfy { $0.recurrenceDays == 7 })
         #expect(events.allSatisfy { $0.assigneeId == human.id.uuidString })
@@ -5672,7 +5704,7 @@ struct HomeCommandExecutorTests {
         #expect(second.didUnlock == true)
         #expect(pet.coconutBalance == 5)
         #expect(PetBondVaultStore.consumptionCount(item.kind, for: pet.id) == 2)
-        #expect(ledgerEvents.filter { $0.actionType == "petBondVaultConsume" }.count == 2)
+        #expect(ledgerEvents.count(where: { $0.actionType == "petBondVaultConsume" }) == 2)
         #expect(walletEntries.count == 2)
         #expect(transactionKeys.count == 2)
     }
@@ -6316,7 +6348,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV59.models)
+        let schema = Schema(ArkSchemaV60.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

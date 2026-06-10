@@ -135,6 +135,60 @@ struct OasisRewardMakeupConfirmationModifier: ViewModifier {
     }
 }
 
+struct OasisEmbeddedLayoutMetrics: Equatable {
+    let topPadding: CGFloat
+    let sectionSpacing: CGFloat
+    let bottomPadding: CGFloat
+    let treeCardHeight: CGFloat
+    let treeVisualHeight: CGFloat
+    let bentoGridHeight: CGFloat
+
+    var totalHeight: CGFloat {
+        topPadding + treeCardHeight + sectionSpacing + bentoGridHeight + bottomPadding
+    }
+}
+
+enum OasisEmbeddedLayoutPolicy {
+    static let compactTreeStageChromeHeight: CGFloat = 210
+
+    static func metrics(availableHeight: CGFloat) -> OasisEmbeddedLayoutMetrics {
+        let height = max(0, availableHeight)
+        guard height > 0 else {
+            return OasisEmbeddedLayoutMetrics(
+                topPadding: 0,
+                sectionSpacing: 0,
+                bottomPadding: 0,
+                treeCardHeight: 0,
+                treeVisualHeight: 0,
+                bentoGridHeight: 0
+            )
+        }
+
+        let topPadding: CGFloat = height >= 620 ? 4 : 2
+        let sectionSpacing: CGFloat = height >= 620 ? 8 : 6
+        let bottomPadding: CGFloat = height >= 620 ? 8 : 6
+        let chromeHeight = topPadding + sectionSpacing + bottomPadding
+        let contentHeight = max(0, height - chromeHeight)
+        let idealBentoHeight = min(124, max(92, contentHeight * 0.19))
+        let bentoGridHeight = min(idealBentoHeight, contentHeight * 0.34)
+        let treeCardHeight = max(0, contentHeight - bentoGridHeight)
+        let idealTreeVisualHeight = min(260, max(170, treeCardHeight * 0.58))
+        let treeVisualHeight = min(
+            idealTreeVisualHeight,
+            max(0, treeCardHeight - compactTreeStageChromeHeight)
+        )
+
+        return OasisEmbeddedLayoutMetrics(
+            topPadding: topPadding,
+            sectionSpacing: sectionSpacing,
+            bottomPadding: bottomPadding,
+            treeCardHeight: treeCardHeight,
+            treeVisualHeight: treeVisualHeight,
+            bentoGridHeight: bentoGridHeight
+        )
+    }
+}
+
 final class OasisTreeHarvestBuffer {
     var pendingIndices: Set<Int> = []
     var commitTask: Task<Void, Never>?
@@ -160,6 +214,7 @@ struct OasisRewardView: View {
     @State var activeSheetRoute: OasisSheetRoute?
     @State var activeFullScreenRoute: OasisFullScreenRoute?
     @State var activeOverlayRoute: OasisOverlayRoute?
+    @State var activeBentoFeatureInfo: OasisBentoFeatureInfo?
     @State var confirmationRoute: OasisConfirmationRoute?
     @State var showCritterNest = false
     @State var critterNestPopupProgress: CGFloat = 0
@@ -242,6 +297,10 @@ struct OasisRewardView: View {
         GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
     }
 
+    var achievementUnlockLevel: Int {
+        GrowthUnlockPolicy.status(for: PetFeature.achievements, currentLevel: 0).step.requiredLevel
+    }
+
     var gachaUnlockLevel: Int {
         GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
     }
@@ -259,6 +318,7 @@ struct OasisRewardView: View {
             OhanaFeedback.error()
             return
         }
+        GrowthNewFeatureStore.markVisited(route)
         activeSheetRoute = route
     }
 
@@ -266,11 +326,13 @@ struct OasisRewardView: View {
         switch route {
         case .coconutShop:
             lockedLevel(requiredLevel: shopUnlockLevel)
+        case .achievements:
+            lockedLevel(requiredLevel: achievementUnlockLevel)
         case .gacha:
             lockedLevel(requiredLevel: gachaUnlockLevel)
         case .critterCodex:
             lockedLevel(requiredLevel: critterUnlockLevel)
-        case .coconutRules, .growthRoadmap, .achievements, .inventory, .checkInDetail:
+        case .coconutRules, .growthRoadmap, .inventory, .checkInDetail:
             nil
         }
     }
@@ -327,7 +389,7 @@ struct OasisRewardView: View {
     }
 
     var canInjectTreeEnergy: Bool {
-        !treeInjectionLocked && hasAvailableTreeInjection
+        treeInjectionUnavailableReason == nil
     }
 
     var hasAvailableTreeInjection: Bool {
@@ -336,6 +398,16 @@ struct OasisRewardView: View {
 
     var hasEnoughCoconutsForTreeInjection: Bool {
         actionSnapshot.canInjectCoconuts ?? (activeHumanCoconutBalance >= 80)
+    }
+
+    var treeInjectionUnavailableReason: String? {
+        if treeInjectionLocked {
+            return l.tr(zh: "注入中", en: "Injecting", de: "Wird eingespeist")
+        }
+        if !hasEnoughCoconutsForTreeInjection {
+            return l.tr(zh: "椰子不足", en: "Not enough coconuts", de: "Nicht genug Kokosnüsse")
+        }
+        return nil
     }
 
     var contentTopInset: CGFloat {

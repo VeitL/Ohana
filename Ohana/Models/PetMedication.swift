@@ -10,6 +10,12 @@ import Foundation
 import SwiftData
 import SwiftUI
 
+enum MedicationEventLink {
+    nonisolated static let humanMedicationPlan = "human_medication"
+    nonisolated static let petMedicationPlan = "pet_medication_plan"
+    nonisolated static let petMedicationDose = "pet_medication"
+}
+
 /// 宠物用药频率
 enum PetMedicationFrequency: String, Codable, CaseIterable, Identifiable {
     case daily = "每天"
@@ -122,6 +128,7 @@ final class PetMedication {
     var colorHex: String // 卡片颜色标签
     var notes: String
     var isActive: Bool
+    var remainingAmount: Double = 0
     var createdAt: Date
 
     @Relationship(inverse: \Pet.medications) var pet: Pet?
@@ -134,6 +141,7 @@ final class PetMedication {
         endDate: Date? = nil,
         colorHex: String = "4ECDC4",
         notes: String = "",
+        remainingAmount: Double = 0,
         pet: Pet? = nil
     ) {
         self.id = UUID()
@@ -146,6 +154,7 @@ final class PetMedication {
         self.colorHex = colorHex
         self.notes = notes
         self.isActive = true
+        self.remainingAmount = max(0, remainingAmount)
         self.createdAt = Date()
         self.pet = pet
     }

@@ -29,6 +29,7 @@ struct TodayFocusCard: View {
     var onTapMemory: () -> Void = {}
     var onTapOasis: () -> Void = {}
     var onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void = { _ in }
+    var onOpenExchange: (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
     var onConfirmExchange: (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
     var freezesToFrontCard: Bool = false
     var allowsAmbientMotion: Bool = false
@@ -61,6 +62,7 @@ struct TodayFocusCard: View {
         onTapMemory: @escaping () -> Void = {},
         onTapOasis: @escaping () -> Void = {},
         onTapFamilyTask: @escaping (TodayFocusFamilyTaskSnapshot) -> Void = { _ in },
+        onOpenExchange: @escaping (TodayFocusExchangeRequestSnapshot) -> Void = { _ in },
         onConfirmExchange: @escaping (TodayFocusExchangeRequestSnapshot) -> Void = { _ in },
         freezesToFrontCard: Bool = false,
         allowsAmbientMotion: Bool = false
@@ -76,6 +78,7 @@ struct TodayFocusCard: View {
         self.onTapMemory = onTapMemory
         self.onTapOasis = onTapOasis
         self.onTapFamilyTask = onTapFamilyTask
+        self.onOpenExchange = onOpenExchange
         self.onConfirmExchange = onConfirmExchange
         self.freezesToFrontCard = freezesToFrontCard
         self.allowsAmbientMotion = allowsAmbientMotion

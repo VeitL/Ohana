@@ -9,7 +9,8 @@ extension OasisRewardView {
     // MARK: - Electronic Pet Motivation
 
     var oasisCritterMotivationCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let codexLockedLevel = lockedLevel(requiredLevel: critterUnlockLevel)
+        return VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 14) {
                 if let critter = featuredCritter {
                     OasisCritterIllustration(catalogId: critter.catalogId, locked: false, size: 104, critter: critter)
@@ -54,10 +55,14 @@ extension OasisRewardView {
 
                 Spacer(minLength: 4)
 
-                Image(systemName: "chevron.right") // a11y: allow decorative disclosure cue
-                    .font(OhanaFont.subheadline(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .accessibilityHidden(true)
+                if let codexLockedLevel {
+                    lockedCritterCodexLabel(level: codexLockedLevel)
+                } else {
+                    Image(systemName: "chevron.right") // a11y: allow decorative disclosure cue
+                        .font(OhanaFont.subheadline(.black))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .accessibilityHidden(true)
+                }
             }
 
             if featuredCritter == nil {
@@ -127,10 +132,32 @@ extension OasisRewardView {
         )
         .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
         .onTapGesture {
+            guard codexLockedLevel == nil else {
+                OhanaFeedback.error()
+                return
+            }
             OhanaFeedback.light()
             openSheet(.critterCodex)
         }
-        .accessibilityLabel(l.tr(zh: "电子宠物图鉴", en: "Critter Codex", de: "Critter-Album"))
+        .accessibilityLabel(codexLockedLevel.map {
+            lockedLevelAccessibility(l.tr(zh: "电子宠物图鉴", en: "Critter Codex", de: "Critter-Album"), level: $0)
+        } ?? l.tr(zh: "电子宠物图鉴", en: "Critter Codex", de: "Critter-Album"))
+    }
+
+    func lockedCritterCodexLabel(level: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "lock.fill")
+                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .accessibilityHidden(true)
+            Text(l.tr(zh: "Lv.\(level) 解锁", en: "Lv.\(level)", de: "Lv.\(level)"))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
+        }
+        .foregroundStyle(Color.ohanaSecondaryText)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
     }
 
     var featuredCritter: OasisElectronicPet? {

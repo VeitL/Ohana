@@ -36,7 +36,7 @@ struct PetMedicationDetailContentSheet: View {
     }
 
     private var remainingAmount: Double {
-        PetMedicationPlanStorageKeys.remainingAmountValue(medicationID: medication.id)
+        PetMedicationPlanStorageKeys.remainingAmountValue(medication: medication)
     }
 
     private var todayRequired: Int {

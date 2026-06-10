@@ -42,7 +42,11 @@ struct RootView: View {
                 currentActiveHumanId: currentActiveHumanId,
                 context: modelContext,
                 careEvents: appServices.careEvents,
-                reminderCompletion: appServices.reminderCompletion
+                reminderCompletion: appServices.reminderCompletion,
+                careLedger: appServices.careLedger,
+                questManager: appServices.questManager,
+                medicationReminders: appServices.medicationReminders,
+                domainRevisions: appServices.domainRevisions
             )
         }
         .alert("数据异常", isPresented: $showDBFallbackAlert) {

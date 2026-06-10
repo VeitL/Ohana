@@ -20,6 +20,7 @@ struct FocusHomeTodayFocusSection: View {
     let onTapNegativeSignal: (IslandNegativeSignal) -> Void
     let onTapOasis: () -> Void
     let onTapFamilyTask: (TodayFocusFamilyTaskSnapshot) -> Void
+    var onOpenExchange: (TodayFocusExchangeRequestSnapshot) -> Void = { _ in }
     let onFirstSuccessFeed: (Pet) -> Void
     let onFirstSuccessPlay: (Pet) -> Void
     let onFirstSuccessMoment: (Pet) -> Void
@@ -27,8 +28,8 @@ struct FocusHomeTodayFocusSection: View {
     var body: some View {
         ZStack(alignment: .top) {
             Color.clear
-                .frame(height: 216)
-                .padding(.top, 12)
+                .frame(height: 144)
+                .padding(.top, 8)
 
             TodayFocusCarousel(cardMargin: cardMargin, animation: animation) { cardWidth in
                 TodayFocusQuestCardHost(
@@ -38,7 +39,8 @@ struct FocusHomeTodayFocusSection: View {
                     onCompleteQuest: onCompleteQuest,
                     onTapNegativeSignal: onTapNegativeSignal,
                     onTapOasis: onTapOasis,
-                    onTapFamilyTask: onTapFamilyTask
+                    onTapFamilyTask: onTapFamilyTask,
+                    onOpenExchange: onOpenExchange
                 )
                 .frame(width: cardWidth)
 
@@ -59,7 +61,7 @@ struct FocusHomeTodayFocusSection: View {
             .allowsHitTesting(!isExpanded)
             .animation(animation, value: isExpanded)
         }
-        .frame(height: 228, alignment: .top)
+        .frame(height: 152, alignment: .top)
         .clipped()
         .allowsHitTesting(!isExpanded)
         .accessibilityHidden(isExpanded)

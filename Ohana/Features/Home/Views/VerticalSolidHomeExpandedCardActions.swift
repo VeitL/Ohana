@@ -214,6 +214,9 @@ struct VerticalSolidHomeExpandedCardActions: View {
 
     private func makeEmbeddedAction(_ item: QuickActionItem) -> VerticalHomeEmbeddedAction {
         let state = quickActionState(for: item)
+        let options = menuOptions(for: item)
+        let menuPolicy = embeddedMenuPolicy(for: item, options: options)
+        let directActionUsesQuickPath = menuPolicy.showsQuickButton
         return VerticalHomeEmbeddedAction(
             id: item.id,
             title: item.label,
@@ -225,12 +228,14 @@ struct VerticalSolidHomeExpandedCardActions: View {
             primaryIcon: primaryIcon(for: item),
             isPrimaryDisabled: isPrimaryDisabled(item: item, state: state),
             detailIcon: detailIcon(for: item.actionType, isHuman: card.isHuman),
-            menuOptions: menuOptions(for: item),
+            menuOptions: options,
+            showsMenu: menuPolicy.showsMenu,
+            showsQuickButton: menuPolicy.showsQuickButton,
             quickAccessibilityLabel: item.label,
             detailAccessibilityLabel: l.tr(zh: "查看详情", en: "Details", de: "Details"),
             detailAction: { onAction(item, false) },
             optionAction: { optionId in onOptionAction(item, optionId) },
-            action: { onAction(item, true) }
+            action: { onAction(item, directActionUsesQuickPath) }
         )
     }
 
@@ -446,6 +451,30 @@ struct VerticalSolidHomeExpandedCardActions: View {
 
     private func isPrimaryDisabled(item: QuickActionItem, state: QuickActionRenderState) -> Bool {
         ExpandedQuickActionLogic.singleUseLabel(for: item.actionType) != nil && state.isCompleted
+    }
+
+    private func embeddedMenuPolicy(
+        for item: QuickActionItem,
+        options: [VerticalHomeEmbeddedActionOption]
+    ) -> ExpandedQuickMenuPolicy {
+        if let pet = currentPet {
+            let policy = ExpandedQuickActionLogic.petMenuPolicy(
+                for: item,
+                pet: pet,
+                allEvents: allEvents,
+                allFeedCareLogs: pet.careLogs,
+                now: Date()
+            )
+            guard !options.isEmpty else { return policy }
+            return ExpandedQuickMenuPolicy(
+                showsMenu: policy.showsMenu || !options.isEmpty,
+                showsQuickButton: false
+            )
+        }
+        if currentHuman != nil {
+            return ExpandedQuickActionLogic.humanMenuPolicy(actionType: item.actionType)
+        }
+        return .none
     }
 
     private func menuOptions(for item: QuickActionItem) -> [VerticalHomeEmbeddedActionOption] {

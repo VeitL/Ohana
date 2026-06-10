@@ -115,7 +115,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!lifecycle.isLive)
     }
 
-    @Test func oasisTabUsesPreparedShellDuringIncomingTransition() {
+    @Test func oasisTabUsesFrozenTreeDuringIncomingTransition() {
         let lifecycle = VerticalHomeTabMountPolicy.lifecycle(
             for: .oasis,
             active: .oasis,
@@ -124,7 +124,7 @@ struct VerticalHomeTabMountPolicyTests {
             preparing: .oasis
         )
 
-        #expect(OasisHomeTabContentPolicy.shouldRenderPreparedShell(for: lifecycle))
+        #expect(OasisHomeTabContentPolicy.shouldRenderFrozenTree(for: lifecycle))
         #expect(!OasisHomeTabContentPolicy.shouldRenderTreeContent(for: lifecycle))
         #expect(!OasisHomeTabContentPolicy.shouldRunActiveWork(for: lifecycle))
     }
@@ -141,14 +141,48 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(OasisHomeTabContentPolicy.shouldRunActiveWork(for: lifecycle))
     }
 
+    @Test func oasisTreeRenderSnapshotClampsUnsafeValues() {
+        let low = OasisTreeRenderSnapshot(level: -4, progressToNextLevel: -0.2)
+        let high = OasisTreeRenderSnapshot(level: 40, progressToNextLevel: 1.7)
+        let invalid = OasisTreeRenderSnapshot(
+            level: 4,
+            progressToNextLevel: .nan,
+            totalEnergy: -20,
+            nextLevelThreshold: -100
+        )
+
+        #expect(low.level == 1)
+        #expect(low.progressToNextLevel == 0)
+        #expect(high.level == 10)
+        #expect(high.progressToNextLevel == 1)
+        #expect(invalid.level == 4)
+        #expect(invalid.progressToNextLevel == 0)
+        #expect(invalid.totalEnergy == 0)
+        #expect(invalid.nextLevelThreshold == 0)
+    }
+
+    @Test func oasisEmbeddedLayoutFitsAvailableHeightWithoutVerticalScroll() {
+        for height: CGFloat in [560, 620, 720] {
+            let metrics = OasisEmbeddedLayoutPolicy.metrics(availableHeight: height)
+
+            #expect(metrics.totalHeight <= height + 0.5)
+            #expect(metrics.bentoGridHeight >= 100)
+            #expect(metrics.treeCardHeight > metrics.bentoGridHeight)
+            #expect(
+                metrics.treeVisualHeight + OasisEmbeddedLayoutPolicy.compactTreeStageChromeHeight
+                    <= metrics.treeCardHeight + 0.5
+            )
+        }
+    }
+
     @Test func tabOutgoingCleanupWaitsForFullMotionSpringTail() {
         #expect(
             VerticalHomeTabTransitionPolicy.outgoingCleanupDelayMilliseconds(for: .full)
-            >= UInt64(700)
+                >= UInt64(700)
         )
         #expect(
             VerticalHomeTabTransitionPolicy.outgoingCleanupDelayMilliseconds(for: .static)
-            == VerticalHomeTabTransitionPolicy.reducedMotionOutgoingCleanupDelayMilliseconds
+                == VerticalHomeTabTransitionPolicy.reducedMotionOutgoingCleanupDelayMilliseconds
         )
     }
 
@@ -279,7 +313,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(HomeBottomNavigationTreePresentation.progressFill(.infinity) == CGFloat(0))
     }
 
-    @Test @MainActor func dailyTreeInjectionPackageBecomesUnavailableAfterUse() {
+    @Test @MainActor func treeInjectionPackageStaysAvailableAfterUseWhenCoconutsRemain() {
         let defaults = UserDefaults.standard
         let oldPeriod = defaults.string(forKey: OasisTreePreferenceStore.dailyInjectionDayKey)
         defer {
@@ -298,6 +332,6 @@ struct VerticalHomeTabMountPolicyTests {
             limitKey: OasisTreePreferenceStore.dailyInjectionDayKey,
             periodKey: EconomyDailyBudgetStore.dayKey(for: date)
         )
-        #expect(!TestOasisTreeManagerProjection.manager.canUseInjectionPackage(cost: 80, date: date))
+        #expect(TestOasisTreeManagerProjection.manager.canUseInjectionPackage(cost: 80, date: date))
     }
 }

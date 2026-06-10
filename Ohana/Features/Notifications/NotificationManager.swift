@@ -43,6 +43,8 @@ final class NotificationManager: NSObject, @unchecked Sendable {
 
     private let center = UNUserNotificationCenter.current()
     private let categoryID = "OHANA_REMINDER"
+    private let petMedicationCategoryID = "MED_REMINDER"
+    private let humanMedicationCategoryID = "HUMAN_MED_REMINDER"
     private let routeCenter: OhanaNotificationRouteCenter
 
     init(routeCenter: OhanaNotificationRouteCenter) {
@@ -87,7 +89,20 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             options: []
         )
 
-        center.setNotificationCategories([category])
+        let petMedicationCategory = UNNotificationCategory(
+            identifier: petMedicationCategoryID,
+            actions: [completeAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        let humanMedicationCategory = UNNotificationCategory(
+            identifier: humanMedicationCategoryID,
+            actions: [completeAction, skipAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        center.setNotificationCategories([category, petMedicationCategory, humanMedicationCategory])
     }
 
     // MARK: - 滚动窗口常量
@@ -331,6 +346,24 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         }
         if let relatedEntityId = userInfo["relatedEntityId"] as? String {
             payload["relatedEntityId"] = relatedEntityId
+        }
+        if let petId = userInfo["petId"] as? String {
+            payload["petId"] = petId
+        }
+        if let humanId = userInfo["humanId"] as? String {
+            payload["humanId"] = humanId
+        }
+        if let medicationId = userInfo["medicationId"] as? String {
+            payload["medicationId"] = medicationId
+        }
+        if let humanMedicationId = userInfo["humanMedicationId"] as? String {
+            payload["humanMedicationId"] = humanMedicationId
+        }
+        if let scheduledAt = userInfo["scheduledAt"] as? TimeInterval {
+            payload["scheduledAt"] = scheduledAt
+        }
+        if let doseIndex = userInfo["doseIndex"] as? Int {
+            payload["doseIndex"] = doseIndex
         }
 
         switch action {

@@ -39,6 +39,27 @@ enum MemberCreationPerformance {
     }
 }
 
+enum MemberCreationCardLayout {
+    static let maxCardWidth: CGFloat = 390
+    static let horizontalPadding: CGFloat = 16
+    static let stackSpacing: CGFloat = 12
+
+    private static let maxCardHeight: CGFloat = 660
+    private static let minCardHeight: CGFloat = 430
+    private static let bottomActionReserve: CGFloat = 88
+    private static let topChromeReserve: CGFloat = 56
+
+    static func cardWidth(in containerWidth: CGFloat) -> CGFloat {
+        min(containerWidth - horizontalPadding * 2, maxCardWidth)
+    }
+
+    static func cardHeight(in containerHeight: CGFloat, includesTopChrome: Bool) -> CGFloat {
+        let chromeReserve = includesTopChrome ? topChromeReserve + stackSpacing : 0
+        let availableHeight = max(containerHeight - chromeReserve - bottomActionReserve, minCardHeight)
+        return min(max(availableHeight, minCardHeight), maxCardHeight)
+    }
+}
+
 enum MemberCreationKind: String, Identifiable {
     case pet
     case human

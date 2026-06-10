@@ -18,6 +18,7 @@ struct OasisCheckInCalendarCard: View {
     let monthCheckInRate: Int
     let lastClaimedMilestone: Int
     let localization: L10n
+    let makeupShopLockedLevel: Int?
     let onRequestMakeup: (String) -> Void
     let onOpenMakeupShop: () -> Void
     let onClaimMilestone: (_ days: Int, _ reward: Int, _ emoji: String) -> Void
@@ -180,13 +181,39 @@ struct OasisCheckInCalendarCard: View {
                     .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.goPrimary.opacity(0.6))
             } else {
-                Button(action: onOpenMakeupShop) {
-                    Text(localization.tr(zh: "去商店购买", en: "Buy in shop", de: "Im Shop kaufen"))
-                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.goYellow.opacity(0.8))
+                if let makeupShopLockedLevel {
+                    lockedMakeupShopLabel(level: makeupShopLockedLevel)
+                } else {
+                    Button(action: onOpenMakeupShop) {
+                        Text(localization.tr(zh: "去商店购买", en: "Buy in shop", de: "Im Shop kaufen"))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color.goYellow.opacity(0.8))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
                 }
             }
         }
+    }
+
+    private func lockedMakeupShopLabel(level: Int) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "lock.fill")
+                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .accessibilityHidden(true)
+            Text(localization.tr(zh: "商店 Lv.\(level) 解锁", en: "Shop Lv.\(level)", de: "Shop Lv.\(level)"))
+                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
+        }
+        .foregroundStyle(Color.ohanaSecondaryText)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.ohanaControlFill.opacity(0.72), in: Capsule())
+        .accessibilityLabel(localization.tr(
+            zh: "椰子商店生命之树 Lv.\(level) 解锁",
+            en: "Coconut shop unlocks at Life Tree level \(level)",
+            de: "Kokos-Shop ab Lebensbaum Level \(level)"
+        ))
     }
 
     private var milestoneRow: some View {

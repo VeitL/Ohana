@@ -404,10 +404,13 @@ extension ReadModelRevisionCenter {
     }
 
     func publishPetMedicationPlan(_ result: PetMedicationPlanCommandResult, note: String) {
+        var affected: Set<UUID> = [result.subjectID, result.medicationID]
+        affected.formUnion(result.calendarEventIDs)
+        affected.formUnion(result.removedCalendarEventIDs)
         publish(
             DomainMutationResult(
                 command: .petMedicationPlan(petID: result.subjectID, medicationID: result.medicationID),
-                affectedEntityIDs: [result.subjectID, result.medicationID],
+                affectedEntityIDs: affected,
                 wroteBusinessFact: true,
                 note: note
             )
@@ -415,10 +418,12 @@ extension ReadModelRevisionCenter {
     }
 
     func publishPetMedicationPlanDelete(_ result: PetMedicationPlanDeleteCommandResult, note: String) {
+        var affected: Set<UUID> = [result.subjectID, result.medicationID]
+        affected.formUnion(result.removedCalendarEventIDs)
         publish(
             DomainMutationResult(
                 command: .petMedicationPlanDelete(petID: result.subjectID, medicationID: result.medicationID),
-                affectedEntityIDs: [result.subjectID, result.medicationID],
+                affectedEntityIDs: affected,
                 wroteBusinessFact: true,
                 note: note
             )
@@ -429,6 +434,9 @@ extension ReadModelRevisionCenter {
         _ result: PetMedicationPlanActivationCommandResult,
         note: String
     ) {
+        var affected: Set<UUID> = [result.subjectID, result.medicationID]
+        affected.formUnion(result.calendarEventIDs)
+        affected.formUnion(result.removedCalendarEventIDs)
         publish(
             DomainMutationResult(
                 command: .petMedicationPlanActivation(
@@ -436,7 +444,7 @@ extension ReadModelRevisionCenter {
                     medicationID: result.medicationID,
                     isActive: result.isActive
                 ),
-                affectedEntityIDs: [result.subjectID, result.medicationID],
+                affectedEntityIDs: affected,
                 wroteBusinessFact: result.didChange,
                 note: note
             )

@@ -31,8 +31,7 @@ extension MemberCardCreationContentView {
                     .allowsHitTesting(false)
             }
         }
-        .frame(maxWidth: 390)
-        .frame(maxHeight: .infinity)
+        .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
     }
 
     var permissionAlertBinding: Binding<Bool> {
@@ -178,7 +177,7 @@ extension MemberCardCreationContentView {
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(!isEnabled)
             }
-            .frame(maxWidth: 390)
+            .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
         }
     }
 

@@ -22,6 +22,8 @@ struct VerticalHomeEmbeddedAction: Identifiable {
     let isPrimaryDisabled: Bool
     let detailIcon: String
     let menuOptions: [VerticalHomeEmbeddedActionOption]
+    let showsMenu: Bool
+    let showsQuickButton: Bool
     let quickAccessibilityLabel: String
     let detailAccessibilityLabel: String
     let detailAction: (() -> Void)?
@@ -42,6 +44,8 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         isPrimaryDisabled: Bool = false,
         detailIcon: String = "chart.line.uptrend.xyaxis",
         menuOptions: [VerticalHomeEmbeddedActionOption] = [],
+        showsMenu: Bool = true,
+        showsQuickButton: Bool = true,
         quickAccessibilityLabel: String = "Quick action",
         detailAccessibilityLabel: String = "Details",
         detailAction: (() -> Void)? = nil,
@@ -61,6 +65,8 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         self.isPrimaryDisabled = isPrimaryDisabled
         self.detailIcon = detailIcon
         self.menuOptions = menuOptions
+        self.showsMenu = showsMenu
+        self.showsQuickButton = showsQuickButton
         self.quickAccessibilityLabel = quickAccessibilityLabel
         self.detailAccessibilityLabel = detailAccessibilityLabel
         self.detailAction = detailAction
@@ -242,12 +248,12 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 guard !isEditMode else { return }
                 triggerIconAnimation(for: item.id)
                 OhanaFeedback.light()
-                if item.detailAction == nil, item.menuOptions.isEmpty {
-                    item.action()
-                } else {
+                if shouldOpenMenu(for: item) {
                     withAnimation(motion) {
                         openActionId = openActionId == item.id ? nil : item.id
                     }
+                } else {
+                    item.action()
                 }
             } label: {
                 let state = visualState(for: item)
@@ -341,15 +347,17 @@ struct VerticalHomeEmbeddedQuickActions: View {
     private func inlineMenu(item: VerticalHomeEmbeddedAction, detailAction: (() -> Void)?, index: Int) -> some View {
         HStack(spacing: 8) {
             if item.menuOptions.isEmpty {
-                inlineMenuButton(
-                    actionType: item.actionType,
-                    icon: item.isPrimaryDisabled ? "checkmark" : item.primaryIcon,
-                    tint: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.16) : Color.goPrimary,
-                    foreground: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.42) : Color.arkInk,
-                    accessibility: item.quickAccessibilityLabel,
-                    isDisabled: item.isPrimaryDisabled,
-                    action: item.action
-                )
+                if item.showsQuickButton {
+                    inlineMenuButton(
+                        actionType: item.actionType,
+                        icon: item.isPrimaryDisabled ? "checkmark" : item.primaryIcon,
+                        tint: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.16) : Color.goPrimary,
+                        foreground: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.42) : Color.arkInk,
+                        accessibility: item.quickAccessibilityLabel,
+                        isDisabled: item.isPrimaryDisabled,
+                        action: item.action
+                    )
+                }
             } else {
                 ForEach(item.menuOptions) { option in
                     inlineMenuButton(
@@ -381,6 +389,11 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .shadow(color: Color.arkInk.opacity(0.24), radius: 14, x: 0, y: 8) // ui-v4: allow embedded quick action submenu lift
         .fixedSize()
         .offset(x: menuOffsetX(index: index, optionCount: item.menuOptions.count), y: menuOffsetY(index: index))
+    }
+
+    private func shouldOpenMenu(for item: VerticalHomeEmbeddedAction) -> Bool {
+        guard item.showsMenu else { return false }
+        return item.showsQuickButton || item.detailAction != nil || !item.menuOptions.isEmpty
     }
 
     private func inlineMenuButton(

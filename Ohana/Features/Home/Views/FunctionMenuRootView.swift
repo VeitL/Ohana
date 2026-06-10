@@ -8,6 +8,7 @@ struct FunctionMenuRootView: View {
     let humans: [Human]
 
     @Environment(AppServices.self) private var appServices
+    @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter(\.shouldShowOnHome) }
@@ -16,6 +17,8 @@ struct FunctionMenuRootView: View {
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
 
     var body: some View {
+        let _ = newFeatureRevision
+
         ZStack {
             OhanaAppBackground()
                 .ignoresSafeArea()
@@ -45,7 +48,8 @@ struct FunctionMenuRootView: View {
                                     icon: group.icon,
                                     iconColor: group.color,
                                     title: group.title,
-                                    status: compactSubtitle(for: subtitle(for: group))
+                                    status: compactSubtitle(for: subtitle(for: group)),
+                                    showsNewFeature: GrowthNewFeatureStore.hasPending(group: group)
                                 ) {
                                     select(.featureGroup(group))
                                 }
@@ -67,7 +71,8 @@ struct FunctionMenuRootView: View {
                                         icon: entry.icon,
                                         iconColor: entry.color,
                                         title: entry.title,
-                                        status: compactSubtitle(for: entry.subtitle)
+                                        status: compactSubtitle(for: entry.subtitle),
+                                        showsNewFeature: GrowthNewFeatureStore.hasPending(entry.destination)
                                     ) {
                                         select(entry.destination)
                                     }
@@ -230,34 +235,42 @@ struct FunctionMenuRootView: View {
         iconColor: Color,
         title: String,
         status: String,
+        showsNewFeature: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: icon)
-                        .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaFunctionalIcon)
-                    Spacer()
-                    Image(systemName: "chevron.right") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
-                        .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
-                }
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: icon)
+                            .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.ohanaFunctionalIcon)
+                        Spacer()
+                        Image(systemName: "chevron.right") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
+                            .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
+                    }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    Text(status)
-                        .font(OhanaFont.caption2(.black))
-                        .foregroundStyle(iconColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        Text(status)
+                            .font(OhanaFont.caption2(.black))
+                            .foregroundStyle(iconColor)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
+
+                if showsNewFeature {
+                    GrowthNewFeatureDot()
+                        .offset(x: 4, y: -4)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
             .padding(14)
             .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         }

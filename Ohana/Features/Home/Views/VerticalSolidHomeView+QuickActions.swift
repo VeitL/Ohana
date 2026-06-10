@@ -273,6 +273,14 @@ extension VerticalSolidHomeView {
 
     func openExpandedFabShortcut(_ shortcut: ExpandedCardFabShortcut, card: FocusCard) {
         closeVerticalFabMenu(immediate: true)
+        switch shortcut.action {
+        case let .quick(actionType):
+            GrowthNewFeatureStore.markVisited(quickActionType: actionType)
+        case let .detail(feature):
+            GrowthNewFeatureStore.markVisited(feature: feature)
+        case .allFeatures, .humanQuick, .humanAllFeatures:
+            break
+        }
         FocusHomeExpandedFabRouter.open(
             shortcut,
             card: card,
@@ -305,6 +313,7 @@ extension VerticalSolidHomeView {
     }
 
     func openPetQuickKey(_ key: String, pet: Pet) {
+        GrowthNewFeatureStore.markVisited(quickActionType: key)
         switch key {
         case "feed":
             routeCoordinator.openSheet(.petFeed(pet.id, opensManualSheet: false))
@@ -363,6 +372,7 @@ extension VerticalSolidHomeView {
     }
 
     func openPetFeature(_ feature: PetFeature, pet: Pet) {
+        GrowthNewFeatureStore.markVisited(feature: feature)
         switch feature {
         case .health:
             routeCoordinator.openSheet(.petHealth(pet.id, initialSection: nil))

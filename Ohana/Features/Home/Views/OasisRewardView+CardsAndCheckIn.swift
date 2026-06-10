@@ -23,18 +23,25 @@ extension OasisRewardView {
 
     var injectEnergyButton: some View {
         let canInject = canInjectTreeEnergy
+        let unavailableReason = treeInjectionUnavailableReason
         return Button {
-            injectTreeEnergy()
+            if canInject {
+                injectTreeEnergy()
+            } else {
+                handleBlockedTreeInjectionTap()
+            }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "bolt.fill") // a11y: allow decorative action icon paired with label
                     .accessibilityHidden(true)
-                Text(l.tr(zh: "注入能量", en: "Inject energy", de: "Energie geben"))
+                Text(unavailableReason ?? l.tr(zh: "注入能量", en: "Inject energy", de: "Energie geben"))
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
-                Text("(-80🥥)")
-                    .font(OhanaFont.subheadline(.bold))
-                    .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.55))
+                if unavailableReason == nil {
+                    Text("(-80🥥)")
+                        .font(OhanaFont.subheadline(.bold))
+                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.55))
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
@@ -48,7 +55,6 @@ extension OasisRewardView {
             ))
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(!canInject)
         .opacity(canInject ? 1 : 0.45)
     }
 
@@ -71,6 +77,7 @@ extension OasisRewardView {
             monthCheckInRate: monthCheckInRate,
             lastClaimedMilestone: lastClaimedMilestone,
             localization: l,
+            makeupShopLockedLevel: lockedLevel(requiredLevel: shopUnlockLevel),
             onRequestMakeup: { date in
                 confirmationRoute = .makeup(date: date)
             },
@@ -181,8 +188,15 @@ extension OasisRewardView {
             snapshot: bentoSnapshot,
             localization: l,
             shopLockedLevel: lockedLevel(requiredLevel: shopUnlockLevel),
+            achievementsLockedLevel: lockedLevel(requiredLevel: achievementUnlockLevel),
             crittersLockedLevel: lockedLevel(requiredLevel: critterUnlockLevel),
             gachaLockedLevel: lockedLevel(requiredLevel: gachaUnlockLevel),
+            isCompact: hideToolbar,
+            onShowFeatureInfo: { info in
+                withAnimation(GoMotion.stateChange) {
+                    activeBentoFeatureInfo = info
+                }
+            },
             onOpenShop: {
                 openSheet(.coconutShop(.effect))
             },

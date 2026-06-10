@@ -98,7 +98,7 @@ struct AddEventContentView: View {
     }
 
     private var manualEventTypes: [EventType] {
-        [.daily, .task, .health, .birthday, .anniversary, .chore, .shoppingList, .medication]
+        [.daily, .task, .health, .birthday, .anniversary, .chore, .shoppingList, .medication, .petMedication]
     }
 
     private var visibleRecurrenceOptions: [RecurrenceOption] {
@@ -714,6 +714,7 @@ struct AddEventContentView: View {
         case .watering: l.tr(zh: "浇水", en: "Water", de: "Gießen")
         case .fertilizing: l.tr(zh: "施肥", en: "Fertilize", de: "Düngen")
         case .medication: l.tr(zh: "吃药", en: "Medication", de: "Medizin")
+        case .petMedication: l.tr(zh: "宠物用药", en: "Pet meds", de: "Tiermedizin")
         case .petMedicationDose: l.tr(zh: "喂药", en: "Dose", de: "Dosis")
         case .insurancePremium: l.tr(zh: "保险", en: "Insurance", de: "Versicherung")
         }

@@ -370,7 +370,7 @@ extension MemberCardCreationContentView {
     }
 
     var homeJoinHandoffSettleDelayMilliseconds: UInt64 {
-        reduceMotion ? 120 : 280
+        reduceMotion ? 80 : 90
     }
 
     func startHomeJoinHandoff() {

@@ -242,6 +242,7 @@ nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
     let petId: UUID?
     let plantId: UUID?
     let healthAlertType: HealthAlert.AlertType?
+    let routeHint: RouteHint?
 
     enum Severity: Sendable {
         case warning // 黄色 - 可缓冲
@@ -255,6 +256,19 @@ nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
         }
     }
 
+    enum RouteHint: String, Sendable {
+        case petOverview
+        case feed
+        case water
+        case potty
+        case walk
+        case weight
+        case medication
+        case health
+        case allFeatures
+        case plant
+    }
+
     init(
         id: String? = nil,
         iconName: String,
@@ -264,7 +278,8 @@ nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
         severity: Severity,
         petId: UUID? = nil,
         plantId: UUID? = nil,
-        healthAlertType: HealthAlert.AlertType? = nil
+        healthAlertType: HealthAlert.AlertType? = nil,
+        routeHint: RouteHint? = nil
     ) {
         self.id = id ?? Self.identityKey(
             title: title,
@@ -272,7 +287,8 @@ nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
             severity: severity,
             petId: petId,
             plantId: plantId,
-            healthAlertType: healthAlertType
+            healthAlertType: healthAlertType,
+            routeHint: routeHint
         )
         self.iconName = iconName
         self.emoji = emoji
@@ -282,6 +298,7 @@ nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
         self.petId = petId
         self.plantId = plantId
         self.healthAlertType = healthAlertType
+        self.routeHint = routeHint
     }
 
     private static func identityKey(
@@ -290,7 +307,8 @@ nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
         severity: Severity,
         petId: UUID?,
         plantId: UUID?,
-        healthAlertType: HealthAlert.AlertType?
+        healthAlertType: HealthAlert.AlertType?,
+        routeHint: RouteHint?
     ) -> String {
         let subject = if let petId {
             "pet:\(petId.uuidString)"
@@ -300,8 +318,9 @@ nonisolated struct IslandNegativeSignal: Identifiable, Equatable, Sendable {
             "household"
         }
         let alert = healthAlertType.map { ":health:\($0.rawValue)" } ?? ""
+        let route = routeHint.map { ":route:\($0.rawValue)" } ?? ""
         return [
-            "negative",
+            "negative" + route,
             subject + alert,
             severity.identityToken,
             stableHash(title),
@@ -366,7 +385,8 @@ nonisolated enum IslandNegativeFeedback {
                 ),
                 severity: alert.severity == .urgent ? .critical : .warning,
                 petId: alert.petId,
-                healthAlertType: alert.type
+                healthAlertType: alert.type,
+                routeHint: routeHint(for: alert.type)
             ))
         }
 
@@ -398,7 +418,9 @@ nonisolated enum IslandNegativeFeedback {
                     zh: "给 \(names.zh) 完成一次喂食、喂水或遛狗打卡即可",
                     en: "Log a feeding, water, or walk check-in for \(names.en)"
                 ),
-                severity: .warning
+                severity: .warning,
+                petId: brokenStreakPets.first?.id,
+                routeHint: .petOverview
             ))
         }
 
@@ -420,7 +442,8 @@ nonisolated enum IslandNegativeFeedback {
                             en: "\(med.name) has \(need - taken) dose\(need - taken == 1 ? "" : "s") left"
                         ),
                         severity: .critical,
-                        petId: pet.id
+                        petId: pet.id,
+                        routeHint: .medication
                     ))
                     break
                 }
@@ -444,7 +467,8 @@ nonisolated enum IslandNegativeFeedback {
                         en: "\(hours) hour\(hours == 1 ? "" : "s") since the last feeding. Log one first."
                     ),
                     severity: .warning,
-                    petId: pet.id
+                    petId: pet.id,
+                    routeHint: .feed
                 ))
                 break
             }
@@ -462,7 +486,8 @@ nonisolated enum IslandNegativeFeedback {
                         en: "\(Int(now.timeIntervalSince(last) / 86400)) day(s) since watering"
                     ),
                     severity: .warning,
-                    plantId: plant.id
+                    plantId: plant.id,
+                    routeHint: .plant
                 ))
                 break
             }
@@ -596,6 +621,25 @@ nonisolated enum IslandNegativeFeedback {
         }
     }
 
+    private static func routeHint(for alertType: HealthAlert.AlertType) -> IslandNegativeSignal.RouteHint {
+        switch alertType {
+        case .weightGainAlert, .weightLossAlert:
+            .weight
+        case .drinkingWeightAlert:
+            .water
+        case .noPotty:
+            .potty
+        case .noWalk:
+            .walk
+        case .dewormingDue:
+            .medication
+        case .documentExpiringSoon:
+            .allFeatures
+        default:
+            .health
+        }
+    }
+
     private static func appetiteTrendSignal(for pet: Pet, calendar: Calendar, now: Date) -> IslandNegativeSignal? {
         let feedLogs = pet.careLogs.filter { $0.careType == .feeding && $0.amountGrams > 0 }
         guard feedLogs.count >= 4 else { return nil }
@@ -611,7 +655,8 @@ nonisolated enum IslandNegativeFeedback {
                 en: "Feeding volume is about \(Int((1 - recent / previous) * 100))% lower than the previous 3 days. Watch energy and stool."
             ),
             severity: .warning,
-            petId: pet.id
+            petId: pet.id,
+            routeHint: .feed
         )
     }
 
@@ -630,7 +675,8 @@ nonisolated enum IslandNegativeFeedback {
                 en: "\(abnormal.count) soft or liquid stool record(s) in the last 3 days. Watch diet changes."
             ),
             severity: abnormal.contains { $0.pottyType == .liquidPoop } ? .critical : .warning,
-            petId: pet.id
+            petId: pet.id,
+            routeHint: .potty
         )
     }
 
@@ -650,7 +696,8 @@ nonisolated enum IslandNegativeFeedback {
                     en: "Water intake is much higher over the last 3 days. Compare with weight and pee patterns."
                 ),
                 severity: .warning,
-                petId: pet.id
+                petId: pet.id,
+                routeHint: .water
             )
         }
         if recent < previous * 0.45 {
@@ -663,7 +710,8 @@ nonisolated enum IslandNegativeFeedback {
                     en: "Water intake is low over the last 3 days. Check the bowl and energy level."
                 ),
                 severity: .warning,
-                petId: pet.id
+                petId: pet.id,
+                routeHint: .water
             )
         }
         return nil

@@ -659,11 +659,11 @@ struct MemberCreationJoinHandoffModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let p = easedProgress
-        let scale = reduceMotion ? mix(1, 0.82, p) : mix(1, 0.64, p)
-        let y = reduceMotion ? mix(0, 10, p) : mix(0, 42, p)
-        let rotation = reduceMotion ? Double(0) : Double(mix(0, 7, p))
-        let flip = reduceMotion ? Double(0) : Double(mix(0, -76, p))
-        let opacity = reduceMotion ? Double(mix(1, 0.68, p)) : Double(mix(1, 0.18, p))
+        let scale = reduceMotion ? mix(1, 0.82, p) : mix(1, HomeJoinHandoffMotion.scale, p)
+        let y = reduceMotion ? mix(0, 10, p) : mix(0, HomeJoinHandoffMotion.y, p)
+        let rotation = reduceMotion ? Double(0) : Double(mix(0, HomeJoinHandoffMotion.rotation, p))
+        let flip = reduceMotion ? Double(0) : Double(mix(0, HomeJoinHandoffMotion.flip, p))
+        let opacity = reduceMotion ? Double(mix(1, 0.68, p)) : Double(mix(1, HomeJoinHandoffMotion.opacity, p))
 
         content
             .rotationEffect(.degrees(rotation))

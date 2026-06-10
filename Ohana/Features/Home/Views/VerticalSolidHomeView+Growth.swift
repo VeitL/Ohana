@@ -108,6 +108,7 @@ extension VerticalSolidHomeView {
             to: currentLevel
         )
         growthLastSeenTreeLevel = currentLevel
+        GrowthNewFeatureStore.markPending(unlockedSteps)
         guard let step = unlockedSteps.last else { return }
 
         growthUnlockToastPresentationTask?.cancel()
@@ -121,9 +122,6 @@ extension VerticalSolidHomeView {
                 growthUnlockToastStatus = GrowthUnlockStatus(step: step, currentLevel: currentLevel)
             }
             growthUnlockToastPresentationTask = nil
-            growthUnlockToastDismissTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 3800) {
-                dismissGrowthUnlockToast()
-            }
         }
     }
 

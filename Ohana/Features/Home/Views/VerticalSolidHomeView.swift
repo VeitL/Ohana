@@ -244,7 +244,7 @@ struct VerticalSolidHomeView: View {
             let headerTopGap: CGFloat = 8
             let headerContentHeight: CGFloat = 30
             let focusTopGap: CGFloat = 2
-            let todayFocusHeight = min(128, max(118, proxy.size.height * 0.145))
+            let todayFocusHeight = min(88, max(80, proxy.size.height * 0.10))
             let focusHeight = todayFocusHeight
             let contentTopGap: CGFloat = 4
             let compactContentGap: CGFloat = 8
@@ -320,8 +320,22 @@ struct VerticalSolidHomeView: View {
                     .padding(.horizontal, 10)
                     .padding(.top, 4)
                 } oasis: { lifecycle in
+                    let treeLevel = treeManager.treeLevel.rawValue
+                    let shopUnlockLevel = GrowthUnlockPolicy.status(for: FMDest.coconutShop, currentLevel: 0).step.requiredLevel
+                    let gachaUnlockLevel = GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 0).step.requiredLevel
+                    let critterUnlockLevel = OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId)?.sourceLevel ?? 10
+
                     OasisHomeTabHost(
                         lifecycle: lifecycle,
+                        treeSnapshot: OasisTreeRenderSnapshot(
+                            level: treeLevel,
+                            progressToNextLevel: treeManager.progressToNextLevel,
+                            totalEnergy: treeManager.totalEnergy,
+                            nextLevelThreshold: treeManager.nextLevelThreshold,
+                            shopLockedLevel: treeLevel >= shopUnlockLevel ? nil : shopUnlockLevel,
+                            crittersLockedLevel: treeLevel >= critterUnlockLevel ? nil : critterUnlockLevel,
+                            gachaLockedLevel: treeLevel >= gachaUnlockLevel ? nil : gachaUnlockLevel
+                        ),
                         injectEnergyTrigger: oasisInjectEnergyTrigger,
                         onPresentCoconutLog: onPresentCoconutLog
                     )
@@ -345,6 +359,7 @@ struct VerticalSolidHomeView: View {
                         onCompleteQuest: completeTodayFocusQuest,
                         onTapNegativeSignal: openTodayFocusNegativeSignal,
                         onTapFamilyTask: openTodayFocusFamilyTask,
+                        onOpenExchange: openTodayFocusExchange,
                         onConfirmExchange: confirmTodayFocusExchange
                     )
                     .padding(.horizontal, 8)
@@ -424,7 +439,7 @@ struct VerticalSolidHomeView: View {
                 }
 
                 if let growthUnlockToastStatus {
-                    GrowthUnlockToastView(
+                    GrowthUnlockPopupView(
                         status: growthUnlockToastStatus,
                         appLanguage: appLanguage,
                         onDismiss: dismissGrowthUnlockToast,
@@ -432,10 +447,8 @@ struct VerticalSolidHomeView: View {
                             openGrowthUnlockDestination(growthUnlockToastStatus)
                         }
                     )
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, max(92, safeBottom + 84))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .transition(.opacity.combined(with: .scale(scale: reduceMotion ? 1 : 0.96)))
                     .zIndex(62)
                 }
 

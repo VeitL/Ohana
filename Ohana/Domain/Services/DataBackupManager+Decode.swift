@@ -376,6 +376,7 @@ nonisolated extension DataBackupManager {
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         l.customFrequencyNote = dto.customFrequencyNote
         l.isActive = dto.isActive
+        l.remainingAmount = max(0, dto.remainingAmount ?? 0)
         l.createdAt = parseDate(dto.createdAt) ?? Date()
         return l
     }

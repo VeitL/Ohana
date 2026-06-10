@@ -667,7 +667,7 @@ struct AddPetMedicationSheet: View {
         }
         (administrationTag, notes) = splitAdministration(from: e.notes)
         colorHex = e.colorHex
-        let remainingValue = PetMedicationPlanStorageKeys.remainingAmountValue(medicationID: e.id)
+        let remainingValue = PetMedicationPlanStorageKeys.remainingAmountValue(medication: e)
         if remainingValue > 0 {
             remainingText = String(format: "%.0f", remainingValue)
         }

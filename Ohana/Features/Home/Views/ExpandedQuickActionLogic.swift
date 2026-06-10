@@ -50,6 +50,15 @@ enum ExpandedHumanQuickRoute {
     case none
 }
 
+struct ExpandedQuickMenuPolicy: Equatable {
+    let showsMenu: Bool
+    let showsQuickButton: Bool
+
+    static let none = ExpandedQuickMenuPolicy(showsMenu: false, showsQuickButton: false)
+    static let detailOnly = ExpandedQuickMenuPolicy(showsMenu: true, showsQuickButton: false)
+    static let quickWithDetail = ExpandedQuickMenuPolicy(showsMenu: true, showsQuickButton: true)
+}
+
 enum ExpandedQuickActionLogic {
     static func feedDashboard(
         for pet: Pet,
@@ -388,6 +397,92 @@ enum ExpandedQuickActionLogic {
         case "substrateChange": "换垫材"
         default: nil
         }
+    }
+
+    static func petMenuPolicy(
+        for item: QuickActionItem,
+        pet: Pet,
+        allEvents: [Event],
+        allFeedCareLogs: [PetCareLog],
+        now: Date
+    ) -> ExpandedQuickMenuPolicy {
+        switch item.actionType {
+        case "feed":
+            return feedQuickCheckInAvailable(
+                for: pet,
+                allEvents: allEvents,
+                allFeedCareLogs: allFeedCareLogs,
+                now: now
+            ) ? .quickWithDetail : .none
+        case "water":
+            if WaterQuickActionPolicy.isAquatic(species: pet.species) {
+                return .detailOnly
+            }
+            return waterQuickCheckInAvailable(for: pet, allEvents: allEvents) ? .quickWithDetail : .none
+        case "walk", "play", "litter", "cageCleaning", "freeFlight", "misting", "substrateChange":
+            return .quickWithDetail
+        case "medication":
+            return medicationQuickCheckInAvailable(for: pet, allEvents: allEvents, now: now) ? .quickWithDetail : .none
+        case "groom", "potty", "health":
+            return .detailOnly
+        case "waterChange", "filterClean", "weight", "expense", "moment":
+            return .detailOnly
+        default:
+            return .none
+        }
+    }
+
+    static func humanMenuPolicy(actionType: String) -> ExpandedQuickMenuPolicy {
+        switch actionType {
+        case "humanWeight", "humanWorkout", "humanMedication", "humanNote", "humanExpense", "humanAllFeatures":
+            .detailOnly
+        default:
+            .none
+        }
+    }
+
+    static func feedQuickCheckInAvailable(
+        for pet: Pet,
+        allEvents: [Event],
+        allFeedCareLogs: [PetCareLog],
+        now: Date
+    ) -> Bool {
+        let dashboard = feedDashboard(
+            for: pet,
+            allEvents: allEvents,
+            allFeedCareLogs: allFeedCareLogs,
+            now: now
+        )
+        switch dashboard.operatingMode {
+        case .manual:
+            return pet.dailyPortionGrams > 0
+        case .manualReminder:
+            return dashboard.nextManualReminder != nil
+        case .autoFeeder:
+            return false
+        }
+    }
+
+    static func waterQuickCheckInAvailable(for pet: Pet, allEvents: [Event]) -> Bool {
+        guard !WaterQuickActionPolicy.isAquatic(species: pet.species) else { return false }
+        let state = waterRuleState(for: pet, allEvents: allEvents)
+        switch state.operatingMode {
+        case .manual:
+            return true
+        case .reminder:
+            return state.nextPendingReminder != nil
+        }
+    }
+
+    static func medicationQuickCheckInAvailable(for pet: Pet, allEvents: [Event], now: Date) -> Bool {
+        pet.medications
+            .filter(\.isActiveToday)
+            .contains { medication in
+                let required = PetMedicationDoseLogging.requiredDoses(on: now, for: medication)
+                if required == 0 { return true }
+                let done = PetMedicationDoseLogging.todayDoseCount(events: allEvents, medicationId: medication.id)
+                return done < required
+            }
     }
 
     static func petTapRoute(for item: QuickActionItem, pet: Pet) -> ExpandedPetQuickTapRoute {

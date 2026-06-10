@@ -351,7 +351,9 @@ enum CarePlanOverdueStatusCalculator {
                 entityType.hasPrefix("pet_")
         }
 
-        if event.eventType == EventType.petMedicationDose.rawValue ||
+        if event.eventType == EventType.petMedication.rawValue ||
+            event.eventType == EventType.petMedicationDose.rawValue ||
+            entityType == MedicationEventLink.petMedicationPlan.lowercased() ||
             entityType == PetMedicationDoseLogging.relatedEntityTypeMedication.lowercased() {
             return pet.medications.contains { $0.id.uuidString == event.relatedEntityId }
         }
@@ -374,7 +376,7 @@ enum CarePlanOverdueStatusCalculator {
                 entityType.hasPrefix("human_")
         }
 
-        if entityType == "human_medication" {
+        if entityType == MedicationEventLink.humanMedicationPlan {
             return medications.first { $0.id.uuidString == event.relatedEntityId }?.humanId == humanId
         }
 
@@ -393,7 +395,9 @@ enum CarePlanOverdueStatusCalculator {
     }
 
     private static func planActionType(for event: Event) -> String? {
-        if event.eventType == EventType.petMedicationDose.rawValue ||
+        if event.eventType == EventType.petMedication.rawValue ||
+            event.eventType == EventType.petMedicationDose.rawValue ||
+            event.relatedEntityType.lowercased() == MedicationEventLink.petMedicationPlan.lowercased() ||
             event.relatedEntityType.lowercased() == PetMedicationDoseLogging.relatedEntityTypeMedication {
             return "medication"
         }
@@ -454,7 +458,7 @@ enum CarePlanOverdueStatusCalculator {
 
     private static func humanPlanActionType(for event: Event) -> String? {
         if event.eventType == EventType.medication.rawValue ||
-            event.relatedEntityType.lowercased() == "human_medication" {
+            event.relatedEntityType.lowercased() == MedicationEventLink.humanMedicationPlan {
             return "humanMedication"
         }
 

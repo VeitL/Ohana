@@ -219,6 +219,7 @@ struct HumanCareCommandExecutor {
     let revisions: DomainRevisionPublishing
     let careLedger: CareLedgerRecording
     let reminderScheduling: ReminderSchedulingManaging
+    let medicationReminders: MedicationReminderManaging
 
     init(context: ModelContext) {
         let careLedger = CareLedgerService()
@@ -226,7 +227,8 @@ struct HumanCareCommandExecutor {
             context: context,
             revisions: SharedDomainRevisionPublisher(),
             careLedger: careLedger,
-            reminderScheduling: ReminderSchedulingManager(careLedger: careLedger)
+            reminderScheduling: ReminderSchedulingManager(careLedger: careLedger),
+            medicationReminders: SharedMedicationReminderManager(careLedger: careLedger)
         )
     }
 
@@ -236,7 +238,8 @@ struct HumanCareCommandExecutor {
             context: context,
             revisions: SharedDomainRevisionPublisher(center: revisionCenter),
             careLedger: careLedger,
-            reminderScheduling: ReminderSchedulingManager(careLedger: careLedger)
+            reminderScheduling: ReminderSchedulingManager(careLedger: careLedger),
+            medicationReminders: SharedMedicationReminderManager(careLedger: careLedger)
         )
     }
 
@@ -245,7 +248,8 @@ struct HumanCareCommandExecutor {
             context: context,
             revisions: services.domainRevisions,
             careLedger: services.careLedger,
-            reminderScheduling: services.reminderScheduling
+            reminderScheduling: services.reminderScheduling,
+            medicationReminders: services.medicationReminders
         )
     }
 
@@ -253,12 +257,14 @@ struct HumanCareCommandExecutor {
         context: ModelContext,
         revisions: DomainRevisionPublishing,
         careLedger: CareLedgerRecording,
-        reminderScheduling: ReminderSchedulingManaging
+        reminderScheduling: ReminderSchedulingManaging,
+        medicationReminders: MedicationReminderManaging
     ) {
         self.context = context
         self.revisions = revisions
         self.careLedger = careLedger
         self.reminderScheduling = reminderScheduling
+        self.medicationReminders = medicationReminders
     }
 
     @discardableResult
@@ -325,7 +331,8 @@ struct HumanCareCommandExecutor {
             colorHex: colorHex,
             notes: notes,
             context: context,
-            reminderEnabled: reminderEnabled
+            reminderEnabled: reminderEnabled,
+            medicationReminders: medicationReminders
         ) else {
             revisions.publish(
                 DomainMutationResult(
@@ -355,7 +362,8 @@ struct HumanCareCommandExecutor {
             editing: existingMedication,
             input: input,
             context: context,
-            scheduleReminders: scheduleReminders
+            scheduleReminders: scheduleReminders,
+            medicationReminders: medicationReminders
         ) else {
             revisions.publish(
                 DomainMutationResult(
@@ -390,7 +398,8 @@ struct HumanCareCommandExecutor {
             isActive: isActive,
             appLanguage: appLanguage,
             context: context,
-            scheduleReminders: scheduleReminders
+            scheduleReminders: scheduleReminders,
+            medicationReminders: medicationReminders
         )
         let revisionNote = note
             ?? (result.scheduledReminderSync ? "human.medication.plan.activation.reminders" : "human.medication.plan.activation")
@@ -409,7 +418,8 @@ struct HumanCareCommandExecutor {
             human: human,
             medication: medication,
             context: context,
-            scheduleReminders: scheduleReminders
+            scheduleReminders: scheduleReminders,
+            medicationReminders: medicationReminders
         )
         revisions.publishHumanMedicationPlanDelete(result, note: note)
         return result
