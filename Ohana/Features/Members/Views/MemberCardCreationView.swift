@@ -143,31 +143,27 @@ struct MemberCardCreationContentView: View {
     }
 
     var cardForeground: Color {
-        prefersDarkCardForeground ? Color.arkInk : Color.goCardWhite
+        Color.goCardWhite.opacity(0.94)
     }
 
     var cardSecondaryForeground: Color {
-        cardForeground.opacity(0.68)
+        Color.goCardWhite.opacity(0.66)
     }
 
     var cardControlFill: Color {
-        prefersDarkCardForeground
-            ? cardAccent.mix(with: .white, by: 0.82)
-            : cardAccent.mix(with: .black, by: 0.48)
+        Color.goCardWhite.opacity(0.14)
     }
 
     var cardControlStroke: Color {
-        prefersDarkCardForeground
-            ? cardAccent.mix(with: .black, by: 0.18)
-            : cardAccent.mix(with: .white, by: 0.22)
+        Color.goCardWhite.opacity(0.30)
     }
 
     var cardSelectedFill: Color {
-        Color.goPrimary
+        cardAccent.mix(with: .white, by: 0.28)
     }
 
     var cardSelectedForeground: Color {
-        Color.arkInk
+        WalletPetCardTheme.prefersDarkForeground(for: draft.normalizedThemeHex) ? Color.arkInk : Color.goCardWhite
     }
 
     var stepContentSpacing: CGFloat { 18 }

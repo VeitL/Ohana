@@ -29,6 +29,7 @@ extension MemberCardCreationContentView {
             Capsule()
                 .strokeBorder(cardControlStroke, lineWidth: 1)
         }
+        .shadow(color: Color.goCardWhite.opacity(0.08), radius: 10, y: 4) // ui-v4: allow member creation glass input depth
     }
 
     func compactOptionRow(options: [String], selection: Binding<String>, label: @escaping (String) -> String) -> some View {
@@ -51,8 +52,9 @@ extension MemberCardCreationContentView {
                         .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
                         .overlay {
                             Capsule()
-                                .strokeBorder(cardControlStroke, lineWidth: 1)
+                                .strokeBorder(isSelected ? cardAccent.opacity(0.62) : cardControlStroke, lineWidth: 1)
                         }
+                        .shadow(color: isSelected ? cardAccent.opacity(0.30) : Color.clear, radius: 12, y: 4) // ui-v4: allow selected glass control glow
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -83,8 +85,9 @@ extension MemberCardCreationContentView {
                         .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
                         .overlay {
                             Capsule()
-                                .strokeBorder(cardControlStroke, lineWidth: 1)
+                                .strokeBorder(isSelected ? cardAccent.opacity(0.62) : cardControlStroke, lineWidth: 1)
                         }
+                        .shadow(color: isSelected ? cardAccent.opacity(0.30) : Color.clear, radius: 12, y: 4) // ui-v4: allow selected glass control glow
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(label(option))
@@ -207,6 +210,7 @@ extension MemberCardCreationContentView {
                     Capsule()
                         .strokeBorder(cardControlStroke, lineWidth: 1)
                 }
+                .shadow(color: Color.goCardWhite.opacity(0.07), radius: 9, y: 3) // ui-v4: allow member creation glass media control depth
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -228,8 +232,9 @@ extension MemberCardCreationContentView {
                 .background(isOn.wrappedValue ? cardSelectedFill : cardControlFill, in: Capsule())
                 .overlay {
                     Capsule()
-                        .strokeBorder(cardControlStroke, lineWidth: 1)
+                        .strokeBorder(isOn.wrappedValue ? cardAccent.opacity(0.58) : cardControlStroke, lineWidth: 1)
                 }
+                .shadow(color: isOn.wrappedValue ? cardAccent.opacity(0.26) : Color.clear, radius: 10, y: 4) // ui-v4: allow selected glass control glow
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -247,10 +252,14 @@ extension MemberCardCreationContentView {
         TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             .textInputAutocapitalization(.words)
             .font(OhanaFont.caption(.bold))
-            .foregroundStyle(Color.ohanaPrimaryText)
+            .foregroundStyle(cardForeground)
             .padding(.horizontal, 12)
             .frame(height: 42)
-            .background(Color.ohanaControlFill, in: Capsule())
+            .background(cardControlFill, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(cardControlStroke, lineWidth: 1)
+            }
     }
 
     func menuPicker(title: String, value: String, @ViewBuilder content: () -> some View) -> some View {
@@ -260,20 +269,24 @@ extension MemberCardCreationContentView {
             HStack(spacing: 8) {
                 Text(title)
                     .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .foregroundStyle(cardSecondaryForeground)
                 Spacer()
                 Text(value)
                     .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .foregroundStyle(cardForeground)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Image(systemName: "chevron.up.chevron.down").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 10, weight: .black))
-                    .foregroundStyle(Color.ohanaTertiaryText)
+                    .foregroundStyle(cardSecondaryForeground)
             }
             .frame(height: 42)
             .padding(.horizontal, 12)
-            .background(Color.ohanaControlFill, in: Capsule())
+            .background(cardControlFill, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(cardControlStroke, lineWidth: 1)
+            }
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -306,6 +319,7 @@ extension MemberCardCreationContentView {
                 Capsule()
                     .strokeBorder(cardControlStroke, lineWidth: 1)
             }
+            .shadow(color: Color.goCardWhite.opacity(0.07), radius: 9, y: 3) // ui-v4: allow member creation glass picker depth
         }
         .buttonStyle(ScaleButtonStyle())
     }

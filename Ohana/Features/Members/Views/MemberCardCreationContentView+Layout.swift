@@ -144,7 +144,11 @@ extension MemberCardCreationContentView {
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                         .frame(width: 104, height: 54)
-                        .background(Color.ohanaControlFill, in: Capsule())
+                        .background(Color.goCardWhite.opacity(0.12), in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(Color.goCardWhite.opacity(0.18), lineWidth: 1)
+                        }
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(isJoinHandoffRunning || isSaving)
@@ -172,7 +176,12 @@ extension MemberCardCreationContentView {
                     .foregroundStyle(isEnabled ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(isEnabled ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                    .background(isEnabled ? Color.goPrimary : Color.goCardWhite.opacity(0.12), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(isEnabled ? Color.goPrimary.opacity(0.42) : Color.goCardWhite.opacity(0.18), lineWidth: 1)
+                    }
+                    .shadow(color: isEnabled ? Color.goPrimary.opacity(0.22) : Color.clear, radius: 14, y: 6) // ui-v4: allow primary creation action glow
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .disabled(!isEnabled)

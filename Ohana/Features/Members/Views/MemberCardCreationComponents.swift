@@ -194,6 +194,7 @@ struct MemberCompactDateRow: View {
             Capsule()
                 .strokeBorder(stroke, lineWidth: 1)
         }
+        .shadow(color: isEnabled ? accent.opacity(0.22) : Color.goCardWhite.opacity(0.06), radius: isEnabled ? 12 : 7, y: 4) // ui-v4: allow selected glass date row glow
         .animation(GoMotion.selection, value: isEnabled)
         .accessibilityElement(children: .contain)
     }
@@ -207,10 +208,10 @@ struct MemberCompactDateRow: View {
             .font(OhanaFont.caption(.black))
             .foregroundStyle(foreground)
             .frame(minWidth: 118, maxWidth: 136, minHeight: 38, alignment: .trailing)
-            .background(secondaryForeground.opacity(0.12), in: Capsule())
+            .background(Color.goCardWhite.opacity(0.12), in: Capsule())
             .overlay {
                 Capsule()
-                    .strokeBorder(accent.opacity(0.28), lineWidth: 1)
+                    .strokeBorder(accent.opacity(0.34), lineWidth: 1)
             }
             .accessibilityLabel("\(title), \(formattedDate)")
     }

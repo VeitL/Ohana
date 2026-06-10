@@ -50,10 +50,10 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            let heroHeight = min(max(width * 0.70, 206), min(height * 0.43, 282))
+            let heroHeight = min(max(width * 0.78, 240), min(height * 0.45, 320))
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    hero(width: width)
+                    hero(width: width, height: heroHeight)
                         .frame(height: heroHeight)
                     Spacer(minLength: 0)
                     controls()
@@ -68,10 +68,28 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
             .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort, style: .continuous)
-                    .strokeBorder(Color.goCardWhite.opacity(0.24), lineWidth: 1)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.goCardWhite.opacity(0.86),
+                                Color.goCardWhite.opacity(0.22),
+                                accent.opacity(0.40)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.4
+                    )
                     .allowsHitTesting(false)
             }
-            .shadow(color: Color.arkInk.opacity(0.22), radius: 24, x: 0, y: 16) // ui-v4: allow intentional member portrait card depth
+            .overlay {
+                RoundedRectangle(cornerRadius: OhanaRadius.sheetComfort - 2, style: .continuous)
+                    .inset(by: 1.2)
+                    .strokeBorder(Color.goCardWhite.opacity(0.14), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: accent.opacity(0.20), radius: 22, x: -8, y: -6) // ui-v4: allow intentional member creation glass glow
+            .shadow(color: Color.arkInk.opacity(0.28), radius: 26, x: 0, y: 18) // ui-v4: allow intentional member portrait card depth
         }
     }
 
@@ -80,26 +98,71 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    accent.mix(with: .white, by: 0.14),
-                    accent,
-                    accent.mix(with: .black, by: 0.34)
+                    Color(hex: "3157F4").opacity(0.72),
+                    accent.mix(with: .white, by: 0.34).opacity(0.58),
+                    Color(hex: "4A2F86").opacity(0.56),
+                    Color(hex: "091342").opacity(0.88)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+
             if usesWidePhoto, let image = snapshot.avatarImage {
                 WalletCardVerticalPhotoBlendLayer(
                     image: image,
                     width: width,
                     height: height,
                     themeColorHex: snapshot.themeColorHex,
-                    shadowDepth: 1.02
+                    shadowDepth: 0.92
                 )
             }
+
+            Circle()
+                .fill(accent.mix(with: .white, by: 0.18).opacity(0.46))
+                .frame(width: width * 0.78, height: width * 0.78)
+                .blur(radius: 34)
+                .offset(x: -width * 0.30, y: -height * 0.34)
+
+            Circle()
+                .fill(Color.goPrimary.opacity(0.18))
+                .frame(width: width * 0.56, height: width * 0.56)
+                .blur(radius: 40)
+                .offset(x: width * 0.32, y: -height * 0.28)
+
+            MemberCreationLightTrail()
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.goCardWhite.opacity(0.00),
+                            Color.goCardWhite.opacity(0.32),
+                            accent.mix(with: .white, by: 0.20).opacity(0.48),
+                            Color.goCardWhite.opacity(0.00)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    style: StrokeStyle(lineWidth: 1.1, lineCap: .round)
+                )
+                .blur(radius: 0.3)
+                .frame(width: width, height: height)
+                .blendMode(.screen)
+
+            watermarkSymbol(width: width)
+                .position(x: width * 0.78, y: height * 0.18)
+
+            LinearGradient(
+                colors: [
+                    Color.goCardWhite.opacity(0.26),
+                    Color.goCardWhite.opacity(0.10),
+                    Color.arkInk.opacity(0.04)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         }
     }
 
-    private func hero(width: CGFloat) -> some View {
+    private func hero(width: CGFloat, height: CGFloat) -> some View {
         let readableText = usesWidePhoto ? Color.goCardWhite : primaryText
         return ZStack(alignment: .topLeading) {
             VStack(alignment: .leading, spacing: 0) {
@@ -139,6 +202,12 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
             .padding(.top, 22)
             .padding(.horizontal, 22)
             .padding(.bottom, 18)
+
+            if !usesWidePhoto, snapshot.avatarImage == nil {
+                watermarkSymbol(width: width * 0.74)
+                    .opacity(0.22)
+                    .position(x: width * 0.55, y: height * 0.56)
+            }
         }
     }
 
@@ -157,6 +226,35 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
             Color.clear
                 .frame(width: width * 0.72, height: width * 0.50)
         }
+    }
+
+    @ViewBuilder
+    private func watermarkSymbol(width: CGFloat) -> some View {
+        Image(systemName: snapshot.kind == .pet ? "pawprint.fill" : "person.crop.circle.fill")
+            .font(OhanaFont.adaptive(size: min(width * 0.30, 118), weight: .black))
+            .foregroundStyle(Color.goCardWhite.opacity(0.20))
+            .symbolRenderingMode(.monochrome)
+            .shadow(color: Color.goCardWhite.opacity(0.16), radius: 12) // ui-v4: allow soft glass watermark glow inside member creation card
+            .accessibilityHidden(true)
+    }
+}
+
+private struct MemberCreationLightTrail: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.05, y: rect.minY + rect.height * 0.43))
+        path.addCurve(
+            to: CGPoint(x: rect.minX + rect.width * 0.96, y: rect.minY + rect.height * 0.35),
+            control1: CGPoint(x: rect.minX + rect.width * 0.34, y: rect.minY + rect.height * 0.31),
+            control2: CGPoint(x: rect.minX + rect.width * 0.64, y: rect.minY + rect.height * 0.52)
+        )
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.02, y: rect.minY + rect.height * 0.50))
+        path.addCurve(
+            to: CGPoint(x: rect.minX + rect.width * 0.72, y: rect.minY + rect.height * 0.42),
+            control1: CGPoint(x: rect.minX + rect.width * 0.22, y: rect.minY + rect.height * 0.38),
+            control2: CGPoint(x: rect.minX + rect.width * 0.44, y: rect.minY + rect.height * 0.48)
+        )
+        return path
     }
 }
 
