@@ -112,7 +112,7 @@ struct FocusMoodQuestStrip: View {
             cardSurface: cardSurface,
             primaryInk: primaryInk,
             borderOpacity: colorScheme == .dark ? 0.12 : 0.04,
-            shadowColor: colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "23181A").opacity(0.09),
+            shadowColor: colorScheme == .dark ? Color.black.opacity(0.2) : Color(hex: "23181A").opacity(0.09), // ui-v4: allow existing soft shadow tuned for this compact quest strip
             currentPage: $currentPage,
             completingId: $completingId,
             onExpand: onExpand,
