@@ -3883,6 +3883,12 @@ struct HomeCommandExecutorTests {
         context.insert(event)
         try context.save()
 
+        let householdKey = CoconutEconomyPolicyV2.householdBudgetKey(context: context)
+        EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: "human-1", date: now)
+        defer {
+            EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: "human-1", date: now)
+        }
+
         let result = EventCompletionCommandService.awardCompletionIfEligible(
             event: event,
             occurrenceDate: now,
@@ -4024,6 +4030,12 @@ struct HomeCommandExecutorTests {
         context.insert(event)
         try context.save()
         let beforeRevision = revisionCenter.homeRevision.value
+
+        let householdKey = CoconutEconomyPolicyV2.householdBudgetKey(context: context)
+        EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: "human-1", date: now)
+        defer {
+            EconomyDailyBudgetStore.reset(householdKey: householdKey, memberKey: "human-1", date: now)
+        }
 
         let result = EventCompletionCommandExecutor(context: context, revisionCenter: revisionCenter).awardCompletionIfEligible(
             event: event,
