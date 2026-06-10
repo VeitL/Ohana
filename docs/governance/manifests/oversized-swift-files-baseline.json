@@ -16,7 +16,7 @@
     { "path": "Ohana/Features/Home/Views/DailyStreakDetailView.swift", "lines": 824 },
     { "path": "Ohana/Features/Home/Views/FocusHomeRouteSheetModifier.swift", "lines": 820 },
     { "path": "Ohana/Features/Home/Views/FocusWalletCardView.swift", "lines": 887 },
-    { "path": "Ohana/Features/Home/Views/VerticalGlassHomeLabView.swift", "lines": 980 },
+    { "path": "Ohana/Features/Settings/DesignLab/VerticalGlassHomeLabView.swift", "lines": 980 },
     { "path": "Ohana/Features/Medication/MedicationCommands.swift", "lines": 856 },
     { "path": "Ohana/Features/Medication/Views/AddMedicationSheet.swift", "lines": 817 },
     { "path": "Ohana/Features/Medication/Views/HumanMedicationView.swift", "lines": 1039 },
