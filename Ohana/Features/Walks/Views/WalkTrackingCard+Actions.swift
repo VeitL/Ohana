@@ -16,6 +16,7 @@ extension WalkTrackingCard {
         HStack(spacing: 8) {
             switch phase {
             case .idle:
+                sharedWalkExecutorMenu
                 sharedWalkTargetMenu
                 Button {
                     mgr.start(pet: pet)
@@ -60,6 +61,42 @@ extension WalkTrackingCard {
     }
 
     @ViewBuilder
+    var sharedWalkExecutorMenu: some View {
+        if allHumans.count > 1 {
+            Menu {
+                ForEach(allHumans) { human in
+                    let humanId = human.id.uuidString
+                    if humanId == activeWalkHumanId {
+                        Label(displayWalkHumanName(human), systemImage: "checkmark.circle.fill")
+                    } else {
+                        Button {
+                            if selectedSharedWalkExecutorIds.contains(humanId) {
+                                selectedSharedWalkExecutorIds.remove(humanId)
+                            } else {
+                                selectedSharedWalkExecutorIds.insert(humanId)
+                            }
+                            UISelectionFeedbackGenerator().selectionChanged()
+                        } label: {
+                            Label(
+                                displayWalkHumanName(human),
+                                systemImage: selectedSharedWalkExecutorIds.contains(humanId) ? "checkmark.circle.fill" : "circle"
+                            )
+                        }
+                    }
+                }
+            } label: {
+                Label(sharedWalkExecutorTitle, systemImage: selectedWalkExecutorIds.count > 1 ? "person.2.fill" : "person.fill")
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.ohanaControlFill, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    @ViewBuilder
     var sharedWalkTargetMenu: some View {
         if sameSpeciesWalkPets.count > 1 {
             Menu {
@@ -94,6 +131,15 @@ extension WalkTrackingCard {
         }
     }
 
+    var sharedWalkExecutorTitle: String {
+        let count = selectedWalkExecutorIds.count
+        return L10n(appLanguage).tr(
+            zh: count > 1 ? "\(count)人" : "单人",
+            en: count > 1 ? "\(count) walkers" : "One",
+            de: count > 1 ? "\(count) Personen" : "Allein"
+        )
+    }
+
     var sharedWalkTargetTitle: String {
         let count = selectedWalkTargets.count
         return L10n(appLanguage).tr(
@@ -101,6 +147,19 @@ extension WalkTrackingCard {
             en: count > 1 ? "\(count) pets" : "Solo",
             de: count > 1 ? "\(count) Tiere" : "Solo"
         )
+    }
+
+    func refreshDefaultWalkExecutors() {
+        let validIds = Set(allHumans.map(\.id.uuidString))
+        selectedSharedWalkExecutorIds = selectedSharedWalkExecutorIds.intersection(validIds)
+        if let activeWalkHumanId {
+            selectedSharedWalkExecutorIds.insert(activeWalkHumanId)
+        }
+    }
+
+    func displayWalkHumanName(_ human: Human) -> String {
+        let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? L10n(appLanguage).tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenannt") : name
     }
 
     func circleButton(icon: String, color: Color, action: @escaping () -> Void) -> some View {
@@ -149,7 +208,7 @@ extension WalkTrackingCard {
             scope: "walk.shared",
             candidates: sameSpeciesWalkPets
         )
-        onStopWalk(selectedWalkTargets)
+        onStopWalk(selectedWalkTargets, selectedWalkExecutorIds)
         presentSummaryBack()
     }
 

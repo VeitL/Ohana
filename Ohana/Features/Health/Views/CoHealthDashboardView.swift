@@ -42,7 +42,7 @@ struct CoHealthDashboardContentView: View {
     private var associatedPets: [Pet] {
         allPets.filter { pet in
             pet.species == "狗" &&
-                pet.walkLogs.contains { $0.executorId == human.id.uuidString }
+                pet.walkLogs.contains { $0.executorIds.contains(human.id.uuidString) }
         }
     }
 
@@ -63,7 +63,7 @@ struct CoHealthDashboardContentView: View {
         let start = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? past30Days
         let myId = human.id.uuidString
         let allLogs: [PetWalkLog] = associatedPets.flatMap(\.walkLogs)
-        let filtered = allLogs.filter { $0.executorId == myId && $0.startDate >= start }
+        let filtered = allLogs.filter { $0.executorIds.contains(myId) && $0.startDate >= start }
         let totalMeters = filtered.reduce(0.0) { $0 + $1.distanceMeters }
         return totalMeters / 1000
     }

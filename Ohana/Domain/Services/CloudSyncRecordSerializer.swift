@@ -256,6 +256,8 @@ nonisolated enum CloudSyncRecordSerializer {
             CloudSyncRecordState.normalizedRecordId(log.id)
         case let log as PetWeightLog:
             CloudSyncRecordState.normalizedRecordId(log.id)
+        case let session as SharedCareSession:
+            CloudSyncRecordState.normalizedRecordId(session.id)
         case let entry as CoconutLedgerEntry:
             CloudSyncRecordState.normalizedRecordId(entry.id)
         default:
@@ -288,6 +290,8 @@ nonisolated enum CloudSyncRecordSerializer {
             petExpenseLogFields(log)
         case let log as PetWeightLog:
             petWeightLogFields(log)
+        case let session as SharedCareSession:
+            sharedCareSessionFields(session)
         case let entry as CoconutLedgerEntry:
             coconutLedgerEntryFields(entry)
         default:
@@ -461,6 +465,7 @@ nonisolated enum CloudSyncRecordSerializer {
             "distanceMeters": .double(log.distanceMeters),
             "coconutsEarned": .int(log.coconutsEarned),
             "executorId": optionalString(log.executorId),
+            "executorIdsRaw": .string(SharedCareParticipantIDs.encode(log.executorIds)),
             "sharedSessionId": .string(log.sharedSessionId),
             "behaviorNotes": optionalString(log.behaviorNotes),
             "moodRating": .int(log.moodRating),
@@ -497,6 +502,31 @@ nonisolated enum CloudSyncRecordSerializer {
             "bcsScore": .int(log.bcsScore),
             "executorId": optionalString(log.executorId),
             "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+    }
+
+    private static func sharedCareSessionFields(_ session: SharedCareSession) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(session.id)),
+            "date": .date(session.date),
+            "actionKindRaw": .string(session.actionKindRaw),
+            "executorId": optionalString(session.executorId),
+            "executorIdsRaw": .string(SharedCareParticipantIDs.encode(session.executorIds)),
+            "sourcePetId": .string(session.sourcePetId),
+            "targetPetIdsRaw": .string(session.targetPetIdsRaw),
+            "speciesRaw": .string(session.speciesRaw),
+            "totalAmountGrams": .double(session.totalAmountGrams),
+            "totalAmountMl": .double(session.totalAmountMl),
+            "totalExpenseAmount": .double(session.totalExpenseAmount),
+            "expenseCategoryRaw": .string(session.expenseCategoryRaw),
+            "currencyCode": .string(session.currencyCode),
+            "allocationModeRaw": .string(session.allocationModeRaw),
+            "foodKindRaw": .string(session.foodKindRaw),
+            "stockOwnerPetId": .string(session.stockOwnerPetId),
+            "primaryLegacyModelName": .string(session.primaryLegacyModelName),
+            "primaryLegacyModelId": .string(session.primaryLegacyModelId),
+            "note": .string(session.note),
+            "createdAt": .date(session.createdAt)
         ]
     }
 

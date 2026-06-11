@@ -612,7 +612,9 @@ struct OnboardingView: View {
         }
         firstQuickCheckInCompleted = false
         showFirstSuccessCard = true
-        withAnimation(GoMotion.page) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
             hasOnboarded = true
         }
     }

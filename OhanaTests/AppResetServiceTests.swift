@@ -51,8 +51,49 @@ final class AppResetServiceTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: AppCountry.storageKey), "DE")
     }
 
+    func testResetClearsCareSettingPrefixes() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let defaultsSuiteName = "AppResetServiceTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuiteName))
+        defer {
+            defaults.removePersistentDomain(forName: defaultsSuiteName)
+        }
+        let suffix = UUID().uuidString
+        let keys = [
+            "waterInterval_\(suffix)",
+            "filterCleanInterval_\(suffix)",
+            "filterReplaceInterval_\(suffix)",
+            "waterReminder_\(suffix)",
+            "filterReminder_\(suffix)",
+            "waterAmountEnabled_\(suffix)",
+            "waterAmountMl_\(suffix)",
+            "waterChangeCycleAnchor_\(suffix)",
+            "feedGoal_\(suffix)",
+            "scoopIntervalDays_\(suffix)",
+            "scoopAnchorDate_\(suffix)"
+        ]
+        for key in keys {
+            defaults.set("stale", forKey: key)
+        }
+
+        try AppResetService.reset(
+            context: context,
+            defaults: defaults,
+            options: AppResetService.Options(
+                cancelPendingNotifications: false,
+                deleteCustomBackground: false,
+                resetSharedRuntimeState: false
+            )
+        )
+
+        for key in keys {
+            XCTAssertNil(defaults.object(forKey: key), key)
+        }
+    }
+
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV67.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

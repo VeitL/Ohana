@@ -407,13 +407,14 @@ struct CloudSyncMetadataServiceTests {
 
         #expect(uploadableNames == CloudSyncEntityRegistry.uploadPipelineEntityNames)
         #expect(uploadableNames.contains(String(describing: Pet.self)))
+        #expect(uploadableNames.contains(String(describing: SharedCareSession.self)))
         #expect(uploadableNames.contains(String(describing: CoconutLedgerEntry.self)))
         #expect(!uploadableNames.contains(String(describing: Reminder.self)))
         #expect(CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: Reminder.self)) == false)
     }
 
     @MainActor
-    @Test func mutationRecorderSkipsEntitiesOutsideImplementedPipeline() throws {
+    @Test func mutationRecorderStagesSharedCareSessionsForUploadPipeline() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let session = SharedCareSession(date: Date(timeIntervalSinceReferenceDate: 25))
@@ -423,26 +424,37 @@ struct CloudSyncMetadataServiceTests {
         let entityName = String(describing: SharedCareSession.self)
         let descriptor = try #require(CloudSyncEntityRegistry.descriptor(for: entityName))
         #expect(descriptor.uploadsToCloudKit)
-        #expect(!CloudSyncEntityRegistry.supportsUploadPipeline(for: entityName))
+        #expect(CloudSyncEntityRegistry.supportsUploadPipeline(for: entityName))
 
         let modified = CloudSyncMutationRecorder.markModified(
             session,
             context: context,
             modifiedAt: Date(timeIntervalSinceReferenceDate: 50)
         )
+        let state = try #require(try CloudSyncMetadataService.state(
+            entityName: entityName,
+            localRecordId: session.id,
+            context: context
+        ))
+
+        #expect(modified?.id == state.id)
+        #expect(state.hasPendingLocalChanges)
+        #expect(!state.isDeletionTombstone)
+
         let deleted = CloudSyncMutationRecorder.markDeleted(
             session,
             context: context,
             deletedAt: Date(timeIntervalSinceReferenceDate: 60)
         )
-
-        #expect(modified == nil)
-        #expect(deleted == nil)
-        #expect(try CloudSyncMetadataService.state(
+        let tombstone = try #require(try CloudSyncMetadataService.state(
             entityName: entityName,
             localRecordId: session.id,
             context: context
-        ) == nil)
+        ))
+
+        #expect(deleted?.id == state.id)
+        #expect(tombstone.isDeletionTombstone)
+        #expect(tombstone.hasPendingLocalChanges)
     }
 
     @MainActor
@@ -575,10 +587,12 @@ struct CloudSyncMetadataServiceTests {
         #expect(pottyPayload.fields["latitude"] == .double(1.25))
         #expect(pottyPayload.fields["sharedSessionId"]?.stringValue == "session-1")
 
+        let coExecutorId = "human-2"
         let walkLog = PetWalkLog(
             startDate: Date(timeIntervalSinceReferenceDate: 90),
             pet: pet,
             executorId: executorId,
+            executorIds: [executorId, coExecutorId],
             sharedSessionId: "session-2"
         )
         walkLog.id = uuid("66666666-6666-4666-8666-666666666666")
@@ -599,8 +613,52 @@ struct CloudSyncMetadataServiceTests {
         #expect(walkPayload.entityName == "PetWalkLog")
         #expect(walkPayload.fields["distanceMeters"] == .double(123.4))
         #expect(walkPayload.fields["coconutsEarned"]?.intValue == 9)
+        #expect(walkPayload.fields["executorIdsRaw"]?.stringValue == "\(executorId)|\(coExecutorId)")
         #expect(walkPayload.fields["behaviorNotes"]?.stringValue == "calm walk")
         #expect(walkPayload.fields["routeLocationsData"] == .assetData(Data([1, 2, 3])))
+    }
+
+    @MainActor
+    @Test func recordSerializerBuildsSharedCareSessionPayload() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let sourcePetId = normalized(uuid("11111111-1111-4111-8111-111111111111"))
+        let targetPetId = normalized(uuid("22222222-2222-4222-8222-222222222222"))
+        let executorId = normalized(uuid("33333333-3333-4333-8333-333333333333"))
+        let coExecutorId = normalized(uuid("44444444-4444-4444-8444-444444444444"))
+        let session = SharedCareSession(
+            date: Date(timeIntervalSinceReferenceDate: 95),
+            actionKind: .walk,
+            executorId: executorId,
+            executorIds: [executorId, coExecutorId],
+            sourcePetId: sourcePetId,
+            targetPetIds: [sourcePetId, targetPetId],
+            species: "dog",
+            allocationMode: .equal,
+            primaryLegacyModelName: String(describing: PetWalkLog.self),
+            primaryLegacyModelId: "walk-log-1",
+            note: "evening loop"
+        )
+        session.id = uuid("55555555-5555-4555-8555-555555555555")
+        session.createdAt = Date(timeIntervalSinceReferenceDate: 96)
+
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: SharedCareSession.self),
+            localRecordId: session.id,
+            householdId: householdId,
+            context: context
+        )
+        let payload = try CloudSyncRecordSerializer.payload(for: session, state: state)
+
+        #expect(payload.entityName == "SharedCareSession")
+        #expect(payload.fields["actionKindRaw"]?.stringValue == SharedCareActionKind.walk.rawValue)
+        #expect(payload.fields["executorId"]?.stringValue == executorId)
+        #expect(payload.fields["executorIdsRaw"]?.stringValue == "\(executorId)|\(coExecutorId)")
+        #expect(payload.fields["targetPetIdsRaw"]?.stringValue == "\(sourcePetId)|\(targetPetId)")
+        #expect(payload.fields["speciesRaw"]?.stringValue == "dog")
+        #expect(payload.fields["primaryLegacyModelName"]?.stringValue == String(describing: PetWalkLog.self))
+        #expect(payload.fields["note"]?.stringValue == "evening loop")
     }
 
     @MainActor
@@ -2075,6 +2133,7 @@ struct CloudSyncMetadataServiceTests {
                 "coconutsEarned": .int(11),
                 "petId": .string(normalized(petId)),
                 "executorId": .string("executor-2"),
+                "executorIdsRaw": .string("executor-2|executor-3"),
                 "sharedSessionId": .string("session-2"),
                 "behaviorNotes": .string("happy"),
                 "moodRating": .int(5)
@@ -2088,9 +2147,66 @@ struct CloudSyncMetadataServiceTests {
         #expect(walkLog.pet?.id == petId)
         #expect(walkLog.distanceMeters == 456.7)
         #expect(walkLog.coconutsEarned == 11)
+        #expect(walkLog.executorIds == ["executor-2", "executor-3"])
         #expect(walkLog.sharedSessionId == "session-2")
         #expect(walkLog.behaviorNotes == "happy")
         #expect(walkLog.moodRating == 5)
+    }
+
+    @MainActor
+    @Test func recordApplierInsertsRemoteSharedCareSession() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let sessionId = uuid("33333333-3333-4333-8333-333333333333")
+        let sourcePetId = normalized(uuid("11111111-1111-4111-8111-111111111111"))
+        let targetPetId = normalized(uuid("22222222-2222-4222-8222-222222222222"))
+        let sessionDate = Date(timeIntervalSinceReferenceDate: 2400)
+        let createdAt = Date(timeIntervalSinceReferenceDate: 2401)
+        let record = try makeRecordPayload(
+            entityName: String(describing: SharedCareSession.self),
+            recordType: String(describing: SharedCareSession.self),
+            localRecordId: sessionId,
+            householdId: householdId,
+            fields: [
+                "date": .date(sessionDate),
+                "actionKindRaw": .string(SharedCareActionKind.walk.rawValue),
+                "executorId": .string("executor-2"),
+                "executorIdsRaw": .string("executor-2|executor-3"),
+                "sourcePetId": .string(sourcePetId),
+                "targetPetIdsRaw": .string("\(sourcePetId)|\(targetPetId)"),
+                "speciesRaw": .string("dog"),
+                "totalAmountGrams": .double(0),
+                "totalAmountMl": .double(0),
+                "totalExpenseAmount": .double(0),
+                "expenseCategoryRaw": .string(ExpenseCategory.other.rawValue),
+                "currencyCode": .string("EUR"),
+                "allocationModeRaw": .string(SharedCareAllocationMode.equal.rawValue),
+                "foodKindRaw": .string(FeedFoodKind.dry.rawValue),
+                "stockOwnerPetId": .string(""),
+                "primaryLegacyModelName": .string(String(describing: PetWalkLog.self)),
+                "primaryLegacyModelId": .string("walk-2"),
+                "note": .string("remote walk"),
+                "createdAt": .date(createdAt)
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .inserted(entityName: "SharedCareSession", localRecordId: normalized(sessionId)))
+        let session = try #require(try fetchSharedCareSession(id: sessionId, context: context))
+        #expect(session.date == sessionDate)
+        #expect(session.actionKind == .walk)
+        #expect(session.executorId == "executor-2")
+        #expect(session.executorIds == ["executor-2", "executor-3"])
+        #expect(session.sourcePetId == sourcePetId)
+        #expect(session.targetPetIds == [sourcePetId, targetPetId])
+        #expect(session.speciesRaw == "dog")
+        #expect(session.currencyCode == "EUR")
+        #expect(session.primaryLegacyModelName == String(describing: PetWalkLog.self))
+        #expect(session.primaryLegacyModelId == "walk-2")
+        #expect(session.note == "remote walk")
+        #expect(session.createdAt == createdAt)
     }
 
     @MainActor
@@ -2375,7 +2491,7 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV66.models)
+        let schema = Schema(ArkSchemaV67.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -2473,6 +2589,14 @@ struct CloudSyncMetadataServiceTests {
     private func fetchPetWalkLog(id: UUID, context: ModelContext) throws -> PetWalkLog? {
         var descriptor = FetchDescriptor<PetWalkLog>(
             predicate: #Predicate<PetWalkLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchSharedCareSession(id: UUID, context: ModelContext) throws -> SharedCareSession? {
+        var descriptor = FetchDescriptor<SharedCareSession>(
+            predicate: #Predicate<SharedCareSession> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

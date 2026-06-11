@@ -57,6 +57,61 @@ enum OhanaFrameScheduler {
     }
 }
 
+enum OnboardingHomeJoinHandoffGate {
+    private static let completedAtKey = "ohana_onboarding_home_join_handoff_completed_at"
+    private static let recentWindowSeconds: TimeInterval = 6
+    private static let rootBootstrapDelayMilliseconds: UInt64 = 900
+    private static let homeReadModelDelayMilliseconds: UInt64 = 120
+    private static let homeAppearDelayMilliseconds: UInt64 = 220
+
+    static func markCompleted(now: Date = Date(), defaults: UserDefaults = .standard) {
+        defaults.set(now.timeIntervalSince1970, forKey: completedAtKey)
+    }
+
+    static func remainingRootBootstrapDelayMilliseconds(
+        now: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) -> UInt64 {
+        remainingDelay(milliseconds: rootBootstrapDelayMilliseconds, now: now, defaults: defaults)
+    }
+
+    static func remainingHomeReadModelDelayMilliseconds(
+        defaultDelayMilliseconds: UInt64,
+        now: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) -> UInt64 {
+        max(
+            defaultDelayMilliseconds,
+            remainingDelay(milliseconds: homeReadModelDelayMilliseconds, now: now, defaults: defaults)
+        )
+    }
+
+    static func remainingHomeAppearDelayMilliseconds(
+        now: Date = Date(),
+        defaults: UserDefaults = .standard
+    ) -> UInt64 {
+        remainingDelay(milliseconds: homeAppearDelayMilliseconds, now: now, defaults: defaults)
+    }
+
+    static func consume(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: completedAtKey)
+    }
+
+    private static func remainingDelay(
+        milliseconds: UInt64,
+        now: Date,
+        defaults: UserDefaults
+    ) -> UInt64 {
+        let completedAt = defaults.double(forKey: completedAtKey)
+        guard completedAt > 0 else { return 0 }
+        let elapsedSeconds = now.timeIntervalSince1970 - completedAt
+        guard elapsedSeconds >= 0, elapsedSeconds < recentWindowSeconds else { return 0 }
+        let elapsedMilliseconds = UInt64(elapsedSeconds * 1000)
+        guard elapsedMilliseconds < milliseconds else { return 0 }
+        return milliseconds - elapsedMilliseconds
+    }
+}
+
 @MainActor
 final class AppWorkloadPolicy: ObservableObject {
     static let shared = AppWorkloadPolicy()

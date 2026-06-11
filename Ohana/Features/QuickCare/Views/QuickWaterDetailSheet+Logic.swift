@@ -73,7 +73,7 @@ extension QuickWaterDetailSheet {
         scheduleCarePlanReminders(reminders)
         if showToast {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            showSaveConfirmation(filterReminderOn ? "已保存滤芯提醒" : "已保存")
+            showSaveConfirmation(filterReminderOn ? l.tr(zh: "已保存滤芯提醒", en: "Filter reminder saved", de: "Filtererinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
         }
     }
 
@@ -284,7 +284,7 @@ extension QuickWaterDetailSheet {
         scheduleWaterPlanMaintenance(delayMilliseconds: waterPlanPostSaveMaintenanceDelayMilliseconds)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         setActiveWaterMode(.reminder)
-        showSaveConfirmation(result.targetCount > 1 ? "共同喂水计划已保存 · \(result.targetCount)只" : "已保存喂水计划")
+        showSaveConfirmation(result.targetCount > 1 ? localizedSharedWaterPlanSaved(result.targetCount) : l.tr(zh: "已保存喂水计划", en: "Water plan saved", de: "Trinkplan gespeichert"))
         isSavingWaterPlan = false
         waterPlanSaveTask = nil
     }
@@ -299,7 +299,7 @@ extension QuickWaterDetailSheet {
                     pet: pet,
                     allEvents: latestAllEvents()
                 )
-                showSaveConfirmation("已切换到手动喂水")
+                showSaveConfirmation(l.tr(zh: "已切换到手动喂水", en: "Switched to manual water logging", de: "Auf manuelles Trinken umgestellt"))
             }
         }
     }
@@ -314,7 +314,7 @@ extension QuickWaterDetailSheet {
         beginWaterModeVisualTransition(to: .reminder) {
             scheduleSettledWaterModeMaintenance(for: .reminder) {
                 ensureUpcomingWaterPlanReminders()
-                showSaveConfirmation("已切换到喂水计划")
+                showSaveConfirmation(l.tr(zh: "已切换到喂水计划", en: "Switched to water plan", de: "Auf Trinkplan umgestellt"))
             }
         }
     }
@@ -327,7 +327,7 @@ extension QuickWaterDetailSheet {
         beginWaterModeVisualTransition(to: .manual, commitWhenUnchanged: true) {
             scheduleSettledWaterModeMaintenance(for: .manual) {
                 commandExecutor.deleteWaterPlan(pet: pet, allEvents: latestAllEvents())
-                showSaveConfirmation("已删除喂水计划")
+                showSaveConfirmation(l.tr(zh: "已删除喂水计划", en: "Water plan deleted", de: "Trinkplan gelöscht"))
             }
         }
     }
@@ -597,7 +597,7 @@ extension QuickWaterDetailSheet {
             amountMl: defaultWaterAmountMl ?? 0,
             executorId: commandExecutor.activeExecutorId()
         )
-        showSaveConfirmation(result.coconutDelta > 0 ? "喂水计划 +\(result.coconutDelta)🥥" : "已完成喂水")
+        showSaveConfirmation(result.coconutDelta > 0 ? localizedWaterPlanReward(result.coconutDelta) : l.tr(zh: "已完成喂水", en: "Water check-in complete", de: "Trink-Check-in erledigt"))
         scheduleWaterPlanMaintenance(delayMilliseconds: 180)
     }
 
@@ -620,7 +620,7 @@ extension QuickWaterDetailSheet {
             amountMl: defaultWaterAmountMl ?? 0,
             executorId: commandExecutor.activeExecutorId()
         )
-        let actionText = result.targetCount > 1 ? "共同喂水 · \(result.targetCount)只" : "已记录喂水"
+        let actionText = result.targetCount > 1 ? localizedSharedWaterLogged(result.targetCount) : l.tr(zh: "已记录喂水", en: "Water logged", de: "Trinken eingetragen")
         showSaveConfirmation(result.coconutDelta > 0 ? "\(actionText) +\(result.coconutDelta)🥥" : actionText)
     }
 
@@ -647,7 +647,7 @@ extension QuickWaterDetailSheet {
             executorId: commandExecutor.activeExecutorId()
         )
         scheduleCarePlanReminders(reminders)
-        showSaveConfirmation("已记录换水")
+        showSaveConfirmation(l.tr(zh: "已记录换水", en: "Water change logged", de: "Wasserwechsel eingetragen"))
     }
 
     func doFilterClean() {
@@ -673,7 +673,7 @@ extension QuickWaterDetailSheet {
             executorId: commandExecutor.activeExecutorId()
         )
         scheduleCarePlanReminders(reminders)
-        showSaveConfirmation("滤芯已清洗")
+        showSaveConfirmation(l.tr(zh: "滤芯已清洗", en: "Filter cleaned", de: "Filter gereinigt"))
     }
 
     func triggerWaterFeedback() {
@@ -713,7 +713,7 @@ extension QuickWaterDetailSheet {
     func deleteLogBusiness(_ log: PetCareLog) {
         switch commandExecutor.deleteLog(log) {
         case .waterChange:
-            saveWaterChangePlanToCalendar(toast: "已更新换水周期")
+            saveWaterChangePlanToCalendar(toast: l.tr(zh: "已更新换水周期", en: "Water change cycle updated", de: "Wasserwechselzyklus aktualisiert"))
         case .filterClean:
             syncFilterPlan(showToast: false)
         case .other:
@@ -734,13 +734,23 @@ extension QuickWaterDetailSheet {
     }
 
     func dueText(daysUntil: Int) -> String {
-        if daysUntil > 0 { return "\(daysUntil)天" }
-        if daysUntil == 0 { return "今天" }
-        return "逾期\(abs(daysUntil))天"
+        if daysUntil > 0 {
+            return l.tr(
+                zh: "\(daysUntil)天",
+                en: "in \(daysUntil) days",
+                de: "in \(daysUntil) Tagen"
+            )
+        }
+        if daysUntil == 0 { return l.tr(zh: "今天", en: "Today", de: "Heute") }
+        return l.tr(
+            zh: "逾期\(abs(daysUntil))天",
+            en: "\(abs(daysUntil)) days overdue",
+            de: "\(abs(daysUntil)) Tage überfällig"
+        )
     }
 
     func optionalDueText(_ daysUntil: Int?) -> String {
-        guard let daysUntil else { return "未记录" }
+        guard let daysUntil else { return l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag") }
         return dueText(daysUntil: daysUntil)
     }
 
@@ -751,9 +761,13 @@ extension QuickWaterDetailSheet {
     func relativeDayText(for date: Date) -> String {
         let days = daysSinceDate(date)
         if days == 0 {
-            return "今天"
+            return l.tr(zh: "今天", en: "Today", de: "Heute")
         }
-        return "\(days)天前"
+        return l.tr(
+            zh: "\(days)天前",
+            en: "\(days) days ago",
+            de: "Vor \(days) Tagen"
+        )
     }
 
     func tint(for log: PetCareLog) -> Color {
@@ -777,12 +791,12 @@ extension QuickWaterDetailSheet {
     }
 
     var waterPrimaryTitle: String {
-        if isAquatic { return "总览" }
+        if isAquatic { return l.tr(zh: "总览", en: "Overview", de: "Übersicht") }
         if waterMode == .reminder {
-            if waterRuleState.missedCount > 0 { return "补打卡" }
-            return waterRuleState.nextPendingReminder == nil ? waterRuleState.completionText : "完成"
+            if waterRuleState.missedCount > 0 { return l.tr(zh: "补打卡", en: "Catch up", de: "Nachholen") }
+            return waterRuleState.nextPendingReminder == nil ? waterRuleState.completionText : l.tr(zh: "完成", en: "Done", de: "Fertig")
         }
-        guard let amount = defaultWaterAmountMl else { return "打卡" }
+        guard let amount = defaultWaterAmountMl else { return l.tr(zh: "打卡", en: "Check in", de: "Eintragen") }
         return "\(Int(amount.rounded()))ml"
     }
 
@@ -792,5 +806,29 @@ extension QuickWaterDetailSheet {
             return waterRuleState.nextPendingReminder == nil ? "checkmark.seal.fill" : "checkmark"
         }
         return "plus"
+    }
+
+    func localizedSharedWaterPlanSaved(_ count: Int) -> String {
+        l.tr(
+            zh: "共同喂水计划已保存 · \(count)只",
+            en: "Shared water plan saved · \(count) pets",
+            de: "Gemeinsamer Trinkplan gespeichert · \(count) Tiere"
+        )
+    }
+
+    func localizedWaterPlanReward(_ coconutDelta: Int) -> String {
+        l.tr(
+            zh: "喂水计划 +\(coconutDelta)🥥",
+            en: "Water plan +\(coconutDelta)🥥",
+            de: "Trinkplan +\(coconutDelta)🥥"
+        )
+    }
+
+    func localizedSharedWaterLogged(_ count: Int) -> String {
+        l.tr(
+            zh: "共同喂水 · \(count)只",
+            en: "Shared water · \(count) pets",
+            de: "Gemeinsam trinken · \(count) Tiere"
+        )
     }
 }

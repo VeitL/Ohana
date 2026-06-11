@@ -475,7 +475,9 @@ struct FamilyWeeklyReportDashboardContentView: View {
             entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.pottyType.rawValue, icon: log.pottyType.systemIconName, color: .goOrange, coconuts: 1))
         }
         for log in pet.walkLogs where interval.contains(log.startDate) {
-            entries.append(entry(date: log.startDate, actorId: log.executorId, pet: pet, title: "遛狗", icon: "figure.walk", color: .goTeal, coconuts: log.coconutsEarned))
+            for executorId in log.executorIds {
+                entries.append(entry(date: log.startDate, actorId: executorId, pet: pet, title: "遛狗", icon: "figure.walk", color: .goTeal, coconuts: log.coconutsEarned))
+            }
         }
         for log in pet.expenseLogs where interval.contains(log.date) {
             entries.append(entry(date: log.date, actorId: log.executorId, pet: pet, title: log.expenseCategory.rawValue, icon: log.expenseCategory.systemIconName, color: .goYellow, coconuts: 0))

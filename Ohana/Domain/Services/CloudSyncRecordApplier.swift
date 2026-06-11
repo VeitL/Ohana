@@ -236,6 +236,8 @@ nonisolated enum CloudSyncRecordApplier {
             try applyPetExpenseLog(record, metadata: metadata, context: context)
         case String(describing: PetWeightLog.self):
             try applyPetWeightLog(record, metadata: metadata, context: context)
+        case String(describing: SharedCareSession.self):
+            try applySharedCareSession(record, metadata: metadata, context: context)
         case String(describing: CoconutLedgerEntry.self):
             try applyCoconutLedgerEntry(record, metadata: metadata, context: context)
         default:
@@ -493,6 +495,10 @@ nonisolated enum CloudSyncRecordApplier {
             startDate: record.date(for: "startDate") ?? metadata.lastModifiedAt,
             pet: pet,
             executorId: record.string(for: "executorId"),
+            executorIds: SharedCareParticipantIDs.decode(
+                record.string(for: "executorIdsRaw") ?? "",
+                fallback: record.string(for: "executorId")
+            ),
             sharedSessionId: record.string(for: "sharedSessionId") ?? ""
         )
         log.id = metadata.localRecordUUID
@@ -551,6 +557,47 @@ nonisolated enum CloudSyncRecordApplier {
         )
         log.id = metadata.localRecordUUID
         context.insert(log)
+        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+    }
+
+    private static func applySharedCareSession(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        if try fetchSharedCareSession(id: metadata.localRecordUUID, context: context) != nil {
+            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        let targetPetIds = (record.string(for: "targetPetIdsRaw") ?? "")
+            .split(separator: "|")
+            .map(String.init)
+        let session = SharedCareSession(
+            date: record.date(for: "date") ?? metadata.lastModifiedAt,
+            actionKind: SharedCareActionKind(rawValue: record.string(for: "actionKindRaw") ?? "") ?? .feeding,
+            executorId: record.string(for: "executorId"),
+            executorIds: SharedCareParticipantIDs.decode(
+                record.string(for: "executorIdsRaw") ?? "",
+                fallback: record.string(for: "executorId")
+            ),
+            sourcePetId: record.string(for: "sourcePetId") ?? "",
+            targetPetIds: targetPetIds,
+            species: record.string(for: "speciesRaw") ?? "",
+            totalAmountGrams: record.double(for: "totalAmountGrams") ?? 0,
+            totalAmountMl: record.double(for: "totalAmountMl") ?? 0,
+            totalExpenseAmount: record.double(for: "totalExpenseAmount") ?? 0,
+            expenseCategory: ExpenseCategory(rawValue: record.string(for: "expenseCategoryRaw") ?? "") ?? .other,
+            currencyCode: record.string(for: "currencyCode") ?? "",
+            allocationMode: SharedCareAllocationMode(rawValue: record.string(for: "allocationModeRaw") ?? "") ?? .equal,
+            foodKind: FeedFoodKind(rawValue: record.string(for: "foodKindRaw") ?? "") ?? .dry,
+            stockOwnerPetId: record.string(for: "stockOwnerPetId") ?? "",
+            primaryLegacyModelName: record.string(for: "primaryLegacyModelName") ?? "",
+            primaryLegacyModelId: record.string(for: "primaryLegacyModelId") ?? "",
+            note: record.string(for: "note") ?? ""
+        )
+        session.id = metadata.localRecordUUID
+        session.createdAt = record.date(for: "createdAt") ?? session.createdAt
+        context.insert(session)
         return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
@@ -690,6 +737,10 @@ nonisolated enum CloudSyncRecordApplier {
             if let model = try fetchPetWeightLog(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
+        case String(describing: SharedCareSession.self):
+            if let model = try fetchSharedCareSession(id: localRecordUUID, context: context) {
+                context.delete(model)
+            }
         case String(describing: CoconutLedgerEntry.self):
             if let model = try fetchCoconutLedgerEntry(id: localRecordUUID, context: context) {
                 context.delete(model)
@@ -774,6 +825,14 @@ nonisolated enum CloudSyncRecordApplier {
     private static func fetchPetWeightLog(id: UUID, context: ModelContext) throws -> PetWeightLog? {
         var descriptor = FetchDescriptor<PetWeightLog>(
             predicate: #Predicate<PetWeightLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchSharedCareSession(id: UUID, context: ModelContext) throws -> SharedCareSession? {
+        var descriptor = FetchDescriptor<SharedCareSession>(
+            predicate: #Predicate<SharedCareSession> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

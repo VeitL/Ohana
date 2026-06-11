@@ -100,9 +100,10 @@ struct IslandExplorationDashboardContentView: View {
     private var topHuman: HumanWalkStats? {
         var dict: [String: (Human, Double)] = [:]
         for log in filteredLogs {
-            guard let hid = log.executorId,
-                  let h = humans.first(where: { $0.id.uuidString == hid }) else { continue }
-            dict[hid] = (h, (dict[hid]?.1 ?? 0) + log.distanceMeters)
+            for hid in log.executorIds {
+                guard let h = humans.first(where: { $0.id.uuidString == hid }) else { continue }
+                dict[hid] = (h, (dict[hid]?.1 ?? 0) + log.distanceMeters)
+            }
         }
         guard let best = dict.values.max(by: { $0.1 < $1.1 }) else { return nil }
         return HumanWalkStats(human: best.0, totalMeters: best.1)

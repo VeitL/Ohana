@@ -114,6 +114,7 @@ struct SharedPetActionDescriptor {
     let targets: [Pet]
     let date: Date
     let executorId: String?
+    let executorIds: [String]
     let allocationMode: SharedCareAllocationMode
     let totalAmountGrams: Double
     let totalAmountMl: Double
@@ -135,6 +136,7 @@ struct SharedPetActionDescriptor {
         targets: [Pet],
         date: Date = Date(),
         executorId: String? = nil,
+        executorIds: [String] = [],
         allocationMode: SharedCareAllocationMode = .equal,
         totalAmountGrams: Double = 0,
         totalAmountMl: Double = 0,
@@ -154,7 +156,9 @@ struct SharedPetActionDescriptor {
         self.sourcePet = sourcePet
         self.targets = targets
         self.date = date
-        self.executorId = executorId
+        let normalizedExecutorIds = SharedCareParticipantIDs.normalized(executorIds, preferredFirst: executorId)
+        self.executorId = normalizedExecutorIds.first ?? executorId
+        self.executorIds = normalizedExecutorIds
         self.allocationMode = allocationMode
         self.totalAmountGrams = totalAmountGrams
         self.totalAmountMl = totalAmountMl
@@ -201,6 +205,7 @@ enum SharedPetActionRecorder {
             date: descriptor.date,
             actionKind: descriptor.actionKind,
             executorId: descriptor.executorId,
+            executorIds: descriptor.executorIds,
             sourcePetId: descriptor.sourcePet.id.uuidString,
             targetPetIds: targets.map(\.id.uuidString),
             species: descriptor.sourcePet.species,
@@ -277,7 +282,13 @@ enum SharedPetActionRecorder {
             }
         case let .walk(distanceMeters, endDate, coconutsEarned, behaviorNotes, moodRating):
             for target in targets {
-                let log = PetWalkLog(startDate: descriptor.date, pet: target, executorId: descriptor.executorId, sharedSessionId: session.id.uuidString)
+                let log = PetWalkLog(
+                    startDate: descriptor.date,
+                    pet: target,
+                    executorId: descriptor.executorId,
+                    executorIds: descriptor.executorIds,
+                    sharedSessionId: session.id.uuidString
+                )
                 log.endDate = endDate
                 log.distanceMeters = max(0, distanceMeters)
                 log.coconutsEarned = max(0, coconutsEarned)
@@ -446,6 +457,7 @@ enum SharedPetActionRecorder {
             reward,
             sessionID: session.id,
             targetCount: targets.count,
+            executorIds: descriptor.executorIds,
             careLedger: dependencies.careLedger,
             questManager: dependencies.questManager
         )
@@ -457,7 +469,11 @@ enum SharedPetActionRecorder {
                 sourceEventId: nil,
                 sourceReminderId: nil,
                 coconutDelta: index == 0 ? dependencies.careLedger.rewardDelta(reward) : 0,
-                metadataJSON: index == 0 ? metadata : sharedMetadata(sessionID: session.id, targetCount: targets.count),
+                metadataJSON: index == 0 ? metadata : sharedMetadata(
+                    sessionID: session.id,
+                    targetCount: targets.count,
+                    executorIds: descriptor.executorIds
+                ),
                 context: context,
                 save: true
             )
@@ -487,7 +503,11 @@ enum SharedPetActionRecorder {
                 coconutDelta: 0,
                 rewardLogId: nil,
                 privacyFieldRaw: nil,
-                metadataJSON: sharedMetadata(sessionID: session.id, targetCount: targets.count),
+                metadataJSON: sharedMetadata(
+                    sessionID: session.id,
+                    targetCount: targets.count,
+                    executorIds: descriptor.executorIds
+                ),
                 context: context,
                 save: true
             )
@@ -513,7 +533,11 @@ enum SharedPetActionRecorder {
                 coconutDelta: index == 0 ? dependencies.careLedger.rewardDelta(reward) : 0,
                 rewardLogId: nil,
                 privacyFieldRaw: nil,
-                metadataJSON: index == 0 ? metadata : sharedMetadata(sessionID: session.id, targetCount: targets.count),
+                metadataJSON: index == 0 ? metadata : sharedMetadata(
+                    sessionID: session.id,
+                    targetCount: targets.count,
+                    executorIds: descriptor.executorIds
+                ),
                 context: context,
                 save: true
             )
@@ -539,7 +563,11 @@ enum SharedPetActionRecorder {
                 coconutDelta: index == 0 ? dependencies.careLedger.rewardDelta(reward) : 0,
                 rewardLogId: nil,
                 privacyFieldRaw: nil,
-                metadataJSON: index == 0 ? metadata : sharedMetadata(sessionID: session.id, targetCount: targets.count),
+                metadataJSON: index == 0 ? metadata : sharedMetadata(
+                    sessionID: session.id,
+                    targetCount: targets.count,
+                    executorIds: pair.1.executorIds
+                ),
                 context: context,
                 save: true
             )
@@ -550,24 +578,39 @@ enum SharedPetActionRecorder {
         _ reward: (humanGot: Int, petGot: Int),
         sessionID: UUID,
         targetCount: Int,
+        executorIds: [String],
         careLedger: CareLedgerRecording,
         questManager: QuestManager
     ) -> String {
         let rewardJSON = careLedger.rewardMetadata(reward, questManager: questManager)
         guard !rewardJSON.isEmpty,
               var object = try? JSONSerialization.jsonObject(with: Data(rewardJSON.utf8)) as? [String: Any] else {
-            return sharedMetadata(sessionID: sessionID, targetCount: targetCount)
+            return sharedMetadata(sessionID: sessionID, targetCount: targetCount, executorIds: executorIds)
         }
         object["sharedSessionId"] = sessionID.uuidString
         object["targets"] = targetCount
+        if executorIds.count > 1 {
+            object["executorIds"] = executorIds
+        }
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
               let json = String(data: data, encoding: .utf8) else {
-            return sharedMetadata(sessionID: sessionID, targetCount: targetCount)
+            return sharedMetadata(sessionID: sessionID, targetCount: targetCount, executorIds: executorIds)
         }
         return json
     }
 
-    private static func sharedMetadata(sessionID: UUID, targetCount: Int) -> String {
-        "{\"sharedSessionId\":\"\(sessionID.uuidString)\",\"targets\":\(targetCount)}"
+    private static func sharedMetadata(sessionID: UUID, targetCount: Int, executorIds: [String] = []) -> String {
+        var object: [String: Any] = [
+            "sharedSessionId": sessionID.uuidString,
+            "targets": targetCount
+        ]
+        if executorIds.count > 1 {
+            object["executorIds"] = executorIds
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return "{\"sharedSessionId\":\"\(sessionID.uuidString)\",\"targets\":\(targetCount)}"
+        }
+        return json
     }
 }

@@ -149,7 +149,7 @@ final class PetWalkingManager {
         startTimer()
     }
 
-    func stop(modelContext: ModelContext, sharedTargets: [Pet] = []) {
+    func stop(modelContext: ModelContext, sharedTargets: [Pet] = [], executorIds sharedExecutorIds: [String] = []) {
         walkStopStartedAt = CFAbsoluteTimeGetCurrent()
         // 最终elapsed：已暂停部分 + 本次跑步部分
         if let r = resumeTime {
@@ -172,6 +172,7 @@ final class PetWalkingManager {
 
         // 隐式读取当前设备执行者（静默，不弹窗）
         let executorId = activeHumanSelection.currentHumanId
+        let executorIds = SharedCareParticipantIDs.normalized(sharedExecutorIds, preferredFirst: executorId)
 
         let startedAt = startTime ?? Date()
         let endedAt = Date()
@@ -196,11 +197,12 @@ final class PetWalkingManager {
                 endDate: endedAt,
                 context: modelContext,
                 executorId: executorId,
+                executorIds: executorIds,
                 startDate: startedAt
             )
             walkLogs = result.walkLogs
         } else {
-            let walkLog = PetWalkLog(startDate: startedAt, pet: pet, executorId: executorId)
+            let walkLog = PetWalkLog(startDate: startedAt, pet: pet, executorId: executorId, executorIds: executorIds)
             walkLog.endDate = endedAt
             walkLog.distanceMeters = distanceMeters
 

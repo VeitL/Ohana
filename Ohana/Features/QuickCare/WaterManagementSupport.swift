@@ -28,6 +28,29 @@ enum WaterOperatingMode: String, CaseIterable, Identifiable, Equatable {
     }
 }
 
+nonisolated enum WaterPlanCatchUpPolicy {
+    static let catchUpWindowHours = 6
+    static let catchUpWindow: TimeInterval = .init(catchUpWindowHours * 60 * 60)
+
+    static func isCatchUpEligible(scheduledAt: Date, now: Date) -> Bool {
+        scheduledAt < now && now.timeIntervalSince(scheduledAt) <= catchUpWindow
+    }
+
+    static func isExpiredMiss(scheduledAt: Date, now: Date) -> Bool {
+        scheduledAt < now && now.timeIntervalSince(scheduledAt) > catchUpWindow
+    }
+
+    static func isCatchUpEligible(_ reminder: Reminder, now: Date) -> Bool {
+        guard !reminder.isCompleted, reminder.isPending || reminder.isFailed else { return false }
+        return isCatchUpEligible(scheduledAt: reminder.scheduledAt, now: now)
+    }
+
+    static func isExpiredMiss(_ reminder: Reminder, now: Date) -> Bool {
+        guard !reminder.isCompleted, reminder.isPending || reminder.isFailed else { return false }
+        return isExpiredMiss(scheduledAt: reminder.scheduledAt, now: now)
+    }
+}
+
 struct WaterRuleState {
     let pet: Pet
     let allEvents: [Event]
@@ -53,9 +76,14 @@ struct WaterRuleState {
     }
 
     var todayPlanReminders: [Reminder] {
+        allPlanReminders
+            .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+    }
+
+    var allPlanReminders: [Reminder] {
         planEvents
             .flatMap(\.reminders)
-            .filter { calendar.isDate($0.scheduledAt, inSameDayAs: now) }
             .sorted { $0.scheduledAt < $1.scheduledAt }
     }
 
@@ -64,10 +92,11 @@ struct WaterRuleState {
     }
 
     var missedPlanReminders: [Reminder] {
-        planEvents
-            .flatMap(\.reminders)
-            .filter { ($0.isPending || $0.isFailed) && $0.scheduledAt <= now }
-            .sorted { $0.scheduledAt < $1.scheduledAt }
+        allPlanReminders.filter { WaterPlanCatchUpPolicy.isCatchUpEligible($0, now: now) }
+    }
+
+    var expiredMissedPlanReminders: [Reminder] {
+        allPlanReminders.filter { WaterPlanCatchUpPolicy.isExpiredMiss($0, now: now) }
     }
 
     var completedTodayPlanReminders: [Reminder] {
@@ -75,7 +104,8 @@ struct WaterRuleState {
     }
 
     var nextPendingReminder: Reminder? {
-        missedPlanReminders.first ?? pendingTodayPlanReminders.first
+        guard expiredMissedPlanReminders.isEmpty else { return nil }
+        return missedPlanReminders.first ?? pendingTodayPlanReminders.first
     }
 
     var missedCount: Int {
@@ -84,6 +114,72 @@ struct WaterRuleState {
 
     var completionText: String {
         "\(completedTodayPlanReminders.count)/\(max(todayPlanReminders.count, planEvents.count, 1))"
+    }
+}
+
+nonisolated enum WaterRuleMetadata {
+    static func localizedTitle(for event: Event, l: L10n = L10n()) -> String? {
+        if event.relatedEntityType == WaterPlanWriter.entityType {
+            return localizedWaterPlanTitle(for: event, l: l)
+        }
+
+        guard let kind = CarePlanCalendarSync.waterMaintenanceKind(for: event) ?? legacyMaintenanceKind(from: event.title) else {
+            return nil
+        }
+        return localizedMaintenanceTitle(kind: kind, event: event, l: l)
+    }
+
+    private static func localizedWaterPlanTitle(for event: Event, l: L10n) -> String {
+        let petName = petName(from: event.title, removing: ["喂水", "补充饮水"])
+        return l.tr(
+            zh: "\(petName) 喂水",
+            en: "Water \(petName)",
+            de: "\(petName) Wasser geben"
+        )
+    }
+
+    private static func localizedMaintenanceTitle(kind: String, event: Event, l: L10n) -> String {
+        switch kind {
+        case "waterChange":
+            let petName = petName(from: event.title, removing: ["换水"])
+            return l.tr(
+                zh: "\(petName) 换水",
+                en: "Change \(petName)'s water",
+                de: "Wasser von \(petName) wechseln"
+            )
+        case "filterClean":
+            let petName = petName(from: event.title, removing: ["清洗滤芯", "过滤检查"])
+            return l.tr(
+                zh: "\(petName) 清洗滤芯",
+                en: "Clean \(petName)'s filter",
+                de: "Filter von \(petName) reinigen"
+            )
+        case "filterReplace":
+            let petName = petName(from: event.title, removing: ["更换滤芯"])
+            return l.tr(
+                zh: "\(petName) 更换滤芯",
+                en: "Replace \(petName)'s filter",
+                de: "Filter von \(petName) ersetzen"
+            )
+        default:
+            return event.title
+        }
+    }
+
+    private static func legacyMaintenanceKind(from title: String) -> String? {
+        if title.contains("清洗滤芯") { return "filterClean" }
+        if title.contains("更换滤芯") { return "filterReplace" }
+        if title.contains("换水") { return "waterChange" }
+        return nil
+    }
+
+    private static func petName(from title: String, removing suffixes: [String]) -> String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        for suffix in suffixes where trimmed.hasSuffix(suffix) {
+            let name = trimmed.dropLast(suffix.count).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty { return String(name) }
+        }
+        return trimmed.isEmpty ? "Ohana" : trimmed
     }
 }
 

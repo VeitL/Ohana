@@ -30,6 +30,28 @@ enum SharedCareAllocationMode: String, Codable, CaseIterable {
     case unknown
 }
 
+nonisolated enum SharedCareParticipantIDs {
+    static func normalized(_ ids: [String], preferredFirst: String? = nil) -> [String] {
+        var result: [String] = []
+        func append(_ raw: String?) {
+            let id = raw?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !id.isEmpty, !result.contains(id) else { return }
+            result.append(id)
+        }
+        append(preferredFirst)
+        ids.forEach { append($0) }
+        return result
+    }
+
+    static func encode(_ ids: [String], preferredFirst: String? = nil) -> String {
+        normalized(ids, preferredFirst: preferredFirst).joined(separator: "|")
+    }
+
+    static func decode(_ raw: String, fallback: String? = nil) -> [String] {
+        normalized(raw.split(separator: "|").map(String.init), preferredFirst: fallback)
+    }
+}
+
 enum SharedCareMetadata {
     static let feedNotePrefix = "ohana_shared_feed:"
     static let waterNotePrefix = "ohana_shared_water:"
@@ -136,6 +158,7 @@ final class SharedCareSession {
     var date: Date = Date()
     var actionKindRaw: String = SharedCareActionKind.feeding.rawValue
     var executorId: String?
+    var executorIdsRaw: String = ""
     var sourcePetId: String = ""
     var targetPetIdsRaw: String = ""
     var speciesRaw: String = ""
@@ -156,6 +179,7 @@ final class SharedCareSession {
         date: Date = Date(),
         actionKind: SharedCareActionKind = .feeding,
         executorId: String? = nil,
+        executorIds: [String] = [],
         sourcePetId: String = "",
         targetPetIds: [String] = [],
         species: String = "",
@@ -174,7 +198,9 @@ final class SharedCareSession {
         self.id = UUID()
         self.date = date
         self.actionKindRaw = actionKind.rawValue
-        self.executorId = executorId
+        let normalizedExecutorIds = SharedCareParticipantIDs.normalized(executorIds, preferredFirst: executorId)
+        self.executorId = normalizedExecutorIds.first ?? executorId
+        self.executorIdsRaw = SharedCareParticipantIDs.encode(normalizedExecutorIds)
         self.sourcePetId = sourcePetId
         self.targetPetIdsRaw = targetPetIds.joined(separator: "|")
         self.speciesRaw = species
@@ -196,6 +222,16 @@ final class SharedCareSession {
     var allocationMode: SharedCareAllocationMode { SharedCareAllocationMode(rawValue: allocationModeRaw) ?? .equal }
     var foodKind: FeedFoodKind { FeedFoodKind(rawValue: foodKindRaw) ?? .dry }
     var expenseCategory: ExpenseCategory { ExpenseCategory(rawValue: expenseCategoryRaw) ?? .other }
+    var executorIds: [String] {
+        SharedCareParticipantIDs.decode(executorIdsRaw, fallback: executorId)
+    }
+
+    func setExecutorIds(_ ids: [String], primaryExecutorId: String? = nil) {
+        let normalized = SharedCareParticipantIDs.normalized(ids, preferredFirst: primaryExecutorId ?? executorId)
+        executorId = normalized.first
+        executorIdsRaw = SharedCareParticipantIDs.encode(normalized)
+    }
+
     var targetPetIds: [String] {
         targetPetIdsRaw
             .split(separator: "|")

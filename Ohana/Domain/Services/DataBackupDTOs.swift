@@ -276,6 +276,7 @@ nonisolated struct SharedCareSessionBackup: Codable {
     var date: String
     var actionKindRaw: String
     var executorId: String?
+    var executorIdsRaw: String?
     var sourcePetId: String
     var targetPetIdsRaw: String
     var speciesRaw: String
@@ -300,6 +301,7 @@ nonisolated struct PetWalkLogBackup: Codable {
     var distanceMeters: Double
     var coconutsEarned: Int
     var executorId: String?
+    var executorIdsRaw: String?
     var petId: String?
     var sharedSessionId: String?
 }

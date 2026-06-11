@@ -12,15 +12,17 @@ import SwiftUI
 struct WalkTrackingCard: View {
     let pet: Pet
     let allPets: [Pet]
+    let allHumans: [Human]
     let snapshot: WalkTrackingSnapshot
     var onCloseSummaryToPetCard: (() -> Void)?
-    var onStopWalk: ([Pet]) -> Void
+    var onStopWalk: ([Pet], [String]) -> Void
     var onSaveWeeklyGoal: (Double) -> Void
 
     @Environment(AppServices.self) var appServices
     var mgr: PetWalkingManaging { appServices.walking }
     var locationMgr: LocationProviding { appServices.location }
     @AppStorage("appLanguage") var appLanguage: String = "zh"
+    @AppStorage("currentActiveHumanId") var activeHumanId: String = ""
     @AppStorage(RainbowWalkEffectKeys.route) var equipFxRainbowRoute = false
     @AppStorage(RainbowWalkEffectKeys.poop) var equipFxRainbowPoop = false
     @StateObject var workloadPolicy = AppWorkloadPolicy.shared
@@ -33,6 +35,7 @@ struct WalkTrackingCard: View {
     @State var showingGoalSetter = false
     @State var goalDraft: Double = 0
     @State var selectedSharedWalkPetIds: Set<UUID> = []
+    @State var selectedSharedWalkExecutorIds: Set<String> = []
     @State var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
     @State var rainbowRoutePhase: CGFloat = 0
 
@@ -61,6 +64,21 @@ struct WalkTrackingCard: View {
     var selectedWalkTargets: [Pet] {
         let selected = sameSpeciesWalkPets.filter { selectedSharedWalkPetIds.contains($0.id) }
         return SharedPetTargetResolver.normalizedTargets(selected, fallback: pet)
+    }
+
+    var activeWalkHumanId: String? {
+        guard !activeHumanId.isEmpty,
+              allHumans.contains(where: { $0.id.uuidString == activeHumanId }) else {
+            return nil
+        }
+        return activeHumanId
+    }
+
+    var selectedWalkExecutorIds: [String] {
+        let selected = allHumans
+            .map(\.id.uuidString)
+            .filter { selectedSharedWalkExecutorIds.contains($0) }
+        return SharedCareParticipantIDs.normalized(selected, preferredFirst: activeWalkHumanId)
     }
 
     var walkClockInterval: TimeInterval {
@@ -151,11 +169,14 @@ struct WalkTrackingCard: View {
                 candidates: sameSpeciesWalkPets,
                 defaultToAll: false
             )
+            refreshDefaultWalkExecutors()
             if case .finished = mgr.phase, mgr.currentPet?.id == pet.id {
                 presentSummaryBack(animated: false)
             }
             updateRainbowRouteFlow()
         }
+        .onChange(of: activeHumanId) { _, _ in refreshDefaultWalkExecutors() }
+        .onChange(of: allHumans.map(\.id)) { _, _ in refreshDefaultWalkExecutors() }
         .onChange(of: shouldAnimateRainbowWalkEffects) { _, _ in updateRainbowRouteFlow() }
     }
 }

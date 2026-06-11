@@ -21,10 +21,10 @@ enum PetSpeciesKey {
         if containsAny(text, ["守宫", "gecko"]) { return "gecko" }
         if containsAny(text, ["蜥", "lizard"]) { return "lizard" }
         if containsAny(text, ["蛇", "snake"]) { return "snake" }
+        if containsAny(text, ["猫头鹰", "鹦鹉", "文鸟", "鸟", "owl", "bird", "parrot"]) { return "bird" }
         if containsAny(text, ["猫", "cat"]) { return "cat" }
         if containsAny(text, ["狗", "犬", "dog"]) { return "dog" }
         if containsAny(text, ["金鱼", "锦鲤", "鱼", "fish", "koi", "aquarium"]) { return "fish" }
-        if containsAny(text, ["鹦鹉", "文鸟", "鸟", "bird", "parrot"]) { return "bird" }
 
         return text
     }

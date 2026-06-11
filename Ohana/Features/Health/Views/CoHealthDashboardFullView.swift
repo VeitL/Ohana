@@ -25,7 +25,7 @@ struct CoHealthDashboardFullContentView: View {
 
     private var associatedPets: [Pet] {
         allPets.filter { pet in
-            pet.walkLogs.contains { $0.executorId == human.id.uuidString }
+            pet.walkLogs.contains { $0.executorIds.contains(human.id.uuidString) }
         }
     }
 
@@ -33,7 +33,7 @@ struct CoHealthDashboardFullContentView: View {
         let start = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? past30Days
         let myId = human.id.uuidString
         let allLogs: [PetWalkLog] = associatedPets.flatMap(\.walkLogs)
-        let filtered = allLogs.filter { $0.executorId == myId && $0.startDate >= start }
+        let filtered = allLogs.filter { $0.executorIds.contains(myId) && $0.startDate >= start }
         let total = filtered.reduce(0.0) { acc, log in acc + log.distanceMeters }
         return total / 1000
     }
@@ -180,7 +180,7 @@ struct CoHealthDashboardFullContentView: View {
         return (0 ..< 7).map { offset in
             let day = Calendar.current.date(byAdding: .day, value: -(6 - offset), to: Date())!
             let dayLogs = allLogs.filter { log in
-                log.executorId == myId &&
+                log.executorIds.contains(myId) &&
                     Calendar.current.isDate(log.startDate, inSameDayAs: day)
             }
             let totalMeters = dayLogs.reduce(0.0) { acc, log in acc + log.distanceMeters }
@@ -227,7 +227,7 @@ struct CoHealthDashboardFullContentView: View {
                     }
                     Spacer()
                     let monthWalk = pet.walkLogs
-                        .filter { $0.executorId == human.id.uuidString &&
+                        .filter { $0.executorIds.contains(human.id.uuidString) &&
                             Calendar.current.isDate($0.startDate, equalTo: Date(), toGranularity: .month)
                         }
                         .reduce(0.0) { $0 + $1.distanceMeters } / 1000

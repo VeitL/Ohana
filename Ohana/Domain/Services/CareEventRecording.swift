@@ -64,7 +64,8 @@ protocol CareEventRecording {
         reminder: Reminder,
         amountMl: Double,
         context: ModelContext,
-        executorId: String?
+        executorId: String?,
+        date: Date
     ) -> (humanGot: Int, petGot: Int)?
 
     @discardableResult
@@ -301,7 +302,8 @@ extension CareEventService {
         reminder: Reminder,
         amountMl: Double,
         context: ModelContext,
-        executorId: String?
+        executorId: String?,
+        date: Date = Date()
     ) -> (humanGot: Int, petGot: Int)? {
         CareEventService.completePlannedWater(
             pet: pet,
@@ -309,6 +311,7 @@ extension CareEventService {
             amountMl: amountMl,
             context: context,
             executorId: executorId,
+            date: date,
             dependencies: dependencies
         )
     }

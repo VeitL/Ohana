@@ -31,6 +31,7 @@ enum MemberDeletionCommandService {
         let petID = pet.id
         let petIDString = petID.uuidString
         let relatedEvents = fetchEvents(relatedEntityID: petIDString, context: context)
+        let affectedSharedSessions = SharedCareSessionMaintenance.sessionsReferencingPet(id: petID, context: context)
         for event in relatedEvents {
             context.delete(event)
         }
@@ -38,6 +39,10 @@ enum MemberDeletionCommandService {
         let removedQuickActionCount = removeQuickAccessItems(forPetID: petID, userDefaults: userDefaults)
         CloudSyncMutationRecorder.markDeleted(pet, context: context)
         context.delete(pet)
+        context.safeSave()
+        for session in affectedSharedSessions {
+            SharedCareSessionMaintenance.reconcile(session, context: context)
+        }
         context.safeSave()
 
         return MemberDeletionCommandResult(

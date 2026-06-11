@@ -71,8 +71,8 @@ enum ExpandedQuickActionLogic {
         return FeedingDashboardState(pet: pet, allEvents: allEvents, manualGoalCount: goal, careLogs: feedLogs, now: now)
     }
 
-    static func waterRuleState(for pet: Pet, allEvents: [Event]) -> WaterRuleState {
-        WaterRuleState(pet: pet, allEvents: allEvents)
+    static func waterRuleState(for pet: Pet, allEvents: [Event], now: Date = Date()) -> WaterRuleState {
+        WaterRuleState(pet: pet, allEvents: allEvents, now: now)
     }
 
     static func playPlanEvent(for pet: Pet, allEvents: [Event]) -> Event? {

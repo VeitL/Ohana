@@ -89,9 +89,9 @@ struct ContentView: View {
             rootAppearHandoffTask?.cancel()
             rootAppearHandoffTask = nil
         }
-        .onChange(of: hasOnboarded) { _, _ in
-            reconcileHumanProfileRequirement()
-            scheduleOnboardingJourneyEvaluation()
+        .onChange(of: hasOnboarded) { _, hasOnboarded in
+            guard hasOnboarded else { return }
+            scheduleRootAppearHandoff()
         }
         .onReceive(appServices.notificationRoutes.routeEvents) { published in
             handleRouteNotificationOutcome(
@@ -194,12 +194,18 @@ struct ContentView: View {
 
     private func scheduleRootAppearHandoff() {
         rootAppearHandoffTask?.cancel()
-        rootAppearHandoffTask = OhanaFrameScheduler.runAfterNextFrame {
+        guard hasOnboarded else {
+            rootAppearHandoffTask = nil
+            return
+        }
+        let bootstrapDelay = OnboardingHomeJoinHandoffGate.remainingRootBootstrapDelayMilliseconds()
+        rootAppearHandoffTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: bootstrapDelay) {
             appServices.lifecycle.handle(.rootAppeared(scenePhase: scenePhase))
             appServices.cloudSync.startAfterFirstRender(modelContainer: modelContext.container)
             scheduleCoconutWalletBootstrap()
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluation()
+            OnboardingHomeJoinHandoffGate.consume()
             rootAppearHandoffTask = nil
         }
     }

@@ -353,8 +353,12 @@ extension MemberCardCreationContentView {
     func save() {
         guard canSave else { return }
         joinSaveTask?.cancel()
-        if canRunHomeJoinHandoff {
-            startHomeJoinHandoff()
+        let showsHomeJoinHandoff = canRunHomeJoinHandoff
+        if showsHomeJoinHandoff {
+            prepareHomeJoinHandoffForSave()
+            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
+                performSave(showsHomeJoinHandoff: true)
+            }
         } else {
             isSaving = true
             performSave(showsHomeJoinHandoff: false)
@@ -365,15 +369,15 @@ extension MemberCardCreationContentView {
         reduceMotion ? 20 : 24
     }
 
-    var homeJoinHandoffSaveDelayMilliseconds: UInt64 {
-        reduceMotion ? 120 : 520
+    var homeJoinHandoffRouteDelayMilliseconds: UInt64 {
+        reduceMotion ? 140 : 820
     }
 
-    var homeJoinHandoffSettleDelayMilliseconds: UInt64 {
-        reduceMotion ? 80 : 90
+    var homeJoinHandoffResetDelayMilliseconds: UInt64 {
+        reduceMotion ? 80 : 240
     }
 
-    func startHomeJoinHandoff() {
+    func prepareHomeJoinHandoffForSave() {
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
@@ -383,13 +387,23 @@ extension MemberCardCreationContentView {
             joinHandoffProgress = 0
         }
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+    }
+
+    func startHomeJoinHandoff(pet: Pet?, human: Human?) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            joinHandoffSnapshot = snapshot
+            isJoinHandoffRunning = true
+            joinHandoffProgress = 0
+        }
         joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffStartDelayMilliseconds) {
             guard isJoinHandoffRunning else { return }
             withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.zStackHero) {
                 joinHandoffProgress = 1
             }
-            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffSaveDelayMilliseconds) {
-                performSave(showsHomeJoinHandoff: true)
+            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffRouteDelayMilliseconds) {
+                finishSaveAfterHomeJoinHandoff(pet: pet, human: human)
             }
         }
     }
@@ -421,7 +435,7 @@ extension MemberCardCreationContentView {
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             if showsHomeJoinHandoff {
-                finishSaveAfterHomeJoinHandoff(pet: result.pet, human: result.human)
+                startHomeJoinHandoff(pet: result.pet, human: result.human)
                 return
             }
             withAnimation(GoMotion.sheet) {
@@ -448,16 +462,17 @@ extension MemberCardCreationContentView {
     }
 
     func finishSaveAfterHomeJoinHandoff(pet: Pet?, human: Human?) {
-        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffSettleDelayMilliseconds) {
-            guard isJoinHandoffRunning else { return }
-            clearMediaReturnStepStorage()
+        guard isJoinHandoffRunning else { return }
+        clearMediaReturnStepStorage()
+        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
+            notifySavedMembers(pet: pet, human: human)
             joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
-                notifySavedMembers(pet: pet, human: human)
-                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
-                    onComplete()
-                    joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 240) {
-                        resetHomeJoinHandoffState()
-                    }
+                if presentationStyle == .onboarding {
+                    OnboardingHomeJoinHandoffGate.markCompleted()
+                }
+                onComplete()
+                joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffResetDelayMilliseconds) {
+                    resetHomeJoinHandoffState()
                 }
             }
         }

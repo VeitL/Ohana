@@ -193,8 +193,12 @@ enum AppResetService {
         "avatar2d_",
         "calendar_",
         "checkIn_",
+        "feedGoal_",
         "feedOperatingMode_",
         "feedRecordMode_",
+        "filterCleanInterval_",
+        "filterReminder_",
+        "filterReplaceInterval_",
         "gacha",
         "home.",
         "home_",
@@ -208,8 +212,15 @@ enum AppResetService {
         "petBondVaultUnlocked_",
         "quest_",
         "shop_",
+        "scoopAnchorDate_",
+        "scoopIntervalDays_",
         "streakRewards_",
         "today_focus_",
+        "waterAmountEnabled_",
+        "waterAmountMl_",
+        "waterChangeCycleAnchor_",
+        "waterInterval_",
+        "waterReminder_",
         "water_operating_mode_"
     ]
 }

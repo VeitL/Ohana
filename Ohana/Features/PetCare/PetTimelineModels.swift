@@ -18,6 +18,7 @@ struct UnifiedLogItem: Identifiable {
     var photos: [PetPhotoLog] = []
     var style: PetTimelineItemStyle = .rail
     var isHighlight: Bool = false
+    var sharedSessionID: UUID?
 }
 
 enum PetTimelineItemStyle {
@@ -80,12 +81,15 @@ enum PetTimelineItemsBuilder {
             list.append(UnifiedLogItem(id: session?.id ?? w.id, date: w.startDate, type: "walk",
                                        title: walkTitle(for: w, session: session, l: l),
                                        subtitle: walkSubtitle(for: w, session: session, l: l),
-                                       iconName: "figure.walk", color: .goPrimary))
+                                       iconName: "figure.walk", color: .goPrimary,
+                                       sharedSessionID: session?.id))
         }
         for p in pet.pottyLogs {
-            list.append(UnifiedLogItem(id: p.id, date: p.date, type: "potty",
+            let session = sharedSession(for: p.sharedSessionId, in: sessionsById)
+            list.append(UnifiedLogItem(id: session?.id ?? p.id, date: p.date, type: "potty",
                                        title: "噗噗 · \(p.pottyType.emoji)\(p.pottyType.rawValue)", subtitle: "",
-                                       iconName: "drop.fill", color: .goOrange))
+                                       iconName: "drop.fill", color: .goOrange,
+                                       sharedSessionID: session?.id))
         }
         for h in pet.healthLogs {
             list.append(UnifiedLogItem(id: h.id, date: h.date, type: "health",
@@ -99,7 +103,8 @@ enum PetTimelineItemsBuilder {
             list.append(UnifiedLogItem(id: session?.id ?? e.id, date: e.date, type: "expense",
                                        title: expenseTitle(for: e, session: session, visibleNote: visibleNote, l: l),
                                        subtitle: expenseSubtitle(for: e, session: session, visibleNote: visibleNote, l: l),
-                                       iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow))
+                                       iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow,
+                                       sharedSessionID: session?.id))
         }
         for w in pet.weightLogs {
             list.append(UnifiedLogItem(id: w.id, date: w.date, type: "weight",
@@ -111,7 +116,8 @@ enum PetTimelineItemsBuilder {
             list.append(UnifiedLogItem(id: session?.id ?? c.id, date: c.date, type: "care",
                                        title: careTitle(for: c, session: session, l: l),
                                        subtitle: careSubtitle(for: c, session: session, l: l),
-                                       iconName: "sparkles", color: .goPurple))
+                                       iconName: "sparkles", color: .goPurple,
+                                       sharedSessionID: session?.id))
         }
 
         let sorted = list.sorted { $0.date > $1.date }
@@ -257,7 +263,14 @@ enum PetTimelineItemsBuilder {
         guard let session else {
             return l.tr(zh: "巡岛 · \(log.distanceText)", en: "Walk · \(log.distanceText)", de: "Spaziergang · \(log.distanceText)")
         }
-        return sharedTitle(prefix: l.tr(zh: "共同散步", en: "Shared walk", de: "Gemeinsamer Spaziergang"), targetCount: targetCount(for: session, note: ""), l: l)
+        let title = sharedTitle(prefix: l.tr(zh: "共同散步", en: "Shared walk", de: "Gemeinsamer Spaziergang"), targetCount: targetCount(for: session, note: ""), l: l)
+        let executorCount = session.executorIds.count
+        guard executorCount > 1 else { return title }
+        return l.tr(
+            zh: "\(title) · \(executorCount)人",
+            en: "\(title) · \(executorCount) walkers",
+            de: "\(title) · \(executorCount) Personen"
+        )
     }
 
     private static func walkSubtitle(for log: PetWalkLog, session: SharedCareSession?, l _: L10n) -> String {

@@ -155,9 +155,12 @@ final class HomeReadModelStore: ObservableObject {
         refreshGeneration &+= 1
         let generation = refreshGeneration
         let container = context.container
+        let refreshDelay = OnboardingHomeJoinHandoffGate.remainingHomeReadModelDelayMilliseconds(
+            defaultDelayMilliseconds: force ? 0 : 48
+        )
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
-            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: force ? 0 : 48)
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: refreshDelay)
             guard !Task.isCancelled else {
                 self?.finishRefreshTask(generation: generation)
                 return

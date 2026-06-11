@@ -19,13 +19,13 @@ extension QuickWaterDetailSheet {
                 nextDateText: waterNextDateText,
                 onSave: {
                     startWaterCalendarPlanSave {
-                        saveWaterChangePlanToCalendar(toast: "已保存换水周期")
+                        saveWaterChangePlanToCalendar(toast: l.tr(zh: "已保存换水周期", en: "Water change cycle saved", de: "Wasserwechselzyklus gespeichert"))
                     }
                 },
                 onDelete: {
                     waterReminderOn = false
                     startWaterCalendarPlanSave {
-                        saveWaterChangePlanToCalendar(toast: "已关闭换水提醒")
+                        saveWaterChangePlanToCalendar(toast: l.tr(zh: "已关闭换水提醒", en: "Water change reminder off", de: "Wasserwechselerinnerung aus"))
                     }
                 }
             )
@@ -39,8 +39,8 @@ extension QuickWaterDetailSheet {
             VStack(spacing: 12) {
                 if sameSpeciesWaterPets.count > 1 {
                     SharedCareTargetPicker(
-                        title: "共同喂水",
-                        subtitle: "\(selectedWaterTargets.count)只\(pet.species)",
+                        title: l.tr(zh: "共同喂水", en: "Shared water", de: "Gemeinsames Trinken"),
+                        subtitle: localizedPetCount(selectedWaterTargets.count, species: pet.species),
                         pets: sameSpeciesWaterPets,
                         selectedPetIds: $selectedSharedWaterPetIds,
                         tint: chromeTint,
@@ -55,7 +55,7 @@ extension QuickWaterDetailSheet {
                     amountText: $waterAmountMlText,
                     onSave: {
                         persistWaterAmountSettings()
-                        showSaveConfirmation(waterAmountEnabled ? "已保存默认水量" : "已关闭默认水量")
+                        showSaveConfirmation(waterAmountEnabled ? l.tr(zh: "已保存默认水量", en: "Default water amount saved", de: "Standard-Trinkmenge gespeichert") : l.tr(zh: "已关闭默认水量", en: "Default water amount off", de: "Standard-Trinkmenge aus"))
                         dismissInlineWaterSheet()
                     }
                 )
@@ -70,8 +70,8 @@ extension QuickWaterDetailSheet {
             VStack(spacing: 12) {
                 if sameSpeciesWaterPets.count > 1 {
                     SharedCareTargetPicker(
-                        title: "目标宠物",
-                        subtitle: "\(selectedWaterTargets.count)只\(pet.species)",
+                        title: l.tr(zh: "目标宠物", en: "Target pets", de: "Zieltiere"),
+                        subtitle: localizedPetCount(selectedWaterTargets.count, species: pet.species),
                         pets: sameSpeciesWaterPets,
                         selectedPetIds: $selectedSharedWaterPetIds,
                         tint: Color.goTeal,
@@ -148,24 +148,24 @@ extension QuickWaterDetailSheet {
             VStack(alignment: .leading, spacing: 16) {
                 overviewRangePicker(tint: waterMode == .reminder ? Color.goTeal : chromeTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    overviewMetric(title: "今日次数", value: "\(todayWaterLogs.count)", icon: "number.circle.fill", tint: chromeTint)
-                    overviewMetric(title: "今日水量", value: todayWaterAmountText, icon: "drop.fill", tint: chromeTint)
+                    overviewMetric(title: l.tr(zh: "今日次数", en: "Today count", de: "Heute Anzahl"), value: "\(todayWaterLogs.count)", icon: "number.circle.fill", tint: chromeTint)
+                    overviewMetric(title: l.tr(zh: "今日水量", en: "Today amount", de: "Heute Menge"), value: todayWaterAmountText, icon: "drop.fill", tint: chromeTint)
                 }
                 overviewLineChart(
-                    title: "饮水趋势",
-                    subtitle: waterAmountEnabled ? "按已记录 ml 聚合。" : "当前只记录次数。",
+                    title: l.tr(zh: "饮水趋势", en: "Water trend", de: "Trinktrend"),
+                    subtitle: waterAmountEnabled ? l.tr(zh: "按已记录 ml 聚合。", en: "Aggregated by logged ml.", de: "Nach eingetragenen ml aggregiert.") : l.tr(zh: "当前只记录次数。", en: "Currently tracking count only.", de: "Aktuell nur Anzahl erfasst."),
                     points: waterChartPoints,
                     tint: waterMode == .reminder ? Color.goTeal : chromeTint,
-                    emptyText: "喂水后会出现趋势"
+                    emptyText: l.tr(zh: "喂水后会出现趋势", en: "Trends appear after water logs", de: "Trends erscheinen nach Trinkeinträgen")
                 )
                 HStack(spacing: 10) {
-                    WaterPrimaryButton(title: waterMode == .reminder ? "计划设置" : "水量设置", icon: "gearshape.fill", tint: waterMode == .reminder ? Color.goTeal : chromeTint) {
+                    WaterPrimaryButton(title: waterMode == .reminder ? l.tr(zh: "计划设置", en: "Plan settings", de: "Planeinstellungen") : l.tr(zh: "水量设置", en: "Amount settings", de: "Mengeneinstellungen"), icon: "gearshape.fill", tint: waterMode == .reminder ? Color.goTeal : chromeTint) {
                         handleWaterSettingsTap()
                     }
                     Button {
                         openWaterSheet(.history)
                     } label: {
-                        Label("全部记录", systemImage: "clock.arrow.circlepath")
+                        Label(l.tr(zh: "全部记录", en: "All records", de: "Alle Einträge"), systemImage: "clock.arrow.circlepath")
                             .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(chromeTint)
                             .frame(maxWidth: .infinity)
@@ -174,10 +174,10 @@ extension QuickWaterDetailSheet {
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
-                overviewSectionHeader("最近喂水")
+                overviewSectionHeader(l.tr(zh: "最近喂水", en: "Recent water logs", de: "Letzte Trinkeinträge"))
                 let logs = Array(waterLogs.prefix(8))
                 if logs.isEmpty {
-                    emptyInlineState(icon: "drop", text: "还没有喂水记录")
+                    emptyInlineState(icon: "drop", text: l.tr(zh: "还没有喂水记录", en: "No water logs yet", de: "Noch keine Trinkeinträge"))
                 } else {
                     ForEach(logs) { log in
                         WaterLogRow(log: log, tint: chromeTint, showDelete: true) { deleteLog(log) }
@@ -194,29 +194,29 @@ extension QuickWaterDetailSheet {
             VStack(alignment: .leading, spacing: 16) {
                 overviewRangePicker(tint: waterChangeStatusTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    overviewMetric(title: "周期", value: "\(waterIntervalDays)天", icon: "repeat", tint: waterChangeStatusTint)
-                    overviewMetric(title: "下次", value: waterNextDateText, icon: "calendar", tint: waterChangeStatusTint)
+                    overviewMetric(title: l.tr(zh: "周期", en: "Cycle", de: "Zyklus"), value: localizedDays(waterIntervalDays), icon: "repeat", tint: waterChangeStatusTint)
+                    overviewMetric(title: l.tr(zh: "下次", en: "Next", de: "Nächstes"), value: waterNextDateText, icon: "calendar", tint: waterChangeStatusTint)
                 }
                 overviewProgressCard(
-                    title: isWaterChangeOverdue ? "换水逾期" : "换水进度",
+                    title: isWaterChangeOverdue ? l.tr(zh: "换水逾期", en: "Water change overdue", de: "Wasserwechsel überfällig") : l.tr(zh: "换水进度", en: "Water change progress", de: "Wasserwechsel-Fortschritt"),
                     elapsed: waterElapsedDays,
                     interval: waterIntervalDays,
                     tint: waterChangeStatusTint,
                     isWarning: isWaterChangeOverdue
                 )
                 overviewLineChart(
-                    title: "换水记录",
-                    subtitle: "按天统计换水次数。",
+                    title: l.tr(zh: "换水记录", en: "Water change records", de: "Wasserwechsel-Einträge"),
+                    subtitle: l.tr(zh: "按天统计换水次数。", en: "Water changes counted by day.", de: "Wasserwechsel pro Tag gezählt."),
                     points: careChartPoints(for: .waterChange),
                     tint: waterChangeStatusTint,
-                    emptyText: "换水后会出现趋势"
+                    emptyText: l.tr(zh: "换水后会出现趋势", en: "Trends appear after water changes", de: "Trends erscheinen nach Wasserwechseln")
                 )
                 HStack(spacing: 10) {
-                    WaterPrimaryButton(title: "记录换水", icon: "checkmark", tint: waterChangeStatusTint) { doWaterChange() }
+                    WaterPrimaryButton(title: l.tr(zh: "记录换水", en: "Log change", de: "Wechsel eintragen"), icon: "checkmark", tint: waterChangeStatusTint) { doWaterChange() }
                     Button {
                         openWaterSheet(.waterSettings)
                     } label: {
-                        Label("管理", systemImage: "slider.horizontal.3")
+                        Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
                             .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(waterChangeStatusTint)
                             .frame(maxWidth: .infinity)
@@ -225,10 +225,10 @@ extension QuickWaterDetailSheet {
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
-                overviewSectionHeader("最近换水")
+                overviewSectionHeader(l.tr(zh: "最近换水", en: "Recent water changes", de: "Letzte Wasserwechsel"))
                 let logs = Array(waterChangeLogs.prefix(8))
                 if logs.isEmpty {
-                    emptyInlineState(icon: "arrow.2.circlepath", text: "还没有换水记录")
+                    emptyInlineState(icon: "arrow.2.circlepath", text: l.tr(zh: "还没有换水记录", en: "No water change records yet", de: "Noch keine Wasserwechsel-Einträge"))
                 } else {
                     ForEach(logs) { log in
                         WaterLogRow(log: log, tint: waterChangeStatusTint, showDelete: true) { deleteLog(log) }
@@ -245,29 +245,29 @@ extension QuickWaterDetailSheet {
             VStack(alignment: .leading, spacing: 16) {
                 overviewRangePicker(tint: filterStatusTint)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    overviewMetric(title: "清洗", value: filterNextCleanText, icon: "sparkles", tint: filterStatusTint)
-                    overviewMetric(title: "更换", value: filterNextReplaceText, icon: "arrow.triangle.2.circlepath", tint: filterStatusTint)
+                    overviewMetric(title: l.tr(zh: "清洗", en: "Clean", de: "Reinigen"), value: filterNextCleanText, icon: "sparkles", tint: filterStatusTint)
+                    overviewMetric(title: l.tr(zh: "更换", en: "Replace", de: "Wechseln"), value: filterNextReplaceText, icon: "arrow.triangle.2.circlepath", tint: filterStatusTint)
                 }
                 overviewProgressCard(
-                    title: isFilterOverdue ? "滤芯逾期" : "清洗进度",
+                    title: isFilterOverdue ? l.tr(zh: "滤芯逾期", en: "Filter overdue", de: "Filter überfällig") : l.tr(zh: "清洗进度", en: "Cleaning progress", de: "Reinigungsfortschritt"),
                     elapsed: filterCleanElapsedDays ?? 0,
                     interval: filterCleanIntervalDays,
                     tint: filterStatusTint,
                     isWarning: isFilterOverdue
                 )
                 overviewLineChart(
-                    title: "滤芯清洗",
-                    subtitle: "按天统计清洗次数。",
+                    title: l.tr(zh: "滤芯清洗", en: "Filter cleaning", de: "Filterreinigung"),
+                    subtitle: l.tr(zh: "按天统计清洗次数。", en: "Cleanings counted by day.", de: "Reinigungen pro Tag gezählt."),
                     points: careChartPoints(for: .filterClean),
                     tint: filterStatusTint,
-                    emptyText: "清洗滤芯后会出现趋势"
+                    emptyText: l.tr(zh: "清洗滤芯后会出现趋势", en: "Trends appear after filter cleanings", de: "Trends erscheinen nach Filterreinigungen")
                 )
                 HStack(spacing: 10) {
-                    WaterPrimaryButton(title: "记录清洗", icon: "checkmark", tint: filterStatusTint) { doFilterClean() }
+                    WaterPrimaryButton(title: l.tr(zh: "记录清洗", en: "Log cleaning", de: "Reinigung eintragen"), icon: "checkmark", tint: filterStatusTint) { doFilterClean() }
                     Button {
                         openWaterSheet(.filterSettings)
                     } label: {
-                        Label("管理", systemImage: "slider.horizontal.3")
+                        Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
                             .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(filterStatusTint)
                             .frame(maxWidth: .infinity)
@@ -276,10 +276,10 @@ extension QuickWaterDetailSheet {
                     }
                     .buttonStyle(ScaleButtonStyle())
                 }
-                overviewSectionHeader("最近清洗")
+                overviewSectionHeader(l.tr(zh: "最近清洗", en: "Recent cleanings", de: "Letzte Reinigungen"))
                 let logs = Array(filterCleanLogs.prefix(8))
                 if logs.isEmpty {
-                    emptyInlineState(icon: "sparkles", text: "还没有滤芯清洗记录")
+                    emptyInlineState(icon: "sparkles", text: l.tr(zh: "还没有滤芯清洗记录", en: "No filter cleaning records yet", de: "Noch keine Filterreinigungen"))
                 } else {
                     ForEach(logs) { log in
                         WaterLogRow(log: log, tint: filterStatusTint, showDelete: true) { deleteLog(log) }
@@ -320,7 +320,7 @@ extension QuickWaterDetailSheet {
                     }
                     scheduleOverviewChartReplay(milliseconds: 60)
                 } label: {
-                    Text(range.title)
+                    Text(range.title(l))
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(overviewRange == range ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
@@ -350,13 +350,13 @@ extension QuickWaterDetailSheet {
         case .waterOverview:
             waterSheetChromeTitleContent(
                 icon: "drop.fill",
-                title: "喂水总览",
+                title: l.tr(zh: "喂水总览", en: "Water overview", de: "Trinkübersicht"),
                 tint: waterMode == .reminder ? Color.goTeal : chromeTint
             )
         case .waterChangeOverview:
-            waterSheetChromeTitleContent(icon: "arrow.2.circlepath", title: "换水总览", tint: waterChangeTint)
+            waterSheetChromeTitleContent(icon: "arrow.2.circlepath", title: l.tr(zh: "换水总览", en: "Water change overview", de: "Wasserwechsel-Übersicht"), tint: waterChangeTint)
         case .filterOverview:
-            waterSheetChromeTitleContent(icon: "sparkles", title: "滤芯总览", tint: filterTint)
+            waterSheetChromeTitleContent(icon: "sparkles", title: l.tr(zh: "滤芯总览", en: "Filter overview", de: "Filterübersicht"), tint: filterTint)
         default:
             EmptyView()
         }
@@ -451,7 +451,7 @@ extension QuickWaterDetailSheet {
                 .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(isWarning ? Color.goRed : Color.ohanaPrimaryText)
                 Spacer()
-                Text("\(elapsed)/\(max(interval, 1))天")
+                Text(localizedProgressDays(elapsed: elapsed, interval: max(interval, 1)))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tint)
             }
@@ -527,12 +527,12 @@ extension QuickWaterDetailSheet {
     }
 
     var filterNextCleanText: String {
-        guard let lastFilterClean else { return "未记录" }
+        guard let lastFilterClean else { return l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag") }
         return dueDateText(nextCycleDate(lastDate: lastFilterClean.date, anchorDate: lastFilterClean.date, intervalDays: filterCleanIntervalDays))
     }
 
     var filterNextReplaceText: String {
-        guard let lastFilterClean else { return "未记录" }
+        guard let lastFilterClean else { return l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag") }
         return dueDateText(nextCycleDate(lastDate: lastFilterClean.date, anchorDate: lastFilterClean.date, intervalDays: filterReplaceIntervalDays))
     }
 
@@ -552,16 +552,20 @@ extension QuickWaterDetailSheet {
     func dueDateText(_ date: Date) -> String {
         let calendar = Calendar.current
         if calendar.isDateInToday(date) {
-            return "今天"
+            return l.tr(zh: "今天", en: "Today", de: "Heute")
         }
         let today = calendar.startOfDay(for: Date())
         let target = calendar.startOfDay(for: date)
         let days = calendar.dateComponents([.day], from: today, to: target).day ?? 0
         if days == 1 {
-            return "明天"
+            return l.tr(zh: "明天", en: "Tomorrow", de: "Morgen")
         }
         if days > 1, days <= 7 {
-            return "\(days)天后"
+            return l.tr(
+                zh: "\(days)天后",
+                en: "in \(days) days",
+                de: "in \(days) Tagen"
+            )
         }
         return date.formatted(.dateTime.month().day())
     }

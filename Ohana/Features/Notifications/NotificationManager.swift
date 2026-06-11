@@ -243,7 +243,8 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         let l = L10n()
         let content = UNMutableNotificationContent()
         content.title = l.tr(zh: "Ohana 提醒", en: "Ohana reminder", de: "Ohana Erinnerung")
-        content.body = "\(event.emoji) \(FeedRuleMetadata.localizedTitle(for: event, l: l))"
+        let localizedEventTitle = WaterRuleMetadata.localizedTitle(for: event, l: l) ?? FeedRuleMetadata.localizedTitle(for: event, l: l)
+        content.body = "\(event.emoji) \(localizedEventTitle)"
         content.sound = .default
         content.categoryIdentifier = categoryID
         content.userInfo = [

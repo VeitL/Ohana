@@ -22,11 +22,14 @@ enum WaterOverviewRange: String, CaseIterable, Identifiable {
         }
     }
 
-    var title: String {
+    func title(_ l: L10n) -> String {
         switch self {
-        case .days7: "7天"
-        case .days30: "30天"
-        case .days90: "90天"
+        case .days7:
+            l.tr(zh: "7天", en: "7 days", de: "7 Tage")
+        case .days30:
+            l.tr(zh: "30天", en: "30 days", de: "30 Tage")
+        case .days90:
+            l.tr(zh: "90天", en: "90 days", de: "90 Tage")
         }
     }
 }
@@ -357,11 +360,14 @@ struct WaterHeroCard: View {
     @State private var ripple = false
     @State private var isVisible = false
     @StateObject private var workloadPolicy = AppWorkloadPolicy.shared
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
     @Environment(\.colorScheme) private var colorScheme
 
     private var shouldAnimateHero: Bool {
         workloadPolicy.shouldAnimate(isVisible: isVisible)
     }
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -401,15 +407,15 @@ struct WaterHeroCard: View {
                 .frame(width: 118, height: 100)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(isAquatic ? "水体状态" : "今日饮水")
+                    Text(isAquatic ? l.tr(zh: "水体状态", en: "Water tank status", de: "Beckenstatus") : l.tr(zh: "今日饮水", en: "Today's water", de: "Trinken heute"))
                         .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                    Text(isAquatic ? "管理" : "\(waterCount) 次")
+                    Text(isAquatic ? l.tr(zh: "管理", en: "Manage", de: "Verwalten") : localizedTimes(waterCount))
                         .font(OhanaFont.adaptive(size: 32, weight: .black, design: .rounded))
                         .foregroundStyle(tint)
                     HStack(spacing: 12) {
-                        MiniWaterGauge(title: "换水", progress: waterDueProgress, tint: tint)
-                        MiniWaterGauge(title: "滤芯", progress: filterDueProgress, tint: secondaryTint)
+                        MiniWaterGauge(title: l.tr(zh: "换水", en: "Change", de: "Wechsel"), progress: waterDueProgress, tint: tint)
+                        MiniWaterGauge(title: l.tr(zh: "滤芯", en: "Filter", de: "Filter"), progress: filterDueProgress, tint: secondaryTint)
                     }
                 }
                 Spacer(minLength: 0)
@@ -431,6 +437,14 @@ struct WaterHeroCard: View {
 
     private func updateHeroMotion() {
         ripple = shouldAnimateHero
+    }
+
+    private func localizedTimes(_ count: Int) -> String {
+        l.tr(
+            zh: "\(count) 次",
+            en: count == 1 ? "1 time" : "\(count) times",
+            de: count == 1 ? "1 Mal" : "\(count) Mal"
+        )
     }
 }
 
@@ -504,6 +518,9 @@ struct WaterAmountSettingsSheet: View {
     let onSave: () -> Void
 
     @State private var showsAmountKeypad = false
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(spacing: 18) {
@@ -514,9 +531,9 @@ struct WaterAmountSettingsSheet: View {
                     .frame(width: 54, height: 54)
                     .background(tint.opacity(0.15), in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("喂水")
+                    Text(l.tr(zh: "喂水", en: "Water", de: "Trinken"))
                         .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
-                    Text(amountEnabled ? "默认 \(displayAmount)ml" : "只记录次数")
+                    Text(amountEnabled ? localizedDefaultAmount(displayAmount) : l.tr(zh: "只记录次数", en: "Count only", de: "Nur Anzahl"))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -524,13 +541,13 @@ struct WaterAmountSettingsSheet: View {
             }
 
             Toggle(isOn: $amountEnabled.animation(GoMotion.feedback)) {
-                settingsRow("记录水量", value: amountEnabled ? "开" : "关")
+                settingsRow(l.tr(zh: "记录水量", en: "Track amount", de: "Menge erfassen"), value: localizedToggle(amountEnabled))
             }
             .tint(tint)
 
             if amountEnabled {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("默认水量")
+                    Text(l.tr(zh: "默认水量", en: "Default amount", de: "Standardmenge"))
                         .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     HStack(spacing: 10) {
@@ -607,7 +624,7 @@ struct WaterAmountSettingsSheet: View {
                 showsAmountKeypad = false
                 onSave()
             } label: {
-                Text("保存")
+                Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity)
@@ -621,6 +638,18 @@ struct WaterAmountSettingsSheet: View {
 
     private var displayAmount: Int {
         Int((CountryDecimalInput.parse(amountText, countryCode: AppCountry.code) ?? 250).rounded())
+    }
+
+    private func localizedDefaultAmount(_ amountMl: Int) -> String {
+        l.tr(
+            zh: "默认 \(amountMl)ml",
+            en: "Default \(amountMl) ml",
+            de: "Standard \(amountMl) ml"
+        )
+    }
+
+    private func localizedToggle(_ isOn: Bool) -> String {
+        isOn ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus")
     }
 
     private func adjustAmount(by delta: Int) {
@@ -664,21 +693,29 @@ struct WaterChangeSettingsSheet: View {
     let onSave: () -> Void
     let onDelete: () -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         VStack(spacing: 18) {
-            settingsHero(icon: "arrow.2.circlepath", title: "换水计划", value: "下次 \(nextDateText)")
+            settingsHero(
+                icon: "arrow.2.circlepath",
+                title: l.tr(zh: "换水计划", en: "Water change plan", de: "Wasserwechselplan"),
+                value: localizedNextDate(nextDateText)
+            )
 
             Stepper(value: $intervalDays.animation(GoMotion.feedback), in: 1 ... 30) {
-                settingsRow("周期", value: "\(intervalDays)天")
+                settingsRow(l.tr(zh: "周期", en: "Cycle", de: "Zyklus"), value: localizedDays(intervalDays))
             }
             .tint(tint)
 
-            DatePicker("起算日", selection: $anchorDate, displayedComponents: .date)
+            DatePicker(l.tr(zh: "起算日", en: "Start date", de: "Startdatum"), selection: $anchorDate, displayedComponents: .date)
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .tint(tint)
 
             Toggle(isOn: $reminderOn.animation(GoMotion.feedback)) {
-                settingsRow("日历提醒", value: reminderOn ? "开" : "关")
+                settingsRow(l.tr(zh: "日历提醒", en: "Calendar reminder", de: "Kalendererinnerung"), value: localizedToggle(reminderOn))
             }
             .tint(tint)
 
@@ -686,7 +723,7 @@ struct WaterChangeSettingsSheet: View {
                 Button(role: .destructive) {
                     onDelete()
                 } label: {
-                    Text("删除")
+                    Text(l.tr(zh: "删除", en: "Delete", de: "Löschen"))
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
@@ -698,7 +735,7 @@ struct WaterChangeSettingsSheet: View {
                 Button {
                     onSave()
                 } label: {
-                    Text("保存")
+                    Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
@@ -740,6 +777,26 @@ struct WaterChangeSettingsSheet: View {
                 .foregroundStyle(tint)
         }
     }
+
+    private func localizedNextDate(_ text: String) -> String {
+        l.tr(
+            zh: "下次 \(text)",
+            en: "Next \(text)",
+            de: "Nächstes \(text)"
+        )
+    }
+
+    private func localizedDays(_ days: Int) -> String {
+        l.tr(
+            zh: "\(days)天",
+            en: "\(days) days",
+            de: "\(days) Tage"
+        )
+    }
+
+    private func localizedToggle(_ isOn: Bool) -> String {
+        isOn ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus")
+    }
 }
 
 struct FilterSettingsSheet: View {
@@ -752,6 +809,10 @@ struct FilterSettingsSheet: View {
     let onSave: () -> Void
     let onDelete: () -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         VStack(spacing: 18) {
             HStack(spacing: 14) {
@@ -761,9 +822,9 @@ struct FilterSettingsSheet: View {
                     .frame(width: 54, height: 54)
                     .background(tint.opacity(0.15), in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("滤芯计划")
+                    Text(l.tr(zh: "滤芯计划", en: "Filter plan", de: "Filterplan"))
                         .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
-                    Text("清洗 \(nextCleanText) · 更换 \(nextReplaceText)")
+                    Text(localizedFilterSummary(cleanText: nextCleanText, replaceText: nextReplaceText))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -771,17 +832,17 @@ struct FilterSettingsSheet: View {
             }
 
             Stepper(value: $cleanIntervalDays.animation(GoMotion.feedback), in: 1 ... 60) {
-                settingsRow("清洗", value: "\(cleanIntervalDays)天")
+                settingsRow(l.tr(zh: "清洗", en: "Clean", de: "Reinigen"), value: localizedDays(cleanIntervalDays))
             }
             .tint(tint)
 
             Stepper(value: $replaceIntervalDays.animation(GoMotion.feedback), in: 7 ... 365) {
-                settingsRow("更换", value: "\(replaceIntervalDays)天")
+                settingsRow(l.tr(zh: "更换", en: "Replace", de: "Wechseln"), value: localizedDays(replaceIntervalDays))
             }
             .tint(tint)
 
             Toggle(isOn: $reminderOn.animation(GoMotion.feedback)) {
-                settingsRow("提醒", value: reminderOn ? "开" : "关")
+                settingsRow(l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"), value: localizedToggle(reminderOn))
             }
             .tint(tint)
 
@@ -789,7 +850,7 @@ struct FilterSettingsSheet: View {
                 Button(role: .destructive) {
                     onDelete()
                 } label: {
-                    Text("删除")
+                    Text(l.tr(zh: "删除", en: "Delete", de: "Löschen"))
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
@@ -801,7 +862,7 @@ struct FilterSettingsSheet: View {
                 Button {
                     onSave()
                 } label: {
-                    Text("保存")
+                    Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.arkInk)
                         .frame(maxWidth: .infinity)
@@ -825,6 +886,26 @@ struct FilterSettingsSheet: View {
                 .foregroundStyle(tint)
         }
     }
+
+    private func localizedFilterSummary(cleanText: String, replaceText: String) -> String {
+        l.tr(
+            zh: "清洗 \(cleanText) · 更换 \(replaceText)",
+            en: "Clean \(cleanText) · replace \(replaceText)",
+            de: "Reinigen \(cleanText) · wechseln \(replaceText)"
+        )
+    }
+
+    private func localizedDays(_ days: Int) -> String {
+        l.tr(
+            zh: "\(days)天",
+            en: "\(days) days",
+            de: "\(days) Tage"
+        )
+    }
+
+    private func localizedToggle(_ isOn: Bool) -> String {
+        isOn ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus")
+    }
 }
 
 struct WaterPlanSettingsSheet: View {
@@ -836,6 +917,10 @@ struct WaterPlanSettingsSheet: View {
     let onSave: () -> Void
     let onDelete: () -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
@@ -846,9 +931,9 @@ struct WaterPlanSettingsSheet: View {
                         .frame(width: 46, height: 46)
                         .background(tint.opacity(0.15), in: Circle())
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("喂水计划")
+                        Text(l.tr(zh: "喂水计划", en: "Water plan", de: "Trinkplan"))
                             .font(OhanaFont.adaptive(size: 21, weight: .black, design: .rounded))
-                        Text("今日 \(completionText) · 每天 \(count) 次")
+                        Text(localizedPlanSummary(completionText: completionText, count: count))
                             .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -856,7 +941,7 @@ struct WaterPlanSettingsSheet: View {
                 }
 
                 Stepper(value: $count.animation(GoMotion.feedback), in: 1 ... 6) {
-                    settingsRow("每日次数", value: "\(count)次")
+                    settingsRow(l.tr(zh: "每日次数", en: "Daily count", de: "Täglich"), value: localizedTimes(count))
                 }
                 .tint(tint)
                 .onChange(of: count) { _, newValue in
@@ -866,7 +951,7 @@ struct WaterPlanSettingsSheet: View {
                 VStack(spacing: 10) {
                     ForEach(0 ..< count, id: \.self) { index in
                         DatePicker(
-                            "第 \(index + 1) 次",
+                            localizedPlanSlot(index + 1),
                             selection: Binding(
                                 get: { time(at: index) },
                                 set: { setTime($0, at: index) }
@@ -885,7 +970,7 @@ struct WaterPlanSettingsSheet: View {
                     Button(role: .destructive) {
                         onDelete()
                     } label: {
-                        Text("切回手动")
+                        Text(l.tr(zh: "切回手动", en: "Back to manual", de: "Zurück zu manuell"))
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.goRed)
                             .frame(maxWidth: .infinity)
@@ -897,7 +982,7 @@ struct WaterPlanSettingsSheet: View {
                     Button {
                         onSave()
                     } label: {
-                        Text("保存计划")
+                        Text(l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern"))
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
@@ -938,6 +1023,30 @@ struct WaterPlanSettingsSheet: View {
                 .foregroundStyle(tint)
         }
     }
+
+    private func localizedPlanSummary(completionText: String, count: Int) -> String {
+        l.tr(
+            zh: "今日 \(completionText) · 每天 \(count) 次",
+            en: "Today \(completionText) · \(count) per day",
+            de: "Heute \(completionText) · \(count) pro Tag"
+        )
+    }
+
+    private func localizedTimes(_ count: Int) -> String {
+        l.tr(
+            zh: "\(count)次",
+            en: count == 1 ? "1 time" : "\(count) times",
+            de: count == 1 ? "1 Mal" : "\(count) Mal"
+        )
+    }
+
+    private func localizedPlanSlot(_ index: Int) -> String {
+        l.tr(
+            zh: "第 \(index) 次",
+            en: "Time \(index)",
+            de: "Zeit \(index)"
+        )
+    }
 }
 
 struct WaterHistorySheet: View {
@@ -945,11 +1054,15 @@ struct WaterHistorySheet: View {
     let tintForLog: (PetCareLog) -> Color
     let onDelete: (PetCareLog) -> Void
 
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
+
+    private var l: L10n { L10n(appLanguage) }
+
     var body: some View {
         NavigationStack {
             List {
                 if logs.isEmpty {
-                    Text("暂无记录")
+                    Text(l.tr(zh: "暂无记录", en: "No records yet", de: "Noch keine Einträge"))
                         .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
@@ -962,7 +1075,7 @@ struct WaterHistorySheet: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .navigationTitle("水管理记录")
+            .navigationTitle(l.tr(zh: "水管理记录", en: "Water care records", de: "Wasserpflege-Einträge"))
             .navigationBarTitleDisplayMode(.inline)
         }
     }

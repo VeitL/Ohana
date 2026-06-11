@@ -133,11 +133,19 @@ final class AppServices {
             careLedgerStats: CareLedgerStatsReader(),
             domainRevisions: domainRevisions,
             lifecycle: AppLifecycleCoordinator(dependencies: .live(walkingManager: walkingManager)),
-            cloudSync: CloudSyncEngineService()
+            cloudSync: AppServices.makeCloudSyncService()
         )
         OasisTreeManagerRegistry.current = oasisTreeManager
         AvatarPipelineRegistry.current = avatarPipeline
         OhanaNotifications.current = notificationManager
+    }
+
+    private static func makeCloudSyncService() -> any CloudSyncManaging {
+        #if OHANA_LOCAL_DEVICE
+            LocalDeviceCloudSyncService()
+        #else
+            CloudSyncEngineService()
+        #endif
     }
 
     init(

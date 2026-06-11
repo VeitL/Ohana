@@ -317,6 +317,16 @@ extension FamilyCollaborationDashboardView {
         return humans.first { $0.id.uuidString == id }?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie")
     }
 
+    func actorNames(_ ids: [String]) -> String {
+        let names = ids
+            .map(actorName)
+            .filter { !$0.isEmpty }
+        guard !names.isEmpty else {
+            return l.tr(zh: "家人", en: "Family", de: "Familie")
+        }
+        return names.joined(separator: l.tr(zh: "、", en: ", ", de: ", "))
+    }
+
     func relativeTime(from date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = AppLanguage.effectiveLocale

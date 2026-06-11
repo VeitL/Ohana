@@ -180,7 +180,7 @@ struct FamilyCollaborationDashboardView: View {
                 CollaborationActivity(
                     title: l.tr(zh: "遛狗", en: "Walk", de: "Gassi"),
                     petName: pet.name,
-                    actor: actorName($0.executorId),
+                    actor: actorNames($0.executorIds),
                     date: $0.startDate,
                     icon: "figure.walk",
                     tint: Color.goPurple

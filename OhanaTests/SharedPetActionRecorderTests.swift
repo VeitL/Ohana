@@ -10,18 +10,21 @@ struct SharedPetActionRecorderTests {
         let source = Pet(name: "Milo", species: "cat")
         let sibling = Pet(name: "Luna", species: " 猫 ")
         let dog = Pet(name: "Biscuit", species: "狗")
+        let owl = Pet(name: "Hoot", species: "猫头鹰")
         let memorial = Pet(name: "Star", species: "cat")
         source.createdAt = Date(timeIntervalSince1970: 10)
         sibling.createdAt = Date(timeIntervalSince1970: 1)
+        owl.createdAt = Date(timeIntervalSince1970: 2)
         memorial.passedAwayDate = Date()
 
         let targets = SharedPetTargetResolver.sameSpeciesTargets(
             sourcePet: source,
-            allPets: [sibling, dog, memorial, source],
-            explicitTargetIds: [sibling.id]
+            allPets: [sibling, owl, dog, memorial, source],
+            explicitTargetIds: [sibling.id, owl.id]
         )
 
         #expect(targets.map(\.id) == [source.id, sibling.id])
+        #expect(PetSpeciesKey.normalized("猫头鹰") == "bird")
     }
 
     @Test func sharedLitterWritesOneSessionTwoCareLogsAndNoPottyProjection() throws {
@@ -145,6 +148,41 @@ struct SharedPetActionRecorderTests {
         #expect(FeedStockCalculator.stockDeductionAmount(for: ownerLog, pet: ownerLog.pet ?? first) == 0)
     }
 
+    @Test func petFoodStockConveniencePropertiesReadStructuredSharedSession() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "猫")
+        first.foodTrackingMode = .precise
+        first.restockWeight = 1
+        first.dailyPortionGrams = 60
+        first.restockDate = Date(timeIntervalSince1970: 1000)
+        second.foodTrackingMode = .precise
+        second.restockWeight = 1
+        second.dailyPortionGrams = 60
+        second.restockDate = Date(timeIntervalSince1970: 1000)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: nil)
+        defer { cleanup() }
+
+        _ = CareEventService.recordSharedManualFeed(
+            sourcePet: first,
+            targets: [first, second],
+            totalGrams: 120,
+            foodKind: .dry,
+            context: context,
+            date: Date(timeIntervalSince1970: 2200)
+        )
+
+        #expect(first.remainingFoodGrams == 880)
+        #expect(first.foodConsumedSinceRestock == 120)
+        #expect(second.remainingFoodGrams == 1000)
+        #expect(second.foodConsumedSinceRestock == 0)
+    }
+
     @Test func sharedSessionFactIsMarkedForCloudSyncAndTimelineUsesSessionTotals() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -225,6 +263,57 @@ struct SharedPetActionRecorderTests {
         #expect(sessions.first?.stockOwnerPetId == survivor.pet?.id.uuidString)
         #expect(remainingLog.note.contains(SharedCareMetadata.stockOwnerKey) == false)
         #expect(FeedStockCalculator.stockDeductionAmount(for: remainingLog, pet: remainingLog.pet ?? second, sharedCareSessions: sessions) == survivor.amountGrams)
+    }
+
+    @Test func deletingPetReconcilesSurvivingSharedFeedSessionStockOwner() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "猫")
+        first.foodTrackingMode = .precise
+        first.restockWeight = 1
+        first.dailyPortionGrams = 60
+        first.restockDate = Date(timeIntervalSince1970: 1000)
+        second.foodTrackingMode = .precise
+        second.restockWeight = 1
+        second.dailyPortionGrams = 60
+        second.restockDate = Date(timeIntervalSince1970: 1000)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: nil)
+        defer { cleanup() }
+
+        _ = CareEventService.recordSharedManualFeed(
+            sourcePet: first,
+            targets: [first, second],
+            totalGrams: 120,
+            foodKind: .dry,
+            context: context,
+            date: Date(timeIntervalSince1970: 2260)
+        )
+
+        _ = MemberDeletionCommandService.deletePet(first, context: context, userDefaults: UserDefaults.standard)
+
+        let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        let session = try #require(sessions.first)
+        let remainingFeedLogs = try context.fetch(FetchDescriptor<PetCareLog>()).filter { $0.careType == .feeding }
+        let remainingLog = try #require(remainingFeedLogs.first)
+        let sessionState = try CloudSyncMetadataService.state(
+            entityName: "SharedCareSession",
+            localRecordId: session.id,
+            context: context
+        )
+
+        #expect(sessions.count == 1)
+        #expect(session.targetPetIds == [second.id.uuidString])
+        #expect(session.stockOwnerPetId == second.id.uuidString)
+        #expect(session.totalAmountGrams == remainingLog.amountGrams)
+        #expect(remainingFeedLogs.count == 1)
+        #expect(second.remainingFoodGrams == 940)
+        #expect(sessionState?.hasPendingLocalChanges == true)
+        #expect(sessionState?.isDeletionTombstone == false)
     }
 
     @Test func deletingSharedSessionCascadeRemovesChildrenLedgerAndMarksTombstone() throws {
@@ -428,16 +517,65 @@ struct SharedPetActionRecorderTests {
         #expect(Set(walkLogs.map(\.sharedSessionId)).count == 1)
     }
 
-    @Test func backupRoundTripsSharedSessionExpenseAndWalkFields() throws {
+    @Test func sharedWalkStoresMultipleExecutorsOnSessionLogsAndLedger() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        let first = Pet(name: "Milo", species: "猫")
-        let second = Pet(name: "Luna", species: "猫")
+        let primary = Human(name: "Guan")
+        let coWalker = Human(name: "Mia")
+        let first = Pet(name: "Biscuit", species: "狗")
+        let second = Pet(name: "Toast", species: "dog")
+        context.insert(primary)
+        context.insert(coWalker)
         context.insert(first)
         context.insert(second)
         try context.save()
 
-        let cleanup = isolateEconomy(activeHumanID: nil)
+        let cleanup = isolateEconomy(activeHumanID: primary.id.uuidString)
+        defer { cleanup() }
+
+        _ = CareEventService.recordSharedWalk(
+            sourcePet: first,
+            targets: [first, second],
+            distanceMeters: 1200,
+            endDate: Date(timeIntervalSince1970: 6200),
+            context: context,
+            executorId: primary.id.uuidString,
+            executorIds: [primary.id.uuidString, coWalker.id.uuidString],
+            startDate: Date(timeIntervalSince1970: 6100)
+        )
+
+        let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        let walkLogs = try context.fetch(FetchDescriptor<PetWalkLog>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+            .filter { $0.eventKind == CareLedgerEventKind.walk.rawValue }
+        let expectedExecutorIds = [primary.id.uuidString, coWalker.id.uuidString]
+
+        #expect(sessions.count == 1)
+        #expect(sessions.first?.executorId == primary.id.uuidString)
+        #expect(sessions.first?.executorIds == expectedExecutorIds)
+        #expect(walkLogs.count == 2)
+        #expect(walkLogs.allSatisfy { $0.executorId == primary.id.uuidString })
+        #expect(walkLogs.allSatisfy { $0.executorIds == expectedExecutorIds })
+        #expect(Set(walkLogs.map(\.sharedSessionId)) == Set(sessions.map(\.id.uuidString)))
+        #expect(ledgerEvents.count == 2)
+        #expect(ledgerEvents.allSatisfy { $0.actorId == primary.id.uuidString })
+        #expect(ledgerEvents.contains { $0.metadataJSON.contains(coWalker.id.uuidString) })
+    }
+
+    @Test func backupRoundTripsSharedSessionExpenseAndWalkFields() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let primary = Human(name: "Guan")
+        let coWalker = Human(name: "Mia")
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "猫")
+        context.insert(primary)
+        context.insert(coWalker)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: primary.id.uuidString)
         defer { cleanup() }
 
         _ = ExpenseCommandService.recordSharedPetExpense(
@@ -455,6 +593,8 @@ struct SharedPetActionRecorderTests {
             distanceMeters: 900,
             endDate: Date(timeIntervalSince1970: 5200),
             context: context,
+            executorId: primary.id.uuidString,
+            executorIds: [primary.id.uuidString, coWalker.id.uuidString],
             startDate: Date(timeIntervalSince1970: 5100)
         )
 
@@ -465,10 +605,12 @@ struct SharedPetActionRecorderTests {
         #expect(decoded.sharedCareSessions?.contains { $0.totalExpenseAmount == 30 && $0.expenseCategoryRaw == ExpenseCategory.food.rawValue } == true)
         #expect(decoded.petExpenseLogs.contains { $0.sharedSessionId?.isEmpty == false })
         #expect(decoded.petWalkLogs.contains { $0.sharedSessionId?.isEmpty == false })
+        #expect(decoded.sharedCareSessions?.contains { $0.executorIdsRaw?.contains(coWalker.id.uuidString) == true } == true)
+        #expect(decoded.petWalkLogs.contains { $0.executorIdsRaw?.contains(coWalker.id.uuidString) == true })
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV66.models)
+        let schema = Schema(ArkSchemaV67.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

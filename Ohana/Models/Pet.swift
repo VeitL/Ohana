@@ -349,15 +349,15 @@ final class Pet {
     }
 
     var remainingFoodGrams: Double {
-        FeedStockCalculator.snapshot(for: self).remainingGrams
+        feedStockSnapshotWithSharedSessions.remainingGrams
     }
 
     var foodConsumedSinceRestock: Double {
-        FeedStockCalculator.mainConsumedSinceRestock(for: self)
+        FeedStockCalculator.mainConsumedSinceRestock(for: self, sharedCareSessions: feedStockSharedSessions)
     }
 
     var remainingFoodDays: Int {
-        FeedStockCalculator.snapshot(for: self).remainingDays
+        feedStockSnapshotWithSharedSessions.remainingDays
     }
 
     var remainingFoodPercent: Double {
@@ -366,7 +366,28 @@ final class Pet {
     }
 
     var estimatedRunOutDate: Date? {
-        FeedStockCalculator.snapshot(for: self).runOutDate
+        feedStockSnapshotWithSharedSessions.runOutDate
+    }
+
+    private var feedStockSnapshotWithSharedSessions: FeedStockSnapshot {
+        FeedStockCalculator.snapshot(for: self, sharedCareSessions: feedStockSharedSessions)
+    }
+
+    private var feedStockSharedSessions: [SharedCareSession]? {
+        guard let context = modelContext else { return nil }
+        let sessionIDs = Set(careLogs.compactMap { log -> UUID? in
+            guard log.careType == .feeding else { return nil }
+            return UUID(uuidString: log.sharedSessionId)
+        })
+        guard !sessionIDs.isEmpty else { return [] }
+
+        let ids = Array(sessionIDs)
+        let descriptor = FetchDescriptor<SharedCareSession>(
+            predicate: #Predicate<SharedCareSession> { session in
+                ids.contains(session.id)
+            }
+        )
+        return try? context.fetch(descriptor)
     }
 
     var genderSymbol: String {

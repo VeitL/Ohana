@@ -286,13 +286,18 @@ final class CareEventService: CareEventRecording {
         amountMl: Double,
         context: ModelContext,
         executorId: String? = nil,
+        date: Date = Date(),
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (humanGot: Int, petGot: Int)? {
         let dependencies = providedDependencies ?? .live()
         guard let event = reminder.event else { return nil }
+        let isCatchUp = reminder.scheduledAt < date
+        guard !isCatchUp || WaterPlanCatchUpPolicy.isCatchUpEligible(reminder, now: date) else {
+            return nil
+        }
 
         let log = PetCareLog(
-            date: Date(),
+            date: date,
             type: .watering,
             amountMl: max(0, amountMl),
             note: "\(PetCareLog.plannedWaterNotePrefix)\(event.id.uuidString)",
@@ -303,7 +308,7 @@ final class CareEventService: CareEventRecording {
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
 
         reminder.statusEnum = .completed
-        reminder.completedAt = Date()
+        reminder.completedAt = date
         if let executorId {
             reminder.completedBy = executorId
         }
@@ -319,6 +324,21 @@ final class CareEventService: CareEventRecording {
             save: true
         )
         dependencies.familyTasks.syncCompletedReminder(reminder, completedBy: executorId, context: context)
+
+        if isCatchUp {
+            dependencies.careLedger.recordPetCare(
+                log: log,
+                pet: pet,
+                source: .reminder,
+                sourceEventId: event.id.uuidString,
+                sourceReminderId: reminder.id.uuidString,
+                coconutDelta: 0,
+                metadataJSON: "",
+                context: context,
+                save: true
+            )
+            return (0, 0)
+        }
 
         let reward = dependencies.economy.awardCareAction(type: .water, pet: pet, context: context, quality: .none)
         dependencies.careLedger.recordPetCare(
@@ -847,6 +867,7 @@ final class CareEventService: CareEventRecording {
         endDate: Date?,
         context: ModelContext,
         executorId: String? = nil,
+        executorIds: [String] = [],
         startDate: Date = Date(),
         behaviorNotes: String? = nil,
         moodRating: Int = 0,
@@ -864,6 +885,7 @@ final class CareEventService: CareEventRecording {
                 targets: targets,
                 date: startDate,
                 executorId: executorId,
+                executorIds: executorIds,
                 allocationMode: .equal,
                 childLogStrategy: .walk(
                     distanceMeters: distanceMeters,

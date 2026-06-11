@@ -11,6 +11,7 @@ nonisolated extension DataBackupManager {
 
     func d(_ date: Date?) -> String? { date.map { iso.string(from: $0) } }
     func d(_ date: Date) -> String { iso.string(from: date) }
+    func nilIfEmpty(_ value: String) -> String? { value.isEmpty ? nil : value }
 
     func encodePet(_ p: Pet) -> PetBackup {
         PetBackup(
@@ -139,6 +140,7 @@ nonisolated extension DataBackupManager {
             date: d(session.date),
             actionKindRaw: session.actionKindRaw,
             executorId: session.executorId,
+            executorIdsRaw: nilIfEmpty(SharedCareParticipantIDs.encode(session.executorIds)),
             sourcePetId: session.sourcePetId,
             targetPetIdsRaw: session.targetPetIdsRaw,
             speciesRaw: session.speciesRaw,
@@ -161,7 +163,9 @@ nonisolated extension DataBackupManager {
         PetWalkLogBackup(id: l.id.uuidString, startDate: d(l.startDate),
                          endDate: d(l.endDate), distanceMeters: l.distanceMeters,
                          coconutsEarned: l.coconutsEarned,
-                         executorId: l.executorId, petId: l.pet?.id.uuidString,
+                         executorId: l.executorId,
+                         executorIdsRaw: nilIfEmpty(SharedCareParticipantIDs.encode(l.executorIds)),
+                         petId: l.pet?.id.uuidString,
                          sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
     }
 

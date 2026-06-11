@@ -166,6 +166,7 @@ nonisolated extension DataBackupManager {
             date: parseDate(dto.date) ?? Date(),
             actionKind: SharedCareActionKind(rawValue: dto.actionKindRaw) ?? .feeding,
             executorId: dto.executorId,
+            executorIds: SharedCareParticipantIDs.decode(dto.executorIdsRaw ?? "", fallback: dto.executorId),
             sourcePetId: dto.sourcePetId,
             targetPetIds: dto.targetPetIdsRaw.split(separator: "|").map(String.init),
             species: dto.speciesRaw,
@@ -190,6 +191,7 @@ nonisolated extension DataBackupManager {
         let l = PetWalkLog(startDate: parseDate(dto.startDate) ?? Date(),
                            pet: dto.petId.flatMap { pets[$0] },
                            executorId: dto.executorId,
+                           executorIds: SharedCareParticipantIDs.decode(dto.executorIdsRaw ?? "", fallback: dto.executorId),
                            sharedSessionId: dto.sharedSessionId ?? "")
         if let uuid = UUID(uuidString: dto.id) { l.id = uuid }
         l.endDate = parseDate(dto.endDate)

@@ -20,6 +20,7 @@ struct QuickWaterDetailSheet: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppServices.self) var appServices
+    @AppStorage("appLanguage") var appLanguage = AppLanguage.fallbackCode
     @StateObject var workloadPolicy = AppWorkloadPolicy.shared
     @State var waterIntervalDays: Int = 3
     @State var waterChangeAnchorDate: Date = .init()
@@ -91,6 +92,7 @@ struct QuickWaterDetailSheet: View {
     var chromeTint: Color { Color.goPrimary }
     var petKey: String { pet.id.uuidString }
     var isAquatic: Bool { WaterQuickActionPolicy.isAquatic(species: pet.species) }
+    var l: L10n { L10n(appLanguage) }
     var sameSpeciesWaterPets: [Pet] {
         let species = normalizedSpecies(pet.species)
         return allPets
@@ -124,7 +126,8 @@ struct QuickWaterDetailSheet: View {
             activeHumanSelection: appServices.activeHumanSelection,
             careEvents: appServices.careEvents,
             userNotifications: appServices.userNotifications,
-            reminderScheduling: appServices.reminderScheduling
+            reminderScheduling: appServices.reminderScheduling,
+            revisions: appServices.domainRevisions
         )
     }
 
@@ -481,7 +484,7 @@ struct QuickWaterDetailSheet: View {
                 Text(pet.name)
                     .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(isAquatic ? "水体 / 换水 / 滤芯" : "喂水 / 换水 / 滤芯")
+                Text(isAquatic ? l.tr(zh: "水体 / 换水 / 滤芯", en: "Water tank / Changes / Filter", de: "Wasserbecken / Wechsel / Filter") : l.tr(zh: "喂水 / 换水 / 滤芯", en: "Water / Changes / Filter", de: "Trinken / Wechsel / Filter"))
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -527,7 +530,7 @@ struct QuickWaterDetailSheet: View {
             HStack(spacing: 6) {
                 Image(systemName: mode == .manual ? "hand.tap.fill" : "bell.badge.fill")
                     .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                Text(mode == .manual ? "手动" : "计划")
+                Text(mode == .manual ? l.tr(zh: "手动", en: "Manual", de: "Manuell") : l.tr(zh: "计划", en: "Plan", de: "Plan"))
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(selected ? Color.arkInk : tint)
@@ -561,10 +564,10 @@ struct QuickWaterDetailSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(isAquatic ? "水体管理" : "今日喂水")
+                    Text(isAquatic ? l.tr(zh: "水体管理", en: "Water tank care", de: "Wasserbeckenpflege") : l.tr(zh: "今日喂水", en: "Today's water", de: "Trinken heute"))
                         .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(isAquatic ? "换水、滤芯和水体状态" : waterSubtitle)
+                    Text(isAquatic ? l.tr(zh: "换水、滤芯和水体状态", en: "Water changes, filter, and tank status", de: "Wasserwechsel, Filter und Beckenstatus") : waterSubtitle)
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
@@ -574,15 +577,19 @@ struct QuickWaterDetailSheet: View {
             }
 
             HStack(spacing: 8) {
-                waterSummaryPill(title: "喂水", value: isAquatic ? "水族" : "\(todayWaterLogs.count)次", tint: chromeTint)
                 waterSummaryPill(
-                    title: "换水",
+                    title: l.tr(zh: "喂水", en: "Water", de: "Trinken"),
+                    value: isAquatic ? l.tr(zh: "水族", en: "Aquatic", de: "Aquaristik") : localizedTimes(todayWaterLogs.count),
+                    tint: chromeTint
+                )
+                waterSummaryPill(
+                    title: l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel"),
                     value: dueText(daysUntil: daysUntilWaterChange),
                     tint: waterChangeStatusTint,
                     isWarning: isWaterChangeOverdue
                 )
                 waterSummaryPill(
-                    title: "滤芯",
+                    title: l.tr(zh: "滤芯", en: "Filter", de: "Filter"),
                     value: optionalDueText(daysUntilFilterClean),
                     tint: filterStatusTint,
                     isWarning: isFilterOverdue
@@ -645,7 +652,7 @@ struct QuickWaterDetailSheet: View {
 
     var waterCard: some View {
         WaterCoreCard(
-            title: "喂水",
+            title: l.tr(zh: "喂水", en: "Water", de: "Trinken"),
             icon: isAquatic ? "water.waves" : "drop.fill",
             tint: waterMode == .reminder ? Color.goTeal : chromeTint,
             value: waterCardValue,
@@ -666,7 +673,7 @@ struct QuickWaterDetailSheet: View {
                     commitWater()
                 }
             },
-            secondaryTitle: isAquatic ? nil : "设置",
+            secondaryTitle: isAquatic ? nil : l.tr(zh: "设置", en: "Settings", de: "Einstellungen"),
             secondaryAction: isAquatic ? nil : {
                 guard !pet.hasPassedAway else {
                     openRootWaterSheet(.waterOverview)
@@ -681,13 +688,13 @@ struct QuickWaterDetailSheet: View {
 
     var waterChangeCard: some View {
         WaterCoreCard(
-            title: "换水",
+            title: l.tr(zh: "换水", en: "Water change", de: "Wasserwechsel"),
             icon: "arrow.2.circlepath",
             tint: waterChangeStatusTint,
             value: dueText(daysUntil: daysUntilWaterChange),
             subtitle: waterChangeSubtitle,
             progress: cycleProgress(elapsed: waterElapsedDays, interval: waterIntervalDays),
-            primaryTitle: "记录",
+            primaryTitle: l.tr(zh: "记录", en: "Log", de: "Eintragen"),
             primaryIcon: "checkmark",
             primaryAction: {
                 guard !pet.hasPassedAway else {
@@ -696,7 +703,7 @@ struct QuickWaterDetailSheet: View {
                 }
                 doWaterChange()
             },
-            secondaryTitle: "管理",
+            secondaryTitle: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
             secondaryAction: {
                 if pet.hasPassedAway {
                     openRootWaterSheet(.waterChangeOverview)
@@ -712,13 +719,13 @@ struct QuickWaterDetailSheet: View {
 
     var filterCard: some View {
         WaterCoreCard(
-            title: "滤芯",
+            title: l.tr(zh: "滤芯", en: "Filter", de: "Filter"),
             icon: "sparkles",
             tint: filterStatusTint,
             value: optionalDueText(daysUntilFilterClean),
             subtitle: filterSubtitle,
             progress: cycleProgress(elapsed: filterCleanElapsedDays ?? 0, interval: filterCleanIntervalDays),
-            primaryTitle: "清洗",
+            primaryTitle: l.tr(zh: "清洗", en: "Clean", de: "Reinigen"),
             primaryIcon: "checkmark",
             primaryAction: {
                 guard !pet.hasPassedAway else {
@@ -727,7 +734,7 @@ struct QuickWaterDetailSheet: View {
                 }
                 doFilterClean()
             },
-            secondaryTitle: "管理",
+            secondaryTitle: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
             secondaryAction: {
                 if pet.hasPassedAway {
                     openRootWaterSheet(.filterOverview)
@@ -744,14 +751,14 @@ struct QuickWaterDetailSheet: View {
     var recentStrip: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("最近")
+                Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Button {
                     openWaterSheet(.history)
                 } label: {
-                    Text("管理")
+                    Text(l.tr(zh: "管理", en: "Manage", de: "Verwalten"))
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(chromeTint)
                 }
@@ -759,7 +766,7 @@ struct QuickWaterDetailSheet: View {
             }
 
             if allWaterLogs.isEmpty {
-                Text("暂无记录")
+                Text(l.tr(zh: "暂无记录", en: "No records yet", de: "Noch keine Einträge"))
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.62))
                     .frame(maxWidth: .infinity)
@@ -793,12 +800,12 @@ struct QuickWaterDetailSheet: View {
     }
 
     var waterCardValue: String {
-        if isAquatic { return "水族" }
+        if isAquatic { return l.tr(zh: "水族", en: "Aquatic", de: "Aquaristik") }
         if waterMode == .reminder {
-            if waterRuleState.missedCount > 0 { return "待补 \(waterRuleState.missedCount)" }
+            if waterRuleState.missedCount > 0 { return localizedMissedCount(waterRuleState.missedCount) }
             return waterRuleState.completionText
         }
-        return "\(todayWaterLogs.count) 次"
+        return localizedTimes(todayWaterLogs.count)
     }
 
     var waterCardProgress: Double? {
@@ -810,44 +817,148 @@ struct QuickWaterDetailSheet: View {
     }
 
     var waterSubtitle: String {
-        if isAquatic { return "不做喂水打卡" }
+        if isAquatic { return l.tr(zh: "不做喂水打卡", en: "No water check-ins", de: "Keine Trink-Check-ins") }
         if waterMode == .reminder {
             if let missed = waterRuleState.missedPlanReminders.first {
-                return "待补 \(missed.scheduledAt.formatted(date: .omitted, time: .shortened))"
+                return localizedCatchUpTime(missed.scheduledAt.formatted(date: .omitted, time: .shortened))
             }
             if let next = waterRuleState.nextPendingReminder {
-                return "下一次 \(next.scheduledAt.formatted(date: .omitted, time: .shortened))"
+                return localizedNextTime(next.scheduledAt.formatted(date: .omitted, time: .shortened))
             }
-            return "今日计划 \(waterRuleState.completionText)"
+            return localizedTodayPlan(waterRuleState.completionText)
         }
         if let lastWaterLog {
             let amountText = lastWaterLog.amountMl > 0 ? " · \(Int(lastWaterLog.amountMl))ml" : ""
             return "\(relativeDayText(for: lastWaterLog.date))\(amountText)"
         }
-        return waterAmountEnabled ? "一键记录 \(Int(defaultWaterAmountMl ?? 250))ml" : "只记录一次"
+        return waterAmountEnabled ? localizedOneTapAmount(Int(defaultWaterAmountMl ?? 250)) : l.tr(zh: "只记录一次", en: "Log one time", de: "Einmal eintragen")
     }
 
     var waterChangeSubtitle: String {
         if isWaterChangeOverdue {
-            return "逾期\(abs(daysUntilWaterChange))天 · 立即换水"
+            return localizedOverdueAction(days: abs(daysUntilWaterChange), action: l.tr(zh: "立即换水", en: "change now", de: "jetzt wechseln"))
         }
         if let lastWaterChange {
-            return "\(relativeDayText(for: lastWaterChange.date)) · \(waterIntervalDays)天周期"
+            return "\(relativeDayText(for: lastWaterChange.date)) · \(localizedDayCycle(waterIntervalDays))"
         }
-        return "\(waterIntervalDays)天周期"
+        return localizedDayCycle(waterIntervalDays)
     }
 
     var filterSubtitle: String {
         if let daysUntilFilterClean, daysUntilFilterClean < 0 {
-            return "清洗逾期\(abs(daysUntilFilterClean))天 · 立即处理"
+            return localizedMaintenanceOverdue(kind: l.tr(zh: "清洗", en: "Cleaning", de: "Reinigung"), days: abs(daysUntilFilterClean))
         }
         if let daysUntilFilterReplace, daysUntilFilterReplace < 0 {
-            return "更换逾期\(abs(daysUntilFilterReplace))天 · 立即处理"
+            return localizedMaintenanceOverdue(kind: l.tr(zh: "更换", en: "Replacement", de: "Wechsel"), days: abs(daysUntilFilterReplace))
         }
-        let replaceText = daysUntilFilterReplace.map { "更换 \(dueText(daysUntil: $0))" } ?? "先清洗一次"
+        let replaceText = daysUntilFilterReplace.map { localizedReplaceDue(dueText(daysUntil: $0)) } ?? l.tr(zh: "先清洗一次", en: "Clean once first", de: "Zuerst einmal reinigen")
         if let lastFilterClean {
             return "\(relativeDayText(for: lastFilterClean.date)) · \(replaceText)"
         }
         return replaceText
+    }
+
+    func localizedTimes(_ count: Int) -> String {
+        l.tr(
+            zh: "\(count) 次",
+            en: count == 1 ? "1 time" : "\(count) times",
+            de: count == 1 ? "1 Mal" : "\(count) Mal"
+        )
+    }
+
+    func localizedPetCount(_ count: Int, species: String) -> String {
+        l.tr(
+            zh: "\(count)只\(species)",
+            en: "\(count) \(species)",
+            de: "\(count) \(species)"
+        )
+    }
+
+    func localizedDays(_ days: Int) -> String {
+        l.tr(
+            zh: "\(days)天",
+            en: "\(days) days",
+            de: "\(days) Tage"
+        )
+    }
+
+    func localizedProgressDays(elapsed: Int, interval: Int) -> String {
+        l.tr(
+            zh: "\(elapsed)/\(interval)天",
+            en: "\(elapsed)/\(interval) days",
+            de: "\(elapsed)/\(interval) Tage"
+        )
+    }
+
+    func localizedMissedCount(_ count: Int) -> String {
+        l.tr(
+            zh: "待补 \(count)",
+            en: "\(count) missed",
+            de: "\(count) offen"
+        )
+    }
+
+    func localizedCatchUpTime(_ timeText: String) -> String {
+        l.tr(
+            zh: "待补 \(timeText)",
+            en: "Catch up \(timeText)",
+            de: "Nachholen \(timeText)"
+        )
+    }
+
+    func localizedNextTime(_ timeText: String) -> String {
+        l.tr(
+            zh: "下一次 \(timeText)",
+            en: "Next \(timeText)",
+            de: "Nächstes \(timeText)"
+        )
+    }
+
+    func localizedTodayPlan(_ completionText: String) -> String {
+        l.tr(
+            zh: "今日计划 \(completionText)",
+            en: "Today's plan \(completionText)",
+            de: "Tagesplan \(completionText)"
+        )
+    }
+
+    func localizedOneTapAmount(_ amountMl: Int) -> String {
+        l.tr(
+            zh: "一键记录 \(amountMl)ml",
+            en: "Log \(amountMl) ml",
+            de: "\(amountMl) ml eintragen"
+        )
+    }
+
+    func localizedDayCycle(_ days: Int) -> String {
+        l.tr(
+            zh: "\(days)天周期",
+            en: "Every \(days) days",
+            de: "Alle \(days) Tage"
+        )
+    }
+
+    func localizedOverdueAction(days: Int, action: String) -> String {
+        l.tr(
+            zh: "逾期\(days)天 · \(action)",
+            en: "\(days) days overdue · \(action)",
+            de: "\(days) Tage überfällig · \(action)"
+        )
+    }
+
+    func localizedMaintenanceOverdue(kind: String, days: Int) -> String {
+        l.tr(
+            zh: "\(kind)逾期\(days)天 · 立即处理",
+            en: "\(kind) \(days) days overdue · handle now",
+            de: "\(kind) \(days) Tage überfällig · jetzt erledigen"
+        )
+    }
+
+    func localizedReplaceDue(_ dueText: String) -> String {
+        l.tr(
+            zh: "更换 \(dueText)",
+            en: "Replace \(dueText)",
+            de: "Wechsel \(dueText)"
+        )
     }
 }

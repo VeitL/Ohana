@@ -33,6 +33,7 @@ struct QuickWaterCommandExecutor {
     private let careEvents: CareEventRecording
     private let userNotifications: UserNotificationManaging
     private let reminderScheduling: ReminderSchedulingManaging
+    private let revisions: DomainRevisionPublishing
 
     init(
         context: ModelContext,
@@ -52,20 +53,21 @@ struct QuickWaterCommandExecutor {
         activeHumanSelection: ActiveHumanSelecting,
         careEvents: CareEventRecording,
         userNotifications: UserNotificationManaging,
-        reminderScheduling: ReminderSchedulingManaging
+        reminderScheduling: ReminderSchedulingManaging,
+        revisions: DomainRevisionPublishing? = nil
     ) {
         self.context = context
         self.activeHumanSelection = activeHumanSelection
         self.careEvents = careEvents
         self.userNotifications = userNotifications
         self.reminderScheduling = reminderScheduling
+        self.revisions = revisions ?? SharedDomainRevisionPublisher()
     }
 
     func latestAllEvents(fallback: [Event]) -> [Event] {
-        var descriptor = FetchDescriptor<Event>(
+        let descriptor = FetchDescriptor<Event>(
             sortBy: [SortDescriptor(\Event.startDate)]
         )
-        descriptor.fetchLimit = 0
         return (try? context.fetch(descriptor)) ?? fallback
     }
 
@@ -137,7 +139,8 @@ struct QuickWaterCommandExecutor {
             enabled: reminderOn,
             cycleAnchor: cycleAnchor
         )
-        return carePlanReminders(pet: pet, allEvents: allEvents, titleContains: "换水")
+        publishWaterMutation(.waterPlan(petID: pet.id, action: "save_water_change"), affectedEntityIDs: [pet.id])
+        return carePlanReminders(pet: pet, allEvents: allEvents, kinds: ["waterChange"])
     }
 
     func syncFilterPlan(
@@ -160,7 +163,8 @@ struct QuickWaterCommandExecutor {
             replaceIntervalDays: replaceIntervalDays,
             enabled: reminderOn
         )
-        return carePlanReminders(pet: pet, allEvents: allEvents, titleContains: "滤芯")
+        publishWaterMutation(.waterPlan(petID: pet.id, action: "save_filter"), affectedEntityIDs: [pet.id])
+        return carePlanReminders(pet: pet, allEvents: allEvents, kinds: ["filterClean", "filterReplace"])
     }
 
     func saveWaterPlan(
@@ -186,6 +190,11 @@ struct QuickWaterCommandExecutor {
                 .filter { !replacedEventIds.contains($0.id) } + created.compactMap(\.event)
             WaterOperatingMode.set(target.id, mode: .reminder)
         }
+        publishWaterMutation(
+            .waterPlan(petID: pet.id, action: "save_drink"),
+            affectedEntityIDs: targetIDs(pet: pet, targets: targets),
+            note: "targets:\(targets.count)"
+        )
         return QuickWaterPlanSaveResult(
             normalizedTimes: normalized,
             optimisticPlanEvents: WaterPlanWriter.planEvents(pet: pet, allEvents: latestEvents),
@@ -195,7 +204,14 @@ struct QuickWaterCommandExecutor {
     }
 
     func setWaterMode(_ mode: WaterOperatingMode, pet: Pet) {
+        let previousMode = WaterOperatingMode.stored(pet.id)
         WaterOperatingMode.set(pet.id, mode: mode)
+        publishWaterMutation(
+            .waterMode(petID: pet.id, mode: mode.rawValue),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: previousMode != mode,
+            note: "optimistic_mode"
+        )
     }
 
     func deactivateWaterPlanReminders(pet: Pet, allEvents: [Event]) {
@@ -208,6 +224,7 @@ struct QuickWaterCommandExecutor {
 
     func deleteWaterPlan(pet: Pet, allEvents: [Event]) {
         WaterPlanWriter.deletePlan(pet: pet, allEvents: allEvents, context: context)
+        publishWaterMutation(.waterPlan(petID: pet.id, action: "delete_drink"), affectedEntityIDs: [pet.id])
     }
 
     func ensureUpcomingWaterPlanReminders(pet: Pet, allEvents: [Event]) -> [Reminder] {
@@ -242,7 +259,14 @@ struct QuickWaterCommandExecutor {
             reminder: reminder,
             amountMl: amountMl,
             context: context,
-            executorId: executorId
+            executorId: executorId,
+            date: Date()
+        )
+        publishWaterMutation(
+            .waterLog(petID: pet.id, source: "planned"),
+            affectedEntityIDs: [pet.id],
+            wroteBusinessFact: reward != nil,
+            note: reward == nil ? "planned_water_noop" : "planned_water_completed"
         )
         return QuickWaterRewardResult(
             coconutDelta: (reward?.humanGot ?? 0) + (reward?.petGot ?? 0),
@@ -275,6 +299,11 @@ struct QuickWaterCommandExecutor {
                 quality: .none,
                 date: Date()
             )
+        publishWaterMutation(
+            .waterLog(petID: pet.id, source: targets.count > 1 ? "shared_manual" : "manual"),
+            affectedEntityIDs: targetIDs(pet: pet, targets: targets),
+            note: targets.count > 1 ? "shared_water" : "manual_water"
+        )
         return QuickWaterRewardResult(
             coconutDelta: reward.humanGot + reward.petGot,
             targetCount: max(targets.count, 1)
@@ -309,6 +338,11 @@ struct QuickWaterCommandExecutor {
             quality: .none,
             date: Date(),
             source: .quickAction
+        )
+        publishWaterMutation(
+            .waterLog(petID: pet.id, source: liveTargets.count > 1 ? "shared_water_change" : "water_change"),
+            affectedEntityIDs: targetIDs(pet: pet, targets: liveTargets),
+            note: "water_change"
         )
         return liveTargets.flatMap {
             saveWaterChangePlan(
@@ -350,6 +384,11 @@ struct QuickWaterCommandExecutor {
             date: Date(),
             source: .quickAction
         )
+        publishWaterMutation(
+            .waterLog(petID: pet.id, source: liveTargets.count > 1 ? "shared_filter_clean" : "filter_clean"),
+            affectedEntityIDs: targetIDs(pet: pet, targets: liveTargets),
+            note: "filter_clean"
+        )
         return liveTargets.flatMap {
             syncFilterPlan(
                 pet: $0,
@@ -371,6 +410,9 @@ struct QuickWaterCommandExecutor {
         }
         context.delete(log)
         context.safeSave()
+        if let petID = log.pet?.id {
+            publishWaterMutation(.waterLog(petID: petID, source: "delete"), affectedEntityIDs: [petID], note: "\(kind)")
+        }
         return kind
     }
 
@@ -378,12 +420,37 @@ struct QuickWaterCommandExecutor {
         activeHumanSelection.currentHumanId
     }
 
-    private func carePlanReminders(pet: Pet, allEvents: [Event], titleContains text: String) -> [Reminder] {
-        latestAllEvents(fallback: allEvents)
-            .filter { event in
-                event.relatedEntityId == pet.id.uuidString &&
-                    event.title.contains(text)
-            }
-            .flatMap(\.reminders)
+    private func carePlanReminders(pet: Pet, allEvents: [Event], kinds: Set<String>) -> [Reminder] {
+        CarePlanCalendarSync.waterMaintenancePlanEvents(
+            pet: pet,
+            kinds: kinds,
+            allEvents: latestAllEvents(fallback: allEvents)
+        )
+        .flatMap(\.reminders)
+    }
+
+    private func publishWaterMutation(
+        _ command: DomainCommand,
+        affectedEntityIDs: Set<UUID>,
+        wroteBusinessFact: Bool = true,
+        note: String? = nil
+    ) {
+        guard wroteBusinessFact else {
+            AppPerformanceMonitor.shared.record("domain_command_noop", valueMS: 0, note: note ?? "\(command)")
+            return
+        }
+        revisions.publish(
+            DomainMutationResult(
+                command: command,
+                affectedEntityIDs: affectedEntityIDs,
+                wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+
+    private func targetIDs(pet: Pet, targets: [Pet]) -> Set<UUID> {
+        let ids = targets.isEmpty ? [pet.id] : targets.map(\.id)
+        return Set(ids)
     }
 }

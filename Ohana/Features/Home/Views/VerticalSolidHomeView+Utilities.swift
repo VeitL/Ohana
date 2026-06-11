@@ -9,7 +9,8 @@ import SwiftUI
 extension VerticalSolidHomeView {
     func scheduleHomeAppearHandoff() {
         homeAppearHandoffTask?.cancel()
-        homeAppearHandoffTask = OhanaFrameScheduler.runAfterNextFrame {
+        let handoffDelay = OnboardingHomeJoinHandoffGate.remainingHomeAppearDelayMilliseconds()
+        homeAppearHandoffTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: handoffDelay) {
             bindHomeAppRouteSink()
             controller.applySnapshot(makeSnapshot(), signature: dataSignature, force: !controller.snapshot.isReady)
             AppPerformanceMonitor.shared.record("home_first_render", valueMS: 0)

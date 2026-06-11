@@ -71,13 +71,15 @@ struct FamilyActivityStripView: View {
             ))
         }
         for log in pet.walkLogs where cal.isDate(log.startDate, inSameDayAs: today) {
-            entries.append(ActivityEntry(
-                date: log.startDate,
-                executorId: log.executorId,
-                iconName: "figure.walk",
-                accent: Color(hex: "7FFF6B"),
-                dedupKey: "\(log.executorId ?? "nil")_walk"
-            ))
+            for executorId in log.executorIds {
+                entries.append(ActivityEntry(
+                    date: log.startDate,
+                    executorId: executorId,
+                    iconName: "figure.walk",
+                    accent: Color(hex: "7FFF6B"),
+                    dedupKey: "\(executorId)_walk"
+                ))
+            }
         }
         for log in pet.expenseLogs where cal.isDate(log.date, inSameDayAs: today) {
             entries.append(ActivityEntry(

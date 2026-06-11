@@ -491,7 +491,9 @@ struct BountyBoardContentView: View {
                 if let id = log.executorId, !id.isEmpty { potty[id, default: 0] += 1 }
             }
             for log in pet.walkLogs where log.startDate >= start {
-                if let id = log.executorId, !id.isEmpty { walk[id, default: 0] += 1 }
+                for id in log.executorIds where !id.isEmpty {
+                    walk[id, default: 0] += 1
+                }
             }
             for log in pet.expenseLogs where log.date >= start {
                 if let id = log.executorId, !id.isEmpty { expense[id, default: 0] += 1 }

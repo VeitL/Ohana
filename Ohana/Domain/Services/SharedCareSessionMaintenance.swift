@@ -95,7 +95,21 @@ enum SharedCareSessionMaintenance {
     }
 
     @MainActor
-    static func reconcile(_ session: SharedCareSession, context: ModelContext) {
+    static func sessionsReferencingPet(id petID: UUID, context: ModelContext) -> [SharedCareSession] {
+        let petIDString = petID.uuidString
+        let descriptor = FetchDescriptor<SharedCareSession>(
+            predicate: #Predicate<SharedCareSession> { session in
+                session.sourcePetId == petIDString ||
+                    session.stockOwnerPetId == petIDString ||
+                    session.targetPetIdsRaw.contains(petIDString)
+            },
+            sortBy: [SortDescriptor(\.date)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    @MainActor
+    static func reconcile(_ session: SharedCareSession, context: ModelContext, reconciledAt: Date = Date()) {
         let sessionID = session.id.uuidString
         let careLogs = fetchCareLogs(sessionID: sessionID, context: context)
         let pottyLogs = fetchPottyLogs(sessionID: sessionID, context: context)
@@ -103,6 +117,7 @@ enum SharedCareSessionMaintenance {
         let walkLogs = fetchWalkLogs(sessionID: sessionID, context: context)
 
         guard !careLogs.isEmpty || !pottyLogs.isEmpty || !expenseLogs.isEmpty || !walkLogs.isEmpty else {
+            CloudSyncMutationRecorder.markDeleted(session, context: context, deletedAt: reconciledAt)
             context.delete(session)
             return
         }
@@ -127,6 +142,15 @@ enum SharedCareSessionMaintenance {
         refreshSharedCareMetadata(session: session, careLogs: careLogs)
         refreshExpenseMetadata(session: session, expenseLogs: expenseLogs)
         refreshPrimaryLegacyModel(session: session, careLogs: careLogs, pottyLogs: pottyLogs, expenseLogs: expenseLogs, walkLogs: walkLogs)
+        markReconciledFactsModified(
+            session: session,
+            careLogs: careLogs,
+            pottyLogs: pottyLogs,
+            expenseLogs: expenseLogs,
+            walkLogs: walkLogs,
+            context: context,
+            modifiedAt: reconciledAt
+        )
     }
 
     @MainActor
@@ -215,6 +239,23 @@ enum SharedCareSessionMaintenance {
     }
 
     @MainActor
+    private static func markReconciledFactsModified(
+        session: SharedCareSession,
+        careLogs: [PetCareLog],
+        pottyLogs: [PetPottyLog],
+        expenseLogs: [PetExpenseLog],
+        walkLogs: [PetWalkLog],
+        context: ModelContext,
+        modifiedAt: Date
+    ) {
+        CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: modifiedAt)
+        CloudSyncMutationRecorder.markModified(careLogs, context: context, modifiedAt: modifiedAt)
+        CloudSyncMutationRecorder.markModified(pottyLogs, context: context, modifiedAt: modifiedAt)
+        CloudSyncMutationRecorder.markModified(expenseLogs, context: context, modifiedAt: modifiedAt)
+        CloudSyncMutationRecorder.markModified(walkLogs, context: context, modifiedAt: modifiedAt)
+    }
+
+    @MainActor
     private static func fetchSession(id: UUID, context: ModelContext) -> SharedCareSession? {
         var descriptor = FetchDescriptor<SharedCareSession>(
             predicate: #Predicate<SharedCareSession> { session in
@@ -281,21 +322,26 @@ enum SharedCareSessionMaintenance {
         let pottyLogIDs = Set(pottyLogs.map(\.id.uuidString))
         let expenseLogIDs = Set(expenseLogs.map(\.id.uuidString))
         let walkLogIDs = Set(walkLogs.map(\.id.uuidString))
-        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
-        return events.filter { event in
-            let legacyModelId = event.legacyModelId ?? ""
-            switch event.legacyModelName {
-            case "PetCareLog":
-                return careLogIDs.contains(legacyModelId)
-            case "PetPottyLog":
-                return pottyLogIDs.contains(legacyModelId)
-            case "PetExpenseLog":
-                return expenseLogIDs.contains(legacyModelId)
-            case "PetWalkLog":
-                return walkLogIDs.contains(legacyModelId)
-            default:
-                return false
+        return ledgerEvents(forLegacyModelName: "PetCareLog", ids: careLogIDs, context: context)
+            + ledgerEvents(forLegacyModelName: "PetPottyLog", ids: pottyLogIDs, context: context)
+            + ledgerEvents(forLegacyModelName: "PetExpenseLog", ids: expenseLogIDs, context: context)
+            + ledgerEvents(forLegacyModelName: "PetWalkLog", ids: walkLogIDs, context: context)
+    }
+
+    @MainActor
+    private static func ledgerEvents(
+        forLegacyModelName modelName: String,
+        ids: Set<String>,
+        context: ModelContext
+    ) -> [CareLedgerEvent] {
+        guard !ids.isEmpty else { return [] }
+        let descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.legacyModelName == modelName
             }
+        )
+        return ((try? context.fetch(descriptor)) ?? []).filter { event in
+            ids.contains(event.legacyModelId ?? "")
         }
     }
 

@@ -64,6 +64,11 @@ private enum PetMomentsArchiveFilter: String, CaseIterable, Identifiable {
     }
 }
 
+private struct PendingSharedSessionDelete: Identifiable {
+    let id: UUID
+    let title: String
+}
+
 struct PetMomentsHubView: View {
     let pet: Pet
     let sharedCareSessions: [SharedCareSession]
@@ -72,11 +77,13 @@ struct PetMomentsHubView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+    @AppStorage("currentActiveHumanId") private var activeHumanId = ""
 
     @State private var tab: PetMomentsTab = .highlights
     @State private var archiveFilter: PetMomentsArchiveFilter = .memories
     @State private var photosPickerItems: [PhotosPickerItem] = []
     @State private var showingQuickMoment = false
+    @State private var pendingSharedSessionDelete: PendingSharedSessionDelete?
 
     private var l: L10n { L10n(appLanguage) }
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
@@ -152,6 +159,24 @@ struct PetMomentsHubView: View {
                     .padding(.bottom, 24)
             }
             .toolbar(.hidden, for: .navigationBar)
+            .confirmationDialog(
+                pendingSharedSessionDelete?.title ?? l.tr(zh: "删除共同记录？", en: "Delete shared record?", de: "Gemeinsamen Eintrag löschen?"),
+                isPresented: sharedSessionDeleteBinding,
+                titleVisibility: .visible
+            ) {
+                Button(l.tr(zh: "删除整组共同记录", en: "Delete shared record", de: "Gemeinsamen Eintrag löschen"), role: .destructive) {
+                    deletePendingSharedSession()
+                }
+                Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {
+                    pendingSharedSessionDelete = nil
+                }
+            } message: {
+                Text(l.tr(
+                    zh: "会同时删除这次共同记录下所有宠物的子记录、账本投影和共享会话。",
+                    en: "This removes every pet entry, ledger projection, and the shared session for this action.",
+                    de: "Dies entfernt alle Haustier-Einträge, Ledger-Projektionen und die gemeinsame Sitzung."
+                ))
+            }
             .overlay {
                 if showingQuickMoment {
                     QuickMomentSheet(
@@ -335,6 +360,7 @@ struct PetMomentsHubView: View {
                 Text(item.date, format: .dateTime.hour().minute())
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
+                sharedSessionActionMenu(for: item)
             }
 
             photoCollage(item.photos)
@@ -392,7 +418,72 @@ struct PetMomentsHubView: View {
             .padding(.top, 4)
 
             Spacer(minLength: 0)
+            sharedSessionActionMenu(for: item)
         }
+    }
+
+    @ViewBuilder
+    private func sharedSessionActionMenu(for item: UnifiedLogItem) -> some View {
+        if item.sharedSessionID != nil {
+            Menu {
+                Button(role: .destructive) {
+                    requestDeleteSharedSession(item)
+                } label: {
+                    Label(l.tr(zh: "删除整组共同记录", en: "Delete shared record", de: "Gemeinsamen Eintrag löschen"), systemImage: "trash")
+                }
+            } label: {
+                Label(l.tr(zh: "共同记录操作", en: "Shared record actions", de: "Aktionen für gemeinsamen Eintrag"), systemImage: "ellipsis")
+                    .labelStyle(.iconOnly)
+                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy icon token; menu frame carries the hit target in compact rows.
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(l.tr(zh: "共同记录操作", en: "Shared record actions", de: "Aktionen für gemeinsamen Eintrag"))
+        }
+    }
+
+    private var sharedSessionDeleteBinding: Binding<Bool> {
+        Binding(
+            get: { pendingSharedSessionDelete != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingSharedSessionDelete = nil
+                }
+            }
+        )
+    }
+
+    private func requestDeleteSharedSession(_ item: UnifiedLogItem) {
+        guard let sharedSessionID = item.sharedSessionID else { return }
+        pendingSharedSessionDelete = PendingSharedSessionDelete(id: sharedSessionID, title: item.title)
+    }
+
+    private func deletePendingSharedSession() {
+        guard let pending = pendingSharedSessionDelete,
+              let session = sharedCareSessions.first(where: { $0.id == pending.id }) else {
+            pendingSharedSessionDelete = nil
+            return
+        }
+
+        let result = SharedCareSessionMaintenance.deleteCascade(
+            session,
+            context: modelContext,
+            deletedByHumanId: activeHumanId.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        )
+        var affected: Set<UUID> = [pet.id, result.sessionID]
+        affected.formUnion(result.careLogIDs)
+        affected.formUnion(result.pottyLogIDs)
+        affected.formUnion(result.expenseLogIDs)
+        affected.formUnion(result.walkLogIDs)
+        affected.formUnion(result.ledgerEventIDs)
+        appServices.domainRevisions.publishDomainMutation(
+            command: .command("petMoments", "deleteSharedCareSession", ["sessionId": result.sessionID.uuidString]),
+            affectedEntityIDs: affected,
+            wroteBusinessFact: true,
+            note: "petMoments.sharedSession.delete"
+        )
+        pendingSharedSessionDelete = nil
     }
 
     @ViewBuilder

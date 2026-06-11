@@ -9,6 +9,8 @@ import Foundation
 import SwiftData
 
 enum CarePlanCalendarSync {
+    static let waterMaintenanceKinds: Set<String> = ["waterChange", "filterClean", "filterReplace"]
+
     private static func eventStorageKey(kind: String, petKey: String) -> String {
         "careCalendarEventId_\(kind)_\(petKey)"
     }
@@ -40,14 +42,14 @@ enum CarePlanCalendarSync {
         let petKey = pet.id.uuidString
         UserDefaults.standard.set(true, forKey: defaultSuppressionKey(kind: kind, petKey: petKey))
         removeCalendarPlan(kind: "default_\(kind)", petKey: petKey, context: context)
-        removeKnownDefaultPlanEvents(kind: kind, pet: pet, context: context)
+        removeLegacyDefaultPlanEvents(kind: kind, pet: pet, context: context)
     }
 
     static func reconcileDefaultPlanOverrides(for pet: Pet, context: ModelContext) {
         let petKey = pet.id.uuidString
         for kind in ["feed", "drink", "litter", "waterChange", "filter", "groom", "play"] where shouldSkipDefaultPlan(kind: kind, petKey: petKey, context: context) {
             removeCalendarPlan(kind: "default_\(kind)", petKey: petKey, context: context)
-            removeKnownDefaultPlanEvents(kind: kind, pet: pet, context: context)
+            removeLegacyDefaultPlanEvents(kind: kind, pet: pet, context: context)
         }
     }
 
@@ -160,6 +162,26 @@ enum CarePlanCalendarSync {
         return false
     }
 
+    static func waterMaintenanceKind(for event: Event) -> String? {
+        let petKey = event.relatedEntityId
+        guard !petKey.isEmpty else { return nil }
+        return waterMaintenanceKinds.first { kind in
+            UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey)) == event.id.uuidString
+        }
+    }
+
+    static func isWaterMaintenancePlan(_ event: Event, pet: Pet, kinds: Set<String>) -> Bool {
+        guard event.relatedEntityId == pet.id.uuidString else { return false }
+        guard let kind = waterMaintenanceKind(for: event) else { return false }
+        return kinds.contains(kind)
+    }
+
+    static func waterMaintenancePlanEvents(pet: Pet, kinds: Set<String>, allEvents: [Event]) -> [Event] {
+        allEvents
+            .filter { isWaterMaintenancePlan($0, pet: pet, kinds: kinds) }
+            .sorted { $0.startDate < $1.startDate }
+    }
+
     private static func hasCustomFeedPlan(petKey: String, context: ModelContext) -> Bool {
         var descriptor = FetchDescriptor<Event>(
             predicate: #Predicate<Event> {
@@ -181,7 +203,7 @@ enum CarePlanCalendarSync {
         return (try? context.fetch(descriptor).isEmpty) == false
     }
 
-    private static func removeKnownDefaultPlanEvents(kind: String, pet: Pet, context: ModelContext) {
+    private static func removeLegacyDefaultPlanEvents(kind: String, pet: Pet, context: ModelContext) {
         let petKey = pet.id.uuidString
         let titles = defaultPlanTitleCandidates(kind: kind, pet: pet)
         guard !titles.isEmpty else { return }
@@ -344,7 +366,7 @@ enum CarePlanCalendarSync {
         for kind in knownDefaultPlanKinds where !activeKinds.contains(kind) {
             removeCalendarPlan(kind: kind, petKey: petKey, context: context)
             if let defaultKind = kind.split(separator: "_").last.map(String.init) {
-                removeKnownDefaultPlanEvents(kind: defaultKind, pet: pet, context: context)
+                removeLegacyDefaultPlanEvents(kind: defaultKind, pet: pet, context: context)
             }
         }
 

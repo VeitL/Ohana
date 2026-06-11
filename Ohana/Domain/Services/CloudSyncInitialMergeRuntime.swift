@@ -176,6 +176,15 @@ enum CloudSyncInitialHouseholdMergeRuntime {
             summary: &summary
         )
         try stageEntity(
+            String(describing: SharedCareSession.self),
+            ids: backup.sharedCareSessions?.map(\.id) ?? [],
+            householdId: householdId,
+            modifiedAt: modifiedAt,
+            metadataJSON: metadataJSON,
+            context: context,
+            summary: &summary
+        )
+        try stageEntity(
             String(describing: CoconutLedgerEntry.self),
             ids: backup.coconutLedgerEntries?.map(\.id) ?? [],
             householdId: householdId,

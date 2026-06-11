@@ -111,7 +111,7 @@ enum ExpandedQuickActionExecutor {
             return
         }
 
-        let state = ExpandedQuickActionLogic.waterRuleState(for: pet, allEvents: allEvents)
+        let state = ExpandedQuickActionLogic.waterRuleState(for: pet, allEvents: allEvents, now: now)
         if state.operatingMode == .reminder {
             if let reminder = state.nextPendingReminder {
                 let reward = careEvents.completePlannedWater(
@@ -119,7 +119,8 @@ enum ExpandedQuickActionExecutor {
                     reminder: reminder,
                     amountMl: ExpandedQuickActionLogic.defaultWaterAmountMl(for: pet) ?? 0,
                     context: modelContext,
-                    executorId: executorId
+                    executorId: executorId,
+                    date: now
                 )
                 let delta = (reward?.humanGot ?? 0) + (reward?.petGot ?? 0)
                 feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta)))

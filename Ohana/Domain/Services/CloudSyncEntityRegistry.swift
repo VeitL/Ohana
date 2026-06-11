@@ -109,6 +109,7 @@ nonisolated enum CloudSyncEntityRegistry {
         String(describing: PetWalkLog.self),
         String(describing: PetExpenseLog.self),
         String(describing: PetWeightLog.self),
+        String(describing: SharedCareSession.self),
         String(describing: CoconutLedgerEntry.self)
     ]
 
