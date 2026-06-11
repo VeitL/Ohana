@@ -11,9 +11,6 @@ import SwiftData
 @MainActor
 enum TodayFocusEconomyService {
     private static let rewardMarkerPrefix = "economyV2.todayFocusCompletion"
-    private static let maxVisibleFamilyTaskCards = 3
-    private static let maxVisibleExchangeCards = 2
-    private static let maxVisibleNegativeCards = 2
 
     @discardableResult
     static func awardDailyCompletionIfNeeded(
@@ -327,13 +324,13 @@ enum TodayFocusEconomyService {
         guard let snapshot else { return true }
         let skippedFocusKeys = TodayFocusHiddenStateStore.loadSkippedFocusKeys(date: now, calendar: calendar)
         let closedNegativeKeys = TodayFocusHiddenStateStore.loadClosedNegativeKeys(date: now, calendar: calendar)
-        let visibleFamilyTasks = snapshot.assignedFamilyTasks.prefix(maxVisibleFamilyTaskCards).contains {
+        let visibleFamilyTasks = snapshot.assignedFamilyTasks.prefix(TodayFocusLimits.maxFamilyTaskCards).contains {
             !skippedFocusKeys.contains("familyTask:\($0.id.uuidString)")
         }
-        let visibleExchangeRequests = snapshot.pendingExchangeRequests.prefix(maxVisibleExchangeCards).contains {
+        let visibleExchangeRequests = snapshot.pendingExchangeRequests.prefix(TodayFocusLimits.maxExchangeCards).contains {
             !skippedFocusKeys.contains("coconutExchange:\($0.id.uuidString)")
         }
-        let visibleNegativeSignals = snapshot.negativeSignals.prefix(maxVisibleNegativeCards).contains {
+        let visibleNegativeSignals = snapshot.negativeSignals.prefix(TodayFocusLimits.maxNegativeCards).contains {
             !closedNegativeKeys.contains($0.id)
         }
         return !visibleFamilyTasks && !visibleExchangeRequests && !visibleNegativeSignals

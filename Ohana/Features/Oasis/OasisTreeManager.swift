@@ -347,69 +347,184 @@ final class OasisTreeManager {
 
     func refreshPreviewEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
         _ = plants
-        let ledgerEvents = Self.ledgerEvents(modelContext: modelContext)
-        islandEnergy = Self.calculatedIslandEnergy(
-            ledgerEvents: ledgerEvents,
+        let snapshot = Self.ledgerEnergySnapshot(
             modelContext: modelContext,
             pets: pets,
             humans: humans
         )
-        refreshInjectedEnergy(ledgerEvents: ledgerEvents)
+        islandEnergy = snapshot.legacyXP + snapshot.growthXP
+        refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
     }
 
     func refreshEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant] = []) {
         _ = plants
-        let ledgerEvents = Self.ledgerEvents(modelContext: modelContext)
-        islandEnergy = Self.calculatedIslandEnergy(
-            ledgerEvents: ledgerEvents,
+        let snapshot = Self.ledgerEnergySnapshot(
             modelContext: modelContext,
             pets: pets,
             humans: humans
         )
-        refreshInjectedEnergy(ledgerEvents: ledgerEvents)
+        islandEnergy = snapshot.legacyXP + snapshot.growthXP
+        refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
         checkAndRewardLevelUp(modelContext: modelContext)
     }
 
     @discardableResult
     @MainActor
     func refreshLedgerEnergy(modelContext: ModelContext) -> TreeLevel {
-        let ledgerEvents = Self.ledgerEvents(modelContext: modelContext)
-        islandEnergy = Self.calculatedIslandEnergy(
-            ledgerEvents: ledgerEvents,
+        let snapshot = Self.ledgerEnergySnapshot(
             modelContext: modelContext,
             pets: [],
             humans: []
         )
-        refreshInjectedEnergy(ledgerEvents: ledgerEvents)
+        islandEnergy = snapshot.legacyXP + snapshot.growthXP
+        refreshInjectedEnergy(ledgerInjectedXP: snapshot.injectedXP)
         checkAndRewardLevelUp(modelContext: modelContext)
         return treeLevel
     }
 
-    private static func ledgerEvents(modelContext: ModelContext) -> [CareLedgerEvent] {
-        (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? [] // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+    private struct LedgerEventCursor: Equatable {
+        let eventId: String
+        let occurredAt: Date
     }
 
-    private static func calculatedIslandEnergy(
-        ledgerEvents: [CareLedgerEvent],
+    private struct LedgerEnergySnapshot {
+        let growthXP: Int
+        let injectedXP: Int
+        let legacyXP: Int
+    }
+
+    private static func ledgerEnergySnapshot(
         modelContext: ModelContext,
         pets: [Pet],
         humans: [Human]
-    ) -> Int {
-        let v2GrowthXP = ledgerEvents.reduce(0) { partial, event in
-            partial + CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: event.metadataJSON)
+    ) -> LedgerEnergySnapshot {
+        let eventCount = ledgerEventCount(modelContext: modelContext)
+        guard eventCount > 0 else {
+            return rebuildLedgerEnergySnapshot(modelContext: modelContext, pets: pets, humans: humans, latestCursor: nil)
         }
-        return legacyCompatibilityXP(
+        let latestCursor = latestLedgerCursor(modelContext: modelContext)
+        if let cached = cachedLedgerEnergySnapshot(
+            modelContext: modelContext,
+            eventCount: eventCount,
+            latestCursor: latestCursor
+        ) {
+            return cached
+        }
+        return rebuildLedgerEnergySnapshot(modelContext: modelContext, pets: pets, humans: humans, latestCursor: latestCursor)
+    }
+
+    private static func cachedLedgerEnergySnapshot(
+        modelContext: ModelContext,
+        eventCount: Int,
+        latestCursor: LedgerEventCursor?
+    ) -> LedgerEnergySnapshot? {
+        guard let cache = OasisTreePreferenceStore.ledgerEnergyCache(),
+              let legacyXP = OasisTreePreferenceStore.legacyBaselineXP(),
+              cache.processedEventCount >= 0 else {
+            return nil
+        }
+        if cache.processedEventCount == eventCount {
+            guard cacheMatchesLatestCursor(cache, latestCursor: latestCursor) else { return nil }
+            return LedgerEnergySnapshot(growthXP: cache.growthXP, injectedXP: cache.injectedXP, legacyXP: legacyXP)
+        }
+        guard cache.processedEventCount < eventCount,
+              let cursorDate = cache.latestOccurredAt else {
+            return nil
+        }
+        let newEvents = ledgerEvents(after: cursorDate, modelContext: modelContext)
+        guard cache.processedEventCount + newEvents.count == eventCount else {
+            return nil
+        }
+        let delta = ledgerEnergyDelta(from: newEvents)
+        let updatedCache = OasisLedgerEnergyCache(
+            processedEventCount: eventCount,
+            latestEventId: latestCursor?.eventId,
+            latestOccurredAt: latestCursor?.occurredAt,
+            growthXP: cache.growthXP + delta.growthXP,
+            injectedXP: cache.injectedXP + delta.injectedXP
+        )
+        guard cacheMatchesLatestCursor(updatedCache, latestCursor: latestCursor) else { return nil }
+        OasisTreePreferenceStore.storeLedgerEnergyCache(updatedCache)
+        return LedgerEnergySnapshot(
+            growthXP: updatedCache.growthXP,
+            injectedXP: updatedCache.injectedXP,
+            legacyXP: legacyXP
+        )
+    }
+
+    private static func rebuildLedgerEnergySnapshot(
+        modelContext: ModelContext,
+        pets: [Pet],
+        humans: [Human],
+        latestCursor: LedgerEventCursor?
+    ) -> LedgerEnergySnapshot {
+        let ledgerEvents = allLedgerEvents(modelContext: modelContext)
+        let delta = ledgerEnergyDelta(from: ledgerEvents)
+        let legacyXP = legacyCompatibilityXP(
             ledgerEvents: ledgerEvents,
             modelContext: modelContext,
             pets: pets,
             humans: humans
-        ) + v2GrowthXP
+        )
+        OasisTreePreferenceStore.storeLedgerEnergyCache(
+            OasisLedgerEnergyCache(
+                processedEventCount: ledgerEvents.count,
+                latestEventId: latestCursor?.eventId,
+                latestOccurredAt: latestCursor?.occurredAt,
+                growthXP: delta.growthXP,
+                injectedXP: delta.injectedXP
+            )
+        )
+        return LedgerEnergySnapshot(growthXP: delta.growthXP, injectedXP: delta.injectedXP, legacyXP: legacyXP)
     }
 
-    private func refreshInjectedEnergy(ledgerEvents: [CareLedgerEvent]) {
-        let ledgerInjectedXP = ledgerEvents.reduce(0) { partial, event in
-            partial + CoconutEconomyPolicyV2.metadataValue(named: "injectedXP", in: event.metadataJSON)
+    private static func ledgerEventCount(modelContext: ModelContext) -> Int {
+        (try? modelContext.fetchCount(FetchDescriptor<CareLedgerEvent>())) ?? 0
+    }
+
+    private static func latestLedgerCursor(modelContext: ModelContext) -> LedgerEventCursor? {
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        let events = (try? modelContext.fetch(descriptor)) ?? []
+        return events.first.map(cursor)
+    }
+
+    private static func ledgerEvents(after cursorDate: Date, modelContext: ModelContext) -> [CareLedgerEvent] {
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { event in
+                event.occurredAt > cursorDate
+            },
+            sortBy: [SortDescriptor(\.occurredAt)]
+        )
+        descriptor.fetchLimit = 256
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private static func allLedgerEvents(modelContext: ModelContext) -> [CareLedgerEvent] {
+        (try? modelContext.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+    }
+
+    private static func cacheMatchesLatestCursor(
+        _ cache: OasisLedgerEnergyCache,
+        latestCursor: LedgerEventCursor?
+    ) -> Bool {
+        cache.latestEventId == latestCursor?.eventId && cache.latestOccurredAt == latestCursor?.occurredAt
+    }
+
+    private static func cursor(for event: CareLedgerEvent) -> LedgerEventCursor {
+        LedgerEventCursor(eventId: event.id.uuidString, occurredAt: event.occurredAt)
+    }
+
+    private static func ledgerEnergyDelta(from events: [CareLedgerEvent]) -> (growthXP: Int, injectedXP: Int) {
+        events.reduce(into: (growthXP: 0, injectedXP: 0)) { partial, event in
+            partial.growthXP += CoconutEconomyPolicyV2.metadataValue(named: "growthXP", in: event.metadataJSON)
+            partial.injectedXP += CoconutEconomyPolicyV2.metadataValue(named: "injectedXP", in: event.metadataJSON)
         }
+    }
+
+    private func refreshInjectedEnergy(ledgerInjectedXP: Int) {
         let recoveredXP = max(OasisTreePreferenceStore.injectedEnergy, ledgerInjectedXP)
         if injectedEnergy != recoveredXP {
             injectedEnergy = recoveredXP
