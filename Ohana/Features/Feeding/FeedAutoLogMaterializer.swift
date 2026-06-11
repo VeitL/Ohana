@@ -25,7 +25,7 @@ enum FeedAutoLogMaterializer {
         guard !autoEvents.isEmpty else { return 0 }
 
         var existingKeys = Set(
-            pet.careLogs.compactMap { FeedLogMetadata.autoDedupKey(from: $0.note) }
+            pet.careLogs.compactMap { FeedLogMetadata.autoDedupKey(for: $0) }
         )
         var inserted = 0
 
@@ -39,8 +39,8 @@ enum FeedAutoLogMaterializer {
                     date: dueDate,
                     type: .feeding,
                     amountGrams: grams,
-                    note: FeedLogMetadata.autoNote(eventId: event.id, scheduledAt: dueDate),
                     foodKind: event.foodKind,
+                    autoFeedDedupKey: key,
                     pet: pet,
                     executorId: nil
                 )

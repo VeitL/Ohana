@@ -68,8 +68,11 @@ nonisolated extension DataBackupManager {
                       bloodType: dto.bloodType, avatarEmoji: dto.avatarEmoji,
                       role: dto.role, nationality: dto.nationality, city: dto.city)
         if let uuid = UUID(uuidString: dto.id) { h.id = uuid }
-        h.appleUserIdentifier = dto.appleUserIdentifier
-        h.notes = dto.notes
+        h.appleUserIdentifier = ""
+        h.genderIdentityRaw = HumanProfileOptions.storedGenderIdentity(
+            dto.genderIdentityRaw ?? HumanProfileOptions.genderMetadata(from: dto.notes)
+        )
+        h.notes = HumanProfileOptions.visibleNoteParts(from: dto.notes).joined(separator: "｜")
         h.createdAt = parseDate(dto.createdAt) ?? Date()
         h.coconutBalance = dto.coconutBalance
         h.shouldShowOnHome = dto.shouldShowOnHome

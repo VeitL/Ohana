@@ -20,8 +20,8 @@ Rule precedence:
 ## Current App Facts
 
 - Ohana is an iOS SwiftUI app using SwiftData and Swift Charts.
-- The current app group in code is `group.com.guanchen.li.Ohana`; do not reintroduce older `Ark` app-group identifiers.
-- The latest SwiftData schema is defined in `Ohana/Models/SharedModelContainer.swift`; as of this consolidation it is `ArkSchemaV60`. Always verify the current `ArkSchemaV*` in that file rather than trusting this number — bump this line whenever a schema version lands.
+- The app currently declares no App Group entitlement. If a future widget or extension needs one, use `group.com.guanchen.li.Ohana`; do not reintroduce older `Ark` app-group identifiers.
+- The latest SwiftData schema is defined in `Ohana/Models/SharedModelContainer.swift`; as of this consolidation it is `ArkSchemaV63`. Always verify the current `ArkSchemaV*` in that file rather than trusting this number — bump this line whenever a schema version lands.
 - Before changing any SwiftData model field or adding a model, inspect the latest `ArkSchemaV*`, add the next schema version, append it to `ArkMigrationPlan.schemas`, and keep added fields lightweight-migration friendly with defaults when possible.
 - Keep `ArkMigrationPlan.stages` empty for add-only/lightweight changes. Add an explicit migration stage only when there is real custom migration logic.
 - User-facing copy must support the registered app languages (currently Chinese, English, German, Spanish, Portuguese, French, Japanese, Korean, Italian — see `Ohana/Shared/LocalizationSettings.swift`) through the localization rules below. Chinese and English are mandatory at authoring time; the others resolve through the fallback chain.
@@ -42,8 +42,9 @@ This repository contains the Ohana iOS app. Main SwiftUI app code lives in `Ohan
 - `open Ohana.xcodeproj` opens the app in Xcode for local development.
 - `scripts/build-debug-fast.sh` is the default quick Debug build. It uses `-sdk iphonesimulator` and resolves the `iPhone 17` simulator BY NAME at run time (newest installed iOS runtime), so it survives new Macs, Xcode reinstalls, and device resets. It does not pin an `OS=` so Xcode uses the installed default runtime instead of downloading an older one.
 - `scripts/dev-check-changed.sh` runs the default cheap local validation for changed files. It formats touched Swift files, runs applicable changed-file audits, validates shell/JSON syntax, and reports when a full build or targeted test should be used as an escalation. It does not run `xcodebuild` unless called with `--build`.
+- `scripts/test-simulator.sh` is the default local simulator test entrypoint. It resolves the `iPhone 17` simulator by name, uses a stable per-worktree DerivedData path outside File Provider-managed workspace folders, disables simulator code signing by default, and strips signing-risk extended attributes before and after the test run.
 - `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build` builds the app directly when the script is not appropriate.
-- `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17'` runs unit and UI tests on the pinned-by-name simulator.
+- `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO` is the direct fallback when the script is not appropriate; use a stable `-derivedDataPath` and run `scripts/strip-build-xattrs.sh` on the DerivedData products if signing-risk xattrs appear.
 - `xcodebuild -list -project Ohana.xcodeproj` lists available targets, schemes, and configurations.
 
 ### Pinned Simulator Build Rule
@@ -92,7 +93,7 @@ Do not create a new worktree or branch by default. Stay in the current worktree 
 
 Each conversation owns only its current worktree. Before editing, run `git status --short` and keep changes inside the requested task scope. If a file is already being changed for an unrelated task, do not patch it to satisfy the current build unless the user explicitly asks you to take over that blocker.
 
-Use `scripts/build-debug-fast.sh` for local Debug builds. The script uses `-sdk iphonesimulator`, resolves the `iPhone 17` simulator by name, and uses a per-worktree/per-branch DerivedData path under `.build/DerivedData/` plus a matching lock under `.build/locks/`, which avoids the common Xcode `build.db` lock failure when two conversations build at once. If you must call `xcodebuild` directly, reuse a stable per-worktree/per-task `-derivedDataPath` instead of inventing a fresh path for each validation run; only choose a new unique path when there is an actual parallel-build lock conflict or an explicitly isolated validation need.
+Use `scripts/build-debug-fast.sh` for local Debug builds and `scripts/test-simulator.sh` for local simulator tests. The scripts use `-sdk iphonesimulator`, resolve the `iPhone 17` simulator by name, keep stable per-worktree/per-branch DerivedData and matching locks under `.build/locks/`, and strip signing-risk extended attributes from build products. If you must call `xcodebuild` directly, reuse a stable per-worktree/per-task `-derivedDataPath` instead of inventing a fresh path for each validation run; only choose a new unique path when there is an actual parallel-build lock conflict, cache corruption, signing-risk xattr contamination, or an explicitly isolated validation need.
 
 When validation fails in files outside the current task scope or outside the files changed by this conversation, report it as an external blocker. Do not “fix forward” into another conversation's feature area just to make the build green unless the user explicitly authorizes that cross-task repair.
 
@@ -124,7 +125,7 @@ Keep the development loop CLI-first. Start with the narrowest trustworthy check 
 - Use `xcodebuild -list -project Ohana.xcodeproj` when schemes or targets are unclear.
 - Use `scripts/build-debug-fast.sh` for day-to-day validation; do not hardcode older simulator OS versions such as `OS=26.4.1`. Let Xcode select the newest installed iOS runtime for the iPhone 17 simulator unless a task explicitly requires another destination.
 - Use `xcodebuild -project Ohana.xcodeproj -scheme Ohana -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' build` only when a direct app build is necessary.
-- Use `xcodebuild test -project Ohana.xcodeproj -scheme Ohana -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17'` for test validation when behavior or persistence changes.
+- Use `scripts/test-simulator.sh` for test validation when behavior or persistence changes. Pass through targeted filters such as `-only-testing:OhanaTests/FooTests`; when calling `xcodebuild test` directly, include `CODE_SIGNING_ALLOWED=NO`.
 - When calling `xcodebuild` repeatedly during one task, keep the same stable `-derivedDataPath` for the task so module, asset, and test-build caches stay warm. Do not create a new `.build/DerivedData/...` directory for every retry unless cache corruption or a real parallel-build conflict requires it.
 - For pure UI changes, do not build by default. If a UI change has already been escalated to compile validation or the user asks for visual verification, prefer the fixed iPhone 17 simulator build/run and screenshots; if deeper simulator control is available through XcodeBuildMCP or similar tooling, use it to launch, inspect logs, and capture screenshots.
 

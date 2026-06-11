@@ -197,6 +197,7 @@ enum FeedingPlanWriter {
             record.remainingCorrectionGrams = nil
             record.remainingCorrectionDate = nil
         }
+        record.calculationModeRaw = calculationMode.rawValue
         record.notes = FeedStockRecordMetadata.notesWithCalculationMode(
             "\(foodKind == .dry ? "干粮" : "湿粮")补粮 · \(Int(sanitizedTotal.rounded()))g",
             mode: calculationMode
@@ -258,7 +259,7 @@ enum FeedingPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [Reminder] {
-        for event in stockReminderEvents(pet: pet, allEvents: allEvents) {
+        for event in currentStockReminderEvents(pet: pet, allEvents: allEvents, context: context) {
             deleteEvent(event, context: context)
         }
 
@@ -300,6 +301,26 @@ enum FeedingPlanWriter {
 
     static func stockReminderEntityId(pet: Pet, foodKind: FeedFoodKind) -> String {
         "\(pet.id.uuidString):\(foodKind.rawValue)"
+    }
+
+    @MainActor
+    private static func currentStockReminderEvents(pet: Pet, allEvents: [Event], context: ModelContext) -> [Event] {
+        var eventsById: [UUID: Event] = [:]
+        for event in stockReminderEvents(pet: pet, allEvents: allEvents) {
+            eventsById[event.id] = event
+        }
+
+        let stockType = stockReminderEntityType
+        let descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.relatedEntityType == stockType
+            }
+        )
+        let fetched = (try? context.fetch(descriptor)) ?? []
+        for event in stockReminderEvents(pet: pet, allEvents: fetched) {
+            eventsById[event.id] = event
+        }
+        return eventsById.values.sorted { $0.startDate < $1.startDate }
     }
 
     static func foodReminderDate(

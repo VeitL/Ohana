@@ -112,7 +112,7 @@ query_outside_containers() {
     input="$(
       for file in "${files[@]}"; do
         [[ -f "$file" ]] || continue
-        rg -n '^\s*@Query' "$file" || true
+        rg -n --with-filename '^\s*@Query' "$file" || true
       done
     )"
   fi

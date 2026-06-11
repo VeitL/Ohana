@@ -20,6 +20,8 @@ final class PetFoodRecord {
     var remainingCorrectionGrams: Double?
     var remainingCorrectionDate: Date?
     var notes: String
+    var expenseId: UUID?
+    var calculationModeRaw: String = FeedStockCalculationMode.manualOrPlan.rawValue
     var executorId: String? // ArkSchemaV11: 执行该动作的 Human.id.uuidString
     var pet: Pet?
 
@@ -31,7 +33,9 @@ final class PetFoodRecord {
         purchaseDate: Date? = nil,
         startDate: Date = Date(),
         pet: Pet? = nil,
-        executorId: String? = nil
+        executorId: String? = nil,
+        expenseId: UUID? = nil,
+        calculationMode: FeedStockCalculationMode = .manualOrPlan
     ) {
         self.id = UUID()
         self.brand = brand
@@ -43,6 +47,8 @@ final class PetFoodRecord {
         self.remainingCorrectionGrams = nil
         self.remainingCorrectionDate = nil
         self.notes = ""
+        self.expenseId = expenseId
+        self.calculationModeRaw = calculationMode.rawValue
         self.executorId = executorId
         self.pet = pet
     }

@@ -759,109 +759,91 @@ enum ArkSchemaV48: VersionedSchema {
 // MARK: - Schema V49（Oasis 电子宠物长期养成扩展字段）
 enum ArkSchemaV49: VersionedSchema {
     static var versionIdentifier = Schema.Version(49, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV48.models
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV48.models }
 }
 
 // MARK: - Schema V50（遛狗便便位置标记）
 enum ArkSchemaV50: VersionedSchema {
     static var versionIdentifier = Schema.Version(50, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV49.models
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV49.models }
 }
 
 // MARK: - Schema V51（3D 破框卡片专用素材）
 enum ArkSchemaV51: VersionedSchema {
     static var versionIdentifier = Schema.Version(51, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV50.models
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV50.models }
 }
 
 // MARK: - Schema V52（同物种多宠共同照护记录）
 enum ArkSchemaV52: VersionedSchema {
     static var versionIdentifier = Schema.Version(52, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV51.models + [SharedCareSession.self]
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV51.models + [SharedCareSession.self] }
 }
 
 // MARK: - Schema V53（系列盲盒扭蛋收藏与抽取记录）
 enum ArkSchemaV53: VersionedSchema {
     static var versionIdentifier = Schema.Version(53, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV52.models + [GachaOwnedItem.self, GachaDrawLog.self]
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV52.models + [GachaOwnedItem.self, GachaDrawLog.self] }
 }
 
 // MARK: - Schema V54（扭蛋非收藏结果与即时奖励记录）
 enum ArkSchemaV54: VersionedSchema {
     static var versionIdentifier = Schema.Version(54, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV53.models
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV53.models }
 }
 
 // MARK: - Schema V55（Oasis 电子宠物低压力生命状态）
 enum ArkSchemaV55: VersionedSchema {
     static var versionIdentifier = Schema.Version(55, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV54.models
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV54.models }
 }
 
 // MARK: - Schema V56（人类体检指标追踪 HumanHealthMetricLog）
 enum ArkSchemaV56: VersionedSchema {
     static var versionIdentifier = Schema.Version(56, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV55.models + [HumanHealthMetricLog.self]
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV55.models + [HumanHealthMetricLog.self] }
 }
 
 // MARK: - Schema V57（同物种共享事实扩展）
 enum ArkSchemaV57: VersionedSchema {
     static var versionIdentifier = Schema.Version(57, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV56.models
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV56.models }
 }
 
 // MARK: - Schema V58（椰子钱包账户与不可变流水）
 enum ArkSchemaV58: VersionedSchema {
     static var versionIdentifier = Schema.Version(58, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV57.models + [CoconutAccount.self, CoconutLedgerEntry.self]
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV57.models + [CoconutAccount.self, CoconutLedgerEntry.self] }
 }
 
 // MARK: - Schema V59（椰子经济每日预算用量事件）
 enum ArkSchemaV59: VersionedSchema {
     static var versionIdentifier = Schema.Version(59, 0, 0)
-
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV58.models + [EconomyBudgetUsageEvent.self]
-    }
+    static var models: [any PersistentModel.Type] { ArkSchemaV58.models + [EconomyBudgetUsageEvent.self] }
 }
 
 // MARK: - Schema V60（宠物用药计划持久化余量）
 enum ArkSchemaV60: VersionedSchema {
     static var versionIdentifier = Schema.Version(60, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV59.models }
+}
 
-    static var models: [any PersistentModel.Type] {
-        ArkSchemaV59.models
-    }
+// MARK: - Schema V61（人类性别/身份迁出 notes 元数据）
+enum ArkSchemaV61: VersionedSchema {
+    static var versionIdentifier = Schema.Version(61, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV60.models }
+}
+
+// MARK: - Schema V62（宠物粮仓元数据结构化）
+enum ArkSchemaV62: VersionedSchema {
+    static var versionIdentifier = Schema.Version(62, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV61.models }
+}
+
+// MARK: - Schema V63（自动喂食去重键结构化）
+enum ArkSchemaV63: VersionedSchema {
+    static var versionIdentifier = Schema.Version(63, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV62.models }
 }
 
 // MARK: - Migration Plan
@@ -885,7 +867,7 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV45.self, ArkSchemaV46.self, ArkSchemaV47.self, ArkSchemaV48.self, ArkSchemaV49.self,
          ArkSchemaV50.self, ArkSchemaV51.self, ArkSchemaV52.self, ArkSchemaV53.self, ArkSchemaV54.self,
          ArkSchemaV55.self, ArkSchemaV56.self, ArkSchemaV57.self, ArkSchemaV58.self, ArkSchemaV59.self,
-         ArkSchemaV60.self]
+         ArkSchemaV60.self, ArkSchemaV61.self, ArkSchemaV62.self, ArkSchemaV63.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -898,9 +880,6 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
 /// 2. **模拟器**：换了一台 Simulator、Reset Content、或删掉 App，会换沙盒路径，数据自然空。
 /// 3. **重复 ModelContainer**：后台任务若再 `make()` 出新容器，可能与主进程争用同一 SQLite，行为异常；现改为**单例**。
 enum SharedModelContainer {
-    /// 与 `Ohana.entitlements` 中 App Group **完全一致**（旧代码误写为 `group.com.guanchen.li.Ark`）
-    static let appGroupID = "group.com.guanchen.li.Ohana"
-
     private static let lock = NSLock()
     private static var _shared: ModelContainer?
 
@@ -915,7 +894,7 @@ enum SharedModelContainer {
     }
 
     private static func createPersistentContainer() -> ModelContainer {
-        let schema = Schema(ArkSchemaV60.models)
+        let schema = Schema(ArkSchemaV63.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

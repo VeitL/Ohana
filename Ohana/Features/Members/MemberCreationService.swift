@@ -317,6 +317,7 @@ final class MemberCreationService: MemberCreating {
         )
         human.avatarImageData = draft.avatarImageData
         human.themeColorHex = draft.normalizedThemeHex
+        human.genderIdentityRaw = HumanProfileOptions.storedGenderIdentity(draft.humanGender)
         human.shouldShowOnHome = shouldShowNewMemberOnHome(
             existingPets: existingPets,
             existingHumans: existingHumans,
@@ -470,11 +471,6 @@ final class MemberCreationService: MemberCreating {
     }
 
     private func humanNotes(draft: MemberCreationDraft) -> String {
-        [
-            "性别:\(HumanProfileOptions.normalizedGender(draft.humanGender))",
-            draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        ]
-        .filter { !$0.isEmpty }
-        .joined(separator: "｜")
+        draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

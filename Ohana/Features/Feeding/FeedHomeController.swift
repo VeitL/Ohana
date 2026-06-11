@@ -285,12 +285,12 @@ enum FeedHomePerformance {
         let startedAt = CFAbsoluteTimeGetCurrent()
         let result = body()
         let elapsed = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000
-        logger.debug("\(name, privacy: .public) \(String(format: "%.1f", elapsed), privacy: .public)ms")
+        logger.debug("\(name, privacy: .private) \(String(format: "%.1f", elapsed), privacy: .public)ms")
         return result
     }
 
     static func mark(_ name: String) {
-        logger.debug("\(name, privacy: .public)")
+        logger.debug("\(name, privacy: .private)")
     }
 }
 

@@ -16,7 +16,10 @@ struct QAManageSheet: View {
     @Binding var savedItems: [QuickActionItem]
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @State private var showingAddSheet = false
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -38,7 +41,7 @@ struct QAManageSheet: View {
                                     .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             } else {
-                                Text("通用")
+                                Text(l.tr(zh: "通用", en: "General", de: "Allgemein"))
                                     .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
@@ -53,7 +56,7 @@ struct QAManageSheet: View {
                     savedItems.move(fromOffsets: indices, toOffset: newOffset)
                 }
             }
-            .navigationTitle("编辑快捷操作")
+            .navigationTitle(l.tr(zh: "编辑快捷操作", en: "Edit quick actions", de: "Schnellaktionen bearbeiten"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -64,7 +67,7 @@ struct QAManageSheet: View {
                         Button { showingAddSheet = true } label: {
                             Image(systemName: "plus") // a11y: allow decorative icon covered by surrounding text or control
                         }
-                        Button("完成") { dismiss() }
+                        Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) { dismiss() }
                             .fontWeight(.bold)
                     }
                 }
@@ -96,10 +99,13 @@ struct AddQuickActionSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @AppStorage("quickActionItems_v2") private var quickActionItemsJSON: String = ""
     @State private var step: Int = 1
     @State private var selectedPet: Pet? = nil
     @State private var showLimitAlert = false
+
+    private var l: L10n { L10n(appLanguage) }
 
     /// F3: 实时读取 AppStorage 中的 item 数量（而非快照）
     private var liveItems: [QuickActionItem] {
@@ -109,6 +115,22 @@ struct AddQuickActionSheet: View {
     private var selectedPetItemCount: Int {
         guard let pet = selectedPet else { return 0 }
         return QuickActionLimit.count(for: pet, in: liveItems)
+    }
+
+    private var quickActionLimitTitle: String {
+        l.tr(
+            zh: QuickActionLimit.title,
+            en: "Quick actions are full",
+            de: "Schnellaktionen sind voll"
+        )
+    }
+
+    private var quickActionLimitMessage: String {
+        l.tr(
+            zh: QuickActionLimit.message,
+            en: "You can add up to 8 quick actions here. More features are available in All Features.",
+            de: "Hier sind bis zu 8 Schnellaktionen möglich. Weitere Funktionen findest du unter Alle Funktionen."
+        )
     }
 
     private func availableActions(for pet: Pet) -> [QuickActionPickerCatalog.Option] {
@@ -140,10 +162,10 @@ struct AddQuickActionSheet: View {
                 step = 2
             }
         }
-        .alert(QuickActionLimit.title, isPresented: $showLimitAlert) {
-            Button("知道了", role: .cancel) {}
+        .alert(quickActionLimitTitle, isPresented: $showLimitAlert) {
+            Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {}
         } message: {
-            Text(QuickActionLimit.message)
+            Text(quickActionLimitMessage)
         }
     }
 
@@ -152,9 +174,9 @@ struct AddQuickActionSheet: View {
             // 标题
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("选择宠物")
+                    Text(l.tr(zh: "选择宠物", en: "Choose pet", de: "Tier auswählen"))
                         .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    Text("为哪只宠物添加快速入口")
+                    Text(l.tr(zh: "为哪只宠物添加快速入口", en: "Choose where to add the shortcut", de: "Wähle das Tier für den Schnellzugriff"))
                         .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
@@ -229,7 +251,7 @@ struct AddQuickActionSheet: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(pet.name)
                             .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        Text("选择快捷功能")
+                        Text(l.tr(zh: "选择快捷功能", en: "Choose quick action", de: "Schnellaktion auswählen"))
                             .font(OhanaFont.adaptive(size: 12, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -250,17 +272,17 @@ struct AddQuickActionSheet: View {
                         let available = availableActions(for: pet)
                         if selectedPetItemCount >= QuickActionLimit.maxItemsPerEntity {
                             VStack(spacing: 8) {
-                                Text("最多 8 个快捷操作")
+                                Text(l.tr(zh: "最多 8 个快捷操作", en: "Up to 8 quick actions", de: "Bis zu 8 Schnellaktionen"))
                                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
-                                Text("更多功能可以去「全部功能」里查看。")
+                                Text(l.tr(zh: "更多功能可以去「全部功能」里查看。", en: "More features are available in All Features.", de: "Weitere Funktionen findest du unter Alle Funktionen."))
                                     .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 40)
                         } else if available.isEmpty {
-                            Text("所有快捷入口已添加")
+                            Text(l.tr(zh: "所有快捷入口已添加", en: "All shortcuts added", de: "Alle Schnellzugriffe hinzugefügt"))
                                 .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .frame(maxWidth: .infinity)
@@ -330,10 +352,12 @@ struct QuickFeedSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage: String = AppLanguage.detectedCode
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var amountText: String = ""
     @State private var setAsDefault = false
 
+    private var l: L10n { L10n(appLanguage) }
     private var isWater: Bool { actionType == "water" }
     private var unit: String { isWater ? "ml" : "g" }
     private var defaultAmount: Double { isWater ? 200 : pet.dailyPortionGrams }
@@ -388,7 +412,7 @@ struct QuickFeedSheet: View {
                 Text(pet.name)
                     .font(OhanaFont.body(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(isWater ? "喂水打卡" : (isCasual ? "佛系喂食 🐾" : "精准喂食 📊"))
+                Text(quickFeedSubtitle)
                     .font(OhanaFont.caption(.medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
             }
@@ -406,7 +430,7 @@ struct QuickFeedSheet: View {
                         .font(OhanaFont.title3(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .multilineTextAlignment(.center)
-                    Text("打卡后获得 +1🥥 椰子奖励")
+                    Text(l.tr(zh: "打卡后获得 +1🥥 椰子奖励", en: "Check in to earn +1🥥", de: "Einchecken für +1🥥"))
                         .font(OhanaFont.footnote(.medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
@@ -417,7 +441,7 @@ struct QuickFeedSheet: View {
             Button { commitFeed(amount: 0) } label: {
                 HStack(spacing: 8) {
                     Text("✅")
-                    Text("确认喂食  +1🥥")
+                    Text(l.tr(zh: "确认喂食  +1🥥", en: "Confirm feed  +1🥥", de: "Fütterung bestätigen  +1🥥"))
                         .font(OhanaFont.headline(.black))
                         .foregroundStyle(Color.arkInk)
                 }
@@ -433,12 +457,12 @@ struct QuickFeedSheet: View {
         VStack(spacing: 16) {
             UltimateGlassCard {
                 VStack(spacing: 12) {
-                    Text("输入\(isWater ? "饮水量" : "喂食量")")
+                    Text(isWater ? l.tr(zh: "输入饮水量", en: "Enter water amount", de: "Wassermenge eingeben") : l.tr(zh: "输入喂食量", en: "Enter food amount", de: "Futtermenge eingeben"))
                         .font(OhanaFont.footnote(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                     InlineNumericInput(
                         text: $amountText,
-                        placeholder: "默认 \(Int(defaultAmount))",
+                        placeholder: l.tr(zh: "默认 \(Int(defaultAmount))", en: "Default \(Int(defaultAmount))", de: "Standard \(Int(defaultAmount))"),
                         unit: unit,
                         maxFractionDigits: 0,
                         accent: Color.goPrimary,
@@ -451,7 +475,7 @@ struct QuickFeedSheet: View {
                         verticalPadding: 10
                     )
                     Toggle(isOn: $setAsDefault) {
-                        Text("设为默认\(isWater ? "饮水量" : "每日份量")")
+                        Text(isWater ? l.tr(zh: "设为默认饮水量", en: "Set as default water", de: "Als Standardwasser setzen") : l.tr(zh: "设为默认每日份量", en: "Set as default daily portion", de: "Als Tagesportion setzen"))
                             .font(OhanaFont.footnote(.medium))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     }
@@ -465,7 +489,7 @@ struct QuickFeedSheet: View {
                 let amount = CountryDecimalInput.parse(amountText, countryCode: AppCountry.code) ?? defaultAmount
                 commitFeed(amount: amount)
             } label: {
-                Text("打卡 +1🥥")
+                Text(l.tr(zh: "打卡 +1🥥", en: "Check in +1🥥", de: "Einchecken +1🥥"))
                     .font(OhanaFont.headline(.black))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
@@ -476,14 +500,29 @@ struct QuickFeedSheet: View {
         }
     }
 
+    private var quickFeedSubtitle: String {
+        if isWater {
+            return l.tr(zh: "喂水打卡", en: "Water check-in", de: "Wasser eintragen")
+        }
+        if isCasual {
+            return l.tr(zh: "佛系喂食 🐾", en: "Casual feeding 🐾", de: "Lockere Fütterung 🐾")
+        }
+        return l.tr(zh: "精准喂食 📊", en: "Precise feeding 📊", de: "Präzise Fütterung 📊")
+    }
+
     private var casualCopyText: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5 ..< 10: return "早餐时间到了！\n主子今天胃口好吗？🌅"
-        case 10 ..< 14: return "午饭打卡！\n记得让 \(pet.name) 多喝水哦 💦"
-        case 14 ..< 18: return "下午喂食 ☀️\n\(pet.name) 今天乖吗？"
-        case 18 ..< 22: return "晚餐时间！\n今天辛苦啦，\(pet.name) 也一样 🌙"
-        default: return "\(pet.name) 的宵夜时间？\n记录一下也没关系 😄"
+        case 5 ..< 10:
+            return l.tr(zh: "早餐时间到了！\n主子今天胃口好吗？🌅", en: "Breakfast time!\nHow is the appetite today? 🌅", de: "Frühstückszeit!\nWie ist der Appetit heute? 🌅")
+        case 10 ..< 14:
+            return l.tr(zh: "午饭打卡！\n记得让 \(pet.name) 多喝水哦 💦", en: "Lunch check-in!\nKeep \(pet.name) hydrated too 💦", de: "Mittag eintragen!\nDenk auch an Wasser für \(pet.name) 💦")
+        case 14 ..< 18:
+            return l.tr(zh: "下午喂食 ☀️\n\(pet.name) 今天乖吗？", en: "Afternoon feeding ☀️\nHow is \(pet.name) doing today?", de: "Nachmittagsfütterung ☀️\nWie macht sich \(pet.name) heute?")
+        case 18 ..< 22:
+            return l.tr(zh: "晚餐时间！\n今天辛苦啦，\(pet.name) 也一样 🌙", en: "Dinner time!\nYou did well today, and so did \(pet.name) 🌙", de: "Abendessen!\nDu warst heute stark, \(pet.name) auch 🌙")
+        default:
+            return l.tr(zh: "\(pet.name) 的宵夜时间？\n记录一下也没关系 😄", en: "Late snack for \(pet.name)?\nLogging it is totally fine 😄", de: "Später Snack für \(pet.name)?\nEintragen ist völlig okay 😄")
         }
     }
 

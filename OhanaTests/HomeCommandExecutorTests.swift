@@ -1784,7 +1784,9 @@ struct HomeCommandExecutorTests {
         #expect(human.mbti == "INFJ")
         #expect(human.nationality == "CN")
         #expect(human.city == "Berlin")
-        #expect(human.notes == "性别:女｜关系:爸爸｜new note")
+        #expect(human.genderRaw == "女")
+        #expect(human.notes == "关系:爸爸｜new note")
+        #expect(!human.notes.contains("性别:"))
         #expect(human.shouldShowOnHome == false)
         #expect(human.privateFields.contains(HumanPrivateField.weight.rawValue))
         #expect(human.privateFields.contains(HumanPrivateField.note.rawValue))
@@ -6526,7 +6528,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV60.models)
+        let schema = Schema(ArkSchemaV63.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

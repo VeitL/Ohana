@@ -36,18 +36,25 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     /// encode run on a dedicated background SwiftData context (`DataBackupActor`)
     /// so the main thread is never blocked; only the final file write happens
     /// here.
-    func exportJSON(container: ModelContainer) async throws -> URL {
+    func exportJSON(container: ModelContainer, password: String? = nil) async throws -> URL {
         let flowStartedAt = await MainActor.run {
             AppFlowPerformance.start(AppPerformanceFlows.backupExport)
         }
         do {
             let data = try await DataBackupActor(modelContainer: container).exportData()
+            let trimmedPassword = password?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let shouldEncrypt = !trimmedPassword.isEmpty
+            let exportData: Data = if shouldEncrypt {
+                try DataBackupEncryption.encrypt(data, password: trimmedPassword)
+            } else {
+                data
+            }
             await MainActor.run {
                 AppFlowPerformance.mark(
                     AppPerformanceFlows.backupExport,
                     AppPerformancePhases.dataReady,
                     startedAt: flowStartedAt,
-                    note: ["bytes": "\(data.count)"]
+                    note: ["bytes": "\(exportData.count)", "encrypted": "\(shouldEncrypt)"]
                 )
             }
 
@@ -62,15 +69,16 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             f.dateFormat = "yyyyMMdd_HHmmss"
             let stamp = f.string(from: Date())
             let uniqueId = UUID().uuidString
+            let suffix = shouldEncrypt ? "encrypted.json" : "json"
             let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("\(Self.backupFilePrefix)\(stamp)_\(uniqueId).json")
-            try data.write(to: url, options: [.atomic, .completeFileProtection])
+                .appendingPathComponent("\(Self.backupFilePrefix)\(stamp)_\(uniqueId).\(suffix)")
+            try exportData.write(to: url, options: [.atomic, .completeFileProtection])
             await MainActor.run {
                 AppFlowPerformance.mark(
                     AppPerformanceFlows.backupExport,
                     AppPerformancePhases.writeSuccess,
                     startedAt: flowStartedAt,
-                    note: ["bytes": "\(data.count)"]
+                    note: ["bytes": "\(exportData.count)", "encrypted": "\(shouldEncrypt)"]
                 )
             }
             return url
@@ -117,8 +125,14 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
     /// Import stays on the main context so SwiftData @Query-backed UI refreshes
     /// immediately after a restore.
     @MainActor
-    func importJSON(from url: URL, context: ModelContext, projectionManager: QuestManager? = nil) async throws {
-        let data = try Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
+    func importJSON(
+        from url: URL,
+        context: ModelContext,
+        projectionManager: QuestManager? = nil,
+        password: String? = nil
+    ) async throws {
+        let fileData = try Data(contentsOf: url) // smoothness: allow legacy prepared-avatar decode path; media service migration tracked after P1 baseline
+        let data = try DataBackupEncryption.decryptIfNeeded(fileData, password: password)
         let decoder = JSONDecoder()
         let backup = try decoder.decode(OhanaBackup.self, from: data)
 

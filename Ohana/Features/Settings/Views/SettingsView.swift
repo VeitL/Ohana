@@ -28,6 +28,7 @@ struct SettingsView: View {
     @AppStorage("appThemePreference") var appThemePreference: String = "dark"
     @AppStorage("appBackgroundStyle") var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage(AppPerformanceMode.powerSavingKey) var powerSavingMode = false
+    @AppStorage(MedicationNotificationPrivacyStore.hidePetDetailsKey) var hidePetMedicationNotificationDetails = false
     @AppStorage("ohana_has_onboarded") var hasOnboarded = false
     @AppStorage("currentActiveHumanId") var currentActiveHumanId = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenHomePetIDsRaw = ""
@@ -38,6 +39,9 @@ struct SettingsView: View {
     @State var exportedJSONURL: URL? = nil
     @State var isExporting = false
     @State var isImporting = false
+    @State var backupEncryptionEnabled = false
+    @State var backupPassword = ""
+    @State var backupPasswordConfirmation = ""
     @State var showingImportPicker = false
     @State var importError: String? = nil
     @State var showingImportSuccess = false
@@ -272,6 +276,8 @@ struct SettingsView: View {
                                 icon: "pills.fill", iconColor: Color(hex: "FF5A00"),
                                 title: "用药提醒", key: "notif_medication_enabled"
                             )
+                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                            petMedicationNotificationPrivacyRow
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                             notificationToggleRow(
                                 icon: "fork.knife", iconColor: Color.goPrimary,

@@ -12,10 +12,52 @@ struct IslandFoodDashboard: View {
     var standalone: Bool = true
     var onOpenPet: ((Pet) -> Void)?
 
-    @Query(sort: \Pet.name) private var pets: [Pet]
-    @Query(sort: \Event.startDate) private var allEvents: [Event]
-    @Query(sort: \PetCareLog.date) private var allCareLogs: [PetCareLog]
-    @Query(sort: \PetFoodRecord.startDate) private var allFoodRecords: [PetFoodRecord]
+    @Query private var pets: [Pet]
+    @Query private var allEvents: [Event]
+    @Query private var allCareLogs: [PetCareLog]
+    @Query private var allFoodRecords: [PetFoodRecord]
+
+    init(
+        standalone: Bool = true,
+        onOpenPet: ((Pet) -> Void)? = nil
+    ) {
+        self.standalone = standalone
+        self.onOpenPet = onOpenPet
+
+        let feedingEventType = EventType.foodChange.rawValue
+        let stockReminderEntityType = FeedingPlanWriter.stockReminderEntityType
+        let autoFeederEntityType = FeedRuleMetadata.autoFeederEntityType
+        let feedingCareType = CareType.feeding.rawValue
+
+        _pets = Query(
+            filter: #Predicate<Pet> { pet in
+                pet.passedAwayDate == nil
+            },
+            sort: \.name
+        )
+        _allEvents = Query(
+            filter: #Predicate<Event> { event in
+                event.eventType == feedingEventType ||
+                    event.relatedEntityType == stockReminderEntityType ||
+                    event.relatedEntityType == autoFeederEntityType
+            },
+            sort: \.startDate
+        )
+        _allCareLogs = Query(
+            filter: #Predicate<PetCareLog> { log in
+                log.type == feedingCareType
+            },
+            sort: \.date,
+            order: .reverse
+        )
+        _allFoodRecords = Query(
+            filter: #Predicate<PetFoodRecord> { record in
+                record.pet?.passedAwayDate == nil
+            },
+            sort: \.startDate,
+            order: .reverse
+        )
+    }
 
     var body: some View {
         IslandFoodDashboardContentView(

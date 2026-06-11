@@ -153,16 +153,20 @@ enum FeedStockRecordMetadata {
 
     static func calculationMode(for record: PetFoodRecord?) -> FeedStockCalculationMode {
         guard let record else { return .manualOrPlan }
-        return calculationMode(from: record.notes) ?? .manualOrPlan
+        return FeedStockCalculationMode(rawValue: record.calculationModeRaw) ??
+            calculationMode(from: record.notes) ??
+            .manualOrPlan
     }
 
-    static func notesWithCalculationMode(_ notes: String, mode: FeedStockCalculationMode) -> String {
-        let visible = notes
+    static func applyCalculationMode(_ mode: FeedStockCalculationMode, to record: PetFoodRecord) {
+        record.calculationModeRaw = mode.rawValue
+        record.notes = notesWithCalculationMode(record.notes, mode: mode)
+    }
+
+    static func notesWithCalculationMode(_ notes: String, mode _: FeedStockCalculationMode) -> String {
+        notes
             .components(separatedBy: "\n")
             .filter { !$0.hasPrefix(calculationModePrefix) }
-            .joined(separator: "\n")
-        return [visible, "\(calculationModePrefix)\(mode.rawValue)"]
-            .filter { !$0.isEmpty }
             .joined(separator: "\n")
     }
 }
@@ -174,7 +178,7 @@ enum FeedLogMetadata {
     static func source(for log: PetCareLog) -> FeedLogSource? {
         guard log.careType == .feeding else { return nil }
         if log.note.hasPrefix(PetCareLog.plannedFeedNotePrefix) { return .manualReminder }
-        if log.note.hasPrefix(autoFeedNotePrefix) { return .autoMain }
+        if autoDedupKey(for: log) != nil { return .autoMain }
         if log.note.hasPrefix(treatFeedNoteMarker) { return .treat }
         return .manualMain
     }
@@ -192,13 +196,30 @@ enum FeedLogMetadata {
         "\(eventId.uuidString):\(Int(scheduledAt.timeIntervalSince1970 / 60))"
     }
 
+    static func applyAutoDedupKey(_ key: String, to log: PetCareLog) {
+        log.autoFeedDedupKey = key
+        log.note = visibleNoteWithoutAutoMetadata(log.note)
+    }
+
     static func autoNote(eventId: UUID, scheduledAt: Date) -> String {
         "\(autoFeedNotePrefix)\(autoDedupKey(eventId: eventId, scheduledAt: scheduledAt))"
+    }
+
+    static func autoDedupKey(for log: PetCareLog) -> String? {
+        if !log.autoFeedDedupKey.isEmpty {
+            return log.autoFeedDedupKey
+        }
+        return autoDedupKey(from: log.note)
     }
 
     static func autoDedupKey(from note: String) -> String? {
         guard note.hasPrefix(autoFeedNotePrefix) else { return nil }
         return String(note.dropFirst(autoFeedNotePrefix.count))
+    }
+
+    private static func visibleNoteWithoutAutoMetadata(_ note: String) -> String {
+        guard note.hasPrefix(autoFeedNotePrefix) else { return note }
+        return ""
     }
 }
 
@@ -335,6 +356,91 @@ enum FeedRuleMetadata {
         }
     }
 
+    static func localizedTitle(
+        for event: Event,
+        l: L10n = L10n(),
+        calendar: Calendar = .current
+    ) -> String {
+        if event.relatedEntityType == FeedingPlanWriter.stockReminderEntityType {
+            return localizedStockReminderTitle(for: event, l: l)
+        }
+
+        guard event.eventType == EventType.foodChange.rawValue else {
+            return event.title
+        }
+
+        if let kind = event.feedRuleKind {
+            return localizedTitle(
+                kind: kind,
+                date: event.startDate,
+                amountGrams: amountGrams(from: event),
+                foodKind: event.foodKind,
+                l: l,
+                calendar: calendar
+            )
+        }
+
+        if event.relatedEntityType == autoFeederEntityType {
+            return localizedTitle(
+                kind: .autoFeeder,
+                date: event.startDate,
+                amountGrams: amountGrams(from: event),
+                foodKind: event.foodKind,
+                l: l,
+                calendar: calendar
+            )
+        }
+
+        if event.relatedEntityType == EntityKind.pet.rawValue || event.relatedEntityType == "pet",
+           hasLegacyManualReminderTitle(event.title) {
+            return localizedTitle(
+                kind: .manualReminder,
+                date: event.startDate,
+                amountGrams: amountGrams(from: event),
+                foodKind: event.foodKind,
+                l: l,
+                calendar: calendar
+            )
+        }
+
+        return event.title
+    }
+
+    static func localizedTitle(
+        kind: FeedRuleKind,
+        date: Date,
+        amountGrams: Double,
+        foodKind: FeedFoodKind = .dry,
+        l: L10n = L10n(),
+        calendar: Calendar = .current
+    ) -> String {
+        let rounded = Int(amountGrams.rounded())
+        let kindLabel = foodKind.title(l)
+        let amountSuffix = rounded > 0 ? " \(rounded)g" : ""
+        switch kind {
+        case .manualReminder:
+            return "\(localizedMealName(for: date, l: l, calendar: calendar)) \(kindLabel)\(amountSuffix)"
+        case .autoFeeder:
+            return "\(l.tr(zh: "自动喂食器", en: "Auto feeder", de: "Futterautomat")) \(kindLabel)\(amountSuffix)"
+        }
+    }
+
+    static func localizedMealName(for date: Date, l: L10n = L10n(), calendar: Calendar = .current) -> String {
+        let hour = calendar.component(.hour, from: date)
+        switch hour {
+        case 5 ..< 10:
+            return l.tr(zh: "早餐", en: "Breakfast", de: "Frühstück")
+        case 10 ..< 14:
+            return l.tr(zh: "午餐", en: "Lunch", de: "Mittagessen")
+        case 14 ..< 17:
+            return l.tr(zh: "下午餐", en: "Afternoon meal", de: "Nachmittagsmahlzeit")
+        case 17 ..< 21:
+            return l.tr(zh: "晚餐", en: "Dinner", de: "Abendessen")
+        default:
+            return l.tr(zh: "夜宵", en: "Late snack", de: "Späte Mahlzeit")
+        }
+    }
+
     static func mealName(for date: Date, calendar: Calendar = .current) -> String {
         let hour = calendar.component(.hour, from: date)
         switch hour {
@@ -376,5 +482,28 @@ enum FeedRuleMetadata {
             guardCount += 1
         }
         return dates
+    }
+
+    private static func localizedStockReminderTitle(for event: Event, l: L10n) -> String {
+        let kindTitle = event.foodKind.title(l)
+        if let petName = stockReminderPetName(from: event.title, foodKind: event.foodKind) {
+            return l.tr(
+                zh: "\(petName) \(kindTitle)快要断粮了，记得补充粮仓",
+                en: "\(kindTitle) for \(petName) is running low. Refill the food stock.",
+                de: "\(kindTitle) für \(petName) wird knapp. Vorrat auffüllen."
+            )
+        }
+        return l.tr(
+            zh: "\(kindTitle)快要断粮了，记得补充粮仓",
+            en: "\(kindTitle) is running low. Refill the food stock.",
+            de: "\(kindTitle) wird knapp. Vorrat auffüllen."
+        )
+    }
+
+    private static func stockReminderPetName(from title: String, foodKind: FeedFoodKind) -> String? {
+        let legacyKind = foodKind == .dry ? "干粮" : "湿粮"
+        guard let range = title.range(of: " \(legacyKind)") else { return nil }
+        let name = String(title[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? nil : name
     }
 }

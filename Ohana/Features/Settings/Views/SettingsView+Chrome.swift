@@ -117,6 +117,29 @@ extension SettingsView {
         .frame(minHeight: 44)
     }
 
+    var petMedicationNotificationPrivacyRow: some View {
+        HStack(spacing: 12) {
+            settingsIcon("eye.slash.fill", color: Color.goYellow)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "隐藏用药通知细节", en: "Hide medication details", de: "Medikamentendetails ausblenden"))
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(primaryText)
+                Text(l.tr(
+                    zh: "锁屏只显示通用提醒",
+                    en: "Lock screen shows a generic reminder",
+                    de: "Sperrbildschirm zeigt nur eine allgemeine Erinnerung"
+                ))
+                .font(OhanaFont.footnote())
+                .foregroundStyle(tertiaryText)
+            }
+            Spacer()
+            Toggle("", isOn: $hidePetMedicationNotificationDetails)
+                .tint(accentColor)
+                .labelsHidden()
+        }
+        .frame(minHeight: 44)
+    }
+
     func resetApp() {
         do {
             try appServices.appReset.reset(context: modelContext)

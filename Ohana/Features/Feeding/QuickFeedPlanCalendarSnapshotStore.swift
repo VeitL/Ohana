@@ -41,7 +41,7 @@ struct QuickFeedPlanCalendarSnapshot {
         )
         let autoLogsByKey = Dictionary(
             grouping: careLogs.compactMap { log -> (String, PetCareLog)? in
-                guard let key = FeedLogMetadata.autoDedupKey(from: log.note) else { return nil }
+                guard let key = FeedLogMetadata.autoDedupKey(for: log) else { return nil }
                 return (key, log)
             },
             by: \.0

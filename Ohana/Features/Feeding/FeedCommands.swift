@@ -195,14 +195,16 @@ struct OverviewQuickCareCommandExecutor {
         }
 
         let grams = amount
+        let foodRecords = FeedCommandFetch.foodRecords(petID: pet.id, context: context, fallback: [])
+        let allEvents = FeedCommandFetch.latestEvents(context: context, fallback: [])
         _ = ManualFeedCommand.recordManual(
             pet: pet,
             targets: [pet],
             grams: grams,
             foodKind: pet.mainFoodKind,
             saveAsDefault: saveAsDefault,
-            foodRecords: [],
-            allEvents: [],
+            foodRecords: foodRecords,
+            allEvents: allEvents,
             context: context,
             executorId: executorId,
             careEvents: careEvents
@@ -440,7 +442,7 @@ enum SaveFoodStockCommand {
             expense.note = note
             expense.executorId = payerId
             expense.pet = pet
-            record.notes = FeedStockExpenseLink.notesWithExpenseLink(record.notes, expenseId: expense.id)
+            FeedStockExpenseLink.applyExpenseLink(to: record, expenseId: expense.id)
             context.safeSave()
             if createdExpense {
                 careLedger.record(
@@ -468,31 +470,39 @@ enum SaveFoodStockCommand {
                 )
             }
         } else if let previousExpenseId {
-            record.notes = FeedStockExpenseLink.notesWithExpenseLink(record.notes, expenseId: previousExpenseId)
+            FeedStockExpenseLink.applyExpenseLink(to: record, expenseId: previousExpenseId)
             context.safeSave()
         }
     }
 }
 
 enum FeedStockExpenseLink {
+    private static let expensePrefix = "stockExpense:"
+
     static func expenseId(from notes: String) -> UUID? {
-        let prefix = "stockExpense:"
-        return notes
+        notes
             .components(separatedBy: "\n")
             .compactMap { line -> UUID? in
-                guard line.hasPrefix(prefix) else { return nil }
-                return UUID(uuidString: String(line.dropFirst(prefix.count)))
+                guard line.hasPrefix(expensePrefix) else { return nil }
+                return UUID(uuidString: String(line.dropFirst(expensePrefix.count)))
             }
             .first
     }
 
-    static func notesWithExpenseLink(_ notes: String, expenseId: UUID) -> String {
-        let visible = notes
+    static func expenseId(for record: PetFoodRecord?) -> UUID? {
+        guard let record else { return nil }
+        return record.expenseId ?? expenseId(from: record.notes)
+    }
+
+    static func applyExpenseLink(to record: PetFoodRecord, expenseId: UUID) {
+        record.expenseId = expenseId
+        record.notes = notesWithExpenseLink(record.notes, expenseId: expenseId)
+    }
+
+    static func notesWithExpenseLink(_ notes: String, expenseId _: UUID) -> String {
+        notes
             .components(separatedBy: "\n")
-            .filter { !$0.hasPrefix("stockExpense:") }
-            .joined(separator: "\n")
-        return [visible, "stockExpense:\(expenseId.uuidString)"]
-            .filter { !$0.isEmpty }
+            .filter { !$0.hasPrefix(expensePrefix) }
             .joined(separator: "\n")
     }
 
@@ -799,15 +809,5 @@ enum SetFeedModeCommand {
         case .manualReminder, .autoFeeder:
             HomeFeedRecordMode.set(pet.id, mode: .planned)
         }
-    }
-}
-
-private enum FeedCommandFetch {
-    @MainActor
-    static func latestEvents(context: ModelContext, fallback: [Event]) -> [Event] {
-        let descriptor = FetchDescriptor<Event>(
-            sortBy: [SortDescriptor(\Event.startDate)]
-        )
-        return (try? context.fetch(descriptor)) ?? fallback
     }
 }

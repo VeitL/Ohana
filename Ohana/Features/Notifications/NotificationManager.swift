@@ -66,19 +66,20 @@ final class NotificationManager: NSObject, @unchecked Sendable {
 
     // MARK: - Register Actions
     private func registerActions() {
+        let l = L10n()
         let completeAction = UNNotificationAction(
             identifier: "COMPLETE",
-            title: "完成 ✅",
+            title: l.tr(zh: "完成 ✅", en: "Done ✅", de: "Erledigt ✅"),
             options: []
         )
         let skipAction = UNNotificationAction(
             identifier: "SKIP",
-            title: "跳过 ⏭️",
+            title: l.tr(zh: "跳过 ⏭️", en: "Skip ⏭️", de: "Überspringen ⏭️"),
             options: []
         )
         let snoozeAction = UNNotificationAction(
             identifier: "SNOOZE",
-            title: "明天再说 🕐",
+            title: l.tr(zh: "明天再说 🕐", en: "Tomorrow 🕐", de: "Morgen 🕐"),
             options: []
         )
 
@@ -239,9 +240,10 @@ final class NotificationManager: NSObject, @unchecked Sendable {
 
     // MARK: - Private helpers
     private func makeContent(event: Event, reminder: Reminder) -> UNMutableNotificationContent {
+        let l = L10n()
         let content = UNMutableNotificationContent()
-        content.title = "Ohana 提醒"
-        content.body = "\(event.emoji) \(event.title)"
+        content.title = l.tr(zh: "Ohana 提醒", en: "Ohana reminder", de: "Ohana Erinnerung")
+        content.body = "\(event.emoji) \(FeedRuleMetadata.localizedTitle(for: event, l: l))"
         content.sound = .default
         content.categoryIdentifier = categoryID
         content.userInfo = [

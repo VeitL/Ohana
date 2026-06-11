@@ -65,6 +65,14 @@ nonisolated enum MedicationDoseProgressStore {
     }
 }
 
+nonisolated enum MedicationNotificationPrivacyStore {
+    static let hidePetDetailsKey = "privacy_hide_pet_medication_notification_details"
+
+    static func hidesPetMedicationDetails(defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: hidePetDetailsKey)
+    }
+}
+
 // MARK: - 频次 → 每日次数
 
 extension PetMedicationFrequency {
@@ -163,7 +171,9 @@ final class MedicationReminderService {
 
                 let content = UNMutableNotificationContent()
                 content.title = l.tr(zh: "宠物用药提醒", en: "Pet medication reminder", de: "Medikamentenerinnerung")
-                content.body = "\(pet.name) · \(med.name) · \(med.dosage)"
+                content.body = MedicationNotificationPrivacyStore.hidesPetMedicationDetails()
+                    ? l.tr(zh: "请打开 Ohana 查看用药详情。", en: "Open Ohana to view medication details.", de: "Öffne Ohana, um Medikamentendetails anzusehen.")
+                    : "\(pet.name) · \(med.name) · \(med.dosage)"
                 content.sound = .default
                 content.userInfo = [
                     "medicationId": med.id.uuidString,
@@ -216,11 +226,13 @@ final class MedicationReminderService {
         let content = UNMutableNotificationContent()
         let l = L10n.current
         content.title = l.tr(zh: "用药即将结束", en: "Medication ending soon", de: "Medikation endet bald")
-        content.body = l.tr(
-            zh: "\(pet.name) · \(med.name) 疗程还剩 3 天，请确认是否续药",
-            en: "\(pet.name) · \(med.name) has 3 days left. Check whether to renew.",
-            de: "\(pet.name) · \(med.name) endet in 3 Tagen. Bitte Verlängerung prüfen."
-        )
+        content.body = MedicationNotificationPrivacyStore.hidesPetMedicationDetails()
+            ? l.tr(zh: "请打开 Ohana 查看用药详情。", en: "Open Ohana to view medication details.", de: "Öffne Ohana, um Medikamentendetails anzusehen.")
+            : l.tr(
+                zh: "\(pet.name) · \(med.name) 疗程还剩 3 天，请确认是否续药",
+                en: "\(pet.name) · \(med.name) has 3 days left. Check whether to renew.",
+                de: "\(pet.name) · \(med.name) endet in 3 Tagen. Bitte Verlängerung prüfen."
+            )
         content.sound = .default
         content.userInfo = [
             "medicationId": med.id.uuidString,

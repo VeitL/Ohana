@@ -135,9 +135,10 @@ enum FamilyTaskService {
         }
 
         let existing = activeTask(forReminderId: reminder.id.uuidString, context: context)
+        let taskTitle = reminderTaskTitle(for: reminder)
         let task = existing
             ?? FamilyCollaborationTask(
-                title: reminder.event?.title ?? "照护任务",
+                title: taskTitle,
                 note: note,
                 kind: .careReminder,
                 relatedPetId: reminder.event?.relatedEntityId,
@@ -157,7 +158,7 @@ enum FamilyTaskService {
         }
         let reward = cappedReward(rewardCoconuts)
         task.kind = reward > 0 ? .bounty : .careReminder
-        task.title = reminder.event?.title ?? task.title
+        task.title = taskTitle
         task.note = note
         task.status = .active
         task.relatedPetId = reminder.event?.relatedEntityId
@@ -175,6 +176,15 @@ enum FamilyTaskService {
         reminder.event?.assigneeId = human.id.uuidString
         context.safeSave()
         return task
+    }
+
+    @MainActor
+    private static func reminderTaskTitle(for reminder: Reminder) -> String {
+        let l = L10n()
+        guard let event = reminder.event else {
+            return l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe")
+        }
+        return FeedRuleMetadata.localizedTitle(for: event, l: l)
     }
 
     @MainActor

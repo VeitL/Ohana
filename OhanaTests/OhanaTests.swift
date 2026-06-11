@@ -813,6 +813,85 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func encryptedBackupRequiresPasswordAndRestoresData() async throws {
+        let source = try makeInMemoryContainer()
+        let sourceContext = source.mainContext
+        let human = Human(name: "Sensitive Ava")
+        human.notes = "private health note"
+        sourceContext.insert(human)
+        try sourceContext.save()
+
+        let url = try await TestDataBackupManagerProjection.manager.exportJSON(
+            container: source,
+            password: "correct horse battery"
+        )
+        let encryptedData = try Data(contentsOf: url)
+        let exported = try #require(String(data: encryptedData, encoding: .utf8))
+        #expect(DataBackupEncryption.isEncryptedBackup(encryptedData))
+        #expect(!exported.contains("Sensitive Ava"))
+        #expect(!exported.contains("private health note"))
+
+        let wrongTarget = try makeInMemoryContainer()
+        var wrongPasswordRejected = false
+        do {
+            try await TestDataBackupManagerProjection.manager.importJSON(
+                from: url,
+                context: wrongTarget.mainContext,
+                password: "wrong password"
+            )
+            Issue.record("Expected encrypted backup import to reject the wrong password")
+        } catch BackupError.invalidBackupPassword {
+            wrongPasswordRejected = true
+        } catch {
+            Issue.record("Expected invalidBackupPassword, got \(error)")
+        }
+        #expect(wrongPasswordRejected)
+
+        let target = try makeInMemoryContainer()
+        try await TestDataBackupManagerProjection.manager.importJSON(
+            from: url,
+            context: target.mainContext,
+            password: "correct horse battery"
+        )
+        let restored = try target.mainContext.fetch(FetchDescriptor<Human>()).first
+        #expect(restored?.name == "Sensitive Ava")
+        #expect(restored?.notes == "private health note")
+    }
+
+    @MainActor
+    @Test func backupOmitsDormantAppleIdentifierAndMovesHumanGenderOutOfNotes() async throws {
+        let source = try makeInMemoryContainer()
+        let sourceContext = source.mainContext
+        let human = Human(name: "Legacy Human")
+        human.appleUserIdentifier = "apple-user-secret"
+        human.notes = "性别:女｜visible note"
+        sourceContext.insert(human)
+        try sourceContext.save()
+
+        let data = try TestDataBackupManagerProjection.manager.encode(
+            TestDataBackupManagerProjection.manager.buildBackup(context: sourceContext)
+        )
+        let exported = try #require(String(data: data, encoding: .utf8))
+        let backup = try JSONDecoder().decode(OhanaBackup.self, from: data)
+
+        #expect(!exported.contains("apple-user-secret"))
+        #expect(!exported.contains("appleUserIdentifier"))
+        #expect(!exported.contains("性别:"))
+        #expect(backup.humans.first?.genderIdentityRaw == "女")
+        #expect(backup.humans.first?.notes == "visible note")
+
+        let target = try makeInMemoryContainer()
+        try await TestDataBackupManagerProjection.manager.importJSON(
+            from: writeTemporaryBackup(data),
+            context: target.mainContext
+        )
+        let restored = try target.mainContext.fetch(FetchDescriptor<Human>()).first
+        #expect(restored?.appleUserIdentifier == "")
+        #expect(restored?.genderRaw == "女")
+        #expect(restored?.notes == "visible note")
+    }
+
+    @MainActor
     @Test func backupRestoresPaidConsumableInventory() async throws {
         let suiteName = "OhanaTests.BackupInventory.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -3870,9 +3949,16 @@ struct OhanaTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV60.models)
+        let schema = Schema(ArkSchemaV63.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func writeTemporaryBackup(_ data: Data) throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaTests.Backup.\(UUID().uuidString).json")
+        try data.write(to: url, options: [.atomic, .completeFileProtection])
+        return url
     }
 
     private func clearCareCalendarDefaults(petKey: String, kinds: [String]) {

@@ -33,8 +33,18 @@ final class SystemAppIconManager: AppIconManaging {
 
 @MainActor
 protocol DataBackupManaging {
-    func exportJSON(container: ModelContainer) async throws -> URL
-    func importJSON(from url: URL, context: ModelContext) async throws
+    func exportJSON(container: ModelContainer, password: String?) async throws -> URL
+    func importJSON(from url: URL, context: ModelContext, password: String?) async throws
+}
+
+extension DataBackupManaging {
+    func exportJSON(container: ModelContainer) async throws -> URL {
+        try await exportJSON(container: container, password: nil)
+    }
+
+    func importJSON(from url: URL, context: ModelContext) async throws {
+        try await importJSON(from: url, context: context, password: nil)
+    }
 }
 
 @MainActor
@@ -50,12 +60,12 @@ final class SharedDataBackupManagerAdapter: DataBackupManaging {
         self.questManager = questManager
     }
 
-    func exportJSON(container: ModelContainer) async throws -> URL {
-        try await manager.exportJSON(container: container)
+    func exportJSON(container: ModelContainer, password: String?) async throws -> URL {
+        try await manager.exportJSON(container: container, password: password)
     }
 
-    func importJSON(from url: URL, context: ModelContext) async throws {
-        try await manager.importJSON(from: url, context: context, projectionManager: questManager)
+    func importJSON(from url: URL, context: ModelContext, password: String?) async throws {
+        try await manager.importJSON(from: url, context: context, projectionManager: questManager, password: password)
     }
 }
 

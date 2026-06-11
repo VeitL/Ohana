@@ -179,13 +179,13 @@ if [[ "$soft" == "1" ]]; then
 fi
 
 if [[ ${#ui_swift_files[@]} -gt 0 ]]; then
-  run "UI V4 audit for touched UI Swift" scripts/audit-ui-v4.sh "${audit_mode[@]}" "${ui_swift_files[@]}"
-  run "Accessibility audit for touched UI Swift" scripts/audit-accessibility.sh "${audit_mode[@]}" "${ui_swift_files[@]}"
+  run "UI V4 audit for touched UI Swift" scripts/audit-ui-v4.sh ${audit_mode[@]+"${audit_mode[@]}"} "${ui_swift_files[@]}"
+  run "Accessibility audit for touched UI Swift" scripts/audit-accessibility.sh ${audit_mode[@]+"${audit_mode[@]}"} "${ui_swift_files[@]}"
 fi
 
 if [[ ${#app_swift_files[@]} -gt 0 ]]; then
-  run "Smoothness audit for touched app Swift" scripts/audit-smoothness-risk.sh "${audit_mode[@]}" "${app_swift_files[@]}"
-  run "Runtime guardrails for touched app Swift" scripts/audit-runtime-guardrails.sh "${audit_mode[@]}" "${app_swift_files[@]}"
+  run "Smoothness audit for touched app Swift" scripts/audit-smoothness-risk.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
+  run "Runtime guardrails for touched app Swift" scripts/audit-runtime-guardrails.sh ${audit_mode[@]+"${audit_mode[@]}"} "${app_swift_files[@]}"
 fi
 
 if [[ ${#build_reasons[@]} -gt 0 ]]; then

@@ -3165,7 +3165,6 @@
 "⚠️ SwiftData: migrationPlan 打开失败 — \\(error)" = "⚠️ SwiftData: migrationPlan failed to open — \\\\(error)";
 "升级奖励：\\(treeLevel.displayName) Lv.\\(current)" = "Upgrade reward: \\\\(treeLevel.displayName) Lv.\\\\(current)";
 "向 \\(activeInsurances.first?.productName ?? " = "To \\\\(activeInsurances.first?.productName ??";
-"❌ [DataExportService] exportZip 失败: \\(error)" = "❌ [DataExportService] exportZip failed: \\\\(error)";
 "今日还需喂 \\(left) 次 · 每次 \\(med.dosage.isEmpty ? " = "Need to feed \\\\(left) times today · Each time \\\\(med.dosage.isEmpty?";
 "底部导航保持 4 到 5 个主入口，中间浮动按钮只承担新增记录或快速护理这类高频单一动作。" = "The bottom navigation maintains 4 to 5 main entrances, and the floating button in the middle is only responsible for high-frequency single actions such as adding new records or quick care.";
 "有效至 \\(exp.formatted(.dateTime.month().day()))" = "Valid to \\\\(exp.formatted(.dateTime.month().day()))";

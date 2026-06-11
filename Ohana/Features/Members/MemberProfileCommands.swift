@@ -326,12 +326,9 @@ enum MemberProfileCommandService {
             input.themeHex,
             fallback: OhanaThemeColorPolicy.humanFallbackHex
         )
+        human.genderIdentityRaw = HumanProfileOptions.storedGenderIdentity(input.gender)
 
         var noteParts: [String] = []
-        let normalizedGender = HumanProfileOptions.normalizedGender(input.gender)
-        if !normalizedGender.isEmpty {
-            noteParts.append("性别:\(normalizedGender)")
-        }
         noteParts.append(contentsOf: input.preservedNoteParts)
         let trimmedNotes = input.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedNotes.isEmpty {
@@ -351,7 +348,7 @@ enum MemberProfileCommandService {
         var changedFields: Set<String> = [
             "name", "avatarImageData", "avatarEmoji", "role", "birthday",
             "bloodType", "heightCm", "mbti", "nationality", "city",
-            "themeColorHex", "notes"
+            "themeColorHex", "genderIdentityRaw", "notes"
         ]
         if input.shouldShowOnHome != nil { changedFields.insert("shouldShowOnHome") }
         if input.privateFieldsRaw != nil { changedFields.insert("privateFields") }

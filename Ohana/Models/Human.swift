@@ -65,6 +65,11 @@ nonisolated enum HumanProfileOptions {
         }
     }
 
+    static func storedGenderIdentity(_ raw: String) -> String? {
+        let normalized = normalizedGender(raw)
+        return normalized.isEmpty ? nil : normalized
+    }
+
     static func visibleNoteParts(from notes: String) -> [String] {
         notes
             .split(separator: "｜", omittingEmptySubsequences: false)
@@ -159,6 +164,8 @@ final class Human {
     var avatarEmoji: String
     @Attribute(.externalStorage) var avatarImageData: Data?
     var role: String
+    // Legacy local field retained for lightweight store compatibility. No Sign in with Apple flow writes it,
+    // and new backups intentionally omit it.
     var appleUserIdentifier: String
     var notes: String
     var createdAt: Date
@@ -171,6 +178,8 @@ final class Human {
     var shouldShowOnHome: Bool
     // ArkSchemaV15：正式主题色字段（迁移自 notes 字段 hack）
     var themeColorHex: String
+    // ArkSchemaV61：正式性别/身份字段（兼容读取旧 notes 中的 "性别:" 元数据）
+    var genderIdentityRaw: String?
     // ArkSchemaV16：隐私控制字段 + 身体数据
     var privateFieldsRaw: String
     var heightCm: Double
@@ -195,6 +204,7 @@ final class Human {
         bloodType: String = "",
         avatarEmoji: String = "👤",
         role: String = "owner",
+        genderIdentityRaw: String = "",
         nationality: String = "",
         city: String = ""
     ) {
@@ -213,6 +223,7 @@ final class Human {
         self.coconutBalance = 0
         self.shouldShowOnHome = true
         self.themeColorHex = OhanaThemeColorPolicy.humanFallbackHex
+        self.genderIdentityRaw = HumanProfileOptions.storedGenderIdentity(genderIdentityRaw)
         self.privateFieldsRaw = ""
         self.heightCm = 0
         self.mbti = ""
@@ -353,7 +364,8 @@ final class Human {
     }
 
     var genderRaw: String {
-        HumanProfileOptions.genderMetadata(from: notes)
+        let stored = HumanProfileOptions.normalizedGender(genderIdentityRaw ?? "")
+        return stored.isEmpty ? HumanProfileOptions.genderMetadata(from: notes) : stored
     }
 
     // MARK: - 隐私控制（FIX 1）

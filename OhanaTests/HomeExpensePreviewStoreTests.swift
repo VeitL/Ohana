@@ -49,7 +49,7 @@ struct HomeExpensePreviewStoreTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV60.models)
+        let schema = Schema(ArkSchemaV63.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -290,7 +290,7 @@ struct SharedPetActionRecorderTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV60.models)
+        let schema = Schema(ArkSchemaV63.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

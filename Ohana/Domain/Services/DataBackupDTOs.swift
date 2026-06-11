@@ -134,7 +134,8 @@ nonisolated struct HumanBackup: Codable {
     var bloodType: String
     var avatarEmoji: String
     var role: String
-    var appleUserIdentifier: String
+    var appleUserIdentifier: String?
+    var genderIdentityRaw: String?
     var notes: String
     var createdAt: String
     var nationality: String

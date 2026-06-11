@@ -471,7 +471,7 @@ private enum AppPerformanceSignposts {
         let note = note ?? ""
         signposter.emitEvent(
             name,
-            "phase=\(phase, privacy: .public), elapsed_ms=\(elapsed, privacy: .public), note=\(note, privacy: .public)"
+            "phase=\(phase, privacy: .public), elapsed_ms=\(elapsed, privacy: .public), note=\(note, privacy: .private)"
         )
     }
 }

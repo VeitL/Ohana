@@ -8,7 +8,7 @@ extension QuickFeedDetailContent {
             draftStore.inputError = l.tr(zh: "请输入购买重量。", en: "Enter stock weight.", de: "Vorratsgewicht eingeben.")
             return
         }
-        let previousExpenseId = draftStore.editingFoodRecord.flatMap { FeedStockExpenseLink.expenseId(from: $0.notes) }
+        let previousExpenseId = draftStore.editingFoodRecord.flatMap { FeedStockExpenseLink.expenseId(for: $0) }
         let expenseAmountText = draftStore.stockExpenseAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
         let expenseAmount = expenseAmountText.isEmpty ? nil : parsePositiveDouble(expenseAmountText)
         if !expenseAmountText.isEmpty, (expenseAmount ?? 0) <= 0 {
@@ -46,7 +46,7 @@ extension QuickFeedDetailContent {
         draftStore.stockExpenseAmountText = ""
         draftStore.stockExpenseAmountKeypadVisible = false
         guard let record,
-              let expenseId = FeedStockExpenseLink.expenseId(from: record.notes),
+              let expenseId = FeedStockExpenseLink.expenseId(for: record),
               let expense = commandExecutor.stockExpense(id: expenseId)
         else { return }
         draftStore.stockExpensePayerId = expense.executorId
