@@ -91,8 +91,12 @@ private extension HomeSheetRoute {
             "humanBasicInfo"
         case .petFood:
             "petFood"
+        case .petWeightQuick:
+            "petWeightQuick"
         case .petWeight:
             "petWeight"
+        case .petExpenseQuick:
+            "petExpenseQuick"
         case .petExpense:
             "petExpense"
         case .petFeed:
@@ -123,10 +127,16 @@ private extension HomeSheetRoute {
             "petRetention"
         case .petBondVault:
             "petBondVault"
+        case .humanMedicationQuick:
+            "humanMedicationQuick"
         case .humanMedication:
             "humanMedication"
+        case .humanWeightQuick:
+            "humanWeightQuick"
         case .humanWeight:
             "humanWeight"
+        case .humanWorkoutQuick:
+            "humanWorkoutQuick"
         case .humanWorkout:
             "humanWorkout"
         case .humanWorkoutDashboard:
@@ -135,10 +145,14 @@ private extension HomeSheetRoute {
             "humanMetrics"
         case .humanReport:
             "humanReport"
+        case .humanExpenseQuick:
+            "humanExpenseQuick"
         case .humanExpense:
             "humanExpense"
         case .humanWishlist:
             "humanWishlist"
+        case .humanNoteQuick:
+            "humanNoteQuick"
         case .humanNote:
             "humanNote"
         }

@@ -94,9 +94,9 @@ extension VerticalSolidHomeView {
             case .waterManagement:
                 routeCoordinator.openSheet(.petWater(pet.id))
             case .weight:
-                routeCoordinator.openSheet(.petWeight(pet.id))
+                routeCoordinator.openSheet(.petWeightQuick(pet.id))
             case .expense:
-                routeCoordinator.openSheet(.petExpense(pet.id))
+                routeCoordinator.openSheet(.petExpenseQuick(pet.id))
             case .moment:
                 routeCoordinator.openQuickMoment(pet)
             case .health:
@@ -186,15 +186,25 @@ extension VerticalSolidHomeView {
             : ExpandedQuickActionLogic.humanLongPressRoute(actionType: item.actionType, isLocked: isLocked)
 
         switch route {
-        case .weightQuick, .weightDetail:
+        case .weightQuick:
+            routeCoordinator.openSheet(.humanWeightQuick(human.id))
+        case .weightDetail:
             routeCoordinator.openSheet(.humanWeight(human.id))
-        case .workoutQuick, .workoutDetail:
+        case .workoutQuick:
+            routeCoordinator.openSheet(.humanWorkoutQuick(human.id))
+        case .workoutDetail:
             routeCoordinator.openSheet(.humanWorkout(human.id))
-        case .medicationAdd, .medicationDetail:
+        case .medicationAdd:
+            routeCoordinator.openSheet(.humanMedicationQuick(human.id))
+        case .medicationDetail:
             routeCoordinator.openSheet(.humanMedication(human.id))
-        case .noteQuick, .noteDetail:
+        case .noteQuick:
+            routeCoordinator.openSheet(.humanNoteQuick(human.id))
+        case .noteDetail:
             routeCoordinator.openSheet(.humanNote(human.id))
-        case .expenseQuick, .expenseDetail:
+        case .expenseQuick:
+            routeCoordinator.openSheet(.humanExpenseQuick(human.id))
+        case .expenseDetail:
             routeCoordinator.openSheet(.humanExpense(human.id))
         case .allFeatures, .selectHuman:
             routeCoordinator.openSheet(.humanAllFeatures(human.id))

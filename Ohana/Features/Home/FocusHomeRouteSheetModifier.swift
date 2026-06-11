@@ -535,10 +535,31 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             } else {
                 missingRouteDismissView()
             }
+        case let .petWeightQuick(id):
+            if let pet = pet(id) {
+                GenericWeightEntrySheet(
+                    target: .pet(pet),
+                    onDismiss: { routes.dismissSheet() }
+                )
+            } else {
+                missingRouteDismissView()
+            }
         case let .petWeight(id):
             if let pet = pet(id) {
                 NavigationStack { WeightHistoryView(pet: pet) }
                     .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .petExpenseQuick(id):
+            if let pet = pet(id) {
+                AddExpenseSheet(
+                    pet: pet,
+                    humans: humans,
+                    allPets: pets,
+                    preselectedPayerId: activeHumanIdStr.isEmpty ? nil : activeHumanIdStr,
+                    onDismiss: { routes.dismissSheet() }
+                )
             } else {
                 missingRouteDismissView()
             }
@@ -661,6 +682,16 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             } else {
                 missingRouteDismissView()
             }
+        case let .humanMedicationQuick(id):
+            if let human = human(id) {
+                QuickHumanMedicationSheet(
+                    human: human,
+                    onManage: { routes.openSheet(.humanMedication(human.id)) },
+                    onDismiss: { routes.dismissSheet() }
+                )
+            } else {
+                missingRouteDismissView()
+            }
         case let .humanMedication(id):
             if let human = human(id) {
                 NavigationStack {
@@ -676,10 +707,28 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             } else {
                 missingRouteDismissView()
             }
+        case let .humanWeightQuick(id):
+            if let human = human(id) {
+                GenericWeightEntrySheet(
+                    target: .human(human),
+                    onDismiss: { routes.dismissSheet() }
+                )
+            } else {
+                missingRouteDismissView()
+            }
         case let .humanWeight(id):
             if let human = human(id) {
                 NavigationStack { HumanWeightHistoryView(human: human) }
                     .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanWorkoutQuick(id):
+            if let human = human(id) {
+                QuickHumanWorkoutSheet(
+                    human: human,
+                    onDismiss: { routes.dismissSheet() }
+                )
             } else {
                 missingRouteDismissView()
             }
@@ -707,7 +756,16 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .humanReport(id):
             if let human = human(id) {
                 HumanHealthReportView(human: human)
-                    .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanExpenseQuick(id):
+            if let human = human(id) {
+                QuickHumanExpenseSheet(
+                    human: human,
+                    onDismiss: { routes.dismissSheet() }
+                )
             } else {
                 missingRouteDismissView()
             }
@@ -722,6 +780,15 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             if let human = human(id) {
                 HumanWishlistView(human: human)
                     .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+            } else {
+                missingRouteDismissView()
+            }
+        case let .humanNoteQuick(id):
+            if let human = human(id) {
+                QuickHumanNoteSheet(
+                    human: human,
+                    onDismiss: { routes.dismissSheet() }
+                )
             } else {
                 missingRouteDismissView()
             }

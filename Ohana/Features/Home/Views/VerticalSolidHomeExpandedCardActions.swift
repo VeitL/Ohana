@@ -45,7 +45,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             isEditMode: isEditMode,
             jiggle: jiggle,
             shouldReduceWork: reduceMotion || workloadPolicy.interactionMotionBudget(isVisible: true) != .full,
-            forcesSubmenusBelow: true,
+            forcesSubmenusBelow: false,
             draggingItemId: $draggingItemId,
             onToggleEdit: toggleEditMode,
             onMove: moveAction,
@@ -538,10 +538,12 @@ struct VerticalSolidHomeExpandedCardActions: View {
     }
 
     private func detailIcon(for actionType: String, isHuman: Bool) -> String {
-        if actionType.contains("medication") { return "list.bullet.rectangle.fill" }
-        if actionType.contains("note") || actionType == "moment" { return "sparkles" }
-        if actionType.contains("expense") { return "creditcard.fill" }
-        if actionType.contains("weight") { return "chart.line.uptrend.xyaxis" }
+        let normalized = actionType.lowercased()
+        if normalized.contains("medication") { return "list.bullet.rectangle.fill" }
+        if normalized.contains("note") || normalized == "moment" { return "sparkles" }
+        if normalized.contains("expense") { return "creditcard.fill" }
+        if ["water", "waterchange", "filterclean"].contains(normalized) { return "drop.circle.fill" }
+        if normalized.contains("weight") { return "chart.line.uptrend.xyaxis" }
         if isHuman { return "rectangle.stack.fill" }
         return "chart.line.uptrend.xyaxis"
     }

@@ -14,7 +14,9 @@ enum HomeSheetRoute: Identifiable {
     case petBasicInfo(UUID)
     case humanBasicInfo(UUID)
     case petFood(UUID)
+    case petWeightQuick(UUID)
     case petWeight(UUID)
+    case petExpenseQuick(UUID)
     case petExpense(UUID)
     case petFeed(UUID, opensManualSheet: Bool)
     case petWater(UUID)
@@ -31,13 +33,18 @@ enum HomeSheetRoute: Identifiable {
     case petRetention(UUID)
     case petBondVault(UUID)
     case humanMedication(UUID)
+    case humanMedicationQuick(UUID)
+    case humanWeightQuick(UUID)
     case humanWeight(UUID)
+    case humanWorkoutQuick(UUID)
     case humanWorkout(UUID)
     case humanWorkoutDashboard(UUID)
     case humanMetrics(UUID)
     case humanReport(UUID)
+    case humanExpenseQuick(UUID)
     case humanExpense(UUID)
     case humanWishlist(UUID)
+    case humanNoteQuick(UUID)
     case humanNote(UUID)
 
     var id: String {
@@ -47,7 +54,9 @@ enum HomeSheetRoute: Identifiable {
         case let .petBasicInfo(id): "pet-basic-\(id.uuidString)"
         case let .humanBasicInfo(id): "human-basic-\(id.uuidString)"
         case let .petFood(id): "pet-food-\(id.uuidString)"
+        case let .petWeightQuick(id): "pet-weight-quick-\(id.uuidString)"
         case let .petWeight(id): "pet-weight-\(id.uuidString)"
+        case let .petExpenseQuick(id): "pet-expense-quick-\(id.uuidString)"
         case let .petExpense(id): "pet-expense-\(id.uuidString)"
         case let .petFeed(id, opensManualSheet): "pet-feed-\(id.uuidString)-manual-\(opensManualSheet)"
         case let .petWater(id): "pet-water-\(id.uuidString)"
@@ -64,13 +73,18 @@ enum HomeSheetRoute: Identifiable {
         case let .petRetention(id): "pet-retention-\(id.uuidString)"
         case let .petBondVault(id): "pet-bond-vault-\(id.uuidString)"
         case let .humanMedication(id): "human-medication-\(id.uuidString)"
+        case let .humanMedicationQuick(id): "human-medication-quick-\(id.uuidString)"
+        case let .humanWeightQuick(id): "human-weight-quick-\(id.uuidString)"
         case let .humanWeight(id): "human-weight-\(id.uuidString)"
+        case let .humanWorkoutQuick(id): "human-workout-quick-\(id.uuidString)"
         case let .humanWorkout(id): "human-workout-\(id.uuidString)"
         case let .humanWorkoutDashboard(id): "human-workout-dashboard-\(id.uuidString)"
         case let .humanMetrics(id): "human-metrics-\(id.uuidString)"
         case let .humanReport(id): "human-report-\(id.uuidString)"
+        case let .humanExpenseQuick(id): "human-expense-quick-\(id.uuidString)"
         case let .humanExpense(id): "human-expense-\(id.uuidString)"
         case let .humanWishlist(id): "human-wishlist-\(id.uuidString)"
+        case let .humanNoteQuick(id): "human-note-quick-\(id.uuidString)"
         case let .humanNote(id): "human-note-\(id.uuidString)"
         }
     }
@@ -445,7 +459,9 @@ private extension HomeSheetRoute {
             .humanProfile(id: id)
         case .petAllFeatures,
              .petFood,
+             .petWeightQuick,
              .petWeight,
+             .petExpenseQuick,
              .petExpense,
              .petFeed,
              .petWater,
@@ -462,14 +478,19 @@ private extension HomeSheetRoute {
              .petRetention,
              .petBondVault,
              .humanAllFeatures,
+             .humanMedicationQuick,
              .humanMedication,
+             .humanWeightQuick,
              .humanWeight,
+             .humanWorkoutQuick,
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
              .humanReport,
+             .humanExpenseQuick,
              .humanExpense,
              .humanWishlist,
+             .humanNoteQuick,
              .humanNote:
             nil
         }
@@ -479,20 +500,27 @@ private extension HomeSheetRoute {
         switch self {
         case .humanAllFeatures,
              .humanBasicInfo,
+             .humanMedicationQuick,
              .humanMedication,
+             .humanWeightQuick,
              .humanWeight,
+             .humanWorkoutQuick,
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
              .humanReport,
+             .humanExpenseQuick,
              .humanExpense,
              .humanWishlist,
+             .humanNoteQuick,
              .humanNote:
             true
         case .petAllFeatures,
              .petBasicInfo,
              .petFood,
+             .petWeightQuick,
              .petWeight,
+             .petExpenseQuick,
              .petExpense,
              .petFeed,
              .petWater,
@@ -571,6 +599,13 @@ private extension HomeSheetRoute {
         case let .humanNote(id):
             .humanNote(id)
         case .petBasicInfo,
+             .petWeightQuick,
+             .petExpenseQuick,
+             .humanMedicationQuick,
+             .humanWeightQuick,
+             .humanWorkoutQuick,
+             .humanExpenseQuick,
+             .humanNoteQuick,
              .humanBasicInfo:
             nil
         }

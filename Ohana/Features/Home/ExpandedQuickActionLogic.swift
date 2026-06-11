@@ -418,14 +418,16 @@ enum ExpandedQuickActionLogic {
             if WaterQuickActionPolicy.isAquatic(species: pet.species) {
                 return .detailOnly
             }
-            return waterQuickCheckInAvailable(for: pet, allEvents: allEvents) ? .quickWithDetail : .none
+            return waterQuickCheckInAvailable(for: pet, allEvents: allEvents, now: now) ? .quickWithDetail : .none
         case "walk", "play", "litter", "cageCleaning", "freeFlight", "misting", "substrateChange":
             return .quickWithDetail
         case "medication":
             return medicationQuickCheckInAvailable(for: pet, allEvents: allEvents, now: now) ? .quickWithDetail : .none
         case "groom", "potty", "health":
             return .detailOnly
-        case "waterChange", "filterClean", "weight", "expense", "moment":
+        case "weight", "expense", "moment":
+            return .quickWithDetail
+        case "waterChange", "filterClean":
             return .detailOnly
         default:
             return .none
@@ -434,7 +436,9 @@ enum ExpandedQuickActionLogic {
 
     static func humanMenuPolicy(actionType: String) -> ExpandedQuickMenuPolicy {
         switch actionType {
-        case "humanWeight", "humanWorkout", "humanMedication", "humanNote", "humanExpense", "humanAllFeatures":
+        case "humanWeight", "humanWorkout", "humanMedication", "humanNote", "humanExpense":
+            .quickWithDetail
+        case "humanAllFeatures":
             .detailOnly
         default:
             .none
@@ -463,9 +467,9 @@ enum ExpandedQuickActionLogic {
         }
     }
 
-    static func waterQuickCheckInAvailable(for pet: Pet, allEvents: [Event]) -> Bool {
+    static func waterQuickCheckInAvailable(for pet: Pet, allEvents: [Event], now: Date) -> Bool {
         guard !WaterQuickActionPolicy.isAquatic(species: pet.species) else { return false }
-        let state = waterRuleState(for: pet, allEvents: allEvents)
+        let state = waterRuleState(for: pet, allEvents: allEvents, now: now)
         switch state.operatingMode {
         case .manual:
             return true

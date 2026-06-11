@@ -253,7 +253,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         openActionId = openActionId == item.id ? nil : item.id
                     }
                 } else {
-                    item.action()
+                    performDirectAction(for: item)
                 }
             } label: {
                 let state = visualState(for: item)
@@ -307,11 +307,11 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .transition(
                         .asymmetric(
                             insertion: .opacity
-                                .combined(with: .scale(scale: 0.82, anchor: .top))
-                                .combined(with: .offset(y: -10)),
+                                .combined(with: .scale(scale: 0.82, anchor: menuTransitionAnchor(index: index)))
+                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 10))),
                             removal: .opacity
-                                .combined(with: .scale(scale: 0.92, anchor: .top))
-                                .combined(with: .offset(y: -4))
+                                .combined(with: .scale(scale: 0.92, anchor: menuTransitionAnchor(index: index)))
+                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 4)))
                         )
                     )
                     .zIndex(80)
@@ -388,12 +388,41 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .background(Color.arkInk.opacity(0.34), in: Capsule()) // ui-v4: allow embedded quick action submenu contrast on dark card gradient
         .shadow(color: Color.arkInk.opacity(0.24), radius: 14, x: 0, y: 8) // ui-v4: allow embedded quick action submenu lift
         .fixedSize()
-        .offset(x: menuOffsetX(index: index, optionCount: item.menuOptions.count), y: menuOffsetY(index: index))
+        .offset(
+            x: menuOffsetX(index: index, buttonCount: menuButtonCount(for: item)),
+            y: menuOffsetY(index: index)
+        )
     }
 
     private func shouldOpenMenu(for item: VerticalHomeEmbeddedAction) -> Bool {
-        guard item.showsMenu else { return false }
-        return item.showsQuickButton || item.detailAction != nil || !item.menuOptions.isEmpty
+        menuButtonCount(for: item) > 1
+    }
+
+    private func menuButtonCount(for item: VerticalHomeEmbeddedAction) -> Int {
+        guard item.showsMenu else { return 0 }
+        let optionCount = item.menuOptions.count
+        let quickCount = optionCount == 0 && item.showsQuickButton && !item.isPrimaryDisabled ? 1 : 0
+        let detailCount = item.detailAction == nil ? 0 : 1
+        return optionCount + quickCount + detailCount
+    }
+
+    private func performDirectAction(for item: VerticalHomeEmbeddedAction) {
+        if item.menuOptions.count == 1, let option = item.menuOptions.first {
+            item.optionAction(option.id)
+            return
+        }
+
+        if item.menuOptions.isEmpty, item.showsQuickButton, !item.isPrimaryDisabled {
+            item.action()
+            return
+        }
+
+        if let detailAction = item.detailAction {
+            detailAction()
+            return
+        }
+
+        item.action()
     }
 
     private func inlineMenuButton(
@@ -433,6 +462,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
     private func detailActionType(for item: VerticalHomeEmbeddedAction) -> String {
         let action = item.actionType.lowercased()
+        if ["water", "waterchange", "filterclean"].contains(action) { return "water" }
         if item.detailIcon.contains("credit") { return "expense" }
         if item.detailIcon.contains("chart") { return action.contains("weight") ? "weight" : "document" }
         if item.detailIcon.contains("sparkles") { return "moment" }
@@ -630,21 +660,41 @@ struct VerticalHomeEmbeddedQuickActions: View {
     }
 
     private func menuOffsetY(index: Int) -> CGFloat {
-        if forcesSubmenusBelow {
-            return 66
-        }
-        return index >= 4 ? -52 : 52
+        opensMenuAbove(index: index) ? -66 : 66
     }
 
-    private func menuOffsetX(index: Int, optionCount: Int) -> CGFloat {
-        let isWide = optionCount > 2
+    private func menuOffsetX(index: Int, buttonCount: Int) -> CGFloat {
+        let edgePush: CGFloat = if buttonCount >= 6 {
+            124
+        } else if buttonCount >= 5 {
+            106
+        } else if buttonCount >= 4 {
+            82
+        } else if buttonCount == 3 {
+            50
+        } else {
+            20
+        }
+        let innerPush = edgePush * 0.34
         switch index % 4 {
-        case 0: return isWide ? 82 : 18
-        case 1: return isWide ? 26 : 0
-        case 2: return isWide ? -26 : 0
-        case 3: return isWide ? -82 : -18
+        case 0: return edgePush
+        case 1: return innerPush
+        case 2: return -innerPush
+        case 3: return -edgePush
         default: return 0
         }
+    }
+
+    private func opensMenuAbove(index: Int) -> Bool {
+        !forcesSubmenusBelow && index >= 4
+    }
+
+    private func menuTransitionAnchor(index: Int) -> UnitPoint {
+        opensMenuAbove(index: index) ? .bottom : .top
+    }
+
+    private func menuTransitionOffsetY(index: Int, magnitude: CGFloat) -> CGFloat {
+        opensMenuAbove(index: index) ? magnitude : -magnitude
     }
 
     private static func revisionKey(for items: [VerticalHomeEmbeddedAction]) -> String {
