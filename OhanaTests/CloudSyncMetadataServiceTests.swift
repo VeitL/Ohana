@@ -335,6 +335,69 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordSerializerBuildsPetScopedCareLogPayloads() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let pet = Pet(name: "Momo")
+        pet.id = uuid("33333333-3333-4333-8333-333333333333")
+        let executorId = normalized(uuid("44444444-4444-4444-8444-444444444444"))
+
+        let pottyLog = PetPottyLog(
+            date: Date(timeIntervalSinceReferenceDate: 80),
+            type: .pee,
+            pet: pet,
+            executorId: executorId,
+            latitude: 1.25,
+            longitude: 2.5,
+            locationAccuracyMeters: 3,
+            walkLogId: "walk-1",
+            sharedSessionId: "session-1"
+        )
+        pottyLog.id = uuid("55555555-5555-4555-8555-555555555555")
+        let pottyState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: PetPottyLog.self),
+            localRecordId: pottyLog.id,
+            householdId: householdId,
+            context: context
+        )
+        let pottyPayload = try CloudSyncRecordSerializer.payload(for: pottyLog, state: pottyState)
+
+        #expect(pottyPayload.entityName == "PetPottyLog")
+        #expect(pottyPayload.fields["petId"]?.stringValue == normalized(pet.id))
+        #expect(pottyPayload.fields["executorId"]?.stringValue == executorId)
+        #expect(pottyPayload.fields["latitude"] == .double(1.25))
+        #expect(pottyPayload.fields["sharedSessionId"]?.stringValue == "session-1")
+
+        let walkLog = PetWalkLog(
+            startDate: Date(timeIntervalSinceReferenceDate: 90),
+            pet: pet,
+            executorId: executorId,
+            sharedSessionId: "session-2"
+        )
+        walkLog.id = uuid("66666666-6666-4666-8666-666666666666")
+        walkLog.endDate = Date(timeIntervalSinceReferenceDate: 120)
+        walkLog.distanceMeters = 123.4
+        walkLog.coconutsEarned = 9
+        walkLog.behaviorNotes = "calm walk"
+        walkLog.moodRating = 4
+        walkLog.routeLocationsData = Data([1, 2, 3])
+        let walkState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: PetWalkLog.self),
+            localRecordId: walkLog.id,
+            householdId: householdId,
+            context: context
+        )
+        let walkPayload = try CloudSyncRecordSerializer.payload(for: walkLog, state: walkState)
+
+        #expect(walkPayload.entityName == "PetWalkLog")
+        #expect(walkPayload.fields["distanceMeters"] == .double(123.4))
+        #expect(walkPayload.fields["coconutsEarned"]?.intValue == 9)
+        #expect(walkPayload.fields["behaviorNotes"]?.stringValue == "calm walk")
+        #expect(walkPayload.fields["routeLocationsData"] == .assetData(Data([1, 2, 3])))
+    }
+
+    @MainActor
     @Test func recordSerializerKeepsLedgerEntriesAsImmutableFacts() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -947,6 +1010,74 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordApplierInsertsRemotePetScopedCareFacts() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        context.insert(pet)
+
+        let pottyId = uuid("11111111-1111-4111-8111-111111111111")
+        let pottyDate = Date(timeIntervalSinceReferenceDate: 2100)
+        let pottyRecord = try makeRecordPayload(
+            entityName: String(describing: PetPottyLog.self),
+            recordType: String(describing: PetPottyLog.self),
+            localRecordId: pottyId,
+            householdId: householdId,
+            fields: [
+                "date": .date(pottyDate),
+                "type": .string(PottyType.pee.rawValue),
+                "petId": .string(normalized(petId)),
+                "executorId": .string("executor-1"),
+                "latitude": .double(1.25),
+                "longitude": .double(2.5),
+                "walkLogId": .string("walk-1")
+            ]
+        ).makeCKRecord()
+
+        let pottyResult = try CloudSyncRecordApplier.apply(pottyRecord, context: context)
+
+        #expect(pottyResult == .inserted(entityName: "PetPottyLog", localRecordId: normalized(pottyId)))
+        let pottyLog = try #require(try fetchPetPottyLog(id: pottyId, context: context))
+        #expect(pottyLog.pet?.id == petId)
+        #expect(pottyLog.type == PottyType.pee.rawValue)
+        #expect(pottyLog.latitude == 1.25)
+        #expect(pottyLog.walkLogId == "walk-1")
+
+        let walkId = uuid("22222222-2222-4222-8222-222222222222")
+        let walkRecord = try makeRecordPayload(
+            entityName: String(describing: PetWalkLog.self),
+            recordType: String(describing: PetWalkLog.self),
+            localRecordId: walkId,
+            householdId: householdId,
+            fields: [
+                "startDate": .date(Date(timeIntervalSinceReferenceDate: 2200)),
+                "endDate": .date(Date(timeIntervalSinceReferenceDate: 2300)),
+                "distanceMeters": .double(456.7),
+                "coconutsEarned": .int(11),
+                "petId": .string(normalized(petId)),
+                "executorId": .string("executor-2"),
+                "sharedSessionId": .string("session-2"),
+                "behaviorNotes": .string("happy"),
+                "moodRating": .int(5)
+            ]
+        ).makeCKRecord()
+
+        let walkResult = try CloudSyncRecordApplier.apply(walkRecord, context: context)
+
+        #expect(walkResult == .inserted(entityName: "PetWalkLog", localRecordId: normalized(walkId)))
+        let walkLog = try #require(try fetchPetWalkLog(id: walkId, context: context))
+        #expect(walkLog.pet?.id == petId)
+        #expect(walkLog.distanceMeters == 456.7)
+        #expect(walkLog.coconutsEarned == 11)
+        #expect(walkLog.sharedSessionId == "session-2")
+        #expect(walkLog.behaviorNotes == "happy")
+        #expect(walkLog.moodRating == 5)
+    }
+
+    @MainActor
     @Test func recordApplierSkipsStaleRemoteMutableRecord() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -1129,6 +1260,22 @@ struct CloudSyncMetadataServiceTests {
     private func fetchPet(id: UUID, context: ModelContext) throws -> Pet? {
         var descriptor = FetchDescriptor<Pet>(
             predicate: #Predicate<Pet> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchPetPottyLog(id: UUID, context: ModelContext) throws -> PetPottyLog? {
+        var descriptor = FetchDescriptor<PetPottyLog>(
+            predicate: #Predicate<PetPottyLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchPetWalkLog(id: UUID, context: ModelContext) throws -> PetWalkLog? {
+        var descriptor = FetchDescriptor<PetWalkLog>(
+            predicate: #Predicate<PetWalkLog> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

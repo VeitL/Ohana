@@ -70,6 +70,18 @@ nonisolated enum CloudSyncUploadBatchBuilder {
             try fetchHuman(id: localRecordId, context: context)
         case String(describing: PetCareLog.self):
             try fetchPetCareLog(id: localRecordId, context: context)
+        case String(describing: PetPottyLog.self):
+            try fetchPetPottyLog(id: localRecordId, context: context)
+        case String(describing: PetHygieneLog.self):
+            try fetchPetHygieneLog(id: localRecordId, context: context)
+        case String(describing: PetHealthLog.self):
+            try fetchPetHealthLog(id: localRecordId, context: context)
+        case String(describing: PetWalkLog.self):
+            try fetchPetWalkLog(id: localRecordId, context: context)
+        case String(describing: PetExpenseLog.self):
+            try fetchPetExpenseLog(id: localRecordId, context: context)
+        case String(describing: PetWeightLog.self):
+            try fetchPetWeightLog(id: localRecordId, context: context)
         case String(describing: CoconutLedgerEntry.self):
             try fetchCoconutLedgerEntry(id: localRecordId, context: context)
         default:
@@ -104,6 +116,54 @@ nonisolated enum CloudSyncUploadBatchBuilder {
     private static func fetchPetCareLog(id: UUID, context: ModelContext) throws -> PetCareLog? {
         var descriptor = FetchDescriptor<PetCareLog>(
             predicate: #Predicate<PetCareLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetPottyLog(id: UUID, context: ModelContext) throws -> PetPottyLog? {
+        var descriptor = FetchDescriptor<PetPottyLog>(
+            predicate: #Predicate<PetPottyLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetHygieneLog(id: UUID, context: ModelContext) throws -> PetHygieneLog? {
+        var descriptor = FetchDescriptor<PetHygieneLog>(
+            predicate: #Predicate<PetHygieneLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetHealthLog(id: UUID, context: ModelContext) throws -> PetHealthLog? {
+        var descriptor = FetchDescriptor<PetHealthLog>(
+            predicate: #Predicate<PetHealthLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetWalkLog(id: UUID, context: ModelContext) throws -> PetWalkLog? {
+        var descriptor = FetchDescriptor<PetWalkLog>(
+            predicate: #Predicate<PetWalkLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetExpenseLog(id: UUID, context: ModelContext) throws -> PetExpenseLog? {
+        var descriptor = FetchDescriptor<PetExpenseLog>(
+            predicate: #Predicate<PetExpenseLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetWeightLog(id: UUID, context: ModelContext) throws -> PetWeightLog? {
+        var descriptor = FetchDescriptor<PetWeightLog>(
+            predicate: #Predicate<PetWeightLog> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

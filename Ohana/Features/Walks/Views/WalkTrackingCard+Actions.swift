@@ -16,6 +16,7 @@ extension WalkTrackingCard {
         HStack(spacing: 8) {
             switch phase {
             case .idle:
+                sharedWalkTargetMenu
                 Button {
                     mgr.start(pet: pet)
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -58,6 +59,50 @@ extension WalkTrackingCard {
         }
     }
 
+    @ViewBuilder
+    var sharedWalkTargetMenu: some View {
+        if sameSpeciesWalkPets.count > 1 {
+            Menu {
+                ForEach(sameSpeciesWalkPets) { target in
+                    if target.id == pet.id {
+                        Label(target.name, systemImage: "checkmark.circle.fill")
+                    } else {
+                        Button {
+                            if selectedSharedWalkPetIds.contains(target.id) {
+                                selectedSharedWalkPetIds.remove(target.id)
+                            } else {
+                                selectedSharedWalkPetIds.insert(target.id)
+                            }
+                            UISelectionFeedbackGenerator().selectionChanged()
+                        } label: {
+                            Label(
+                                target.name,
+                                systemImage: selectedSharedWalkPetIds.contains(target.id) ? "checkmark.circle.fill" : "circle"
+                            )
+                        }
+                    }
+                }
+            } label: {
+                Label(sharedWalkTargetTitle, systemImage: selectedWalkTargets.count > 1 ? "pawprint.fill" : "pawprint")
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.ohanaControlFill, in: Capsule())
+            }
+            .buttonStyle(ScaleButtonStyle())
+        }
+    }
+
+    var sharedWalkTargetTitle: String {
+        let count = selectedWalkTargets.count
+        return L10n(appLanguage).tr(
+            zh: count > 1 ? "同行 \(count)只" : "单独",
+            en: count > 1 ? "\(count) pets" : "Solo",
+            de: count > 1 ? "\(count) Tiere" : "Solo"
+        )
+    }
+
     func circleButton(icon: String, color: Color, action: @escaping () -> Void) -> some View {
         Button {
             action()
@@ -98,7 +143,7 @@ extension WalkTrackingCard {
 
     func finishWalkAndFlip() {
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-        onStopWalk()
+        onStopWalk(selectedWalkTargets)
         presentSummaryBack()
     }
 

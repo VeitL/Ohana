@@ -124,6 +124,7 @@ struct SharedPetActionResult {
     let pottyLog: PetPottyLog?
     let expenseLogIDs: [UUID]
     let walkLogIDs: [UUID]
+    let walkLogs: [PetWalkLog]
     let reward: (humanGot: Int, petGot: Int)
 
     var coconutDelta: Int { max(0, reward.humanGot) + max(0, reward.petGot) }
@@ -236,6 +237,10 @@ enum SharedPetActionRecorder {
             session.primaryLegacyModelId = primary.id
         }
         CloudSyncMutationRecorder.markModified(careLogs.map(\.1), context: context, modifiedAt: descriptor.date)
+        if let pottyLog {
+            CloudSyncMutationRecorder.markModified(pottyLog, context: context, modifiedAt: descriptor.date)
+        }
+        CloudSyncMutationRecorder.markModified(expenseLogs.map(\.1), context: context, modifiedAt: descriptor.date)
         context.safeSave()
 
         let reward: (humanGot: Int, petGot: Int) = if let rewardType = descriptor.reward {
@@ -254,6 +259,7 @@ enum SharedPetActionRecorder {
             for (index, pair) in walkLogs.enumerated() {
                 pair.1.coconutsEarned = index == 0 ? actualWalkCoconuts : 0
             }
+            CloudSyncMutationRecorder.markModified(walkLogs.map(\.1), context: context, modifiedAt: descriptor.date)
         }
 
         recordLedger(
@@ -304,6 +310,7 @@ enum SharedPetActionRecorder {
             pottyLog: pottyLog,
             expenseLogIDs: expenseLogs.map(\.1.id),
             walkLogIDs: walkLogs.map(\.1.id),
+            walkLogs: walkLogs.map(\.1),
             reward: reward
         )
     }

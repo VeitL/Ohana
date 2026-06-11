@@ -114,6 +114,12 @@ nonisolated enum CloudSyncRecordApplier {
              String(describing: Pet.self),
              String(describing: Human.self),
              String(describing: PetCareLog.self),
+             String(describing: PetPottyLog.self),
+             String(describing: PetHygieneLog.self),
+             String(describing: PetHealthLog.self),
+             String(describing: PetWalkLog.self),
+             String(describing: PetExpenseLog.self),
+             String(describing: PetWeightLog.self),
              String(describing: CoconutLedgerEntry.self):
             true
         default:
@@ -136,6 +142,18 @@ nonisolated enum CloudSyncRecordApplier {
             try applyHuman(record, metadata: metadata, context: context)
         case String(describing: PetCareLog.self):
             try applyPetCareLog(record, metadata: metadata, context: context)
+        case String(describing: PetPottyLog.self):
+            try applyPetPottyLog(record, metadata: metadata, context: context)
+        case String(describing: PetHygieneLog.self):
+            try applyPetHygieneLog(record, metadata: metadata, context: context)
+        case String(describing: PetHealthLog.self):
+            try applyPetHealthLog(record, metadata: metadata, context: context)
+        case String(describing: PetWalkLog.self):
+            try applyPetWalkLog(record, metadata: metadata, context: context)
+        case String(describing: PetExpenseLog.self):
+            try applyPetExpenseLog(record, metadata: metadata, context: context)
+        case String(describing: PetWeightLog.self):
+            try applyPetWeightLog(record, metadata: metadata, context: context)
         case String(describing: CoconutLedgerEntry.self):
             try applyCoconutLedgerEntry(record, metadata: metadata, context: context)
         default:
@@ -306,6 +324,154 @@ nonisolated enum CloudSyncRecordApplier {
         return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
     }
 
+    private static func applyPetPottyLog(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        if try fetchPetPottyLog(id: metadata.localRecordUUID, context: context) != nil {
+            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        let pet = try petReference(from: record, context: context)
+        let log = PetPottyLog(
+            date: record.date(for: "date") ?? metadata.lastModifiedAt,
+            type: PottyType(rawValue: record.string(for: "type") ?? "") ?? .perfectPoop,
+            pet: pet,
+            executorId: record.string(for: "executorId"),
+            latitude: record.double(for: "latitude"),
+            longitude: record.double(for: "longitude"),
+            locationAccuracyMeters: record.double(for: "locationAccuracyMeters"),
+            walkLogId: record.string(for: "walkLogId"),
+            sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+        )
+        log.id = metadata.localRecordUUID
+        context.insert(log)
+        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+    }
+
+    private static func applyPetHygieneLog(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        if try fetchPetHygieneLog(id: metadata.localRecordUUID, context: context) != nil {
+            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        let pet = try petReference(from: record, context: context)
+        let log = PetHygieneLog(
+            date: record.date(for: "date") ?? metadata.lastModifiedAt,
+            type: HygieneType(rawValue: record.string(for: "type") ?? "") ?? .bath,
+            pet: pet,
+            executorId: record.string(for: "executorId")
+        )
+        log.id = metadata.localRecordUUID
+        context.insert(log)
+        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+    }
+
+    private static func applyPetHealthLog(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        if try fetchPetHealthLog(id: metadata.localRecordUUID, context: context) != nil {
+            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        let pet = try petReference(from: record, context: context)
+        let log = PetHealthLog(
+            date: record.date(for: "date") ?? metadata.lastModifiedAt,
+            type: HealthLogType(rawValue: record.string(for: "type") ?? "") ?? .general,
+            note: record.string(for: "note") ?? "",
+            pet: pet,
+            executorId: record.string(for: "executorId")
+        )
+        log.id = metadata.localRecordUUID
+        log.vetName = record.string(for: "vetName") ?? ""
+        log.cost = record.double(for: "cost") ?? 0
+        log.expirationDate = record.date(for: "expirationDate")
+        log.nextCheckupDate = record.date(for: "nextCheckupDate")
+        context.insert(log)
+        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+    }
+
+    private static func applyPetWalkLog(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        if try fetchPetWalkLog(id: metadata.localRecordUUID, context: context) != nil {
+            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        let pet = try petReference(from: record, context: context)
+        let log = PetWalkLog(
+            startDate: record.date(for: "startDate") ?? metadata.lastModifiedAt,
+            pet: pet,
+            executorId: record.string(for: "executorId"),
+            sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+        )
+        log.id = metadata.localRecordUUID
+        log.endDate = record.date(for: "endDate")
+        log.distanceMeters = record.double(for: "distanceMeters") ?? 0
+        log.coconutsEarned = record.int(for: "coconutsEarned") ?? 0
+        log.mapSnapshotData = record.assetData(for: "mapSnapshotData")
+        log.routeLocationsData = record.assetData(for: "routeLocationsData")
+        log.behaviorNotes = record.string(for: "behaviorNotes")
+        log.moodRating = record.int(for: "moodRating") ?? 0
+        context.insert(log)
+        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+    }
+
+    private static func applyPetExpenseLog(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        if try fetchPetExpenseLog(id: metadata.localRecordUUID, context: context) != nil {
+            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        let pet = try petReference(from: record, context: context)
+        let log = PetExpenseLog(
+            date: record.date(for: "date") ?? metadata.lastModifiedAt,
+            amount: record.double(for: "amount") ?? 0,
+            category: ExpenseCategory(rawValue: record.string(for: "category") ?? "") ?? .other,
+            note: record.string(for: "note") ?? "",
+            pet: pet,
+            executorId: record.string(for: "executorId"),
+            sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+        )
+        log.id = metadata.localRecordUUID
+        context.insert(log)
+        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+    }
+
+    private static func applyPetWeightLog(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        if try fetchPetWeightLog(id: metadata.localRecordUUID, context: context) != nil {
+            return .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        let pet = try petReference(from: record, context: context)
+        let log = PetWeightLog(
+            date: record.date(for: "date") ?? metadata.lastModifiedAt,
+            weight: record.double(for: "weight") ?? 0,
+            weightUnit: record.string(for: "weightUnit") ?? "kg",
+            bcsScore: record.int(for: "bcsScore") ?? 0,
+            pet: pet,
+            executorId: record.string(for: "executorId")
+        )
+        log.id = metadata.localRecordUUID
+        context.insert(log)
+        return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+    }
+
     private static func applyCoconutLedgerEntry(
         _ record: CKRecord,
         metadata: RemoteMetadata,
@@ -405,6 +571,30 @@ nonisolated enum CloudSyncRecordApplier {
             if let model = try fetchPetCareLog(id: metadata.localRecordUUID, context: context) {
                 context.delete(model)
             }
+        case String(describing: PetPottyLog.self):
+            if let model = try fetchPetPottyLog(id: metadata.localRecordUUID, context: context) {
+                context.delete(model)
+            }
+        case String(describing: PetHygieneLog.self):
+            if let model = try fetchPetHygieneLog(id: metadata.localRecordUUID, context: context) {
+                context.delete(model)
+            }
+        case String(describing: PetHealthLog.self):
+            if let model = try fetchPetHealthLog(id: metadata.localRecordUUID, context: context) {
+                context.delete(model)
+            }
+        case String(describing: PetWalkLog.self):
+            if let model = try fetchPetWalkLog(id: metadata.localRecordUUID, context: context) {
+                context.delete(model)
+            }
+        case String(describing: PetExpenseLog.self):
+            if let model = try fetchPetExpenseLog(id: metadata.localRecordUUID, context: context) {
+                context.delete(model)
+            }
+        case String(describing: PetWeightLog.self):
+            if let model = try fetchPetWeightLog(id: metadata.localRecordUUID, context: context) {
+                context.delete(model)
+            }
         case String(describing: CoconutLedgerEntry.self):
             if let model = try fetchCoconutLedgerEntry(id: metadata.localRecordUUID, context: context) {
                 context.delete(model)
@@ -446,12 +636,67 @@ nonisolated enum CloudSyncRecordApplier {
         return try context.fetch(descriptor).first
     }
 
+    private static func fetchPetPottyLog(id: UUID, context: ModelContext) throws -> PetPottyLog? {
+        var descriptor = FetchDescriptor<PetPottyLog>(
+            predicate: #Predicate<PetPottyLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetHygieneLog(id: UUID, context: ModelContext) throws -> PetHygieneLog? {
+        var descriptor = FetchDescriptor<PetHygieneLog>(
+            predicate: #Predicate<PetHygieneLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetHealthLog(id: UUID, context: ModelContext) throws -> PetHealthLog? {
+        var descriptor = FetchDescriptor<PetHealthLog>(
+            predicate: #Predicate<PetHealthLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetWalkLog(id: UUID, context: ModelContext) throws -> PetWalkLog? {
+        var descriptor = FetchDescriptor<PetWalkLog>(
+            predicate: #Predicate<PetWalkLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetExpenseLog(id: UUID, context: ModelContext) throws -> PetExpenseLog? {
+        var descriptor = FetchDescriptor<PetExpenseLog>(
+            predicate: #Predicate<PetExpenseLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetWeightLog(id: UUID, context: ModelContext) throws -> PetWeightLog? {
+        var descriptor = FetchDescriptor<PetWeightLog>(
+            predicate: #Predicate<PetWeightLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     private static func fetchCoconutLedgerEntry(id: UUID, context: ModelContext) throws -> CoconutLedgerEntry? {
         var descriptor = FetchDescriptor<CoconutLedgerEntry>(
             predicate: #Predicate<CoconutLedgerEntry> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
+    }
+
+    private static func petReference(from record: CKRecord, context: ModelContext) throws -> Pet? {
+        guard let petId = record.string(for: "petId").flatMap(UUID.init(uuidString:)) else {
+            return nil
+        }
+        return try fetchPet(id: petId, context: context)
     }
 }
 

@@ -390,6 +390,7 @@ final class CareEventService: CareEventRecording {
         if createsLinkedPottyLog, type == .litter {
             let linked = PetPottyLog(date: date, type: .perfectPoop, pet: pet, executorId: executorId)
             context.insert(linked)
+            CloudSyncMutationRecorder.markModified(linked, context: context, modifiedAt: date)
             pottyLog = linked
         } else {
             pottyLog = nil
@@ -453,6 +454,7 @@ final class CareEventService: CareEventRecording {
         let dependencies = providedDependencies ?? .live()
         let log = PetPottyLog(date: date, type: type, pet: pet, executorId: executorId)
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
         let reward = dependencies.economy.awardCareAction(type: .potty(isLitter: false), pet: pet, context: context, quality: .none)
@@ -514,6 +516,7 @@ final class CareEventService: CareEventRecording {
         let dependencies = providedDependencies ?? .live()
         let log = PetHygieneLog(date: date, type: type, pet: pet, executorId: executorId)
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
         let reward = dependencies.economy.awardCareAction(type: .care(type: type), pet: pet, context: context, quality: .none)
@@ -572,6 +575,7 @@ final class CareEventService: CareEventRecording {
         let dependencies = providedDependencies ?? .live()
         let log = PetHealthLog(date: date, type: type, note: note, pet: pet, executorId: executorId)
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
         let reward = dependencies.economy.awardCareAction(type: .health, pet: pet, context: context, quality: .none)

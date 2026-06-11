@@ -11,9 +11,10 @@ import SwiftUI
 
 struct WalkTrackingCard: View {
     let pet: Pet
+    let allPets: [Pet]
     let snapshot: WalkTrackingSnapshot
     var onCloseSummaryToPetCard: (() -> Void)?
-    var onStopWalk: () -> Void
+    var onStopWalk: ([Pet]) -> Void
     var onSaveWeeklyGoal: (Double) -> Void
 
     @Environment(AppServices.self) var appServices
@@ -31,6 +32,7 @@ struct WalkTrackingCard: View {
     @State var summaryRotation: Double = 0
     @State var showingGoalSetter = false
     @State var goalDraft: Double = 0
+    @State var selectedSharedWalkPetIds: Set<UUID> = []
     @State var cameraPosition: MapCameraPosition = .userLocation(fallback: .automatic)
     @State var rainbowRoutePhase: CGFloat = 0
 
@@ -50,6 +52,15 @@ struct WalkTrackingCard: View {
         guard isActivePet else { return false }
         if case .running = mgr.phase { return true }
         return false
+    }
+
+    var sameSpeciesWalkPets: [Pet] {
+        SharedPetTargetResolver.sameSpeciesTargets(sourcePet: pet, allPets: allPets)
+    }
+
+    var selectedWalkTargets: [Pet] {
+        let selected = sameSpeciesWalkPets.filter { selectedSharedWalkPetIds.contains($0.id) }
+        return SharedPetTargetResolver.normalizedTargets(selected, fallback: pet)
     }
 
     var walkClockInterval: TimeInterval {

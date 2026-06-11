@@ -149,7 +149,7 @@ final class PetWalkingManager {
         startTimer()
     }
 
-    func stop(modelContext: ModelContext) {
+    func stop(modelContext: ModelContext, sharedTargets: [Pet] = []) {
         walkStopStartedAt = CFAbsoluteTimeGetCurrent()
         // 最终elapsed：已暂停部分 + 本次跑步部分
         if let r = resumeTime {
@@ -173,30 +173,67 @@ final class PetWalkingManager {
         // 隐式读取当前设备执行者（静默，不弹窗）
         let executorId = activeHumanSelection.currentHumanId
 
-        // 保存遛狗记录
-        let walkLog = PetWalkLog(startDate: startTime ?? Date(), pet: pet, executorId: executorId)
-        walkLog.endDate = Date()
+        let startedAt = startTime ?? Date()
+        let endedAt = Date()
         let distanceMeters = locationManager.totalDistance
-        walkLog.distanceMeters = distanceMeters
 
         let routeLocations = locationManager.routeLocationsForPersistence()
         let routeCoordinates = routeLocations.map(\.coordinate)
         let coordinates = routeLocations.map {
             ["lat": $0.coordinate.latitude, "lon": $0.coordinate.longitude]
         }
-        walkLog.routeLocationsData = try? JSONSerialization.data(withJSONObject: coordinates)
+        let routeData = try? JSONSerialization.data(withJSONObject: coordinates)
 
+        // N2/Phase54: 遛狗椰子奖励（距离 < 20m 不发放奖励，日志正常保存）
+        let isTooShortForReward = !CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
+        let normalizedTargets = SharedPetTargetResolver.normalizedTargets(sharedTargets, fallback: pet)
+        let walkLogs: [PetWalkLog]
+        if normalizedTargets.count > 1 {
+            let result = CareEventService.recordSharedWalk(
+                sourcePet: pet,
+                targets: normalizedTargets,
+                distanceMeters: distanceMeters,
+                endDate: endedAt,
+                context: modelContext,
+                executorId: executorId,
+                startDate: startedAt
+            )
+            walkLogs = result.walkLogs
+        } else {
+            let walkLog = PetWalkLog(startDate: startedAt, pet: pet, executorId: executorId)
+            walkLog.endDate = endedAt
+            walkLog.distanceMeters = distanceMeters
+
+            var earnedCoconuts = 0
+            if !isTooShortForReward {
+                let reward = questManager.awardAction(
+                    type: .walk(distanceMeters: distanceMeters),
+                    pet: pet,
+                    context: modelContext
+                )
+                earnedCoconuts = reward.humanGot + reward.petGot
+            }
+            walkLog.coconutsEarned = earnedCoconuts
+            modelContext.insert(walkLog)
+            walkLogs = [walkLog]
+        }
+
+        for walkLog in walkLogs {
+            walkLog.routeLocationsData = routeData
+            generateMapSnapshot(for: walkLog, routeLocations: routeLocations, poopMarkers: poopMarkers, modelContext: modelContext)
+        }
+
+        let sourceWalkLog = walkLogs.first { $0.pet?.id == pet.id } ?? walkLogs.first
         lastCompletedPetId = pet.id
-        lastCompletedWalk = walkLog
+        lastCompletedWalk = sourceWalkLog
         lastCompletedRouteCoordinates = routeCoordinates
         lastCompletedPoopMarkers = poopMarkers
-
-        generateMapSnapshot(for: walkLog, routeLocations: routeLocations, poopMarkers: poopMarkers, modelContext: modelContext)
 
         // 保存遛狗中的便便路线事件（含真实打卡时间与可选坐标）
         let persistedMarkers: [WalkPoopMarker] = poopMarkers.isEmpty && poop > 0
             ? (0 ..< poop).map { _ in WalkPoopMarker(date: Date(), location: nil) }
             : poopMarkers
+        var pottyLogs: [PetPottyLog] = []
         for marker in persistedMarkers {
             let pottyLog = PetPottyLog(
                 date: marker.date,
@@ -206,23 +243,12 @@ final class PetWalkingManager {
                 latitude: marker.latitude,
                 longitude: marker.longitude,
                 locationAccuracyMeters: marker.accuracyMeters,
-                walkLogId: walkLog.id.uuidString
+                walkLogId: sourceWalkLog?.id.uuidString
             )
             modelContext.insert(pottyLog)
+            pottyLogs.append(pottyLog)
         }
 
-        // N2/Phase54: 遛狗椰子奖励（距离 < 20m 不发放奖励，日志正常保存）
-        var earnedCoconuts = 0
-        let isTooShortForReward = !CoconutWalkRewardPolicy.isRewardable(distanceMeters: distanceMeters)
-        if !isTooShortForReward {
-            let reward = questManager.awardAction(
-                type: .walk(distanceMeters: distanceMeters),
-                pet: pet,
-                context: modelContext
-            )
-            earnedCoconuts = reward.humanGot + reward.petGot
-        }
-        walkLog.coconutsEarned = earnedCoconuts
         // 遛狗中每次便便：人+2, 宠物+5（OhanaActionType.potty(isLitter:false)）
         if poop > 0 {
             for _ in 0 ..< poop {
@@ -234,7 +260,8 @@ final class PetWalkingManager {
             }
         }
 
-        modelContext.insert(walkLog)
+        CloudSyncMutationRecorder.markModified(walkLogs, context: modelContext, modifiedAt: endedAt)
+        CloudSyncMutationRecorder.markModified(pottyLogs, context: modelContext, modifiedAt: endedAt)
         modelContext.safeSave()
 
         phase = .finished(elapsed: elapsed, poopCount: poop)

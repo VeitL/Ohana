@@ -243,6 +243,18 @@ nonisolated enum CloudSyncRecordSerializer {
             CloudSyncRecordState.normalizedRecordId(human.id)
         case let log as PetCareLog:
             CloudSyncRecordState.normalizedRecordId(log.id)
+        case let log as PetPottyLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
+        case let log as PetHygieneLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
+        case let log as PetHealthLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
+        case let log as PetWalkLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
+        case let log as PetExpenseLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
+        case let log as PetWeightLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
         case let entry as CoconutLedgerEntry:
             CloudSyncRecordState.normalizedRecordId(entry.id)
         default:
@@ -263,6 +275,18 @@ nonisolated enum CloudSyncRecordSerializer {
             humanFields(human)
         case let log as PetCareLog:
             petCareLogFields(log)
+        case let log as PetPottyLog:
+            petPottyLogFields(log)
+        case let log as PetHygieneLog:
+            petHygieneLogFields(log)
+        case let log as PetHealthLog:
+            petHealthLogFields(log)
+        case let log as PetWalkLog:
+            petWalkLogFields(log)
+        case let log as PetExpenseLog:
+            petExpenseLogFields(log)
+        case let log as PetWeightLog:
+            petWeightLogFields(log)
         case let entry as CoconutLedgerEntry:
             coconutLedgerEntryFields(entry)
         default:
@@ -388,6 +412,93 @@ nonisolated enum CloudSyncRecordSerializer {
         ]
     }
 
+    private static func petPottyLogFields(_ log: PetPottyLog) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "date": .date(log.date),
+            "type": .string(log.type),
+            "executorId": optionalString(log.executorId),
+            "latitude": optionalDouble(log.latitude),
+            "longitude": optionalDouble(log.longitude),
+            "locationAccuracyMeters": optionalDouble(log.locationAccuracyMeters),
+            "walkLogId": optionalString(log.walkLogId),
+            "sharedSessionId": .string(log.sharedSessionId),
+            "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+    }
+
+    private static func petHygieneLogFields(_ log: PetHygieneLog) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "date": .date(log.date),
+            "type": .string(log.type),
+            "executorId": optionalString(log.executorId),
+            "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+    }
+
+    private static func petHealthLogFields(_ log: PetHealthLog) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "date": .date(log.date),
+            "type": .string(log.type),
+            "note": .string(log.note),
+            "vetName": .string(log.vetName),
+            "cost": .double(log.cost),
+            "expirationDate": optionalDate(log.expirationDate),
+            "nextCheckupDate": optionalDate(log.nextCheckupDate),
+            "executorId": optionalString(log.executorId),
+            "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+    }
+
+    private static func petWalkLogFields(_ log: PetWalkLog) -> [String: CloudSyncRecordFieldValue] {
+        var fields: [String: CloudSyncRecordFieldValue] = [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "startDate": .date(log.startDate),
+            "endDate": optionalDate(log.endDate),
+            "distanceMeters": .double(log.distanceMeters),
+            "coconutsEarned": .int(log.coconutsEarned),
+            "executorId": optionalString(log.executorId),
+            "sharedSessionId": .string(log.sharedSessionId),
+            "behaviorNotes": optionalString(log.behaviorNotes),
+            "moodRating": .int(log.moodRating),
+            "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+        if let mapSnapshotData = log.mapSnapshotData {
+            fields["mapSnapshotData"] = .assetData(mapSnapshotData)
+        }
+        if let routeLocationsData = log.routeLocationsData {
+            fields["routeLocationsData"] = .assetData(routeLocationsData)
+        }
+        return fields
+    }
+
+    private static func petExpenseLogFields(_ log: PetExpenseLog) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "date": .date(log.date),
+            "amount": .double(log.amount),
+            "category": .string(log.category),
+            "note": .string(log.note),
+            "sharedSessionId": .string(log.sharedSessionId),
+            "executorId": optionalString(log.executorId),
+            "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+    }
+
+    private static func petWeightLogFields(_ log: PetWeightLog) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "date": .date(log.date),
+            "weight": .double(log.weight),
+            "weightUnit": .string(log.weightUnit),
+            "bcsScore": .int(log.bcsScore),
+            "executorId": optionalString(log.executorId),
+            "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+    }
+
     private static func coconutLedgerEntryFields(_ entry: CoconutLedgerEntry) -> [String: CloudSyncRecordFieldValue] {
         [
             "id": .string(CloudSyncRecordState.normalizedRecordId(entry.id)),
@@ -425,5 +536,10 @@ nonisolated enum CloudSyncRecordSerializer {
     private static func optionalDate(_ value: Date?) -> CloudSyncRecordFieldValue {
         guard let value else { return .null }
         return .date(value)
+    }
+
+    private static func optionalDouble(_ value: Double?) -> CloudSyncRecordFieldValue {
+        guard let value else { return .null }
+        return .double(value)
     }
 }

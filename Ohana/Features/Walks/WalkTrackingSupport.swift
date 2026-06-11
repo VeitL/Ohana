@@ -72,8 +72,8 @@ struct WalkTrackingCommandExecutor {
     let modelContext: ModelContext
     let services: AppServices
 
-    func stopWalk(manager: PetWalkingManaging) {
-        manager.stop(modelContext: modelContext)
+    func stopWalk(manager: PetWalkingManaging, sharedTargets: [Pet]) {
+        manager.stop(modelContext: modelContext, sharedTargets: sharedTargets)
     }
 
     func saveWeeklyGoal(_ goal: Double, for pet: Pet) {
@@ -91,15 +91,17 @@ struct WalkTrackingCardHost: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @Query(sort: \Pet.createdAt) private var allPets: [Pet]
 
     var body: some View {
         let commandExecutor = WalkTrackingCommandExecutor(modelContext: modelContext, services: appServices)
         WalkTrackingCard(
             pet: pet,
+            allPets: allPets,
             snapshot: WalkTrackingSnapshot.make(pet: pet, manager: appServices.walking),
             onCloseSummaryToPetCard: onCloseSummaryToPetCard,
-            onStopWalk: {
-                commandExecutor.stopWalk(manager: appServices.walking)
+            onStopWalk: { sharedTargets in
+                commandExecutor.stopWalk(manager: appServices.walking, sharedTargets: sharedTargets)
             },
             onSaveWeeklyGoal: { goal in
                 commandExecutor.saveWeeklyGoal(goal, for: pet)
