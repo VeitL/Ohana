@@ -23,7 +23,7 @@ struct PetBondVaultContentView: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var petWalletBalance: Int {
-        CoconutWalletService.balance(for: pet, context: modelContext)
+        appServices.coconutWallet.balance(for: pet, context: modelContext)
     }
 
     private var petLogs: [CoconutLogEntry] {

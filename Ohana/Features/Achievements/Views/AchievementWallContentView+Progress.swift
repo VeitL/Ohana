@@ -12,7 +12,7 @@ extension AchievementWallContentView {
         let takenMedicationCount = medicationLogs(for: human).count(where: { $0.status == .taken })
         let expenseCount = expenses(for: human).count
         let accountDays = Calendar.current.dateComponents([.day], from: human.createdAt, to: Date()).day ?? 0
-        let coconutBalance = CoconutWalletService.balance(for: human, context: modelContext)
+        let coconutBalance = appServices.coconutWallet.balance(for: human, context: modelContext)
 
         return [
             Achievement(

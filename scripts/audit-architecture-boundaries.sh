@@ -124,11 +124,11 @@ query_outside_containers() {
 forbidden_patterns() {
   local pattern="$1"
   if [[ "$mode" == "all" ]]; then
-    rg -n --pcre2 "$pattern" Ohana --glob '*.swift' || true
+    rg -n --with-filename --pcre2 "$pattern" Ohana --glob '*.swift' || true
   else
     for file in "${files[@]}"; do
       [[ -f "$file" ]] || continue
-      rg -n --pcre2 "$pattern" "$file" || true
+      rg -n --with-filename --pcre2 "$pattern" "$file" || true
     done
   fi
 }
@@ -212,7 +212,7 @@ coconut_balance_writes_outside_wallet() {
   )"
   [[ -z "$input" ]] && return 0
   printf '%s\n' "$input" \
-    | rg -v '^\s*Ohana/Domain/Economy/CoconutWalletService\.swift:' \
+    | rg -v '^\s*Ohana/Domain/Economy/CoconutWalletService(\+[^:]*)?\.swift:' \
     | rg -v '^\s*Ohana/Domain/Services/DataBackupManager\+Decode\.swift:' \
     | rg -v '^\s*Ohana/Models/Human\.swift:' \
     | rg -v '^\s*Ohana/Models/Pet\.swift:' \

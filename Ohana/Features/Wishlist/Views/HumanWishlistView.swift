@@ -32,7 +32,7 @@ struct HumanWishlistContentView: View {
     private var pendingItems: [WishlistItem] { myItems.filter { !$0.isRedeemed } }
     private var redeemedItems: [WishlistItem] { myItems.filter(\.isRedeemed) }
     private var walletBalance: Int {
-        CoconutWalletService.balance(for: human, context: modelContext)
+        appServices.coconutWallet.balance(for: human, context: modelContext)
     }
 
     private var isPrivacyLocked: Bool {

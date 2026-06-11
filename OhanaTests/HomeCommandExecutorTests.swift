@@ -3954,7 +3954,7 @@ struct HomeCommandExecutorTests {
         #expect(human.coconutBalance == 5)
         #expect(walletEntries.count == 1)
         #expect(walletEntries.first?.transactionKey == "eventReward:\(event.id.uuidString):\(Event.occurrenceStorageKey(for: now))")
-        #expect(budgetEvents.filter { $0.actionKey == "calendarEventCompletion" }.count == 2)
+        #expect(budgetEvents.count { $0.actionKey == "calendarEventCompletion" } == 2)
     }
 
     @MainActor
@@ -6572,6 +6572,24 @@ struct HomeCommandExecutorTests {
         func totalBalance(context _: ModelContext) -> Int {
             0
         }
+
+        func balance(accountKey _: String, context _: ModelContext, fallback: Int) -> Int {
+            fallback
+        }
+
+        func balance(for human: Human, context _: ModelContext) -> Int {
+            human.coconutBalance
+        }
+
+        func balance(for pet: Pet, context _: ModelContext) -> Int {
+            pet.coconutBalance
+        }
+
+        func legacySystemBalance(context _: ModelContext, fallback: Int) -> Int {
+            fallback
+        }
+
+        func setDeveloperOverrideBalance(amount _: Int, for _: Human?, displayName _: String, context _: ModelContext) {}
 
         func refreshQuestProjection(context _: ModelContext, manager _: QuestManager?) {}
 

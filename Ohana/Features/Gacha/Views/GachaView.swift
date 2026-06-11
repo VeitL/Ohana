@@ -59,14 +59,13 @@ struct GachaView: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var series: GachaSeriesEntry { GachaSeriesCatalog.series(id: selectedSeriesId) }
-    private var currentHuman: Human? {
-        humans.first { $0.id.uuidString == activeHumanId }
-    }
+    private var currentHuman: Human? { humans.first { $0.id.uuidString == activeHumanId } }
 
     private var currentCoconutBalance: Int {
         guard let currentHuman else { return 0 }
-        return CoconutWalletService.balance(for: currentHuman, context: modelContext)
+        return appServices.coconutWallet.balance(for: currentHuman, context: modelContext)
     }
+
     private var currentHumanLogs: [GachaDrawLog] {
         drawLogs.filter { $0.ownerHumanId == currentHuman?.id.uuidString && $0.seriesId == series.id }
     }

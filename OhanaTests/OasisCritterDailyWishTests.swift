@@ -374,7 +374,7 @@ struct OasisCritterDailyWishTests {
         let oldTreeManager = OasisTreeManagerRegistry.current
         let treeManager = OasisTreeManager()
         OasisTreeManagerRegistry.current = treeManager
-        treeManager.injectedEnergy = 3_600
+        treeManager.injectedEnergy = 3600
         defer {
             OasisTreeManagerRegistry.current = oldTreeManager
             if let oldActiveHumanID {
@@ -547,6 +547,31 @@ struct OasisCritterDailyWishTests {
 
         func totalBalance(context: ModelContext) -> Int {
             wrapped.totalBalance(context: context)
+        }
+
+        func balance(accountKey: String, context: ModelContext, fallback: Int) -> Int {
+            wrapped.balance(accountKey: accountKey, context: context, fallback: fallback)
+        }
+
+        func balance(for human: Human, context: ModelContext) -> Int {
+            wrapped.balance(for: human, context: context)
+        }
+
+        func balance(for pet: Pet, context: ModelContext) -> Int {
+            wrapped.balance(for: pet, context: context)
+        }
+
+        func legacySystemBalance(context: ModelContext, fallback: Int) -> Int {
+            wrapped.legacySystemBalance(context: context, fallback: fallback)
+        }
+
+        func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
+            wrapped.setDeveloperOverrideBalance(
+                amount: amount,
+                for: human,
+                displayName: displayName,
+                context: context
+            )
         }
 
         func refreshQuestProjection(context: ModelContext, manager: QuestManager?) {

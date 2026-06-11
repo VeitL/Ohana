@@ -28,11 +28,24 @@ protocol CoconutWalletManaging {
     ) throws -> [CoconutLedgerEntry]
 
     func totalBalance(context: ModelContext) -> Int
+    func balance(accountKey: String, context: ModelContext, fallback: Int) -> Int
+    func balance(for human: Human, context: ModelContext) -> Int
+    func balance(for pet: Pet, context: ModelContext) -> Int
+    func legacySystemBalance(context: ModelContext, fallback: Int) -> Int
+    func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext)
     func refreshQuestProjection(context: ModelContext, manager: QuestManager?)
     func bootstrapIfNeeded(context: ModelContext, projectionManager: QuestManager?) throws
 }
 
 extension CoconutWalletManaging {
+    func balance(accountKey: String, context: ModelContext) -> Int {
+        balance(accountKey: accountKey, context: context, fallback: 0)
+    }
+
+    func legacySystemBalance(context: ModelContext) -> Int {
+        legacySystemBalance(context: context, fallback: 0)
+    }
+
     @discardableResult
     func applyActorDelta(
         amount: Int,
@@ -120,6 +133,31 @@ final class SwiftDataCoconutWalletManager: CoconutWalletManaging {
 
     func totalBalance(context: ModelContext) -> Int {
         CoconutWalletService.totalBalance(context: context)
+    }
+
+    func balance(accountKey: String, context: ModelContext, fallback: Int) -> Int {
+        CoconutWalletService.balance(accountKey: accountKey, context: context, fallback: fallback)
+    }
+
+    func balance(for human: Human, context: ModelContext) -> Int {
+        CoconutWalletService.balance(for: human, context: context)
+    }
+
+    func balance(for pet: Pet, context: ModelContext) -> Int {
+        CoconutWalletService.balance(for: pet, context: context)
+    }
+
+    func legacySystemBalance(context: ModelContext, fallback: Int) -> Int {
+        CoconutWalletService.legacySystemBalance(context: context, fallback: fallback)
+    }
+
+    func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
+        CoconutWalletService.setDeveloperOverrideBalance(
+            amount: amount,
+            for: human,
+            displayName: displayName,
+            context: context
+        )
     }
 
     func refreshQuestProjection(context: ModelContext, manager: QuestManager?) {

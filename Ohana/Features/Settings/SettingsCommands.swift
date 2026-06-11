@@ -65,21 +65,23 @@ enum SettingsCommandService {
         projectionManager: QuestManager
     ) -> SettingsCoconutBalanceCommandResult {
         let amount = max(0, rawAmount)
-        let accountKey = human.map { CoconutAccountKey.human($0.id) } ?? CoconutAccountKey.legacySystem
-        let existingAccount = coconutAccount(accountKey: accountKey, context: context)
-        let current = existingAccount?.balance ?? human?.coconutBalance ?? wallet.totalBalance(context: context)
+        let current = if let human {
+            wallet.balance(for: human, context: context)
+        } else {
+            wallet.legacySystemBalance(
+                context: context,
+                fallback: wallet.totalBalance(context: context)
+            )
+        }
         let delta = amount - current
         let displayName = actorName ?? human?.name ?? "Legacy island total"
         // Developer overrides must not create wallet ledger entries or reward feedback.
-        upsertCoconutAccount(
-            accountKey: accountKey,
-            ownerKind: human == nil ? .system : .human,
-            ownerId: human?.id.uuidString ?? "",
-            displayName: displayName,
+        wallet.setDeveloperOverrideBalance(
             amount: amount,
+            for: human,
+            displayName: displayName,
             context: context
         )
-        human?.coconutBalance = amount
         context.safeSave()
         projectionManager.replaceCoconutProjection(
             count: amount,
@@ -91,43 +93,6 @@ enum SettingsCommandService {
             amount: amount,
             legacyDelta: delta
         )
-    }
-
-    private static func coconutAccount(accountKey: String, context: ModelContext) -> CoconutAccount? {
-        var descriptor = FetchDescriptor<CoconutAccount>(
-            predicate: #Predicate<CoconutAccount> { $0.accountKey == accountKey }
-        )
-        descriptor.fetchLimit = 1
-        return try? context.fetch(descriptor).first
-    }
-
-    private static func upsertCoconutAccount(
-        accountKey: String,
-        ownerKind: CoconutWalletOwnerKind,
-        ownerId: String,
-        displayName: String,
-        amount: Int,
-        context: ModelContext
-    ) {
-        let now = Date()
-        if let account = coconutAccount(accountKey: accountKey, context: context) {
-            account.ownerKindRaw = ownerKind.rawValue
-            account.ownerId = ownerId
-            account.displayName = displayName
-            account.balance = amount
-            account.updatedAt = now
-        } else {
-            context.insert(CoconutAccount(
-                accountKey: accountKey,
-                ownerKind: ownerKind,
-                ownerId: ownerId,
-                displayName: displayName,
-                balance: amount,
-                createdAt: now,
-                updatedAt: now,
-                metadataJSON: "{\"source\":\"settings.coconut.test\"}"
-            ))
-        }
     }
 }
 
