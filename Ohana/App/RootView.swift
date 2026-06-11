@@ -18,16 +18,23 @@ struct RootView: View {
     // F3: 数据库降级警告
     @State private var showDBFallbackAlert = DatabaseFallbackPreferenceStore.isFallbackActive()
     @State private var appSwitcherSnapshotCoverRequested = false
+    @State private var isOnboardingHomePreflightActive = false
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
 
     var body: some View {
         ZStack {
-            if hasOnboarded {
-                ContentView()
-            } else {
-                OnboardingView()
+            if hasOnboarded || isOnboardingHomePreflightActive {
+                ContentView(showsEmbeddedOnboarding: false)
+                    .allowsHitTesting(hasOnboarded)
+            }
+
+            if !hasOnboarded {
+                OnboardingView(
+                    onHomeJoinHandoffPreflight: beginOnboardingHomePreflight
+                )
+                .zIndex(100)
             }
 
             if shouldShowPrivacySnapshotCover {
@@ -43,6 +50,10 @@ struct RootView: View {
         }
         .onDisappear {
             startupMaintenance.cancel()
+        }
+        .onChange(of: hasOnboarded) { _, hasOnboarded in
+            guard hasOnboarded else { return }
+            isOnboardingHomePreflightActive = false
         }
         .onReceive(appServices.notificationRoutes.reminderActionEvents) { event in
             appServices.reminderActions.handle(
@@ -78,6 +89,15 @@ struct RootView: View {
             isEnabled: true,
             scenePhase: scenePhase
         )
+    }
+
+    private func beginOnboardingHomePreflight() {
+        guard !hasOnboarded, !isOnboardingHomePreflightActive else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isOnboardingHomePreflightActive = true
+        }
     }
 }
 

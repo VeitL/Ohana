@@ -11,6 +11,8 @@ import SwiftUI
 import UIKit
 
 struct ContentView: View {
+    var showsEmbeddedOnboarding = true
+
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -27,7 +29,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            if !hasOnboarded {
+            if showsEmbeddedOnboarding, !hasOnboarded {
                 OnboardingView()
                     .transition(.opacity)
                     .zIndex(100)

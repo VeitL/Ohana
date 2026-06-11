@@ -355,10 +355,11 @@ extension MemberCardCreationContentView {
         joinSaveTask?.cancel()
         let showsHomeJoinHandoff = canRunHomeJoinHandoff
         if showsHomeJoinHandoff {
+            let hadWarmHomePreflight = didRunHomeJoinHandoffPreflight
             prepareHomeJoinHandoffForSave()
-            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame {
-                performSave(showsHomeJoinHandoff: true)
-            }
+            startHomeJoinHandoff(
+                waitForColdHomePreflight: presentationStyle == .onboarding && !hadWarmHomePreflight
+            )
         } else {
             isSaving = true
             performSave(showsHomeJoinHandoff: false)
@@ -369,7 +370,15 @@ extension MemberCardCreationContentView {
         reduceMotion ? 20 : 24
     }
 
-    var homeJoinHandoffRouteDelayMilliseconds: UInt64 {
+    var homeJoinHandoffColdPreflightDelayMilliseconds: UInt64 {
+        reduceMotion ? 40 : 140
+    }
+
+    var homeJoinHandoffPreflightDelayMilliseconds: UInt64 {
+        reduceMotion ? 70 : 180
+    }
+
+    var homeJoinHandoffSaveDelayMilliseconds: UInt64 {
         reduceMotion ? 140 : 820
     }
 
@@ -377,7 +386,33 @@ extension MemberCardCreationContentView {
         reduceMotion ? 80 : 240
     }
 
+    func scheduleHomeJoinHandoffPreflightIfNeeded() {
+        guard presentationStyle == .onboarding,
+              canRunHomeJoinHandoff,
+              !didRequestHomeJoinHandoffPreflight
+        else { return }
+        didRequestHomeJoinHandoffPreflight = true
+        homeJoinHandoffPreflightTask?.cancel()
+        homeJoinHandoffPreflightTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffPreflightDelayMilliseconds) {
+            runHomeJoinHandoffPreflightNow()
+            homeJoinHandoffPreflightTask = nil
+        }
+    }
+
+    func runHomeJoinHandoffPreflightNow() {
+        guard presentationStyle == .onboarding,
+              canRunHomeJoinHandoff,
+              !didRunHomeJoinHandoffPreflight
+        else { return }
+        didRequestHomeJoinHandoffPreflight = true
+        didRunHomeJoinHandoffPreflight = true
+        onHomeJoinHandoffPreflight?()
+    }
+
     func prepareHomeJoinHandoffForSave() {
+        homeJoinHandoffPreflightTask?.cancel()
+        homeJoinHandoffPreflightTask = nil
+        runHomeJoinHandoffPreflightNow()
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
@@ -386,24 +421,18 @@ extension MemberCardCreationContentView {
             isJoinHandoffRunning = true
             joinHandoffProgress = 0
         }
-        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        onHomeJoinHandoffStarted?()
     }
 
-    func startHomeJoinHandoff(pet: Pet?, human: Human?) {
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            joinHandoffSnapshot = snapshot
-            isJoinHandoffRunning = true
-            joinHandoffProgress = 0
-        }
-        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffStartDelayMilliseconds) {
+    func startHomeJoinHandoff(waitForColdHomePreflight: Bool) {
+        let startDelay = waitForColdHomePreflight ? homeJoinHandoffColdPreflightDelayMilliseconds : homeJoinHandoffStartDelayMilliseconds
+        joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: startDelay) {
             guard isJoinHandoffRunning else { return }
             withAnimation(reduceMotion ? GoMotion.reduced : GoMotion.zStackHero) {
                 joinHandoffProgress = 1
             }
-            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffRouteDelayMilliseconds) {
-                finishSaveAfterHomeJoinHandoff(pet: pet, human: human)
+            joinSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: homeJoinHandoffSaveDelayMilliseconds) {
+                performSave(showsHomeJoinHandoff: true)
             }
         }
     }
@@ -433,9 +462,11 @@ extension MemberCardCreationContentView {
                     isTransparent: decodedAvatarTransparent
                 )
             }
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            if !showsHomeJoinHandoff {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
             if showsHomeJoinHandoff {
-                startHomeJoinHandoff(pet: result.pet, human: result.human)
+                finishSaveAfterHomeJoinHandoff(pet: result.pet, human: result.human)
                 return
             }
             withAnimation(GoMotion.sheet) {
@@ -489,6 +520,7 @@ extension MemberCardCreationContentView {
 
     func handleSaveFailure(_ message: String) {
         isSaving = false
+        onHomeJoinHandoffEnded?()
         restoreHomeJoinHandoffAfterFailure()
         showInlineError(message)
     }
@@ -502,6 +534,7 @@ extension MemberCardCreationContentView {
             joinHandoffProgress = 0
             joinHandoffSnapshot = nil
         }
+        onHomeJoinHandoffEnded?()
     }
 
     func restoreHomeJoinHandoffAfterFailure() {

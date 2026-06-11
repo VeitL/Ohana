@@ -83,6 +83,7 @@ struct OnboardingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var isReplay: Bool = false
     var onReplayFinished: (() -> Void)?
+    var onHomeJoinHandoffPreflight: (() -> Void)?
 
     private enum FlowStep: Equatable {
         case intro
@@ -100,6 +101,8 @@ struct OnboardingView: View {
     @State private var flipTask: Task<Void, Never>?
     @State private var isFlippingToProfile = false
     @State private var isProfilePrepared = false
+    @State private var isHomeJoinHandoffPreflightActive = false
+    @State private var isHomeJoinHandoffPresentationActive = false
     private let introPageCount = 3
 
     private var languageCode: String { AppLanguage.normalize(appLanguage) }
@@ -144,12 +147,14 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            OhanaAppBackground()
-                .ignoresSafeArea()
+            if !isHomeJoinHandoffPresentationActive {
+                OhanaAppBackground()
+                    .ignoresSafeArea()
+            }
 
             content
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(isHomeJoinHandoffPreflightActive ? nil : .dark)
         .environment(\.colorScheme, .dark)
         .onAppear {
             if shouldReduceWork {
@@ -197,12 +202,15 @@ struct OnboardingView: View {
             onHumanSaved: { human in
                 currentActiveHumanId = human.id.uuidString
             },
-            presentationStyle: .onboarding
+            presentationStyle: .onboarding,
+            onHomeJoinHandoffPreflight: beginHomeJoinHandoffPreflight,
+            onHomeJoinHandoffStarted: beginHomeJoinHandoffPresentation,
+            onHomeJoinHandoffEnded: endHomeJoinHandoffPresentation
         )
         .id(humanWizardSessionId)
         .environment(\.colorScheme, .dark)
         .environment(\.memberCreationCardFlipProgress, profileCardFlipProgress)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(isHomeJoinHandoffPreflightActive ? nil : .dark)
     }
 
     // MARK: - Intro flow
@@ -599,6 +607,36 @@ struct OnboardingView: View {
                 isProfilePrepared = false
                 introDragOffset = 0
             }
+        }
+    }
+
+    private func beginHomeJoinHandoffPreflight() {
+        guard !isReplay else { return }
+        guard !isHomeJoinHandoffPreflightActive else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isHomeJoinHandoffPreflightActive = true
+        }
+        onHomeJoinHandoffPreflight?()
+    }
+
+    private func beginHomeJoinHandoffPresentation() {
+        beginHomeJoinHandoffPreflight()
+        guard !isHomeJoinHandoffPresentationActive else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isHomeJoinHandoffPresentationActive = true
+        }
+    }
+
+    private func endHomeJoinHandoffPresentation() {
+        guard isHomeJoinHandoffPresentationActive else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            isHomeJoinHandoffPresentationActive = false
         }
     }
 

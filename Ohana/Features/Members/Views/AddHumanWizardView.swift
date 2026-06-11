@@ -12,6 +12,9 @@ struct AddHumanWizardContentView: View {
     var onCancel: (() -> Void)?
     var onHumanSaved: ((Human) -> Void)?
     var presentationStyle: MemberCreationPresentationStyle = .standard
+    var onHomeJoinHandoffPreflight: (() -> Void)?
+    var onHomeJoinHandoffStarted: (() -> Void)?
+    var onHomeJoinHandoffEnded: (() -> Void)?
 
     @State private var memberCreationSessionId = UUID()
 
@@ -22,7 +25,10 @@ struct AddHumanWizardContentView: View {
             onCancel: onCancel,
             onHumanSaved: onHumanSaved,
             recoverySessionId: memberCreationSessionId,
-            presentationStyle: presentationStyle
+            presentationStyle: presentationStyle,
+            onHomeJoinHandoffPreflight: onHomeJoinHandoffPreflight,
+            onHomeJoinHandoffStarted: onHomeJoinHandoffStarted,
+            onHomeJoinHandoffEnded: onHomeJoinHandoffEnded
         )
     }
 }

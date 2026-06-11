@@ -371,16 +371,18 @@ struct MemberCreationJoinHandoffModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        let rawProgress = clampedProgress
         let p = easedProgress
         let scale = reduceMotion ? mix(1, 0.82, p) : mix(1, HomeJoinHandoffMotion.scale, p)
         let y = reduceMotion ? mix(0, 10, p) : mix(0, HomeJoinHandoffMotion.y, p)
         let rotation = reduceMotion ? Double(0) : Double(mix(0, HomeJoinHandoffMotion.rotation, p))
-        let flip = reduceMotion ? Double(0) : Double(mix(0, HomeJoinHandoffMotion.flip, p))
+        let flipArc = sin(Double(rawProgress) * .pi)
+        let flip = reduceMotion ? Double(0) : Double(HomeJoinHandoffMotion.flip) * flipArc
         let opacity = reduceMotion ? Double(mix(1, 0.68, p)) : Double(mix(1, HomeJoinHandoffMotion.opacity, p))
 
         content
             .rotationEffect(.degrees(rotation))
-            .rotation3DEffect(.degrees(flip), axis: (x: 0, y: 1, z: 0), perspective: 0.72)
+            .rotation3DEffect(.degrees(flip), axis: (x: 0.04, y: 1, z: 0), perspective: 0.88)
             .scaleEffect(scale, anchor: .center)
             .offset(y: y)
             .opacity(opacity)

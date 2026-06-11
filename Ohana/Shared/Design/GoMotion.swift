@@ -32,9 +32,9 @@ enum GoMotion {
 }
 
 enum HomeJoinHandoffMotion {
-    static let scale: CGFloat = 0.58
-    static let rotation: CGFloat = 6
-    static let flip: CGFloat = -28
-    static let y: CGFloat = 86
-    static let opacity: CGFloat = 0.72
+    static let scale: CGFloat = 0.43
+    static let rotation: CGFloat = -10.5
+    static let flip: CGFloat = -62
+    static let y: CGFloat = 62
+    static let opacity: CGFloat = 1
 }

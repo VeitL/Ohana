@@ -20,6 +20,9 @@ struct MemberCardCreationContentView: View {
     var onCancel: (() -> Void)?
     var onPetSaved: ((Pet) -> Void)?
     var onHumanSaved: ((Human) -> Void)?
+    var onHomeJoinHandoffPreflight: (() -> Void)?
+    var onHomeJoinHandoffStarted: (() -> Void)?
+    var onHomeJoinHandoffEnded: (() -> Void)?
     let existingPets: [Pet]
     let existingHumans: [Human]
     let recoverySessionId: UUID
@@ -68,6 +71,9 @@ struct MemberCardCreationContentView: View {
     @State var joinHandoffProgress: CGFloat = 0
     @State var joinHandoffSnapshot: MemberCardRenderSnapshot?
     @State var joinSaveTask: Task<Void, Never>?
+    @State var didRequestHomeJoinHandoffPreflight = false
+    @State var didRunHomeJoinHandoffPreflight = false
+    @State var homeJoinHandoffPreflightTask: Task<Void, Never>?
 
     init(
         kind: MemberCreationKind,
@@ -78,13 +84,19 @@ struct MemberCardCreationContentView: View {
         existingPets: [Pet],
         existingHumans: [Human],
         recoverySessionId: UUID = UUID(),
-        presentationStyle: MemberCreationPresentationStyle = .standard
+        presentationStyle: MemberCreationPresentationStyle = .standard,
+        onHomeJoinHandoffPreflight: (() -> Void)? = nil,
+        onHomeJoinHandoffStarted: (() -> Void)? = nil,
+        onHomeJoinHandoffEnded: (() -> Void)? = nil
     ) {
         self.kind = kind
         self.onComplete = onComplete
         self.onCancel = onCancel
         self.onPetSaved = onPetSaved
         self.onHumanSaved = onHumanSaved
+        self.onHomeJoinHandoffPreflight = onHomeJoinHandoffPreflight
+        self.onHomeJoinHandoffStarted = onHomeJoinHandoffStarted
+        self.onHomeJoinHandoffEnded = onHomeJoinHandoffEnded
         self.existingPets = existingPets
         self.existingHumans = existingHumans
         self.recoverySessionId = recoverySessionId
@@ -190,6 +202,10 @@ struct MemberCardCreationContentView: View {
         return 180 - 180 * Double(profileCardFlipProgress)
     }
 
+    var usesTransparentHomeJoinHandoffBackdrop: Bool {
+        presentationStyle == .onboarding && isJoinHandoffRunning
+    }
+
     var snapshot: MemberCardRenderSnapshot {
         let displayName = draft.trimmedName.isEmpty ? l.tr(zh: "新成员", en: "New member", de: "Neues Mitglied") : draft.trimmedName
         return MemberCardRenderSnapshot(
@@ -207,7 +223,9 @@ struct MemberCardCreationContentView: View {
 
     var body: some View {
         ZStack {
-            OhanaAppBackground()
+            if !usesTransparentHomeJoinHandoffBackdrop {
+                OhanaAppBackground()
+            }
             GeometryReader { proxy in
                 let cardHeight = MemberCreationCardLayout.cardHeight(
                     in: proxy.size.height,
@@ -218,7 +236,7 @@ struct MemberCardCreationContentView: View {
                     if presentationStyle.showsTopChrome {
                         topChrome
                             .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
-                            .opacity(isJoinHandoffRunning ? 0.28 : 1)
+                            .opacity(isJoinHandoffRunning ? (presentationStyle == .onboarding ? 0 : 0.28) : 1)
                             .allowsHitTesting(!isJoinHandoffRunning)
                     }
                     creationCardArea
@@ -265,6 +283,7 @@ struct MemberCardCreationContentView: View {
             MemberCreationPerformance.event("Member Creation Disappeared")
             decodeTask?.cancel()
             joinSaveTask?.cancel()
+            homeJoinHandoffPreflightTask?.cancel()
             if !isAvatarMediaTransitioning {
                 cropPresentationTask?.cancel()
                 cropPresentationTask = nil
@@ -282,6 +301,9 @@ struct MemberCardCreationContentView: View {
         .onChange(of: currentStep) { _, newStep in
             if newStep == .avatar {
                 configureAvatarStepIfNeeded()
+            }
+            if creationSteps.last == newStep {
+                scheduleHomeJoinHandoffPreflightIfNeeded()
             }
         }
         .onChange(of: media.photoItem) { _, item in handlePhotoPickerItem(item) }

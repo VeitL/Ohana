@@ -61,8 +61,8 @@ enum OnboardingHomeJoinHandoffGate {
     private static let completedAtKey = "ohana_onboarding_home_join_handoff_completed_at"
     private static let recentWindowSeconds: TimeInterval = 6
     private static let rootBootstrapDelayMilliseconds: UInt64 = 900
-    private static let homeReadModelDelayMilliseconds: UInt64 = 120
-    private static let homeAppearDelayMilliseconds: UInt64 = 220
+    private static let homeReadModelDelayMilliseconds: UInt64 = 0
+    private static let homeAppearDelayMilliseconds: UInt64 = 0
 
     static func markCompleted(now: Date = Date(), defaults: UserDefaults = .standard) {
         defaults.set(now.timeIntervalSince1970, forKey: completedAtKey)

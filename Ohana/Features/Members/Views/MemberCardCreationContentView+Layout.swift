@@ -183,7 +183,7 @@ extension MemberCardCreationContentView {
                     }
                     .shadow(color: isEnabled ? Color.goPrimary.opacity(0.22) : Color.clear, radius: 14, y: 6) // ui-v4: allow primary creation action glow
                 }
-                .buttonStyle(ScaleButtonStyle())
+                .buttonStyle(ScaleButtonStyle(triggersHaptic: !isLastStep))
                 .disabled(!isEnabled)
             }
             .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)

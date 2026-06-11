@@ -9,6 +9,9 @@ struct MemberCardCreationView: View {
     var onHumanSaved: ((Human) -> Void)?
     private let recoverySessionId: UUID
     private let presentationStyle: MemberCreationPresentationStyle
+    private let onHomeJoinHandoffPreflight: (() -> Void)?
+    private let onHomeJoinHandoffStarted: (() -> Void)?
+    private let onHomeJoinHandoffEnded: (() -> Void)?
 
     @Query(sort: \Pet.createdAt) private var existingPets: [Pet]
     @Query(sort: \Human.createdAt) private var existingHumans: [Human]
@@ -20,7 +23,10 @@ struct MemberCardCreationView: View {
         onPetSaved: ((Pet) -> Void)? = nil,
         onHumanSaved: ((Human) -> Void)? = nil,
         recoverySessionId: UUID = UUID(),
-        presentationStyle: MemberCreationPresentationStyle = .standard
+        presentationStyle: MemberCreationPresentationStyle = .standard,
+        onHomeJoinHandoffPreflight: (() -> Void)? = nil,
+        onHomeJoinHandoffStarted: (() -> Void)? = nil,
+        onHomeJoinHandoffEnded: (() -> Void)? = nil
     ) {
         self.kind = kind
         self.onComplete = onComplete
@@ -29,6 +35,9 @@ struct MemberCardCreationView: View {
         self.onHumanSaved = onHumanSaved
         self.recoverySessionId = recoverySessionId
         self.presentationStyle = presentationStyle
+        self.onHomeJoinHandoffPreflight = onHomeJoinHandoffPreflight
+        self.onHomeJoinHandoffStarted = onHomeJoinHandoffStarted
+        self.onHomeJoinHandoffEnded = onHomeJoinHandoffEnded
     }
 
     var body: some View {
@@ -41,7 +50,10 @@ struct MemberCardCreationView: View {
             existingPets: existingPets,
             existingHumans: existingHumans,
             recoverySessionId: recoverySessionId,
-            presentationStyle: presentationStyle
+            presentationStyle: presentationStyle,
+            onHomeJoinHandoffPreflight: onHomeJoinHandoffPreflight,
+            onHomeJoinHandoffStarted: onHomeJoinHandoffStarted,
+            onHomeJoinHandoffEnded: onHomeJoinHandoffEnded
         )
     }
 }

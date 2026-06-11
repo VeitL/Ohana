@@ -5,13 +5,15 @@ import SwiftUI
 
 struct ScaleButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    var triggersHaptic = true
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .modifier(
                 OhanaButtonPressFeedbackModifier(
                     isPressed: configuration.isPressed,
-                    isEnabled: isEnabled
+                    isEnabled: isEnabled,
+                    triggersHaptic: triggersHaptic
                 )
             )
             .animation(GoMotion.reduced, value: isEnabled)
