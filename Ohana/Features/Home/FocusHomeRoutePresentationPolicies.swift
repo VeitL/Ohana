@@ -36,7 +36,16 @@ extension AppPresentationPolicyProvider {
     }
 
     static func policy(for route: HomeSheetRoute) -> AppPresentationPolicy {
-        homeSheetPagePolicy("home.\(route.presentationName)")
+        if route.isQuickEntry {
+            return AppPresentationPolicy(
+                surface: .sheetPage,
+                loading: .immediate,
+                instrumentationName: "home.\(route.presentationName)",
+                detents: [.large],
+                cornerRadius: OhanaRadius.sheetPage
+            )
+        }
+        return homeSheetPagePolicy("home.\(route.presentationName)")
     }
 
     static func policy(for route: HomeFullScreenRoute) -> AppPresentationPolicy {
@@ -79,6 +88,50 @@ extension AppPresentationPolicyProvider {
 }
 
 private extension HomeSheetRoute {
+    var isQuickEntry: Bool {
+        switch self {
+        case .petWeightQuick,
+             .petExpenseQuick,
+             .humanMedicationQuick,
+             .humanWeightQuick,
+             .humanWorkoutQuick,
+             .humanExpenseQuick,
+             .humanNoteQuick:
+            true
+        case .petAllFeatures,
+             .humanAllFeatures,
+             .petBasicInfo,
+             .humanBasicInfo,
+             .petFood,
+             .petWeight,
+             .petExpense,
+             .petFeed,
+             .petWater,
+             .petPotty,
+             .petLitter,
+             .petPlay,
+             .petHygiene,
+             .petWalkSummary,
+             .petHealth,
+             .petMedication,
+             .petMomentHistory,
+             .petDocuments,
+             .petAchievements,
+             .petRetention,
+             .petBondVault,
+             .humanMedication,
+             .humanWeight,
+             .humanWorkout,
+             .humanWorkoutDashboard,
+             .humanMetrics,
+             .humanReport,
+             .humanExpense,
+             .humanWishlist,
+             .humanNote:
+            false
+        }
+    }
+
     var presentationName: String {
         switch self {
         case .petAllFeatures:

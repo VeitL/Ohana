@@ -345,7 +345,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
     }
 
     private func inlineMenu(item: VerticalHomeEmbeddedAction, detailAction: (() -> Void)?, index: Int) -> some View {
-        HStack(spacing: 8) {
+        let buttonCount = menuButtonCount(for: item)
+        let buttonWidth = inlineMenuButtonWidth(buttonCount: buttonCount)
+        let buttonSpacing = inlineMenuSpacing(buttonCount: buttonCount)
+        return HStack(spacing: buttonSpacing) {
             if item.menuOptions.isEmpty {
                 if item.showsQuickButton {
                     inlineMenuButton(
@@ -355,6 +358,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         foreground: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.42) : Color.arkInk,
                         accessibility: item.quickAccessibilityLabel,
                         isDisabled: item.isPrimaryDisabled,
+                        buttonWidth: buttonWidth,
                         action: item.action
                     )
                 }
@@ -367,6 +371,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                         foreground: Color.arkInk,
                         accessibility: option.title,
                         isDisabled: false,
+                        buttonWidth: buttonWidth,
                         action: { item.optionAction(option.id) }
                     )
                 }
@@ -380,6 +385,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     foreground: Color.goCardWhite,
                     accessibility: item.detailAccessibilityLabel,
                     isDisabled: false,
+                    buttonWidth: buttonWidth,
                     action: detailAction
                 )
             }
@@ -389,7 +395,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         .shadow(color: Color.arkInk.opacity(0.24), radius: 14, x: 0, y: 8) // ui-v4: allow embedded quick action submenu lift
         .fixedSize()
         .offset(
-            x: menuOffsetX(index: index, buttonCount: menuButtonCount(for: item)),
+            x: menuOffsetX(index: index, buttonCount: buttonCount),
             y: menuOffsetY(index: index)
         )
     }
@@ -432,6 +438,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         foreground: Color,
         accessibility: String,
         isDisabled: Bool,
+        buttonWidth: CGFloat,
         action: @escaping () -> Void
     ) -> some View {
         Button {
@@ -451,7 +458,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 color: foreground,
                 animatesStateChanges: false
             )
-            .frame(width: 44, height: 38)
+            .frame(width: buttonWidth, height: 38)
             .background(tint, in: Circle())
             .contentShape(Rectangle())
         }
@@ -661,6 +668,16 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
     private func menuOffsetY(index: Int) -> CGFloat {
         opensMenuAbove(index: index) ? -66 : 66
+    }
+
+    private func inlineMenuButtonWidth(buttonCount: Int) -> CGFloat {
+        if buttonCount >= 6 { return 38 }
+        if buttonCount >= 5 { return 40 }
+        return 44
+    }
+
+    private func inlineMenuSpacing(buttonCount: Int) -> CGFloat {
+        buttonCount >= 5 ? 6 : 8
     }
 
     private func menuOffsetX(index: Int, buttonCount: Int) -> CGFloat {

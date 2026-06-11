@@ -31,6 +31,8 @@ struct VerticalSolidHomeExpandedCardActions: View {
     @State private var renderModel = VerticalSolidHomeExpandedActionRenderModel.empty
     @State private var renderModelTask: Task<Void, Never>?
     @State private var jiggleTask: Task<Void, Never>?
+    @State private var observedHomeRevision = HomeRevision()
+    @State private var currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
 
     private var l: L10n { localization }
 
@@ -53,7 +55,15 @@ struct VerticalSolidHomeExpandedCardActions: View {
             onAdd: addAction
         )
         .onAppear {
+            observedHomeRevision = appServices.domainRevisions.homeRevision
+            currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
             scheduleRenderModelRefresh(normalizesStoredItems: true)
+        }
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { revision in
+            observedHomeRevision = revision
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            currentDayToken = HomeReadModelRefreshKey.dayToken(for: Date())
         }
         .onChange(of: card.id) { _, _ in
             exitEditMode(persists: false)
@@ -82,6 +92,8 @@ struct VerticalSolidHomeExpandedCardActions: View {
             quickActionItemsRaw,
             localization.languageCode,
             activeHumanID?.uuidString ?? "",
+            "\(observedHomeRevision.value)",
+            "\(currentDayToken)",
             "\(allEvents.count)",
             "\(humanMedications.count)",
             "\(humanMedicationLogs.count)",
@@ -215,7 +227,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
     private func makeEmbeddedAction(_ item: QuickActionItem) -> VerticalHomeEmbeddedAction {
         let state = quickActionState(for: item)
         let options = menuOptions(for: item)
-        let menuPolicy = embeddedMenuPolicy(for: item, options: options)
+        let menuPolicy = state.isLocked ? .none : embeddedMenuPolicy(for: item, options: options)
         let directActionUsesQuickPath = menuPolicy.showsQuickButton
         return VerticalHomeEmbeddedAction(
             id: item.id,
