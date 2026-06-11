@@ -116,31 +116,9 @@ struct QuickFeedDetailContent: View {
     @StateObject var overviewSnapshotStore: QuickFeedOverviewSnapshotStore
     @StateObject var planCalendarSnapshotStore: QuickFeedPlanCalendarSnapshotStore
     @StateObject var treatSnapshotStore: QuickFeedTreatSnapshotStore
-    @State var activeAlert: QuickFeedAlertRoute?
-    @State var pendingRepeatAction: (() -> Void)?
-    @State var activeOverlay: QuickFeedOverlayRoute?
-    @State var toastTask: Task<Void, Never>?
+    @StateObject var presentationState = QuickFeedPresentationState()
+    @StateObject var runtimeState = QuickFeedRuntimeState()
     @StateObject var feedHomeController: FeedHomeController
-    @State var feedDetailDataTask: Task<Void, Never>?
-    @State var didApplyInitialSheet = false
-    @State var didScheduleBootstrapMaintenance = false
-    @State var overviewChartProgress: Double = 1
-    @State var feedModeTransitionTask: Task<Void, Never>?
-    @State var feedModeMaintenanceTask: Task<Void, Never>?
-    @State var feedRefreshTask: Task<Void, Never>?
-    @State var feedPlanSaveTask: Task<Void, Never>?
-    @State var feedPlanReminderSchedulingTask: Task<Void, Never>?
-    @State var feedStockReminderSchedulingTask: Task<Void, Never>?
-    @State var pendingFeedRefreshRequest = QuickFeedRefreshRequest()
-    @State var clockTick = Date()
-    @State var lastFeedClockMinute: Int = -1
-    @State var feedFeedbackToken: CheckInFeedbackToken?
-    @State var feedFeedbackMetricId: String?
-    @State var stockFeedbackToken: CheckInFeedbackToken?
-    @State var stockFeedbackKind: FeedFoodKind?
-    @State var treatFeedbackToken: CheckInFeedbackToken?
-    @State var activeEmbeddedPanel: ActiveFeedEmbeddedPanel?
-    @State var feedbackClearTask: Task<Void, Never>?
     @FocusState var focusedField: FeedInputField?
 
     let stockReminderAdvanceOptions = [1, 3, 7, 14]
@@ -252,8 +230,8 @@ struct QuickFeedDetailContent: View {
             deleteFoodRecordTitle: deleteFoodRecordAlertTitle,
             deleteFoodRecordConfirmTitle: deleteFoodRecordConfirmTitle,
             deleteFoodRecordMessage: deleteFoodRecordAlertMessage,
-            activeAlert: $activeAlert,
-            pendingRepeatAction: $pendingRepeatAction,
+            activeAlert: activeAlertBinding,
+            pendingRepeatAction: pendingRepeatActionBinding,
             onDeleteFeedLog: deleteFeedLog,
             onDeleteFoodRecord: deleteFoodRecord
         )
@@ -573,13 +551,8 @@ struct QuickFeedDetailContent: View {
     }
 
     func cancelFeedTasks() {
-        feedModeTransitionTask?.cancel()
-        feedModeMaintenanceTask?.cancel()
-        feedDetailDataTask?.cancel()
-        feedRefreshTask?.cancel()
-        feedPlanSaveTask?.cancel()
-        feedPlanReminderSchedulingTask?.cancel()
-        feedStockReminderSchedulingTask?.cancel()
+        runtimeState.cancelTasks()
+        presentationState.cancelTransientTasks()
         draftStore.isSavingFeedPlan = false
         feedHomeController.cancel()
     }

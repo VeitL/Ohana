@@ -134,7 +134,7 @@ extension FamilyCollaborationDashboardView {
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
             VStack(alignment: .leading, spacing: 3) {
-                Text(reminder.event?.title ?? l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe"))
+                Text(reminderTitle(reminder))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)

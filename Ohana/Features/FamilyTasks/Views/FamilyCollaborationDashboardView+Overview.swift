@@ -96,7 +96,7 @@ extension FamilyCollaborationDashboardView {
         guard let reminder = todayAssignedReminders.first else {
             return l.tr(zh: "没有指派给你的任务", en: "Nothing assigned to you", de: "Dir ist nichts zugewiesen")
         }
-        return reminder.event?.title ?? reminderSubtitle(reminder)
+        return reminderTitle(reminder, fallback: reminderSubtitle(reminder))
     }
 
     var gapSlotSubtitle: String {

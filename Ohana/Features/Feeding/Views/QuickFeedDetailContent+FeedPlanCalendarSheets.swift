@@ -289,37 +289,16 @@ extension QuickFeedDetailContent {
         let grams = formattedFoodWeight(FeedRuleMetadata.amountGrams(from: event, fallback: pet.dailyPortionGrams))
         let status = feedPlanStatus(for: occurrence)
         let actionTitle = feedPlanActionTitle(for: occurrence)
-        return HStack(spacing: 10) {
-            Image(systemName: status.icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
-                .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(status.tint, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(status.title)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text("\(occurrence.date.formatted(date: .omitted, time: .shortened)) · \(event.foodKind.title(l)) · \(grams)")
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+        return QuickFeedPlanStatusRow(
+            icon: status.icon,
+            title: status.title,
+            detail: "\(occurrence.date.formatted(date: .omitted, time: .shortened)) · \(event.foodKind.title(l)) · \(grams)",
+            tint: status.tint,
+            actionTitle: actionTitle,
+            onAction: actionTitle == nil ? nil : {
+                completeSelectedPlanOccurrence(occurrence)
             }
-            Spacer()
-            if let actionTitle {
-                Button {
-                    completeSelectedPlanOccurrence(occurrence)
-                } label: {
-                    Text(actionTitle)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(status.tint, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-        }
-        .padding(12)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
+        )
     }
 
     @ViewBuilder

@@ -110,6 +110,101 @@ nonisolated enum CloudSyncRecordApplier {
         return result
     }
 
+    @discardableResult
+    static func applyHardDeletedRecord(
+        recordID: CKRecord.ID,
+        recordType: CKRecord.RecordType,
+        deletedAt: Date = Date(),
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        let entityName = CloudSyncRecordState.normalizedEntityName(recordType)
+        guard let descriptor = CloudSyncEntityRegistry.descriptor(for: entityName),
+              descriptor.uploadsToCloudKit else {
+            return .skippedUnsupported(entityName: entityName)
+        }
+        guard supportsApply(for: descriptor.entityName) else {
+            return .skippedUnsupported(entityName: descriptor.entityName)
+        }
+        let matchedState = try CloudSyncMetadataService.state(
+            entityName: descriptor.entityName,
+            ckRecordName: recordID.recordName,
+            ckZoneName: recordID.zoneID.zoneName,
+            context: context
+        )
+        let parsedLocalRecordId = CloudSyncRecordIdentityParser.localRecordIdFromRecordName(
+            recordID.recordName,
+            entityName: descriptor.entityName
+        )
+        guard let rawLocalRecordId = parsedLocalRecordId ?? matchedState?.localRecordId else {
+            throw CloudSyncRecordApplyError.missingLocalRecordId(recordName: recordID.recordName)
+        }
+        let localRecordId = CloudSyncRecordState.normalizedRecordId(rawLocalRecordId)
+        guard let localRecordUUID = UUID(uuidString: localRecordId) else {
+            throw CloudSyncRecordApplyError.invalidLocalRecordId(
+                entityName: descriptor.entityName,
+                localRecordId: localRecordId
+            )
+        }
+
+        let matchedHouseholdId = matchedState?.householdId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawHouseholdId = CloudSyncRecordIdentityParser.householdIdFromZoneName(recordID.zoneID.zoneName)
+            ?? (matchedHouseholdId?.isEmpty == false ? matchedHouseholdId : nil)
+            ?? (descriptor.entityName == String(describing: Household.self) ? localRecordId : "")
+        let householdId = CloudSyncRecordState.normalizedRecordId(rawHouseholdId)
+        let householdUUID = UUID(uuidString: householdId)
+        let recordKey = CloudSyncRecordState.recordKey(
+            entityName: descriptor.entityName,
+            localRecordId: localRecordId
+        )
+
+        try deleteLocalModel(
+            entityName: descriptor.entityName,
+            localRecordUUID: localRecordUUID,
+            context: context
+        )
+        let state: CloudSyncRecordState
+        let existingState: CloudSyncRecordState? = if let matchedState {
+            matchedState
+        } else {
+            try CloudSyncMetadataService.state(recordKey: recordKey, context: context)
+        }
+        if let existing = existingState {
+            state = existing
+            state.householdId = householdId
+            state.conflictPolicy = descriptor.defaultConflictPolicy
+        } else {
+            state = CloudSyncRecordState(
+                entityName: descriptor.entityName,
+                localRecordId: localRecordUUID,
+                householdId: householdUUID,
+                ckZoneName: recordID.zoneID.zoneName,
+                ckRecordName: recordID.recordName,
+                ckChangeTag: "",
+                conflictPolicy: descriptor.defaultConflictPolicy,
+                isDeleted: true,
+                deletedAt: deletedAt,
+                hasPendingLocalChanges: false,
+                lastModifiedAt: deletedAt,
+                lastSyncedAt: Date(),
+                createdAt: deletedAt,
+                updatedAt: Date()
+            )
+            context.insert(state)
+        }
+        state.ckRecordName = recordID.recordName
+        state.ckZoneName = recordID.zoneID.zoneName
+        state.ckChangeTag = ""
+        state.isDeleted = true
+        state.isDeletionTombstone = true
+        state.deletedAt = deletedAt
+        state.deletedByHumanId = ""
+        state.hasPendingLocalChanges = false
+        state.lastModifiedAt = deletedAt
+        state.lastSyncedAt = Date()
+        state.updatedAt = Date()
+        return .deleted(entityName: descriptor.entityName, localRecordId: localRecordId)
+    }
+
     private static func supportsApply(for entityName: String) -> Bool {
         CloudSyncEntityRegistry.supportsUploadPipeline(for: entityName)
     }
@@ -542,49 +637,61 @@ nonisolated enum CloudSyncRecordApplier {
     }
 
     private static func deleteLocalModel(metadata: RemoteMetadata, context: ModelContext) throws {
-        switch metadata.entityName {
+        try deleteLocalModel(
+            entityName: metadata.entityName,
+            localRecordUUID: metadata.localRecordUUID,
+            context: context
+        )
+    }
+
+    private static func deleteLocalModel(
+        entityName: String,
+        localRecordUUID: UUID,
+        context: ModelContext
+    ) throws {
+        switch entityName {
         case String(describing: Household.self):
-            if let model = try fetchHousehold(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchHousehold(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: Pet.self):
-            if let model = try fetchPet(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchPet(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: Human.self):
-            if let model = try fetchHuman(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchHuman(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: PetCareLog.self):
-            if let model = try fetchPetCareLog(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchPetCareLog(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: PetPottyLog.self):
-            if let model = try fetchPetPottyLog(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchPetPottyLog(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: PetHygieneLog.self):
-            if let model = try fetchPetHygieneLog(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchPetHygieneLog(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: PetHealthLog.self):
-            if let model = try fetchPetHealthLog(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchPetHealthLog(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: PetWalkLog.self):
-            if let model = try fetchPetWalkLog(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchPetWalkLog(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: PetExpenseLog.self):
-            if let model = try fetchPetExpenseLog(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchPetExpenseLog(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: PetWeightLog.self):
-            if let model = try fetchPetWeightLog(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchPetWeightLog(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: CoconutLedgerEntry.self):
-            if let model = try fetchCoconutLedgerEntry(id: metadata.localRecordUUID, context: context) {
+            if let model = try fetchCoconutLedgerEntry(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         default:
@@ -707,7 +814,10 @@ private nonisolated struct RemoteMetadata {
             record.string(for: CloudSyncRecordFieldKey.entityName) ?? record.recordType
         )
         let rawLocalRecordId = record.string(for: CloudSyncRecordFieldKey.localRecordId)
-            ?? Self.localRecordIdFromRecordName(record.recordID.recordName, entityName: entityName)
+            ?? CloudSyncRecordIdentityParser.localRecordIdFromRecordName(
+                record.recordID.recordName,
+                entityName: entityName
+            )
         guard let rawLocalRecordId else {
             throw CloudSyncRecordApplyError.missingLocalRecordId(recordName: record.recordID.recordName)
         }
@@ -725,7 +835,7 @@ private nonisolated struct RemoteMetadata {
             ?? CloudSyncRecordState.recordKey(entityName: entityName, localRecordId: normalizedLocalRecordId)
 
         let rawHouseholdId = record.string(for: CloudSyncRecordFieldKey.householdId)
-            ?? Self.householdIdFromZoneName(record.recordID.zoneID.zoneName)
+            ?? CloudSyncRecordIdentityParser.householdIdFromZoneName(record.recordID.zoneID.zoneName)
             ?? (entityName == String(describing: Household.self) ? normalizedLocalRecordId : "")
         householdId = CloudSyncRecordState.normalizedRecordId(rawHouseholdId)
         householdUUID = UUID(uuidString: householdId)
@@ -740,14 +850,16 @@ private nonisolated struct RemoteMetadata {
             .flatMap(CloudSyncConflictPolicy.init(rawValue:))
             ?? CloudSyncMergePolicy.defaultConflictPolicy(for: entityName)
     }
+}
 
-    private static func localRecordIdFromRecordName(_ recordName: String, entityName: String) -> String? {
+private nonisolated enum CloudSyncRecordIdentityParser {
+    static func localRecordIdFromRecordName(_ recordName: String, entityName: String) -> String? {
         let prefix = "\(entityName)_"
         guard recordName.hasPrefix(prefix) else { return nil }
         return String(recordName.dropFirst(prefix.count))
     }
 
-    private static func householdIdFromZoneName(_ zoneName: String) -> String? {
+    static func householdIdFromZoneName(_ zoneName: String) -> String? {
         let prefix = "household-"
         guard zoneName.hasPrefix(prefix) else { return nil }
         return String(zoneName.dropFirst(prefix.count))

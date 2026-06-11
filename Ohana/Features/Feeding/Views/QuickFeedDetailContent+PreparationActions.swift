@@ -2,6 +2,71 @@ import SwiftUI
 import UIKit
 
 extension QuickFeedDetailContent {
+    var clockTick: Date {
+        get { runtimeState.clockTick }
+        nonmutating set { runtimeState.clockTick = newValue }
+    }
+
+    var overviewChartProgress: Double {
+        get { runtimeState.overviewChartProgress }
+        nonmutating set { runtimeState.overviewChartProgress = newValue }
+    }
+
+    var feedDetailDataTask: Task<Void, Never>? {
+        get { runtimeState.feedDetailDataTask }
+        nonmutating set { runtimeState.feedDetailDataTask = newValue }
+    }
+
+    var didApplyInitialSheet: Bool {
+        get { runtimeState.didApplyInitialSheet }
+        nonmutating set { runtimeState.didApplyInitialSheet = newValue }
+    }
+
+    var didScheduleBootstrapMaintenance: Bool {
+        get { runtimeState.didScheduleBootstrapMaintenance }
+        nonmutating set { runtimeState.didScheduleBootstrapMaintenance = newValue }
+    }
+
+    var feedModeTransitionTask: Task<Void, Never>? {
+        get { runtimeState.feedModeTransitionTask }
+        nonmutating set { runtimeState.feedModeTransitionTask = newValue }
+    }
+
+    var feedModeMaintenanceTask: Task<Void, Never>? {
+        get { runtimeState.feedModeMaintenanceTask }
+        nonmutating set { runtimeState.feedModeMaintenanceTask = newValue }
+    }
+
+    var feedRefreshTask: Task<Void, Never>? {
+        get { runtimeState.feedRefreshTask }
+        nonmutating set { runtimeState.feedRefreshTask = newValue }
+    }
+
+    var feedPlanSaveTask: Task<Void, Never>? {
+        get { runtimeState.feedPlanSaveTask }
+        nonmutating set { runtimeState.feedPlanSaveTask = newValue }
+    }
+
+    var feedPlanReminderSchedulingTask: Task<Void, Never>? {
+        get { runtimeState.feedPlanReminderSchedulingTask }
+        nonmutating set { runtimeState.feedPlanReminderSchedulingTask = newValue }
+    }
+
+    var feedStockReminderSchedulingTask: Task<Void, Never>? {
+        get { runtimeState.feedStockReminderSchedulingTask }
+        nonmutating set { runtimeState.feedStockReminderSchedulingTask = newValue }
+    }
+
+    var pendingFeedRefreshRequest: QuickFeedRefreshRequest {
+        get { runtimeState.pendingFeedRefreshRequest }
+        nonmutating set { runtimeState.pendingFeedRefreshRequest = newValue }
+    }
+
+    var lastFeedClockMinute: Int {
+        get { runtimeState.lastFeedClockMinute }
+        nonmutating set { runtimeState.lastFeedClockMinute = newValue }
+    }
+
     func syncDisplayedFeedMode(animated: Bool = false, force: Bool = false) {
         guard force || feedHomeController.modeTransition == nil else { return }
         let resolvedMode = FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: clockTick)

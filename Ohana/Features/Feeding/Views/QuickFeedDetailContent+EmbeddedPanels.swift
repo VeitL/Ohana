@@ -218,7 +218,7 @@ extension QuickFeedDetailContent {
 
     func embeddedPlanMealEditor(index: Int, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(FeedRuleMetadata.mealName(for: draftStore.planMeals[index].time), systemImage: "clock.fill")
+            Label(FeedRuleMetadata.localizedMealName(for: draftStore.planMeals[index].time, l: l), systemImage: "clock.fill")
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(tint)
             DatePicker(

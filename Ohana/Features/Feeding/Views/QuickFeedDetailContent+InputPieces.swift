@@ -110,67 +110,24 @@ extension QuickFeedDetailContent {
         selection: FeedFoodKind,
         setSelection: @escaping (FeedFoodKind) -> Void
     ) -> some View {
-        GeometryReader { proxy in
-            let spacing = CGFloat(10)
-            let options = FeedFoodKind.allCases
-            let selectedIndex = options.firstIndex(of: selection) ?? 0
-            let segmentWidth = max(0, (proxy.size.width - spacing) / 2)
-            let selectedTint = foodKindTint(selection)
-
-            ZStack(alignment: .leading) {
-                HStack(spacing: spacing) {
-                    ForEach(options) { _ in
-                        Capsule()
-                            .fill(Color.ohanaControlFill.opacity(0.82))
-                            .frame(width: segmentWidth, height: 46)
-                    }
-                }
-
-                Capsule()
-                    .fill(selectedTint)
-                    .frame(width: segmentWidth, height: 46)
-                    .offset(x: CGFloat(selectedIndex) * (segmentWidth + spacing))
-                    .shadow(color: selectedTint.opacity(0.20), radius: 10, y: 5) // ui-v4: allow stable local segmented-control lift
-                    .animation(GoMotion.page, value: selection)
-
-                HStack(spacing: spacing) {
-                    ForEach(options) { foodKind in
-                        Button {
-                            setSelection(foodKind)
-                        } label: {
-                            Text(foodKind.title(l))
-                                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                                .foregroundStyle(selection == foodKind ? Color.arkInk : foodKindTint(foodKind))
-                                .contentTransition(.opacity)
-                                .frame(width: segmentWidth, height: 46)
-                                .contentShape(Capsule())
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                    }
-                }
-            }
-        }
-        .frame(height: 46)
+        QuickFeedFoodKindSegmentedControl(
+            selection: selection,
+            title: { $0.title(l) },
+            tintForKind: foodKindTint,
+            setSelection: setSelection
+        )
     }
 
     func treatKindPicker(selection: Binding<FeedTreatKind>) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], spacing: 8) {
-            ForEach(FeedTreatKind.allCases) { treatKind in
-                Button {
-                    withAnimation(GoMotion.feedback) {
-                        selection.wrappedValue = treatKind
-                    }
-                    UISelectionFeedbackGenerator().selectionChanged()
-                } label: {
-                    Label(treatKind.title(l), systemImage: treatKind.systemIconName)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(selection.wrappedValue == treatKind ? Color.arkInk : treatTint)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(selection.wrappedValue == treatKind ? treatTint : treatTint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-                }
-                .buttonStyle(ScaleButtonStyle())
+        QuickFeedTreatKindPicker(
+            selection: selection.wrappedValue,
+            title: { $0.title(l) },
+            tint: treatTint
+        ) { treatKind in
+            withAnimation(GoMotion.feedback) {
+                selection.wrappedValue = treatKind
             }
+            UISelectionFeedbackGenerator().selectionChanged()
         }
     }
 
@@ -179,24 +136,13 @@ extension QuickFeedDetailContent {
         let filtered = draftStore.stockBrandText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? brands
             : brands.filter { $0.localizedCaseInsensitiveContains(draftStore.stockBrandText) }
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(Array(filtered.prefix(18)), id: \.self) { brand in
-                    Button {
-                        draftStore.stockBrandText = brand
-                        dismissFeedKeyboard()
-                        UISelectionFeedbackGenerator().selectionChanged()
-                    } label: {
-                        Text(brand)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(stockTint)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(stockTint.opacity(0.12), in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
+        return QuickFeedBrandSuggestionChips(
+            brands: Array(filtered.prefix(18)),
+            tint: stockTint
+        ) { brand in
+            draftStore.stockBrandText = brand
+            dismissFeedKeyboard()
+            UISelectionFeedbackGenerator().selectionChanged()
         }
     }
 
@@ -243,89 +189,63 @@ extension QuickFeedDetailContent {
         tint: Color,
         quickValues: [Double]
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            HStack(spacing: 10) {
-                gramStepButton(systemName: "minus", tint: tint) {
-                    adjustGramText(text, delta: -5)
-                }
-                Button {
-                    openFeedNumberPad(field)
-                } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(text.wrappedValue.isEmpty ? "50" : text.wrappedValue)
-                            .font(OhanaFont.adaptive(size: 32, weight: .black, design: .rounded))
-                            .foregroundStyle(text.wrappedValue.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
-                            .monospacedDigit()
-                        Text("g")
-                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
-                            .foregroundStyle(tint)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(ScaleButtonStyle())
-                gramStepButton(systemName: "plus", tint: tint) {
-                    adjustGramText(text, delta: 5)
-                }
+        QuickFeedGramInput(
+            title: title,
+            text: text,
+            tint: tint,
+            onDecrease: {
+                dismissFeedKeyboard()
+                adjustGramText(text, delta: -5)
+                UISelectionFeedbackGenerator().selectionChanged()
+            },
+            onIncrease: {
+                dismissFeedKeyboard()
+                adjustGramText(text, delta: 5)
+                UISelectionFeedbackGenerator().selectionChanged()
+            },
+            onOpenNumberPad: {
+                openFeedNumberPad(field)
+            },
+            keypad: {
+                feedInlineNumberPad(field: field, text: text, tint: tint, maxFractionDigits: 0)
+            },
+            chips: {
+                quickGramChips(values: quickValues, text: text, tint: tint)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
-
-            feedInlineNumberPad(field: field, text: text, tint: tint, maxFractionDigits: 0)
-            quickGramChips(values: quickValues, text: text, tint: tint)
-        }
+        )
     }
 
     func gramStepButton(systemName: String, tint: Color, action: @escaping () -> Void) -> some View {
-        Button {
+        QuickFeedGramStepButton(systemName: systemName, tint: tint) {
             dismissFeedKeyboard()
             action()
             UISelectionFeedbackGenerator().selectionChanged()
-        } label: {
-            Image(systemName: systemName)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
-                .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(tint, in: Circle())
         }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityAddTraits(.isButton)
     }
 
     func planMealGramEditor(index: Int, tint: Color) -> some View {
         let field = FeedInputField.planMealGrams(index)
         let text = planMealGramsTextBinding(index: index)
-        return VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                gramStepButton(systemName: "minus", tint: tint) {
-                    adjustPlanMealGrams(index: index, delta: -5)
-                }
-                Button {
-                    openFeedNumberPad(field)
-                } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(text.wrappedValue.isEmpty ? "50" : text.wrappedValue)
-                            .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(text.wrappedValue.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
-                            .monospacedDigit()
-                        Text("g")
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(tint)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(ScaleButtonStyle())
-                gramStepButton(systemName: "plus", tint: tint) {
-                    adjustPlanMealGrams(index: index, delta: 5)
-                }
+        return QuickFeedPlanMealGramEditor(
+            valueText: text.wrappedValue,
+            tint: tint,
+            onDecrease: {
+                dismissFeedKeyboard()
+                adjustPlanMealGrams(index: index, delta: -5)
+                UISelectionFeedbackGenerator().selectionChanged()
+            },
+            onIncrease: {
+                dismissFeedKeyboard()
+                adjustPlanMealGrams(index: index, delta: 5)
+                UISelectionFeedbackGenerator().selectionChanged()
+            },
+            onOpenNumberPad: {
+                openFeedNumberPad(field)
+            },
+            keypad: {
+                feedInlineNumberPad(field: field, text: text, tint: tint, maxFractionDigits: 0)
             }
-            feedInlineNumberPad(field: field, text: text, tint: tint, maxFractionDigits: 0)
-        }
-        .padding(10)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
+        )
     }
 
     func adjustGramText(_ text: Binding<String>, delta: Double) {
@@ -356,30 +276,17 @@ extension QuickFeedDetailContent {
         field: FeedInputField,
         tint: Color
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            HStack(spacing: 5) {
-                Button {
-                    openFeedNumberPad(field)
-                } label: {
-                    Text(text.wrappedValue.isEmpty ? "50" : text.wrappedValue)
-                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
-                        .foregroundStyle(text.wrappedValue.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
-                        .monospacedDigit()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(ScaleButtonStyle())
-                Text("g")
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(tint)
+        QuickFeedGramInputCompact(
+            title: title,
+            text: text,
+            tint: tint,
+            onOpenNumberPad: {
+                openFeedNumberPad(field)
+            },
+            keypad: {
+                feedInlineNumberPad(field: field, text: text, tint: tint, maxFractionDigits: 0)
             }
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            feedInlineNumberPad(field: field, text: text, tint: tint, maxFractionDigits: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        )
     }
 
     func openFeedNumberPad(_ field: FeedInputField) {
@@ -425,24 +332,14 @@ extension QuickFeedDetailContent {
     }
 
     func quickGramChips(values: [Double], text: Binding<String>, tint: Color) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(values, id: \.self) { value in
-                    Button {
-                        dismissFeedKeyboard()
-                        text.wrappedValue = String(format: "%.0f", value)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                    } label: {
-                        Text(formattedFoodWeight(value))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(tint)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(tint.opacity(0.12), in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
+        QuickFeedQuickGramChips(
+            values: values,
+            title: formattedFoodWeight,
+            tint: tint
+        ) { value in
+            dismissFeedKeyboard()
+            text.wrappedValue = String(format: "%.0f", value)
+            UISelectionFeedbackGenerator().selectionChanged()
         }
     }
 
@@ -452,44 +349,19 @@ extension QuickFeedDetailContent {
         tint: Color,
         @ViewBuilder control: () -> some View
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            HStack {
-                Text(value)
-                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(tint)
-                Spacer()
-                control()
-            }
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        QuickFeedPlanStepperCard(
+            title: title,
+            value: value,
+            tint: tint,
+            control: control
+        )
     }
 
     func compactNotice(icon: String, text: String, tint: Color) -> some View {
-        HStack(alignment: .top, spacing: 9) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
-                .foregroundStyle(tint)
-                .frame(width: 18)
-            Text(text)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
+        QuickFeedCompactNotice(icon: icon, text: text, tint: tint)
     }
 
     func errorText(_ text: String) -> some View {
-        Label(text, systemImage: "exclamationmark.triangle.fill")
-            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-            .foregroundStyle(Color.goRed)
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
+        QuickFeedErrorText(text: text)
     }
 }

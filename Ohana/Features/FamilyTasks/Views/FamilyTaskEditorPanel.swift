@@ -59,7 +59,7 @@ struct FamilyTaskEditorPanel: View {
             let reminder = context.reminder
             let currentHumanId = currentHuman?.id.uuidString
             let firstAssignableId = humans.first { $0.id.uuidString != currentHumanId }?.id.uuidString ?? ""
-            _title = State(initialValue: reminder?.event?.title ?? "")
+            _title = State(initialValue: Self.reminderTitle(reminder, l: L10n()))
             _note = State(initialValue: "")
             _selectedHumanId = State(initialValue: firstAssignableId)
             _reward = State(initialValue: 0)
@@ -157,7 +157,7 @@ struct FamilyTaskEditorPanel: View {
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
             VStack(alignment: .leading, spacing: 3) {
-                Text(reminder.event?.title ?? l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe"))
+                Text(Self.reminderTitle(reminder, l: l))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(reminder.scheduledAt.formatted(date: .abbreviated, time: .shortened))
@@ -168,6 +168,13 @@ struct FamilyTaskEditorPanel: View {
         }
         .padding(12)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+    }
+
+    private static func reminderTitle(_ reminder: Reminder?, l: L10n) -> String {
+        guard let event = reminder?.event else {
+            return l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe")
+        }
+        return FeedRuleMetadata.localizedTitle(for: event, l: l)
     }
 
     private func textFieldBlock(title: String, placeholder: String, text: Binding<String>) -> some View {

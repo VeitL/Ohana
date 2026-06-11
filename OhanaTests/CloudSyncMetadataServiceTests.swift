@@ -77,6 +77,142 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func metadataServiceFindsStateByCloudKitRecordIdentity() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let recordId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Pet.self),
+            localRecordId: recordId,
+            householdId: householdId,
+            context: context
+        )
+        CloudSyncMetadataService.markSynced(
+            state,
+            ckRecordName: "legacy-pet-record-name",
+            ckChangeTag: "server-change-tag",
+            ckZoneName: "household-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        )
+
+        let found = try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            ckRecordName: "legacy-pet-record-name",
+            ckZoneName: "household-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            context: context
+        )
+
+        #expect(found?.recordKey == state.recordKey)
+        #expect(try CloudSyncMetadataService.state(
+            entityName: String(describing: Human.self),
+            ckRecordName: "legacy-pet-record-name",
+            ckZoneName: "household-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            context: context
+        ) == nil)
+    }
+
+    @MainActor
+    @Test func metadataServiceDeduplicatesStatesByRecordKey() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let recordId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let older = CloudSyncRecordState(
+            entityName: String(describing: Pet.self),
+            localRecordId: recordId,
+            householdId: householdId,
+            ckChangeTag: "old-tag",
+            hasPendingLocalChanges: true,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 100),
+            lastSyncedAt: Date(timeIntervalSinceReferenceDate: 150),
+            createdAt: Date(timeIntervalSinceReferenceDate: 100),
+            updatedAt: Date(timeIntervalSinceReferenceDate: 150)
+        )
+        let newer = CloudSyncRecordState(
+            entityName: String(describing: Pet.self),
+            localRecordId: recordId,
+            householdId: householdId,
+            ckChangeTag: "new-tag",
+            hasPendingLocalChanges: true,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 300),
+            lastSyncedAt: Date(timeIntervalSinceReferenceDate: 350),
+            createdAt: Date(timeIntervalSinceReferenceDate: 300),
+            updatedAt: Date(timeIntervalSinceReferenceDate: 350)
+        )
+        context.insert(older)
+        context.insert(newer)
+
+        let recordKey = older.recordKey
+        let found = try CloudSyncMetadataService.state(recordKey: recordKey, context: context)
+        try context.save()
+
+        #expect(found?.id == newer.id)
+        let remaining = try context.fetch(FetchDescriptor<CloudSyncRecordState>(
+            predicate: #Predicate<CloudSyncRecordState> {
+                $0.recordKey == recordKey
+            }
+        ))
+        #expect(remaining.map(\.id) == [newer.id])
+    }
+
+    @MainActor
+    @Test func metadataServiceDeduplicatesStatesByCloudKitRecordIdentity() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let olderRecordId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let newerRecordId = uuid("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+        let recordName = "legacy-pet-record-name"
+        let zoneName = "household-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        let older = CloudSyncRecordState(
+            entityName: String(describing: Pet.self),
+            localRecordId: olderRecordId,
+            householdId: householdId,
+            ckZoneName: zoneName,
+            ckRecordName: recordName,
+            ckChangeTag: "old-tag",
+            hasPendingLocalChanges: false,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 100),
+            lastSyncedAt: Date(timeIntervalSinceReferenceDate: 200),
+            createdAt: Date(timeIntervalSinceReferenceDate: 100),
+            updatedAt: Date(timeIntervalSinceReferenceDate: 200)
+        )
+        let newer = CloudSyncRecordState(
+            entityName: String(describing: Pet.self),
+            localRecordId: newerRecordId,
+            householdId: householdId,
+            ckZoneName: zoneName,
+            ckRecordName: recordName,
+            ckChangeTag: "new-tag",
+            hasPendingLocalChanges: false,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 300),
+            lastSyncedAt: Date(timeIntervalSinceReferenceDate: 400),
+            createdAt: Date(timeIntervalSinceReferenceDate: 300),
+            updatedAt: Date(timeIntervalSinceReferenceDate: 400)
+        )
+        context.insert(older)
+        context.insert(newer)
+
+        let found = try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            ckRecordName: recordName,
+            ckZoneName: zoneName,
+            context: context
+        )
+        try context.save()
+
+        #expect(found?.recordKey == newer.recordKey)
+        let remaining = try context.fetch(FetchDescriptor<CloudSyncRecordState>(
+            predicate: #Predicate<CloudSyncRecordState> {
+                $0.entityName == "Pet" &&
+                    $0.ckRecordName == recordName &&
+                    $0.ckZoneName == zoneName
+            }
+        ))
+        #expect(remaining.map(\.recordKey) == [newer.recordKey])
+    }
+
+    @MainActor
     @Test func mergePolicyCallsOutCountersAndLedgerProjections() {
         #expect(
             CloudSyncMergePolicy.conflictPolicy(
@@ -929,6 +1065,7 @@ struct CloudSyncMetadataServiceTests {
             Date(timeIntervalSinceReferenceDate: 4000).timeIntervalSinceReferenceDate,
             forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey
         )
+        defaults.set(CloudSyncRetryOperation.fetch.rawValue, forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey)
 
         let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
         let household = Household(name: "Shared Home")
@@ -973,6 +1110,7 @@ struct CloudSyncMetadataServiceTests {
         #expect(defaults.data(forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey) == nil)
         #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) == nil)
         #expect(defaults.object(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey) == nil)
         #expect(petState.hasPendingLocalChanges)
         #expect(petState.ckChangeTag.isEmpty)
         #expect(petState.lastModifiedAt == restagedAt)
@@ -1237,6 +1375,38 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func cloudSyncEngineServiceClearsStaleSharedOwnerWhenSharedScopeHasBlankOwner() {
+        let suiteName = "CloudSyncEngineServiceBlankSharedOwnerTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(Data("stale-state".utf8), forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey)
+        defaults.set("old-share-owner", forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey)
+        defaults.set(2, forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey)
+        defaults.set(
+            Date(timeIntervalSinceReferenceDate: 1000).timeIntervalSinceReferenceDate,
+            forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey
+        )
+        defaults.set(CloudSyncRetryOperation.send.rawValue, forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey)
+
+        let service = CloudSyncEngineService(
+            userDefaults: defaults,
+            ownerName: "private-owner",
+            automaticallySync: false
+        )
+
+        service.setDatabaseScope(.sharedCloudDatabase, zoneOwnerName: "   ")
+
+        #expect(service.databaseScope == .sharedCloudDatabase)
+        #expect(service.recordZoneOwnerName == "private-owner")
+        #expect(defaults.string(forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey) == nil)
+        #expect(defaults.data(forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey) == nil)
+    }
+
+    @MainActor
     @Test func cloudSyncEngineServiceIgnoresRemoteNotificationsWhenDisabled() async throws {
         let container = try makeContainer()
         let suiteName = "CloudSyncEngineServiceRemoteNotificationTests-\(UUID().uuidString)"
@@ -1271,6 +1441,7 @@ struct CloudSyncMetadataServiceTests {
             Date(timeIntervalSinceReferenceDate: 4000).timeIntervalSinceReferenceDate,
             forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey
         )
+        defaults.set(CloudSyncRetryOperation.fetch.rawValue, forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey)
 
         let service = CloudSyncEngineService(
             userDefaults: defaults,
@@ -1288,6 +1459,7 @@ struct CloudSyncMetadataServiceTests {
         #expect(defaults.data(forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey) == nil)
         #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) == nil)
         #expect(defaults.object(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey) == nil)
     }
 
     @MainActor
@@ -1296,6 +1468,25 @@ struct CloudSyncMetadataServiceTests {
         #expect(CloudSyncSharedZoneAccessFailureClassifier.isSharedZoneAccessLoss(CKError(.permissionFailure)))
         #expect(CloudSyncSharedZoneAccessFailureClassifier.isSharedZoneAccessLoss(CKError(.userDeletedZone)))
         #expect(!CloudSyncSharedZoneAccessFailureClassifier.isSharedZoneAccessLoss(CKError(.networkUnavailable)))
+    }
+
+    @MainActor
+    @Test func sharedZoneAccessFailureClassifierDetectsRevokedShareInsidePartialFailure() {
+        let recordID = CKRecord.ID(
+            recordName: "revoked-record",
+            zoneID: CKRecordZone.ID(zoneName: "household-zone", ownerName: "share-owner")
+        )
+        let partialFailure = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.partialFailure.rawValue,
+            userInfo: [
+                CKPartialErrorsByItemIDKey: [
+                    recordID: CKError(.permissionFailure)
+                ] as [CKRecord.ID: Error]
+            ]
+        )
+
+        #expect(CloudSyncSharedZoneAccessFailureClassifier.isSharedZoneAccessLoss(partialFailure))
     }
 
     @MainActor
@@ -1368,6 +1559,41 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func transientRetryPolicyUsesRetryAfterInsidePartialFailure() throws {
+        let now = Date(timeIntervalSinceReferenceDate: 2400)
+        let recordID = CKRecord.ID(
+            recordName: "rate-limited-record",
+            zoneID: CKRecordZone.ID(zoneName: "household-zone", ownerName: CKCurrentUserDefaultName)
+        )
+        let rateLimited = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.requestRateLimited.rawValue,
+            userInfo: [CKErrorRetryAfterKey: 17.0]
+        )
+        let partialFailure = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.partialFailure.rawValue,
+            userInfo: [
+                CKPartialErrorsByItemIDKey: [
+                    recordID: rateLimited
+                ] as [CKRecord.ID: Error]
+            ]
+        )
+
+        let plan = try #require(CloudSyncTransientErrorRetryPolicy.plan(
+            for: partialFailure,
+            operation: .send,
+            previousAttempt: 1,
+            now: now
+        ))
+
+        #expect(plan.operation == .send)
+        #expect(plan.attempt == 2)
+        #expect(plan.delaySeconds == 17)
+        #expect(plan.nextRetryAt == now.addingTimeInterval(17))
+    }
+
+    @MainActor
     @Test func cloudSyncEngineServiceQueuesTransientRetryWithoutClearingSharedScope() {
         let suiteName = "CloudSyncEngineServiceTransientRetryTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1396,15 +1622,48 @@ struct CloudSyncMetadataServiceTests {
         #expect(!service.hasSharedZoneAccessRevokedNotice)
         #expect(service.hasPendingTransientRetry)
         #expect(service.nextTransientRetryAt == now.addingTimeInterval(5))
+        #expect(service.pendingTransientRetryOperation == .send)
         #expect(defaults.integer(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) == 1)
         #expect(defaults.double(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey) == now.addingTimeInterval(5).timeIntervalSinceReferenceDate)
+        #expect(defaults.string(forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey) == CloudSyncRetryOperation.send.rawValue)
 
         service.setEnabled(false)
 
         #expect(!service.hasPendingTransientRetry)
         #expect(service.nextTransientRetryAt == nil)
+        #expect(service.pendingTransientRetryOperation == nil)
         #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) == nil)
         #expect(defaults.object(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey) == nil)
+    }
+
+    @MainActor
+    @Test func cloudSyncEngineServiceRestoresPersistedTransientRetryPlan() {
+        let suiteName = "CloudSyncEngineServicePersistedTransientRetryTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let nextRetryAt = Date(timeIntervalSinceReferenceDate: 4500)
+        defaults.set(3, forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey)
+        defaults.set(nextRetryAt.timeIntervalSinceReferenceDate, forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey)
+        defaults.set(CloudSyncRetryOperation.fetch.rawValue, forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey)
+
+        let service = CloudSyncEngineService(
+            userDefaults: defaults,
+            automaticallySync: false
+        )
+
+        let futurePlan = service.pendingTransientRetryPlan(now: Date(timeIntervalSinceReferenceDate: 4400))
+        let duePlan = service.pendingTransientRetryPlan(now: Date(timeIntervalSinceReferenceDate: 4600))
+
+        #expect(service.hasPendingTransientRetry)
+        #expect(service.pendingTransientRetryOperation == .fetch)
+        #expect(futurePlan?.operation == .fetch)
+        #expect(futurePlan?.attempt == 3)
+        #expect(futurePlan?.delaySeconds == 100)
+        #expect(futurePlan?.nextRetryAt == nextRetryAt)
+        #expect(duePlan?.delaySeconds == 0)
     }
 
     @MainActor
@@ -1430,6 +1689,173 @@ struct CloudSyncMetadataServiceTests {
         #expect(batch.recordsToSave.count == 1)
         #expect(batch.recordsToSave.first?.recordID.recordName == secondPayload.recordName)
         #expect(batch.recordIDsToDelete.isEmpty)
+    }
+
+    @MainActor
+    @Test func engineDelegateAdapterAppliesServerRecordChangedFailureThroughFetchedApplier() async throws {
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let serverRecord = try makeRecordPayload(
+            localRecordId: householdId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 7000),
+            fields: ["name": .string("Server Home")]
+        ).makeCKRecord()
+        let error = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.serverRecordChanged.rawValue,
+            userInfo: [CKRecordChangedErrorServerRecordKey: serverRecord]
+        )
+        let applier = CapturingCloudSyncFetchedRecordApplier()
+        let runtime = CloudSyncEngineDelegateAdapter(
+            uploadPayloadProvider: StaticCloudSyncUploadPayloadProvider(payloads: []),
+            fetchedRecordApplier: applier
+        )
+
+        let resolved = await runtime.resolveFailedRecordSaveConflicts([
+            CloudSyncFailedRecordSaveContext(
+                recordName: serverRecord.recordID.recordName,
+                error: error
+            ),
+            CloudSyncFailedRecordSaveContext(
+                recordName: "network-failure",
+                error: CKError(.networkUnavailable)
+            )
+        ])
+
+        #expect(resolved == [serverRecord.recordID.recordName])
+        #expect(applier.appliedRecordNames == [serverRecord.recordID.recordName])
+    }
+
+    @MainActor
+    @Test func engineDelegateAdapterMatchesServerRecordChangedPartialFailureByRecordName() async throws {
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let decoyRecord = try makeRecordPayload(
+            localRecordId: uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 7050),
+            fields: ["name": .string("Decoy Home")]
+        ).makeCKRecord()
+        let targetRecord = try makeRecordPayload(
+            localRecordId: householdId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 7060),
+            fields: ["name": .string("Target Home")]
+        ).makeCKRecord()
+        let decoyError = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.serverRecordChanged.rawValue,
+            userInfo: [CKRecordChangedErrorServerRecordKey: decoyRecord]
+        )
+        let targetError = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.serverRecordChanged.rawValue,
+            userInfo: [CKRecordChangedErrorServerRecordKey: targetRecord]
+        )
+        let partialFailure = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.partialFailure.rawValue,
+            userInfo: [
+                CKPartialErrorsByItemIDKey: [
+                    decoyRecord.recordID: decoyError,
+                    targetRecord.recordID: targetError
+                ] as [CKRecord.ID: Error]
+            ]
+        )
+        let applier = CapturingCloudSyncFetchedRecordApplier()
+        let runtime = CloudSyncEngineDelegateAdapter(
+            uploadPayloadProvider: StaticCloudSyncUploadPayloadProvider(payloads: []),
+            fetchedRecordApplier: applier
+        )
+
+        let resolved = await runtime.resolveFailedRecordSaveConflicts([
+            CloudSyncFailedRecordSaveContext(
+                recordName: targetRecord.recordID.recordName,
+                error: partialFailure
+            )
+        ])
+
+        #expect(resolved == [targetRecord.recordID.recordName])
+        #expect(applier.appliedRecordNames == [targetRecord.recordID.recordName])
+    }
+
+    @MainActor
+    @Test func engineDelegateAdapterKeepsFailedServerRecordConflictUnresolved() async throws {
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let serverRecord = try makeRecordPayload(
+            localRecordId: householdId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 7100),
+            fields: ["name": .string("Server Home")]
+        ).makeCKRecord()
+        let error = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.serverRecordChanged.rawValue,
+            userInfo: [CKRecordChangedErrorServerRecordKey: serverRecord]
+        )
+        let runtime = CloudSyncEngineDelegateAdapter(
+            uploadPayloadProvider: StaticCloudSyncUploadPayloadProvider(payloads: []),
+            fetchedRecordApplier: FailingCloudSyncFetchedRecordApplier()
+        )
+
+        let resolved = await runtime.resolveFailedRecordSaveConflicts([
+            CloudSyncFailedRecordSaveContext(
+                recordName: serverRecord.recordID.recordName,
+                error: error
+            )
+        ])
+
+        #expect(resolved.isEmpty)
+    }
+
+    @MainActor
+    @Test func engineDelegateAdapterResolvesMixedServerRecordConflictsIndividually() async throws {
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let resolvedRecord = try makeRecordPayload(
+            localRecordId: householdId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 7200),
+            fields: ["name": .string("Resolved Home")]
+        ).makeCKRecord()
+        let unresolvedRecord = try makeRecordPayload(
+            localRecordId: uuid("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 7210),
+            fields: ["name": .string("Unresolved Home")]
+        ).makeCKRecord()
+        let resolvedError = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.serverRecordChanged.rawValue,
+            userInfo: [CKRecordChangedErrorServerRecordKey: resolvedRecord]
+        )
+        let unresolvedError = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.serverRecordChanged.rawValue,
+            userInfo: [CKRecordChangedErrorServerRecordKey: unresolvedRecord]
+        )
+        let applier = SelectiveFailingCloudSyncFetchedRecordApplier(
+            failingRecordNames: [unresolvedRecord.recordID.recordName]
+        )
+        let runtime = CloudSyncEngineDelegateAdapter(
+            uploadPayloadProvider: StaticCloudSyncUploadPayloadProvider(payloads: []),
+            fetchedRecordApplier: applier
+        )
+
+        let resolved = await runtime.resolveFailedRecordSaveConflicts([
+            CloudSyncFailedRecordSaveContext(
+                recordName: resolvedRecord.recordID.recordName,
+                error: resolvedError
+            ),
+            CloudSyncFailedRecordSaveContext(
+                recordName: unresolvedRecord.recordID.recordName,
+                error: unresolvedError
+            )
+        ])
+
+        #expect(resolved == [resolvedRecord.recordID.recordName])
+        #expect(applier.appliedRecordNames == [
+            resolvedRecord.recordID.recordName,
+            unresolvedRecord.recordID.recordName
+        ])
     }
 
     @MainActor
@@ -1766,6 +2192,115 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordApplierAppliesCloudKitHardDeletionAsSyncedTombstone() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let petId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 5000)
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        context.insert(pet)
+        let recordName = CloudSyncZoneNaming.recordName(
+            entityName: String(describing: Pet.self),
+            localRecordId: normalized(petId)
+        )
+        let zoneName = CloudSyncZoneNaming.zoneName(forHouseholdId: normalized(householdId))
+        let recordID = CKRecord.ID(
+            recordName: recordName,
+            zoneID: CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
+        )
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 1000),
+            context: context
+        )
+        CloudSyncMetadataService.markSynced(
+            state,
+            ckRecordName: recordID.recordName,
+            ckChangeTag: "old-tag",
+            ckZoneName: recordID.zoneID.zoneName,
+            syncedAt: Date(timeIntervalSinceReferenceDate: 1200)
+        )
+
+        let result = try CloudSyncRecordApplier.applyHardDeletedRecord(
+            recordID: recordID,
+            recordType: String(describing: Pet.self),
+            deletedAt: deletedAt,
+            context: context
+        )
+
+        #expect(result == .deleted(entityName: "Pet", localRecordId: normalized(petId)))
+        #expect(try fetchPet(id: petId, context: context) == nil)
+        let tombstone = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            context: context
+        ))
+        #expect(tombstone.isDeleted)
+        #expect(tombstone.isDeletionTombstone)
+        #expect(!tombstone.hasPendingLocalChanges)
+        #expect(tombstone.ckRecordName == recordName)
+        #expect(tombstone.ckZoneName == zoneName)
+        #expect(tombstone.ckChangeTag.isEmpty)
+        #expect(tombstone.deletedAt == deletedAt)
+    }
+
+    @MainActor
+    @Test func recordApplierAppliesHardDeletionUsingStoredCloudKitRecordIdentity() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let petId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 5200)
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        context.insert(pet)
+        let recordName = "legacy-pet-record-name"
+        let zoneName = CloudSyncZoneNaming.zoneName(forHouseholdId: normalized(householdId))
+        let recordID = CKRecord.ID(
+            recordName: recordName,
+            zoneID: CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
+        )
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 1000),
+            context: context
+        )
+        CloudSyncMetadataService.markSynced(
+            state,
+            ckRecordName: recordID.recordName,
+            ckChangeTag: "old-tag",
+            ckZoneName: recordID.zoneID.zoneName,
+            syncedAt: Date(timeIntervalSinceReferenceDate: 1200)
+        )
+
+        let result = try CloudSyncRecordApplier.applyHardDeletedRecord(
+            recordID: recordID,
+            recordType: String(describing: Pet.self),
+            deletedAt: deletedAt,
+            context: context
+        )
+
+        #expect(result == .deleted(entityName: "Pet", localRecordId: normalized(petId)))
+        #expect(try fetchPet(id: petId, context: context) == nil)
+        let tombstone = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            context: context
+        ))
+        #expect(tombstone.isDeletionTombstone)
+        #expect(!tombstone.hasPendingLocalChanges)
+        #expect(tombstone.ckRecordName == recordName)
+        #expect(tombstone.ckZoneName == zoneName)
+        #expect(tombstone.deletedAt == deletedAt)
+    }
+
+    @MainActor
     @Test func localStoreActorAppliesFetchedRecordsThroughRecordApplier() async throws {
         let container = try makeContainer()
         let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
@@ -1782,6 +2317,60 @@ struct CloudSyncMetadataServiceTests {
         let verificationContext = ModelContext(container)
         let household = try #require(try fetchHousehold(id: householdId, context: verificationContext))
         #expect(household.name == "Actor Home")
+    }
+
+    @MainActor
+    @Test func localStoreActorAppliesFetchedRecordDeletionsThroughRecordApplier() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let petId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        context.insert(pet)
+        let recordName = CloudSyncZoneNaming.recordName(
+            entityName: String(describing: Pet.self),
+            localRecordId: normalized(petId)
+        )
+        let zoneName = CloudSyncZoneNaming.zoneName(forHouseholdId: normalized(householdId))
+        let recordID = CKRecord.ID(
+            recordName: recordName,
+            zoneID: CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
+        )
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            context: context
+        )
+        CloudSyncMetadataService.markSynced(
+            state,
+            ckRecordName: recordID.recordName,
+            ckChangeTag: "old-tag",
+            ckZoneName: recordID.zoneID.zoneName
+        )
+        try context.save()
+
+        let actor = CloudSyncLocalStoreActor(modelContainer: container)
+        let summary = try await actor.applyFetchedRecordDeletions([
+            CloudSyncFetchedRecordDeletion(
+                recordID: recordID,
+                recordType: String(describing: Pet.self)
+            )
+        ])
+
+        #expect(summary.deleted == 1)
+        let verificationContext = ModelContext(container)
+        #expect(try fetchPet(id: petId, context: verificationContext) == nil)
+        let tombstone = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            context: verificationContext
+        ))
+        #expect(tombstone.isDeletionTombstone)
+        #expect(!tombstone.hasPendingLocalChanges)
+        #expect(tombstone.ckRecordName == recordName)
+        #expect(tombstone.ckZoneName == zoneName)
     }
 
     @MainActor
@@ -1895,5 +2484,46 @@ private struct StaticCloudSyncUploadPayloadProvider: CloudSyncEngineUploadPayloa
 
     func uploadPayloads() async throws -> [CloudSyncRecordPayload] {
         payloads
+    }
+}
+
+private final class CapturingCloudSyncFetchedRecordApplier: CloudSyncEngineFetchedRecordApplying {
+    private(set) var appliedRecordNames: [String] = []
+
+    func applyFetchedRecords(_ records: [CKRecord]) async throws -> CloudSyncRecordApplySummary {
+        appliedRecordNames.append(contentsOf: records.map(\.recordID.recordName))
+        var summary = CloudSyncRecordApplySummary.empty
+        summary.updated = records.count
+        return summary
+    }
+}
+
+private final class SelectiveFailingCloudSyncFetchedRecordApplier: CloudSyncEngineFetchedRecordApplying {
+    private let failingRecordNames: Set<String>
+    private(set) var appliedRecordNames: [String] = []
+
+    init(failingRecordNames: Set<String>) {
+        self.failingRecordNames = failingRecordNames
+    }
+
+    func applyFetchedRecords(_ records: [CKRecord]) async throws -> CloudSyncRecordApplySummary {
+        appliedRecordNames.append(contentsOf: records.map(\.recordID.recordName))
+        var summary = CloudSyncRecordApplySummary.empty
+        for record in records {
+            if failingRecordNames.contains(record.recordID.recordName) {
+                summary.failed += 1
+            } else {
+                summary.updated += 1
+            }
+        }
+        return summary
+    }
+}
+
+private struct FailingCloudSyncFetchedRecordApplier: CloudSyncEngineFetchedRecordApplying {
+    func applyFetchedRecords(_: [CKRecord]) async throws -> CloudSyncRecordApplySummary {
+        var summary = CloudSyncRecordApplySummary.empty
+        summary.failed = 1
+        return summary
     }
 }

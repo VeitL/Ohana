@@ -155,7 +155,33 @@ nonisolated enum CloudSyncMetadataService {
         recordKey: String,
         context: ModelContext
     ) throws -> CloudSyncRecordState? {
-        try states(recordKey: recordKey, context: context).first
+        let matchedStates = try states(recordKey: recordKey, context: context)
+        guard let canonical = matchedStates.first else { return nil }
+        deleteDuplicateStates(matchedStates, keeping: canonical, context: context)
+        return canonical
+    }
+
+    static func state(
+        entityName: String,
+        ckRecordName: String,
+        ckZoneName: String,
+        context: ModelContext
+    ) throws -> CloudSyncRecordState? {
+        let normalizedEntityName = CloudSyncRecordState.normalizedEntityName(entityName)
+        let trimmedRecordName = ckRecordName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedZoneName = ckZoneName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedRecordName.isEmpty, !trimmedZoneName.isEmpty else {
+            return nil
+        }
+        let matchedStates = try states(
+            entityName: normalizedEntityName,
+            ckRecordName: trimmedRecordName,
+            ckZoneName: trimmedZoneName,
+            context: context
+        )
+        guard let canonical = matchedStates.first else { return nil }
+        deleteDuplicateStates(matchedStates, keeping: canonical, context: context)
+        return canonical
     }
 
     private static func normalizedHouseholdId(_ householdId: UUID?) -> String? {
@@ -168,6 +194,26 @@ nonisolated enum CloudSyncMetadataService {
     ) throws -> [CloudSyncRecordState] {
         let descriptor = FetchDescriptor<CloudSyncRecordState>(
             predicate: #Predicate<CloudSyncRecordState> { $0.recordKey == recordKey },
+            sortBy: [
+                SortDescriptor(\.updatedAt, order: .reverse),
+                SortDescriptor(\.lastModifiedAt, order: .reverse)
+            ]
+        )
+        return try context.fetch(descriptor)
+    }
+
+    private static func states(
+        entityName: String,
+        ckRecordName: String,
+        ckZoneName: String,
+        context: ModelContext
+    ) throws -> [CloudSyncRecordState] {
+        let descriptor = FetchDescriptor<CloudSyncRecordState>(
+            predicate: #Predicate<CloudSyncRecordState> {
+                $0.entityName == entityName &&
+                    $0.ckRecordName == ckRecordName &&
+                    $0.ckZoneName == ckZoneName
+            },
             sortBy: [
                 SortDescriptor(\.updatedAt, order: .reverse),
                 SortDescriptor(\.lastModifiedAt, order: .reverse)

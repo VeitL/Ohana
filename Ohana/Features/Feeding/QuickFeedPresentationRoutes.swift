@@ -5,6 +5,7 @@
 //  Typed presentation routes for the feeding detail flow.
 //
 
+import Combine
 import SwiftUI
 
 enum QuickFeedAlertRoute: Identifiable {
@@ -55,5 +56,37 @@ enum QuickFeedOverlayRoute: Identifiable {
         case let .treatCelebration(id, _):
             id
         }
+    }
+}
+
+@MainActor
+final class QuickFeedPresentationState: ObservableObject {
+    @Published var activeAlert: QuickFeedAlertRoute?
+    @Published var activeOverlay: QuickFeedOverlayRoute?
+    @Published var feedFeedbackToken: CheckInFeedbackToken?
+    @Published var feedFeedbackMetricId: String?
+    @Published var stockFeedbackToken: CheckInFeedbackToken?
+    @Published var stockFeedbackKind: FeedFoodKind?
+    @Published var treatFeedbackToken: CheckInFeedbackToken?
+    @Published var activeEmbeddedPanel: ActiveFeedEmbeddedPanel?
+
+    var pendingRepeatAction: (() -> Void)?
+    var toastTask: Task<Void, Never>?
+    var feedbackClearTask: Task<Void, Never>?
+
+    func clearFeedback() {
+        feedFeedbackToken = nil
+        feedFeedbackMetricId = nil
+        stockFeedbackToken = nil
+        stockFeedbackKind = nil
+        treatFeedbackToken = nil
+    }
+
+    func cancelTransientTasks() {
+        toastTask?.cancel()
+        feedbackClearTask?.cancel()
+        toastTask = nil
+        feedbackClearTask = nil
+        pendingRepeatAction = nil
     }
 }

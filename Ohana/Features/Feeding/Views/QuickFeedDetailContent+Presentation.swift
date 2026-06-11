@@ -9,6 +9,75 @@ import SwiftUI
 import UIKit
 
 extension QuickFeedDetailContent {
+    var activeAlert: QuickFeedAlertRoute? {
+        get { presentationState.activeAlert }
+        nonmutating set { presentationState.activeAlert = newValue }
+    }
+
+    var activeAlertBinding: Binding<QuickFeedAlertRoute?> {
+        Binding(
+            get: { presentationState.activeAlert },
+            set: { presentationState.activeAlert = $0 }
+        )
+    }
+
+    var pendingRepeatAction: (() -> Void)? {
+        get { presentationState.pendingRepeatAction }
+        nonmutating set { presentationState.pendingRepeatAction = newValue }
+    }
+
+    var pendingRepeatActionBinding: Binding<(() -> Void)?> {
+        Binding(
+            get: { presentationState.pendingRepeatAction },
+            set: { presentationState.pendingRepeatAction = $0 }
+        )
+    }
+
+    var activeOverlay: QuickFeedOverlayRoute? {
+        get { presentationState.activeOverlay }
+        nonmutating set { presentationState.activeOverlay = newValue }
+    }
+
+    var toastTask: Task<Void, Never>? {
+        get { presentationState.toastTask }
+        nonmutating set { presentationState.toastTask = newValue }
+    }
+
+    var feedFeedbackToken: CheckInFeedbackToken? {
+        get { presentationState.feedFeedbackToken }
+        nonmutating set { presentationState.feedFeedbackToken = newValue }
+    }
+
+    var feedFeedbackMetricId: String? {
+        get { presentationState.feedFeedbackMetricId }
+        nonmutating set { presentationState.feedFeedbackMetricId = newValue }
+    }
+
+    var stockFeedbackToken: CheckInFeedbackToken? {
+        get { presentationState.stockFeedbackToken }
+        nonmutating set { presentationState.stockFeedbackToken = newValue }
+    }
+
+    var stockFeedbackKind: FeedFoodKind? {
+        get { presentationState.stockFeedbackKind }
+        nonmutating set { presentationState.stockFeedbackKind = newValue }
+    }
+
+    var treatFeedbackToken: CheckInFeedbackToken? {
+        get { presentationState.treatFeedbackToken }
+        nonmutating set { presentationState.treatFeedbackToken = newValue }
+    }
+
+    var activeEmbeddedPanel: ActiveFeedEmbeddedPanel? {
+        get { presentationState.activeEmbeddedPanel }
+        nonmutating set { presentationState.activeEmbeddedPanel = newValue }
+    }
+
+    var feedbackClearTask: Task<Void, Never>? {
+        get { presentationState.feedbackClearTask }
+        nonmutating set { presentationState.feedbackClearTask = newValue }
+    }
+
     func systemFeedSheetContent(_ sheet: ActiveFeedSheet) -> some View {
         NavigationStack {
             ZStack {

@@ -92,32 +92,15 @@ extension QuickFeedDetailContent {
     }
 
     var stockCalculationModePicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(l.tr(zh: "粮仓计算", en: "Stock calculation", de: "Vorratsberechnung"))
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    ForEach(FeedStockCalculationMode.allCases) { mode in
-                        stockCalculationModeButton(mode)
-                    }
-                }
-                VStack(spacing: 10) {
-                    ForEach(FeedStockCalculationMode.allCases) { mode in
-                        stockCalculationModeButton(mode)
-                    }
-                }
-            }
-        }
-        .padding(12)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
-    }
-
-    func stockCalculationModeButton(_ mode: FeedStockCalculationMode) -> some View {
-        let isSelected = draftStore.stockCalculationMode == mode
-        let tint = stockCalculationModeTint(mode)
-        return Button {
+        QuickFeedStockCalculationModePicker(
+            title: l.tr(zh: "粮仓计算", en: "Stock calculation", de: "Vorratsberechnung"),
+            modes: Array(FeedStockCalculationMode.allCases),
+            selectedMode: draftStore.stockCalculationMode,
+            titleForMode: stockCalculationModeTitle,
+            subtitleForMode: stockCalculationModeSubtitle,
+            iconForMode: stockCalculationModeIcon,
+            tintForMode: stockCalculationModeTint
+        ) { mode in
             guard draftStore.stockCalculationMode != mode else {
                 UISelectionFeedbackGenerator().selectionChanged()
                 return
@@ -126,34 +109,7 @@ extension QuickFeedDetailContent {
                 draftStore.stockCalculationMode = mode
             }
             UISelectionFeedbackGenerator().selectionChanged()
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: stockCalculationModeIcon(mode))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(isSelected ? Color.arkInk : tint)
-                    .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(isSelected ? Color.arkInk.opacity(0.14) : tint.opacity(0.12), in: Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(stockCalculationModeTitle(mode))
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                    Text(stockCalculationModeSubtitle(mode))
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 12)
-            .frame(minHeight: 54)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? tint : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
         }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(stockCalculationModeTitle(mode))
     }
 
     func stockCalculationModeTitle(_ mode: FeedStockCalculationMode) -> String {
@@ -217,24 +173,12 @@ extension QuickFeedDetailContent {
     }
 
     func optionalStockDateRow(title: String, isOn: Binding<Bool>, date: Binding<Date>) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Toggle(isOn: isOn.animation(GoMotion.feedback)) {
-                Text(title)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-            }
-            .tint(stockTint)
-
-            if isOn.wrappedValue {
-                DatePicker("", selection: date, displayedComponents: .date)
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                    .tint(stockTint)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .padding(12)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
+        QuickFeedOptionalStockDateRow(
+            title: title,
+            isOn: isOn,
+            date: date,
+            tint: stockTint
+        )
     }
 
     var stockExpenseOptions: some View {
@@ -271,64 +215,22 @@ extension QuickFeedDetailContent {
     }
 
     var stockExpenseAmountInput: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(l.tr(zh: "金额", en: "Amount", de: "Betrag"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                Spacer()
-                Text(l.tr(zh: "可选", en: "Optional", de: "Optional"))
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(draftStore.stockExpenseAmountText.isEmpty ? Color.ohanaTertiaryText : stockTint)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+        QuickFeedStockExpenseAmountInput(
+            amountTitle: l.tr(zh: "金额", en: "Amount", de: "Betrag"),
+            optionalTitle: l.tr(zh: "可选", en: "Optional", de: "Optional"),
+            currencySymbol: AppCurrency.symbol,
+            placeholder: CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: AppCountry.code),
+            countryCode: AppCountry.code,
+            tint: stockTint,
+            amountText: $draftStore.stockExpenseAmountText,
+            isKeypadVisible: $draftStore.stockExpenseAmountKeypadVisible
+        ) {
+            dismissSystemFeedKeyboardIfNeeded()
+            focusedField = nil
+            withAnimation(GoMotion.feedback) {
+                draftStore.stockExpenseAmountKeypadVisible.toggle()
             }
-
-            Button {
-                dismissSystemFeedKeyboardIfNeeded()
-                focusedField = nil
-                withAnimation(GoMotion.feedback) {
-                    draftStore.stockExpenseAmountKeypadVisible.toggle()
-                }
-                UISelectionFeedbackGenerator().selectionChanged()
-            } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(AppCurrency.symbol)
-                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
-                        .foregroundStyle(stockTint)
-                    Text(draftStore.stockExpenseAmountText.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: AppCountry.code) : draftStore.stockExpenseAmountText)
-                        .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
-                        .foregroundStyle(draftStore.stockExpenseAmountText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.55)
-                    Spacer(minLength: 8)
-                    Image(systemName: draftStore.stockExpenseAmountKeypadVisible ? "keyboard.chevron.compact.down" : "number")
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
-                        .foregroundStyle(stockTint)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-            }
-            .buttonStyle(ScaleButtonStyle())
-
-            if draftStore.stockExpenseAmountKeypadVisible {
-                EmbeddedDecimalKeypad(
-                    text: $draftStore.stockExpenseAmountText,
-                    countryCode: AppCountry.code,
-                    maxFractionDigits: 2,
-                    accent: stockTint,
-                    isMini: true
-                ) {
-                    withAnimation(GoMotion.feedback) {
-                        draftStore.stockExpenseAmountKeypadVisible = false
-                    }
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
-            }
+            UISelectionFeedbackGenerator().selectionChanged()
         }
     }
 
@@ -387,34 +289,17 @@ extension QuickFeedDetailContent {
     }
 
     func stockDeleteCurrentRecordCard(record: PetFoodRecord) -> some View {
-        Button {
+        QuickFeedStockDeleteCurrentRecordCard(
+            title: l.tr(zh: "删除这袋粮", en: "Delete this bag", de: "Diesen Vorrat löschen"),
+            message: l.tr(
+                zh: "只删除当前补粮/开袋记录，不删除喂食历史。",
+                en: "Removes only this stock record, not feeding history.",
+                de: "Entfernt nur diesen Vorratseintrag, nicht die Fütterungshistorie."
+            ),
+            isDisabled: pet.hasPassedAway
+        ) {
             activeAlert = .deleteFoodRecord(record)
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "trash").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.goRed)
-                    .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(l.tr(zh: "删除这袋粮", en: "Delete this bag", de: "Diesen Vorrat löschen"))
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goRed)
-                    Text(l.tr(
-                        zh: "只删除当前补粮/开袋记录，不删除喂食历史。",
-                        en: "Removes only this stock record, not feeding history.",
-                        de: "Entfernt nur diesen Vorratseintrag, nicht die Fütterungshistorie."
-                    ))
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                Spacer()
-            }
-            .padding(14)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.input)
         }
-        .buttonStyle(ScaleButtonStyle())
-        .disabled(pet.hasPassedAway)
     }
 
     var managedStockRecords: [PetFoodRecord] {
@@ -435,132 +320,67 @@ extension QuickFeedDetailContent {
 
     func stockManagementCurrentCard(record: PetFoodRecord) -> some View {
         let snapshot = stockSnapshot.stock(for: draftStore.selectedStockFoodKind)
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(record.brand.isEmpty ? l.tr(zh: "当前余粮", en: "Current stock", de: "Aktueller Vorrat") : record.brand)
-                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text("\(draftStore.selectedStockFoodKind.title(l)) · \(formattedStockWeight(snapshot.remainingGrams))")
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(stockStatusTint(snapshot))
-                }
-                Spacer()
-                Text(snapshot.remainingDays > 0 ? "\(snapshot.remainingDays)d" : "--")
-                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(stockStatusTint(snapshot))
-            }
-
-            stockDateLine(
-                title: l.tr(zh: "购买", en: "Bought", de: "Gekauft"),
-                date: record.purchaseDate ?? record.startDate
-            )
-            stockDateLine(
-                title: l.tr(zh: "开袋", en: "Opened", de: "Geöffnet"),
-                date: record.startDate
-            )
-            if let grams = record.remainingCorrectionGrams, let date = record.remainingCorrectionDate {
-                Text(l.tr(
-                    zh: "已手动修正为 \(formattedStockWeight(grams)) · \(date.formatted(date: .numeric, time: .shortened))",
-                    en: "Manually corrected to \(formattedStockWeight(grams)) · \(date.formatted(date: .numeric, time: .shortened))",
-                    de: "Manuell korrigiert auf \(formattedStockWeight(grams)) · \(date.formatted(date: .numeric, time: .shortened))"
-                ))
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            }
-        }
-        .padding(14)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.input)
-        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-        .onTapGesture {
+        return QuickFeedStockManagementCurrentCard(
+            title: record.brand.isEmpty ? l.tr(zh: "当前余粮", en: "Current stock", de: "Aktueller Vorrat") : record.brand,
+            subtitle: "\(draftStore.selectedStockFoodKind.title(l)) · \(formattedStockWeight(snapshot.remainingGrams))",
+            remainingDaysText: snapshot.remainingDays > 0 ? "\(snapshot.remainingDays)d" : "--",
+            statusTint: stockStatusTint(snapshot),
+            purchaseTitle: l.tr(zh: "购买", en: "Bought", de: "Gekauft"),
+            purchaseDate: record.purchaseDate ?? record.startDate,
+            openTitle: l.tr(zh: "开袋", en: "Opened", de: "Geöffnet"),
+            openDate: record.startDate,
+            correctionText: stockCorrectionText(for: record)
+        ) {
             prepareStockSheet(record: record)
             openFeedSheet(.stock)
             UISelectionFeedbackGenerator().selectionChanged()
         }
-        .accessibilityAddTraits(.isButton)
     }
 
-    func stockDateLine(title: String, date: Date) -> some View {
-        HStack {
-            Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            Spacer()
-            Text(date.formatted(date: .numeric, time: .omitted))
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
+    func stockCorrectionText(for record: PetFoodRecord) -> String? {
+        guard let grams = record.remainingCorrectionGrams, let date = record.remainingCorrectionDate else {
+            return nil
         }
+        return l.tr(
+            zh: "已手动修正为 \(formattedStockWeight(grams)) · \(date.formatted(date: .numeric, time: .shortened))",
+            en: "Manually corrected to \(formattedStockWeight(grams)) · \(date.formatted(date: .numeric, time: .shortened))",
+            de: "Manuell korrigiert auf \(formattedStockWeight(grams)) · \(date.formatted(date: .numeric, time: .shortened))"
+        )
     }
 
     func stockCorrectionCard(record: PetFoodRecord) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(l.tr(zh: "手动修正余量", en: "Correct remaining stock", de: "Restbestand korrigieren"))
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            VStack(alignment: .leading, spacing: 8) {
-                Button {
-                    openFeedNumberPad(.stockCorrection)
-                } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(draftStore.stockCorrectionText.isEmpty ? "800" : draftStore.stockCorrectionText)
-                            .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
-                            .foregroundStyle(draftStore.stockCorrectionText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
-                            .monospacedDigit()
-                        Text("g")
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(stockTint)
-                        Spacer()
-                        Image(systemName: "number").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
-                            .foregroundStyle(stockTint)
-                    }
-                }
-                .buttonStyle(ScaleButtonStyle())
-
+        QuickFeedStockCorrectionCard(
+            title: l.tr(zh: "手动修正余量", en: "Correct remaining stock", de: "Restbestand korrigieren"),
+            placeholder: "800",
+            valueText: draftStore.stockCorrectionText,
+            unitText: "g",
+            tint: stockTint,
+            saveTitle: l.tr(zh: "保存修正", en: "Save correction", de: "Korrektur speichern"),
+            onOpenNumberPad: {
+                openFeedNumberPad(.stockCorrection)
+            },
+            onSave: {
+                correctStock(record)
+            },
+            keypad: {
                 feedInlineNumberPad(field: .stockCorrection, text: $draftStore.stockCorrectionText, tint: stockTint, maxFractionDigits: 0)
             }
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            FoodPrimaryButton(title: l.tr(zh: "保存修正", en: "Save correction", de: "Korrektur speichern"), icon: "checkmark", tint: stockTint) {
-                correctStock(record)
-            }
-        }
-        .padding(14)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.input)
+        )
     }
 
     var stockReminderManageCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Toggle(isOn: $draftStore.stockReminderEnabled) {
-                Text(l.tr(zh: "低余粮提醒", en: "Low stock reminder", de: "Vorrats-Erinnerung"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-            }
-            .tint(stockTint)
-
-            if draftStore.stockReminderEnabled {
-                Picker(l.tr(zh: "提前", en: "Advance", de: "Vorher"), selection: $draftStore.stockReminderAdvanceDays) {
-                    ForEach(stockReminderAdvanceOptions, id: \.self) { days in
-                        Text("\(days) \(l.tr(zh: "天", en: "days", de: "Tage"))").tag(days)
-                    }
-                }
-                .pickerStyle(.segmented)
-            }
-
-            Button {
-                saveStockReminderSettings()
-            } label: {
-                Label(l.tr(zh: "保存提醒", en: "Save reminder", de: "Erinnerung speichern"), systemImage: "bell.badge.fill")
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(stockTint)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-            }
-            .buttonStyle(ScaleButtonStyle())
+        QuickFeedStockReminderManageCard(
+            title: l.tr(zh: "低余粮提醒", en: "Low stock reminder", de: "Vorrats-Erinnerung"),
+            pickerTitle: l.tr(zh: "提前", en: "Advance", de: "Vorher"),
+            saveTitle: l.tr(zh: "保存提醒", en: "Save reminder", de: "Erinnerung speichern"),
+            dayTitle: { days in "\(days) \(l.tr(zh: "天", en: "days", de: "Tage"))" },
+            advanceOptions: stockReminderAdvanceOptions,
+            tint: stockTint,
+            isEnabled: $draftStore.stockReminderEnabled,
+            advanceDays: $draftStore.stockReminderAdvanceDays
+        ) {
+            saveStockReminderSettings()
         }
-        .padding(14)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.input)
     }
 
     var stockPendingRecordsCard: some View {

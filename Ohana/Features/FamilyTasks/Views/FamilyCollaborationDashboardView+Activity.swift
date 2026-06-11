@@ -89,7 +89,7 @@ extension FamilyCollaborationDashboardView {
                 .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(event?.title ?? l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe"))
+                Text(reminderTitle(reminder))
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -254,10 +254,18 @@ extension FamilyCollaborationDashboardView {
 
     func careGapLabels(for pet: Pet) -> [String] {
         let reminderLabels = openReminders(for: pet).compactMap { reminder in
-            reminder.event?.title.isEmpty == false ? reminder.event?.title : nil
+            let title = reminderTitle(reminder, fallback: "")
+            return title.isEmpty ? nil : title
         }
         if !reminderLabels.isEmpty { return reminderLabels }
         return missingCareLabels(for: pet)
+    }
+
+    func reminderTitle(_ reminder: Reminder, fallback: String? = nil) -> String {
+        guard let event = reminder.event else {
+            return fallback ?? l.tr(zh: "照护任务", en: "Care task", de: "Pflegeaufgabe")
+        }
+        return FeedRuleMetadata.localizedTitle(for: event, l: l)
     }
 
     func missingCareLabels(for pet: Pet) -> [String] {

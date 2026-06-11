@@ -30,6 +30,27 @@ protocol CloudSyncEngineFetchedRecordApplying {
     func applyFetchedRecords(_ records: [CKRecord]) async throws -> CloudSyncRecordApplySummary
 }
 
+nonisolated struct CloudSyncFetchedRecordDeletion: Equatable, Sendable {
+    let recordID: CKRecord.ID
+    let recordType: CKRecord.RecordType
+
+    init(recordID: CKRecord.ID, recordType: CKRecord.RecordType) {
+        self.recordID = recordID
+        self.recordType = recordType
+    }
+
+    init(_ deletion: CKDatabase.RecordZoneChange.Deletion) {
+        recordID = deletion.recordID
+        recordType = deletion.recordType
+    }
+}
+
+protocol CloudSyncEngineFetchedRecordDeletionApplying {
+    func applyFetchedRecordDeletions(
+        _ deletions: [CloudSyncFetchedRecordDeletion]
+    ) async throws -> CloudSyncRecordApplySummary
+}
+
 @MainActor
 protocol CloudSyncManaging {
     var isEnabled: Bool { get }
@@ -68,6 +89,7 @@ nonisolated enum CloudSyncEngineRuntime {
     static let sharedZoneAccessRevokedDefaultsKey = "ohana_cloud_sync_shared_zone_access_revoked"
     static let retryAttemptDefaultsKey = "ohana_cloud_sync_retry_attempt"
     static let nextRetryAtDefaultsKey = "ohana_cloud_sync_next_retry_at"
+    static let retryOperationDefaultsKey = "ohana_cloud_sync_retry_operation"
     static let firstRenderStartDelayMilliseconds: UInt64 = 6000
     static let retryBaseDelaySeconds: TimeInterval = 5
     static let retryMaxDelaySeconds: TimeInterval = 300
@@ -111,6 +133,31 @@ nonisolated enum CloudSyncAccountChangeResult: Equatable {
     case failed
 }
 
+nonisolated enum CloudSyncNestedErrorScanner {
+    static func errors(from value: Any) -> [Error] {
+        if let nested = value as? Error {
+            return [nested]
+        }
+        return keyedErrors(from: value).map(\.1)
+    }
+
+    static func keyedErrors(from value: Any) -> [(AnyHashable, Error)] {
+        if let nested = value as? [AnyHashable: Error] {
+            return nested.map { ($0.key, $0.value) }
+        }
+        if let nested = value as? [CKRecord.ID: Error] {
+            return nested.map { (AnyHashable($0.key), $0.value) }
+        }
+        if let nested = value as? [AnyHashable: Any] {
+            return nested.compactMap { key, value in
+                guard let error = value as? Error else { return nil }
+                return (key, error)
+            }
+        }
+        return []
+    }
+}
+
 nonisolated enum CloudSyncSharedZoneAccessFailureClassifier {
     private static let accessLossCodes: Set<CKError.Code> = [
         .permissionFailure,
@@ -131,13 +178,8 @@ nonisolated enum CloudSyncSharedZoneAccessFailureClassifier {
         }
 
         return nsError.userInfo.values.contains { value in
-            if let nested = value as? Error {
-                return isSharedZoneAccessLoss(nested)
-            }
-            if let nested = value as? [AnyHashable: Error] {
-                return nested.values.contains(where: isSharedZoneAccessLoss)
-            }
-            return false
+            CloudSyncNestedErrorScanner.errors(from: value)
+                .contains(where: isSharedZoneAccessLoss)
         }
     }
 
@@ -156,6 +198,86 @@ nonisolated enum CloudSyncSharedZoneAccessFailureClassifier {
 nonisolated enum CloudSyncRetryOperation: String, Sendable {
     case send
     case fetch
+}
+
+nonisolated struct CloudSyncFailedRecordSaveContext {
+    let recordName: String
+    let error: Error
+}
+
+nonisolated enum CloudSyncServerRecordChangedResolver {
+    static func serverRecord(from error: Error, matching recordName: String? = nil) -> CKRecord? {
+        let nsError = error as NSError
+        if nsError.domain == CKError.errorDomain,
+           CKError.Code(rawValue: nsError.code) == .serverRecordChanged,
+           let serverRecord = nsError.userInfo[CKRecordChangedErrorServerRecordKey] as? CKRecord,
+           matches(serverRecord, recordName: recordName) {
+            return serverRecord
+        }
+
+        for (key, value) in nsError.userInfo {
+            if let nested = value as? Error,
+               let serverRecord = serverRecord(from: nested, matching: recordName) {
+                return serverRecord
+            }
+            let nestedErrors = CloudSyncNestedErrorScanner.keyedErrors(from: value)
+            if !nestedErrors.isEmpty,
+               let serverRecord = serverRecord(
+                   in: nestedErrors,
+                   matching: recordName,
+                   requiresKeyMatch: key == CKPartialErrorsByItemIDKey
+               ) {
+                return serverRecord
+            }
+        }
+        return nil
+    }
+
+    private static func serverRecord(
+        in nestedErrors: [(AnyHashable, Error)],
+        matching recordName: String?,
+        requiresKeyMatch: Bool
+    ) -> CKRecord? {
+        if let recordName {
+            let matchingErrors = nestedErrors.filter { keyMatches($0.0, recordName: recordName) }
+            if !matchingErrors.isEmpty {
+                for (_, error) in matchingErrors {
+                    if let serverRecord = serverRecord(from: error, matching: recordName) {
+                        return serverRecord
+                    }
+                }
+                return nil
+            }
+            if requiresKeyMatch {
+                return nil
+            }
+        }
+
+        for (_, error) in nestedErrors {
+            if let serverRecord = serverRecord(from: error, matching: recordName) {
+                return serverRecord
+            }
+        }
+        return nil
+    }
+
+    private static func matches(_ record: CKRecord, recordName: String?) -> Bool {
+        guard let recordName else { return true }
+        return record.recordID.recordName == recordName
+    }
+
+    private static func keyMatches(_ key: AnyHashable, recordName: String) -> Bool {
+        if let recordID = key.base as? CKRecord.ID {
+            return recordID.recordName == recordName
+        }
+        if let string = key.base as? String {
+            return string == recordName
+        }
+        if let nsString = key.base as? NSString {
+            return nsString as String == recordName
+        }
+        return false
+    }
 }
 
 nonisolated struct CloudSyncTransientRetryPlan: Equatable {
@@ -189,13 +311,8 @@ nonisolated enum CloudSyncTransientErrorRetryPolicy {
         }
 
         return nsError.userInfo.values.contains { value in
-            if let nested = value as? Error {
-                return isTransient(nested)
-            }
-            if let nested = value as? [AnyHashable: Error] {
-                return nested.values.contains(where: isTransient)
-            }
-            return false
+            CloudSyncNestedErrorScanner.errors(from: value)
+                .contains(where: isTransient)
         }
     }
 
@@ -257,15 +374,9 @@ nonisolated enum CloudSyncTransientErrorRetryPolicy {
         }
 
         for value in nsError.userInfo.values {
-            if let nested = value as? Error,
-               let retryAfter = retryAfterSeconds(in: nested) {
-                return retryAfter
-            }
-            if let nested = value as? [AnyHashable: Error] {
-                for error in nested.values {
-                    if let retryAfter = retryAfterSeconds(in: error) {
-                        return retryAfter
-                    }
+            for error in CloudSyncNestedErrorScanner.errors(from: value) {
+                if let retryAfter = retryAfterSeconds(in: error) {
+                    return retryAfter
                 }
             }
         }
@@ -292,7 +403,7 @@ nonisolated enum CloudSyncEnginePendingChangeBuilder {
 }
 
 @ModelActor
-actor CloudSyncLocalStoreActor: CloudSyncEngineUploadPayloadProviding, CloudSyncEngineSentRecordMarking, CloudSyncEngineFetchedRecordApplying {
+actor CloudSyncLocalStoreActor: CloudSyncEngineUploadPayloadProviding, CloudSyncEngineSentRecordMarking, CloudSyncEngineFetchedRecordApplying, CloudSyncEngineFetchedRecordDeletionApplying {
     func uploadPayloads() async throws -> [CloudSyncRecordPayload] {
         try CloudSyncUploadBatchBuilder.dirtyPayloads(context: modelContext)
     }
@@ -312,6 +423,28 @@ actor CloudSyncLocalStoreActor: CloudSyncEngineUploadPayloadProviding, CloudSync
                 summary.failed += 1
                 OhanaLog.warning(
                     "Cloud sync failed to apply fetched \(record.recordID.recordName): \(error)",
+                    category: "CloudSync"
+                )
+            }
+        }
+        guard summary.hasMutations else { return summary }
+        try modelContext.save()
+        return summary
+    }
+
+    func applyFetchedRecordDeletions(_ deletions: [CloudSyncFetchedRecordDeletion]) async throws -> CloudSyncRecordApplySummary {
+        var summary = CloudSyncRecordApplySummary.empty
+        for deletion in deletions {
+            do {
+                try summary.record(CloudSyncRecordApplier.applyHardDeletedRecord(
+                    recordID: deletion.recordID,
+                    recordType: deletion.recordType,
+                    context: modelContext
+                ))
+            } catch {
+                summary.failed += 1
+                OhanaLog.warning(
+                    "Cloud sync failed to apply hard deletion \(deletion.recordID.recordName): \(error)",
                     category: "CloudSync"
                 )
             }
@@ -386,14 +519,35 @@ final class CloudSyncEngineService: CloudSyncManaging {
     }
 
     var hasPendingTransientRetry: Bool {
-        userDefaults.integer(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) > 0 &&
-            nextTransientRetryAt != nil
+        pendingTransientRetryPlan() != nil
     }
 
     var nextTransientRetryAt: Date? {
         let rawValue = userDefaults.double(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey)
         guard rawValue > 0 else { return nil }
         return Date(timeIntervalSinceReferenceDate: rawValue)
+    }
+
+    var pendingTransientRetryOperation: CloudSyncRetryOperation? {
+        guard let rawValue = userDefaults.string(forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey) else {
+            return nil
+        }
+        return CloudSyncRetryOperation(rawValue: rawValue)
+    }
+
+    func pendingTransientRetryPlan(now: Date = Date()) -> CloudSyncTransientRetryPlan? {
+        let attempt = userDefaults.integer(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey)
+        guard attempt > 0,
+              let operation = pendingTransientRetryOperation,
+              let nextRetryAt = nextTransientRetryAt else {
+            return nil
+        }
+        return CloudSyncTransientRetryPlan(
+            operation: operation,
+            attempt: attempt,
+            delaySeconds: max(nextRetryAt.timeIntervalSince(now), 0),
+            nextRetryAt: nextRetryAt
+        )
     }
 
     func setEnabled(_ enabled: Bool) {
@@ -416,6 +570,8 @@ final class CloudSyncEngineService: CloudSyncManaging {
             let trimmed = zoneOwnerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !trimmed.isEmpty {
                 userDefaults.set(trimmed, forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey)
+            } else {
+                userDefaults.removeObject(forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey)
             }
         }
 
@@ -467,6 +623,7 @@ final class CloudSyncEngineService: CloudSyncManaging {
 
         userDefaults.set(plan.attempt, forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey)
         userDefaults.set(plan.nextRetryAt.timeIntervalSinceReferenceDate, forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey)
+        userDefaults.set(plan.operation.rawValue, forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey)
         scheduleTransientRetry(plan)
         OhanaLog.warning(
             "Cloud sync transient \(operation.rawValue) failure; retrying in \(Int(plan.delaySeconds))s.",
@@ -514,6 +671,7 @@ final class CloudSyncEngineService: CloudSyncManaging {
             )
             delegateAdapter = adapter
             localStore = store
+            schedulePersistedTransientRetryIfNeeded()
             OhanaLog.info("Cloud sync engine started", category: "CloudSync")
         } catch {
             OhanaLog.error("Cloud sync failed to start: \(error)", category: "CloudSync")
@@ -621,6 +779,7 @@ final class CloudSyncEngineService: CloudSyncManaging {
     func retryPendingSyncNow(modelContainer: ModelContainer) async {
         retryTask?.cancel()
         retryTask = nil
+        clearTransientRetryState()
         setEnabled(true)
         await startIfNeeded(modelContainer: modelContainer)
         _ = await sendPendingLocalChanges()
@@ -662,11 +821,21 @@ final class CloudSyncEngineService: CloudSyncManaging {
         }
     }
 
+    private func schedulePersistedTransientRetryIfNeeded(now: Date = Date()) {
+        guard retryTask == nil,
+              engine != nil,
+              let plan = pendingTransientRetryPlan(now: now) else {
+            return
+        }
+        scheduleTransientRetry(plan)
+    }
+
     private func clearTransientRetryState() {
         retryTask?.cancel()
         retryTask = nil
         userDefaults.removeObject(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey)
         userDefaults.removeObject(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey)
+        userDefaults.removeObject(forKey: CloudSyncEngineRuntime.retryOperationDefaultsKey)
     }
 
     private func resetEngineAfterAccountChange() {
@@ -744,10 +913,21 @@ final nonisolated class CloudSyncEngineDelegateAdapter: NSObject, CKSyncEngineDe
             await persistStateSerialization(update.stateSerialization)
         case let .fetchedRecordZoneChanges(changes):
             await applyFetchedRecords(changes.modifications.map(\.record))
-            logFetchedRecordDeletions(changes.deletions)
+            await applyFetchedRecordDeletions(changes.deletions.map(CloudSyncFetchedRecordDeletion.init))
         case let .sentRecordZoneChanges(changes):
             await markSavedRecords(changes.savedRecords)
-            logFailedRecordSaves(changes.failedRecordSaves)
+            let resolvedRecordNames = await resolveFailedRecordSaveConflicts(
+                changes.failedRecordSaves.map {
+                    CloudSyncFailedRecordSaveContext(
+                        recordName: $0.record.recordID.recordName,
+                        error: $0.error
+                    )
+                }
+            )
+            logFailedRecordSaves(
+                changes.failedRecordSaves,
+                resolvedRecordNames: resolvedRecordNames
+            )
         default:
             break
         }
@@ -793,18 +973,85 @@ final nonisolated class CloudSyncEngineDelegateAdapter: NSObject, CKSyncEngineDe
         }
     }
 
+    private func applyFetchedRecordDeletions(_ deletions: [CloudSyncFetchedRecordDeletion]) async {
+        guard !deletions.isEmpty else { return }
+        guard let deletionApplier = fetchedRecordApplier as? any CloudSyncEngineFetchedRecordDeletionApplying else {
+            logFetchedRecordDeletions(deletions)
+            return
+        }
+        do {
+            let summary = try await deletionApplier.applyFetchedRecordDeletions(deletions)
+            if summary.hasMutations || summary.failed > 0 {
+                OhanaLog.info(
+                    "Cloud sync applied hard deletions: deleted=\(summary.deleted), unsupported=\(summary.skippedUnsupported), failed=\(summary.failed)",
+                    category: "CloudSync"
+                )
+            }
+        } catch {
+            OhanaLog.error("Cloud sync failed to apply hard deletions: \(error)", category: "CloudSync")
+        }
+    }
+
+    @discardableResult
+    func resolveFailedRecordSaveConflicts(
+        _ failures: [CloudSyncFailedRecordSaveContext]
+    ) async -> Set<String> {
+        guard !failures.isEmpty, let fetchedRecordApplier else { return [] }
+        let serverRecordPairs = failures.compactMap { failure -> (String, CKRecord)? in
+            guard let serverRecord = CloudSyncServerRecordChangedResolver.serverRecord(
+                from: failure.error,
+                matching: failure.recordName
+            ),
+                serverRecord[CloudSyncRecordFieldKey.recordKey] as? String != nil else {
+                return nil
+            }
+            return (failure.recordName, serverRecord)
+        }
+        guard !serverRecordPairs.isEmpty else { return [] }
+
+        var resolvedRecordNames: Set<String> = []
+        var aggregateSummary = CloudSyncRecordApplySummary.empty
+        for (recordName, serverRecord) in serverRecordPairs {
+            do {
+                let summary = try await fetchedRecordApplier.applyFetchedRecords([serverRecord])
+                aggregateSummary.inserted += summary.inserted
+                aggregateSummary.updated += summary.updated
+                aggregateSummary.deleted += summary.deleted
+                aggregateSummary.skippedStale += summary.skippedStale
+                aggregateSummary.skippedUnsupported += summary.skippedUnsupported
+                aggregateSummary.failed += summary.failed
+                if summary.hasMutations,
+                   summary.skippedUnsupported == 0,
+                   summary.failed == 0 {
+                    resolvedRecordNames.insert(recordName)
+                }
+            } catch {
+                aggregateSummary.failed += 1
+                OhanaLog.error("Cloud sync failed to resolve server-record conflict for \(recordName): \(error)", category: "CloudSync")
+            }
+        }
+        OhanaLog.info(
+            "Cloud sync resolved \(resolvedRecordNames.count)/\(serverRecordPairs.count) server-record conflict(s): inserted=\(aggregateSummary.inserted), updated=\(aggregateSummary.updated), deleted=\(aggregateSummary.deleted), stale=\(aggregateSummary.skippedStale), unsupported=\(aggregateSummary.skippedUnsupported), failed=\(aggregateSummary.failed)",
+            category: "CloudSync"
+        )
+        return resolvedRecordNames
+    }
+
     private func logFailedRecordSaves(
-        _ failures: [CKSyncEngine.Event.SentRecordZoneChanges.FailedRecordSave]
+        _ failures: [CKSyncEngine.Event.SentRecordZoneChanges.FailedRecordSave],
+        resolvedRecordNames: Set<String>
     ) {
         for failure in failures {
+            let recordName = failure.record.recordID.recordName
+            guard !resolvedRecordNames.contains(recordName) else { continue }
             OhanaLog.warning(
-                "Cloud sync failed to save \(failure.record.recordID.recordName): \(failure.error.localizedDescription)",
+                "Cloud sync failed to save \(recordName): \(failure.error.localizedDescription)",
                 category: "CloudSync"
             )
         }
     }
 
-    private func logFetchedRecordDeletions(_ deletions: [CKDatabase.RecordZoneChange.Deletion]) {
+    private func logFetchedRecordDeletions(_ deletions: [CloudSyncFetchedRecordDeletion]) {
         guard !deletions.isEmpty else { return }
         OhanaLog.warning(
             "Cloud sync received \(deletions.count) hard record deletions; Ohana expects tombstone records for model deletes.",

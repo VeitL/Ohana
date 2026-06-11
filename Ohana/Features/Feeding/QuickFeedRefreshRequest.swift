@@ -5,6 +5,7 @@
 //  Coalesced refresh flags for the feeding sheet's route-scoped read models.
 //
 
+import Combine
 import Foundation
 
 struct QuickFeedRefreshRequest: OptionSet {
@@ -24,4 +25,41 @@ struct QuickFeedRefreshRequest: OptionSet {
     static let forcePlanCalendarSnapshot = QuickFeedRefreshRequest(rawValue: 1 << 11)
     static let refreshTreatSnapshot = QuickFeedRefreshRequest(rawValue: 1 << 12)
     static let forceTreatSnapshot = QuickFeedRefreshRequest(rawValue: 1 << 13)
+}
+
+@MainActor
+final class QuickFeedRuntimeState: ObservableObject {
+    @Published var clockTick = Date()
+    @Published var overviewChartProgress: Double = 1
+
+    var feedDetailDataTask: Task<Void, Never>?
+    var didApplyInitialSheet = false
+    var didScheduleBootstrapMaintenance = false
+    var feedModeTransitionTask: Task<Void, Never>?
+    var feedModeMaintenanceTask: Task<Void, Never>?
+    var feedRefreshTask: Task<Void, Never>?
+    var feedPlanSaveTask: Task<Void, Never>?
+    var feedPlanReminderSchedulingTask: Task<Void, Never>?
+    var feedStockReminderSchedulingTask: Task<Void, Never>?
+    var pendingFeedRefreshRequest = QuickFeedRefreshRequest()
+    var lastFeedClockMinute = -1
+
+    func cancelTasks() {
+        feedModeTransitionTask?.cancel()
+        feedModeMaintenanceTask?.cancel()
+        feedDetailDataTask?.cancel()
+        feedRefreshTask?.cancel()
+        feedPlanSaveTask?.cancel()
+        feedPlanReminderSchedulingTask?.cancel()
+        feedStockReminderSchedulingTask?.cancel()
+
+        feedModeTransitionTask = nil
+        feedModeMaintenanceTask = nil
+        feedDetailDataTask = nil
+        feedRefreshTask = nil
+        feedPlanSaveTask = nil
+        feedPlanReminderSchedulingTask = nil
+        feedStockReminderSchedulingTask = nil
+        pendingFeedRefreshRequest = QuickFeedRefreshRequest()
+    }
 }

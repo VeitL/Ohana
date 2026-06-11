@@ -34,11 +34,7 @@ extension QuickFeedDetailContent {
             try? await Task.sleep(nanoseconds: 1_250_000_000)
             guard !Task.isCancelled else { return }
             withAnimation(GoMotion.quick) {
-                feedFeedbackToken = nil
-                feedFeedbackMetricId = nil
-                stockFeedbackToken = nil
-                stockFeedbackKind = nil
-                treatFeedbackToken = nil
+                presentationState.clearFeedback()
             }
         }
     }
@@ -192,23 +188,26 @@ extension QuickFeedDetailContent {
                 withAnimation(GoMotion.feedback) {
                     activeOverlay = nil
                 }
+                toastTask = nil
             }
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     func showTreatSavedCelebration() {
+        toastTask?.cancel()
         let route = QuickFeedOverlayRoute.treatCelebration(tint: treatTint)
         withAnimation(GoMotion.fab) {
             activeOverlay = route
         }
-        Task {
+        toastTask = Task {
             try? await Task.sleep(nanoseconds: 1_650_000_000)
             await MainActor.run {
                 guard activeOverlay?.id == route.id else { return }
                 withAnimation(GoMotion.quick) {
                     activeOverlay = nil
                 }
+                toastTask = nil
             }
         }
     }

@@ -3,95 +3,31 @@ import UIKit
 
 extension QuickFeedDetailContent {
     func manageRow(icon: String, title: String, value: String, tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(value)
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                Spacer()
-                Image(systemName: "chevron.right").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            .padding(12)
-            .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
-        }
-        .buttonStyle(ScaleButtonStyle())
+        QuickFeedManageRow(icon: icon, title: title, value: value, tint: tint, action: action)
     }
 
     func emptyInlineState(icon: String, text: String, solid _: Bool = false) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 16, weight: .bold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            Text(text)
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            Spacer()
-        }
-        .padding(14)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
+        QuickFeedEmptyInlineState(icon: icon, text: text)
     }
 
     func feedLogRow(_ log: PetCareLog, compact: Bool, solidSurface _: Bool = false) -> some View {
         let badge = feedLogBadge(for: log)
         let grams = feedLogDisplayGrams(for: log)
-        return HStack(spacing: 10) {
-            Image(systemName: badge.icon)
-                .font(.system(size: compact ? 12 : 14, weight: .black))
-                .foregroundStyle(Color.arkInk)
-                .frame(width: compact ? 30 : 36, height: compact ? 30 : 36)
-                .background(badge.tint, in: RoundedRectangle(cornerRadius: compact ? 10 : 12, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(badge.title)
-                    .font(.system(size: compact ? 12 : 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(log.date, format: compact ? .dateTime.hour().minute() : .dateTime.month().day().hour().minute())
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+        return QuickFeedLogRow(
+            icon: badge.icon,
+            title: badge.title,
+            tint: badge.tint,
+            date: log.date,
+            gramsText: grams > 0 ? formattedFoodWeight(grams) : "--",
+            compact: compact,
+            editTint: mainFoodTint,
+            onEdit: compact ? nil : {
+                beginEditingFeedLog(log)
+            },
+            onDelete: compact ? nil : {
+                activeAlert = .deleteFeedLog(log)
             }
-            Spacer()
-            Text(grams > 0 ? formattedFoodWeight(grams) : "--")
-                .font(.system(size: compact ? 13 : 15, weight: .black, design: .rounded))
-                .foregroundStyle(badge.tint)
-            if !compact {
-                Button {
-                    beginEditingFeedLog(log)
-                } label: {
-                    Image(systemName: "pencil").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black))
-                        .foregroundStyle(mainFoodTint)
-                        .frame(width: 30, height: 30) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                }
-                .buttonStyle(ScaleButtonStyle())
-                Button {
-                    activeAlert = .deleteFeedLog(log)
-                } label: {
-                    Image(systemName: "trash").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black))
-                        .foregroundStyle(Color.goRed)
-                        .frame(width: 30, height: 30) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-        }
-        .padding(compact ? 0 : 12)
-        .background {
-            if !compact {
-                RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
-                    .fill(Color.ohanaCardSurface)
-            }
-        }
+        )
     }
 
     func planReminderHistoryRow(_ reminder: Reminder, allowsCatchUp: Bool = false) -> some View {
@@ -108,83 +44,38 @@ extension QuickFeedDetailContent {
         let grams = event.map { formattedFoodWeight(FeedRuleMetadata.amountGrams(from: $0, fallback: pet.dailyPortionGrams)) } ?? "--"
         let foodKind = event?.foodKind.title(l) ?? pet.mainFoodKind.title(l)
 
-        return HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
-                .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(statusTitle)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text("\(reminder.scheduledAt.formatted(date: .abbreviated, time: .shortened)) · \(foodKind) · \(grams)")
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+        return QuickFeedPlanStatusRow(
+            icon: icon,
+            title: statusTitle,
+            detail: "\(reminder.scheduledAt.formatted(date: .abbreviated, time: .shortened)) · \(foodKind) · \(grams)",
+            tint: tint,
+            actionTitle: allowsCatchUp && overdue && canCatchUpPlanReminder(reminder)
+                ? l.tr(zh: "补打卡", en: "Catch up", de: "Nachtragen")
+                : nil,
+            onAction: {
+                completePlannedFeed(reminder)
             }
-            Spacer()
-            if allowsCatchUp, overdue, canCatchUpPlanReminder(reminder) {
-                Button {
-                    completePlannedFeed(reminder)
-                } label: {
-                    Text(l.tr(zh: "补打卡", en: "Catch up", de: "Nachtragen"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(tint, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
-            }
-        }
-        .padding(12)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
+        )
     }
 
     func foodRecordRow(_ record: PetFoodRecord) -> some View {
         let total = stockSnapshot.totalGrams(for: record)
-        return HStack(spacing: 10) {
-            Image(systemName: record.foodKind.systemIconName)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
-                .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(foodKindTint(record.foodKind), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(record.brand.isEmpty ? l.tr(zh: "未命名主粮", en: "Food", de: "Futter") : record.brand)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(stockRecordDateSummary(record))
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
-            if total > 0 {
-                Text(formattedFoodWeight(total))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(foodKindTint(record.foodKind))
-            }
-            Button {
+        let foodTint = foodKindTint(record.foodKind)
+        return QuickFeedFoodRecordRow(
+            icon: record.foodKind.systemIconName,
+            title: record.brand.isEmpty ? l.tr(zh: "未命名主粮", en: "Food", de: "Futter") : record.brand,
+            subtitle: stockRecordDateSummary(record),
+            value: total > 0 ? formattedFoodWeight(total) : nil,
+            foodTint: foodTint,
+            stockTint: stockTint,
+            onEdit: {
                 prepareStockSheet(record: record)
                 openFeedSheet(.stock)
                 UISelectionFeedbackGenerator().selectionChanged()
-            } label: {
-                Image(systemName: "pencil").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(stockTint)
-                    .frame(width: 30, height: 30) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-            }
-            .buttonStyle(ScaleButtonStyle())
-            Button {
+            },
+            onDelete: {
                 activeAlert = .deleteFoodRecord(record)
-            } label: {
-                Image(systemName: "trash").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(Color.goRed)
-                    .frame(width: 30, height: 30) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
-            .buttonStyle(ScaleButtonStyle())
-        }
-        .padding(12)
-        .feedFlatBlockSurface(cornerRadius: OhanaRadius.controlLarge)
+        )
     }
 }
