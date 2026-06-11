@@ -59,10 +59,10 @@
       "expiry": "Visible feeding route or home presenter lifetime; avoid broad recompute on unrelated taps.",
       "recovery": "Keep previous snapshot stable during visible transitions and refresh in route-scoped work.",
       "paths": [
-        "Ohana/Features/Feeding/Views/QuickFeedOverviewSnapshotStore.swift",
-        "Ohana/Features/Feeding/Views/QuickFeedPlanCalendarSnapshotStore.swift",
-        "Ohana/Features/Feeding/Views/QuickFeedStockSnapshotStore.swift",
-        "Ohana/Features/Feeding/Views/QuickFeedTreatSnapshotStore.swift",
+        "Ohana/Features/Feeding/QuickFeedOverviewSnapshotStore.swift",
+        "Ohana/Features/Feeding/QuickFeedPlanCalendarSnapshotStore.swift",
+        "Ohana/Features/Feeding/QuickFeedStockSnapshotStore.swift",
+        "Ohana/Features/Feeding/QuickFeedTreatSnapshotStore.swift",
         "OhanaTests/QuickFeedOverviewSnapshotStoreTests.swift"
       ]
     },

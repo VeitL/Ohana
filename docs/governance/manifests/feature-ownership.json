@@ -49,7 +49,7 @@
       "ownedPaths": [
         "Ohana/Features/Home",
         "Ohana/Features/Feeding/Views/QuickFeedHomePresenter.swift",
-        "Ohana/Features/Feeding/Views/QuickFeedHomeSnapshot.swift"
+        "Ohana/Features/Feeding/QuickFeedHomeSnapshot.swift"
       ]
     },
     {
