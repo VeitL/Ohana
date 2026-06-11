@@ -56,6 +56,7 @@ struct QuickFeedDetailRouteContainer: View {
     @Query(sort: \Pet.createdAt) private var allPets: [Pet]
     @Query private var allCareLogs: [PetCareLog]
     @Query private var allFoodRecords: [PetFoodRecord]
+    @Query private var sharedCareSessions: [SharedCareSession]
 
     let onRemove: () -> Void
     let onClose: (() -> Void)?
@@ -75,6 +76,7 @@ struct QuickFeedDetailRouteContainer: View {
         let dryStockKey = "\(petKey):\(FeedFoodKind.dry.rawValue)"
         let wetStockKey = "\(petKey):\(FeedFoodKind.wet.rawValue)"
         let feedingType = CareType.feeding.rawValue
+        let sharedFeedingKind = SharedCareActionKind.feeding.rawValue
         let homeLogStartDate = Calendar.current.date(
             byAdding: .day,
             value: -6,
@@ -108,6 +110,14 @@ struct QuickFeedDetailRouteContainer: View {
             sort: \.startDate,
             order: .reverse
         )
+        _sharedCareSessions = Query(
+            filter: #Predicate<SharedCareSession> { session in
+                session.actionKindRaw == sharedFeedingKind &&
+                    session.stockOwnerPetId == petKey
+            },
+            sort: \.date,
+            order: .reverse
+        )
         self.onRemove = onRemove
         self.onClose = onClose
         self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
@@ -128,7 +138,8 @@ struct QuickFeedDetailRouteContainer: View {
                 allHumans: allHumans,
                 allPets: allPets,
                 allCareLogs: allCareLogs,
-                allFoodRecords: allFoodRecords
+                allFoodRecords: allFoodRecords,
+                allSharedCareSessions: sharedCareSessions
             )
         } else {
             QuickCareMissingRouteEntityView(kind: "pet")

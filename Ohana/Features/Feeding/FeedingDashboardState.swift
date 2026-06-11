@@ -12,6 +12,7 @@ struct FeedingDashboardState {
     let manualGoalCount: Int
     let careLogs: [PetCareLog]?
     let foodRecords: [PetFoodRecord]?
+    let sharedCareSessions: [SharedCareSession]?
     let now: Date
     let calendar: Calendar
 
@@ -21,6 +22,7 @@ struct FeedingDashboardState {
         manualGoalCount: Int = 1,
         careLogs: [PetCareLog]? = nil,
         foodRecords: [PetFoodRecord]? = nil,
+        sharedCareSessions: [SharedCareSession]? = nil,
         now: Date = Date(),
         calendar: Calendar = .current
     ) {
@@ -29,6 +31,7 @@ struct FeedingDashboardState {
         self.manualGoalCount = max(1, manualGoalCount)
         self.careLogs = careLogs
         self.foodRecords = foodRecords
+        self.sharedCareSessions = sharedCareSessions
         self.now = now
         self.calendar = calendar
     }
@@ -42,11 +45,11 @@ struct FeedingDashboardState {
     }
 
     var stock: FeedStockSnapshot {
-        FeedStockCalculator.snapshot(for: pet, events: allEvents, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar)
+        FeedStockCalculator.snapshot(for: pet, events: allEvents, careLogs: careLogs, foodRecords: foodRecords, sharedCareSessions: sharedCareSessions, now: now, calendar: calendar)
     }
 
     func stock(foodKind: FeedFoodKind) -> FeedStockSnapshot {
-        FeedStockCalculator.snapshot(for: pet, foodKind: foodKind, events: allEvents, careLogs: careLogs, foodRecords: foodRecords, now: now, calendar: calendar)
+        FeedStockCalculator.snapshot(for: pet, foodKind: foodKind, events: allEvents, careLogs: careLogs, foodRecords: foodRecords, sharedCareSessions: sharedCareSessions, now: now, calendar: calendar)
     }
 
     var manualPlanEvents: [Event] { rules.manualReminderEvents }

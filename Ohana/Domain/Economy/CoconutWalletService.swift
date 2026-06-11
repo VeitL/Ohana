@@ -330,6 +330,7 @@ enum CoconutWalletService {
             context.insert(entry)
             createdEntries.append(entry)
         }
+        CloudSyncMutationRecorder.markModified(createdEntries, context: context)
 
         if save {
             try context.save()
@@ -719,6 +720,7 @@ enum CoconutEconomyBootstrapService {
         let humanById = Dictionary(uniqueKeysWithValues: humans.map { ($0.id.uuidString, $0) })
         let petById = Dictionary(uniqueKeysWithValues: pets.map { ($0.id.uuidString, $0) })
         let accountByKey = Dictionary(uniqueKeysWithValues: ((try? context.fetch(FetchDescriptor<CoconutAccount>())) ?? []).map { ($0.accountKey, $0) }) // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+        var importedEntries: [CoconutLedgerEntry] = []
 
         for log in legacyLogs.prefix(200) {
             let delta: CoconutWalletDelta = if let actorId = log.actorId, let human = humanById[actorId] {
@@ -785,7 +787,9 @@ enum CoconutEconomyBootstrapService {
                 occurredAt: delta.occurredAt
             )
             context.insert(entry)
+            importedEntries.append(entry)
         }
+        CloudSyncMutationRecorder.markModified(importedEntries, context: context)
     }
 
     private static func decodeLegacyLogs(defaults: UserDefaults) -> [CoconutLogEntry] {

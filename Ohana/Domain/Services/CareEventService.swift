@@ -125,6 +125,7 @@ final class CareEventService: CareEventRecording {
             executorId: executorId
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
         context.safeSave()
 
         dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
@@ -182,6 +183,7 @@ final class CareEventService: CareEventRecording {
             executorId: executorId
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
         dependencies.careLedger.recordPetCare(
             log: log,
@@ -225,6 +227,7 @@ final class CareEventService: CareEventRecording {
             executorId: executorId
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
 
         reminder.statusEnum = .completed
         reminder.completedAt = date
@@ -297,6 +300,7 @@ final class CareEventService: CareEventRecording {
             executorId: executorId
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: log.date)
 
         reminder.statusEnum = .completed
         reminder.completedAt = Date()
@@ -381,6 +385,7 @@ final class CareEventService: CareEventRecording {
             executorId: executorId
         )
         context.insert(log)
+        CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         let pottyLog: PetPottyLog?
         if createsLinkedPottyLog, type == .litter {
             let linked = PetPottyLog(date: date, type: .perfectPoop, pet: pet, executorId: executorId)

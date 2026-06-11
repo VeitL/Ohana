@@ -20,6 +20,7 @@ struct QuickFeedRootEventHost: ViewModifier {
     let eventCount: Int
     let careLogCount: Int
     let foodRecordCount: Int
+    let sharedSessionCount: Int
     let appLanguage: String
     let feedClockInterval: TimeInterval
     let workloadPolicy: AppWorkloadPolicy
@@ -34,6 +35,7 @@ struct QuickFeedRootEventHost: ViewModifier {
     let onEventCountChange: () -> Void
     let onCareLogCountChange: () -> Void
     let onFoodRecordCountChange: () -> Void
+    let onSharedSessionCountChange: () -> Void
     let onLanguageChange: () -> Void
     let onKeyboardFrameChange: (Notification) -> Void
     let onKeyboardHide: () -> Void
@@ -62,6 +64,7 @@ struct QuickFeedRootEventHost: ViewModifier {
             .onChange(of: eventCount) { _, _ in onEventCountChange() }
             .onChange(of: careLogCount) { _, _ in onCareLogCountChange() }
             .onChange(of: foodRecordCount) { _, _ in onFoodRecordCountChange() }
+            .onChange(of: sharedSessionCount) { _, _ in onSharedSessionCountChange() }
             .onChange(of: appLanguage) { _, _ in onLanguageChange() }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
                 onKeyboardFrameChange(notification)

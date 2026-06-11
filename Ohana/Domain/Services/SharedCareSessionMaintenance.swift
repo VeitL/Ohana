@@ -76,12 +76,9 @@ enum SharedCareSessionMaintenance {
 
         let prefix = SharedCareMetadata.prefix(for: session.actionKind)
         for log in feedingLogs {
-            let isOwner = log.id == ownerLog.id
             log.note = SharedCareMetadata.note(
                 prefix: prefix,
                 sessionId: session.id,
-                stockTotalGrams: isOwner ? session.totalAmountGrams : nil,
-                isStockOwner: isOwner,
                 targetCount: feedingLogs.count,
                 visibleNote: SharedCareMetadata.visibleNote(log.note)
             )

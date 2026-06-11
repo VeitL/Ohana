@@ -170,7 +170,6 @@ enum SharedPetActionRecorder {
             let perPetGrams = distributedAmount(descriptor.totalAmountGrams, count: allocationTargetCount, fractionDigits: 0)
             let perPetMl = distributedAmount(descriptor.totalAmountMl, count: allocationTargetCount, fractionDigits: 0)
             for (index, target) in targets.enumerated() {
-                let isStockOwner = descriptor.stockOwnerPet?.id == target.id
                 let log = PetCareLog(
                     date: descriptor.date,
                     type: type,
@@ -179,8 +178,6 @@ enum SharedPetActionRecorder {
                     note: SharedCareMetadata.note(
                         prefix: prefix,
                         sessionId: session.id,
-                        stockTotalGrams: isStockOwner ? descriptor.totalAmountGrams : nil,
-                        isStockOwner: isStockOwner,
                         targetCount: targets.count
                     ),
                     foodKind: descriptor.foodKind,
@@ -238,6 +235,7 @@ enum SharedPetActionRecorder {
             session.primaryLegacyModelName = primary.name
             session.primaryLegacyModelId = primary.id
         }
+        CloudSyncMutationRecorder.markModified(careLogs.map(\.1), context: context, modifiedAt: descriptor.date)
         context.safeSave()
 
         let reward: (humanGot: Int, petGot: Int) = if let rewardType = descriptor.reward {

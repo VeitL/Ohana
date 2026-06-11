@@ -12,6 +12,7 @@ struct FeedHomeSnapshotInput {
     let allEvents: [Event]
     let careLogs: [PetCareLog]
     let foodRecords: [PetFoodRecord]
+    let sharedCareSessions: [SharedCareSession]
     let now: Date
     let todayLabel: String
     let calendar: Calendar
@@ -21,6 +22,7 @@ struct FeedHomeSnapshotInput {
         allEvents: [Event],
         careLogs: [PetCareLog],
         foodRecords: [PetFoodRecord],
+        sharedCareSessions: [SharedCareSession] = [],
         now: Date,
         todayLabel: String,
         calendar: Calendar = .current
@@ -29,6 +31,7 @@ struct FeedHomeSnapshotInput {
         self.allEvents = allEvents
         self.careLogs = careLogs
         self.foodRecords = foodRecords
+        self.sharedCareSessions = sharedCareSessions
         self.now = now
         self.todayLabel = todayLabel
         self.calendar = calendar
@@ -41,6 +44,7 @@ enum FeedHomeSnapshotBuilder {
         let allEvents = input.allEvents
         let careLogs = input.careLogs
         let foodRecords = input.foodRecords
+        let sharedCareSessions = input.sharedCareSessions
         let now = input.now
         let calendar = input.calendar
 
@@ -84,6 +88,7 @@ enum FeedHomeSnapshotBuilder {
             events: allEvents,
             careLogs: careLogs,
             foodRecords: foodRecords,
+            sharedCareSessions: sharedCareSessions,
             now: now,
             calendar: calendar
         )
@@ -93,6 +98,7 @@ enum FeedHomeSnapshotBuilder {
             events: allEvents,
             careLogs: careLogs,
             foodRecords: foodRecords,
+            sharedCareSessions: sharedCareSessions,
             now: now,
             calendar: calendar
         )

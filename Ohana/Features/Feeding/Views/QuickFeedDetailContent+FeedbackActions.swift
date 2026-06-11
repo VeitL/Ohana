@@ -98,6 +98,7 @@ extension QuickFeedDetailContent {
             allEvents: allEvents,
             careLogs: observedCareLogs,
             foodRecords: observedFoodRecords,
+            sharedCareSessions: allSharedCareSessions,
             now: clockTick,
             force: force
         )

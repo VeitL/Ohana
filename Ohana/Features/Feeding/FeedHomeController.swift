@@ -182,6 +182,7 @@ struct FeedHomeViewState {
 struct FeedHomeSnapshotRevision: Equatable {
     let careLogRevision: Int
     let foodRecordRevision: Int
+    let sharedSessionRevision: Int
     let eventRevision: Int
     let modeRevision: Int
     let petRevision: Int
@@ -192,12 +193,14 @@ struct FeedHomeSnapshotRevision: Equatable {
         events: [Event],
         careLogs: [PetCareLog],
         foodRecords: [PetFoodRecord],
+        sharedCareSessions: [SharedCareSession],
         mode: FeedOperatingMode,
         now: Date
     ) -> FeedHomeSnapshotRevision {
         FeedHomeSnapshotRevision(
             careLogRevision: hashCareLogs(careLogs),
             foodRecordRevision: hashFoodRecords(foodRecords),
+            sharedSessionRevision: hashSharedSessions(sharedCareSessions),
             eventRevision: hashEvents(events),
             modeRevision: mode.rawValue.hashValue,
             petRevision: hashPetSettings(pet),
@@ -233,6 +236,19 @@ struct FeedHomeSnapshotRevision: Equatable {
                 hasher.combine(record.notes)
                 hasher.combine(record.remainingCorrectionGrams ?? -1)
                 hasher.combine(record.remainingCorrectionDate?.timeIntervalSince1970 ?? 0)
+            }
+        }
+    }
+
+    private static func hashSharedSessions(_ sessions: [SharedCareSession]) -> Int {
+        hash { hasher in
+            hasher.combine(sessions.count)
+            for session in sessions.prefix(90) {
+                hasher.combine(session.id)
+                hasher.combine(session.date.timeIntervalSince1970)
+                hasher.combine(session.actionKindRaw)
+                hasher.combine(session.stockOwnerPetId)
+                hasher.combine(session.totalAmountGrams)
             }
         }
     }
@@ -346,6 +362,7 @@ final class FeedHomeController: ObservableObject {
             events: input.allEvents,
             careLogs: input.careLogs,
             foodRecords: input.foodRecords,
+            sharedCareSessions: input.sharedCareSessions,
             mode: targetMode,
             now: input.now
         )

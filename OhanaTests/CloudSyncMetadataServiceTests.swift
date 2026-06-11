@@ -96,6 +96,108 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func mutationRecorderCreatesDefaultHouseholdZoneForNewPet() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let pet = Pet(name: "Momo")
+        pet.id = uuid("99999999-9999-4999-8999-999999999999")
+        let modifiedAt = Date(timeIntervalSinceReferenceDate: 90)
+        context.insert(pet)
+
+        CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: modifiedAt)
+
+        let household = try #require(try context.fetch(FetchDescriptor<Household>()).first)
+        let petState = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            localRecordId: pet.id,
+            context: context
+        ))
+        let householdState = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Household.self),
+            localRecordId: household.id,
+            context: context
+        ))
+
+        #expect(petState.householdId == normalized(household.id))
+        #expect(petState.hasPendingLocalChanges)
+        #expect(householdState.householdId == normalized(household.id))
+        #expect(householdState.hasPendingLocalChanges)
+    }
+
+    @MainActor
+    @Test func careEventServiceMarksPetCareLogDirty() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let household = Household(name: "Shared Home")
+        household.id = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let pet = Pet(name: "Momo")
+        pet.id = uuid("99999999-9999-4999-8999-999999999999")
+        let recordedAt = Date(timeIntervalSinceReferenceDate: 91)
+        context.insert(household)
+        context.insert(pet)
+
+        let log = CareEventService.recordTreatFeed(
+            pet: pet,
+            amountGrams: 6,
+            context: context,
+            executorId: nil,
+            date: recordedAt
+        )
+
+        let state = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: PetCareLog.self),
+            localRecordId: log.id,
+            context: context
+        ))
+        #expect(state.householdId == normalized(household.id))
+        #expect(state.conflictPolicy == .appendOnly)
+        #expect(state.lastModifiedAt == recordedAt)
+        #expect(state.hasPendingLocalChanges)
+    }
+
+    @MainActor
+    @Test func coconutWalletServiceMarksLedgerEntriesDirty() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let household = Household(name: "Shared Home")
+        household.id = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let human = Human(name: "Avery")
+        human.id = uuid("22222222-2222-4222-8222-222222222222")
+        context.insert(household)
+        context.insert(human)
+        let occurredAt = Date(timeIntervalSinceReferenceDate: 92)
+
+        let entries = try CoconutWalletService.apply(
+            deltas: [
+                .human(
+                    human,
+                    delta: 7,
+                    entryKind: .reward,
+                    source: .service,
+                    title: "Sync test reward",
+                    occurredAt: occurredAt,
+                    transactionKey: "cloud-sync:test:ledger"
+                )
+            ],
+            context: context,
+            save: true,
+            postsRewardFeedback: false,
+            updatesProjection: false
+        )
+        let entry = try #require(entries.first)
+        let state = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: CoconutLedgerEntry.self),
+            localRecordId: entry.id,
+            context: context
+        ))
+
+        #expect(state.householdId == normalized(household.id))
+        #expect(state.conflictPolicy == .appendOnly)
+        #expect(state.lastModifiedAt == occurredAt)
+        #expect(state.hasPendingLocalChanges)
+    }
+
+    @MainActor
     @Test func entityRegistryCoversCurrentSwiftDataSchema() {
         let schemaNames = Set(ArkSchemaV64.models.map { String(describing: $0) })
         let descriptorNames = Set(CloudSyncEntityRegistry.descriptors.map(\.entityName))

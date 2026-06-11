@@ -271,6 +271,7 @@ enum MemberProfileCommandService {
             pet.dailyPortionGrams = max(0, dailyPortionGrams)
         }
         CarePlanCalendarSync.ensureDefaultPlans(for: pet, context: context)
+        CloudSyncMutationRecorder.markModified(pet, context: context)
         context.safeSave()
 
         var changedFields: Set<String> = [
@@ -343,6 +344,7 @@ enum MemberProfileCommandService {
                 human.setPrivate(field, privateFieldsRaw.contains(field.rawValue))
             }
         }
+        CloudSyncMutationRecorder.markModified(human, context: context)
         context.safeSave()
 
         var changedFields: Set<String> = [

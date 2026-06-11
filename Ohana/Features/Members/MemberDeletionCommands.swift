@@ -36,6 +36,7 @@ enum MemberDeletionCommandService {
         }
 
         let removedQuickActionCount = removeQuickAccessItems(forPetID: petID, userDefaults: userDefaults)
+        CloudSyncMutationRecorder.markDeleted(pet, context: context)
         context.delete(pet)
         context.safeSave()
 
@@ -65,6 +66,7 @@ enum MemberDeletionCommandService {
         let requiresReplacementHuman = !hasRemainingHuman
         let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
+        CloudSyncMutationRecorder.markDeleted(human, context: context, deletedByHumanId: activeHumanID)
         context.delete(human)
         context.safeSave()
 

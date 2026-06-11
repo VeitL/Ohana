@@ -71,6 +71,7 @@ struct IslandFoodDashboardSnapshot {
         allEvents: [Event],
         allCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
+        allSharedCareSessions: [SharedCareSession] = [],
         now: Date,
         calendar: Calendar = .current
     ) -> IslandFoodDashboardSnapshot {
@@ -134,6 +135,7 @@ struct IslandFoodDashboardSnapshot {
                 allEvents: allEvents,
                 careLogs: logsByPetID[pet.id] ?? [],
                 foodRecords: recordsByPetID[pet.id] ?? [],
+                sharedCareSessions: allSharedCareSessions,
                 now: now,
                 calendar: calendar
             ) else { return nil }
@@ -174,6 +176,7 @@ struct IslandFoodDashboardSnapshot {
         allEvents: [Event],
         careLogs: [PetCareLog],
         foodRecords: [PetFoodRecord],
+        sharedCareSessions: [SharedCareSession],
         now: Date,
         calendar: Calendar
     ) -> FoodStockOverview? {
@@ -183,6 +186,7 @@ struct IslandFoodDashboardSnapshot {
             events: allEvents,
             careLogs: careLogs,
             foodRecords: foodRecords,
+            sharedCareSessions: sharedCareSessions,
             now: now,
             calendar: calendar
         )
@@ -192,6 +196,7 @@ struct IslandFoodDashboardSnapshot {
             events: allEvents,
             careLogs: careLogs,
             foodRecords: foodRecords,
+            sharedCareSessions: sharedCareSessions,
             now: now,
             calendar: calendar
         )
@@ -229,6 +234,7 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
     let eventRevision: Int
     let careLogRevision: Int
     let foodRecordRevision: Int
+    let sharedSessionRevision: Int
     let selectedPetRawValue: String
     let timeRevision: Int
 
@@ -238,6 +244,7 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
         allEvents: [Event],
         allCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
+        allSharedCareSessions: [SharedCareSession],
         now: Date
     ) -> IslandFoodDashboardSnapshotRevision {
         IslandFoodDashboardSnapshotRevision(
@@ -279,6 +286,13 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
                 hasher.combine(record.remainingCorrectionGrams ?? -1)
                 hasher.combine(record.remainingCorrectionDate?.timeIntervalSince1970 ?? 0)
             },
+            sharedSessionRevision: revisionHash(allSharedCareSessions.prefix(220)) { hasher, session in
+                hasher.combine(session.id)
+                hasher.combine(session.date.timeIntervalSince1970)
+                hasher.combine(session.actionKindRaw)
+                hasher.combine(session.stockOwnerPetId)
+                hasher.combine(session.totalAmountGrams)
+            },
             selectedPetRawValue: selectedPetId?.uuidString ?? "all",
             timeRevision: Int(now.timeIntervalSince1970 / 60)
         )
@@ -310,6 +324,7 @@ final class IslandFoodDashboardSnapshotStore: ObservableObject {
         allEvents: [Event],
         allCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
+        allSharedCareSessions: [SharedCareSession],
         now: Date = Date(),
         force: Bool = false
     ) {
@@ -319,6 +334,7 @@ final class IslandFoodDashboardSnapshotStore: ObservableObject {
             allEvents: allEvents,
             allCareLogs: allCareLogs,
             allFoodRecords: allFoodRecords,
+            allSharedCareSessions: allSharedCareSessions,
             now: now
         )
         guard force || nextRevision != revision else { return }
@@ -328,6 +344,7 @@ final class IslandFoodDashboardSnapshotStore: ObservableObject {
             allEvents: allEvents,
             allCareLogs: allCareLogs,
             allFoodRecords: allFoodRecords,
+            allSharedCareSessions: allSharedCareSessions,
             now: now
         )
         revision = nextRevision

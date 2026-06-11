@@ -27,6 +27,7 @@ struct QuickFeedDetailSheet: View {
     let allPets: [Pet]
     let allCareLogs: [PetCareLog]
     let allFoodRecords: [PetFoodRecord]
+    let allSharedCareSessions: [SharedCareSession]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -44,7 +45,8 @@ struct QuickFeedDetailSheet: View {
         allHumans: [Human] = [],
         allPets: [Pet] = [],
         allCareLogs: [PetCareLog] = [],
-        allFoodRecords: [PetFoodRecord] = []
+        allFoodRecords: [PetFoodRecord] = [],
+        allSharedCareSessions: [SharedCareSession] = []
     ) {
         self.pet = pet
         self.onRemove = onRemove
@@ -57,6 +59,7 @@ struct QuickFeedDetailSheet: View {
         self.allPets = allPets
         self.allCareLogs = allCareLogs
         self.allFoodRecords = allFoodRecords
+        self.allSharedCareSessions = allSharedCareSessions
     }
 
     var body: some View {
@@ -72,6 +75,7 @@ struct QuickFeedDetailSheet: View {
             allPets: allPets,
             allCareLogs: allCareLogs,
             allFoodRecords: allFoodRecords,
+            allSharedCareSessions: allSharedCareSessions,
             commandExecutor: QuickFeedCommandExecutor(
                 context: modelContext,
                 careEvents: appServices.careEvents,
@@ -96,6 +100,7 @@ struct QuickFeedDetailContent: View {
     let allPets: [Pet]
     let allCareLogs: [PetCareLog]
     let allFoodRecords: [PetFoodRecord]
+    let allSharedCareSessions: [SharedCareSession]
     let commandExecutor: QuickFeedCommandExecutor
     let appLanguage: String
     @Binding var defaultFeedGrams: Double
@@ -152,6 +157,7 @@ struct QuickFeedDetailContent: View {
         allPets: [Pet],
         allCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
+        allSharedCareSessions: [SharedCareSession],
         commandExecutor: QuickFeedCommandExecutor,
         appLanguage: String,
         defaultFeedGrams: Binding<Double>
@@ -167,6 +173,7 @@ struct QuickFeedDetailContent: View {
         self.allPets = allPets
         self.allCareLogs = allCareLogs
         self.allFoodRecords = allFoodRecords
+        self.allSharedCareSessions = allSharedCareSessions
         self.commandExecutor = commandExecutor
         self.appLanguage = appLanguage
         _defaultFeedGrams = defaultFeedGrams
@@ -180,6 +187,7 @@ struct QuickFeedDetailContent: View {
                 allEvents: allEvents,
                 careLogs: allCareLogs,
                 foodRecords: allFoodRecords,
+                sharedCareSessions: allSharedCareSessions,
                 now: initialNow
             )
         ))
@@ -276,6 +284,7 @@ struct QuickFeedDetailContent: View {
             allEvents: allEvents,
             careLogs: allCareLogs,
             foodRecords: allFoodRecords,
+            sharedCareSessions: allSharedCareSessions,
             now: clockTick,
             todayLabel: l.tr(zh: "今", en: "T", de: "H")
         )
@@ -446,6 +455,7 @@ struct QuickFeedDetailContent: View {
             eventCount: allEvents.count,
             careLogCount: allCareLogs.count,
             foodRecordCount: allFoodRecords.count,
+            sharedSessionCount: allSharedCareSessions.count,
             appLanguage: appLanguage,
             feedClockInterval: feedClockInterval,
             workloadPolicy: workloadPolicy,
@@ -475,6 +485,9 @@ struct QuickFeedDetailContent: View {
             },
             onFoodRecordCountChange: {
                 scheduleDeferredFeedRefresh([.reloadFullFoodRecordsIfLoaded, .reloadSnapshots])
+            },
+            onSharedSessionCountChange: {
+                scheduleDeferredFeedRefresh([.reloadSnapshots, .refreshFeedHomeSnapshot, .forceFeedHomeSnapshot])
             },
             onLanguageChange: {
                 scheduleDeferredFeedRefresh([.refreshFeedHomeSnapshot, .forceFeedHomeSnapshot])

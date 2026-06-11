@@ -17,6 +17,8 @@ enum MemberLifecycleCommandService {
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
         RainbowBridgeService().markPassedAway(pet: pet, date: date, context: context)
+        CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: date)
+        context.safeSave()
         return MemberLifecycleCommandResult(
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,
@@ -31,6 +33,8 @@ enum MemberLifecycleCommandService {
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
         RainbowBridgeService().undoPassedAway(pet: pet, context: context)
+        CloudSyncMutationRecorder.markModified(pet, context: context)
+        context.safeSave()
         return MemberLifecycleCommandResult(
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,
@@ -48,6 +52,8 @@ enum MemberLifecycleCommandService {
         pet.clearAllActivityRecords(in: context)
         let manager = questManager ?? QuestManager()
         manager.clearPerPetAuxiliaryState(forPetId: pet.id)
+        CloudSyncMutationRecorder.markModified(pet, context: context)
+        context.safeSave()
         return MemberLifecycleCommandResult(
             entityID: pet.id,
             kind: EntityKind.pet.rawValue,
@@ -63,6 +69,7 @@ enum MemberLifecycleCommandService {
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
         human.passedAwayDate = date
+        CloudSyncMutationRecorder.markModified(human, context: context, modifiedAt: date)
         context.safeSave()
         return MemberLifecycleCommandResult(
             entityID: human.id,
@@ -78,6 +85,7 @@ enum MemberLifecycleCommandService {
         context: ModelContext
     ) -> MemberLifecycleCommandResult {
         human.passedAwayDate = nil
+        CloudSyncMutationRecorder.markModified(human, context: context)
         context.safeSave()
         return MemberLifecycleCommandResult(
             entityID: human.id,
@@ -96,6 +104,7 @@ enum MemberHomeVisibilityCommandService {
         context: ModelContext
     ) -> MemberHomeVisibilityCommandResult {
         human.shouldShowOnHome = visible
+        CloudSyncMutationRecorder.markModified(human, context: context)
         context.safeSave()
         return MemberHomeVisibilityCommandResult(
             entityID: human.id,
@@ -114,6 +123,7 @@ enum PetWalkCommandService {
         context: ModelContext
     ) -> PetWalkGoalCommandResult {
         pet.weeklyWalkGoalKm = max(0, goalKm)
+        CloudSyncMutationRecorder.markModified(pet, context: context)
         context.safeSave()
         return PetWalkGoalCommandResult(petID: pet.id, goalKm: pet.weeklyWalkGoalKm)
     }

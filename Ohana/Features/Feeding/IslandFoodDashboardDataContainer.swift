@@ -16,6 +16,7 @@ struct IslandFoodDashboard: View {
     @Query private var allEvents: [Event]
     @Query private var allCareLogs: [PetCareLog]
     @Query private var allFoodRecords: [PetFoodRecord]
+    @Query private var allSharedCareSessions: [SharedCareSession]
 
     init(
         standalone: Bool = true,
@@ -28,6 +29,7 @@ struct IslandFoodDashboard: View {
         let stockReminderEntityType = FeedingPlanWriter.stockReminderEntityType
         let autoFeederEntityType = FeedRuleMetadata.autoFeederEntityType
         let feedingCareType = CareType.feeding.rawValue
+        let sharedFeedingKind = SharedCareActionKind.feeding.rawValue
         let careLogWindowStart = Calendar.current.date(byAdding: .day, value: -730, to: Date()) ?? .distantPast
 
         _pets = Query(
@@ -58,6 +60,14 @@ struct IslandFoodDashboard: View {
             sort: \.startDate,
             order: .reverse
         )
+        _allSharedCareSessions = Query(
+            filter: #Predicate<SharedCareSession> { session in
+                session.actionKindRaw == sharedFeedingKind &&
+                    session.date >= careLogWindowStart
+            },
+            sort: \.date,
+            order: .reverse
+        )
     }
 
     var body: some View {
@@ -67,7 +77,8 @@ struct IslandFoodDashboard: View {
             pets: pets,
             allEvents: allEvents,
             allCareLogs: allCareLogs,
-            allFoodRecords: allFoodRecords
+            allFoodRecords: allFoodRecords,
+            allSharedCareSessions: allSharedCareSessions
         )
     }
 }

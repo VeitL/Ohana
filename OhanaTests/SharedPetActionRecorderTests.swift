@@ -105,10 +105,11 @@ struct SharedPetActionRecorderTests {
         #expect(waterLogs.map(\.amountMl) == [151, 150])
         #expect(Set(feedLogs.map(\.sharedSessionId)).count == 1)
         #expect(Set(waterLogs.map(\.sharedSessionId)).count == 1)
-        #expect(feedLogs.count(where: { $0.note.contains(SharedCareMetadata.stockOwnerKey) }) == 1)
+        #expect(feedLogs.allSatisfy { !SharedCareMetadata.visibleNote($0.note).contains("stock") })
+        #expect(feedLogs.allSatisfy { !$0.note.contains(SharedCareMetadata.stockOwnerKey) })
     }
 
-    @Test func deletingSharedFeedStockOwnerMigratesDeductionToSurvivingLog() throws {
+    @Test func sharedFeedStockDeductionReadsStructuredSessionFields() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let first = Pet(name: "Milo", species: "猫")
@@ -130,7 +131,43 @@ struct SharedPetActionRecorderTests {
         )
 
         let feedLogs = try context.fetch(FetchDescriptor<PetCareLog>()).filter { $0.careType == .feeding }
-        let ownerLog = try #require(feedLogs.first { $0.note.contains(SharedCareMetadata.stockOwnerKey) })
+        let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
+        let session = try #require(sessions.first)
+        let ownerLog = try #require(feedLogs.first { $0.pet?.id.uuidString == session.stockOwnerPetId })
+        let nonOwnerLog = try #require(feedLogs.first { $0.id != ownerLog.id })
+
+        #expect(session.totalAmountGrams == 121)
+        #expect(ownerLog.note.contains(SharedCareMetadata.stockTotalKey) == false)
+        #expect(ownerLog.note.contains(SharedCareMetadata.stockOwnerKey) == false)
+        #expect(FeedStockCalculator.stockDeductionAmount(for: ownerLog, pet: ownerLog.pet ?? first, sharedCareSessions: sessions) == 121)
+        #expect(FeedStockCalculator.stockDeductionAmount(for: nonOwnerLog, pet: nonOwnerLog.pet ?? second, sharedCareSessions: sessions) == 0)
+        #expect(FeedStockCalculator.stockDeductionAmount(for: ownerLog, pet: ownerLog.pet ?? first) == 0)
+    }
+
+    @Test func deletingSharedFeedStockOwnerMigratesSessionDeductionToSurvivingLog() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "猫")
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: nil)
+        defer { cleanup() }
+
+        _ = CareEventService.recordSharedManualFeed(
+            sourcePet: first,
+            targets: [first, second],
+            totalGrams: 121,
+            foodKind: .dry,
+            context: context,
+            date: Date(timeIntervalSince1970: 2200)
+        )
+
+        let initialSession = try #require(try context.fetch(FetchDescriptor<SharedCareSession>()).first)
+        let feedLogs = try context.fetch(FetchDescriptor<PetCareLog>()).filter { $0.careType == .feeding }
+        let ownerLog = try #require(feedLogs.first { $0.pet?.id.uuidString == initialSession.stockOwnerPetId })
         let survivor = try #require(feedLogs.first { $0.id != ownerLog.id })
 
         _ = PetCareTrackingCommandService.deleteCareLog(ownerLog, pet: ownerLog.pet ?? first, context: context)
@@ -143,8 +180,9 @@ struct SharedPetActionRecorderTests {
         #expect(sessions.first?.totalAmountGrams == survivor.amountGrams)
         #expect(sessions.first?.targetPetIds == [survivor.pet?.id.uuidString ?? ""])
         #expect(remainingFeedLogs.count == 1)
-        #expect(remainingLog.note.contains(SharedCareMetadata.stockOwnerKey))
-        #expect(FeedStockCalculator.stockDeductionAmount(for: remainingLog, pet: remainingLog.pet ?? second) == survivor.amountGrams)
+        #expect(sessions.first?.stockOwnerPetId == survivor.pet?.id.uuidString)
+        #expect(remainingLog.note.contains(SharedCareMetadata.stockOwnerKey) == false)
+        #expect(FeedStockCalculator.stockDeductionAmount(for: remainingLog, pet: remainingLog.pet ?? second, sharedCareSessions: sessions) == survivor.amountGrams)
     }
 
     @Test func sharedExpenseDistributesCurrencyRemainderAndUsesCurrentCurrency() throws {

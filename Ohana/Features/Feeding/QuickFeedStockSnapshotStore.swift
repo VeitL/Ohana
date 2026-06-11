@@ -29,6 +29,7 @@ struct QuickFeedStockSnapshot {
         allEvents: [Event],
         careLogs: [PetCareLog],
         foodRecords: [PetFoodRecord],
+        sharedCareSessions: [SharedCareSession] = [],
         now: Date,
         calendar: Calendar = .current
     ) -> QuickFeedStockSnapshot {
@@ -52,6 +53,7 @@ struct QuickFeedStockSnapshot {
             events: allEvents,
             careLogs: careLogs,
             foodRecords: records,
+            sharedCareSessions: sharedCareSessions,
             now: now,
             calendar: calendar
         )
@@ -61,6 +63,7 @@ struct QuickFeedStockSnapshot {
             events: allEvents,
             careLogs: careLogs,
             foodRecords: records,
+            sharedCareSessions: sharedCareSessions,
             now: now,
             calendar: calendar
         )
@@ -127,6 +130,7 @@ struct QuickFeedStockSnapshotRevision: Equatable {
     let eventRevision: Int
     let careLogRevision: Int
     let foodRecordRevision: Int
+    let sharedSessionRevision: Int
     let petRevision: Int
     let timeRevision: Int
 
@@ -135,6 +139,7 @@ struct QuickFeedStockSnapshotRevision: Equatable {
         allEvents: [Event],
         careLogs: [PetCareLog],
         foodRecords: [PetFoodRecord],
+        sharedCareSessions: [SharedCareSession],
         now: Date
     ) -> QuickFeedStockSnapshotRevision {
         QuickFeedStockSnapshotRevision(
@@ -163,6 +168,13 @@ struct QuickFeedStockSnapshotRevision: Equatable {
                 hasher.combine(record.notes)
                 hasher.combine(record.remainingCorrectionGrams ?? -1)
                 hasher.combine(record.remainingCorrectionDate?.timeIntervalSince1970 ?? 0)
+            },
+            sharedSessionRevision: revisionHash(sharedCareSessions.prefix(90)) { hasher, session in
+                hasher.combine(session.id)
+                hasher.combine(session.date.timeIntervalSince1970)
+                hasher.combine(session.actionKindRaw)
+                hasher.combine(session.stockOwnerPetId)
+                hasher.combine(session.totalAmountGrams)
             },
             petRevision: revisionHash([pet]) { hasher, pet in
                 hasher.combine(pet.id)
@@ -206,6 +218,7 @@ final class QuickFeedStockSnapshotStore: ObservableObject {
         allEvents: [Event],
         careLogs: [PetCareLog],
         foodRecords: [PetFoodRecord],
+        sharedCareSessions: [SharedCareSession],
         now: Date,
         force: Bool = false
     ) {
@@ -214,6 +227,7 @@ final class QuickFeedStockSnapshotStore: ObservableObject {
             allEvents: allEvents,
             careLogs: careLogs,
             foodRecords: foodRecords,
+            sharedCareSessions: sharedCareSessions,
             now: now
         )
         guard force || nextRevision != revision else { return }
@@ -222,6 +236,7 @@ final class QuickFeedStockSnapshotStore: ObservableObject {
             allEvents: allEvents,
             careLogs: careLogs,
             foodRecords: foodRecords,
+            sharedCareSessions: sharedCareSessions,
             now: now
         )
         revision = nextRevision

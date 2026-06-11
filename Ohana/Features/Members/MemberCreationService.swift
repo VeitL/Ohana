@@ -225,6 +225,7 @@ final class MemberCreationService: MemberCreating {
             )
         }
         context.insert(pet)
+        CloudSyncMutationRecorder.markModified(pet, context: context)
         do {
             try context.save()
         } catch {
@@ -334,6 +335,7 @@ final class MemberCreationService: MemberCreating {
         human.setPrivate(.wishlist, draft.privateWishlist)
         human.setPrivate(.expense, draft.privateExpense)
         context.insert(human)
+        CloudSyncMutationRecorder.markModified(human, context: context)
         if let weight = CountryDecimalInput.parse(draft.weightText, countryCode: countryCode), weight > 0 {
             let executorId = activeHumanSelection.currentHumanId
             context.insert(HumanWeightLog(date: Date(), weight: weight, human: human, executorId: executorId))

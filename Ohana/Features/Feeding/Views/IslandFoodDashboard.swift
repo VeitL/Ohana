@@ -15,6 +15,7 @@ struct IslandFoodDashboardContentView: View {
     let allEvents: [Event]
     let allCareLogs: [PetCareLog]
     let allFoodRecords: [PetFoodRecord]
+    let allSharedCareSessions: [SharedCareSession]
 
     @Environment(\.dismiss) private var dismiss
 
@@ -67,6 +68,7 @@ struct IslandFoodDashboardContentView: View {
                 playChartReveal()
             }
             .onChange(of: allFoodRecords.count) { _, _ in rebuildSnapshot(force: true) }
+            .onChange(of: allSharedCareSessions.count) { _, _ in rebuildSnapshot(force: true) }
     }
 
     @ViewBuilder
@@ -419,6 +421,7 @@ struct IslandFoodDashboardContentView: View {
             allEvents: allEvents,
             allCareLogs: allCareLogs,
             allFoodRecords: allFoodRecords,
+            allSharedCareSessions: allSharedCareSessions,
             force: force
         )
     }

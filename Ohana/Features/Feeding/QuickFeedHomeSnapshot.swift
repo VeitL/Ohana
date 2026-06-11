@@ -36,6 +36,7 @@ struct QuickFeedHomeSnapshot {
         allEvents: [Event],
         careLogs: [PetCareLog],
         foodRecords: [PetFoodRecord],
+        sharedCareSessions: [SharedCareSession] = [],
         now: Date,
         todayLabel: String,
         calendar: Calendar = .current
@@ -45,6 +46,7 @@ struct QuickFeedHomeSnapshot {
             allEvents: allEvents,
             careLogs: careLogs,
             foodRecords: foodRecords,
+            sharedCareSessions: sharedCareSessions,
             now: now,
             todayLabel: todayLabel,
             calendar: calendar
