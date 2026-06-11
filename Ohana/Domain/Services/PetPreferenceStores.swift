@@ -4,8 +4,8 @@ enum PetBondVaultPreferenceStore {
     static let revisionKey = "petBondVaultRevision"
     private static let defaults = UserDefaults.standard
 
-    static func unlockedIDs(for petId: UUID) -> Set<String> {
-        let raw = defaults.string(forKey: key(for: petId)) ?? ""
+    nonisolated static func unlockedIDs(for petId: UUID) -> Set<String> {
+        let raw = UserDefaults.standard.string(forKey: key(for: petId)) ?? ""
         return Set(raw.split(separator: ",").map(String.init))
     }
 
@@ -26,7 +26,7 @@ enum PetBondVaultPreferenceStore {
         defaults.set(defaults.integer(forKey: revisionKey) + 1, forKey: revisionKey)
     }
 
-    private static func key(for petId: UUID) -> String {
+    private nonisolated static func key(for petId: UUID) -> String {
         "petBondVaultUnlocked_\(petId.uuidString)"
     }
 

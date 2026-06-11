@@ -15,7 +15,7 @@ enum SymptomSeverity: Int, Codable, CaseIterable {
     case severe = 3
     case critical = 4
 
-    var label: String {
+    nonisolated var label: String {
         switch self {
         case .mild: "轻微"
         case .moderate: "中度"

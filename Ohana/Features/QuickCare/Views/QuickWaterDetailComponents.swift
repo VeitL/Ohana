@@ -147,14 +147,6 @@ struct QuickWaterRenderSnapshot {
     }
 }
 
-struct WaterNativeSheetGlassSurface: View {
-    let cornerRadius: CGFloat
-
-    var body: some View {
-        OhanaPopupGlassSurface(cornerRadius: cornerRadius)
-    }
-}
-
 struct WaterInlineSheetGlassSurface: View {
     let cornerRadius: CGFloat
 

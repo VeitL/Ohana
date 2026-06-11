@@ -128,11 +128,11 @@ enum PetBondVaultCatalog {
 enum PetBondVaultStore {
     static let revisionKey = PetBondVaultPreferenceStore.revisionKey
 
-    static func unlockedIDs(for petId: UUID) -> Set<String> {
+    nonisolated static func unlockedIDs(for petId: UUID) -> Set<String> {
         PetBondVaultPreferenceStore.unlockedIDs(for: petId)
     }
 
-    static func isUnlocked(_ kind: PetBondVaultItemKind, for petId: UUID) -> Bool {
+    nonisolated static func isUnlocked(_ kind: PetBondVaultItemKind, for petId: UUID) -> Bool {
         unlockedIDs(for: petId).contains(kind.rawValue)
     }
 

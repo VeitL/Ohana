@@ -19,8 +19,6 @@ struct AvatarColorPreset: Identifiable {
     var color: Color { Color(hex: hex) }
 }
 
-enum AvatarColorCategory { case eye, fur }
-
 extension AvatarColorPreset {
     static let eyePresets: [AvatarColorPreset] = [
         .init(name: "琥珀", hex: "D4A017"),

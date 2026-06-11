@@ -319,13 +319,6 @@ struct FeedPlanMonthlyCalendarView: View {
     }
 }
 
-struct FeedStockTrendPoint: Identifiable {
-    var id: String { "\(foodKind.rawValue)-\(Int(date.timeIntervalSinceReferenceDate / 86400))" }
-    let date: Date
-    let value: Double
-    let foodKind: FeedFoodKind
-}
-
 enum FeedInputField: Hashable {
     case manualGrams
     case treatGrams

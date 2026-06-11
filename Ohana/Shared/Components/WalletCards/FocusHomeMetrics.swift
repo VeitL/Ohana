@@ -80,34 +80,3 @@ enum OhanaHeroGeometry {
 }
 
 typealias HomeWalletHeroTimeline = WalletHeroTimeline
-
-struct HomeHeroQuickModuleRevealModifier: AnimatableModifier {
-    var progress: CGFloat
-
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
-    }
-
-    func body(content: Content) -> some View {
-        let reveal = WalletHeroTimeline.quickReveal(progress: progress)
-        content
-            .opacity(reveal > 0.015 ? 1 : 0)
-            .clipShape(HomeHeroTopRevealShape(reveal: reveal))
-            .allowsHitTesting(reveal > 0.98)
-    }
-}
-
-private struct HomeHeroTopRevealShape: Shape {
-    var reveal: CGFloat
-
-    var animatableData: CGFloat {
-        get { reveal }
-        set { reveal = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        let visibleHeight = rect.height * min(max(reveal, 0), 1)
-        return Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: visibleHeight))
-    }
-}

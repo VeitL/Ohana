@@ -7,20 +7,6 @@
 
 import SwiftUI
 
-enum WalletHeroPhase: Equatable {
-    case collapsed
-    case expanding
-    case expanded
-    case collapsing
-}
-
-struct WalletHeroSnapshot<Card: Identifiable> {
-    let cards: [Card]
-    let selectedCardId: Card.ID?
-    let progress: CGFloat
-    let direction: Int
-}
-
 enum WalletHeroTimeline {
     static func smooth(_ value: CGFloat, _ start: CGFloat = 0, _ end: CGFloat = 1) -> CGFloat {
         guard end > start else { return value >= end ? 1 : 0 }

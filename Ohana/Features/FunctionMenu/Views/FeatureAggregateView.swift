@@ -7,21 +7,6 @@
 import SwiftData
 import SwiftUI
 
-private struct FeatureAggregateNavigationChrome: ViewModifier {
-    let title: String
-    let isEnabled: Bool
-
-    func body(content: Content) -> some View {
-        if isEnabled {
-            content
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-        } else {
-            content
-        }
-    }
-}
-
 struct FeatureAggregateView: View {
     let feature: PetFeature
     @Binding var parentPath: NavigationPath

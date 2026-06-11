@@ -274,56 +274,6 @@ struct MemberCreationSection<Content: View>: View {
     }
 }
 
-struct MemberAvatarCandidateCell: View {
-    let candidate: Avatar2DCandidate
-    let isSelected: Bool
-    let action: () -> Void
-
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-    @State private var image: UIImage?
-
-    private var l: L10n { L10n(appLanguage) }
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
-                        .fill(isSelected ? Color.goPrimary : Color.ohanaControlFill)
-                    if let image {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .padding(8)
-                    } else {
-                        Image(systemName: "person.crop.square.fill").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 24, weight: .semibold))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                }
-                .frame(width: 76, height: 96)
-                .overlay {
-                    RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
-                        .strokeBorder(isSelected ? Color.goPrimary : Color.clear, lineWidth: 2)
-                }
-                Text(candidate.isDefault ? l.tr(zh: "智能", en: "Smart", de: "Smart") : candidate.subtitle)
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(width: 76)
-            }
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .task(id: candidate.id) {
-            let data = candidate.data
-            image = await Task.detached(priority: .utility) { // smoothness: allow legacy off-main media/compute worker; cancellable service migration tracked after P1 baseline
-                UIImage(data: data) // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
-            }.value
-        }
-    }
-}
-
 struct MemberPortraitCropView: View {
     let item: MemberPortraitCropItem
     let onComplete: (Data) -> Void

@@ -6268,7 +6268,7 @@ struct HomeCommandExecutorTests {
         #expect(mutation.command == .backdateCheckIn(petID: pet.id, action: "milestone"))
         #expect(mutation.note == "test.reward.backdate")
 
-        try wallet.apply(
+        _ = try wallet.apply(
             deltas: [
                 .pet(
                     pet,

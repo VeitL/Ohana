@@ -5,45 +5,6 @@
 
 import SwiftUI
 
-/// Configuration for inner elements (like TextFields, Tags, secondary backgrounds)
-/// that sit directly on top of the `UltimateGlassCard`.
-public struct InnerPillConfig {
-    public var isDark: Bool
-
-    public init(isDark: Bool) {
-        self.isDark = isDark
-    }
-
-    public var bg: Color {
-        isDark ? .white.opacity(0.1) : .black.opacity(0.04)
-    }
-
-    public var text: Color {
-        // Slate 600 map -> roughly #475569
-        isDark ? .white.opacity(0.8) : Color(hex: "475569")
-    }
-}
-
-/// A standard tag component built for the Glass UI.
-public struct InnerGlassTag: View {
-    public var text: String
-    public var isDark: Bool
-
-    public init(text: String, isDark: Bool) {
-        self.text = text
-        self.isDark = isDark
-    }
-
-    public var body: some View {
-        Text(text)
-            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-            .foregroundStyle(InnerPillConfig(isDark: isDark).text)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(InnerPillConfig(isDark: isDark).bg, in: Capsule())
-    }
-}
-
 /// The core container for legacy cards and bento boxes, backed by the current Go Focus surface.
 public struct UltimateGlassCard<Content: View>: View {
     @Environment(\.colorScheme) private var colorScheme

@@ -8,7 +8,7 @@
 import Foundation
 
 enum FocusHomeCardDataSource {
-    static let maxCardsPerPage = 6
+    nonisolated static let maxCardsPerPage = 6
 
     static func buildSnapshot(
         pets: [Pet],

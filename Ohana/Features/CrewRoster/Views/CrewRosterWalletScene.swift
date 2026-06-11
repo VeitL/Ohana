@@ -594,14 +594,3 @@ struct CrewRosterProfileSummaryHeader: View {
         .shadow(color: Color.arkInk.opacity(0.30), radius: 5, y: 2) // ui-v4: allow text readability shadow on image card
     }
 }
-
-struct CrewRosterWalletInfoOverlay: View {
-    let card: FocusCard
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
-
-    private var l: L10n { L10n(appLanguage) }
-
-    var body: some View {
-        CrewRosterProfileSummaryHeader(snapshot: .make(card: card, l: l))
-    }
-}

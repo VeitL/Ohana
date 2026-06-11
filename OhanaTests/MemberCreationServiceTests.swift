@@ -65,7 +65,7 @@ struct MemberCreationServiceTests {
             #expect(Bool(false))
         } catch let error as MemberCreationService.ServiceError {
             if case .avatarPassRequired = error {
-                #expect(true)
+                // Expected: 2D avatar creation requires an avatar pass.
             } else {
                 Issue.record("Expected avatar pass requirement")
             }

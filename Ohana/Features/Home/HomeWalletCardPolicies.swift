@@ -155,12 +155,12 @@ enum HomeCardVisibility {
         return updated
     }
 
-    static func isPetIDVisible(_ id: UUID, raw: String? = nil) -> Bool {
+    nonisolated static func isPetIDVisible(_ id: UUID, raw: String? = nil) -> Bool {
         !hiddenPetIDs(from: raw ?? "")
             .contains(id.uuidString)
     }
 
-    static func isPetVisible(_ pet: Pet, raw: String? = nil) -> Bool {
+    nonisolated static func isPetVisible(_ pet: Pet, raw: String? = nil) -> Bool {
         isPetIDVisible(pet.id, raw: raw)
     }
 
@@ -191,7 +191,7 @@ enum HomeCardVisibility {
         return encodedHiddenPetIDs(ids)
     }
 
-    private static func hiddenPetIDs(from raw: String) -> Set<String> {
+    private nonisolated static func hiddenPetIDs(from raw: String) -> Set<String> {
         Set(raw.split(separator: ",").map(String.init))
     }
 

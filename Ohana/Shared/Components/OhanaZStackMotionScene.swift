@@ -70,37 +70,6 @@ struct OhanaMotionScene<Content: View>: View {
     }
 }
 
-struct OhanaSceneRevealShape: Shape {
-    enum Edge {
-        case top
-        case bottom
-        case leading
-        case trailing
-    }
-
-    var progress: CGFloat
-    var edge: Edge = .top
-
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
-    }
-
-    func path(in rect: CGRect) -> Path {
-        let p = min(max(progress, 0), 1)
-        switch edge {
-        case .top:
-            return Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height * p))
-        case .bottom:
-            return Path(CGRect(x: rect.minX, y: rect.maxY - rect.height * p, width: rect.width, height: rect.height * p))
-        case .leading:
-            return Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width * p, height: rect.height))
-        case .trailing:
-            return Path(CGRect(x: rect.maxX - rect.width * p, y: rect.minY, width: rect.width * p, height: rect.height))
-        }
-    }
-}
-
 extension View {
     func ohanaMotionScene(
         role: OhanaMotionSceneRole,

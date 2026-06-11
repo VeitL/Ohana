@@ -513,7 +513,7 @@ final class OasisTreeManager {
         cache.latestEventId == latestCursor?.eventId && cache.latestOccurredAt == latestCursor?.occurredAt
     }
 
-    private static func cursor(for event: CareLedgerEvent) -> LedgerEventCursor {
+    private nonisolated static func cursor(for event: CareLedgerEvent) -> LedgerEventCursor {
         LedgerEventCursor(eventId: event.id.uuidString, occurredAt: event.occurredAt)
     }
 

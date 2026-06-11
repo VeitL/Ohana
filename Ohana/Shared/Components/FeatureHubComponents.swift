@@ -164,56 +164,6 @@ struct FeatureHubMetricStrip: View {
     }
 }
 
-struct FeatureHubDestinationHost<Content: View>: View {
-    let onClose: () -> Void
-    var showsCloseButton: Bool = true
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            OhanaAppBackground().ignoresSafeArea()
-            content
-
-            if showsCloseButton {
-                Button(action: onClose) {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
-                .padding(.top, 10)
-                .padding(.trailing, 14)
-                .zIndex(30)
-            }
-        }
-    }
-}
-
-struct FeatureHubSectionView<Destination: Hashable>: View {
-    let section: FeatureHubSectionData<Destination>
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(section.title)
-                .font(OhanaFont.headline(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
-                    NavigationLink(value: item.destination) {
-                        FeatureHubTile(data: item.data)
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .ohanaSmoothAppear(index: index)
-                }
-            }
-        }
-    }
-}
-
 struct FeatureHubSectionActionView<Destination: Hashable>: View {
     let section: FeatureHubSectionData<Destination>
     let onSelect: (Destination) -> Void

@@ -780,7 +780,7 @@ struct OhanaTests {
         }
 
         if case .locked = HumanPasscodeService.verify("1234", for: human, now: now.addingTimeInterval(1)) {
-            #expect(true)
+            // Expected: correct passcode should remain locked during cooldown.
         } else {
             Issue.record("Expected correct passcode to remain locked during cooldown")
         }

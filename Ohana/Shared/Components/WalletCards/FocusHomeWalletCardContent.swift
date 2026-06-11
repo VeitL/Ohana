@@ -67,29 +67,3 @@ struct FocusHomeWalletCardContent: View {
         }
     }
 }
-
-struct FocusHomeExpandedActionPulseOverlay: View {
-    let isActive: Bool
-
-    var body: some View {
-        if isActive {
-            RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner, style: .continuous)
-                .strokeBorder(Color.goPrimary.opacity(0.88), lineWidth: 2)
-                .shadow(color: Color.goPrimary.opacity(0.45), radius: 18, y: 0) // ui-v4: allow quick-action success pulse
-                .allowsHitTesting(false)
-                .transition(.opacity.combined(with: .scale(scale: 1.015)))
-        }
-    }
-}
-
-struct FocusHomeWalkTransformBurstOverlay: View {
-    let isActive: Bool
-
-    var body: some View {
-        if isActive {
-            WalkLaunchBurst()
-                .allowsHitTesting(false)
-                .transition(.opacity.combined(with: .scale(scale: 0.96)))
-        }
-    }
-}

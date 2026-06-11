@@ -68,7 +68,7 @@ nonisolated struct FocusCard: Identifiable, @unchecked Sendable {
 }
 
 extension FocusCard {
-    var homePrimaryMetricValue: String {
+    nonisolated var homePrimaryMetricValue: String {
         if isElectronicPet {
             return electronicPetLevelMetricValue
         }
@@ -83,7 +83,7 @@ extension FocusCard {
         return "\(coconutBalance)"
     }
 
-    var homePrimaryMetricUnit: String {
+    nonisolated var homePrimaryMetricUnit: String {
         if isElectronicPet {
             return "Lv"
         }
@@ -105,16 +105,16 @@ extension FocusCard {
             .reduce(0.0) { $0 + $1.distanceMeters }
     }
 
-    private var isRegularPetCard: Bool {
+    private nonisolated var isRegularPetCard: Bool {
         !isHuman && !isElectronicPet
     }
 
-    private var isDogCard: Bool {
+    private nonisolated var isDogCard: Bool {
         let species = (petSpecies ?? kind).lowercased()
         return species.contains("dog") || species.contains("狗")
     }
 
-    private var homeWalkDistanceMetric: (value: String, unit: String) {
+    private nonisolated var homeWalkDistanceMetric: (value: String, unit: String) {
         let formatted = AppMeasurementSystem.formatDistanceMeters(homeWalkDistanceMeters)
         let parts = formatted.split(separator: " ", maxSplits: 1).map(String.init)
         guard parts.count == 2 else {
@@ -123,7 +123,7 @@ extension FocusCard {
         return (parts[0], parts[1])
     }
 
-    private var electronicPetLevelMetricValue: String {
+    private nonisolated var electronicPetLevelMetricValue: String {
         let trimmed = (ageText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if let firstNumber = trimmed.split(whereSeparator: { !$0.isNumber }).first,
            !firstNumber.isEmpty {

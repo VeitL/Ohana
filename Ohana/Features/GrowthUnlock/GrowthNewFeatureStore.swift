@@ -33,9 +33,9 @@ enum GrowthNewFeatureStore {
         case .achievements:
             markVisited(feature: .achievements)
         case .coconutShop:
-            markVisited(.coconutShop)
+            markVisited(stageID: GrowthUnlockPolicy.stageID(for: FMDest.coconutShop))
         case .gacha:
-            markVisited(.gacha)
+            markVisited(stageID: GrowthUnlockPolicy.stageID(for: FMDest.gacha))
         case .critterCodex:
             markVisited(stageID: .mastery)
         case .coconutRules, .growthRoadmap, .inventory, .checkInDetail:

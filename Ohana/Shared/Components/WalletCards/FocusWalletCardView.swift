@@ -867,20 +867,3 @@ private struct OptionalHeroArtMatch: ViewModifier {
         }
     }
 }
-
-private struct RealPetTransitionModifier: ViewModifier {
-    let card: FocusCard
-    let heroNS: Namespace.ID
-
-    func body(content: Content) -> some View {
-        if card.isReal, !card.isDummy {
-            content
-                .matchedTransitionSource(id: card.id as UUID, in: heroNS) { cfg in
-                    cfg.clipShape(RoundedRectangle(cornerRadius: HeroAnim.stackCardCorner,
-                                                   style: .continuous))
-                }
-        } else {
-            content
-        }
-    }
-}
