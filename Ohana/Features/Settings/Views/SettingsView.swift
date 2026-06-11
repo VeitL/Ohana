@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     var onClose: (() -> Void)?
+    let homeHouseholds: [Household]?
     let homePets: [Pet]?
     let homeHumans: [Human]?
     let homeElectronicPets: [OasisElectronicPet]?
@@ -35,6 +36,9 @@ struct SettingsView: View {
     @AppStorage("currentActiveHumanId") var currentActiveHumanId = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenHomePetIDsRaw = ""
     @AppStorage("goFocusHomeCardOrder.v1") var homeCardOrderRaw = ""
+    @AppStorage(CloudSyncEngineRuntime.sharedZoneAccessRevokedDefaultsKey) var hasCloudSyncSharedZoneAccessRevokedNotice = false
+    @AppStorage(CloudSyncEngineRuntime.retryAttemptDefaultsKey) var cloudSyncRetryAttempt = 0
+    @AppStorage(CloudSyncEngineRuntime.nextRetryAtDefaultsKey) var cloudSyncNextRetryAtReferenceDate: Double = 0
     @State var showingAppResetAlert = false
     @State var appResetErrorMessage: String? = nil
     // TASK 1：JSON 备份
@@ -53,16 +57,24 @@ struct SettingsView: View {
     @State var showingBackgroundPicker = false
     @State var showingPetManagement = false
     @State var quickSwitchHuman: Human? = nil
+    @State var householdSharePresentation: CloudSyncHouseholdSharePresentation? = nil
+    @State var isPreparingHouseholdShare = false
+    @State var isBindingCloudIdentity = false
+    @State var isRetryingCloudSyncNow = false
+    @State var householdSyncStatusMessage: String? = nil
+    @State var householdSyncErrorMessage: String? = nil
     @State var areDataSectionsMounted = false
     @State var dataSectionsMountTask: Task<Void, Never>?
     @State var biometricGateAvailability = MemberGateBiometricAuthenticator.availability()
 
     init(
+        homeHouseholds: [Household]? = nil,
         homePets: [Pet]? = nil,
         homeHumans: [Human]? = nil,
         homeElectronicPets: [OasisElectronicPet]? = nil,
         onClose: (() -> Void)? = nil
     ) {
+        self.homeHouseholds = homeHouseholds
         self.homePets = homePets
         self.homeHumans = homeHumans
         self.homeElectronicPets = homeElectronicPets
@@ -117,6 +129,7 @@ struct SettingsView: View {
                         settingsHeader
 
                         settingsDataSections
+                        householdSyncSection
 
                         // 国家 / 语言 / 单位 / 货币
                         settingsSection(title: l.preferences) {
@@ -643,6 +656,25 @@ struct SettingsView: View {
                 quickSwitchHuman = nil
             }
             .ohanaCompactSheetPresentation(detents: [.height(500)])
+        }
+        .sheet(item: $householdSharePresentation) { presentation in
+            CloudSyncHouseholdSharingController(
+                presentation: presentation,
+                onSaved: { share in handleHouseholdShareSaved(share) },
+                onStoppedSharing: { handleHouseholdShareStopped(presentation) },
+                onError: { error in householdSyncErrorMessage = error.localizedDescription }
+            )
+            .ignoresSafeArea()
+        }
+        .alert(l.tr(zh: "家庭同步失败", en: "Family Sync Failed", de: "Familiensynchronisierung fehlgeschlagen"), isPresented: Binding(
+            get: { householdSyncErrorMessage != nil },
+            set: { if !$0 { householdSyncErrorMessage = nil } }
+        )) {
+            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {
+                householdSyncErrorMessage = nil
+            }
+        } message: {
+            Text(householdSyncErrorMessage ?? l.tr(zh: "未知错误", en: "Unknown error", de: "Unbekannter Fehler"))
         }
     }
 }

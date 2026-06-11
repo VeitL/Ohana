@@ -154,6 +154,22 @@ enum CloudSyncMutationRecorder {
         markPetScopedModified(PetExpenseLog.self, id: log.id, petId: log.pet?.id, context: context, modifiedAt: modifiedAt)
     }
 
+    @discardableResult
+    static func markModified(
+        _ session: SharedCareSession,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markModified(
+            entityName: String(describing: SharedCareSession.self),
+            localRecordId: session.id,
+            householdId: sharedHouseholdId(context: context, now: modifiedAt),
+            fallbackHouseholdId: session.id,
+            modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
     static func markModified(
         _ logs: [PetExpenseLog],
         context: ModelContext,
@@ -179,6 +195,24 @@ enum CloudSyncMutationRecorder {
                 context: context
             )
         }
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ event: CareLedgerEvent,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: CareLedgerEvent.self),
+            localRecordId: event.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: event.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        )
     }
 
     @discardableResult
@@ -325,6 +359,54 @@ enum CloudSyncMutationRecorder {
         )
     }
 
+    @discardableResult
+    static func markDeleted(
+        _ session: SharedCareSession,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        let entityName = String(describing: SharedCareSession.self)
+        guard supportsSyncPipeline(for: entityName) else {
+            return nil
+        }
+
+        let householdId = sharedHouseholdId(context: context, now: deletedAt)
+        if let state = markDeleted(
+            entityName: entityName,
+            localRecordId: session.id,
+            householdId: householdId,
+            fallbackHouseholdId: session.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        ) {
+            state.isDeleted = true
+            state.isDeletionTombstone = true
+            state.deletedAt = deletedAt
+            state.deletedByHumanId = uuid(from: deletedByHumanId).map(CloudSyncRecordState.normalizedRecordId) ?? ""
+            state.hasPendingLocalChanges = true
+            return state
+        }
+
+        do {
+            return try CloudSyncMetadataService.markDeleted(
+                entityName: entityName,
+                localRecordId: session.id,
+                householdId: householdId ?? session.id,
+                deletedAt: deletedAt,
+                deletedByHumanId: uuid(from: deletedByHumanId),
+                context: context
+            )
+        } catch {
+            OhanaLog.warning(
+                "Cloud sync failed to force mark deleted SharedCareSession:\(session.id): \(error)",
+                category: "CloudSync"
+            )
+            return nil
+        }
+    }
+
     private static func markModified(
         entityName: String,
         localRecordId: UUID,
@@ -333,7 +415,7 @@ enum CloudSyncMutationRecorder {
         modifiedAt: Date,
         context: ModelContext
     ) -> CloudSyncRecordState? {
-        guard CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true else {
+        guard supportsSyncPipeline(for: entityName) else {
             return nil
         }
         do {
@@ -362,7 +444,7 @@ enum CloudSyncMutationRecorder {
         deletedByHumanId: UUID?,
         context: ModelContext
     ) -> CloudSyncRecordState? {
-        guard CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true else {
+        guard supportsSyncPipeline(for: entityName) else {
             return nil
         }
         do {
@@ -381,6 +463,11 @@ enum CloudSyncMutationRecorder {
             )
             return nil
         }
+    }
+
+    private static func supportsSyncPipeline(for entityName: String) -> Bool {
+        CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true
+            && CloudSyncEntityRegistry.supportsUploadPipeline(for: entityName)
     }
 
     private static func markPetScopedModified<T>(

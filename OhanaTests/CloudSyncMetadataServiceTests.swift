@@ -32,7 +32,7 @@ struct CloudSyncMetadataServiceTests {
 
         #expect(first.id == second.id)
         #expect(second.hasPendingLocalChanges)
-        #expect(!second.isDeleted)
+        #expect(!second.isDeletionTombstone)
         #expect(second.lastModifiedAt == secondDate)
         #expect(second.conflictPolicy == .lastWriterWins)
         #expect(second.householdId == householdId.uuidString.lowercased())
@@ -56,7 +56,7 @@ struct CloudSyncMetadataServiceTests {
             context: context
         )
 
-        #expect(tombstone.isDeleted)
+        #expect(tombstone.isDeletionTombstone)
         #expect(tombstone.deletedAt == deletionDate)
         #expect(tombstone.deletedByHumanId == humanId.uuidString.lowercased())
         #expect(tombstone.hasPendingLocalChanges)
@@ -71,7 +71,7 @@ struct CloudSyncMetadataServiceTests {
         )
 
         #expect(!tombstone.hasPendingLocalChanges)
-        #expect(tombstone.isDeleted)
+        #expect(tombstone.isDeletionTombstone)
         #expect(tombstone.ckChangeTag == "server-change-tag")
         #expect(try CloudSyncMetadataService.dirtyStates(context: context).isEmpty)
     }
@@ -207,6 +207,32 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func cloudSyncProjectConfigurationKeepsRequiredCloudKitCapabilities() throws {
+        let rootURL = repositoryRootURL()
+        let entitlements = try propertyListDictionary(
+            rootURL.appendingPathComponent("Ohana/Ohana.entitlements")
+        )
+        let infoPlist = try propertyListDictionary(
+            rootURL.appendingPathComponent("Ohana/Info.plist")
+        )
+        let project = try String(
+            contentsOf: rootURL.appendingPathComponent("Ohana.xcodeproj/project.pbxproj"),
+            encoding: .utf8
+        )
+
+        let containers = try #require(entitlements["com.apple.developer.icloud-container-identifiers"] as? [String])
+        let services = try #require(entitlements["com.apple.developer.icloud-services"] as? [String])
+        let backgroundModes = try #require(infoPlist["UIBackgroundModes"] as? [String])
+
+        #expect(containers.contains(CloudSyncEngineRuntime.containerIdentifier))
+        #expect(services.contains("CloudKit"))
+        #expect((entitlements["aps-environment"] as? String)?.isEmpty == false)
+        #expect(backgroundModes.contains("remote-notification"))
+        #expect(infoPlist["CKSharingSupported"] as? Bool == true)
+        #expect(project.contains("CODE_SIGN_ENTITLEMENTS = Ohana/Ohana.entitlements;"))
+    }
+
+    @MainActor
     @Test func entityRegistryKeepsLocalSecurityFieldsOutOfCloudPayloads() throws {
         let human = try #require(CloudSyncEntityRegistry.descriptor(for: Human.self))
         #expect(!human.shouldUploadField("appleUserIdentifier"))
@@ -237,6 +263,50 @@ struct CloudSyncMetadataServiceTests {
         let syncState = try #require(CloudSyncEntityRegistry.descriptor(for: CloudSyncRecordState.self))
         #expect(!syncState.uploadsToCloudKit)
         #expect(syncState.role == .localSyncMetadata)
+    }
+
+    @MainActor
+    @Test func entityRegistryUploadableDescriptorsMatchImplementedPipeline() {
+        let uploadableNames = Set(CloudSyncEntityRegistry.uploadableDescriptors.map(\.entityName))
+
+        #expect(uploadableNames == CloudSyncEntityRegistry.uploadPipelineEntityNames)
+        #expect(uploadableNames.contains(String(describing: Pet.self)))
+        #expect(uploadableNames.contains(String(describing: CoconutLedgerEntry.self)))
+        #expect(!uploadableNames.contains(String(describing: Reminder.self)))
+        #expect(CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: Reminder.self)) == false)
+    }
+
+    @MainActor
+    @Test func mutationRecorderSkipsEntitiesOutsideImplementedPipeline() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let session = SharedCareSession(date: Date(timeIntervalSinceReferenceDate: 25))
+        session.id = uuid("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
+        context.insert(session)
+
+        let entityName = String(describing: SharedCareSession.self)
+        let descriptor = try #require(CloudSyncEntityRegistry.descriptor(for: entityName))
+        #expect(descriptor.uploadsToCloudKit)
+        #expect(!CloudSyncEntityRegistry.supportsUploadPipeline(for: entityName))
+
+        let modified = CloudSyncMutationRecorder.markModified(
+            session,
+            context: context,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 50)
+        )
+        let deleted = CloudSyncMutationRecorder.markDeleted(
+            session,
+            context: context,
+            deletedAt: Date(timeIntervalSinceReferenceDate: 60)
+        )
+
+        #expect(modified == nil)
+        #expect(deleted == nil)
+        #expect(try CloudSyncMetadataService.state(
+            entityName: entityName,
+            localRecordId: session.id,
+            context: context
+        ) == nil)
     }
 
     @MainActor
@@ -545,6 +615,25 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func uploadBatchBuilderSkipsDirtyStatesOutsideImplementedPipeline() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let reminderId = uuid("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
+
+        _ = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Reminder.self),
+            localRecordId: reminderId,
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 550),
+            context: context
+        )
+
+        let payloads = try CloudSyncUploadBatchBuilder.dirtyPayloads(context: context)
+
+        #expect(payloads.isEmpty)
+    }
+
+    @MainActor
     @Test func uploadBatchBuilderFailsWhenDirtyModelIsMissing() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -761,6 +850,21 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func cloudSyncAccountPreflightMapsCloudKitAccountStatus() async {
+        #expect(CloudSyncAccountPreflight.availability(for: .available) == .available)
+        #expect(CloudSyncAccountPreflight.availability(for: .noAccount) == .unavailable(.noAccount))
+        #expect(CloudSyncAccountPreflight.availability(for: .restricted) == .unavailable(.restricted))
+        #expect(CloudSyncAccountPreflight.availability(for: .temporarilyUnavailable) == .unavailable(.temporarilyUnavailable))
+        #expect(CloudSyncAccountPreflight.availability(for: .couldNotDetermine) == .unavailable(.couldNotDetermine))
+
+        let failingAvailability = await CloudSyncAccountPreflight.availability(
+            provider: FailingCloudSyncAccountStatusProvider()
+        )
+
+        #expect(failingAvailability == .unavailable(.couldNotDetermine))
+    }
+
+    @MainActor
     @Test func householdShareStateUpdaterStoresZoneWideShareName() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -781,6 +885,254 @@ struct CloudSyncMetadataServiceTests {
 
         #expect(didUpdate)
         #expect(household.ckShareRecordName == CKRecordNameZoneWideShare)
+    }
+
+    @MainActor
+    @Test func householdShareStateUpdaterClearsStoppedShareName() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let household = Household(name: "Shared Home")
+        household.id = householdId
+        household.ckShareRecordName = CKRecordNameZoneWideShare
+        context.insert(household)
+
+        let didUpdate = try CloudSyncHouseholdShareStateUpdater.markShareStopped(
+            householdId: householdId,
+            context: context
+        )
+
+        #expect(didUpdate)
+        #expect(household.ckShareRecordName.isEmpty)
+    }
+
+    @MainActor
+    @Test func householdShareStopRuntimeRestagesLocalSnapshotForPrivateSync() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let suiteName = "CloudSyncHouseholdShareStopRuntimeTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let service = CloudSyncEngineService(
+            userDefaults: defaults,
+            ownerName: "private-owner",
+            automaticallySync: false
+        )
+        service.setEnabled(true)
+        service.setDatabaseScope(.sharedCloudDatabase, zoneOwnerName: "share-owner")
+        defaults.set(Data("shared-state".utf8), forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey)
+        defaults.set(true, forKey: CloudSyncEngineRuntime.sharedZoneAccessRevokedDefaultsKey)
+        defaults.set(2, forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey)
+        defaults.set(
+            Date(timeIntervalSinceReferenceDate: 4000).timeIntervalSinceReferenceDate,
+            forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey
+        )
+
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let household = Household(name: "Shared Home")
+        household.id = householdId
+        household.ckShareRecordName = CKRecordNameZoneWideShare
+        let pet = Pet(name: "Momo")
+        pet.id = uuid("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+        context.insert(household)
+        context.insert(pet)
+        let petState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Pet.self),
+            localRecordId: pet.id,
+            householdId: householdId,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 10),
+            context: context
+        )
+        CloudSyncMetadataService.markSynced(
+            petState,
+            ckRecordName: "Pet_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            ckChangeTag: "shared-change-tag",
+            ckZoneName: CloudSyncZoneNaming.zoneName(forHouseholdId: normalized(householdId)),
+            syncedAt: Date(timeIntervalSinceReferenceDate: 20)
+        )
+        let restagedAt = Date(timeIntervalSinceReferenceDate: 5000)
+
+        let summary = try CloudSyncHouseholdShareStopRuntime.stopSharingLocally(
+            householdId: householdId,
+            context: context,
+            cloudSync: service,
+            modifiedAt: restagedAt
+        )
+
+        #expect(summary.householdId == householdId)
+        #expect(summary.shareRecordWasCleared)
+        #expect(summary.stagedRecordCount == 2)
+        #expect(summary.restagedSnapshot.mergedHouseholdCount == 0)
+        #expect(household.ckShareRecordName.isEmpty)
+        #expect(service.databaseScope == .privateCloudDatabase)
+        #expect(service.recordZoneOwnerName == "private-owner")
+        #expect(!service.hasSharedZoneAccessRevokedNotice)
+        #expect(defaults.string(forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey) == nil)
+        #expect(defaults.data(forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey) == nil)
+        #expect(petState.hasPendingLocalChanges)
+        #expect(petState.ckChangeTag.isEmpty)
+        #expect(petState.lastModifiedAt == restagedAt)
+        #expect(petState.metadataJSON.contains("shareStoppedPrivateRestage"))
+    }
+
+    @MainActor
+    @Test func acceptedShareStateUpdaterCreatesPlaceholderHousehold() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let zoneID = CloudSyncShareRuntime.zoneID(householdId: householdId)
+        let share = CKShare(recordZoneID: zoneID)
+        share[CKShare.SystemFieldKey.title] = "Joined Home" as CKRecordValue
+        share[CKShare.SystemFieldKey.shareType] = CloudSyncShareRuntime.shareType as CKRecordValue
+
+        let acceptedHouseholdId = try CloudSyncAcceptedShareStateUpdater.markAcceptedShare(
+            share,
+            context: context
+        )
+
+        #expect(acceptedHouseholdId == householdId)
+        let household = try #require(try fetchHousehold(id: householdId, context: context))
+        #expect(household.name == "Joined Home")
+        #expect(household.ckShareRecordName == CKRecordNameZoneWideShare)
+    }
+
+    @MainActor
+    @Test func acceptedShareStateUpdaterRejectsNonHouseholdShareType() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let zoneID = CloudSyncShareRuntime.zoneID(householdId: householdId)
+        let share = CKShare(recordZoneID: zoneID)
+        share[CKShare.SystemFieldKey.title] = "Not Ohana" as CKRecordValue
+        share[CKShare.SystemFieldKey.shareType] = "com.example.other.share" as CKRecordValue
+
+        let acceptedHouseholdId = try CloudSyncAcceptedShareStateUpdater.markAcceptedShare(
+            share,
+            context: context
+        )
+
+        #expect(acceptedHouseholdId == nil)
+        #expect(try fetchHousehold(id: householdId, context: context) == nil)
+    }
+
+    @MainActor
+    @Test func humanIdentityBinderStoresCurrentCloudKitUserLocally() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let human = Human(name: "Avery")
+        human.id = uuid("22222222-2222-4222-8222-222222222222")
+        context.insert(human)
+
+        let didBind = try CloudSyncHumanIdentityBinder.bind(
+            currentUserRecordName: "_abcdef123456",
+            toHumanId: human.id,
+            context: context
+        )
+
+        #expect(didBind)
+        #expect(human.appleUserIdentifier == "_abcdef123456")
+        #expect(try CloudSyncMetadataService.state(
+            entityName: String(describing: Human.self),
+            localRecordId: human.id,
+            context: context
+        ) == nil)
+    }
+
+    @MainActor
+    @Test func initialHouseholdMergeStagesSupportedLocalSnapshotIntoSharedZone() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let acceptedHouseholdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let legacyHouseholdId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let stagedAt = Date(timeIntervalSinceReferenceDate: 800)
+        let acceptedHousehold = Household(name: "")
+        acceptedHousehold.id = acceptedHouseholdId
+        acceptedHousehold.totalProsperity = 2
+        let legacyHousehold = Household(name: "Local Home")
+        legacyHousehold.id = legacyHouseholdId
+        legacyHousehold.totalProsperity = 9
+        let pet = Pet(name: "Momo")
+        pet.id = uuid("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+        let human = Human(name: "Avery")
+        human.id = uuid("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
+        let careLog = PetCareLog(
+            date: Date(timeIntervalSinceReferenceDate: 700),
+            type: .feeding,
+            amountGrams: 42,
+            pet: pet,
+            executorId: human.id.uuidString
+        )
+        careLog.id = uuid("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
+        context.insert(acceptedHousehold)
+        context.insert(legacyHousehold)
+        context.insert(pet)
+        context.insert(human)
+        context.insert(careLog)
+
+        let summary = try CloudSyncInitialHouseholdMergeRuntime.stageLocalSnapshotForHouseholdShare(
+            householdId: acceptedHouseholdId,
+            context: context,
+            modifiedAt: stagedAt
+        )
+        let payloads = try CloudSyncUploadBatchBuilder.dirtyPayloads(context: context)
+        let sharedZoneName = CloudSyncZoneNaming.zoneName(forHouseholdId: normalized(acceptedHouseholdId))
+
+        #expect(summary.snapshotRecordCount == 5)
+        #expect(summary.mergedHouseholdCount == 1)
+        #expect(summary.stagedRecordCount == 4)
+        #expect(summary.stagedByEntityName[String(describing: Household.self)] == 1)
+        #expect(summary.stagedByEntityName[String(describing: Pet.self)] == 1)
+        #expect(summary.stagedByEntityName[String(describing: Human.self)] == 1)
+        #expect(summary.stagedByEntityName[String(describing: PetCareLog.self)] == 1)
+        #expect(acceptedHousehold.name == "Local Home")
+        #expect(acceptedHousehold.totalProsperity == 9)
+        #expect(payloads.count == 4)
+        #expect(payloads.allSatisfy { $0.zoneName == sharedZoneName })
+        #expect(payloads.contains { $0.entityName == String(describing: PetCareLog.self) })
+    }
+
+    @MainActor
+    @Test func initialHouseholdMergeRehomesExistingSyncedStateToSharedZone() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let acceptedHouseholdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let oldHouseholdId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let acceptedHousehold = Household(name: "Shared Home")
+        acceptedHousehold.id = acceptedHouseholdId
+        let pet = Pet(name: "Momo")
+        pet.id = uuid("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
+        context.insert(acceptedHousehold)
+        context.insert(pet)
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Pet.self),
+            localRecordId: pet.id,
+            householdId: oldHouseholdId,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 10),
+            context: context
+        )
+        CloudSyncMetadataService.markSynced(
+            state,
+            ckRecordName: "Pet_cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+            ckChangeTag: "old-change-tag",
+            ckZoneName: CloudSyncZoneNaming.zoneName(forHouseholdId: normalized(oldHouseholdId)),
+            syncedAt: Date(timeIntervalSinceReferenceDate: 20)
+        )
+
+        _ = try CloudSyncInitialHouseholdMergeRuntime.stageLocalSnapshotForHouseholdShare(
+            householdId: acceptedHouseholdId,
+            context: context,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 30)
+        )
+
+        #expect(state.householdId == normalized(acceptedHouseholdId))
+        #expect(state.ckZoneName == CloudSyncZoneNaming.zoneName(forHouseholdId: normalized(acceptedHouseholdId)))
+        #expect(state.ckChangeTag.isEmpty)
+        #expect(state.hasPendingLocalChanges)
+        #expect(state.lastModifiedAt == Date(timeIntervalSinceReferenceDate: 30))
     }
 
     @MainActor
@@ -815,6 +1167,244 @@ struct CloudSyncMetadataServiceTests {
         }
         #expect(firstZone.zoneID.zoneName == "household-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
         #expect(secondZone.zoneID.zoneName == "household-dddddddd-dddd-4ddd-8ddd-dddddddddddd")
+    }
+
+    @MainActor
+    @Test func pendingChangeBuilderSkipsZoneSavesForSharedDatabaseScope() {
+        let payload = makeRecordPayload(
+            localRecordId: uuid("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"),
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            fields: ["name": .string("Shared Home")]
+        )
+
+        let databaseChanges = CloudSyncEnginePendingChangeBuilder.pendingDatabaseChanges(
+            for: [payload],
+            ownerName: "share-owner",
+            databaseScope: .sharedCloudDatabase
+        )
+        let recordChanges = CloudSyncEngineBatchBuilder.pendingSaveChanges(
+            for: [payload],
+            ownerName: "share-owner"
+        )
+
+        #expect(databaseChanges.isEmpty)
+        guard case let .saveRecord(recordID) = recordChanges.first else {
+            Issue.record("Expected shared database participants to save records into the shared zone")
+            return
+        }
+        #expect(recordID.zoneID.ownerName == "share-owner")
+        #expect(recordID.zoneID.zoneName == "household-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    }
+
+    @MainActor
+    @Test func cloudSyncEngineServicePersistsSharedDatabaseScopeAndOwnerName() {
+        let suiteName = "CloudSyncEngineServiceScopeTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(Data("stale-state".utf8), forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey)
+
+        let service = CloudSyncEngineService(
+            userDefaults: defaults,
+            ownerName: "private-owner",
+            automaticallySync: false
+        )
+
+        #expect(service.databaseScope == .privateCloudDatabase)
+        #expect(service.recordZoneOwnerName == "private-owner")
+
+        service.setDatabaseScope(.sharedCloudDatabase, zoneOwnerName: " share-owner ")
+
+        #expect(service.databaseScope == .sharedCloudDatabase)
+        #expect(service.recordZoneOwnerName == "share-owner")
+        #expect(defaults.string(forKey: CloudSyncEngineRuntime.databaseScopeDefaultsKey) == CloudSyncDatabaseScope.sharedCloudDatabase.rawValue)
+        #expect(defaults.string(forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey) == "share-owner")
+        #expect(defaults.data(forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey) == nil)
+
+        let restored = CloudSyncEngineService(
+            userDefaults: defaults,
+            ownerName: "private-owner",
+            automaticallySync: false
+        )
+        #expect(restored.databaseScope == .sharedCloudDatabase)
+        #expect(restored.recordZoneOwnerName == "share-owner")
+
+        restored.setDatabaseScope(.privateCloudDatabase, zoneOwnerName: nil)
+
+        #expect(restored.databaseScope == .privateCloudDatabase)
+        #expect(restored.recordZoneOwnerName == "private-owner")
+        #expect(defaults.string(forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey) == nil)
+    }
+
+    @MainActor
+    @Test func cloudSyncEngineServiceIgnoresRemoteNotificationsWhenDisabled() async throws {
+        let container = try makeContainer()
+        let suiteName = "CloudSyncEngineServiceRemoteNotificationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let service = CloudSyncEngineService(
+            userDefaults: defaults,
+            automaticallySync: false
+        )
+
+        let result = await service.handleRemoteNotification(modelContainer: container)
+
+        #expect(result == .ignored)
+        #expect(!service.isStarted)
+        #expect(await service.fetchRemoteChanges() == false)
+        #expect(await service.sendPendingLocalChanges() == false)
+    }
+
+    @MainActor
+    @Test func cloudSyncEngineServiceClearsEngineStateWhenCloudKitAccountBecomesUnavailable() async throws {
+        let container = try makeContainer()
+        let suiteName = "CloudSyncEngineServiceAccountChangedTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(true, forKey: CloudSyncEngineRuntime.enabledDefaultsKey)
+        defaults.set(Data("stale-state".utf8), forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey)
+        defaults.set(2, forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey)
+        defaults.set(
+            Date(timeIntervalSinceReferenceDate: 4000).timeIntervalSinceReferenceDate,
+            forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey
+        )
+
+        let service = CloudSyncEngineService(
+            userDefaults: defaults,
+            automaticallySync: false
+        )
+
+        let result = await service.handleAccountChanged(
+            availability: .unavailable(.noAccount),
+            modelContainer: container
+        )
+
+        #expect(result == .paused(.noAccount))
+        #expect(service.isEnabled)
+        #expect(!service.isStarted)
+        #expect(defaults.data(forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey) == nil)
+    }
+
+    @MainActor
+    @Test func sharedZoneAccessFailureClassifierDetectsRevokedShareErrors() {
+        #expect(CloudSyncSharedZoneAccessFailureClassifier.isSharedZoneAccessLoss(CKError(.zoneNotFound)))
+        #expect(CloudSyncSharedZoneAccessFailureClassifier.isSharedZoneAccessLoss(CKError(.permissionFailure)))
+        #expect(CloudSyncSharedZoneAccessFailureClassifier.isSharedZoneAccessLoss(CKError(.userDeletedZone)))
+        #expect(!CloudSyncSharedZoneAccessFailureClassifier.isSharedZoneAccessLoss(CKError(.networkUnavailable)))
+    }
+
+    @MainActor
+    @Test func cloudSyncEngineServiceStopsSharedSyncWhenSharedZoneAccessIsLost() {
+        let suiteName = "CloudSyncEngineServiceRevokedShareTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(Data("stale-state".utf8), forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey)
+
+        let service = CloudSyncEngineService(
+            userDefaults: defaults,
+            ownerName: "private-owner",
+            automaticallySync: false
+        )
+        service.setEnabled(true)
+        service.setDatabaseScope(.sharedCloudDatabase, zoneOwnerName: "share-owner")
+
+        let didRecover = service.handleSharedZoneAccessLossIfNeeded(CKError(.zoneNotFound))
+
+        #expect(didRecover)
+        #expect(!service.isEnabled)
+        #expect(service.databaseScope == .privateCloudDatabase)
+        #expect(service.recordZoneOwnerName == "private-owner")
+        #expect(service.hasSharedZoneAccessRevokedNotice)
+        #expect(defaults.string(forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey) == nil)
+        #expect(defaults.data(forKey: UserDefaultsCloudSyncEngineStateStore.defaultKey) == nil)
+
+        service.clearSharedZoneAccessRevokedNotice()
+
+        #expect(!service.hasSharedZoneAccessRevokedNotice)
+    }
+
+    @MainActor
+    @Test func transientRetryPolicyUsesCloudKitRetryAfterBeforeFallbackBackoff() throws {
+        let now = Date(timeIntervalSinceReferenceDate: 2000)
+        let rateLimited = NSError(
+            domain: CKError.errorDomain,
+            code: CKError.Code.requestRateLimited.rawValue,
+            userInfo: [CKErrorRetryAfterKey: 42.0]
+        )
+
+        let systemPlan = try #require(CloudSyncTransientErrorRetryPolicy.plan(
+            for: rateLimited,
+            operation: .send,
+            previousAttempt: 0,
+            now: now
+        ))
+        let fallbackPlan = try #require(CloudSyncTransientErrorRetryPolicy.plan(
+            for: CKError(.networkUnavailable),
+            operation: .fetch,
+            previousAttempt: 2,
+            now: now
+        ))
+
+        #expect(systemPlan.operation == .send)
+        #expect(systemPlan.attempt == 1)
+        #expect(systemPlan.delaySeconds == 42)
+        #expect(systemPlan.nextRetryAt == now.addingTimeInterval(42))
+        #expect(fallbackPlan.operation == .fetch)
+        #expect(fallbackPlan.attempt == 3)
+        #expect(fallbackPlan.delaySeconds == 20)
+        #expect(fallbackPlan.nextRetryAt == now.addingTimeInterval(20))
+        #expect(CloudSyncTransientErrorRetryPolicy.plan(
+            for: CKError(.permissionFailure),
+            operation: .send,
+            previousAttempt: 0,
+            now: now
+        ) == nil)
+    }
+
+    @MainActor
+    @Test func cloudSyncEngineServiceQueuesTransientRetryWithoutClearingSharedScope() {
+        let suiteName = "CloudSyncEngineServiceTransientRetryTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let service = CloudSyncEngineService(
+            userDefaults: defaults,
+            ownerName: "private-owner",
+            automaticallySync: false
+        )
+        service.setEnabled(true)
+        service.setDatabaseScope(.sharedCloudDatabase, zoneOwnerName: "share-owner")
+
+        let now = Date(timeIntervalSinceReferenceDate: 3000)
+        let didQueueRetry = service.handleTransientSyncFailureIfNeeded(
+            CKError(.networkUnavailable),
+            operation: .send,
+            now: now
+        )
+
+        #expect(didQueueRetry)
+        #expect(service.isEnabled)
+        #expect(service.databaseScope == .sharedCloudDatabase)
+        #expect(service.recordZoneOwnerName == "share-owner")
+        #expect(!service.hasSharedZoneAccessRevokedNotice)
+        #expect(service.hasPendingTransientRetry)
+        #expect(service.nextTransientRetryAt == now.addingTimeInterval(5))
+        #expect(defaults.integer(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) == 1)
+        #expect(defaults.double(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey) == now.addingTimeInterval(5).timeIntervalSinceReferenceDate)
+
+        service.setEnabled(false)
+
+        #expect(!service.hasPendingTransientRetry)
+        #expect(service.nextTransientRetryAt == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) == nil)
+        #expect(defaults.object(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey) == nil)
     }
 
     @MainActor
@@ -1170,7 +1760,7 @@ struct CloudSyncMetadataServiceTests {
             localRecordId: petId,
             context: context
         ))
-        #expect(state.isDeleted)
+        #expect(state.isDeletionTombstone)
         #expect(!state.hasPendingLocalChanges)
         #expect(state.deletedAt == deletedAt)
     }
@@ -1196,9 +1786,27 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV66.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func repositoryRootURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+    }
+
+    private func propertyListDictionary(_ url: URL) throws -> [String: Any] {
+        let data = try Data(contentsOf: url)
+        let object = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        return try #require(object as? [String: Any])
+    }
+
+    private struct FailingCloudSyncAccountStatusProvider: CloudSyncAccountStatusProviding {
+        func accountStatus() async throws -> CKAccountStatus {
+            throw CKError(.networkFailure)
+        }
     }
 
     private func makeRecordPayload(

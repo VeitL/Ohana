@@ -260,6 +260,12 @@ extension QuickWaterDetailSheet {
     }
 
     func saveWaterPlan() {
+        SharedPetSelectionMemory.saveSelection(
+            Set(selectedWaterTargets.map(\.id)),
+            sourcePet: pet,
+            scope: "quickCare.water",
+            candidates: sameSpeciesWaterPets
+        )
         let result = commandExecutor.saveWaterPlan(
             pet: pet,
             targets: selectedWaterTargets,
@@ -602,6 +608,12 @@ extension QuickWaterDetailSheet {
     }
 
     func commitWaterBusiness() {
+        SharedPetSelectionMemory.saveSelection(
+            Set(selectedWaterTargets.map(\.id)),
+            sourcePet: pet,
+            scope: "quickCare.water",
+            candidates: sameSpeciesWaterPets
+        )
         let result = commandExecutor.recordWater(
             pet: pet,
             targets: selectedWaterTargets,
@@ -619,6 +631,12 @@ extension QuickWaterDetailSheet {
     }
 
     func recordWaterChangeBusiness() {
+        SharedPetSelectionMemory.saveSelection(
+            Set(selectedWaterTargets.map(\.id)),
+            sourcePet: pet,
+            scope: "quickCare.water",
+            candidates: sameSpeciesWaterPets
+        )
         let reminders = commandExecutor.recordWaterChange(
             pet: pet,
             targets: selectedWaterTargets,
@@ -639,6 +657,12 @@ extension QuickWaterDetailSheet {
     }
 
     func recordFilterCleanBusiness() {
+        SharedPetSelectionMemory.saveSelection(
+            Set(selectedWaterTargets.map(\.id)),
+            sourcePet: pet,
+            scope: "quickCare.water",
+            candidates: sameSpeciesWaterPets
+        )
         let reminders = commandExecutor.recordFilterClean(
             pet: pet,
             targets: selectedWaterTargets,

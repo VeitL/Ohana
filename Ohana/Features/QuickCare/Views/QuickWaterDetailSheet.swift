@@ -260,7 +260,12 @@ struct QuickWaterDetailSheet: View {
         .onAppear {
             loadSettings()
             rebuildWaterSnapshot(force: true)
-            selectedSharedWaterPetIds = Set(sameSpeciesWaterPets.map(\.id))
+            selectedSharedWaterPetIds = SharedPetSelectionMemory.restoredSelection(
+                sourcePet: pet,
+                scope: "quickCare.water",
+                candidates: sameSpeciesWaterPets,
+                defaultToAll: true
+            )
             syncDisplayedWaterMode(force: true)
             scheduleWaterPlanMaintenance(delayMilliseconds: 220)
             if filterReminderOn {

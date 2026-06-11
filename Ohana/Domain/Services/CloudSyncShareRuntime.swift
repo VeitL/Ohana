@@ -26,6 +26,69 @@ nonisolated enum CloudSyncShareRuntime {
     static func zoneWideShareRecordID(zoneID: CKRecordZone.ID) -> CKRecord.ID {
         CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zoneID)
     }
+
+    static func isHouseholdShare(_ share: CKShare) -> Bool {
+        let rawShareType = share[CKShare.SystemFieldKey.shareType] as? String
+        return rawShareType == shareType
+    }
+}
+
+nonisolated enum CloudSyncAccountUnavailableReason: Equatable, Sendable {
+    case couldNotDetermine
+    case noAccount
+    case restricted
+    case temporarilyUnavailable
+}
+
+nonisolated enum CloudSyncAccountAvailability: Equatable, Sendable {
+    case available
+    case unavailable(CloudSyncAccountUnavailableReason)
+}
+
+nonisolated protocol CloudSyncAccountStatusProviding {
+    nonisolated func accountStatus() async throws -> CKAccountStatus
+}
+
+nonisolated struct CloudKitAccountStatusProvider: CloudSyncAccountStatusProviding {
+    private let container: CKContainer
+
+    init(containerIdentifier: String = CloudSyncEngineRuntime.containerIdentifier) {
+        container = CKContainer(identifier: containerIdentifier)
+    }
+
+    nonisolated func accountStatus() async throws -> CKAccountStatus {
+        try await container.accountStatus()
+    }
+}
+
+nonisolated enum CloudSyncAccountPreflight {
+    static func availability(for status: CKAccountStatus) -> CloudSyncAccountAvailability {
+        switch status {
+        case .available:
+            .available
+        case .noAccount:
+            .unavailable(.noAccount)
+        case .restricted:
+            .unavailable(.restricted)
+        case .temporarilyUnavailable:
+            .unavailable(.temporarilyUnavailable)
+        case .couldNotDetermine:
+            .unavailable(.couldNotDetermine)
+        @unknown default:
+            .unavailable(.couldNotDetermine)
+        }
+    }
+
+    static func availability(
+        provider: any CloudSyncAccountStatusProviding = CloudKitAccountStatusProvider()
+    ) async -> CloudSyncAccountAvailability {
+        do {
+            let status = try await provider.accountStatus()
+            return availability(for: status)
+        } catch {
+            return .unavailable(.couldNotDetermine)
+        }
+    }
 }
 
 nonisolated struct CloudSyncHouseholdSharePreparation: Sendable {
@@ -171,10 +234,14 @@ final nonisolated class CloudSyncHouseholdShareService: @unchecked Sendable {
 
     func acceptShare(url: URL) async throws -> CKShare {
         let metadata = try await shareMetadata(for: url)
+        return try await acceptShare(metadata: metadata)
+    }
+
+    func acceptShare(metadata: CKShare.Metadata) async throws -> CKShare {
         let container = cloudKitContainer
         let results = try await container.accept([metadata])
         guard let result = results[metadata] else {
-            throw CloudSyncHouseholdShareError.acceptedShareMissing(url: url)
+            throw CloudSyncHouseholdShareError.acceptedShareMissing(url: URL(fileURLWithPath: "/accepted-cloudkit-share"))
         }
         return try result.get()
     }
@@ -226,5 +293,160 @@ nonisolated enum CloudSyncHouseholdShareStateUpdater {
         }
         household.ckShareRecordName = shareRecordName
         return true
+    }
+
+    @discardableResult
+    static func markShareStopped(
+        householdId: UUID,
+        context: ModelContext
+    ) throws -> Bool {
+        var descriptor = FetchDescriptor<Household>(
+            predicate: #Predicate<Household> { $0.id == householdId }
+        )
+        descriptor.fetchLimit = 1
+        guard let household = try context.fetch(descriptor).first else {
+            return false
+        }
+        household.ckShareRecordName = ""
+        return true
+    }
+}
+
+nonisolated struct CloudSyncHouseholdShareStopSummary: Equatable, Sendable {
+    let householdId: UUID
+    let shareRecordWasCleared: Bool
+    let restagedSnapshot: CloudSyncInitialHouseholdMergeSummary
+
+    var stagedRecordCount: Int {
+        restagedSnapshot.stagedRecordCount
+    }
+}
+
+@MainActor
+enum CloudSyncHouseholdShareStopRuntime {
+    static func stopSharingLocally(
+        householdId: UUID,
+        context: ModelContext,
+        cloudSync: any CloudSyncManaging,
+        backupManager: DataBackupManager = DataBackupManager(),
+        modifiedAt: Date = Date()
+    ) throws -> CloudSyncHouseholdShareStopSummary {
+        let didClearShare = try CloudSyncHouseholdShareStateUpdater.markShareStopped(
+            householdId: householdId,
+            context: context
+        )
+        let restagedSnapshot = try CloudSyncInitialHouseholdMergeRuntime.stageLocalSnapshotForPrivateHouseholdSync(
+            householdId: householdId,
+            context: context,
+            backupManager: backupManager,
+            modifiedAt: modifiedAt
+        )
+        cloudSync.setDatabaseScope(.privateCloudDatabase, zoneOwnerName: nil)
+        cloudSync.clearSharedZoneAccessRevokedNotice()
+
+        return CloudSyncHouseholdShareStopSummary(
+            householdId: householdId,
+            shareRecordWasCleared: didClearShare,
+            restagedSnapshot: restagedSnapshot
+        )
+    }
+}
+
+nonisolated enum CloudSyncAcceptedShareStateUpdater {
+    @discardableResult
+    @MainActor
+    static func markAcceptedShare(
+        _ share: CKShare,
+        context: ModelContext
+    ) throws -> UUID? {
+        guard CloudSyncShareRuntime.isHouseholdShare(share),
+              let householdId = householdId(from: share.recordID.zoneID) else {
+            return nil
+        }
+        var descriptor = FetchDescriptor<Household>(
+            predicate: #Predicate<Household> { $0.id == householdId }
+        )
+        descriptor.fetchLimit = 1
+        let household: Household
+        if let existing = try context.fetch(descriptor).first {
+            household = existing
+        } else {
+            household = Household(name: shareTitle(from: share))
+            household.id = householdId
+            household.createdAt = Date()
+            context.insert(household)
+        }
+        household.ckShareRecordName = share.recordID.recordName
+        if household.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            household.name = shareTitle(from: share)
+        }
+        return householdId
+    }
+
+    static func householdId(from zoneID: CKRecordZone.ID) -> UUID? {
+        let prefix = "household-"
+        guard zoneID.zoneName.hasPrefix(prefix) else { return nil }
+        let rawId = String(zoneID.zoneName.dropFirst(prefix.count))
+        return UUID(uuidString: CloudSyncRecordState.normalizedRecordId(rawId))
+    }
+
+    private static func shareTitle(from share: CKShare) -> String {
+        let title = share[CKShare.SystemFieldKey.title] as? String
+        let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? CloudSyncShareRuntime.fallbackTitle : trimmed
+    }
+}
+
+protocol CloudSyncCurrentUserRecordIdentifying {
+    func currentUserRecordName() async throws -> String
+}
+
+struct CloudKitCurrentUserRecordIdentifier: CloudSyncCurrentUserRecordIdentifying {
+    private let container: CKContainer
+
+    init(containerIdentifier: String = CloudSyncEngineRuntime.containerIdentifier) {
+        container = CKContainer(identifier: containerIdentifier)
+    }
+
+    func currentUserRecordName() async throws -> String {
+        try await container.userRecordID().recordName
+    }
+}
+
+nonisolated enum CloudSyncHumanIdentityBinder {
+    @discardableResult
+    @MainActor
+    static func bind(
+        currentUserRecordName: String,
+        toHumanId humanId: UUID,
+        context: ModelContext
+    ) throws -> Bool {
+        let trimmed = currentUserRecordName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { $0.id == humanId }
+        )
+        descriptor.fetchLimit = 1
+        guard let human = try context.fetch(descriptor).first else {
+            return false
+        }
+        human.appleUserIdentifier = trimmed
+        return true
+    }
+
+    @discardableResult
+    @MainActor
+    static func bindCurrentCloudKitUser(
+        toHumanId humanId: UUID,
+        context: ModelContext,
+        identifier: (any CloudSyncCurrentUserRecordIdentifying)? = nil
+    ) async throws -> Bool {
+        let identifier = identifier ?? CloudKitCurrentUserRecordIdentifier()
+        let currentUserRecordName = try await identifier.currentUserRecordName()
+        return try bind(
+            currentUserRecordName: currentUserRecordName,
+            toHumanId: humanId,
+            context: context
+        )
     }
 }

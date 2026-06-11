@@ -279,7 +279,12 @@ struct QuickPottyDetailSheet: View {
         }
         .onAppear {
             loadSettings()
-            selectedSharedPottyPetIds = Set(sameSpeciesPottyPets.map(\.id))
+            selectedSharedPottyPetIds = SharedPetSelectionMemory.restoredSelection(
+                sourcePet: pet,
+                scope: "quickCare.potty",
+                candidates: sameSpeciesPottyPets,
+                defaultToAll: true
+            )
             guard !pet.hasPassedAway else { return }
             if !isCatPet {
                 selectedFocus = .potty

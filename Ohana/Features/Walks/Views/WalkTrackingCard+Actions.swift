@@ -143,6 +143,12 @@ extension WalkTrackingCard {
 
     func finishWalkAndFlip() {
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        SharedPetSelectionMemory.saveSelection(
+            Set(selectedWalkTargets.map(\.id)),
+            sourcePet: pet,
+            scope: "walk.shared",
+            candidates: sameSpeciesWalkPets
+        )
         onStopWalk(selectedWalkTargets)
         presentSummaryBack()
     }

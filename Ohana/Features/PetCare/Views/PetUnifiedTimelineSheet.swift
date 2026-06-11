@@ -12,6 +12,6 @@ struct PetUnifiedTimelineSheet: View {
     let pet: Pet
 
     var body: some View {
-        PetMomentsHubView(pet: pet)
+        PetMomentsHubRouteContainer(pet: pet)
     }
 }

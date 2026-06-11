@@ -31,9 +31,15 @@ nonisolated enum CloudSyncUploadBatchBuilder {
         for states: [CloudSyncRecordState],
         context: ModelContext
     ) throws -> [CloudSyncRecordPayload] {
-        try states.map { state in
-            if state.isDeleted {
-                return try CloudSyncRecordSerializer.tombstonePayload(for: state)
+        var payloads: [CloudSyncRecordPayload] = []
+        for state in states {
+            guard CloudSyncEntityRegistry.descriptor(for: state.entityName)?.uploadsToCloudKit == true,
+                  CloudSyncEntityRegistry.supportsUploadPipeline(for: state.entityName) else {
+                continue
+            }
+            if state.isDeletionTombstone {
+                try payloads.append(CloudSyncRecordSerializer.tombstonePayload(for: state))
+                continue
             }
 
             guard let recordId = UUID(uuidString: state.localRecordId) else {
@@ -52,8 +58,9 @@ nonisolated enum CloudSyncUploadBatchBuilder {
                     localRecordId: state.localRecordId
                 )
             }
-            return try CloudSyncRecordSerializer.payload(for: model, state: state)
+            try payloads.append(CloudSyncRecordSerializer.payload(for: model, state: state))
         }
+        return payloads
     }
 
     private static func localModel(

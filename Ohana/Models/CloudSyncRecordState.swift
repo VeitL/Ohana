@@ -33,7 +33,9 @@ final class CloudSyncRecordState {
     var ckRecordName: String
     var ckChangeTag: String
     var conflictPolicyRaw: String
+    // Legacy column: SwiftData does not reliably persist this name as sync tombstone state.
     var isDeleted: Bool
+    var isDeletionTombstone: Bool
     var deletedAt: Date?
     var deletedByHumanId: String
     var hasPendingLocalChanges: Bool
@@ -53,6 +55,7 @@ final class CloudSyncRecordState {
         ckChangeTag: String = "",
         conflictPolicy: CloudSyncConflictPolicy = .lastWriterWins,
         isDeleted: Bool = false,
+        isDeletionTombstone: Bool? = nil,
         deletedAt: Date? = nil,
         deletedByHumanId: UUID? = nil,
         hasPendingLocalChanges: Bool = true,
@@ -75,6 +78,7 @@ final class CloudSyncRecordState {
         self.ckChangeTag = ckChangeTag
         self.conflictPolicyRaw = conflictPolicy.rawValue
         self.isDeleted = isDeleted
+        self.isDeletionTombstone = isDeletionTombstone ?? isDeleted
         self.deletedAt = deletedAt
         self.deletedByHumanId = deletedByHumanId.map(Self.normalizedRecordId) ?? ""
         self.hasPendingLocalChanges = hasPendingLocalChanges

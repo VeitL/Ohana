@@ -14,6 +14,12 @@ extension QuickFeedDetailContent {
         let targets = selectedPlanTargets
         let targetMode: FeedOperatingMode = kind == .manualReminder ? .manualReminder : .autoFeeder
         let savingTint = kind == .manualReminder ? Color.goPurple : Color.goTeal
+        SharedPetSelectionMemory.saveSelection(
+            Set(targets.map(\.id)),
+            sourcePet: pet,
+            scope: "feeding.plan.\(kind.rawValue)",
+            candidates: sameSpeciesFeedPets
+        )
 
         draftStore.inputError = nil
         draftStore.isSavingFeedPlan = true

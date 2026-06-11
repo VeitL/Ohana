@@ -44,10 +44,13 @@ nonisolated enum CloudSyncMetadataService {
         let policy = conflictPolicy ?? CloudSyncMergePolicy.defaultConflictPolicy(for: normalizedEntityName)
         let recordKey = CloudSyncRecordState.recordKey(entityName: normalizedEntityName, localRecordId: localRecordId)
 
-        if let existing = try state(recordKey: recordKey, context: context) {
+        let existingStates = try states(recordKey: recordKey, context: context)
+        if let existing = existingStates.first {
+            deleteDuplicateStates(existingStates, keeping: existing, context: context)
             existing.householdId = normalizedHouseholdId(householdId) ?? existing.householdId
             existing.conflictPolicy = policy
             existing.isDeleted = false
+            existing.isDeletionTombstone = false
             existing.deletedAt = nil
             existing.deletedByHumanId = ""
             existing.hasPendingLocalChanges = true
@@ -89,10 +92,13 @@ nonisolated enum CloudSyncMetadataService {
         let policy = conflictPolicy ?? CloudSyncMergePolicy.defaultConflictPolicy(for: normalizedEntityName)
         let recordKey = CloudSyncRecordState.recordKey(entityName: normalizedEntityName, localRecordId: localRecordId)
 
-        if let existing = try state(recordKey: recordKey, context: context) {
+        let existingStates = try states(recordKey: recordKey, context: context)
+        if let existing = existingStates.first {
+            deleteDuplicateStates(existingStates, keeping: existing, context: context)
             existing.householdId = normalizedHouseholdId(householdId) ?? existing.householdId
             existing.conflictPolicy = policy
             existing.isDeleted = true
+            existing.isDeletionTombstone = true
             existing.deletedAt = deletedAt
             existing.deletedByHumanId = deletedByHumanId.map(CloudSyncRecordState.normalizedRecordId) ?? ""
             existing.hasPendingLocalChanges = true
@@ -149,14 +155,34 @@ nonisolated enum CloudSyncMetadataService {
         recordKey: String,
         context: ModelContext
     ) throws -> CloudSyncRecordState? {
-        var descriptor = FetchDescriptor<CloudSyncRecordState>(
-            predicate: #Predicate<CloudSyncRecordState> { $0.recordKey == recordKey }
-        )
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first
+        try states(recordKey: recordKey, context: context).first
     }
 
     private static func normalizedHouseholdId(_ householdId: UUID?) -> String? {
         householdId.map(CloudSyncRecordState.normalizedRecordId)
+    }
+
+    private static func states(
+        recordKey: String,
+        context: ModelContext
+    ) throws -> [CloudSyncRecordState] {
+        let descriptor = FetchDescriptor<CloudSyncRecordState>(
+            predicate: #Predicate<CloudSyncRecordState> { $0.recordKey == recordKey },
+            sortBy: [
+                SortDescriptor(\.updatedAt, order: .reverse),
+                SortDescriptor(\.lastModifiedAt, order: .reverse)
+            ]
+        )
+        return try context.fetch(descriptor)
+    }
+
+    private static func deleteDuplicateStates(
+        _ states: [CloudSyncRecordState],
+        keeping canonical: CloudSyncRecordState,
+        context: ModelContext
+    ) {
+        for state in states where state.id != canonical.id {
+            context.delete(state)
+        }
     }
 }

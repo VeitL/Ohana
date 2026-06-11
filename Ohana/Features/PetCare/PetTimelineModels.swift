@@ -66,12 +66,20 @@ struct PetTimelineArchiveSection: Identifiable {
 
 enum PetTimelineItemsBuilder {
     /// 构建统一时间轴；`limit` 为 nil 时不截断
-    static func items(for pet: Pet, limit: Int? = nil) -> [UnifiedLogItem] {
+    static func items(
+        for pet: Pet,
+        limit: Int? = nil,
+        sharedCareSessions: [SharedCareSession] = [],
+        l: L10n = L10n(AppLanguage.code)
+    ) -> [UnifiedLogItem] {
         var list: [UnifiedLogItem] = []
+        let sessionsById = sharedSessionLookup(sharedCareSessions)
 
         for w in pet.walkLogs {
-            list.append(UnifiedLogItem(id: w.id, date: w.startDate, type: "walk",
-                                       title: "巡岛 · \(w.distanceText)", subtitle: w.durationText,
+            let session = sharedSession(for: w.sharedSessionId, in: sessionsById)
+            list.append(UnifiedLogItem(id: session?.id ?? w.id, date: w.startDate, type: "walk",
+                                       title: walkTitle(for: w, session: session, l: l),
+                                       subtitle: walkSubtitle(for: w, session: session, l: l),
                                        iconName: "figure.walk", color: .goPrimary))
         }
         for p in pet.pottyLogs {
@@ -86,10 +94,11 @@ enum PetTimelineItemsBuilder {
                                        iconName: "heart.text.clipboard", color: .goTeal))
         }
         for e in pet.expenseLogs {
+            let session = sharedSession(for: e.sharedSessionId, in: sessionsById)
             let visibleNote = SharedCareMetadata.visibleNote(e.note)
-            list.append(UnifiedLogItem(id: e.id, date: e.date, type: "expense",
-                                       title: expenseTitle(for: e, visibleNote: visibleNote),
-                                       subtitle: e.category,
+            list.append(UnifiedLogItem(id: session?.id ?? e.id, date: e.date, type: "expense",
+                                       title: expenseTitle(for: e, session: session, visibleNote: visibleNote, l: l),
+                                       subtitle: expenseSubtitle(for: e, session: session, visibleNote: visibleNote, l: l),
                                        iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow))
         }
         for w in pet.weightLogs {
@@ -98,8 +107,10 @@ enum PetTimelineItemsBuilder {
                                        iconName: "scalemass.fill", color: .goTeal))
         }
         for c in pet.careLogs {
-            list.append(UnifiedLogItem(id: c.id, date: c.date, type: "care",
-                                       title: careTitle(for: c), subtitle: SharedCareMetadata.visibleNote(c.note),
+            let session = sharedSession(for: c.sharedSessionId, in: sessionsById)
+            list.append(UnifiedLogItem(id: session?.id ?? c.id, date: c.date, type: "care",
+                                       title: careTitle(for: c, session: session, l: l),
+                                       subtitle: careSubtitle(for: c, session: session, l: l),
                                        iconName: "sparkles", color: .goPurple))
         }
 
@@ -110,8 +121,13 @@ enum PetTimelineItemsBuilder {
         return sorted
     }
 
-    static func archiveSections(for pet: Pet, mode: PetTimelineDisplayMode, l: L10n) -> [PetTimelineArchiveSection] {
-        let visibleItems = archiveItems(for: pet, mode: mode, l: l)
+    static func archiveSections(
+        for pet: Pet,
+        mode: PetTimelineDisplayMode,
+        l: L10n,
+        sharedCareSessions: [SharedCareSession] = []
+    ) -> [PetTimelineArchiveSection] {
+        let visibleItems = archiveItems(for: pet, mode: mode, l: l, sharedCareSessions: sharedCareSessions)
         let calendar = Calendar.current
         let grouped = Dictionary(grouping: visibleItems) { item in
             calendar.startOfDay(for: item.date)
@@ -135,9 +151,14 @@ enum PetTimelineItemsBuilder {
             }
     }
 
-    static func archiveItems(for pet: Pet, mode: PetTimelineDisplayMode, l: L10n) -> [UnifiedLogItem] {
+    static func archiveItems(
+        for pet: Pet,
+        mode: PetTimelineDisplayMode,
+        l: L10n,
+        sharedCareSessions: [SharedCareSession] = []
+    ) -> [UnifiedLogItem] {
         let now = Date()
-        let base = items(for: pet, limit: nil)
+        let base = items(for: pet, limit: nil, sharedCareSessions: sharedCareSessions, l: l)
             .filter { isVisiblePast($0.date, now: now) }
             .map { item in
                 var copy = item
@@ -189,27 +210,120 @@ enum PetTimelineItemsBuilder {
             .sorted { $0.date > $1.date }
     }
 
-    private static func careTitle(for log: PetCareLog) -> String {
-        guard !log.sharedSessionId.isEmpty else {
+    private static func careTitle(for log: PetCareLog, session: SharedCareSession?, l: L10n) -> String {
+        guard let session else {
             return "护理 · \(log.careType.emoji)\(log.careType.rawValue)"
         }
-        return sharedTitle(prefix: "共同\(log.careType.rawValue)", note: log.note)
+        return sharedTitle(prefix: sharedCareActionTitle(for: session, fallback: log.careType, l: l), targetCount: targetCount(for: session, note: log.note), l: l)
     }
 
-    private static func expenseTitle(for log: PetExpenseLog, visibleNote: String) -> String {
-        let amount = AppCurrency.format(log.amount, fractionDigits: 0)
-        guard !log.sharedSessionId.isEmpty else {
+    private static func careSubtitle(for log: PetCareLog, session: SharedCareSession?, l: L10n) -> String {
+        let visibleNote = SharedCareMetadata.visibleNote(log.note)
+        guard let session else { return visibleNote }
+        var parts: [String] = []
+        if session.totalAmountGrams > 0 {
+            parts.append(formattedWholeAmount(session.totalAmountGrams, unit: "g"))
+            parts.append(session.foodKind.title(l))
+        } else if session.totalAmountMl > 0 {
+            parts.append(formattedWholeAmount(session.totalAmountMl, unit: "ml"))
+        }
+        if !visibleNote.isEmpty {
+            parts.append(visibleNote)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private static func expenseTitle(for log: PetExpenseLog, session: SharedCareSession?, visibleNote: String, l: L10n) -> String {
+        guard let session else {
+            let amount = AppCurrency.format(log.amount, fractionDigits: 0)
             return "\(amount) · \(visibleNote.isEmpty ? log.category : visibleNote)"
         }
-        let detail = visibleNote.isEmpty ? log.category : visibleNote
-        return "\(amount) · \(sharedTitle(prefix: "共同花费", note: log.note)) · \(detail)"
+        let amount = AppCurrency.format(session.totalExpenseAmount, fractionDigits: 0)
+        return "\(amount) · \(sharedTitle(prefix: l.tr(zh: "共同花费", en: "Shared cost", de: "Gemeinsame Kosten"), targetCount: targetCount(for: session, note: log.note), l: l))"
     }
 
-    private static func sharedTitle(prefix: String, note: String) -> String {
-        guard let count = SharedCareMetadata.targetCount(from: note), count > 1 else {
+    private static func expenseSubtitle(for log: PetExpenseLog, session: SharedCareSession?, visibleNote: String, l: L10n) -> String {
+        guard let session else { return log.category }
+        let detail = visibleNote.isEmpty ? session.expenseCategory.rawValue : visibleNote
+        let perPet = AppCurrency.format(log.amount, fractionDigits: 2)
+        return l.tr(
+            zh: "\(detail) · 本宠 \(perPet)",
+            en: "\(detail) · this pet \(perPet)",
+            de: "\(detail) · dieses Tier \(perPet)"
+        )
+    }
+
+    private static func walkTitle(for log: PetWalkLog, session: SharedCareSession?, l: L10n) -> String {
+        guard let session else {
+            return l.tr(zh: "巡岛 · \(log.distanceText)", en: "Walk · \(log.distanceText)", de: "Spaziergang · \(log.distanceText)")
+        }
+        return sharedTitle(prefix: l.tr(zh: "共同散步", en: "Shared walk", de: "Gemeinsamer Spaziergang"), targetCount: targetCount(for: session, note: ""), l: l)
+    }
+
+    private static func walkSubtitle(for log: PetWalkLog, session: SharedCareSession?, l _: L10n) -> String {
+        guard session != nil else { return log.durationText }
+        return "\(log.distanceText) · \(log.durationText)"
+    }
+
+    private static func sharedTitle(prefix: String, targetCount: Int, l: L10n) -> String {
+        guard targetCount > 1 else {
             return prefix
         }
-        return "\(prefix) · \(count)只"
+        return l.tr(
+            zh: "\(prefix) · \(targetCount)只",
+            en: "\(prefix) · \(targetCount) pets",
+            de: "\(prefix) · \(targetCount) Tiere"
+        )
+    }
+
+    private static func sharedCareActionTitle(for session: SharedCareSession, fallback: CareType, l: L10n) -> String {
+        switch session.actionKind {
+        case .feeding:
+            l.tr(zh: "共同喂食", en: "Shared feeding", de: "Gemeinsames Füttern")
+        case .watering:
+            l.tr(zh: "共同喂水", en: "Shared water", de: "Gemeinsames Wasser")
+        case .litterScoop:
+            l.tr(zh: "共同铲砂", en: "Shared litter scoop", de: "Gemeinsames Klo-Reinigen")
+        case .litterChange:
+            l.tr(zh: "共同换砂", en: "Shared litter change", de: "Gemeinsamer Streuwechsel")
+        case .waterChange:
+            l.tr(zh: "共同换水", en: "Shared water change", de: "Gemeinsamer Wasserwechsel")
+        case .filterClean:
+            l.tr(zh: "共同清理滤材", en: "Shared filter clean", de: "Gemeinsame Filterreinigung")
+        case .cageCleaning:
+            l.tr(zh: "共同清理鸟笼", en: "Shared cage clean", de: "Gemeinsame Käfigreinigung")
+        case .freeFlight:
+            l.tr(zh: "共同放飞互动", en: "Shared free flight", de: "Gemeinsamer Freiflug")
+        case .misting:
+            l.tr(zh: "共同喷水保湿", en: "Shared misting", de: "Gemeinsames Besprühen")
+        case .substrateChange:
+            l.tr(zh: "共同换垫材", en: "Shared substrate change", de: "Gemeinsamer Substratwechsel")
+        case .play:
+            l.tr(zh: "共同逗玩", en: "Shared play", de: "Gemeinsames Spielen")
+        case .pottyUnknown, .walk, .expense:
+            l.tr(zh: "共同\(fallback.rawValue)", en: "Shared care", de: "Gemeinsame Pflege")
+        }
+    }
+
+    private static func targetCount(for session: SharedCareSession, note: String) -> Int {
+        max(session.targetPetIds.count, SharedCareMetadata.targetCount(from: note) ?? 0)
+    }
+
+    private static func sharedSessionLookup(_ sessions: [SharedCareSession]) -> [String: SharedCareSession] {
+        Dictionary(uniqueKeysWithValues: sessions.map { ($0.id.uuidString, $0) })
+    }
+
+    private static func sharedSession(for id: String, in lookup: [String: SharedCareSession]) -> SharedCareSession? {
+        guard !id.isEmpty else { return nil }
+        return lookup[id]
+    }
+
+    private static func formattedWholeAmount(_ value: Double, unit: String) -> String {
+        let rounded = value.rounded()
+        if abs(value - rounded) < 0.001 {
+            return "\(Int(rounded)) \(unit)"
+        }
+        return String(format: "%.1f %@", value, unit)
     }
 
     private static func memoryItems(for pet: Pet, l: L10n, now: Date) -> [UnifiedLogItem] {

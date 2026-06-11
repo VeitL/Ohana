@@ -45,6 +45,62 @@ enum SharedPetTargetResolver {
     }
 }
 
+enum SharedPetSelectionMemory {
+    @MainActor
+    static func restoredSelection(
+        sourcePet: Pet,
+        scope: String,
+        candidates: [Pet],
+        defaultToAll: Bool
+    ) -> Set<UUID> {
+        let candidateIDs = Set(candidates.map(\.id))
+        guard let stored = UserDefaults.standard.array(forKey: storageKey(sourcePet: sourcePet, scope: scope)) as? [String],
+              !stored.isEmpty else {
+            return defaultSelection(sourcePet: sourcePet, candidates: candidates, defaultToAll: defaultToAll)
+        }
+
+        var restored = Set(stored.compactMap(UUID.init(uuidString:))).intersection(candidateIDs)
+        if candidateIDs.contains(sourcePet.id) {
+            restored.insert(sourcePet.id)
+        }
+        return restored.isEmpty
+            ? defaultSelection(sourcePet: sourcePet, candidates: candidates, defaultToAll: defaultToAll)
+            : restored
+    }
+
+    @MainActor
+    static func saveSelection(
+        _ selectedPetIds: Set<UUID>,
+        sourcePet: Pet,
+        scope: String,
+        candidates: [Pet]
+    ) {
+        let candidateIDs = Set(candidates.map(\.id))
+        guard !candidateIDs.isEmpty else { return }
+        var normalized = selectedPetIds.intersection(candidateIDs)
+        if candidateIDs.contains(sourcePet.id) {
+            normalized.insert(sourcePet.id)
+        }
+        let encoded = normalized
+            .map(\.uuidString)
+            .sorted()
+        UserDefaults.standard.set(encoded, forKey: storageKey(sourcePet: sourcePet, scope: scope))
+    }
+
+    @MainActor
+    private static func defaultSelection(sourcePet: Pet, candidates: [Pet], defaultToAll: Bool) -> Set<UUID> {
+        if defaultToAll {
+            return Set(candidates.map(\.id))
+        }
+        return Set(candidates.contains(where: { $0.id == sourcePet.id }) ? [sourcePet.id] : [])
+    }
+
+    @MainActor
+    private static func storageKey(sourcePet: Pet, scope: String) -> String {
+        "sharedPetSelection.\(scope).\(sourcePet.id.uuidString)"
+    }
+}
+
 enum SharedPetChildLogStrategy {
     case care(type: CareType)
     case unknownPotty(type: PottyType)
@@ -236,6 +292,7 @@ enum SharedPetActionRecorder {
             session.primaryLegacyModelName = primary.name
             session.primaryLegacyModelId = primary.id
         }
+        CloudSyncMutationRecorder.markModified(session, context: context, modifiedAt: descriptor.date)
         CloudSyncMutationRecorder.markModified(careLogs.map(\.1), context: context, modifiedAt: descriptor.date)
         if let pottyLog {
             CloudSyncMutationRecorder.markModified(pottyLog, context: context, modifiedAt: descriptor.date)

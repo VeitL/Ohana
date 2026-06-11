@@ -113,7 +113,7 @@ struct AppPetDetailSheetRouteContainer: View {
         case .medication:
             NavigationStack { PetMedicationView(pet: pet) }
         case .momentHistory:
-            PetMomentsHubView(pet: pet)
+            PetMomentsHubRouteContainer(pet: pet)
         case .documents:
             DocumentsListView(pet: pet, showsCloseButton: true)
         case .achievements:

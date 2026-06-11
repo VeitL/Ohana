@@ -145,6 +145,12 @@ struct WalkTrackingCard: View {
             }
         }
         .onAppear {
+            selectedSharedWalkPetIds = SharedPetSelectionMemory.restoredSelection(
+                sourcePet: pet,
+                scope: "walk.shared",
+                candidates: sameSpeciesWalkPets,
+                defaultToAll: false
+            )
             if case .finished = mgr.phase, mgr.currentPet?.id == pet.id {
                 presentSummaryBack(animated: false)
             }

@@ -15,6 +15,8 @@ let ohanaProcessStartTime = CFAbsoluteTimeGetCurrent()
 
 @main
 struct OhanaApp: App {
+    @UIApplicationDelegateAdaptor(OhanaCloudSharingAppDelegate.self) private var cloudSharingAppDelegate
+
     private let modelContainer: ModelContainer
     private let appServices: AppServices
     @AppStorage("appThemePreference") private var appThemePreference: String = "dark"
@@ -31,6 +33,7 @@ struct OhanaApp: App {
         modelContainer = SharedModelContainer.make()
         let services = AppServices()
         appServices = services
+        cloudSharingAppDelegate.configure(modelContainer: modelContainer, cloudSync: services.cloudSync)
         let metricKit = services.metricKit
         let initDurationMS = (CFAbsoluteTimeGetCurrent() - initStartedAt) * 1000
         let containerDurationMS = (CFAbsoluteTimeGetCurrent() - containerStartedAt) * 1000

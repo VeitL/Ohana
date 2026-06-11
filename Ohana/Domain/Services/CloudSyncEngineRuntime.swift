@@ -18,6 +18,10 @@ protocol CloudSyncEngineStateSerializationPersisting {
     func saveStateSerialization(_ serialization: CKSyncEngine.State.Serialization) async throws
 }
 
+protocol CloudSyncEngineStateSerializationClearing {
+    func clearStateSerialization()
+}
+
 protocol CloudSyncEngineSentRecordMarking {
     func markSavedRecords(_ records: [CKRecord]) async throws
 }
@@ -30,14 +34,28 @@ protocol CloudSyncEngineFetchedRecordApplying {
 protocol CloudSyncManaging {
     var isEnabled: Bool { get }
     var isStarted: Bool { get }
+    var databaseScope: CloudSyncDatabaseScope { get }
+    var hasSharedZoneAccessRevokedNotice: Bool { get }
+    var hasPendingTransientRetry: Bool { get }
+    var nextTransientRetryAt: Date? { get }
 
     func setEnabled(_ enabled: Bool)
+    func setDatabaseScope(_ scope: CloudSyncDatabaseScope, zoneOwnerName: String?)
+    func clearSharedZoneAccessRevokedNotice()
     func startAfterFirstRender(modelContainer: ModelContainer)
     func startIfNeeded(modelContainer: ModelContainer) async
     @discardableResult
     func registerDirtyLocalChanges() async -> CloudSyncPendingChangeSummary
-    func sendPendingLocalChanges() async
-    func fetchRemoteChanges() async
+    @discardableResult
+    func sendPendingLocalChanges() async -> Bool
+    @discardableResult
+    func fetchRemoteChanges() async -> Bool
+    func handleRemoteNotification(modelContainer: ModelContainer) async -> CloudSyncRemoteNotificationResult
+    func handleAccountChanged(
+        availability: CloudSyncAccountAvailability,
+        modelContainer: ModelContainer
+    ) async -> CloudSyncAccountChangeResult
+    func retryPendingSyncNow(modelContainer: ModelContainer) async
     func cancel()
 }
 
@@ -45,7 +63,28 @@ nonisolated enum CloudSyncEngineRuntime {
     static let containerIdentifier = "iCloud.HT.Ohana"
     static let defaultSubscriptionID = "ohana-cloud-sync-engine"
     static let enabledDefaultsKey = "ohana_cloud_sync_enabled"
+    static let databaseScopeDefaultsKey = "ohana_cloud_sync_database_scope"
+    static let sharedZoneOwnerNameDefaultsKey = "ohana_cloud_sync_shared_zone_owner_name"
+    static let sharedZoneAccessRevokedDefaultsKey = "ohana_cloud_sync_shared_zone_access_revoked"
+    static let retryAttemptDefaultsKey = "ohana_cloud_sync_retry_attempt"
+    static let nextRetryAtDefaultsKey = "ohana_cloud_sync_next_retry_at"
     static let firstRenderStartDelayMilliseconds: UInt64 = 6000
+    static let retryBaseDelaySeconds: TimeInterval = 5
+    static let retryMaxDelaySeconds: TimeInterval = 300
+}
+
+nonisolated enum CloudSyncDatabaseScope: String, Codable, Sendable {
+    case privateCloudDatabase
+    case sharedCloudDatabase
+
+    func database(in container: CKContainer) -> CKDatabase {
+        switch self {
+        case .privateCloudDatabase:
+            container.privateCloudDatabase
+        case .sharedCloudDatabase:
+            container.sharedCloudDatabase
+        }
+    }
 }
 
 nonisolated struct CloudSyncPendingChangeSummary: Equatable {
@@ -59,11 +98,190 @@ nonisolated struct CloudSyncPendingChangeSummary: Equatable {
     }
 }
 
+nonisolated enum CloudSyncRemoteNotificationResult: Equatable {
+    case ignored
+    case fetched
+    case failed
+}
+
+nonisolated enum CloudSyncAccountChangeResult: Equatable {
+    case ignored
+    case paused(CloudSyncAccountUnavailableReason)
+    case resynced
+    case failed
+}
+
+nonisolated enum CloudSyncSharedZoneAccessFailureClassifier {
+    private static let accessLossCodes: Set<CKError.Code> = [
+        .permissionFailure,
+        .userDeletedZone,
+        .zoneNotFound
+    ]
+
+    static func isSharedZoneAccessLoss(_ error: Error) -> Bool {
+        if let ckError = error as? CKError {
+            return isSharedZoneAccessLoss(ckError)
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == CKError.errorDomain,
+           let code = CKError.Code(rawValue: nsError.code),
+           accessLossCodes.contains(code) {
+            return true
+        }
+
+        return nsError.userInfo.values.contains { value in
+            if let nested = value as? Error {
+                return isSharedZoneAccessLoss(nested)
+            }
+            if let nested = value as? [AnyHashable: Error] {
+                return nested.values.contains(where: isSharedZoneAccessLoss)
+            }
+            return false
+        }
+    }
+
+    private static func isSharedZoneAccessLoss(_ error: CKError) -> Bool {
+        if accessLossCodes.contains(error.code) {
+            return true
+        }
+        guard error.code == .partialFailure,
+              let partialErrors = error.partialErrorsByItemID else {
+            return false
+        }
+        return partialErrors.values.contains(where: isSharedZoneAccessLoss)
+    }
+}
+
+nonisolated enum CloudSyncRetryOperation: String, Sendable {
+    case send
+    case fetch
+}
+
+nonisolated struct CloudSyncTransientRetryPlan: Equatable {
+    let operation: CloudSyncRetryOperation
+    let attempt: Int
+    let delaySeconds: TimeInterval
+    let nextRetryAt: Date
+}
+
+nonisolated enum CloudSyncTransientErrorRetryPolicy {
+    private static let transientCodes: Set<CKError.Code> = [
+        .batchRequestFailed,
+        .limitExceeded,
+        .networkFailure,
+        .networkUnavailable,
+        .requestRateLimited,
+        .serviceUnavailable,
+        .zoneBusy
+    ]
+
+    static func isTransient(_ error: Error) -> Bool {
+        if let ckError = error as? CKError {
+            return isTransient(ckError)
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == CKError.errorDomain,
+           let code = CKError.Code(rawValue: nsError.code),
+           transientCodes.contains(code) {
+            return true
+        }
+
+        return nsError.userInfo.values.contains { value in
+            if let nested = value as? Error {
+                return isTransient(nested)
+            }
+            if let nested = value as? [AnyHashable: Error] {
+                return nested.values.contains(where: isTransient)
+            }
+            return false
+        }
+    }
+
+    private static func isTransient(_ error: CKError) -> Bool {
+        if transientCodes.contains(error.code) {
+            return true
+        }
+        guard error.code == .partialFailure,
+              let partialErrors = error.partialErrorsByItemID else {
+            return false
+        }
+        return partialErrors.values.contains(where: isTransient)
+    }
+
+    static func plan(
+        for error: Error,
+        operation: CloudSyncRetryOperation,
+        previousAttempt: Int,
+        now: Date = Date()
+    ) -> CloudSyncTransientRetryPlan? {
+        guard isTransient(error) else { return nil }
+        let attempt = min(max(previousAttempt + 1, 1), 10)
+        let systemDelay = retryAfterSeconds(in: error)
+        let fallbackDelay = fallbackDelaySeconds(attempt: attempt)
+        let delay = min(
+            max(systemDelay ?? fallbackDelay, 1),
+            CloudSyncEngineRuntime.retryMaxDelaySeconds
+        )
+        return CloudSyncTransientRetryPlan(
+            operation: operation,
+            attempt: attempt,
+            delaySeconds: delay,
+            nextRetryAt: now.addingTimeInterval(delay)
+        )
+    }
+
+    private static func fallbackDelaySeconds(attempt: Int) -> TimeInterval {
+        let exponent = min(max(attempt - 1, 0), 6)
+        return min(
+            CloudSyncEngineRuntime.retryBaseDelaySeconds * pow(2, Double(exponent)),
+            CloudSyncEngineRuntime.retryMaxDelaySeconds
+        )
+    }
+
+    private static func retryAfterSeconds(in error: Error) -> TimeInterval? {
+        if let ckError = error as? CKError,
+           let retryAfter = ckError.retryAfterSeconds {
+            return retryAfter
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == CKError.errorDomain,
+           let retryAfter = nsError.userInfo[CKErrorRetryAfterKey] as? TimeInterval {
+            return retryAfter
+        }
+        if nsError.domain == CKError.errorDomain,
+           let retryAfter = nsError.userInfo[CKErrorRetryAfterKey] as? NSNumber {
+            return retryAfter.doubleValue
+        }
+
+        for value in nsError.userInfo.values {
+            if let nested = value as? Error,
+               let retryAfter = retryAfterSeconds(in: nested) {
+                return retryAfter
+            }
+            if let nested = value as? [AnyHashable: Error] {
+                for error in nested.values {
+                    if let retryAfter = retryAfterSeconds(in: error) {
+                        return retryAfter
+                    }
+                }
+            }
+        }
+        return nil
+    }
+}
+
 nonisolated enum CloudSyncEnginePendingChangeBuilder {
     static func pendingDatabaseChanges(
         for payloads: [CloudSyncRecordPayload],
-        ownerName: String = CKCurrentUserDefaultName
+        ownerName: String = CKCurrentUserDefaultName,
+        databaseScope: CloudSyncDatabaseScope = .privateCloudDatabase
     ) -> [CKSyncEngine.PendingDatabaseChange] {
+        guard databaseScope == .privateCloudDatabase else {
+            return []
+        }
         var seenZoneNames = Set<String>()
         return payloads.compactMap { payload in
             guard seenZoneNames.insert(payload.zoneName).inserted else { return nil }
@@ -114,6 +332,7 @@ final class CloudSyncEngineService: CloudSyncManaging {
     private let atomicByZone: Bool
     private let automaticallySync: Bool
     private var startTask: Task<Void, Never>?
+    private var retryTask: Task<Void, Never>?
     private var engine: CKSyncEngine?
     private var delegateAdapter: CloudSyncEngineDelegateAdapter?
     private var localStore: CloudSyncLocalStoreActor?
@@ -121,7 +340,7 @@ final class CloudSyncEngineService: CloudSyncManaging {
     init(
         userDefaults: UserDefaults = .standard,
         containerIdentifier: String = CloudSyncEngineRuntime.containerIdentifier,
-        stateStore: any CloudSyncEngineStateSerializationPersisting = UserDefaultsCloudSyncEngineStateStore(),
+        stateStore: (any CloudSyncEngineStateSerializationPersisting)? = nil,
         assetFileStore: CloudSyncAssetFileStore = CloudSyncAssetFileStore(),
         ownerName: String = CKCurrentUserDefaultName,
         atomicByZone: Bool = false,
@@ -129,7 +348,7 @@ final class CloudSyncEngineService: CloudSyncManaging {
     ) {
         self.userDefaults = userDefaults
         self.containerIdentifier = containerIdentifier
-        self.stateStore = stateStore
+        self.stateStore = stateStore ?? UserDefaultsCloudSyncEngineStateStore(userDefaults: userDefaults)
         self.assetFileStore = assetFileStore
         self.ownerName = ownerName
         self.atomicByZone = atomicByZone
@@ -144,11 +363,116 @@ final class CloudSyncEngineService: CloudSyncManaging {
         engine != nil
     }
 
+    var databaseScope: CloudSyncDatabaseScope {
+        guard let rawValue = userDefaults.string(forKey: CloudSyncEngineRuntime.databaseScopeDefaultsKey),
+              let scope = CloudSyncDatabaseScope(rawValue: rawValue) else {
+            return .privateCloudDatabase
+        }
+        return scope
+    }
+
+    var recordZoneOwnerName: String {
+        guard databaseScope == .sharedCloudDatabase else {
+            return ownerName
+        }
+        let persisted = userDefaults
+            .string(forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return persisted.isEmpty ? ownerName : persisted
+    }
+
+    var hasSharedZoneAccessRevokedNotice: Bool {
+        userDefaults.bool(forKey: CloudSyncEngineRuntime.sharedZoneAccessRevokedDefaultsKey)
+    }
+
+    var hasPendingTransientRetry: Bool {
+        userDefaults.integer(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey) > 0 &&
+            nextTransientRetryAt != nil
+    }
+
+    var nextTransientRetryAt: Date? {
+        let rawValue = userDefaults.double(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey)
+        guard rawValue > 0 else { return nil }
+        return Date(timeIntervalSinceReferenceDate: rawValue)
+    }
+
     func setEnabled(_ enabled: Bool) {
         userDefaults.set(enabled, forKey: CloudSyncEngineRuntime.enabledDefaultsKey)
         if !enabled {
+            clearTransientRetryState()
             cancel()
         }
+    }
+
+    func setDatabaseScope(_ scope: CloudSyncDatabaseScope, zoneOwnerName: String? = nil) {
+        let previousScope = databaseScope
+        let previousOwnerName = recordZoneOwnerName
+
+        userDefaults.set(scope.rawValue, forKey: CloudSyncEngineRuntime.databaseScopeDefaultsKey)
+        switch scope {
+        case .privateCloudDatabase:
+            userDefaults.removeObject(forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey)
+        case .sharedCloudDatabase:
+            let trimmed = zoneOwnerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !trimmed.isEmpty {
+                userDefaults.set(trimmed, forKey: CloudSyncEngineRuntime.sharedZoneOwnerNameDefaultsKey)
+            }
+        }
+
+        if engine != nil, previousScope != databaseScope || previousOwnerName != recordZoneOwnerName {
+            (stateStore as? any CloudSyncEngineStateSerializationClearing)?.clearStateSerialization()
+            clearTransientRetryState()
+            cancel()
+        } else if previousScope != databaseScope || previousOwnerName != recordZoneOwnerName {
+            (stateStore as? any CloudSyncEngineStateSerializationClearing)?.clearStateSerialization()
+            clearTransientRetryState()
+        }
+    }
+
+    func clearSharedZoneAccessRevokedNotice() {
+        userDefaults.set(false, forKey: CloudSyncEngineRuntime.sharedZoneAccessRevokedDefaultsKey)
+    }
+
+    @discardableResult
+    func handleSharedZoneAccessLossIfNeeded(_ error: Error) -> Bool {
+        guard databaseScope == .sharedCloudDatabase,
+              CloudSyncSharedZoneAccessFailureClassifier.isSharedZoneAccessLoss(error) else {
+            return false
+        }
+
+        userDefaults.set(true, forKey: CloudSyncEngineRuntime.sharedZoneAccessRevokedDefaultsKey)
+        OhanaLog.warning(
+            "Cloud sync shared zone access was revoked; pausing shared sync and clearing shared database scope.",
+            category: "CloudSync"
+        )
+        setEnabled(false)
+        setDatabaseScope(.privateCloudDatabase, zoneOwnerName: nil)
+        return true
+    }
+
+    @discardableResult
+    func handleTransientSyncFailureIfNeeded(
+        _ error: Error,
+        operation: CloudSyncRetryOperation,
+        now: Date = Date()
+    ) -> Bool {
+        guard let plan = CloudSyncTransientErrorRetryPolicy.plan(
+            for: error,
+            operation: operation,
+            previousAttempt: userDefaults.integer(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey),
+            now: now
+        ) else {
+            return false
+        }
+
+        userDefaults.set(plan.attempt, forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey)
+        userDefaults.set(plan.nextRetryAt.timeIntervalSinceReferenceDate, forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey)
+        scheduleTransientRetry(plan)
+        OhanaLog.warning(
+            "Cloud sync transient \(operation.rawValue) failure; retrying in \(Int(plan.delaySeconds))s.",
+            category: "CloudSync"
+        )
+        return true
     }
 
     func startAfterFirstRender(modelContainer: ModelContainer) {
@@ -167,19 +491,22 @@ final class CloudSyncEngineService: CloudSyncManaging {
         guard isEnabled, engine == nil else { return }
         assetFileStore.pruneFiles()
         let store = CloudSyncLocalStoreActor(modelContainer: modelContainer)
+        let activeScope = databaseScope
+        let activeOwnerName = recordZoneOwnerName
         let adapter = CloudSyncEngineDelegateAdapter(
             uploadPayloadProvider: store,
             stateStore: stateStore,
             sentRecordMarker: store,
             fetchedRecordApplier: store,
-            ownerName: ownerName,
+            ownerName: activeOwnerName,
             atomicByZone: atomicByZone,
             assetFileURLProvider: assetFileStore.assetFileURLProvider()
         )
 
         do {
             let serialization = try await stateStore.loadStateSerialization()
-            let database = CKContainer(identifier: containerIdentifier).privateCloudDatabase
+            let container = CKContainer(identifier: containerIdentifier)
+            let database = activeScope.database(in: container)
             engine = adapter.makeEngine(
                 database: database,
                 stateSerialization: serialization,
@@ -198,13 +525,15 @@ final class CloudSyncEngineService: CloudSyncManaging {
         guard let engine, let localStore else { return .empty }
         do {
             let payloads = try await localStore.uploadPayloads()
+            let activeOwnerName = recordZoneOwnerName
             let databaseChanges = CloudSyncEnginePendingChangeBuilder.pendingDatabaseChanges(
                 for: payloads,
-                ownerName: ownerName
+                ownerName: activeOwnerName,
+                databaseScope: databaseScope
             )
             let recordChanges = CloudSyncEngineBatchBuilder.pendingSaveChanges(
                 for: payloads,
-                ownerName: ownerName
+                ownerName: activeOwnerName
             )
             let newDatabaseChanges = databaseChanges.filter { !engine.state.pendingDatabaseChanges.contains($0) }
             let newRecordChanges = recordChanges.filter { !engine.state.pendingRecordZoneChanges.contains($0) }
@@ -225,28 +554,84 @@ final class CloudSyncEngineService: CloudSyncManaging {
         }
     }
 
-    func sendPendingLocalChanges() async {
-        guard let engine else { return }
+    @discardableResult
+    func sendPendingLocalChanges() async -> Bool {
+        guard let engine else { return false }
         _ = await registerDirtyLocalChanges()
         do {
             try await engine.sendChanges()
+            clearTransientRetryState()
+            return true
         } catch {
-            OhanaLog.error("Cloud sync failed to send local changes: \(error)", category: "CloudSync")
+            if handleSharedZoneAccessLossIfNeeded(error) {
+                return false
+            }
+            if !handleTransientSyncFailureIfNeeded(error, operation: .send) {
+                OhanaLog.error("Cloud sync failed to send local changes: \(error)", category: "CloudSync")
+            }
+            return false
         }
     }
 
-    func fetchRemoteChanges() async {
-        guard let engine else { return }
+    @discardableResult
+    func fetchRemoteChanges() async -> Bool {
+        guard let engine else { return false }
         do {
             try await engine.fetchChanges()
+            clearTransientRetryState()
+            return true
         } catch {
-            OhanaLog.error("Cloud sync failed to fetch remote changes: \(error)", category: "CloudSync")
+            if handleSharedZoneAccessLossIfNeeded(error) {
+                return false
+            }
+            if !handleTransientSyncFailureIfNeeded(error, operation: .fetch) {
+                OhanaLog.error("Cloud sync failed to fetch remote changes: \(error)", category: "CloudSync")
+            }
+            return false
         }
+    }
+
+    func handleRemoteNotification(modelContainer: ModelContainer) async -> CloudSyncRemoteNotificationResult {
+        guard isEnabled else { return .ignored }
+        await startIfNeeded(modelContainer: modelContainer)
+        guard engine != nil else { return .failed }
+        return await fetchRemoteChanges() ? .fetched : .failed
+    }
+
+    func handleAccountChanged(
+        availability: CloudSyncAccountAvailability,
+        modelContainer: ModelContainer
+    ) async -> CloudSyncAccountChangeResult {
+        guard isEnabled else { return .ignored }
+
+        resetEngineAfterAccountChange()
+
+        switch availability {
+        case .available:
+            await startIfNeeded(modelContainer: modelContainer)
+            guard engine != nil else { return .failed }
+            let didSend = await sendPendingLocalChanges()
+            let didFetch = await fetchRemoteChanges()
+            return didSend || didFetch ? .resynced : .failed
+        case let .unavailable(reason):
+            return .paused(reason)
+        }
+    }
+
+    func retryPendingSyncNow(modelContainer: ModelContainer) async {
+        retryTask?.cancel()
+        retryTask = nil
+        setEnabled(true)
+        await startIfNeeded(modelContainer: modelContainer)
+        _ = await sendPendingLocalChanges()
+        _ = await fetchRemoteChanges()
     }
 
     func cancel() {
         startTask?.cancel()
         startTask = nil
+        retryTask?.cancel()
+        retryTask = nil
         guard let engine else {
             delegateAdapter = nil
             localStore = nil
@@ -256,6 +641,38 @@ final class CloudSyncEngineService: CloudSyncManaging {
         self.engine = nil
         delegateAdapter = nil
         localStore = nil
+    }
+
+    private func scheduleTransientRetry(_ plan: CloudSyncTransientRetryPlan) {
+        retryTask?.cancel()
+        retryTask = Task { @MainActor [weak self] in
+            let nanoseconds = UInt64(plan.delaySeconds * 1_000_000_000)
+            do {
+                try await Task.sleep(nanoseconds: nanoseconds)
+            } catch {
+                return
+            }
+            guard let self, self.isEnabled, self.engine != nil else { return }
+            switch plan.operation {
+            case .send:
+                _ = await self.sendPendingLocalChanges()
+            case .fetch:
+                _ = await self.fetchRemoteChanges()
+            }
+        }
+    }
+
+    private func clearTransientRetryState() {
+        retryTask?.cancel()
+        retryTask = nil
+        userDefaults.removeObject(forKey: CloudSyncEngineRuntime.retryAttemptDefaultsKey)
+        userDefaults.removeObject(forKey: CloudSyncEngineRuntime.nextRetryAtDefaultsKey)
+    }
+
+    private func resetEngineAfterAccountChange() {
+        (stateStore as? any CloudSyncEngineStateSerializationClearing)?.clearStateSerialization()
+        clearTransientRetryState()
+        cancel()
     }
 }
 
@@ -396,7 +813,7 @@ final nonisolated class CloudSyncEngineDelegateAdapter: NSObject, CKSyncEngineDe
     }
 }
 
-nonisolated struct UserDefaultsCloudSyncEngineStateStore: CloudSyncEngineStateSerializationPersisting {
+nonisolated struct UserDefaultsCloudSyncEngineStateStore: CloudSyncEngineStateSerializationPersisting, CloudSyncEngineStateSerializationClearing {
     static let defaultKey = "Ohana.CloudSyncEngine.StateSerialization"
 
     private let userDefaults: UserDefaults
@@ -424,6 +841,10 @@ nonisolated struct UserDefaultsCloudSyncEngineStateStore: CloudSyncEngineStateSe
     func saveStateSerialization(_ serialization: CKSyncEngine.State.Serialization) async throws {
         let data = try encoder.encode(serialization)
         userDefaults.set(data, forKey: key)
+    }
+
+    func clearStateSerialization() {
+        userDefaults.removeObject(forKey: key)
     }
 }
 

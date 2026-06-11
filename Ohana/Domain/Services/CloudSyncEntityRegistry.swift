@@ -95,7 +95,25 @@ nonisolated enum CloudSyncEntityRegistry {
     ]
 
     static var uploadableDescriptors: [CloudSyncEntityDescriptor] {
-        descriptors.filter(\.uploadsToCloudKit)
+        descriptors.filter { $0.uploadsToCloudKit && supportsUploadPipeline(for: $0.entityName) }
+    }
+
+    static let uploadPipelineEntityNames: Set<String> = [
+        String(describing: Household.self),
+        String(describing: Pet.self),
+        String(describing: Human.self),
+        String(describing: PetCareLog.self),
+        String(describing: PetPottyLog.self),
+        String(describing: PetHygieneLog.self),
+        String(describing: PetHealthLog.self),
+        String(describing: PetWalkLog.self),
+        String(describing: PetExpenseLog.self),
+        String(describing: PetWeightLog.self),
+        String(describing: CoconutLedgerEntry.self)
+    ]
+
+    static func supportsUploadPipeline(for entityName: String) -> Bool {
+        uploadPipelineEntityNames.contains(CloudSyncRecordState.normalizedEntityName(entityName))
     }
 
     static func descriptor(for entityName: String) -> CloudSyncEntityDescriptor? {

@@ -355,6 +355,12 @@ struct AddExpenseSheet: View {
         }
         .onAppear {
             configureInitialPayer()
+            selectedSharedExpensePetIds = SharedPetSelectionMemory.restoredSelection(
+                sourcePet: pet,
+                scope: "expense.shared",
+                candidates: sameSpeciesExpensePets,
+                defaultToAll: false
+            )
             popupVisible = false
             isClosing = false
             DispatchQueue.main.async {

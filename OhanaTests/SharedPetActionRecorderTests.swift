@@ -4,6 +4,7 @@ import Testing
 @testable import Ohana
 
 @MainActor
+@Suite(.serialized)
 struct SharedPetActionRecorderTests {
     @Test func resolverKeepsSourceFirstAndFiltersSameSpeciesLiveTargets() {
         let source = Pet(name: "Milo", species: "cat")
@@ -144,6 +145,47 @@ struct SharedPetActionRecorderTests {
         #expect(FeedStockCalculator.stockDeductionAmount(for: ownerLog, pet: ownerLog.pet ?? first) == 0)
     }
 
+    @Test func sharedSessionFactIsMarkedForCloudSyncAndTimelineUsesSessionTotals() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "cat")
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: nil)
+        defer { cleanup() }
+
+        _ = CareEventService.recordSharedManualFeed(
+            sourcePet: first,
+            targets: [first, second],
+            totalGrams: 121,
+            foodKind: .dry,
+            context: context,
+            date: Date(timeIntervalSince1970: 2250)
+        )
+
+        let session = try #require(try context.fetch(FetchDescriptor<SharedCareSession>()).first)
+        let sessionState = try CloudSyncMetadataService.state(
+            entityName: "SharedCareSession",
+            localRecordId: session.id,
+            context: context
+        )
+        let item = try #require(PetTimelineItemsBuilder.items(
+            for: first,
+            sharedCareSessions: [session],
+            l: L10n("en")
+        ).first { $0.type == "care" })
+
+        #expect(sessionState?.hasPendingLocalChanges == true)
+        #expect(sessionState?.isDeletionTombstone == false)
+        #expect(item.id == session.id)
+        #expect(item.title == "Shared feeding · 2 pets")
+        #expect(item.subtitle.contains("121 g"))
+        #expect(item.subtitle.contains("Dry food"))
+    }
+
     @Test func deletingSharedFeedStockOwnerMigratesSessionDeductionToSurvivingLog() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -183,6 +225,53 @@ struct SharedPetActionRecorderTests {
         #expect(sessions.first?.stockOwnerPetId == survivor.pet?.id.uuidString)
         #expect(remainingLog.note.contains(SharedCareMetadata.stockOwnerKey) == false)
         #expect(FeedStockCalculator.stockDeductionAmount(for: remainingLog, pet: remainingLog.pet ?? second, sharedCareSessions: sessions) == survivor.amountGrams)
+    }
+
+    @Test func deletingSharedSessionCascadeRemovesChildrenLedgerAndMarksTombstone() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "猫")
+        context.insert(human)
+        context.insert(first)
+        context.insert(second)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: human.id.uuidString)
+        defer { cleanup() }
+
+        _ = CareEventService.recordSharedManualFeed(
+            sourcePet: first,
+            targets: [first, second],
+            totalGrams: 120,
+            foodKind: .dry,
+            context: context,
+            executorId: human.id.uuidString,
+            date: Date(timeIntervalSince1970: 2260)
+        )
+
+        let session = try #require(try context.fetch(FetchDescriptor<SharedCareSession>()).first)
+        let result = SharedCareSessionMaintenance.deleteCascade(
+            session,
+            context: context,
+            deletedByHumanId: human.id.uuidString,
+            deletedAt: Date(timeIntervalSince1970: 2270)
+        )
+        let sessionState = try CloudSyncMetadataService.state(
+            entityName: "SharedCareSession",
+            localRecordId: session.id,
+            context: context
+        )
+        #expect(result.sessionID == session.id)
+        #expect(result.careLogIDs.count == 2)
+        #expect(result.deletedChildCount == 2)
+        #expect(result.ledgerEventIDs.count == 2)
+        #expect(try context.fetch(FetchDescriptor<SharedCareSession>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(sessionState?.isDeletionTombstone == true)
+        #expect(sessionState?.deletedByHumanId == CloudSyncRecordState.normalizedRecordId(human.id))
     }
 
     @Test func sharedExpenseDistributesCurrencyRemainderAndUsesCurrentCurrency() throws {
@@ -379,7 +468,7 @@ struct SharedPetActionRecorderTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV66.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

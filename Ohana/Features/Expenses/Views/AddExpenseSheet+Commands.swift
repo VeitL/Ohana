@@ -27,6 +27,12 @@ extension AddExpenseSheet {
         let savedReceiptDrafts = receiptDrafts()
         let hasActiveInsurance = !activeInsurances.isEmpty
         let savedTargets = selectedExpenseTargets
+        SharedPetSelectionMemory.saveSelection(
+            Set(savedTargets.map(\.id)),
+            sourcePet: pet,
+            scope: "expense.shared",
+            candidates: sameSpeciesExpensePets
+        )
         let command = DomainCommand.expenseEntry(entityID: pet.id, entityKind: EntityKind.pet.rawValue)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
 

@@ -20,6 +20,7 @@ struct AppAccountSwitcherRouteContainer: View {
 }
 
 struct AppSettingsSheetRouteContainer: View {
+    @Query(sort: \Household.createdAt) private var households: [Household]
     @Query(sort: \Pet.createdAt) private var pets: [Pet]
     @Query(sort: \Human.createdAt) private var humans: [Human]
     @Query private var electronicPets: [OasisElectronicPet]
@@ -28,6 +29,7 @@ struct AppSettingsSheetRouteContainer: View {
 
     var body: some View {
         SettingsView(
+            homeHouseholds: households,
             homePets: pets,
             homeHumans: humans,
             homeElectronicPets: electronicPets,

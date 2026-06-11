@@ -8,7 +8,72 @@
 import Foundation
 import SwiftData
 
+struct SharedCareSessionDeleteResult: Equatable {
+    let sessionID: UUID
+    let careLogIDs: [UUID]
+    let pottyLogIDs: [UUID]
+    let expenseLogIDs: [UUID]
+    let walkLogIDs: [UUID]
+    let ledgerEventIDs: [UUID]
+
+    var deletedChildCount: Int {
+        careLogIDs.count + pottyLogIDs.count + expenseLogIDs.count + walkLogIDs.count
+    }
+}
+
 enum SharedCareSessionMaintenance {
+    @discardableResult
+    @MainActor
+    static func deleteCascade(
+        _ session: SharedCareSession,
+        context: ModelContext,
+        deletedByHumanId: String? = nil,
+        deletedAt: Date = Date()
+    ) -> SharedCareSessionDeleteResult {
+        let sessionUUID = session.id
+        let sessionID = session.id.uuidString
+        let careLogs = fetchCareLogs(sessionID: sessionID, context: context)
+        let pottyLogs = fetchPottyLogs(sessionID: sessionID, context: context)
+        let expenseLogs = fetchExpenseLogs(sessionID: sessionID, context: context)
+        let walkLogs = fetchWalkLogs(sessionID: sessionID, context: context)
+        let ledgerEvents = ledgerEvents(careLogs: careLogs, pottyLogs: pottyLogs, expenseLogs: expenseLogs, walkLogs: walkLogs, context: context)
+
+        CloudSyncMutationRecorder.markDeleted(session, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        for event in ledgerEvents {
+            CloudSyncMutationRecorder.markDeleted(event, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+            context.delete(event)
+        }
+        for log in careLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+            context.delete(log)
+        }
+        for log in pottyLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+            context.delete(log)
+        }
+        for log in expenseLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+            context.delete(log)
+        }
+        for log in walkLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+            context.delete(log)
+        }
+        context.delete(session)
+        context.safeSave()
+        markDeletedSharedSessionState(sessionID: sessionUUID, context: context, deletedAt: deletedAt, deletedByHumanId: deletedByHumanId)
+        context.safeSave()
+
+        return SharedCareSessionDeleteResult(
+            sessionID: sessionUUID,
+            careLogIDs: careLogs.map(\.id),
+            pottyLogIDs: pottyLogs.map(\.id),
+            expenseLogIDs: expenseLogs.map(\.id),
+            walkLogIDs: walkLogs.map(\.id),
+            ledgerEventIDs: ledgerEvents.map(\.id)
+        )
+    }
+
     @MainActor
     static func reconcileAfterDeletingChild(sharedSessionId: String, context: ModelContext) {
         guard let sessionID = UUID(uuidString: sharedSessionId),
@@ -202,5 +267,58 @@ enum SharedCareSessionMaintenance {
             sortBy: [SortDescriptor(\.startDate)]
         )
         return (try? context.fetch(descriptor)) ?? []
+    }
+
+    @MainActor
+    private static func ledgerEvents(
+        careLogs: [PetCareLog],
+        pottyLogs: [PetPottyLog],
+        expenseLogs: [PetExpenseLog],
+        walkLogs: [PetWalkLog],
+        context: ModelContext
+    ) -> [CareLedgerEvent] {
+        let careLogIDs = Set(careLogs.map(\.id.uuidString))
+        let pottyLogIDs = Set(pottyLogs.map(\.id.uuidString))
+        let expenseLogIDs = Set(expenseLogs.map(\.id.uuidString))
+        let walkLogIDs = Set(walkLogs.map(\.id.uuidString))
+        let events = (try? context.fetch(FetchDescriptor<CareLedgerEvent>())) ?? []
+        return events.filter { event in
+            let legacyModelId = event.legacyModelId ?? ""
+            switch event.legacyModelName {
+            case "PetCareLog":
+                return careLogIDs.contains(legacyModelId)
+            case "PetPottyLog":
+                return pottyLogIDs.contains(legacyModelId)
+            case "PetExpenseLog":
+                return expenseLogIDs.contains(legacyModelId)
+            case "PetWalkLog":
+                return walkLogIDs.contains(legacyModelId)
+            default:
+                return false
+            }
+        }
+    }
+
+    @MainActor
+    private static func markDeletedSharedSessionState(
+        sessionID: UUID,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) {
+        do {
+            try CloudSyncMetadataService.markDeleted(
+                entityName: String(describing: SharedCareSession.self),
+                localRecordId: sessionID,
+                deletedAt: deletedAt,
+                deletedByHumanId: deletedByHumanId.flatMap(UUID.init(uuidString:)),
+                context: context
+            )
+        } catch {
+            OhanaLog.warning(
+                "Cloud sync failed to mark deleted SharedCareSession:\(sessionID): \(error)",
+                category: "CloudSync"
+            )
+        }
     }
 }

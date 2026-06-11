@@ -621,7 +621,7 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             }
         case let .petMomentHistory(id):
             if let pet = pet(id) {
-                PetMomentsHubView(pet: pet)
+                PetMomentsHubRouteContainer(pet: pet)
                     .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
             } else {
                 missingRouteDismissView()

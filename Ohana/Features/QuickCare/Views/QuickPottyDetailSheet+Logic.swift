@@ -190,6 +190,12 @@ extension QuickPottyDetailSheet {
     func logUnknownGroupPotty() {
         let targetIDs = Set(selectedPottyTargets.map(\.id))
         let executorId = activeExecutorId()
+        SharedPetSelectionMemory.saveSelection(
+            targetIDs,
+            sourcePet: pet,
+            scope: "quickCare.potty",
+            candidates: sameSpeciesPottyPets
+        )
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "unknownSharedPotty")) {
             guard pottyCommandExecutor.recordUnknownSharedPotty(
@@ -228,6 +234,12 @@ extension QuickPottyDetailSheet {
         let targets = selectedPottyTargets
         let targetIDs = Set(targets.map(\.id))
         let executorId = activeExecutorId()
+        SharedPetSelectionMemory.saveSelection(
+            targetIDs,
+            sourcePet: pet,
+            scope: "quickCare.potty",
+            candidates: sameSpeciesPottyPets
+        )
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "litterScoop")) {
             guard let result = pottyCommandExecutor.recordLitterCare(
@@ -260,6 +272,12 @@ extension QuickPottyDetailSheet {
         let targets = selectedPottyTargets
         let targetIDs = Set(targets.map(\.id))
         let executorId = activeExecutorId()
+        SharedPetSelectionMemory.saveSelection(
+            targetIDs,
+            sourcePet: pet,
+            scope: "quickCare.potty",
+            candidates: sameSpeciesPottyPets
+        )
         litterCycleAnchorDate = cycleAnchor
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "litterFullChange")) {

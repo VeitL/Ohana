@@ -66,6 +66,7 @@ private enum PetMomentsArchiveFilter: String, CaseIterable, Identifiable {
 
 struct PetMomentsHubView: View {
     let pet: Pet
+    let sharedCareSessions: [SharedCareSession]
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -81,11 +82,11 @@ struct PetMomentsHubView: View {
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
 
     private var highlightCount: Int {
-        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .highlights, l: l).count
+        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .highlights, l: l, sharedCareSessions: sharedCareSessions).count
     }
 
     private var memoryCount: Int {
-        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .memories, l: l).count
+        PetTimelineItemsBuilder.archiveItems(for: pet, mode: .memories, l: l, sharedCareSessions: sharedCareSessions).count
     }
 
     private var realPhotos: [PetPhotoLog] {
@@ -97,9 +98,9 @@ struct PetMomentsHubView: View {
     private var currentSections: [PetTimelineArchiveSection] {
         switch tab {
         case .highlights:
-            PetTimelineItemsBuilder.archiveSections(for: pet, mode: .highlights, l: l)
+            PetTimelineItemsBuilder.archiveSections(for: pet, mode: .highlights, l: l, sharedCareSessions: sharedCareSessions)
         case .timeline:
-            PetTimelineItemsBuilder.archiveSections(for: pet, mode: archiveFilter.mode, l: l)
+            PetTimelineItemsBuilder.archiveSections(for: pet, mode: archiveFilter.mode, l: l, sharedCareSessions: sharedCareSessions)
         case .photos:
             []
         }

@@ -238,7 +238,7 @@ struct PetRetentionHubView: View {
                 title: l.tr(zh: "成长回忆", en: "Memories", de: "Erinnerungen"),
                 value: "\(memoryCount)",
                 subtitle: l.tr(zh: "最近：\(recentMemoryText)", en: "Latest: \(recentMemoryText)", de: "Zuletzt: \(recentMemoryText)"),
-                destination: PetMomentsHubView(pet: pet)
+                destination: PetMomentsHubRouteContainer(pet: pet)
             )
 
             archiveNavigationCard(
@@ -260,7 +260,7 @@ struct PetRetentionHubView: View {
                     title: l.tr(zh: "记录中心 · 全部", en: "Moments · All", de: "Momente · Alle"),
                     value: "\(timelineCount)",
                     tint: Color(hex: "8B5CF6"),
-                    destination: PetMomentsHubView(pet: pet)
+                    destination: PetMomentsHubRouteContainer(pet: pet)
                 )
 
                 compactNavigationAction(
@@ -437,11 +437,11 @@ struct PetRetentionHubView: View {
         case .documents:
             DocumentsListView(pet: pet)
         case .moments:
-            PetMomentsHubView(pet: pet)
+            PetMomentsHubRouteContainer(pet: pet)
         case .weight:
             WeightHistoryView(pet: pet)
         case .retention:
-            PetMomentsHubView(pet: pet)
+            PetMomentsHubRouteContainer(pet: pet)
         }
     }
 

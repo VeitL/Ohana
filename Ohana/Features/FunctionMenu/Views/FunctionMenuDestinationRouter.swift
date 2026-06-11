@@ -84,9 +84,9 @@ struct FunctionMenuDestinationRouter: View {
         case let .petInsurance(id):
             if let pet = pet(for: id) { PetInsuranceView(pet: pet) }
         case let .petMoments(id):
-            if let pet = pet(for: id) { PetMomentsHubView(pet: pet) }
+            if let pet = pet(for: id) { PetMomentsHubRouteContainer(pet: pet) }
         case let .petTimeline(id):
-            if let pet = pet(for: id) { PetMomentsHubView(pet: pet) }
+            if let pet = pet(for: id) { PetMomentsHubRouteContainer(pet: pet) }
         case let .petAchievements(id):
             if let pet = pet(for: id) { AchievementWallView(pet: pet) }
         case let .petRetention(id):

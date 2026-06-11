@@ -61,7 +61,12 @@ extension QuickFeedDetailContent {
         draftStore.manualFoodKindDraft = pet.mainFoodKind
         draftStore.selectedSharedFeedPetIds = settingsOnly
             ? Set([pet.id])
-            : Set(sameSpeciesFeedPets.map(\.id))
+            : SharedPetSelectionMemory.restoredSelection(
+                sourcePet: pet,
+                scope: "feeding.manual",
+                candidates: sameSpeciesFeedPets,
+                defaultToAll: true
+            )
         if let grams = currentPortionAmount ?? (defaultFeedGrams > 0 ? defaultFeedGrams : nil) {
             draftStore.manualGramsText = String(format: "%.0f", grams)
         } else {
@@ -133,7 +138,12 @@ extension QuickFeedDetailContent {
 
     func preparePlanEditorDraft(_ kind: FeedRuleKind) {
         let events = FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents)
-        draftStore.selectedSharedPlanPetIds = Set(sameSpeciesFeedPets.map(\.id))
+        draftStore.selectedSharedPlanPetIds = SharedPetSelectionMemory.restoredSelection(
+            sourcePet: pet,
+            scope: "feeding.plan.\(kind.rawValue)",
+            candidates: sameSpeciesFeedPets,
+            defaultToAll: true
+        )
         if events.isEmpty {
             draftStore.planCount = 3
             let grams = currentPortionAmount ?? 50

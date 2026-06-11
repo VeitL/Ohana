@@ -42,6 +42,12 @@ extension QuickFeedDetailContent {
             if saveAsDefault {
                 defaultFeedGrams = grams
             }
+            SharedPetSelectionMemory.saveSelection(
+                Set(selectedFeedTargets.map(\.id)),
+                sourcePet: pet,
+                scope: "feeding.manual",
+                candidates: sameSpeciesFeedPets
+            )
             let result = commandExecutor.recordManual(
                 pet: pet,
                 targets: selectedFeedTargets,

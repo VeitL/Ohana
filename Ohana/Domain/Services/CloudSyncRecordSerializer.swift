@@ -157,7 +157,7 @@ nonisolated enum CloudSyncRecordSerializer {
             descriptor: descriptor,
             state: state,
             rawFields: rawFields,
-            isDeleted: state.isDeleted
+            isDeleted: state.isDeletionTombstone
         )
     }
 
@@ -176,7 +176,8 @@ nonisolated enum CloudSyncRecordSerializer {
         guard let descriptor = CloudSyncEntityRegistry.descriptor(for: normalizedEntityName) else {
             throw CloudSyncRecordSerializationError.missingDescriptor(entityName: normalizedEntityName)
         }
-        guard descriptor.uploadsToCloudKit else {
+        guard descriptor.uploadsToCloudKit,
+              CloudSyncEntityRegistry.supportsUploadPipeline(for: normalizedEntityName) else {
             throw CloudSyncRecordSerializationError.notUploadable(entityName: normalizedEntityName)
         }
         return descriptor

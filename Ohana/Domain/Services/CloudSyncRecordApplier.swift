@@ -81,6 +81,7 @@ nonisolated enum CloudSyncRecordApplier {
             try deleteLocalModel(metadata: metadata, context: context)
             let state = try upsertState(metadata: metadata, record: record, context: context)
             state.isDeleted = true
+            state.isDeletionTombstone = true
             state.deletedAt = metadata.deletedAt ?? metadata.lastModifiedAt
             state.deletedByHumanId = metadata.deletedByHumanId
             CloudSyncMetadataService.markSynced(
@@ -96,6 +97,7 @@ nonisolated enum CloudSyncRecordApplier {
         let result = try applyLiveRecord(record, metadata: metadata, descriptor: descriptor, context: context)
         let state = try upsertState(metadata: metadata, record: record, context: context)
         state.isDeleted = false
+        state.isDeletionTombstone = false
         state.deletedAt = nil
         state.deletedByHumanId = ""
         CloudSyncMetadataService.markSynced(
@@ -109,22 +111,7 @@ nonisolated enum CloudSyncRecordApplier {
     }
 
     private static func supportsApply(for entityName: String) -> Bool {
-        switch CloudSyncRecordState.normalizedEntityName(entityName) {
-        case String(describing: Household.self),
-             String(describing: Pet.self),
-             String(describing: Human.self),
-             String(describing: PetCareLog.self),
-             String(describing: PetPottyLog.self),
-             String(describing: PetHygieneLog.self),
-             String(describing: PetHealthLog.self),
-             String(describing: PetWalkLog.self),
-             String(describing: PetExpenseLog.self),
-             String(describing: PetWeightLog.self),
-             String(describing: CoconutLedgerEntry.self):
-            true
-        default:
-            false
-        }
+        CloudSyncEntityRegistry.supportsUploadPipeline(for: entityName)
     }
 
     private static func applyLiveRecord(
@@ -488,7 +475,7 @@ nonisolated enum CloudSyncRecordApplier {
         let entry = CoconutLedgerEntry(
             id: metadata.localRecordUUID,
             transactionKey: record.string(for: "transactionKey") ?? metadata.recordKey,
-            accountKey: record.string(for: "accountKey") ?? CoconutAccountKey.system(),
+            accountKey: record.string(for: "accountKey") ?? "system:legacy",
             ownerKind: CoconutWalletOwnerKind(rawValue: ownerKindRaw) ?? .system,
             ownerId: record.string(for: "ownerId") ?? "",
             ownerName: record.string(for: "ownerName") ?? "",
@@ -540,6 +527,7 @@ nonisolated enum CloudSyncRecordApplier {
                 ckChangeTag: record.recordChangeTag ?? "",
                 conflictPolicy: metadata.conflictPolicy,
                 isDeleted: metadata.isDeleted,
+                isDeletionTombstone: metadata.isDeleted,
                 deletedAt: metadata.deletedAt,
                 deletedByHumanId: metadata.deletedByHumanUUID,
                 hasPendingLocalChanges: false,
@@ -700,7 +688,7 @@ nonisolated enum CloudSyncRecordApplier {
     }
 }
 
-private struct RemoteMetadata {
+private nonisolated struct RemoteMetadata {
     let entityName: String
     let recordKey: String
     let localRecordId: String
@@ -767,7 +755,7 @@ private struct RemoteMetadata {
 }
 
 private extension CKRecord {
-    func string(for key: String) -> String? {
+    nonisolated func string(for key: String) -> String? {
         if let value = self[key] as? String {
             return value
         }
@@ -777,7 +765,7 @@ private extension CKRecord {
         return nil
     }
 
-    func int(for key: String) -> Int? {
+    nonisolated func int(for key: String) -> Int? {
         if let value = self[key] as? Int {
             return value
         }
@@ -787,7 +775,7 @@ private extension CKRecord {
         return nil
     }
 
-    func double(for key: String) -> Double? {
+    nonisolated func double(for key: String) -> Double? {
         if let value = self[key] as? Double {
             return value
         }
@@ -797,7 +785,7 @@ private extension CKRecord {
         return nil
     }
 
-    func bool(for key: String) -> Bool? {
+    nonisolated func bool(for key: String) -> Bool? {
         if let value = self[key] as? Bool {
             return value
         }
@@ -807,7 +795,7 @@ private extension CKRecord {
         return nil
     }
 
-    func date(for key: String) -> Date? {
+    nonisolated func date(for key: String) -> Date? {
         if let value = self[key] as? Date {
             return value
         }
@@ -817,7 +805,7 @@ private extension CKRecord {
         return nil
     }
 
-    func assetData(for key: String) -> Data? {
+    nonisolated func assetData(for key: String) -> Data? {
         guard let asset = self[key] as? CKAsset,
               let fileURL = asset.fileURL else {
             return nil
