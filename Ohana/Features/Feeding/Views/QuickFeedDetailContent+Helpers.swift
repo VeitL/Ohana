@@ -368,7 +368,11 @@ extension QuickFeedDetailContent {
     }
 
     func feedLogBadge(for log: PetCareLog) -> (title: String, tint: Color, icon: String) {
-        switch FeedLogMetadata.source(for: log) ?? .manualMain {
+        if !log.sharedSessionId.isEmpty {
+            let countSuffix = SharedCareMetadata.targetCount(from: log.note).map { " · \($0)只" } ?? ""
+            return ("\(l.tr(zh: "共同喂食", en: "Shared", de: "Gemeinsam"))\(countSuffix) · \(log.foodKind.title(l))", foodKindTint(log.foodKind), "person.2.fill")
+        }
+        return switch FeedLogMetadata.source(for: log) ?? .manualMain {
         case .manualMain:
             ("\(l.tr(zh: "手动", en: "Manual", de: "Manuell")) · \(log.foodKind.title(l))", foodKindTint(log.foodKind), "hand.tap.fill")
         case .manualReminder:

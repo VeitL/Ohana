@@ -128,13 +128,15 @@ struct DashboardRecordCommandExecutor {
     let revisions: DomainRevisionPublishing
     let questManager: QuestManager
     let careLedger: CareLedgerRecording
+    let careEvents: CareEventRecording
 
     init(context: ModelContext) {
         self.init(
             context: context,
             revisions: SharedDomainRevisionPublisher(),
             questManager: QuestManager(),
-            careLedger: CareLedgerService()
+            careLedger: CareLedgerService(),
+            careEvents: CareEventService()
         )
     }
 
@@ -143,7 +145,8 @@ struct DashboardRecordCommandExecutor {
             context: context,
             revisions: SharedDomainRevisionPublisher(center: revisionCenter),
             questManager: QuestManager(),
-            careLedger: CareLedgerService()
+            careLedger: CareLedgerService(),
+            careEvents: CareEventService()
         )
     }
 
@@ -152,7 +155,8 @@ struct DashboardRecordCommandExecutor {
             context: context,
             revisions: services.domainRevisions,
             questManager: services.questManager,
-            careLedger: services.careLedger
+            careLedger: services.careLedger,
+            careEvents: services.careEvents
         )
     }
 
@@ -160,12 +164,14 @@ struct DashboardRecordCommandExecutor {
         context: ModelContext,
         revisions: DomainRevisionPublishing,
         questManager: QuestManager,
-        careLedger: CareLedgerRecording
+        careLedger: CareLedgerRecording,
+        careEvents: CareEventRecording
     ) {
         self.context = context
         self.revisions = revisions
         self.questManager = questManager
         self.careLedger = careLedger
+        self.careEvents = careEvents
     }
 
     @discardableResult
@@ -267,6 +273,45 @@ struct DashboardRecordCommandExecutor {
     }
 
     @discardableResult
+    func recordSharedPetExpense(
+        sourcePet: Pet,
+        targets: [Pet],
+        amount: Double,
+        date: Date,
+        category: ExpenseCategory,
+        note expenseNote: String,
+        executorId: String?,
+        source: CareLedgerSource = .detail,
+        command: DomainCommand,
+        revisionNote: String
+    ) -> SharedPetActionResult {
+        let result = ExpenseCommandService.recordSharedPetExpense(
+            sourcePet: sourcePet,
+            targets: targets,
+            amount: amount,
+            date: date,
+            category: category,
+            note: expenseNote,
+            context: context,
+            executorId: executorId,
+            source: source,
+            careEvents: careEvents
+        )
+        var affectedIDs = Set(result.targetPetIDs)
+        affectedIDs.insert(result.sessionID)
+        result.expenseLogIDs.forEach { affectedIDs.insert($0) }
+        revisions.publish(
+            DomainMutationResult(
+                command: command,
+                affectedEntityIDs: affectedIDs,
+                wroteBusinessFact: true,
+                note: revisionNote
+            )
+        )
+        return result
+    }
+
+    @discardableResult
     func recordHumanExpense(
         human: Human,
         amount: Double,
@@ -349,13 +394,21 @@ enum DashboardRecordCommandService {
         pet: Pet,
         context: ModelContext
     ) -> DashboardRecordDeleteCommandResult {
-        deleteRecord(
-            log,
+        let recordID = log.id
+        let sharedSessionId = log.sharedSessionId
+        let ledgerEvents = ledgerEvents(forLegacyModelName: "PetExpenseLog", id: recordID, context: context)
+        for event in ledgerEvents {
+            context.delete(event)
+        }
+        context.delete(log)
+        SharedCareSessionMaintenance.reconcileAfterDeletingChild(sharedSessionId: sharedSessionId, context: context)
+        context.safeSave()
+        return DashboardRecordDeleteCommandResult(
             subjectID: pet.id,
             subjectKind: EntityKind.pet.rawValue,
-            recordID: log.id,
+            recordID: recordID,
             recordKind: "PetExpenseLog",
-            context: context
+            removedLedgerEventIDs: ledgerEvents.map(\.id)
         )
     }
 

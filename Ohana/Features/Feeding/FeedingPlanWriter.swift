@@ -22,6 +22,7 @@ enum FeedingPlanWriter {
         draft: FeedPlanDraft,
         allEvents: [Event],
         context: ModelContext,
+        feedPlanGroupId: String = "",
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> FeedingPlanWriteResult {
@@ -45,6 +46,7 @@ enum FeedingPlanWriter {
             event.feedRuleKindRaw = draft.kind.rawValue
             event.foodKindRaw = meal.foodKind.rawValue
             event.feedAmountGrams = meal.grams
+            event.feedPlanGroupId = feedPlanGroupId
             context.insert(event)
             createdEvents.append(event)
 

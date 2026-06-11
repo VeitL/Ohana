@@ -11,6 +11,7 @@ import SwiftUI
 struct ExpenseHistoryContentView: View {
     let pet: Pet
     let allHumans: [Human]
+    let allPets: [Pet]
     var onRemove: (() -> Void)?
     var showsCloseButton: Bool = true
     @Environment(\.modelContext) private var modelContext
@@ -131,6 +132,7 @@ struct ExpenseHistoryContentView: View {
                 AddExpenseSheet(
                     pet: pet,
                     humans: allHumans,
+                    allPets: allPets,
                     preselectedPayerId: selectedPayerId ?? currentActiveHumanId,
                     onDismiss: {
                         withAnimation(GoMotion.feedback) {
@@ -497,6 +499,7 @@ struct ExpenseHistoryContentView: View {
         let payer = payer(for: log)
         let payerLabel = isReimbursement ? "到账" : "支付者"
         let payerName = payer?.name ?? (isReimbursement ? "保险" : "未指定")
+        let visibleNote = SharedCareMetadata.visibleNote(log.note)
 
         return HStack(spacing: 14) {
             ZStack {
@@ -512,7 +515,7 @@ struct ExpenseHistoryContentView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(isReimbursement ? "保险报销" : log.category)
+                    Text(expenseTitle(log, isReimbursement: isReimbursement))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(isReimbursement ? accentColor : .primary)
                     if isReimbursement {
@@ -527,8 +530,8 @@ struct ExpenseHistoryContentView: View {
                     Text(log.date, format: .dateTime.year().month().day())
                         .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                    if !log.note.isEmpty {
-                        Text(log.note)
+                    if !visibleNote.isEmpty {
+                        Text(visibleNote)
                             .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .lineLimit(1)
@@ -571,6 +574,14 @@ struct ExpenseHistoryContentView: View {
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .goSelectableSurface(isSelected: isReimbursement, tint: accentColor, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+    }
+
+    private func expenseTitle(_ log: PetExpenseLog, isReimbursement: Bool) -> String {
+        guard !isReimbursement, !log.sharedSessionId.isEmpty else {
+            return isReimbursement ? "保险报销" : log.category
+        }
+        let countSuffix = SharedCareMetadata.targetCount(from: log.note).map { " · \($0)只" } ?? ""
+        return "共同花费\(countSuffix)"
     }
 
     private func payer(for log: PetExpenseLog) -> Human? {

@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum CloudSyncEntityRole: String, Codable, CaseIterable {
+nonisolated enum CloudSyncEntityRole: String, Codable, CaseIterable {
     case mutableRecord
     case appendOnlyFact
     case ledgerEntry
@@ -15,7 +15,7 @@ enum CloudSyncEntityRole: String, Codable, CaseIterable {
     case localSyncMetadata
 }
 
-struct CloudSyncEntityDescriptor: Equatable {
+nonisolated struct CloudSyncEntityDescriptor: Equatable {
     let entityName: String
     let recordType: String
     let role: CloudSyncEntityRole
@@ -36,7 +36,7 @@ struct CloudSyncEntityDescriptor: Equatable {
     }
 }
 
-enum CloudSyncEntityRegistry {
+nonisolated enum CloudSyncEntityRegistry {
     static let descriptors: [CloudSyncEntityDescriptor] = [
         mutable(Pet.self, excluded: ["ckRecordName"], fieldPolicies: ["coconutBalance": .ledgerProjection]),
         mutable(

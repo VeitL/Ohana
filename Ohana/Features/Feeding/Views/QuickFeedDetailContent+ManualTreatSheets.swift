@@ -23,7 +23,8 @@ extension QuickFeedDetailContent {
                         subtitle: "\(selectedFeedTargets.count)只\(pet.species)",
                         pets: sameSpeciesFeedPets,
                         selectedPetIds: $draftStore.selectedSharedFeedPetIds,
-                        tint: mainFoodTint
+                        tint: mainFoodTint,
+                        fixedPetId: pet.id
                     )
                 }
                 manualGramInput(

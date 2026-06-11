@@ -142,7 +142,7 @@ enum ExpenseCommandService {
             context: context,
             executorId: executorId,
             date: date,
-            currencyCode: "currency",
+            currencyCode: AppCurrency.code,
             source: source
         )
     }

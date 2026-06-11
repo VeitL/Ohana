@@ -167,6 +167,10 @@ nonisolated struct EventBackup: Codable {
     var createdAt: String
     var completedOccurrences: [String]?
     var assigneeId: String?
+    var feedRuleKindRaw: String?
+    var foodKindRaw: String?
+    var feedAmountGrams: Double?
+    var feedPlanGroupId: String?
 }
 
 nonisolated struct ReminderBackup: Codable {

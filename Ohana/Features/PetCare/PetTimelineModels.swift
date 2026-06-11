@@ -86,8 +86,9 @@ enum PetTimelineItemsBuilder {
                                        iconName: "heart.text.clipboard", color: .goTeal))
         }
         for e in pet.expenseLogs {
+            let visibleNote = SharedCareMetadata.visibleNote(e.note)
             list.append(UnifiedLogItem(id: e.id, date: e.date, type: "expense",
-                                       title: "\(AppCurrency.format(e.amount, fractionDigits: 0)) · \(e.note.isEmpty ? e.category : e.note)",
+                                       title: expenseTitle(for: e, visibleNote: visibleNote),
                                        subtitle: e.category,
                                        iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow))
         }
@@ -98,7 +99,7 @@ enum PetTimelineItemsBuilder {
         }
         for c in pet.careLogs {
             list.append(UnifiedLogItem(id: c.id, date: c.date, type: "care",
-                                       title: "护理 · \(c.careType.emoji)\(c.careType.rawValue)", subtitle: c.note,
+                                       title: careTitle(for: c), subtitle: SharedCareMetadata.visibleNote(c.note),
                                        iconName: "sparkles", color: .goPurple))
         }
 
@@ -186,6 +187,29 @@ enum PetTimelineItemsBuilder {
             .filter { isVisiblePast($0.date, now: now) }
             .deduplicatedByDayTitle()
             .sorted { $0.date > $1.date }
+    }
+
+    private static func careTitle(for log: PetCareLog) -> String {
+        guard !log.sharedSessionId.isEmpty else {
+            return "护理 · \(log.careType.emoji)\(log.careType.rawValue)"
+        }
+        return sharedTitle(prefix: "共同\(log.careType.rawValue)", note: log.note)
+    }
+
+    private static func expenseTitle(for log: PetExpenseLog, visibleNote: String) -> String {
+        let amount = AppCurrency.format(log.amount, fractionDigits: 0)
+        guard !log.sharedSessionId.isEmpty else {
+            return "\(amount) · \(visibleNote.isEmpty ? log.category : visibleNote)"
+        }
+        let detail = visibleNote.isEmpty ? log.category : visibleNote
+        return "\(amount) · \(sharedTitle(prefix: "共同花费", note: log.note)) · \(detail)"
+    }
+
+    private static func sharedTitle(prefix: String, note: String) -> String {
+        guard let count = SharedCareMetadata.targetCount(from: note), count > 1 else {
+            return prefix
+        }
+        return "\(prefix) · \(count)只"
     }
 
     private static func memoryItems(for pet: Pet, l: L10n, now: Date) -> [UnifiedLogItem] {

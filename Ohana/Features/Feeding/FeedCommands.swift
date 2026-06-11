@@ -179,7 +179,8 @@ enum SaveFeedPlanCommand {
         allEvents: [Event],
         context: ModelContext
     ) -> SaveFeedPlanCommandResult {
-        let normalizedTargets = targets.isEmpty ? [pet] : targets
+        let normalizedTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
+        let feedPlanGroupId = normalizedTargets.count > 1 ? UUID().uuidString : ""
         let targetMode: FeedOperatingMode = kind == .manualReminder ? .manualReminder : .autoFeeder
         var latestEvents = allEvents
         var planReminders: [Reminder] = []
@@ -190,7 +191,8 @@ enum SaveFeedPlanCommand {
                 pet: target,
                 draft: draft,
                 allEvents: latestEvents,
-                context: context
+                context: context,
+                feedPlanGroupId: feedPlanGroupId
             )
             latestEvents = latestEvents
                 .filter { existing in
@@ -412,11 +414,6 @@ enum FeedStockExpenseLink {
             .joined(separator: "\n")
     }
 
-    @available(*, deprecated, message: "Use notesScrubbingLegacyExpenseLink(_:); expense id is stored in expenseId.")
-    static func notesWithExpenseLink(_ notes: String, expenseId _: UUID) -> String {
-        notesScrubbingLegacyExpenseLink(notes)
-    }
-
     @MainActor
     static func fetchExpense(id: UUID, context: ModelContext) -> PetExpenseLog? {
         var descriptor = FetchDescriptor<PetExpenseLog>(
@@ -506,8 +503,7 @@ enum FeedRecordCommand {
         allEvents: [Event],
         context: ModelContext
     ) -> FeedStockCommandResult {
-        context.delete(log)
-        context.safeSave()
+        _ = PetCareTrackingCommandService.deleteCareLog(log, pet: pet, context: context)
         return FeedStockCommandResult(
             stockReminders: FeedingPlanWriter.rebuildFoodStockReminders(
                 pet: pet,

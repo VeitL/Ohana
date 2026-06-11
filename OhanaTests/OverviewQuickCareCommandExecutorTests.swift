@@ -264,9 +264,11 @@ struct ManualFeedCommandTests {
         let context = container.mainContext
         let now = date(year: 2026, month: 5, day: 1, hour: 7)
         let petA = Pet(name: "Momo", species: "猫")
-        let petB = Pet(name: "Nori", species: "狗")
+        let petB = Pet(name: "Nori", species: "cat")
+        let petC = Pet(name: "Biscuit", species: "狗")
         context.insert(petA)
         context.insert(petB)
+        context.insert(petC)
         try context.save()
 
         let draft = FeedPlanDraft(
@@ -279,7 +281,7 @@ struct ManualFeedCommandTests {
         )
         let result = SaveFeedPlanCommand.run(
             pet: petA,
-            targets: [petA, petB],
+            targets: [petB, petC],
             kind: .manualReminder,
             draft: draft,
             allEvents: [],
@@ -292,6 +294,9 @@ struct ManualFeedCommandTests {
         #expect(result.planReminders.isEmpty == false)
         #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: petA) }) == 2)
         #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: petB) }) == 2)
+        #expect(events.contains { FeedRuleMetadata.isManualReminderEvent($0, pet: petC) } == false)
+        #expect(Set(events.map(\.feedPlanGroupId)).count == 1)
+        #expect(events.allSatisfy { !$0.feedPlanGroupId.isEmpty })
         #expect(FeedOperatingMode.resolved(pet: petA, allEvents: events, now: now) == .manualReminder)
         #expect(FeedOperatingMode.resolved(pet: petB, allEvents: events, now: now) == .manualReminder)
     }

@@ -36,7 +36,8 @@ extension QuickPottyDetailSheet {
                         subtitle: petCountText(selectedPottyTargets.count, species: pet.species),
                         pets: sameSpeciesPottyPets,
                         selectedPetIds: $selectedSharedPottyPetIds,
-                        tint: scoopTint
+                        tint: scoopTint,
+                        fixedPetId: pet.id
                     )
                     .padding(.horizontal, 20)
                     .padding(.top, 14)
@@ -73,7 +74,8 @@ extension QuickPottyDetailSheet {
                         subtitle: petCountText(selectedPottyTargets.count, species: pet.species),
                         pets: sameSpeciesPottyPets,
                         selectedPetIds: $selectedSharedPottyPetIds,
-                        tint: litterTint
+                        tint: litterTint,
+                        fixedPetId: pet.id
                     )
                     .padding(.horizontal, 20)
                     .padding(.top, 14)
@@ -171,8 +173,10 @@ extension QuickPottyDetailSheet {
         case .pottyHistory:
             PoopHistorySheet(
                 title: l.tr(zh: "噗噗历史", en: "Poop history", de: "Häufchen-Verlauf"),
-                items: pottyLogs.map(PoopLogItem.potty),
+                items: pottyHistoryItems,
                 tintForItem: tint(for:),
+                claimTargets: sameSpeciesPottyPets,
+                onClaim: claimUnknownPotty,
                 onDelete: deleteItem
             )
         case .scoopHistory:
@@ -189,6 +193,8 @@ extension QuickPottyDetailSheet {
                 title: l.tr(zh: "噗噗节目单", en: "Poop Radio log", de: "Häufchen-Radio-Log"),
                 items: recentItems,
                 tintForItem: tint(for:),
+                claimTargets: sameSpeciesPottyPets,
+                onClaim: claimUnknownPotty,
                 onDelete: deleteItem
             )
         }
@@ -214,11 +220,17 @@ extension QuickPottyDetailSheet {
                     poopSummaryRow(icon: summary.icon, title: summary.title, value: timesText(summary.count), tint: summary.tint)
                 }
                 overviewSectionHeader(l.tr(zh: "最近噗噗", en: "Latest poop", de: "Neueste Häufchen"))
-                if pottyLogs.isEmpty {
+                if pottyHistoryItems.isEmpty {
                     emptyInlineState(icon: "seal", text: l.tr(zh: "还没有噗噗记录", en: "No poop logs yet", de: "Noch keine Häufchen"))
                 } else {
-                    ForEach(Array(pottyLogs.prefix(8)).map(PoopLogItem.potty)) { item in
-                        PoopLogRow(item: item, tint: tint(for: item), showDelete: true) {
+                    ForEach(Array(pottyHistoryItems.prefix(8))) { item in
+                        PoopLogRow(
+                            item: item,
+                            tint: tint(for: item),
+                            showDelete: true,
+                            claimTargets: sameSpeciesPottyPets,
+                            onClaim: claimUnknownPotty
+                        ) {
                             deleteItem(item)
                         }
                     }

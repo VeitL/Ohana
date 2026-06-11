@@ -100,7 +100,7 @@ struct QuickPottyDetailSheet: View {
 
     var selectedPottyTargets: [Pet] {
         let targets = sameSpeciesPottyPets.filter { selectedSharedPottyPetIds.contains($0.id) }
-        return targets.isEmpty ? [pet] : targets
+        return SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
     }
 
     var availableFocuses: [PottyFocus] {
@@ -117,6 +117,15 @@ struct QuickPottyDetailSheet: View {
         pet.pottyLogs.sorted { $0.date > $1.date }
     }
 
+    var unknownSharedPottyItems: [PoopLogItem] {
+        QuickPottyUnknownClaimStore.items(for: pet, context: modelContext)
+    }
+
+    var pottyHistoryItems: [PoopLogItem] {
+        (pottyLogs.map(PoopLogItem.potty) + unknownSharedPottyItems)
+            .sorted { $0.date > $1.date }
+    }
+
     var litterLogs: [PetCareLog] {
         pet.careLogs
             .filter { $0.type == CareType.litter.rawValue }
@@ -128,7 +137,7 @@ struct QuickPottyDetailSheet: View {
     }
 
     var recentItems: [PoopLogItem] {
-        let pottyItems = pottyLogs.map(PoopLogItem.potty)
+        let pottyItems = pottyHistoryItems
         guard isCatPet else { return Array(pottyItems.prefix(12)) }
         let litterItems = litterLogs.map(PoopLogItem.litter)
         return Array((pottyItems + litterItems).sorted { $0.date > $1.date }.prefix(12))

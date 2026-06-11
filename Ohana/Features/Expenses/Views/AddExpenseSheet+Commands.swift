@@ -26,29 +26,52 @@ extension AddExpenseSheet {
         let savedReceiptCategory = receiptDocumentCategory()
         let savedReceiptDrafts = receiptDrafts()
         let hasActiveInsurance = !activeInsurances.isEmpty
+        let savedTargets = selectedExpenseTargets
         let command = DomainCommand.expenseEntry(entityID: pet.id, entityKind: EntityKind.pet.rawValue)
         UINotificationFeedbackGenerator().notificationOccurred(.success)
 
         commandQueue.enqueue(command) {
-            let result = DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetExpense(
-                pet: pet,
-                amount: amount,
-                date: savedDate,
-                category: savedCategory,
-                note: cleanNote,
-                executorId: payerId,
-                source: .detail,
-                receiptTitle: savedReceiptTitle,
-                receiptCategory: savedReceiptCategory,
-                receiptAttachments: savedReceiptDrafts,
-                command: command,
-                revisionNote: "dashboard.expense.entry"
-            )
+            let executor = DashboardRecordCommandExecutor(context: modelContext, services: appServices)
+            let coconutDelta: Int
+            let savedLogID: UUID?
+            if savedTargets.count > 1 {
+                let result = executor.recordSharedPetExpense(
+                    sourcePet: pet,
+                    targets: savedTargets,
+                    amount: amount,
+                    date: savedDate,
+                    category: savedCategory,
+                    note: cleanNote,
+                    executorId: payerId,
+                    source: .detail,
+                    command: command,
+                    revisionNote: "dashboard.expense.sharedEntry"
+                )
+                coconutDelta = result.coconutDelta
+                savedLogID = result.expenseLogIDs.first
+            } else {
+                let result = executor.recordPetExpense(
+                    pet: pet,
+                    amount: amount,
+                    date: savedDate,
+                    category: savedCategory,
+                    note: cleanNote,
+                    executorId: payerId,
+                    source: .detail,
+                    receiptTitle: savedReceiptTitle,
+                    receiptCategory: savedReceiptCategory,
+                    receiptAttachments: savedReceiptDrafts,
+                    command: command,
+                    revisionNote: "dashboard.expense.entry"
+                )
+                coconutDelta = result.coconutDelta
+                savedLogID = result.logID
+            }
             onSaved?()
-            onRewarded?(result.coconutDelta)
+            onRewarded?(coconutDelta)
 
-            if savedCategory == .medical, hasActiveInsurance {
-                savedExpenseId = result.logID.uuidString
+            if savedTargets.count == 1, savedCategory == .medical, hasActiveInsurance, let savedLogID {
+                savedExpenseId = savedLogID.uuidString
                 isSaving = false
             } else {
                 closeSheet()

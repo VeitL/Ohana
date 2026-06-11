@@ -10,15 +10,17 @@ import SwiftData
 
 enum SharedPetTargetResolver {
     static func normalizedSpecies(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        PetSpeciesKey.normalized(value)
     }
 
     @MainActor
     static func normalizedTargets(_ targets: [Pet], fallback sourcePet: Pet) -> [Pet] {
         let candidates = targets.isEmpty ? [sourcePet] : targets
+        let sourceSpecies = normalizedSpecies(sourcePet.species)
         var seen = Set<UUID>()
         var liveTargets = candidates.filter { pet in
             guard !pet.hasPassedAway, !seen.contains(pet.id) else { return false }
+            guard normalizedSpecies(pet.species) == sourceSpecies else { return false }
             seen.insert(pet.id)
             return true
         }
@@ -165,20 +167,21 @@ enum SharedPetActionRecorder {
         switch descriptor.childLogStrategy {
         case let .care(type):
             let prefix = SharedCareMetadata.prefix(for: descriptor.actionKind)
-            let perPetGrams = descriptor.totalAmountGrams > 0 ? descriptor.totalAmountGrams / Double(allocationTargetCount) : 0
-            let perPetMl = descriptor.totalAmountMl > 0 ? descriptor.totalAmountMl / Double(allocationTargetCount) : 0
-            for target in targets {
+            let perPetGrams = distributedAmount(descriptor.totalAmountGrams, count: allocationTargetCount, fractionDigits: 0)
+            let perPetMl = distributedAmount(descriptor.totalAmountMl, count: allocationTargetCount, fractionDigits: 0)
+            for (index, target) in targets.enumerated() {
                 let isStockOwner = descriptor.stockOwnerPet?.id == target.id
                 let log = PetCareLog(
                     date: descriptor.date,
                     type: type,
-                    amountGrams: type == .feeding ? perPetGrams : 0,
-                    amountMl: type == .watering ? perPetMl : 0,
+                    amountGrams: type == .feeding ? perPetGrams[index] : 0,
+                    amountMl: type == .watering ? perPetMl[index] : 0,
                     note: SharedCareMetadata.note(
                         prefix: prefix,
                         sessionId: session.id,
                         stockTotalGrams: isStockOwner ? descriptor.totalAmountGrams : nil,
-                        isStockOwner: isStockOwner
+                        isStockOwner: isStockOwner,
+                        targetCount: targets.count
                     ),
                     foodKind: descriptor.foodKind,
                     sharedSessionId: session.id.uuidString,
@@ -199,13 +202,18 @@ enum SharedPetActionRecorder {
             context.insert(log)
             pottyLog = log
         case let .expense(category, note):
-            let perPetAmount = descriptor.totalExpenseAmount > 0 ? descriptor.totalExpenseAmount / Double(allocationTargetCount) : 0
-            for target in targets {
+            let perPetAmounts = distributedAmount(descriptor.totalExpenseAmount, count: allocationTargetCount, fractionDigits: 2)
+            for (index, target) in targets.enumerated() {
                 let log = PetExpenseLog(
                     date: descriptor.date,
-                    amount: perPetAmount,
+                    amount: perPetAmounts[index],
                     category: category,
-                    note: note,
+                    note: SharedCareMetadata.note(
+                        prefix: SharedCareMetadata.expenseNotePrefix,
+                        sessionId: session.id,
+                        targetCount: targets.count,
+                        visibleNote: note
+                    ),
                     pet: target,
                     executorId: descriptor.executorId,
                     sharedSessionId: session.id.uuidString
@@ -335,6 +343,17 @@ enum SharedPetActionRecorder {
         return .other
     }
 
+    private static func distributedAmount(_ total: Double, count: Int, fractionDigits: Int) -> [Double] {
+        guard total > 0, count > 0 else { return Array(repeating: 0, count: max(count, 0)) }
+        let factor = pow(10, Double(fractionDigits))
+        let totalUnits = Int((total * factor).rounded())
+        let base = totalUnits / count
+        let remainder = totalUnits % count
+        return (0 ..< count).map { index in
+            Double(base + (index < remainder ? 1 : 0)) / factor
+        }
+    }
+
     private static func primaryLegacyModel(
         careLogs: [(Pet, PetCareLog)],
         pottyLog: PetPottyLog?,
@@ -393,7 +412,11 @@ enum SharedPetActionRecorder {
                 actionType: pottyLog.pottyType.rawValue,
                 amountValue: 0,
                 amountUnit: "",
-                note: SharedCareMetadata.note(prefix: SharedCareMetadata.unknownPottyNotePrefix, sessionId: session.id),
+                note: SharedCareMetadata.note(
+                    prefix: SharedCareMetadata.unknownPottyNotePrefix,
+                    sessionId: session.id,
+                    targetCount: targets.count
+                ),
                 source: descriptor.source,
                 sourceEventId: nil,
                 sourceReminderId: nil,
@@ -419,7 +442,7 @@ enum SharedPetActionRecorder {
                 actionType: pair.1.category,
                 amountValue: pair.1.amount,
                 amountUnit: descriptor.currencyCode,
-                note: pair.1.note,
+                note: SharedCareMetadata.visibleNote(pair.1.note),
                 source: descriptor.source,
                 sourceEventId: nil,
                 sourceReminderId: nil,

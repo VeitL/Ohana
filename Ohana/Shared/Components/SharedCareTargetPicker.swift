@@ -13,6 +13,7 @@ struct SharedCareTargetPicker: View {
     let pets: [Pet]
     @Binding var selectedPetIds: Set<UUID>
     let tint: Color
+    var fixedPetId: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -41,8 +42,10 @@ struct SharedCareTargetPicker: View {
     }
 
     private func targetChip(_ pet: Pet) -> some View {
-        let isSelected = selectedPetIds.contains(pet.id)
+        let isFixed = fixedPetId == pet.id
+        let isSelected = isFixed || selectedPetIds.contains(pet.id)
         return Button {
+            guard !isFixed else { return }
             withAnimation(GoMotion.feedback) {
                 if isSelected, selectedPetIds.count > 1 {
                     selectedPetIds.remove(pet.id)
@@ -75,6 +78,7 @@ struct SharedCareTargetPicker: View {
             .padding(.vertical, 7)
             .background(isSelected ? tint : Color.ohanaControlFill, in: Capsule())
         }
+        .disabled(isFixed)
         .buttonStyle(ScaleButtonStyle())
     }
 }

@@ -157,7 +157,8 @@ extension QuickFeedDetailContent {
                     subtitle: "\(selectedPlanTargets.count)只\(pet.species)",
                     pets: sameSpeciesFeedPets,
                     selectedPetIds: $draftStore.selectedSharedPlanPetIds,
-                    tint: tint
+                    tint: tint,
+                    fixedPetId: pet.id
                 )
             }
             planStepperCard(

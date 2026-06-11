@@ -46,6 +46,7 @@ final class AppServices {
     let careLedgerStats: CareLedgerStatsReading
     let domainRevisions: DomainRevisionPublishing
     let lifecycle: AppLifecycleHandling
+    let cloudSync: CloudSyncManaging
 
     convenience init() {
         let activeHumanSelection = UserDefaultsActiveHumanSelection()
@@ -131,7 +132,8 @@ final class AppServices {
             location: SharedLocationProvider(manager: locationManager),
             careLedgerStats: CareLedgerStatsReader(),
             domainRevisions: domainRevisions,
-            lifecycle: AppLifecycleCoordinator(dependencies: .live(walkingManager: walkingManager))
+            lifecycle: AppLifecycleCoordinator(dependencies: .live(walkingManager: walkingManager)),
+            cloudSync: CloudSyncEngineService()
         )
         OasisTreeManagerRegistry.current = oasisTreeManager
         AvatarPipelineRegistry.current = avatarPipeline
@@ -172,7 +174,8 @@ final class AppServices {
         location: LocationProviding,
         careLedgerStats: CareLedgerStatsReading,
         domainRevisions: DomainRevisionPublishing,
-        lifecycle: AppLifecycleHandling
+        lifecycle: AppLifecycleHandling,
+        cloudSync: CloudSyncManaging
     ) {
         self.careEvents = careEvents
         self.activeHumanSelection = activeHumanSelection
@@ -208,5 +211,6 @@ final class AppServices {
         self.careLedgerStats = careLedgerStats
         self.domainRevisions = domainRevisions
         self.lifecycle = lifecycle
+        self.cloudSync = cloudSync
     }
 }

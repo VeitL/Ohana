@@ -43,7 +43,8 @@ extension QuickWaterDetailSheet {
                         subtitle: "\(selectedWaterTargets.count)只\(pet.species)",
                         pets: sameSpeciesWaterPets,
                         selectedPetIds: $selectedSharedWaterPetIds,
-                        tint: chromeTint
+                        tint: chromeTint,
+                        fixedPetId: pet.id
                     )
                     .padding(.horizontal, 20)
                     .padding(.top, 14)
@@ -73,7 +74,8 @@ extension QuickWaterDetailSheet {
                         subtitle: "\(selectedWaterTargets.count)只\(pet.species)",
                         pets: sameSpeciesWaterPets,
                         selectedPetIds: $selectedSharedWaterPetIds,
-                        tint: Color.goTeal
+                        tint: Color.goTeal,
+                        fixedPetId: pet.id
                     )
                     .padding(.horizontal, 20)
                     .padding(.top, 14)

@@ -79,11 +79,7 @@ extension OasisRewardView {
 
                 stageEnergyRail
                     .padding(.horizontal, 18)
-                    .padding(.bottom, isCompact ? 8 : 12)
-
-                stageInjectButton
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, isCompact ? 10 : 18)
+                    .padding(.bottom, isCompact ? 14 : 20)
             }
 
             if let reward = openedUpgradeReward {
@@ -522,42 +518,6 @@ extension OasisRewardView {
             }
             .frame(height: 8)
         }
-    }
-
-    var stageInjectButton: some View {
-        let canInject = canInjectTreeEnergy
-        let unavailableReason = treeInjectionUnavailableReason
-        return Button {
-            if canInject {
-                injectTreeEnergy()
-            } else {
-                handleBlockedTreeInjectionTap()
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "bolt.fill") // a11y: allow decorative action icon paired with label
-                    .font(OhanaFont.subheadline(.black))
-                    .accessibilityHidden(true)
-                Text(unavailableReason ?? l.tr(zh: "注入 +20XP", en: "Infuse +20XP", de: "+20XP einspeisen"))
-                    .font(OhanaFont.callout(.black))
-                if unavailableReason == nil {
-                    Text("-80🥥")
-                        .font(OhanaFont.caption(.black))
-                        .opacity(0.66)
-                }
-            }
-            .foregroundStyle(canInject ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
-            .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(canInject ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .opacity(canInject ? 1 : 0.55)
-        .accessibilityHint(unavailableReason ?? l.tr(
-            zh: "消耗 80 个椰子，为生命之树增加 20 点成长经验",
-            en: "Spend 80 coconuts to add 20 growth XP to the Life Tree",
-            de: "Verbraucht 80 Kokosnüsse für 20 Wachstums-XP"
-        ))
     }
 
     var stageLevelUpBadge: some View {

@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum CloudSyncMergePolicy {
+nonisolated enum CloudSyncMergePolicy {
     static func defaultConflictPolicy(for entityName: String) -> CloudSyncConflictPolicy {
         CloudSyncEntityRegistry.defaultConflictPolicy(for: entityName)
     }
@@ -18,7 +18,7 @@ enum CloudSyncMergePolicy {
     }
 }
 
-enum CloudSyncMetadataService {
+nonisolated enum CloudSyncMetadataService {
     static func state(
         entityName: String,
         localRecordId: UUID,
@@ -145,7 +145,7 @@ enum CloudSyncMetadataService {
         return try context.fetch(descriptor)
     }
 
-    private static func state(
+    static func state(
         recordKey: String,
         context: ModelContext
     ) throws -> CloudSyncRecordState? {

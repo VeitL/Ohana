@@ -301,7 +301,6 @@ struct StardustView: View {
 #Preview {
     struct PreviewWrapper: View {
         @State private var level = 5
-        @State private var isInjecting = false
         @State private var harvested: Set<Int> = []
 
         var body: some View {
@@ -310,7 +309,7 @@ struct StardustView: View {
                 VStack(spacing: 24) {
                     BeautifulCoconutTree(
                         level: level,
-                        isInjecting: isInjecting,
+                        isInjecting: false,
                         harvestedCoconuts: harvested,
                         onHarvest: { harvested.insert($0) }
                     )
@@ -327,16 +326,6 @@ struct StardustView: View {
                         .padding(.horizontal, 20).padding(.vertical, 10)
                         .background(Color.goPrimary, in: Capsule())
                         .foregroundStyle(Color.arkInk)
-
-                        Button("注入能量") {
-                            isInjecting = true
-                            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 500) {
-                                isInjecting = false
-                            }
-                        }
-                        .padding(.horizontal, 20).padding(.vertical, 10)
-                        .background(Color.ohanaControlFill, in: Capsule())
-                        .foregroundStyle(Color.ohanaPrimaryText)
 
                         Button("重置椰子") { harvested = [] }
                             .padding(.horizontal, 20).padding(.vertical, 10)

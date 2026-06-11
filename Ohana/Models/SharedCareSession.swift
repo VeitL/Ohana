@@ -40,8 +40,25 @@ enum SharedCareMetadata {
     static let expenseNotePrefix = "ohana_shared_expense:"
     static let stockTotalKey = "stockTotal="
     static let stockOwnerKey = "stockOwner=1"
+    static let targetCountKey = "targets="
+    private static let metadataNotePrefixes = [
+        feedNotePrefix,
+        waterNotePrefix,
+        litterNotePrefix,
+        unknownPottyNotePrefix,
+        careNotePrefix,
+        walkNotePrefix,
+        expenseNotePrefix
+    ]
 
-    static func note(prefix: String, sessionId: UUID, stockTotalGrams: Double? = nil, isStockOwner: Bool = false) -> String {
+    static func note(
+        prefix: String,
+        sessionId: UUID,
+        stockTotalGrams: Double? = nil,
+        isStockOwner: Bool = false,
+        targetCount: Int? = nil,
+        visibleNote: String = ""
+    ) -> String {
         var parts = ["\(prefix)\(sessionId.uuidString)"]
         if let stockTotalGrams {
             parts.append("\(stockTotalKey)\(Int(stockTotalGrams.rounded()))")
@@ -49,7 +66,39 @@ enum SharedCareMetadata {
         if isStockOwner {
             parts.append(stockOwnerKey)
         }
+        if let targetCount, targetCount > 0 {
+            parts.append("\(targetCountKey)\(targetCount)")
+        }
+        let cleanVisibleNote = visibleNote.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanVisibleNote.isEmpty {
+            parts.append(cleanVisibleNote)
+        }
         return parts.joined(separator: " ")
+    }
+
+    static func visibleNote(_ note: String) -> String {
+        let parts = note
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+
+        guard let metadataToken = parts.first,
+              metadataNotePrefixes.contains(where: { metadataToken.hasPrefix($0) })
+        else {
+            return note
+        }
+
+        return parts
+            .dropFirst()
+            .filter { !$0.hasPrefix(stockTotalKey) && !$0.hasPrefix(targetCountKey) && $0 != stockOwnerKey }
+            .joined(separator: " ")
+    }
+
+    static func targetCount(from note: String) -> Int? {
+        guard let token = note.split(separator: " ").first(where: { $0.hasPrefix(targetCountKey) }) else {
+            return nil
+        }
+        return Int(token.dropFirst(targetCountKey.count))
     }
 
     static func stockDeductionGrams(from note: String) -> Double? {

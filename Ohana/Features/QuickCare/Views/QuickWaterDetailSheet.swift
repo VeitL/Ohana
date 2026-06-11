@@ -104,7 +104,7 @@ struct QuickWaterDetailSheet: View {
 
     var selectedWaterTargets: [Pet] {
         let targets = sameSpeciesWaterPets.filter { selectedSharedWaterPetIds.contains($0.id) }
-        return targets.isEmpty ? [pet] : targets
+        return SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
     }
 
     var waterChangeTint: Color { Color(hex: CareType.waterChange.accentColorHex) }

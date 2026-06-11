@@ -169,11 +169,6 @@ enum FeedStockRecordMetadata {
             .filter { !$0.hasPrefix(calculationModePrefix) }
             .joined(separator: "\n")
     }
-
-    @available(*, deprecated, message: "Use notesScrubbingLegacyCalculationMode(_:); calculation mode is stored in calculationModeRaw.")
-    static func notesWithCalculationMode(_ notes: String, mode _: FeedStockCalculationMode) -> String {
-        notesScrubbingLegacyCalculationMode(notes)
-    }
 }
 
 enum FeedLogMetadata {

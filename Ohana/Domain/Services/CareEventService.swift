@@ -804,7 +804,7 @@ final class CareEventService: CareEventRecording {
         context: ModelContext,
         executorId: String? = nil,
         date: Date = Date(),
-        currencyCode: String = "currency",
+        currencyCode: String = AppCurrency.code,
         source: CareLedgerSource = .detail,
         dependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {

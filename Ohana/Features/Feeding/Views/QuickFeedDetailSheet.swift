@@ -286,7 +286,7 @@ struct QuickFeedDetailContent: View {
     }
 
     func normalizedSpecies(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        SharedPetTargetResolver.normalizedSpecies(value)
     }
 
     var savedGoal: Int {
@@ -337,12 +337,12 @@ struct QuickFeedDetailContent: View {
 
     var selectedFeedTargets: [Pet] {
         let targets = sameSpeciesFeedPets.filter { draftStore.selectedSharedFeedPetIds.contains($0.id) }
-        return targets.isEmpty ? [pet] : targets
+        return SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
     }
 
     var selectedPlanTargets: [Pet] {
         let targets = sameSpeciesFeedPets.filter { draftStore.selectedSharedPlanPetIds.contains($0.id) }
-        return targets.isEmpty ? [pet] : targets
+        return SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
     }
 
     var activeSheet: ActiveFeedSheet? {

@@ -196,6 +196,7 @@ struct ContentView: View {
         rootAppearHandoffTask?.cancel()
         rootAppearHandoffTask = OhanaFrameScheduler.runAfterNextFrame {
             appServices.lifecycle.handle(.rootAppeared(scenePhase: scenePhase))
+            appServices.cloudSync.startAfterFirstRender(modelContainer: modelContext.container)
             scheduleCoconutWalletBootstrap()
             reconcileHumanProfileRequirement()
             scheduleOnboardingJourneyEvaluation()

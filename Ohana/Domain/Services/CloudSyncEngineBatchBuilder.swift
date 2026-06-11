@@ -8,7 +8,7 @@
 import CloudKit
 import Foundation
 
-enum CloudSyncEngineBatchBuilder {
+nonisolated enum CloudSyncEngineBatchBuilder {
     static func recordID(
         for payload: CloudSyncRecordPayload,
         ownerName: String = CKCurrentUserDefaultName

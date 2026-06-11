@@ -104,7 +104,9 @@ enum PetCareTrackingCommandService {
         if let linkedPotty {
             context.delete(linkedPotty)
         }
+        let sharedSessionId = log.sharedSessionId
         context.delete(log)
+        SharedCareSessionMaintenance.reconcileAfterDeletingChild(sharedSessionId: sharedSessionId, context: context)
         context.safeSave()
 
         return PetCareTrackingDeleteCommandResult(
@@ -173,6 +175,13 @@ struct PetPottyDeleteCommandResult: Equatable {
     let removedLedgerEventIDs: [UUID]
 }
 
+struct PetPottyClaimCommandResult: Equatable {
+    let petID: UUID
+    let logID: UUID
+    let sharedSessionID: String
+    let updatedLedgerEventIDs: [UUID]
+}
+
 enum PetPottyCommandService {
     @discardableResult
     @MainActor
@@ -186,12 +195,41 @@ enum PetPottyCommandService {
         for event in ledgerEvents {
             context.delete(event)
         }
+        let sharedSessionId = log.sharedSessionId
         context.delete(log)
+        SharedCareSessionMaintenance.reconcileAfterDeletingChild(sharedSessionId: sharedSessionId, context: context)
         context.safeSave()
         return PetPottyDeleteCommandResult(
             petID: pet.id,
             logID: logID,
             removedLedgerEventIDs: ledgerEvents.map(\.id)
+        )
+    }
+
+    @discardableResult
+    @MainActor
+    static func claimUnknownPottyLog(
+        _ log: PetPottyLog,
+        pet: Pet,
+        context: ModelContext
+    ) -> PetPottyClaimCommandResult {
+        let sharedSessionId = log.sharedSessionId
+        log.pet = pet
+
+        let ledgerEvents = ledgerEvents(forLegacyModelName: "PetPottyLog", id: log.id, context: context)
+        for event in ledgerEvents {
+            event.subjectKind = CareLedgerSubjectKind.pet.rawValue
+            event.subjectId = pet.id.uuidString
+            event.note = SharedCareMetadata.visibleNote(event.note)
+        }
+        SharedCareSessionMaintenance.reconcileAfterClaimingPotty(log, pet: pet, context: context)
+        context.safeSave()
+
+        return PetPottyClaimCommandResult(
+            petID: pet.id,
+            logID: log.id,
+            sharedSessionID: sharedSessionId,
+            updatedLedgerEventIDs: ledgerEvents.map(\.id)
         )
     }
 
@@ -274,6 +312,22 @@ struct PetCareCommandExecutor {
     ) -> PetPottyDeleteCommandResult {
         let result = PetPottyCommandService.deletePottyLog(log, pet: pet, context: context)
         revisions.publishPetPottyDelete(result, note: note)
+        return result
+    }
+
+    @discardableResult
+    func claimUnknownPottyLog(
+        _ log: PetPottyLog,
+        pet: Pet,
+        note: String
+    ) -> PetPottyClaimCommandResult {
+        let result = PetPottyCommandService.claimUnknownPottyLog(log, pet: pet, context: context)
+        revisions.publishDomainMutation(
+            command: .quickCare(entityID: pet.id, action: "claimUnknownPotty"),
+            affectedEntityIDs: [pet.id, log.id],
+            wroteBusinessFact: true,
+            note: note
+        )
         return result
     }
 

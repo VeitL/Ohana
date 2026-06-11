@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum CloudSyncConflictPolicy: String, Codable, CaseIterable {
+nonisolated enum CloudSyncConflictPolicy: String, Codable, CaseIterable {
     case lastWriterWins
     case maxValue
     case appendOnly

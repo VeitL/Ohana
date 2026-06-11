@@ -44,6 +44,8 @@
 		<string>de</string>
 		<string>zh-Hans</string>
 	</array>
+	<key>CKSharingSupported</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>用于拍摄成员或宠物头像，以及记录时刻中的照片。</string>
 	<key>NSFaceIDUsageDescription</key>

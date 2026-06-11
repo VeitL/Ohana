@@ -8,7 +8,7 @@
 import CloudKit
 import Foundation
 
-enum CloudSyncRecordSerializationError: LocalizedError, Equatable {
+nonisolated enum CloudSyncRecordSerializationError: LocalizedError, Equatable {
     case missingDescriptor(entityName: String)
     case notUploadable(entityName: String)
     case missingLocalRecordId(entityName: String)
@@ -34,7 +34,7 @@ enum CloudSyncRecordSerializationError: LocalizedError, Equatable {
     }
 }
 
-enum CloudSyncRecordFieldValue: Equatable {
+nonisolated enum CloudSyncRecordFieldValue: Equatable, Sendable {
     case null
     case string(String)
     case int(Int)
@@ -64,8 +64,8 @@ enum CloudSyncRecordFieldValue: Equatable {
     }
 }
 
-struct CloudSyncRecordPayload: Equatable {
-    typealias AssetFileURLProvider = (_ fieldName: String, _ data: Data) throws -> URL
+nonisolated struct CloudSyncRecordPayload: Equatable, Sendable {
+    typealias AssetFileURLProvider = @Sendable (_ fieldName: String, _ data: Data) throws -> URL
 
     let entityName: String
     let recordType: String
@@ -76,7 +76,7 @@ struct CloudSyncRecordPayload: Equatable {
     let isDeleted: Bool
     let fields: [String: CloudSyncRecordFieldValue]
 
-    func makeCKRecord(
+    nonisolated func makeCKRecord(
         ownerName: String = CKCurrentUserDefaultName,
         assetFileURLProvider: AssetFileURLProvider? = nil
     ) throws -> CKRecord {
@@ -110,7 +110,7 @@ struct CloudSyncRecordPayload: Equatable {
     }
 }
 
-enum CloudSyncRecordFieldKey {
+nonisolated enum CloudSyncRecordFieldKey {
     static let recordKey = "sync_recordKey"
     static let entityName = "sync_entityName"
     static let localRecordId = "sync_localRecordId"
@@ -122,7 +122,7 @@ enum CloudSyncRecordFieldKey {
     static let conflictPolicy = "sync_conflictPolicy"
 }
 
-enum CloudSyncZoneNaming {
+nonisolated enum CloudSyncZoneNaming {
     static let unassignedPrivateZoneName = "ohana-private-unassigned"
 
     static func zoneName(forHouseholdId householdId: String) -> String {
@@ -136,7 +136,7 @@ enum CloudSyncZoneNaming {
     }
 }
 
-enum CloudSyncRecordSerializer {
+nonisolated enum CloudSyncRecordSerializer {
     static func payload(
         for model: Any,
         state: CloudSyncRecordState

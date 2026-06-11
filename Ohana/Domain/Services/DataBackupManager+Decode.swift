@@ -113,6 +113,10 @@ nonisolated extension DataBackupManager {
         e.completedOccurrences = dto.completedOccurrences ?? []
         e.createdAt = parseDate(dto.createdAt) ?? Date()
         e.assigneeId = dto.assigneeId
+        e.feedRuleKindRaw = dto.feedRuleKindRaw ?? ""
+        e.foodKindRaw = dto.foodKindRaw ?? FeedFoodKind.dry.rawValue
+        e.feedAmountGrams = dto.feedAmountGrams ?? 0
+        e.feedPlanGroupId = dto.feedPlanGroupId ?? ""
         return e
     }
 

@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum CloudSyncUploadBatchError: LocalizedError, Equatable {
+nonisolated enum CloudSyncUploadBatchError: LocalizedError, Equatable {
     case invalidLocalRecordId(recordKey: String, localRecordId: String)
     case missingLocalModel(entityName: String, localRecordId: String)
 
@@ -22,7 +22,7 @@ enum CloudSyncUploadBatchError: LocalizedError, Equatable {
     }
 }
 
-enum CloudSyncUploadBatchBuilder {
+nonisolated enum CloudSyncUploadBatchBuilder {
     static func dirtyPayloads(context: ModelContext) throws -> [CloudSyncRecordPayload] {
         try payloads(for: CloudSyncMetadataService.dirtyStates(context: context), context: context)
     }

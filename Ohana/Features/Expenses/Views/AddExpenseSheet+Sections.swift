@@ -156,6 +156,55 @@ extension AddExpenseSheet {
     }
 
     @ViewBuilder
+    var sharedExpenseTargetSection: some View {
+        if sameSpeciesExpensePets.count > 1 {
+            VStack(alignment: .leading, spacing: 8) {
+                SharedCareTargetPicker(
+                    title: l.tr(zh: "共同花费", en: "Shared expense", de: "Gemeinsame Ausgabe"),
+                    subtitle: selectedExpenseTargets.count > 1
+                        ? l.tr(
+                            zh: "\(selectedExpenseTargets.count)只宠物平摊",
+                            en: "\(selectedExpenseTargets.count) pets split this",
+                            de: "\(selectedExpenseTargets.count) Tiere teilen diese Ausgabe"
+                        )
+                        : l.tr(zh: "仅记录给 \(pet.name)", en: "Only \(pet.name)", de: "Nur \(pet.name)"),
+                    pets: sameSpeciesExpensePets,
+                    selectedPetIds: $selectedSharedExpensePetIds,
+                    tint: sheetTint,
+                    fixedPetId: pet.id
+                )
+                .padding(.horizontal, 20)
+
+                if sharedExpenseReceiptBlocked {
+                    sharedExpenseReceiptNotice
+                        .padding(.horizontal, 20)
+                }
+            }
+        }
+    }
+
+    var sharedExpenseReceiptNotice: some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: "paperclip") // a11y: allow decorative icon; notice text carries the message.
+                .accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .foregroundStyle(sheetTint)
+                .frame(width: 18)
+            Text(l.tr(
+                zh: "带收据的花费暂时只能保存到单只宠物；取消其他宠物或先移除收据。",
+                en: "Expenses with receipts are saved to one pet for now. Deselect the others or remove the receipt.",
+                de: "Ausgaben mit Beleg werden vorerst nur einem Tier zugeordnet. Wähle die anderen ab oder entferne den Beleg."
+            ))
+            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+            .foregroundStyle(secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(sheetTint.opacity(0.10), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+    }
+
+    @ViewBuilder
     var payerSection: some View {
         if humans.count > 1 {
             VStack(alignment: .leading, spacing: 8) {

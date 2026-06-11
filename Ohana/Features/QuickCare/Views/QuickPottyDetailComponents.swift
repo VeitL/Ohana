@@ -65,11 +65,13 @@ struct PoopInlineSheetGlassSurface: View {
 
 enum PoopLogItem: Identifiable {
     case potty(PetPottyLog)
+    case unknownPotty(PetPottyLog, targetCount: Int)
     case litter(PetCareLog)
 
     var id: String {
         switch self {
         case let .potty(log): "potty-\(log.id.uuidString)"
+        case let .unknownPotty(log, _): "unknown-potty-\(log.id.uuidString)"
         case let .litter(log): "litter-\(log.id.uuidString)"
         }
     }
@@ -77,6 +79,7 @@ enum PoopLogItem: Identifiable {
     var date: Date {
         switch self {
         case let .potty(log): log.date
+        case let .unknownPotty(log, _): log.date
         case let .litter(log): log.date
         }
     }
@@ -84,20 +87,29 @@ enum PoopLogItem: Identifiable {
     var title: String {
         switch self {
         case let .potty(log): log.pottyType.rawValue
+        case .unknownPotty: "未知噗噗"
         case .litter: CareType.litter.label
         }
     }
 
     func title(_ l: L10n) -> String {
         switch self {
-        case let .potty(log): log.pottyType.localizedLabel(l)
-        case .litter: l.tr(zh: "铲砂", en: "Litter scooped", de: "Klo gereinigt")
+        case let .potty(log):
+            return log.pottyType.localizedLabel(l)
+        case let .unknownPotty(_, targetCount):
+            if targetCount > 1 {
+                return l.tr(zh: "共同未知噗噗 · \(targetCount)只", en: "Shared mystery poop · \(targetCount)", de: "Unbekanntes Gruppen-Häufchen · \(targetCount)")
+            }
+            return l.tr(zh: "未知噗噗", en: "Mystery poop", de: "Unbekanntes Häufchen")
+        case .litter:
+            return l.tr(zh: "铲砂", en: "Litter scooped", de: "Klo gereinigt")
         }
     }
 
     var icon: String {
         switch self {
         case let .potty(log): log.pottyType.systemIconName
+        case .unknownPotty: "questionmark.circle.fill"
         case .litter: CareType.litter.systemIconName
         }
     }
@@ -105,6 +117,7 @@ enum PoopLogItem: Identifiable {
     var detail: String? {
         switch self {
         case let .potty(log): log.executorId == nil ? nil : "已记录"
+        case .unknownPotty: "待认领"
         case .litter: nil
         }
     }
@@ -113,7 +126,18 @@ enum PoopLogItem: Identifiable {
         switch self {
         case let .potty(log):
             log.executorId == nil ? nil : l.tr(zh: "已记录", en: "Logged", de: "Erfasst")
+        case .unknownPotty:
+            l.tr(zh: "待认领", en: "Needs claim", de: "Zuordnen")
         case .litter:
+            nil
+        }
+    }
+
+    var claimablePottyLog: PetPottyLog? {
+        switch self {
+        case let .unknownPotty(log, _):
+            log
+        case .potty, .litter:
             nil
         }
     }
@@ -373,6 +397,8 @@ struct PoopLogRow: View {
     let item: PoopLogItem
     let tint: Color
     var showDelete = true
+    var claimTargets: [Pet] = []
+    var onClaim: ((PetPottyLog, Pet) -> Void)?
     let onDelete: () -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
@@ -400,6 +426,23 @@ struct PoopLogRow: View {
             Text(item.date, format: .dateTime.month().day().hour().minute())
                 .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
+            if let log = item.claimablePottyLog, !claimTargets.isEmpty, let onClaim {
+                Menu {
+                    ForEach(claimTargets) { target in
+                        Button {
+                            onClaim(log, target)
+                        } label: {
+                            Label(target.name, systemImage: "pawprint.fill")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "person.crop.circle.badge.checkmark") // a11y: allow decorative menu glyph; menu labels name claim targets.
+                        .accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold))
+                        .foregroundStyle(tint)
+                        .frame(width: 30, height: 30) // a11y: allow compact icon; menu row text owns accessibility.
+                }
+            }
             if showDelete {
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash").accessibilityHidden(true)
@@ -758,6 +801,8 @@ struct PoopHistorySheet: View {
     let title: String
     let items: [PoopLogItem]
     let tintForItem: (PoopLogItem) -> Color
+    var claimTargets: [Pet] = []
+    var onClaim: ((PetPottyLog, Pet) -> Void)?
     let onDelete: (PoopLogItem) -> Void
 
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
@@ -773,7 +818,13 @@ struct PoopHistorySheet: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
                     ForEach(items) { item in
-                        PoopLogRow(item: item, tint: tintForItem(item), showDelete: true) {
+                        PoopLogRow(
+                            item: item,
+                            tint: tintForItem(item),
+                            showDelete: true,
+                            claimTargets: claimTargets,
+                            onClaim: onClaim
+                        ) {
                             onDelete(item)
                         }
                         .listRowBackground(Color.clear)

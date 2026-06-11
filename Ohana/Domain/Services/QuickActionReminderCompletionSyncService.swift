@@ -268,13 +268,7 @@ final class QuickActionReminderCompletionSyncService: QuickActionReminderComplet
 extension CareEventService {
     @MainActor
     static func normalizedTargets(_ targets: [Pet], fallback: Pet) -> [Pet] {
-        let candidates = targets.isEmpty ? [fallback] : targets
-        var seen = Set<UUID>()
-        return candidates.filter { pet in
-            guard !pet.hasPassedAway, !seen.contains(pet.id) else { return false }
-            seen.insert(pet.id)
-            return true
-        }
+        SharedPetTargetResolver.normalizedTargets(targets, fallback: fallback)
     }
 
     @MainActor

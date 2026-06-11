@@ -302,7 +302,7 @@ extension QuickPottyDetailSheet {
 
     func deleteItem(_ item: PoopLogItem) {
         switch item {
-        case let .potty(log):
+        case let .potty(log), let .unknownPotty(log, _):
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             commandQueue.enqueue(.petPottyDelete(petID: pet.id, logID: log.id)) {
                 _ = PetCareCommandExecutor(context: modelContext, services: appServices).deletePottyLog(
@@ -324,12 +324,37 @@ extension QuickPottyDetailSheet {
         }
     }
 
+    func claimUnknownPotty(_ log: PetPottyLog, target: Pet) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(.quickCare(entityID: target.id, action: "claimUnknownPotty")) {
+            _ = PetCareCommandExecutor(context: modelContext, services: appServices).claimUnknownPottyLog(
+                log,
+                pet: target,
+                note: "quickPotty.claimUnknown"
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            showSaveConfirmation(
+                l.tr(
+                    zh: "已归到 \(target.name)",
+                    en: "Assigned to \(target.name)",
+                    de: "\(target.name) zugeordnet"
+                )
+            )
+            pottyFeedbackToken = CheckInFeedbackToken(
+                kind: .done,
+                deltaText: "✓",
+                tint: pottyTint
+            )
+            scheduleFeedbackClear()
+        }
+    }
+
     func activeExecutorId() -> String? {
         appServices.activeHumanSelection.currentHumanId
     }
 
     func normalizedSpecies(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        SharedPetTargetResolver.normalizedSpecies(value)
     }
 
     func latestAllEvents() -> [Event] {
@@ -416,6 +441,8 @@ extension QuickPottyDetailSheet {
         switch item {
         case let .potty(log):
             pottyTypeColor(log.pottyType)
+        case .unknownPotty:
+            pottyTint
         case .litter:
             scoopTint
         }

@@ -67,7 +67,11 @@ nonisolated extension DataBackupManager {
             recurrenceDays: e.recurrenceDays, recurrenceEndDate: d(e.recurrenceEndDate),
             isCompleted: e.isCompleted, createdAt: d(e.createdAt),
             completedOccurrences: e.completedOccurrences,
-            assigneeId: e.assigneeId
+            assigneeId: e.assigneeId,
+            feedRuleKindRaw: e.feedRuleKindRaw.isEmpty ? nil : e.feedRuleKindRaw,
+            foodKindRaw: e.foodKindRaw,
+            feedAmountGrams: e.feedAmountGrams,
+            feedPlanGroupId: e.feedPlanGroupId.isEmpty ? nil : e.feedPlanGroupId
         )
     }
 

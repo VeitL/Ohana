@@ -19,45 +19,6 @@ extension OasisRewardView {
         )
     }
 
-    // MARK: - Inject Energy Button
-
-    var injectEnergyButton: some View {
-        let canInject = canInjectTreeEnergy
-        let unavailableReason = treeInjectionUnavailableReason
-        return Button {
-            if canInject {
-                injectTreeEnergy()
-            } else {
-                handleBlockedTreeInjectionTap()
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "bolt.fill") // a11y: allow decorative action icon paired with label
-                    .accessibilityHidden(true)
-                Text(unavailableReason ?? l.tr(zh: "注入能量", en: "Inject energy", de: "Energie geben"))
-                    .font(OhanaFont.headline(.black))
-                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                if unavailableReason == nil {
-                    Text("(-80🥥)")
-                        .font(OhanaFont.subheadline(.bold))
-                        .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.55))
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                canInject ? Color.goPrimary : Color.ohanaControlFill,
-                in: Capsule()
-            )
-            .overlay(Capsule().strokeBorder(
-                canInject ? Color.clear : Color.ohanaPrimaryText.opacity(0.08),
-                lineWidth: 1
-            ))
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .opacity(canInject ? 1 : 0.45)
-    }
-
     // MARK: - Milestone Card
 
     var milestoneCard: some View {

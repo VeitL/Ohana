@@ -161,13 +161,15 @@ struct PetExpenseDashboardContent: View {
     }
 
     private func expenseRow(_ log: PetExpenseLog) -> some View {
-        HStack(spacing: 12) {
+        let visibleNote = SharedCareMetadata.visibleNote(log.note)
+        let title = expenseTitle(log, visibleNote: visibleNote)
+        return HStack(spacing: 12) {
             Image(systemName: log.expenseCategory.systemIconName)
                 .font(OhanaFont.adaptive(size: 14, weight: .black))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
             VStack(alignment: .leading, spacing: 3) {
-                Text(log.note.isEmpty ? l.expenseCategoryTitle(log.expenseCategory) : log.note)
+                Text(title)
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
@@ -200,6 +202,15 @@ struct PetExpenseDashboardContent: View {
         }
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
+    }
+
+    private func expenseTitle(_ log: PetExpenseLog, visibleNote: String) -> String {
+        guard !log.sharedSessionId.isEmpty else {
+            return visibleNote.isEmpty ? l.expenseCategoryTitle(log.expenseCategory) : visibleNote
+        }
+        let countSuffix = SharedCareMetadata.targetCount(from: log.note).map { " · \($0)只" } ?? ""
+        let detail = visibleNote.isEmpty ? l.expenseCategoryTitle(log.expenseCategory) : visibleNote
+        return "\(l.tr(zh: "共同花费", en: "Shared expense", de: "Gemeinsame Ausgabe"))\(countSuffix) · \(detail)"
     }
 
     private func rowSubtitle(_ log: PetExpenseLog) -> String {

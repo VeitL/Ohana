@@ -665,11 +665,7 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
 
                 frozenProgressRail
                     .padding(.horizontal, 18)
-                    .padding(.bottom, 8)
-
-                frozenInjectControl
-                    .padding(.horizontal, 18)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 14)
             }
         }
         .frame(height: metrics.treeCardHeight)
@@ -720,7 +716,7 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
     private var frozenUpgradeCoconutDock: some View {
         HStack(spacing: 10) {
             HStack(spacing: 6) {
-                Image(systemName: "sparkles")
+                Image(systemName: "sparkles") // a11y: allow decorative frozen Oasis hint icon
                     .accessibilityHidden(true)
                 Text(nextStageHint)
                     .lineLimit(1)
@@ -743,24 +739,6 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
             en: "Next upgrade coconut is growing",
             de: "Nächste Upgrade-Kokosnuss wächst"
         )
-    }
-
-    private var frozenInjectControl: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "bolt.fill")
-                .font(OhanaFont.subheadline(.black))
-                .accessibilityHidden(true)
-            Text(l.tr(zh: "注入 +20XP", en: "Infuse +20XP", de: "+20XP einspeisen"))
-                .font(OhanaFont.callout(.black))
-            Text("-80🥥")
-                .font(OhanaFont.caption(.black))
-                .opacity(0.66)
-        }
-        .foregroundStyle(Color.ohanaSecondaryText)
-        .frame(maxWidth: .infinity)
-        .frame(height: 48)
-        .background(Color.ohanaControlFill, in: Capsule())
-        .opacity(0.55)
     }
 
     private var frozenProgressRail: some View {
@@ -832,7 +810,7 @@ struct VerticalSolidHomeOasisFrozenTreeStage: View {
     private var frozenStageSun: some View {
         Circle()
             .fill(Color.goYellow)
-            .frame(width: 26, height: 26)
+            .frame(width: 26, height: 26) // a11y: allow non-interactive frozen Oasis celestial dot
             .shadow(color: Color.goYellow.opacity(0.68), radius: 14, x: 0, y: 0) // ui-v4: allow frozen Oasis stage celestial glow
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             .padding(.top, 24)

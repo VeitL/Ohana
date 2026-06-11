@@ -109,6 +109,7 @@ final class Event {
     var feedRuleKindRaw: String = ""
     var foodKindRaw: String = FeedFoodKind.dry.rawValue
     var feedAmountGrams: Double = 0
+    var feedPlanGroupId: String = ""
 
     @Relationship(deleteRule: .cascade) var reminders: [Reminder]
 
@@ -138,6 +139,7 @@ final class Event {
         self.feedRuleKindRaw = ""
         self.foodKindRaw = FeedFoodKind.dry.rawValue
         self.feedAmountGrams = 0
+        self.feedPlanGroupId = ""
         self.reminders = []
     }
 

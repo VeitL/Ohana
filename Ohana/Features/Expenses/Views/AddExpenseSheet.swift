@@ -114,6 +114,7 @@ struct ExpenseReceiptPreviewViewer: View {
 struct AddExpenseSheet: View {
     let pet: Pet
     let humans: [Human]
+    var allPets: [Pet] = []
     var preselectedPayerId: String?
     var onSaved: (() -> Void)?
     var onRewarded: ((Int) -> Void)?
@@ -132,6 +133,7 @@ struct AddExpenseSheet: View {
     @State var noteInput = ""
     @State var date = Date()
     @State var selectedPayerId: String? = nil
+    @State var selectedSharedExpensePetIds: Set<UUID> = []
     @State var showMore = false
     @State var isSaving = false
     @State var receiptAttachments: [ExpenseReceiptAttachment] = []
@@ -191,7 +193,7 @@ struct AddExpenseSheet: View {
     }
 
     var canSave: Bool {
-        isAmountValid && !isSaving && !hasSavedMedicalExpense
+        isAmountValid && !isSaving && !hasSavedMedicalExpense && !sharedExpenseReceiptBlocked
     }
 
     var hasSavedMedicalExpense: Bool {
@@ -201,6 +203,30 @@ struct AddExpenseSheet: View {
     // 该宠物的活跃保单（用于报销快捷入口）
     var activeInsurances: [PetInsurance] {
         pet.insurances.filter(\.isActive)
+    }
+
+    var sameSpeciesExpensePets: [Pet] {
+        let sourceSpecies = SharedPetTargetResolver.normalizedSpecies(pet.species)
+        return allPets
+            .filter { !$0.hasPassedAway && SharedPetTargetResolver.normalizedSpecies($0.species) == sourceSpecies }
+            .sorted { lhs, rhs in
+                if lhs.id == pet.id { return true }
+                if rhs.id == pet.id { return false }
+                return lhs.createdAt < rhs.createdAt
+            }
+    }
+
+    var selectedExpenseTargets: [Pet] {
+        let selectedTargets = sameSpeciesExpensePets.filter { selectedSharedExpensePetIds.contains($0.id) }
+        return SharedPetTargetResolver.normalizedTargets(selectedTargets, fallback: pet)
+    }
+
+    var isSharedExpense: Bool {
+        selectedExpenseTargets.count > 1
+    }
+
+    var sharedExpenseReceiptBlocked: Bool {
+        isSharedExpense && !receiptAttachments.isEmpty
     }
 
     var quickAmounts: [Double] {
@@ -247,6 +273,7 @@ struct AddExpenseSheet: View {
                             amountEntry
                             quickAmountStrip
                             categoryStrip
+                            sharedExpenseTargetSection
                             payerSection
                             receiptSection
                             if selectedCategory == .insurancePremium {

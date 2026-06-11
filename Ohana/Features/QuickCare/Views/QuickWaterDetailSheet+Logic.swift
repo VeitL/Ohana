@@ -698,7 +698,7 @@ extension QuickWaterDetailSheet {
     }
 
     func normalizedSpecies(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        SharedPetTargetResolver.normalizedSpecies(value)
     }
 
     // MARK: - Formatting

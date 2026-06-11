@@ -508,6 +508,460 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func assetFileStoreWritesUploadDataToTemporaryFile() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaCloudSyncAssetFileStoreTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let store = CloudSyncAssetFileStore(directoryURL: directoryURL)
+        let data = Data([9, 8, 7])
+
+        let fileURL = try store.assetFileURLProvider()("avatar image", data)
+
+        #expect(fileURL.deletingLastPathComponent() == directoryURL)
+        #expect(fileURL.lastPathComponent.hasPrefix("avatar-image-"))
+        #expect(try Data(contentsOf: fileURL) == data)
+    }
+
+    @MainActor
+    @Test func engineBatchBuilderUsesAssetFileProviderForCKAssets() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaCloudSyncAssetBatchTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let store = CloudSyncAssetFileStore(directoryURL: directoryURL)
+        let data = Data([1, 2, 3])
+        let payload = makeRecordPayload(
+            entityName: String(describing: Pet.self),
+            recordType: String(describing: Pet.self),
+            localRecordId: uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            fields: ["avatarImageData": .assetData(data)]
+        )
+
+        let batch = try #require(try CloudSyncEngineBatchBuilder.recordZoneChangeBatch(
+            for: [payload],
+            assetFileURLProvider: store.assetFileURLProvider()
+        ))
+        let record = try #require(batch.recordsToSave.first)
+        let asset = try #require(record["avatarImageData"] as? CKAsset)
+        let fileURL = try #require(asset.fileURL)
+
+        #expect(try Data(contentsOf: fileURL) == data)
+    }
+
+    @MainActor
+    @Test func assetFileStorePrunesOldFilesOnly() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("OhanaCloudSyncAssetPruneTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let store = CloudSyncAssetFileStore(directoryURL: directoryURL)
+        let oldURL = try store.fileURL(fieldName: "old", data: Data([1]))
+        let recentURL = try store.fileURL(fieldName: "recent", data: Data([2]))
+        let oldDate = Date(timeIntervalSinceReferenceDate: 10)
+        try FileManager.default.setAttributes([.modificationDate: oldDate], ofItemAtPath: oldURL.path)
+
+        store.pruneFiles(olderThan: Date(timeIntervalSinceReferenceDate: 20))
+
+        #expect(!FileManager.default.fileExists(atPath: oldURL.path))
+        #expect(FileManager.default.fileExists(atPath: recentURL.path))
+    }
+
+    @MainActor
+    @Test func householdShareServicePreparesZoneWideShare() {
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let service = CloudSyncHouseholdShareService()
+
+        let preparation = service.prepareZoneWideShare(
+            householdId: householdId,
+            householdName: "Shared Home"
+        )
+
+        #expect(preparation.zoneID.zoneName == "household-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        #expect(preparation.shareRecordID.recordName == CKRecordNameZoneWideShare)
+        #expect(preparation.shareRecordID.zoneID.zoneName == preparation.zoneID.zoneName)
+        #expect(preparation.title == "Shared Home")
+        #expect(preparation.shareType == CloudSyncShareRuntime.shareType)
+    }
+
+    @MainActor
+    @Test func householdShareServiceUsesFallbackTitleForBlankName() {
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let service = CloudSyncHouseholdShareService()
+
+        let preparation = service.prepareZoneWideShare(
+            householdId: householdId,
+            householdName: "   "
+        )
+
+        #expect(preparation.title == CloudSyncShareRuntime.fallbackTitle)
+    }
+
+    @MainActor
+    @Test func householdShareStateUpdaterStoresZoneWideShareName() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let household = Household(name: "Shared Home")
+        household.id = householdId
+        context.insert(household)
+        let shareRecordName = CloudSyncHouseholdShareService()
+            .prepareZoneWideShare(householdId: householdId, householdName: household.name)
+            .shareRecordID
+            .recordName
+
+        let didUpdate = try CloudSyncHouseholdShareStateUpdater.markSharePrepared(
+            householdId: householdId,
+            shareRecordName: shareRecordName,
+            context: context
+        )
+
+        #expect(didUpdate)
+        #expect(household.ckShareRecordName == CKRecordNameZoneWideShare)
+    }
+
+    @MainActor
+    @Test func pendingChangeBuilderCreatesOneZoneSavePerDirtyZone() {
+        let householdZonePayload = makeRecordPayload(
+            localRecordId: uuid("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"),
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            fields: ["name": .string("Home")]
+        )
+        let petPayload = makeRecordPayload(
+            entityName: String(describing: Pet.self),
+            recordType: String(describing: Pet.self),
+            localRecordId: uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            fields: ["name": .string("Momo")]
+        )
+        let secondHouseholdPayload = makeRecordPayload(
+            localRecordId: uuid("ffffffff-ffff-4fff-8fff-ffffffffffff"),
+            householdId: uuid("dddddddd-dddd-4ddd-8ddd-dddddddddddd"),
+            fields: ["name": .string("Second Home")]
+        )
+
+        let changes = CloudSyncEnginePendingChangeBuilder.pendingDatabaseChanges(
+            for: [householdZonePayload, petPayload, secondHouseholdPayload]
+        )
+
+        #expect(changes.count == 2)
+        guard case let .saveZone(firstZone) = changes[0],
+              case let .saveZone(secondZone) = changes[1] else {
+            Issue.record("Expected custom CloudKit zones to be registered before record uploads")
+            return
+        }
+        #expect(firstZone.zoneID.zoneName == "household-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        #expect(secondZone.zoneID.zoneName == "household-dddddddd-dddd-4ddd-8ddd-dddddddddddd")
+    }
+
+    @MainActor
+    @Test func engineDelegateAdapterBuildsBatchThroughUploadProvider() async throws {
+        let firstPayload = makeRecordPayload(
+            localRecordId: uuid("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"),
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            fields: ["name": .string("First")]
+        )
+        let secondPayload = makeRecordPayload(
+            localRecordId: uuid("ffffffff-ffff-4fff-8fff-ffffffffffff"),
+            householdId: uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            fields: ["name": .string("Second")]
+        )
+        let runtime = CloudSyncEngineDelegateAdapter(
+            uploadPayloadProvider: StaticCloudSyncUploadPayloadProvider(payloads: [firstPayload, secondPayload])
+        )
+
+        let batch = try #require(await runtime.recordZoneChangeBatch(
+            sendScope: .recordIDs([CloudSyncEngineBatchBuilder.recordID(for: secondPayload)])
+        ))
+
+        #expect(batch.recordsToSave.count == 1)
+        #expect(batch.recordsToSave.first?.recordID.recordName == secondPayload.recordName)
+        #expect(batch.recordIDsToDelete.isEmpty)
+    }
+
+    @MainActor
+    @Test func localStoreActorBuildsDirtyPayloadsFromSwiftData() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let household = Household(name: "Shared Home")
+        household.id = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        context.insert(household)
+        _ = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Household.self),
+            localRecordId: household.id,
+            householdId: household.id,
+            context: context
+        )
+        try context.save()
+
+        let actor = CloudSyncLocalStoreActor(modelContainer: container)
+        let payloads = try await actor.uploadPayloads()
+
+        #expect(payloads.count == 1)
+        #expect(payloads.first?.recordName == "Household_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        #expect(payloads.first?.fields["name"]?.stringValue == "Shared Home")
+    }
+
+    @MainActor
+    @Test func sentRecordStateUpdaterMarksSavedRecordSynced() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let household = Household(name: "Shared Home")
+        household.id = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        context.insert(household)
+
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Household.self),
+            localRecordId: household.id,
+            householdId: household.id,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 10),
+            context: context
+        )
+        let payload = try CloudSyncRecordSerializer.payload(for: household, state: state)
+        let record = try payload.makeCKRecord()
+        let syncedAt = Date(timeIntervalSinceReferenceDate: 20)
+
+        let updatedCount = try CloudSyncSentRecordStateUpdater.markSavedRecords(
+            [record],
+            syncedAt: syncedAt,
+            context: context
+        )
+
+        #expect(updatedCount == 1)
+        #expect(!state.hasPendingLocalChanges)
+        #expect(state.ckRecordName == payload.recordName)
+        #expect(state.ckZoneName == payload.zoneName)
+        #expect(state.ckChangeTag.isEmpty)
+        #expect(state.lastSyncedAt == syncedAt)
+    }
+
+    @MainActor
+    @Test func sentRecordStateUpdaterIgnoresRecordsWithoutLocalSyncState() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let zoneID = CKRecordZone.ID(zoneName: "household-unknown", ownerName: CKCurrentUserDefaultName)
+        let unknownRecord = CKRecord(
+            recordType: String(describing: Household.self),
+            recordID: CKRecord.ID(recordName: "Household_unknown", zoneID: zoneID)
+        )
+        unknownRecord[CloudSyncRecordFieldKey.recordKey] = "Household:unknown" as CKRecordValue
+
+        let updatedCount = try CloudSyncSentRecordStateUpdater.markSavedRecords(
+            [unknownRecord],
+            context: context
+        )
+
+        #expect(updatedCount == 0)
+    }
+
+    @MainActor
+    @Test func localStoreActorMarksSavedRecordSynced() async throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let household = Household(name: "Shared Home")
+        household.id = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        context.insert(household)
+
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Household.self),
+            localRecordId: household.id,
+            householdId: household.id,
+            context: context
+        )
+        let payload = try CloudSyncRecordSerializer.payload(for: household, state: state)
+        let record = try payload.makeCKRecord()
+        try context.save()
+
+        let actor = CloudSyncLocalStoreActor(modelContainer: container)
+        try await actor.markSavedRecords([record])
+
+        let verificationContext = ModelContext(container)
+        let savedState = try #require(try CloudSyncMetadataService.state(
+            recordKey: state.recordKey,
+            context: verificationContext
+        ))
+        #expect(!savedState.hasPendingLocalChanges)
+        #expect(savedState.ckRecordName == payload.recordName)
+        #expect(savedState.ckZoneName == payload.zoneName)
+    }
+
+    @MainActor
+    @Test func recordApplierInsertsRemoteHouseholdAndMarksSynced() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let remoteModifiedAt = Date(timeIntervalSinceReferenceDate: 1000)
+        let record = try makeRecordPayload(
+            localRecordId: householdId,
+            householdId: householdId,
+            lastModifiedAt: remoteModifiedAt,
+            fields: [
+                "name": .string("Remote Home"),
+                "createdAt": .date(Date(timeIntervalSinceReferenceDate: 900)),
+                "totalProsperity": .int(12)
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .inserted(entityName: "Household", localRecordId: normalized(householdId)))
+        let household = try #require(try fetchHousehold(id: householdId, context: context))
+        #expect(household.name == "Remote Home")
+        #expect(household.totalProsperity == 12)
+
+        let state = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Household.self),
+            localRecordId: householdId,
+            context: context
+        ))
+        #expect(!state.hasPendingLocalChanges)
+        #expect(state.lastModifiedAt == remoteModifiedAt)
+        #expect(state.ckRecordName == "Household_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    }
+
+    @MainActor
+    @Test func recordApplierMergesProsperityCounterWithMax() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let household = Household(name: "Local Home")
+        household.id = householdId
+        household.totalProsperity = 20
+        context.insert(household)
+
+        let record = try makeRecordPayload(
+            localRecordId: householdId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 2000),
+            fields: [
+                "name": .string("Remote Home"),
+                "totalProsperity": .int(4)
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .updated(entityName: "Household", localRecordId: normalized(householdId)))
+        #expect(household.name == "Remote Home")
+        #expect(household.totalProsperity == 20)
+    }
+
+    @MainActor
+    @Test func recordApplierSkipsStaleRemoteMutableRecord() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let petId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let pet = Pet(name: "Local Momo")
+        pet.id = petId
+        context.insert(pet)
+        let state = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            modifiedAt: Date(timeIntervalSinceReferenceDate: 3000),
+            context: context
+        )
+        let record = try makeRecordPayload(
+            entityName: String(describing: Pet.self),
+            recordType: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 2000),
+            fields: ["name": .string("Remote Momo")]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .skippedStale(entityName: "Pet", localRecordId: normalized(petId)))
+        #expect(pet.name == "Local Momo")
+        #expect(state.hasPendingLocalChanges)
+    }
+
+    @MainActor
+    @Test func recordApplierDoesNotApplyLedgerProjectionBalanceFields() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let humanId = uuid("22222222-2222-4222-8222-222222222222")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let human = Human(name: "Local Avery")
+        human.id = humanId
+        human.coconutBalance = 99
+        context.insert(human)
+        let record = try makeRecordPayload(
+            entityName: String(describing: Human.self),
+            recordType: String(describing: Human.self),
+            localRecordId: humanId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 2000),
+            fields: [
+                "name": .string("Remote Avery"),
+                "coconutBalance": .int(1)
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .updated(entityName: "Human", localRecordId: normalized(humanId)))
+        #expect(human.name == "Remote Avery")
+        #expect(human.coconutBalance == 99)
+    }
+
+    @MainActor
+    @Test func recordApplierAppliesRemoteTombstoneAndKeepsSyncState() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let petId = uuid("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let deletedAt = Date(timeIntervalSinceReferenceDate: 4000)
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        context.insert(pet)
+        let record = try makeRecordPayload(
+            entityName: String(describing: Pet.self),
+            recordType: String(describing: Pet.self),
+            localRecordId: petId,
+            householdId: householdId,
+            isDeleted: true,
+            lastModifiedAt: deletedAt,
+            fields: [
+                CloudSyncRecordFieldKey.deletedAt: .date(deletedAt),
+                CloudSyncRecordFieldKey.deletedByHumanId: .string(normalized(uuid("33333333-3333-4333-8333-333333333333")))
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+
+        #expect(result == .deleted(entityName: "Pet", localRecordId: normalized(petId)))
+        #expect(try fetchPet(id: petId, context: context) == nil)
+        let state = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            localRecordId: petId,
+            context: context
+        ))
+        #expect(state.isDeleted)
+        #expect(!state.hasPendingLocalChanges)
+        #expect(state.deletedAt == deletedAt)
+    }
+
+    @MainActor
+    @Test func localStoreActorAppliesFetchedRecordsThroughRecordApplier() async throws {
+        let container = try makeContainer()
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let record = try makeRecordPayload(
+            localRecordId: householdId,
+            householdId: householdId,
+            fields: ["name": .string("Actor Home")]
+        ).makeCKRecord()
+
+        let actor = CloudSyncLocalStoreActor(modelContainer: container)
+        let summary = try await actor.applyFetchedRecords([record])
+
+        #expect(summary.inserted == 1)
+        let verificationContext = ModelContext(container)
+        let household = try #require(try fetchHousehold(id: householdId, context: verificationContext))
+        #expect(household.name == "Actor Home")
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV64.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
@@ -520,14 +974,28 @@ struct CloudSyncMetadataServiceTests {
         localRecordId: UUID,
         householdId: UUID,
         isDeleted: Bool = false,
+        lastModifiedAt: Date = Date(timeIntervalSinceReferenceDate: 500),
         fields: [String: CloudSyncRecordFieldValue] = [:]
     ) -> CloudSyncRecordPayload {
         let localRecordId = normalized(localRecordId)
         let householdId = normalized(householdId)
+        let normalizedEntityName = CloudSyncRecordState.normalizedEntityName(entityName)
+        var fields = fields
+        fields[CloudSyncRecordFieldKey.recordKey] = .string(
+            CloudSyncRecordState.recordKey(entityName: normalizedEntityName, localRecordId: localRecordId)
+        )
+        fields[CloudSyncRecordFieldKey.entityName] = .string(normalizedEntityName)
+        fields[CloudSyncRecordFieldKey.localRecordId] = .string(localRecordId)
+        fields[CloudSyncRecordFieldKey.householdId] = .string(householdId)
+        fields[CloudSyncRecordFieldKey.isDeleted] = .bool(isDeleted)
+        fields[CloudSyncRecordFieldKey.lastModifiedAt] = .date(lastModifiedAt)
+        fields[CloudSyncRecordFieldKey.conflictPolicy] = .string(
+            CloudSyncMergePolicy.defaultConflictPolicy(for: normalizedEntityName).rawValue
+        )
         return CloudSyncRecordPayload(
-            entityName: entityName,
+            entityName: normalizedEntityName,
             recordType: recordType,
-            recordName: CloudSyncZoneNaming.recordName(entityName: entityName, localRecordId: localRecordId),
+            recordName: CloudSyncZoneNaming.recordName(entityName: normalizedEntityName, localRecordId: localRecordId),
             zoneName: CloudSyncZoneNaming.zoneName(forHouseholdId: householdId),
             localRecordId: localRecordId,
             householdId: householdId,
@@ -546,5 +1014,29 @@ struct CloudSyncMetadataServiceTests {
 
     private func normalized(_ id: UUID) -> String {
         CloudSyncRecordState.normalizedRecordId(id)
+    }
+
+    private func fetchHousehold(id: UUID, context: ModelContext) throws -> Household? {
+        var descriptor = FetchDescriptor<Household>(
+            predicate: #Predicate<Household> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchPet(id: UUID, context: ModelContext) throws -> Pet? {
+        var descriptor = FetchDescriptor<Pet>(
+            predicate: #Predicate<Pet> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+}
+
+private struct StaticCloudSyncUploadPayloadProvider: CloudSyncEngineUploadPayloadProviding {
+    let payloads: [CloudSyncRecordPayload]
+
+    func uploadPayloads() async throws -> [CloudSyncRecordPayload] {
+        payloads
     }
 }
