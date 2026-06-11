@@ -1,0 +1,429 @@
+//
+//  CloudSyncRecordSerializer.swift
+//  Ohana
+//
+//  Narrow SwiftData-to-CloudKit record mapping for the future CKSyncEngine queue.
+//
+
+import CloudKit
+import Foundation
+
+enum CloudSyncRecordSerializationError: LocalizedError, Equatable {
+    case missingDescriptor(entityName: String)
+    case notUploadable(entityName: String)
+    case missingLocalRecordId(entityName: String)
+    case mismatchedState(entityName: String, expected: String, actual: String)
+    case unsupportedEntity(entityName: String)
+    case missingAssetFileURL(fieldName: String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .missingDescriptor(entityName):
+            "Cloud sync descriptor is missing for \(entityName)."
+        case let .notUploadable(entityName):
+            "\(entityName) is local-only or derived and cannot be uploaded to CloudKit."
+        case let .missingLocalRecordId(entityName):
+            "\(entityName) does not expose a stable UUID for CloudKit serialization."
+        case let .mismatchedState(entityName, expected, actual):
+            "\(entityName) sync state points at \(expected), but the local model is \(actual)."
+        case let .unsupportedEntity(entityName):
+            "\(entityName) does not have a CloudKit field mapper yet."
+        case let .missingAssetFileURL(fieldName):
+            "\(fieldName) contains binary asset data, but no asset file URL provider was supplied."
+        }
+    }
+}
+
+enum CloudSyncRecordFieldValue: Equatable {
+    case null
+    case string(String)
+    case int(Int)
+    case double(Double)
+    case bool(Bool)
+    case date(Date)
+    case assetData(Data)
+
+    var stringValue: String? {
+        guard case let .string(value) = self else { return nil }
+        return value
+    }
+
+    var intValue: Int? {
+        guard case let .int(value) = self else { return nil }
+        return value
+    }
+
+    var boolValue: Bool? {
+        guard case let .bool(value) = self else { return nil }
+        return value
+    }
+
+    var dateValue: Date? {
+        guard case let .date(value) = self else { return nil }
+        return value
+    }
+}
+
+struct CloudSyncRecordPayload: Equatable {
+    typealias AssetFileURLProvider = (_ fieldName: String, _ data: Data) throws -> URL
+
+    let entityName: String
+    let recordType: String
+    let recordName: String
+    let zoneName: String
+    let localRecordId: String
+    let householdId: String
+    let isDeleted: Bool
+    let fields: [String: CloudSyncRecordFieldValue]
+
+    func makeCKRecord(
+        ownerName: String = CKCurrentUserDefaultName,
+        assetFileURLProvider: AssetFileURLProvider? = nil
+    ) throws -> CKRecord {
+        let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: ownerName)
+        let recordID = CKRecord.ID(recordName: recordName, zoneID: zoneID)
+        let record = CKRecord(recordType: recordType, recordID: recordID)
+
+        for (fieldName, value) in fields {
+            switch value {
+            case .null:
+                record[fieldName] = nil
+            case let .string(string):
+                record[fieldName] = string as CKRecordValue
+            case let .int(int):
+                record[fieldName] = int as CKRecordValue
+            case let .double(double):
+                record[fieldName] = double as CKRecordValue
+            case let .bool(bool):
+                record[fieldName] = bool as CKRecordValue
+            case let .date(date):
+                record[fieldName] = date as CKRecordValue
+            case let .assetData(data):
+                guard let assetFileURLProvider else {
+                    throw CloudSyncRecordSerializationError.missingAssetFileURL(fieldName: fieldName)
+                }
+                record[fieldName] = try CKAsset(fileURL: assetFileURLProvider(fieldName, data))
+            }
+        }
+
+        return record
+    }
+}
+
+enum CloudSyncRecordFieldKey {
+    static let recordKey = "sync_recordKey"
+    static let entityName = "sync_entityName"
+    static let localRecordId = "sync_localRecordId"
+    static let householdId = "sync_householdId"
+    static let isDeleted = "sync_isDeleted"
+    static let deletedAt = "sync_deletedAt"
+    static let deletedByHumanId = "sync_deletedByHumanId"
+    static let lastModifiedAt = "sync_lastModifiedAt"
+    static let conflictPolicy = "sync_conflictPolicy"
+}
+
+enum CloudSyncZoneNaming {
+    static let unassignedPrivateZoneName = "ohana-private-unassigned"
+
+    static func zoneName(forHouseholdId householdId: String) -> String {
+        let normalized = CloudSyncRecordState.normalizedRecordId(householdId)
+        guard !normalized.isEmpty else { return unassignedPrivateZoneName }
+        return "household-\(normalized)"
+    }
+
+    static func recordName(entityName: String, localRecordId: String) -> String {
+        "\(CloudSyncRecordState.normalizedEntityName(entityName))_\(CloudSyncRecordState.normalizedRecordId(localRecordId))"
+    }
+}
+
+enum CloudSyncRecordSerializer {
+    static func payload(
+        for model: Any,
+        state: CloudSyncRecordState
+    ) throws -> CloudSyncRecordPayload {
+        let descriptor = try uploadableDescriptor(for: state.entityName)
+        let modelRecordId = try localRecordId(for: model, entityName: descriptor.entityName)
+        let expectedRecordId = CloudSyncRecordState.normalizedRecordId(state.localRecordId)
+        guard modelRecordId == expectedRecordId else {
+            throw CloudSyncRecordSerializationError.mismatchedState(
+                entityName: descriptor.entityName,
+                expected: expectedRecordId,
+                actual: modelRecordId
+            )
+        }
+
+        let rawFields = try localFields(for: model, entityName: descriptor.entityName)
+        return payload(
+            descriptor: descriptor,
+            state: state,
+            rawFields: rawFields,
+            isDeleted: state.isDeleted
+        )
+    }
+
+    static func tombstonePayload(for state: CloudSyncRecordState) throws -> CloudSyncRecordPayload {
+        let descriptor = try uploadableDescriptor(for: state.entityName)
+        return payload(
+            descriptor: descriptor,
+            state: state,
+            rawFields: [:],
+            isDeleted: true
+        )
+    }
+
+    private static func uploadableDescriptor(for entityName: String) throws -> CloudSyncEntityDescriptor {
+        let normalizedEntityName = CloudSyncRecordState.normalizedEntityName(entityName)
+        guard let descriptor = CloudSyncEntityRegistry.descriptor(for: normalizedEntityName) else {
+            throw CloudSyncRecordSerializationError.missingDescriptor(entityName: normalizedEntityName)
+        }
+        guard descriptor.uploadsToCloudKit else {
+            throw CloudSyncRecordSerializationError.notUploadable(entityName: normalizedEntityName)
+        }
+        return descriptor
+    }
+
+    private static func payload(
+        descriptor: CloudSyncEntityDescriptor,
+        state: CloudSyncRecordState,
+        rawFields: [String: CloudSyncRecordFieldValue],
+        isDeleted: Bool
+    ) -> CloudSyncRecordPayload {
+        let recordName = state.ckRecordName.isEmpty
+            ? CloudSyncZoneNaming.recordName(entityName: descriptor.entityName, localRecordId: state.localRecordId)
+            : state.ckRecordName
+        let zoneName = state.ckZoneName.isEmpty
+            ? CloudSyncZoneNaming.zoneName(forHouseholdId: state.householdId)
+            : state.ckZoneName
+        var fields = rawFields.filter { descriptor.shouldUploadField($0.key) }
+        fields.merge(metadataFields(for: state, isDeleted: isDeleted)) { _, metadata in metadata }
+
+        return CloudSyncRecordPayload(
+            entityName: descriptor.entityName,
+            recordType: descriptor.recordType,
+            recordName: recordName,
+            zoneName: zoneName,
+            localRecordId: CloudSyncRecordState.normalizedRecordId(state.localRecordId),
+            householdId: CloudSyncRecordState.normalizedRecordId(state.householdId),
+            isDeleted: isDeleted,
+            fields: fields
+        )
+    }
+
+    private static func metadataFields(
+        for state: CloudSyncRecordState,
+        isDeleted: Bool
+    ) -> [String: CloudSyncRecordFieldValue] {
+        var fields: [String: CloudSyncRecordFieldValue] = [
+            CloudSyncRecordFieldKey.recordKey: .string(state.recordKey),
+            CloudSyncRecordFieldKey.entityName: .string(state.entityName),
+            CloudSyncRecordFieldKey.localRecordId: .string(CloudSyncRecordState.normalizedRecordId(state.localRecordId)),
+            CloudSyncRecordFieldKey.householdId: .string(CloudSyncRecordState.normalizedRecordId(state.householdId)),
+            CloudSyncRecordFieldKey.isDeleted: .bool(isDeleted),
+            CloudSyncRecordFieldKey.lastModifiedAt: .date(state.lastModifiedAt),
+            CloudSyncRecordFieldKey.conflictPolicy: .string(state.conflictPolicy.rawValue)
+        ]
+
+        if let deletedAt = state.deletedAt, isDeleted {
+            fields[CloudSyncRecordFieldKey.deletedAt] = .date(deletedAt)
+        }
+        if !state.deletedByHumanId.isEmpty, isDeleted {
+            fields[CloudSyncRecordFieldKey.deletedByHumanId] = .string(state.deletedByHumanId)
+        }
+
+        return fields
+    }
+
+    private static func localRecordId(for model: Any, entityName: String) throws -> String {
+        switch model {
+        case let household as Household:
+            CloudSyncRecordState.normalizedRecordId(household.id)
+        case let pet as Pet:
+            CloudSyncRecordState.normalizedRecordId(pet.id)
+        case let human as Human:
+            CloudSyncRecordState.normalizedRecordId(human.id)
+        case let log as PetCareLog:
+            CloudSyncRecordState.normalizedRecordId(log.id)
+        case let entry as CoconutLedgerEntry:
+            CloudSyncRecordState.normalizedRecordId(entry.id)
+        default:
+            throw CloudSyncRecordSerializationError.missingLocalRecordId(entityName: entityName)
+        }
+    }
+
+    private static func localFields(
+        for model: Any,
+        entityName: String
+    ) throws -> [String: CloudSyncRecordFieldValue] {
+        switch model {
+        case let household as Household:
+            householdFields(household)
+        case let pet as Pet:
+            petFields(pet)
+        case let human as Human:
+            humanFields(human)
+        case let log as PetCareLog:
+            petCareLogFields(log)
+        case let entry as CoconutLedgerEntry:
+            coconutLedgerEntryFields(entry)
+        default:
+            throw CloudSyncRecordSerializationError.unsupportedEntity(entityName: entityName)
+        }
+    }
+
+    private static func householdFields(_ household: Household) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(household.id)),
+            "name": .string(household.name),
+            "createdAt": .date(household.createdAt),
+            "ckShareRecordName": .string(household.ckShareRecordName),
+            "totalProsperity": .int(household.totalProsperity)
+        ]
+    }
+
+    private static func petFields(_ pet: Pet) -> [String: CloudSyncRecordFieldValue] {
+        var fields: [String: CloudSyncRecordFieldValue] = [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(pet.id)),
+            "name": .string(pet.name),
+            "species": .string(pet.species),
+            "breed": .string(pet.breed),
+            "birthday": optionalDate(pet.birthday),
+            "gender": .string(pet.gender),
+            "isNeutered": .bool(pet.isNeutered),
+            "avatarEmoji": .string(pet.avatarEmoji),
+            "microchipID": .string(pet.microchipID),
+            "vetContact": .string(pet.vetContact),
+            "vetClinicName": .string(pet.vetClinicName),
+            "vetDoctorName": .string(pet.vetDoctorName),
+            "vetAddress": .string(pet.vetAddress),
+            "allergies": .string(pet.allergies),
+            "passportNumber": .string(pet.passportNumber),
+            "passportExpiryDate": optionalDate(pet.passportExpiryDate),
+            "formerName": .string(pet.formerName),
+            "lineageInfo": .string(pet.lineageInfo),
+            "themeColorHex": .string(pet.themeColorHex),
+            "homeDate": optionalDate(pet.homeDate),
+            "birthCountry": .string(pet.birthCountry),
+            "birthCity": .string(pet.birthCity),
+            "foodBrand": .string(pet.foodBrand),
+            "restockDate": optionalDate(pet.restockDate),
+            "restockWeight": .double(pet.restockWeight),
+            "dailyPortionGrams": .double(pet.dailyPortionGrams),
+            "mainFoodKindRaw": .string(pet.mainFoodKindRaw),
+            "foodPrice": .double(pet.foodPrice),
+            "isShared": .bool(pet.isShared),
+            "ckRecordName": .string(pet.ckRecordName),
+            "createdAt": .date(pet.createdAt),
+            "notes": .string(pet.notes),
+            "coatColor": .string(pet.coatColor),
+            "eyeColor": .string(pet.eyeColor),
+            "currentStreak": .int(pet.currentStreak),
+            "lastCheckInDate": optionalDate(pet.lastCheckInDate),
+            "foodTrackingModeRaw": .string(pet.foodTrackingModeRaw),
+            "casualOpenDate": optionalDate(pet.casualOpenDate),
+            "casualDurationDays": .int(pet.casualDurationDays),
+            "foodReminderEnabled": .bool(pet.foodReminderEnabled),
+            "foodReminderAdvanceDays": .int(pet.foodReminderAdvanceDays),
+            "coconutBalance": .int(pet.coconutBalance),
+            "passedAwayDate": optionalDate(pet.passedAwayDate),
+            "cardStyleRaw": .string(pet.cardStyleRaw),
+            "cardPopoutSourceRaw": optionalString(pet.cardPopoutSourceRaw),
+            "weeklyWalkGoalKm": .double(pet.weeklyWalkGoalKm),
+            "personalityTagsRaw": .string(pet.personalityTagsRaw)
+        ]
+        if let avatarImageData = pet.avatarImageData {
+            fields["avatarImageData"] = .assetData(avatarImageData)
+        }
+        if let cardPopoutImageData = pet.cardPopoutImageData {
+            fields["cardPopoutImageData"] = .assetData(cardPopoutImageData)
+        }
+        return fields
+    }
+
+    private static func humanFields(_ human: Human) -> [String: CloudSyncRecordFieldValue] {
+        var fields: [String: CloudSyncRecordFieldValue] = [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(human.id)),
+            "name": .string(human.name),
+            "birthday": optionalDate(human.birthday),
+            "bloodType": .string(human.bloodType),
+            "avatarEmoji": .string(human.avatarEmoji),
+            "role": .string(human.role),
+            "appleUserIdentifier": .string(human.appleUserIdentifier),
+            "notes": .string(human.notes),
+            "createdAt": .date(human.createdAt),
+            "nationality": .string(human.nationality),
+            "city": .string(human.city),
+            "coconutBalance": .int(human.coconutBalance),
+            "shouldShowOnHome": .bool(human.shouldShowOnHome),
+            "themeColorHex": .string(human.themeColorHex),
+            "genderIdentityRaw": optionalString(human.genderIdentityRaw),
+            "privateFieldsRaw": .string(human.privateFieldsRaw),
+            "heightCm": .double(human.heightCm),
+            "mbti": .string(human.mbti),
+            "pinHash": .string(human.pinHash),
+            "pinSalt": .string(human.pinSalt),
+            "pinFailedAttempts": .int(human.pinFailedAttempts),
+            "pinLockedUntil": optionalDate(human.pinLockedUntil),
+            "passedAwayDate": optionalDate(human.passedAwayDate)
+        ]
+        if let avatarImageData = human.avatarImageData {
+            fields["avatarImageData"] = .assetData(avatarImageData)
+        }
+        return fields
+    }
+
+    private static func petCareLogFields(_ log: PetCareLog) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
+            "date": .date(log.date),
+            "type": .string(log.type),
+            "amountGrams": .double(log.amountGrams),
+            "amountMl": .double(log.amountMl),
+            "note": .string(log.note),
+            "foodKindRaw": .string(log.foodKindRaw),
+            "treatKindRaw": .string(log.treatKindRaw),
+            "autoFeedDedupKey": .string(log.autoFeedDedupKey),
+            "sharedSessionId": .string(log.sharedSessionId),
+            "executorId": optionalString(log.executorId),
+            "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+    }
+
+    private static func coconutLedgerEntryFields(_ entry: CoconutLedgerEntry) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(entry.id)),
+            "transactionKey": .string(entry.transactionKey),
+            "accountKey": .string(entry.accountKey),
+            "ownerKindRaw": .string(entry.ownerKindRaw),
+            "ownerId": .string(entry.ownerId),
+            "ownerName": .string(entry.ownerName),
+            "delta": .int(entry.delta),
+            "balanceBefore": .int(entry.balanceBefore),
+            "balanceAfter": .int(entry.balanceAfter),
+            "affectsBalance": .bool(entry.affectsBalance),
+            "entryKindRaw": .string(entry.entryKindRaw),
+            "sourceRaw": .string(entry.sourceRaw),
+            "title": .string(entry.title),
+            "emoji": .string(entry.emoji),
+            "actorId": optionalString(entry.actorId),
+            "actorName": optionalString(entry.actorName),
+            "subjectKindRaw": .string(entry.subjectKindRaw),
+            "subjectId": optionalString(entry.subjectId),
+            "sourceModelName": .string(entry.sourceModelName),
+            "sourceModelId": .string(entry.sourceModelId),
+            "careLedgerEventId": optionalString(entry.careLedgerEventId),
+            "metadataJSON": .string(entry.metadataJSON),
+            "occurredAt": .date(entry.occurredAt),
+            "createdAt": .date(entry.createdAt)
+        ]
+    }
+
+    private static func optionalString(_ value: String?) -> CloudSyncRecordFieldValue {
+        guard let value else { return .null }
+        return .string(value)
+    }
+
+    private static func optionalDate(_ value: Date?) -> CloudSyncRecordFieldValue {
+        guard let value else { return .null }
+        return .date(value)
+    }
+}

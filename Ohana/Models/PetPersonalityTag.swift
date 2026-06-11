@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - 用户自定义标签（存 UserDefaults，id 前缀 u.）
 
-struct CustomPersonalityTagRecord: Codable, Identifiable, Equatable {
+nonisolated struct CustomPersonalityTagRecord: Codable, Identifiable, Equatable {
     let id: String
     var titleZh: String
     var titleEn: String
@@ -18,7 +18,7 @@ struct CustomPersonalityTagRecord: Codable, Identifiable, Equatable {
     func title(l: L10n) -> String { l.tr(zh: titleZh, en: titleEn, de: titleEn) }
 }
 
-enum CustomPersonalityTagStore {
+nonisolated enum CustomPersonalityTagStore {
     static func load() -> [CustomPersonalityTagRecord] {
         CustomPersonalityTagPreferenceStore.load()
     }
@@ -34,7 +34,7 @@ enum CustomPersonalityTagStore {
 
 // MARK: - Tag 目录（稳定 id 存入 Pet.personalityTagsRaw）
 
-struct PetPersonalityTag: Identifiable, Hashable {
+nonisolated struct PetPersonalityTag: Identifiable, Hashable {
     let id: String
     /// 日历 / 添加页统一用 SF Symbol 纯色剪影
     let sfSymbol: String
@@ -120,7 +120,7 @@ struct PetPersonalityTag: Identifiable, Hashable {
 
 // MARK: - 首页副标题问候（结合时段 + 标签）
 
-enum PetTagGreeting {
+nonisolated enum PetTagGreeting {
     /// 稳定轮换：同一天同一时段内文案不变，避免闪烁
     static func homeSubtitleHint(pet: Pet, hour: Int, l: L10n) -> String {
         let ids = pet.personalityTagIdList

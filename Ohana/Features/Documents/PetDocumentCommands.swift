@@ -175,10 +175,13 @@ enum PetDocumentCommandService {
         } else if !input.attachments.isEmpty {
             applyAttachments(input.attachments, to: document, context: context)
         } else if let data = input.attachmentData {
-            document.attachmentData = data
-            if document.attachmentFilename.isEmpty {
-                document.attachmentFilename = "image.jpg"
-            }
+            let filename = document.attachmentFilename.isEmpty ? "image.jpg" : document.attachmentFilename
+            document.attachmentData = AttachmentPrivacySanitizer.sanitizedData(
+                data,
+                filename: filename,
+                isImage: AttachmentPrivacySanitizer.isImageFilename(filename)
+            )
+            document.attachmentFilename = filename
         }
         context.safeSave()
         return PetDocumentCommandResult(
@@ -217,11 +220,13 @@ enum PetDocumentCommandService {
         context: ModelContext
     ) {
         guard let first = attachments.first else { return }
-        document.attachmentData = first.data
+        let sanitizedAttachments = attachments.map(sanitizedAttachment)
+        let sanitizedFirst = sanitizedAttachments[0]
+        document.attachmentData = sanitizedFirst.data
         document.attachmentFilename = first.filename.isEmpty
             ? (first.isImage ? "image.jpg" : "attachment")
             : first.filename
-        document.attachments = attachments.map { input in
+        document.attachments = sanitizedAttachments.map { input in
             PetDocumentAttachment(
                 data: input.data,
                 filename: input.filename.isEmpty ? (input.isImage ? "image.jpg" : "attachment") : input.filename,
@@ -231,6 +236,20 @@ enum PetDocumentCommandService {
         for attachment in document.attachments {
             context.insert(attachment)
         }
+    }
+
+    private static func sanitizedAttachment(
+        _ input: PetDocumentAttachmentCommandInput
+    ) -> PetDocumentAttachmentCommandInput {
+        PetDocumentAttachmentCommandInput(
+            data: AttachmentPrivacySanitizer.sanitizedData(
+                input.data,
+                filename: input.filename,
+                isImage: input.isImage
+            ),
+            filename: input.filename,
+            isImage: input.isImage
+        )
     }
 
     @MainActor

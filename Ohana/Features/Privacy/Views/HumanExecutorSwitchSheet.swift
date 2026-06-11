@@ -16,12 +16,15 @@ struct HumanExecutorSwitchSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanId = ""
+    @AppStorage(MemberGateBiometricAuthStore.enabledKey) private var enableMemberGateBiometrics = MemberGateBiometricAuthStore.defaultEnabled
 
     @State private var pendingHuman: Human? = nil
     @State private var pin = ""
     @State private var statusMessage = ""
     @State private var isError = false
     @State private var now = Date()
+    @State private var biometricAvailability = MemberGateBiometricAuthenticator.availability()
+    @State private var isAuthenticatingBiometrics = false
 
     private var activeHuman: Human? {
         humans.first { $0.id.uuidString == activeHumanId && !$0.hasPassedAway }
@@ -48,9 +51,12 @@ struct HumanExecutorSwitchSheet: View {
             .padding(.top, 18)
             .padding(.bottom, 20)
         }
-        .presentationDetents([.height(pendingHuman == nil ? 330 : 430)])
+        .presentationDetents([.height(pendingHuman == nil ? 330 : (canUseBiometricMemberGate ? 500 : 430))])
         .presentationDragIndicator(.hidden)
         .animation(GoMotion.feedback, value: pendingHuman?.id)
+        .onAppear {
+            biometricAvailability = MemberGateBiometricAuthenticator.availability()
+        }
     }
 
     private var header: some View {
@@ -169,6 +175,24 @@ struct HumanExecutorSwitchSheet: View {
             HumanPasscodePad(pin: $pin, accent: Color(hex: human.themeColor)) {
                 verifyPendingPasscode()
             }
+
+            if canUseBiometricMemberGate {
+                Button {
+                    authenticatePendingHumanWithBiometrics(human)
+                } label: {
+                    Label(
+                        isAuthenticatingBiometrics ? "正在验证 \(biometricAvailability.label)" : "使用 \(biometricAvailability.label)",
+                        systemImage: biometricAvailability.symbolName
+                    )
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.arkInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .disabled(isAuthenticatingBiometrics)
+            }
         }
         .padding(14)
         .background(Color.primary.opacity(0.075), in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
@@ -233,6 +257,30 @@ struct HumanExecutorSwitchSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         onSwitched?()
         dismiss()
+    }
+
+    private var canUseBiometricMemberGate: Bool {
+        enableMemberGateBiometrics && biometricAvailability.isAvailable
+    }
+
+    private func authenticatePendingHumanWithBiometrics(_ human: Human) {
+        guard !isAuthenticatingBiometrics else { return }
+        isAuthenticatingBiometrics = true
+        isError = false
+        statusMessage = "正在验证 \(biometricAvailability.label)"
+        Task { @MainActor in
+            let success = await MemberGateBiometricAuthenticator.authenticate(
+                reason: "验证后切换到 \(displayName(human))"
+            )
+            isAuthenticatingBiometrics = false
+            if success {
+                switchTo(human)
+            } else {
+                isError = true
+                statusMessage = "\(biometricAvailability.label) 未通过，可继续输入密码"
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
+        }
     }
 
     @ViewBuilder

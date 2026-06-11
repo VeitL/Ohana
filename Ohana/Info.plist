@@ -46,6 +46,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>用于拍摄成员或宠物头像，以及记录时刻中的照片。</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>用于在切换成员资料时快速通过本人验证，替代输入 PIN。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>用于从相册选择成员或宠物头像，以及记录附件图片。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -62,6 +64,7 @@
 	<array>
 		<string>fetch</string>
 		<string>location</string>
+		<string>remote-notification</string>
 	</array>
 </dict>
 </plist>

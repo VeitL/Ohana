@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum OasisUpgradeRewardCatalog {
+nonisolated enum OasisUpgradeRewardCatalog {
     static let firstCritterId = "sprout_mochi"
     static let legendaryCritterId = "aurora_luma"
     static let mossBunId = "moss_bun"

@@ -1,6 +1,6 @@
 import Foundation
 
-struct WaterCareSettingsSnapshot {
+nonisolated struct WaterCareSettingsSnapshot {
     let waterIntervalDays: Int
     let filterCleanIntervalDays: Int
     let filterReplaceIntervalDays: Int
@@ -13,7 +13,7 @@ struct WaterCareSettingsSnapshot {
 }
 
 enum WaterCareSettingsStore {
-    static func snapshot(
+    nonisolated static func snapshot(
         petKey: String,
         now: Date = Date(),
         calendar: Calendar = .current,
@@ -39,15 +39,15 @@ enum WaterCareSettingsStore {
         )
     }
 
-    static func waterIntervalDays(petKey: String, defaults: UserDefaults = .standard) -> Int {
+    nonisolated static func waterIntervalDays(petKey: String, defaults: UserDefaults = .standard) -> Int {
         positiveInteger(defaults.integer(forKey: waterIntervalKey(petKey)), fallback: 3)
     }
 
-    static func filterCleanIntervalDays(petKey: String, defaults: UserDefaults = .standard) -> Int {
+    nonisolated static func filterCleanIntervalDays(petKey: String, defaults: UserDefaults = .standard) -> Int {
         positiveInteger(defaults.integer(forKey: filterCleanIntervalKey(petKey)), fallback: 14)
     }
 
-    static func filterReplaceIntervalDays(petKey: String, defaults: UserDefaults = .standard) -> Int {
+    nonisolated static func filterReplaceIntervalDays(petKey: String, defaults: UserDefaults = .standard) -> Int {
         positiveInteger(defaults.integer(forKey: filterReplaceIntervalKey(petKey)), fallback: 90)
     }
 
@@ -87,18 +87,18 @@ enum WaterCareSettingsStore {
         defaults.set(reminderOn, forKey: filterReminderKey(petKey))
     }
 
-    private static func positiveInteger(_ value: Int, fallback: Int) -> Int {
+    private nonisolated static func positiveInteger(_ value: Int, fallback: Int) -> Int {
         max(value > 0 ? value : fallback, 1)
     }
 
-    private static func waterIntervalKey(_ petKey: String) -> String { "waterInterval_\(petKey)" }
-    private static func filterCleanIntervalKey(_ petKey: String) -> String { "filterCleanInterval_\(petKey)" }
-    private static func filterReplaceIntervalKey(_ petKey: String) -> String { "filterReplaceInterval_\(petKey)" }
-    private static func waterReminderKey(_ petKey: String) -> String { "waterReminder_\(petKey)" }
-    private static func filterReminderKey(_ petKey: String) -> String { "filterReminder_\(petKey)" }
-    private static func waterAmountEnabledKey(_ petKey: String) -> String { "waterAmountEnabled_\(petKey)" }
-    private static func waterAmountKey(_ petKey: String) -> String { "waterAmountMl_\(petKey)" }
-    private static func waterChangeCycleAnchorKey(_ petKey: String) -> String { "waterChangeCycleAnchor_\(petKey)" }
+    private nonisolated static func waterIntervalKey(_ petKey: String) -> String { "waterInterval_\(petKey)" }
+    private nonisolated static func filterCleanIntervalKey(_ petKey: String) -> String { "filterCleanInterval_\(petKey)" }
+    private nonisolated static func filterReplaceIntervalKey(_ petKey: String) -> String { "filterReplaceInterval_\(petKey)" }
+    private nonisolated static func waterReminderKey(_ petKey: String) -> String { "waterReminder_\(petKey)" }
+    private nonisolated static func filterReminderKey(_ petKey: String) -> String { "filterReminder_\(petKey)" }
+    private nonisolated static func waterAmountEnabledKey(_ petKey: String) -> String { "waterAmountEnabled_\(petKey)" }
+    private nonisolated static func waterAmountKey(_ petKey: String) -> String { "waterAmountMl_\(petKey)" }
+    private nonisolated static func waterChangeCycleAnchorKey(_ petKey: String) -> String { "waterChangeCycleAnchor_\(petKey)" }
 }
 
 struct LitterCareSettingsSnapshot {

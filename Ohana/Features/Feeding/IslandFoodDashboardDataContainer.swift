@@ -28,6 +28,7 @@ struct IslandFoodDashboard: View {
         let stockReminderEntityType = FeedingPlanWriter.stockReminderEntityType
         let autoFeederEntityType = FeedRuleMetadata.autoFeederEntityType
         let feedingCareType = CareType.feeding.rawValue
+        let careLogWindowStart = Calendar.current.date(byAdding: .day, value: -730, to: Date()) ?? .distantPast
 
         _pets = Query(
             filter: #Predicate<Pet> { pet in
@@ -45,7 +46,7 @@ struct IslandFoodDashboard: View {
         )
         _allCareLogs = Query(
             filter: #Predicate<PetCareLog> { log in
-                log.type == feedingCareType
+                log.type == feedingCareType && log.date >= careLogWindowStart
             },
             sort: \.date,
             order: .reverse

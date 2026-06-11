@@ -28,6 +28,8 @@ struct SettingsView: View {
     @AppStorage("appThemePreference") var appThemePreference: String = "dark"
     @AppStorage("appBackgroundStyle") var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage(AppPerformanceMode.powerSavingKey) var powerSavingMode = false
+    @AppStorage(AppPrivacySnapshotProtectionStore.hideSnapshotKey) var hideAppSwitcherSnapshot = AppPrivacySnapshotProtectionStore.defaultHideSnapshot
+    @AppStorage(MemberGateBiometricAuthStore.enabledKey) var enableMemberGateBiometrics = MemberGateBiometricAuthStore.defaultEnabled
     @AppStorage(MedicationNotificationPrivacyStore.hidePetDetailsKey) var hidePetMedicationNotificationDetails = false
     @AppStorage("ohana_has_onboarded") var hasOnboarded = false
     @AppStorage("currentActiveHumanId") var currentActiveHumanId = ""
@@ -53,6 +55,7 @@ struct SettingsView: View {
     @State var quickSwitchHuman: Human? = nil
     @State var areDataSectionsMounted = false
     @State var dataSectionsMountTask: Task<Void, Never>?
+    @State var biometricGateAvailability = MemberGateBiometricAuthenticator.availability()
 
     init(
         homePets: [Pet]? = nil,
@@ -263,6 +266,8 @@ struct SettingsView: View {
                                 showingOnboardingReplay = true
                             }
                         }
+
+                        privacySecuritySection
 
                         // 通知
                         settingsSection(title: l.notifications) {
@@ -589,6 +594,7 @@ struct SettingsView: View {
         .preferredColorScheme(preferredScheme)
         .onAppear {
             syncStoredRegionalDefaultsIfNeeded()
+            refreshBiometricGateAvailability()
             scheduleDataSectionsMount()
         }
         .onDisappear {
@@ -636,7 +642,7 @@ struct SettingsView: View {
                 switchActiveHuman(to: human, emitSuccessFeedback: false)
                 quickSwitchHuman = nil
             }
-            .ohanaCompactSheetPresentation(detents: [.height(420)])
+            .ohanaCompactSheetPresentation(detents: [.height(500)])
         }
     }
 }

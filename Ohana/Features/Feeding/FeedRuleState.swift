@@ -6,7 +6,7 @@
 import Foundation
 import SwiftData
 
-struct FeedRuleState {
+nonisolated struct FeedRuleState {
     let pet: Pet
     let allEvents: [Event]
     let now: Date
@@ -72,6 +72,7 @@ struct FeedRuleState {
         return catchUpManualReminders.first ?? pendingTodayManualReminders.first
     }
 
+    @MainActor
     var autoDailyTotalGrams: Double {
         FeedStockCalculator.autoRuleDailyTotalGrams(for: pet, events: allEvents)
     }

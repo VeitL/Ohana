@@ -67,11 +67,11 @@ struct HumanMedicationDoseLogUpdate {
 }
 
 enum HumanMedicationLogStore {
-    static func sameScheduledMinute(_ lhs: Date, _ rhs: Date, calendar: Calendar = .current) -> Bool {
+    nonisolated static func sameScheduledMinute(_ lhs: Date, _ rhs: Date, calendar: Calendar = .current) -> Bool {
         calendar.isDate(lhs, equalTo: rhs, toGranularity: .minute)
     }
 
-    static func matchingLog(
+    nonisolated static func matchingLog(
         in logs: [HumanMedicationLog],
         humanId: String,
         medicationId: String,

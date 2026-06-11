@@ -15,6 +15,7 @@ struct ManualFeedCommandResult {
     let affectsStock: Bool
     let stockReminders: [Reminder]
     let didRecord: Bool
+    let coconutDelta: Int
 }
 
 enum ManualFeedCommand {
@@ -42,7 +43,8 @@ enum ManualFeedCommand {
         allEvents: [Event],
         context: ModelContext,
         executorId: String?,
-        careEvents: CareEventRecording? = nil
+        careEvents: CareEventRecording? = nil,
+        date: Date = Date()
     ) -> ManualFeedCommandResult {
         let careEvents = careEvents ?? CareEventService()
         pet.mainFoodKind = foodKind
@@ -52,8 +54,8 @@ enum ManualFeedCommand {
 
         let quality = QuestManager.QualityBonus.compose(precise: true, hasNote: false, hasPhoto: false)
         let normalizedTargets = targets.isEmpty ? [pet] : targets
-        if normalizedTargets.count > 1 {
-            _ = careEvents.recordSharedManualFeed(
+        let reward = if normalizedTargets.count > 1 {
+            careEvents.recordSharedManualFeed(
                 sourcePet: pet,
                 targets: normalizedTargets,
                 totalGrams: grams,
@@ -61,31 +63,34 @@ enum ManualFeedCommand {
                 context: context,
                 executorId: executorId,
                 quality: quality,
-                date: Date()
+                date: date
             )
         } else {
-            _ = careEvents.recordManualFeed(
+            careEvents.recordManualFeed(
                 pet: pet,
                 amountGrams: grams,
                 context: context,
                 executorId: executorId,
                 quality: quality,
-                date: Date(),
+                date: date,
                 foodKind: foodKind
             )
         }
+        let stockReminders = FeedingPlanWriter.rebuildFoodStockReminders(
+            pet: pet,
+            allEvents: allEvents,
+            context: context,
+            now: date
+        )
 
         return ManualFeedCommandResult(
             foodKind: foodKind,
             grams: grams,
             targetCount: normalizedTargets.count,
-            affectsStock: FeedStockCalculator.activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords) != nil,
-            stockReminders: FeedingPlanWriter.rebuildFoodStockReminders(
-                pet: pet,
-                allEvents: allEvents,
-                context: context
-            ),
-            didRecord: true
+            affectsStock: FeedStockCalculator.activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: date) != nil,
+            stockReminders: stockReminders,
+            didRecord: true,
+            coconutDelta: reward.humanGot + reward.petGot
         )
     }
 
@@ -97,7 +102,8 @@ enum ManualFeedCommand {
         allEvents: [Event],
         context: ModelContext,
         executorId: String?,
-        careEvents: CareEventRecording? = nil
+        careEvents: CareEventRecording? = nil,
+        date: Date = Date()
     ) -> ManualFeedCommandResult {
         let careEvents = careEvents ?? CareEventService()
         let event = reminder.event
@@ -109,122 +115,22 @@ enum ManualFeedCommand {
             context: context,
             quality: .precise,
             executorId: executorId,
-            date: Date()
+            date: date
+        )
+        let stockReminders = FeedingPlanWriter.rebuildFoodStockReminders(
+            pet: pet,
+            allEvents: allEvents,
+            context: context,
+            now: date
         )
         return ManualFeedCommandResult(
             foodKind: foodKind,
             grams: grams,
             targetCount: 1,
-            affectsStock: FeedStockCalculator.activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords) != nil,
-            stockReminders: FeedingPlanWriter.rebuildFoodStockReminders(
-                pet: pet,
-                allEvents: allEvents,
-                context: context
-            ),
-            didRecord: reward != nil
-        )
-    }
-}
-
-struct OverviewQuickCareCommandResult: Equatable {
-    let petID: UUID
-    let action: String
-    let coconutDelta: Int
-}
-
-@MainActor
-struct OverviewQuickCareCommandExecutor {
-    private let context: ModelContext
-    private let careEvents: CareEventRecording
-    private let revisions: DomainRevisionPublishing
-
-    init(context: ModelContext) {
-        self.init(
-            context: context,
-            careEvents: CareEventService(),
-            revisions: SharedDomainRevisionPublisher()
-        )
-    }
-
-    init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
-        self.init(
-            context: context,
-            careEvents: CareEventService(),
-            revisions: SharedDomainRevisionPublisher(center: revisionCenter)
-        )
-    }
-
-    init(
-        context: ModelContext,
-        careEvents: CareEventRecording,
-        revisions: DomainRevisionPublishing
-    ) {
-        self.context = context
-        self.careEvents = careEvents
-        self.revisions = revisions
-    }
-
-    @discardableResult
-    func record(
-        pet: Pet,
-        actionType: String,
-        amount: Double,
-        saveAsDefault: Bool,
-        executorId: String?
-    ) -> OverviewQuickCareCommandResult {
-        if actionType == "water" {
-            let waterAmount = amount > 0 ? amount : 200
-            let result = QuickWaterCommandExecutor(
-                context: context,
-                activeHumanSelection: UserDefaultsActiveHumanSelection(),
-                careEvents: careEvents,
-                userNotifications: SharedUserNotificationManager(),
-                reminderScheduling: ReminderSchedulingManager()
-            ).recordWater(
-                pet: pet,
-                targets: [pet],
-                amountMl: waterAmount,
-                executorId: executorId
-            )
-            publish(petID: pet.id, action: "water", note: "overview.quick.water")
-            return OverviewQuickCareCommandResult(
-                petID: pet.id,
-                action: "water",
-                coconutDelta: result.coconutDelta
-            )
-        }
-
-        let grams = amount
-        let foodRecords = FeedCommandFetch.foodRecords(petID: pet.id, context: context, fallback: [])
-        let allEvents = FeedCommandFetch.latestEvents(context: context, fallback: [])
-        _ = ManualFeedCommand.recordManual(
-            pet: pet,
-            targets: [pet],
-            grams: grams,
-            foodKind: pet.mainFoodKind,
-            saveAsDefault: saveAsDefault,
-            foodRecords: foodRecords,
-            allEvents: allEvents,
-            context: context,
-            executorId: executorId,
-            careEvents: careEvents
-        )
-        publish(petID: pet.id, action: "feed", note: "overview.quick.feed")
-        return OverviewQuickCareCommandResult(
-            petID: pet.id,
-            action: "feed",
-            coconutDelta: 0
-        )
-    }
-
-    private func publish(petID: UUID, action: String, note: String) {
-        revisions.publish(
-            DomainMutationResult(
-                command: .quickCare(entityID: petID, action: action),
-                affectedEntityIDs: [petID],
-                wroteBusinessFact: true,
-                note: note
-            )
+            affectsStock: FeedStockCalculator.activeStockRecord(for: pet, foodKind: foodKind, foodRecords: foodRecords, now: date) != nil,
+            stockReminders: stockReminders,
+            didRecord: reward != nil,
+            coconutDelta: (reward?.humanGot ?? 0) + (reward?.petGot ?? 0)
         )
     }
 }
@@ -496,14 +402,19 @@ enum FeedStockExpenseLink {
 
     static func applyExpenseLink(to record: PetFoodRecord, expenseId: UUID) {
         record.expenseId = expenseId
-        record.notes = notesWithExpenseLink(record.notes, expenseId: expenseId)
+        record.notes = notesScrubbingLegacyExpenseLink(record.notes)
     }
 
-    static func notesWithExpenseLink(_ notes: String, expenseId _: UUID) -> String {
+    static func notesScrubbingLegacyExpenseLink(_ notes: String) -> String {
         notes
             .components(separatedBy: "\n")
             .filter { !$0.hasPrefix(expensePrefix) }
             .joined(separator: "\n")
+    }
+
+    @available(*, deprecated, message: "Use notesScrubbingLegacyExpenseLink(_:); expense id is stored in expenseId.")
+    static func notesWithExpenseLink(_ notes: String, expenseId _: UUID) -> String {
+        notesScrubbingLegacyExpenseLink(notes)
     }
 
     @MainActor

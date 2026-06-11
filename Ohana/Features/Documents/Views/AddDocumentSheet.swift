@@ -331,7 +331,15 @@ struct AddDocumentContentSheet: View {
                                         Task {
                                             for item in items {
                                                 if let data = try? await item.loadTransferable(type: Data.self) {
-                                                    let att = DocAttachment(data: data, filename: "", isImage: true)
+                                                    let att = DocAttachment(
+                                                        data: AttachmentPrivacySanitizer.sanitizedData(
+                                                            data,
+                                                            filename: "photo.jpg",
+                                                            isImage: true
+                                                        ),
+                                                        filename: "",
+                                                        isImage: true
+                                                    )
                                                     await MainActor.run { attachments.append(att) }
                                                 }
                                             }
@@ -412,7 +420,10 @@ struct AddDocumentContentSheet: View {
         // B4: 拍照 sheet — onDismiss 后处理 pending image，避免 sheet 嵌套冲突
         .fullScreenCover(isPresented: $showingCamera, onDismiss: {
             if let img = pendingCapturedImage {
-                let data = img.jpegData(compressionQuality: 0.85) ?? Data()
+                let data = AttachmentPrivacySanitizer.sanitizedImageData(
+                    from: img,
+                    compressionQuality: 0.85
+                ) ?? Data()
                 attachments.append(DocAttachment(data: data, filename: "photo_\(attachments.count + 1).jpg", isImage: true))
                 pendingCapturedImage = nil
             }
@@ -441,7 +452,16 @@ struct AddDocumentContentSheet: View {
             if case let .success(url) = result {
                 Task {
                     if let data = await AttachmentImageDecoder.readFileData(url) {
-                        let att = DocAttachment(data: data, filename: url.lastPathComponent, isImage: false)
+                        let isImage = AttachmentPrivacySanitizer.isImageFilename(url.lastPathComponent)
+                        let att = DocAttachment(
+                            data: AttachmentPrivacySanitizer.sanitizedData(
+                                data,
+                                filename: url.lastPathComponent,
+                                isImage: isImage
+                            ),
+                            filename: url.lastPathComponent,
+                            isImage: isImage
+                        )
                         await MainActor.run {
                             attachments.append(att)
                         }

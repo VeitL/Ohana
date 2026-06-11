@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct WaterCareCycleStatus {
+nonisolated struct WaterCareCycleStatus {
     let elapsedDays: Int
     let intervalDays: Int
 
@@ -34,7 +34,7 @@ struct WaterCareCycleStatus {
     }
 }
 
-enum WaterCareCycleStatusCalculator {
+nonisolated enum WaterCareCycleStatusCalculator {
     static func waterChangeStatus(
         for pet: Pet,
         now: Date = Date(),

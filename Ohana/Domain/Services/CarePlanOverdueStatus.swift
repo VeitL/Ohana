@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct CarePlanOverdueStatus: Equatable {
+nonisolated struct CarePlanOverdueStatus: Equatable {
     let title: String
     let actionType: String
     let scheduledAt: Date
@@ -26,7 +26,7 @@ struct CarePlanOverdueStatus: Equatable {
     }
 }
 
-enum CarePlanOverdueStatusCalculator {
+nonisolated enum CarePlanOverdueStatusCalculator {
     static func petWarning(
         for pet: Pet,
         events: [Event],
@@ -649,7 +649,7 @@ enum CarePlanOverdueStatusCalculator {
 }
 
 private extension FeedRuleMetadata {
-    static func isAutoFeederEvent(_ event: Event, petId: String) -> Bool {
+    nonisolated static func isAutoFeederEvent(_ event: Event, petId: String) -> Bool {
         event.relatedEntityType == autoFeederEntityType &&
             event.relatedEntityId == petId &&
             event.eventType == EventType.foodChange.rawValue

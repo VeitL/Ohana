@@ -9,13 +9,26 @@ in-app member-privacy/PIN rules in `docs/app-architecture-governance.md`.
 
 - **Privacy manifest:** `Ohana/PrivacyInfo.xcprivacy` must stay accurate. It
   currently declares `NSPrivacyAccessedAPICategoryUserDefaults` (`CA92.1`),
+  `NSPrivacyAccessedAPICategoryFileTimestamp` (`C617.1`),
   `NSPrivacyTracking=false`, and empty tracking domains / collected data types.
-  Re-audit it whenever a required-reason API (file timestamps, disk space, system
-  boot time, active keyboards) or any data collection/network call is added.
+  Re-audit it whenever another required-reason API (disk space, system boot time,
+  active keyboards, etc.) or any data collection/network call is added.
 - **App Store privacy "nutrition label":** Keep the App Store Connect privacy
-  questionnaire in sync with reality. Today Ohana is local-first and should
-  report data as not collected / not linked / not used for tracking. If that ever
-  changes (analytics, accounts, cloud sync), update the label in the same change.
+  questionnaire in sync with reality. For the current zero-upload build, answer
+  "No, we do not collect data from this app"; the App Store label should read
+  **Data Not Collected**. User-initiated exports, backups, or shared files remain
+  under the user's control and are not developer collection unless Ohana, a
+  backend, or a third-party partner can access the transmitted data beyond the
+  user's chosen share action. If that ever changes (analytics, accounts, cloud
+  sync, support uploads, third-party SDKs), update the label in the same change.
+- **Privacy policy URL:** App Store Connect requires a public privacy policy URL
+  for iOS. The published policy for the current build must state that Ohana is
+  local-first, does not track users, does not run analytics, does not create an
+  account, and does not transmit app data to the developer. It must also disclose
+  that user-initiated exports/backups may contain sensitive pet, family, health,
+  medication, document, photo, and location data; users choose where to store or
+  share those files; and deleting/resetting app data removes local records under
+  the app's control.
 - **Permission strings:** Camera / Photo / Location usage descriptions live only
   in `Ohana/Info.plist` + `en.lproj`/`de.lproj` `InfoPlist.strings` (zh/en/de).
   Do not reintroduce duplicate `INFOPLIST_KEY_*` permission strings in build
@@ -60,7 +73,10 @@ Even though data is local, the user has rights over it:
 Before shipping a change that touches data, permissions, or background work:
 
 - `PrivacyInfo.xcprivacy` still accurate.
-- App Store privacy label still accurate.
+- App Store privacy label still accurate (`Data Not Collected` for the current
+  zero-upload build).
+- Published privacy policy URL exists and matches the current local-first /
+  zero-upload behavior.
 - No unused permission/entitlement/background mode.
 - Export and delete-my-data paths still complete (`audit-release-data-safety.sh`).
 - Diagnostics still privacy-safe.

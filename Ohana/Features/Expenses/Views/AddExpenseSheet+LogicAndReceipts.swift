@@ -103,7 +103,10 @@ extension AddExpenseSheet {
     }
 
     func appendReceiptImage(_ image: UIImage) {
-        let data = image.jpegData(compressionQuality: 0.85) ?? Data()
+        let data = AttachmentPrivacySanitizer.sanitizedImageData(
+            from: image,
+            compressionQuality: 0.85
+        ) ?? Data()
         let attachment = ExpenseReceiptAttachment(
             data: data,
             filename: "receipt_\(receiptAttachments.count + 1).jpg",
@@ -119,9 +122,14 @@ extension AddExpenseSheet {
         guard !items.isEmpty else { return }
         for item in items {
             if let data = try? await item.loadTransferable(type: Data.self) {
+                let filename = "receipt_\(receiptAttachments.count + 1).jpg"
                 let attachment = ExpenseReceiptAttachment(
-                    data: data,
-                    filename: "receipt_\(receiptAttachments.count + 1).jpg",
+                    data: AttachmentPrivacySanitizer.sanitizedData(
+                        data,
+                        filename: filename,
+                        isImage: true
+                    ),
+                    filename: filename,
                     isImage: true
                 )
                 withAnimation(GoMotion.feedback) {
@@ -140,7 +148,11 @@ extension AddExpenseSheet {
         let type = UTType(filenameExtension: url.pathExtension)
         let isImage = type?.conforms(to: .image) ?? false
         let attachment = ExpenseReceiptAttachment(
-            data: data,
+            data: AttachmentPrivacySanitizer.sanitizedData(
+                data,
+                filename: url.lastPathComponent,
+                isImage: isImage
+            ),
             filename: url.lastPathComponent,
             isImage: isImage
         )

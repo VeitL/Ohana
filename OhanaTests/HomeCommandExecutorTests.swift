@@ -42,6 +42,62 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func quickFeedByIdDoesNotDuplicateFoodStockReminderEvents() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 8, hour: 9, minute: 0)
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.dailyPortionGrams = 50
+        pet.mainFoodKind = .dry
+        pet.foodTrackingMode = .precise
+        pet.foodReminderEnabled = true
+        pet.foodReminderAdvanceDays = 2
+        let foodRecord = PetFoodRecord(
+            brand: "Test",
+            dailyGrams: 50,
+            totalGrams: 10000,
+            foodKind: .dry,
+            startDate: now,
+            pet: pet
+        )
+        context.insert(pet)
+        context.insert(foodRecord)
+        try context.save()
+
+        let executor = HomeCommandExecutor(modelContext: context)
+        var feedbacks: [ExpandedQuickActionExecutor.Feedback] = []
+
+        func performQuickFeed(at date: Date) {
+            executor.performActionType(
+                "feed",
+                petID: pet.id,
+                executorId: "human-1",
+                now: date,
+                antiRepeatTitle: "Already logged",
+                antiRepeatMessage: { "\($0.executorName) \($0.minutesAgo)" },
+                openFeedDetail: { _, _ in },
+                showAntiRepeat: { _, _, pendingAction in
+                    pendingAction()
+                },
+                startWalk: { _ in },
+                openWaterManagement: { _ in },
+                openMedication: { _ in },
+                feedback: { feedbacks.append($0) }
+            )
+        }
+
+        performQuickFeed(at: now)
+        #expect(stockReminderEvents(for: pet, context: context).count == 1)
+
+        performQuickFeed(at: now.addingTimeInterval(60))
+
+        let feedingLogs = try context.fetch(FetchDescriptor<PetCareLog>()).filter { $0.careType == .feeding }
+        #expect(feedingLogs.count == 2)
+        #expect(stockReminderEvents(for: pet, context: context).count == 1)
+        #expect(feedbacks.map(\.cardId) == [pet.id, pet.id])
+    }
+
+    @MainActor
     @Test func quickGroomByIdWritesOneHygieneFact() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -6528,9 +6584,14 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV63.models)
+        let schema = Schema(ArkSchemaV64.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func stockReminderEvents(for pet: Pet, context: ModelContext) -> [Event] {
+        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+        return FeedingPlanWriter.stockReminderEvents(pet: pet, allEvents: events)
     }
 
     @MainActor

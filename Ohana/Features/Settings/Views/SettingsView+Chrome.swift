@@ -100,6 +100,78 @@ extension SettingsView {
         }
     }
 
+    var privacySecuritySection: some View {
+        settingsSection(title: l.tr(zh: "隐私与安全", en: "Privacy & Security", de: "Datenschutz & Sicherheit")) {
+            appSwitcherSnapshotPrivacyRow
+            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+            memberGateBiometricRow
+        }
+    }
+
+    var appSwitcherSnapshotPrivacyRow: some View {
+        HStack(spacing: 12) {
+            settingsIcon("rectangle.on.rectangle.slash", color: Color.goYellow)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "隐藏 App 切换器预览", en: "Hide app switcher preview", de: "App-Umschalter-Vorschau ausblenden"))
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(primaryText)
+                Text(l.tr(
+                    zh: "离开 App 时用遮罩覆盖健康与用药页面",
+                    en: "Covers health and medication screens when leaving the app",
+                    de: "Deckt Gesundheits- und Medikamentenseiten beim Verlassen ab"
+                ))
+                .font(OhanaFont.footnote())
+                .foregroundStyle(tertiaryText)
+            }
+            Spacer()
+            Toggle("", isOn: $hideAppSwitcherSnapshot)
+                .tint(accentColor)
+                .labelsHidden()
+        }
+        .frame(minHeight: 44)
+    }
+
+    var memberGateBiometricRow: some View {
+        HStack(spacing: 12) {
+            settingsIcon(biometricGateAvailability.symbolName, color: Color.goPrimary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(l.tr(zh: "成员门禁使用 \(biometricGateAvailability.label)", en: "Use \(biometricGateAvailability.label) for member gate", de: "\(biometricGateAvailability.label) für Mitgliederschutz nutzen"))
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(primaryText)
+                Text(memberGateBiometricSubtitle)
+                    .font(OhanaFont.footnote())
+                    .foregroundStyle(tertiaryText)
+            }
+            Spacer()
+            Toggle("", isOn: $enableMemberGateBiometrics)
+                .tint(accentColor)
+                .labelsHidden()
+        }
+        .frame(minHeight: 44)
+        .onAppear {
+            refreshBiometricGateAvailability()
+        }
+    }
+
+    var memberGateBiometricSubtitle: String {
+        if biometricGateAvailability.isAvailable {
+            return l.tr(
+                zh: "切换受保护成员时可用生物识别代替输入密码",
+                en: "Use biometrics instead of typing the PIN for protected members",
+                de: "Biometrie statt PIN beim Wechsel geschützter Mitglieder"
+            )
+        }
+        return l.tr(
+            zh: "当前设备不可用时会继续使用 4 位密码",
+            en: "Falls back to the 4-digit PIN when biometrics are unavailable",
+            de: "Fällt auf die 4-stellige PIN zurück, wenn Biometrie nicht verfügbar ist"
+        )
+    }
+
+    func refreshBiometricGateAvailability() {
+        biometricGateAvailability = MemberGateBiometricAuthenticator.availability()
+    }
+
     func notificationToggleRow(icon: String, iconColor: Color, title: String, key: String) -> some View {
         HStack(spacing: 12) {
             settingsIcon(icon, color: iconColor)

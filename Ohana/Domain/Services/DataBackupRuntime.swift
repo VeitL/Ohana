@@ -12,6 +12,7 @@ import SwiftData
 enum BackupError: LocalizedError {
     case unsupportedVersion(Int)
     case missingPassword
+    case weakPassword(minimum: Int)
     case passwordMismatch
     case invalidBackupPassword
     case invalidEncryptedBackup
@@ -23,6 +24,8 @@ enum BackupError: LocalizedError {
             "备份文件版本 v\(v) 不受支持，请更新 App 后重试。"
         case .missingPassword:
             "请输入备份密码后重试。"
+        case let .weakPassword(minimum):
+            "备份密码至少需要 \(minimum) 个字符。"
         case .passwordMismatch:
             "两次输入的备份密码不一致。"
         case .invalidBackupPassword:

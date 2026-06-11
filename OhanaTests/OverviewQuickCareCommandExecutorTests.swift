@@ -4,10 +4,11 @@ import Testing
 @testable import Ohana
 
 @MainActor
-struct OverviewQuickCareCommandExecutorTests {
-    @Test func quickFeedDoesNotDuplicateFoodStockReminderEvents() throws {
+struct ManualFeedCommandTests {
+    @Test func manualFeedCommandDoesNotDuplicateFoodStockReminderEvents() throws {
         let container = try makeContainer()
         let context = container.mainContext
+        let now = date(year: 2026, month: 5, day: 1, hour: 9)
         let pet = Pet(name: "Momo", species: "猫")
         pet.dailyPortionGrams = 50
         pet.mainFoodKind = .dry
@@ -20,36 +21,92 @@ struct OverviewQuickCareCommandExecutorTests {
             dailyGrams: 50,
             totalGrams: 10000,
             foodKind: .dry,
-            startDate: Date(),
+            startDate: now,
             pet: pet
         )
         context.insert(pet)
         context.insert(foodRecord)
         try context.save()
 
-        let executor = OverviewQuickCareCommandExecutor(
+        let careEvents = CareEventService()
+        _ = ManualFeedCommand.recordManual(
+            pet: pet,
+            targets: [pet],
+            grams: 50,
+            foodKind: pet.mainFoodKind,
+            saveAsDefault: false,
+            foodRecords: [foodRecord],
+            allEvents: [],
             context: context,
-            careEvents: CareEventService(),
-            revisions: SharedDomainRevisionPublisher()
-        )
-
-        executor.record(
-            pet: pet,
-            actionType: "feed",
-            amount: 50,
-            saveAsDefault: false,
-            executorId: nil
+            executorId: nil,
+            careEvents: careEvents,
+            date: now
         )
         #expect(stockReminderEvents(for: pet, context: context).count == 1)
 
-        executor.record(
+        _ = ManualFeedCommand.recordManual(
             pet: pet,
-            actionType: "feed",
-            amount: 50,
+            targets: [pet],
+            grams: 50,
+            foodKind: pet.mainFoodKind,
             saveAsDefault: false,
-            executorId: nil
+            foodRecords: [foodRecord],
+            allEvents: stockReminderEvents(for: pet, context: context),
+            context: context,
+            executorId: nil,
+            careEvents: careEvents,
+            date: now.addingTimeInterval(60)
         )
         #expect(stockReminderEvents(for: pet, context: context).count == 1)
+    }
+
+    @Test func manualFeedCommandDeletesExistingStockReminderWhenCallerHasNoEvents() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = date(year: 2026, month: 5, day: 1, hour: 9)
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.dailyPortionGrams = 50
+        pet.mainFoodKind = .dry
+        pet.foodTrackingMode = .precise
+        pet.foodReminderEnabled = true
+        pet.foodReminderAdvanceDays = 2
+        let foodRecord = PetFoodRecord(
+            brand: "Test",
+            dailyGrams: 50,
+            totalGrams: 10000,
+            foodKind: .dry,
+            startDate: now,
+            pet: pet
+        )
+        let staleEvent = Event(
+            title: "旧断粮提醒",
+            startDate: date(year: 2026, month: 5, day: 5, hour: 9),
+            eventType: EventType.shoppingList.rawValue,
+            relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
+            relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
+        )
+        let staleReminder = Reminder(event: staleEvent, scheduledAt: staleEvent.startDate)
+        context.insert(pet)
+        context.insert(foodRecord)
+        context.insert(staleEvent)
+        context.insert(staleReminder)
+        try context.save()
+
+        _ = ManualFeedCommand.recordManual(
+            pet: pet,
+            targets: [pet],
+            grams: 50,
+            foodKind: pet.mainFoodKind,
+            saveAsDefault: false,
+            foodRecords: [foodRecord],
+            allEvents: [],
+            context: context,
+            executorId: nil
+        )
+        let reminders = stockReminderEvents(for: pet, context: context)
+
+        #expect(reminders.count == 1)
+        #expect(reminders.first?.id != staleEvent.id)
     }
 
     @Test func rebuildFoodStockRemindersDeletesContextEventsWhenCallerHasNoEvents() throws {
@@ -294,7 +351,7 @@ struct OverviewQuickCareCommandExecutorTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV63.models)
+        let schema = Schema(ArkSchemaV64.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

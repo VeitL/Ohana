@@ -65,6 +65,7 @@ enum AppResetService {
     }
 
     private static func deleteAllPersistentModels(in context: ModelContext) throws {
+        try delete(CloudSyncRecordState.self, in: context)
         try delete(PetDocumentAttachment.self, in: context)
         try delete(InsuranceClaim.self, in: context)
         try delete(Reminder.self, in: context)

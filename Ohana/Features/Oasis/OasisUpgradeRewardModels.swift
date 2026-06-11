@@ -19,7 +19,7 @@ enum OasisUpgradeRewardKind: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum OasisElectronicPetRarity: String, Codable, CaseIterable, Identifiable {
+nonisolated enum OasisElectronicPetRarity: String, Codable, CaseIterable, Identifiable {
     case common
     case rare
     case epic
@@ -55,7 +55,7 @@ enum OasisElectronicPetRarity: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-enum OasisCritterLifeState: String, Codable, CaseIterable, Identifiable {
+nonisolated enum OasisCritterLifeState: String, Codable, CaseIterable, Identifiable {
     case healthy
     case needsCare
     case atRisk
@@ -120,7 +120,7 @@ struct OasisCritterLifecycleSnapshot: Equatable {
 // OasisCritterFragmentBalance, OasisCritterActionLog, OasisUnlock) live in
 // OasisUpgradeModels.swift.
 
-struct OasisElectronicPetCatalogEntry: Identifiable, Equatable {
+nonisolated struct OasisElectronicPetCatalogEntry: Identifiable, Equatable {
     let id: String
     let emoji: String
     let rarity: OasisElectronicPetRarity

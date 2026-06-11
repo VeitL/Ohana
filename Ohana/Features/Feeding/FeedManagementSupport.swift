@@ -160,14 +160,19 @@ enum FeedStockRecordMetadata {
 
     static func applyCalculationMode(_ mode: FeedStockCalculationMode, to record: PetFoodRecord) {
         record.calculationModeRaw = mode.rawValue
-        record.notes = notesWithCalculationMode(record.notes, mode: mode)
+        record.notes = notesScrubbingLegacyCalculationMode(record.notes)
     }
 
-    static func notesWithCalculationMode(_ notes: String, mode _: FeedStockCalculationMode) -> String {
+    static func notesScrubbingLegacyCalculationMode(_ notes: String) -> String {
         notes
             .components(separatedBy: "\n")
             .filter { !$0.hasPrefix(calculationModePrefix) }
             .joined(separator: "\n")
+    }
+
+    @available(*, deprecated, message: "Use notesScrubbingLegacyCalculationMode(_:); calculation mode is stored in calculationModeRaw.")
+    static func notesWithCalculationMode(_ notes: String, mode _: FeedStockCalculationMode) -> String {
+        notesScrubbingLegacyCalculationMode(notes)
     }
 }
 
@@ -235,7 +240,7 @@ enum FeedRuleKind: String, CaseIterable {
     }
 }
 
-enum FeedPlanCatchUpPolicy {
+nonisolated enum FeedPlanCatchUpPolicy {
     static let catchUpWindowHours = 6
     static let catchUpWindow: TimeInterval = .init(catchUpWindowHours * 60 * 60)
 
@@ -258,7 +263,7 @@ enum FeedPlanCatchUpPolicy {
     }
 }
 
-enum FeedOperatingMode: String, CaseIterable, Identifiable, Equatable {
+nonisolated enum FeedOperatingMode: String, CaseIterable, Identifiable, Equatable {
     case manual
     case manualReminder
     case autoFeeder
@@ -300,7 +305,7 @@ enum FeedOperatingMode: String, CaseIterable, Identifiable, Equatable {
     }
 }
 
-enum FeedRuleMetadata {
+nonisolated enum FeedRuleMetadata {
     static let autoFeederEntityType = "pet_auto_feeder"
 
     static func isManualReminderEvent(_ event: Event, pet: Pet) -> Bool {

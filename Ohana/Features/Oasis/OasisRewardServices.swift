@@ -8,15 +8,31 @@
 import Foundation
 import SwiftData
 
-enum OasisCritterPresentationRules {
-    static var maxAppearanceStage: Int { OasisUpgradeRewardService.maxCritterAppearanceStage }
+nonisolated enum OasisCritterPresentationRules {
+    static let maxAppearanceStage = 5
 
     static func appearanceStage(forLevel level: Int) -> Int {
-        OasisUpgradeRewardService.appearanceStage(forLevel: level)
+        switch max(1, min(12, level)) {
+        case 1 ... 2:
+            1
+        case 3 ... 5:
+            2
+        case 6 ... 8:
+            3
+        case 9 ... 11:
+            4
+        default:
+            maxAppearanceStage
+        }
     }
 
     static func awakeningCost(for rarity: OasisElectronicPetRarity) -> (fragments: Int, coconuts: Int) {
-        OasisUpgradeRewardService.awakeningCost(for: rarity)
+        switch rarity {
+        case .common: (120, 80)
+        case .rare: (180, 120)
+        case .epic: (300, 220)
+        case .legendary: (520, 420)
+        }
     }
 }
 

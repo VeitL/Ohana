@@ -11,20 +11,28 @@ import SwiftUI
 import UIKit
 
 struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("ohana_has_onboarded") private var hasOnboarded = false
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
+    @AppStorage(AppPrivacySnapshotProtectionStore.hideSnapshotKey) private var hideAppSwitcherSnapshot = AppPrivacySnapshotProtectionStore.defaultHideSnapshot
     // F3: 数据库降级警告
     @State private var showDBFallbackAlert = DatabaseFallbackPreferenceStore.isFallbackActive()
+    @State private var appSwitcherSnapshotCoverRequested = false
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
 
     var body: some View {
-        Group {
+        ZStack {
             if hasOnboarded {
                 ContentView()
             } else {
                 OnboardingView()
+            }
+
+            if shouldShowPrivacySnapshotCover {
+                AppPrivacySnapshotCover()
+                    .zIndex(1000)
             }
         }
         .buttonStyle(ScaleButtonStyle())
@@ -49,6 +57,12 @@ struct RootView: View {
                 domainRevisions: appServices.domainRevisions
             )
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            appSwitcherSnapshotCoverRequested = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            appSwitcherSnapshotCoverRequested = false
+        }
         .alert("数据异常", isPresented: $showDBFallbackAlert) {
             Button("我知道了", role: .cancel) {
                 DatabaseFallbackPreferenceStore.clearFallbackActive()
@@ -56,6 +70,14 @@ struct RootView: View {
         } message: {
             Text("数据库加载失败，当前为临时模式。本次会话的数据不会被保存。请尝试重启 App，如问题持续请联系开发者。")
         }
+    }
+
+    private var shouldShowPrivacySnapshotCover: Bool {
+        guard hideAppSwitcherSnapshot else { return false }
+        return appSwitcherSnapshotCoverRequested || AppPrivacySnapshotProtectionStore.shouldShowProtection(
+            isEnabled: true,
+            scenePhase: scenePhase
+        )
     }
 }
 

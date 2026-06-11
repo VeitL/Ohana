@@ -84,6 +84,68 @@ struct ReminderActionCoordinatorTests {
         #expect(logs.first?.pet?.id == pet.id)
     }
 
+    @Test func manualFeedNotificationCompleteDoesNotDuplicateFoodStockReminderEvents() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.dailyPortionGrams = 50
+        pet.mainFoodKind = .dry
+        pet.foodTrackingMode = .precise
+        pet.foodReminderEnabled = true
+        pet.foodReminderAdvanceDays = 2
+        let event = Event(
+            title: "Breakfast",
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        event.feedAmountGrams = 50
+        event.foodKindRaw = FeedFoodKind.dry.rawValue
+        let reminder = Reminder(event: event, scheduledAt: now.addingTimeInterval(60))
+        let foodRecord = PetFoodRecord(
+            brand: "Test",
+            dailyGrams: 50,
+            totalGrams: 10000,
+            foodKind: .dry,
+            startDate: now,
+            pet: pet
+        )
+        let staleEvent = Event(
+            title: "Old stock reminder",
+            startDate: now.addingTimeInterval(2 * 24 * 60 * 60),
+            eventType: EventType.shoppingList.rawValue,
+            relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
+            relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
+        )
+        let staleReminder = Reminder(event: staleEvent, scheduledAt: staleEvent.startDate)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        context.insert(foodRecord)
+        context.insert(staleEvent)
+        context.insert(staleReminder)
+        try context.save()
+
+        let result = ReminderActionCoordinator.handle(
+            userInfo: [
+                "action": "COMPLETE",
+                "reminderId": reminder.id.uuidString
+            ],
+            currentActiveHumanId: "human-1",
+            context: context
+        )
+
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
+        let stockEvents = stockReminderEvents(for: pet, context: context)
+        #expect(result == .completed)
+        #expect(logs.count == 1)
+        #expect(reminder.statusEnum == .completed)
+        #expect(stockEvents.count == 1)
+        #expect(stockEvents.first?.id != staleEvent.id)
+    }
+
     @Test func humanMedicationNotificationCompleteWritesDoseLog() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -178,9 +240,14 @@ struct ReminderActionCoordinatorTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV63.models)
+        let schema = Schema(ArkSchemaV64.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func stockReminderEvents(for pet: Pet, context: ModelContext) -> [Event] {
+        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+        return FeedingPlanWriter.stockReminderEvents(pet: pet, allEvents: events)
     }
 }
 

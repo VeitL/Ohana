@@ -104,6 +104,7 @@ struct HomeCommandExecutor {
 
         let events = fetchQuickCareEvents(petID: petID, now: now)
         let feedLogs = fetchRecentCareLogs(petID: petID, now: now)
+        let foodRecords = fetchFoodRecords(petID: petID)
         let humans = fetchHumans()
         AppFlowPerformance.mark(
             AppPerformanceFlows.quickCareCommand,
@@ -113,6 +114,7 @@ struct HomeCommandExecutor {
                 "action": actionType,
                 "events": "\(events.count)",
                 "feedLogs": "\(feedLogs.count)",
+                "foodRecords": "\(foodRecords.count)",
                 "humans": "\(humans.count)"
             ]
         )
@@ -123,6 +125,7 @@ struct HomeCommandExecutor {
             executorId: executorId,
             allEvents: events,
             allFeedCareLogs: feedLogs,
+            allFoodRecords: foodRecords,
             humans: humans,
             now: now,
             antiRepeatTitle: antiRepeatTitle,
@@ -135,6 +138,7 @@ struct HomeCommandExecutor {
                     pet: plannedPet,
                     events: events,
                     feedLogs: feedLogs,
+                    foodRecords: foodRecords,
                     executorId: executorId,
                     now: now,
                     feedback: feedback
@@ -165,6 +169,7 @@ struct HomeCommandExecutor {
         executorId: String?,
         allEvents: [Event],
         allFeedCareLogs: [PetCareLog],
+        allFoodRecords: [PetFoodRecord],
         humans: [Human],
         now: Date,
         antiRepeatTitle: String,
@@ -190,6 +195,7 @@ struct HomeCommandExecutor {
             executorId: executorId,
             allEvents: allEvents,
             allFeedCareLogs: allFeedCareLogs,
+            allFoodRecords: allFoodRecords,
             humans: humans,
             modelContext: modelContext,
             now: now,
@@ -220,20 +226,25 @@ struct HomeCommandExecutor {
     func completePlannedFeed(
         pet: Pet,
         reminder: Reminder,
-        executorId: String?
-    ) -> (humanGot: Int, petGot: Int)? {
-        let reward = careEvents.completePlannedFeed(
+        allEvents: [Event],
+        foodRecords: [PetFoodRecord],
+        executorId: String?,
+        now: Date
+    ) -> ManualFeedCommandResult {
+        let result = ManualFeedCommand.completePlanned(
             pet: pet,
             reminder: reminder,
+            foodRecords: foodRecords,
+            allEvents: allEvents,
             context: modelContext,
-            quality: .precise,
             executorId: executorId,
-            date: Date()
+            careEvents: careEvents,
+            date: now
         )
-        if reward != nil {
+        if result.didRecord {
             publishMutation(QuickCareCommand.plannedFeed(petID: pet.id, reminderID: reminder.id))
         }
-        return reward
+        return result
     }
 
     func applyPottyCheckIn(
@@ -439,6 +450,7 @@ struct HomeCommandExecutor {
         pet: Pet,
         events: [Event],
         feedLogs: [PetCareLog],
+        foodRecords: [PetFoodRecord],
         executorId: String?,
         now: Date,
         feedback: (ExpandedQuickActionExecutor.Feedback) -> Void
@@ -452,18 +464,21 @@ struct HomeCommandExecutor {
             return false
         }
 
-        let reward = completePlannedFeed(
+        let result = completePlannedFeed(
             pet: pet,
             reminder: reminder,
-            executorId: executorId
+            allEvents: events,
+            foodRecords: foodRecords,
+            executorId: executorId,
+            now: now
         )
-        guard let reward else { return false }
-        let delta = reward.humanGot + reward.petGot
+        guard result.didRecord else { return false }
+        let delta = result.coconutDelta
         feedback(
             ExpandedQuickActionExecutor.Feedback(
                 cardId: pet.id,
                 coconutDelta: delta,
-                label: delta > 0 ? "喂食 +\(delta)🥥" : nil
+                label: ExpandedQuickActionExecutor.rewardLabel(actionType: "feed", delta: delta)
             )
         )
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -549,6 +564,17 @@ struct HomeCommandExecutor {
         )
         descriptor.fetchLimit = 300
         return ((try? modelContext.fetch(descriptor)) ?? []).filter { $0.pet?.id == petID } // smoothness: allow legacy plan lookup; QuickCare read-model migration tracked after P1 baseline
+    }
+
+    private func fetchFoodRecords(petID: UUID) -> [PetFoodRecord] {
+        var descriptor = FetchDescriptor<PetFoodRecord>(
+            predicate: #Predicate<PetFoodRecord> { record in
+                record.pet?.id == petID
+            },
+            sortBy: [SortDescriptor(\.startDate, order: .reverse)]
+        )
+        descriptor.fetchLimit = 120
+        return (try? modelContext.fetch(descriptor)) ?? [] // smoothness: allow command-side stock reminder rebuild; bounded to one pet
     }
 
     private func publishMutation(

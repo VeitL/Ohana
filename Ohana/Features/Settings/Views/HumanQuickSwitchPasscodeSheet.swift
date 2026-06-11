@@ -9,10 +9,13 @@ struct HumanQuickSwitchPasscodeSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @AppStorage(MemberGateBiometricAuthStore.enabledKey) private var enableMemberGateBiometrics = MemberGateBiometricAuthStore.defaultEnabled
 
     @State private var pin = ""
     @State private var message = "输入 4 位密码后切换到此账户"
     @State private var isError = false
+    @State private var biometricAvailability = MemberGateBiometricAuthenticator.availability()
+    @State private var isAuthenticatingBiometrics = false
 
     var body: some View {
         ZStack {
@@ -24,11 +27,17 @@ struct HumanQuickSwitchPasscodeSheet: View {
                         verify()
                     }
                     .padding(.top, 8)
+                    if canUseBiometricMemberGate {
+                        biometricButton
+                    }
                     statusText
                 }
                 .padding(22)
                 .padding(.bottom, 28)
             }
+        }
+        .onAppear {
+            biometricAvailability = MemberGateBiometricAuthenticator.availability()
         }
     }
 
@@ -68,6 +77,24 @@ struct HumanQuickSwitchPasscodeSheet: View {
             .animation(GoMotion.feedback, value: isError)
     }
 
+    private var biometricButton: some View {
+        Button {
+            authenticateWithBiometrics()
+        } label: {
+            Label(
+                isAuthenticatingBiometrics ? "正在验证 \(biometricAvailability.label)" : "使用 \(biometricAvailability.label)",
+                systemImage: biometricAvailability.symbolName
+            )
+            .font(OhanaFont.callout(.black))
+            .foregroundStyle(Color.arkInk)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .disabled(isAuthenticatingBiometrics)
+    }
+
     private var avatar: some View {
         HumanAvatarPipelineView(
             human: human,
@@ -99,6 +126,32 @@ struct HumanQuickSwitchPasscodeSheet: View {
             isError = true
             message = "请输入 4 位数字"
             UINotificationFeedbackGenerator().notificationOccurred(.error)
+        }
+    }
+
+    private var canUseBiometricMemberGate: Bool {
+        enableMemberGateBiometrics && biometricAvailability.isAvailable
+    }
+
+    private func authenticateWithBiometrics() {
+        guard !isAuthenticatingBiometrics else { return }
+        isAuthenticatingBiometrics = true
+        isError = false
+        message = "正在验证 \(biometricAvailability.label)"
+        Task { @MainActor in
+            let success = await MemberGateBiometricAuthenticator.authenticate(
+                reason: "验证后切换到 \(displayName(human))"
+            )
+            isAuthenticatingBiometrics = false
+            if success {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                onVerified()
+                dismiss()
+            } else {
+                isError = true
+                message = "\(biometricAvailability.label) 未通过，可继续输入密码"
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            }
         }
     }
 

@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-enum PetCoatPattern: String, CaseIterable {
+nonisolated enum PetCoatPattern: String, CaseIterable {
     case calico = "三花"
     case silverChinchilla = "银渐层"
     case tortoiseshell = "玳瑁"

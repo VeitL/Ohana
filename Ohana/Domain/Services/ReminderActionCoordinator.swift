@@ -197,13 +197,16 @@ enum ReminderActionCoordinator {
             guard let pet = pet(for: event, context: context) else {
                 return .missingPet
             }
-            _ = careEvents.completePlannedFeed(
+            let foodRecords = FeedCommandFetch.foodRecords(petID: pet.id, context: context, fallback: [])
+            let allEvents = FeedCommandFetch.latestEvents(context: context, fallback: [event])
+            _ = ManualFeedCommand.completePlanned(
                 pet: pet,
                 reminder: reminder,
+                foodRecords: foodRecords,
+                allEvents: allEvents,
                 context: context,
-                quality: .precise,
                 executorId: executorId,
-                date: Date()
+                careEvents: careEvents
             )
             return .completed
         }

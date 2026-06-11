@@ -98,7 +98,7 @@ extension FocusCard {
         return "c"
     }
 
-    static func weeklyWalkDistanceMeters(for pet: Pet, now: Date = Date()) -> Double {
+    nonisolated static func weeklyWalkDistanceMeters(for pet: Pet, now: Date = Date()) -> Double {
         let start = Calendar.current.date(byAdding: .day, value: -6, to: now) ?? now
         return pet.walkLogs
             .filter { $0.startDate >= start }
@@ -162,7 +162,7 @@ struct ExpandedCardFabShortcut: Identifiable {
 }
 
 extension FocusCard {
-    static func from(
+    nonisolated static func from(
         _ pet: Pet,
         includeAvatarData: Bool = true,
         includeWalkDistance: Bool = true
@@ -263,7 +263,7 @@ extension FocusCard {
         )
     }
 
-    static func from(_ human: Human, includeAvatarData: Bool = true) -> FocusCard {
+    nonisolated static func from(_ human: Human, includeAvatarData: Bool = true) -> FocusCard {
         let hex = human.safeThemeColorHex
         let days = human.hasPassedAway
             ? human.daysTogetherAtPassing
@@ -305,7 +305,7 @@ extension FocusCard {
         )
     }
 
-    static func from(_ critter: OasisElectronicPet) -> FocusCard {
+    nonisolated static func from(_ critter: OasisElectronicPet) -> FocusCard {
         let language = AppLanguage.code
         let l = L10n(language)
         let state = critter.lifeState
@@ -349,7 +349,7 @@ extension FocusCard {
         )
     }
 
-    static let dummies: [FocusCard] = [
+    nonisolated static let dummies: [FocusCard] = [
         FocusCard(id: UUID(), name: "Mochi", kind: "DOG", emoji: "🐶",
                   color: Color(hex: "F4A7B9"), streak: 7, coconutBalance: 42,
                   petSpecies: "狗", coatColor: Color(hex: "D7A76D"), eyeColor: Color(hex: "57341E"),
@@ -385,7 +385,7 @@ extension FocusCard {
 }
 
 extension Pet {
-    func localizedAgeTextForWallet(birthday: Date, l: L10n) -> String {
+    nonisolated func localizedAgeTextForWallet(birthday: Date, l: L10n) -> String {
         let components = Calendar.current.dateComponents([.year, .month], from: birthday, to: Date())
         let years = max(0, components.year ?? 0)
         let months = max(0, components.month ?? 0)
@@ -402,7 +402,7 @@ extension Pet {
         return l.tr(zh: "\(months)个月", en: "\(months)m", de: "\(months) Mon.")
     }
 
-    func humanEquivalentAgeTextForWallet(birthday: Date, l: L10n) -> String {
+    nonisolated func humanEquivalentAgeTextForWallet(birthday: Date, l: L10n) -> String {
         let equivalent = FocusPetHumanAgeEstimator.equivalentHumanYears(
             birthday: birthday,
             species: species,
@@ -418,7 +418,7 @@ extension Pet {
 }
 
 extension Human {
-    func localizedAgeTextForWallet(birthday: Date, l: L10n) -> String {
+    nonisolated func localizedAgeTextForWallet(birthday: Date, l: L10n) -> String {
         let years = max(0, Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0)
         if years >= 1 {
             return l.tr(zh: "\(years)岁", en: "\(years)y", de: "\(years) J.")
@@ -427,7 +427,7 @@ extension Human {
     }
 }
 
-enum FocusPetHumanAgeEstimator {
+nonisolated enum FocusPetHumanAgeEstimator {
     static func equivalentHumanYears(birthday: Date, species: String, breed: String) -> Int {
         let ageYears = max(0, Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365
         let preciseAge = max(0, Double(Calendar.current.dateComponents([.day], from: birthday, to: Date()).day ?? 0) / 365.25)

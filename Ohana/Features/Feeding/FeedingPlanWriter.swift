@@ -12,7 +12,7 @@ struct FeedingPlanWriteResult {
 }
 
 enum FeedingPlanWriter {
-    static let stockReminderEntityType = "pet_food_stock"
+    nonisolated static let stockReminderEntityType = "pet_food_stock"
     private static let manualReminderWindowDays = 14
 
     @MainActor
@@ -198,9 +198,8 @@ enum FeedingPlanWriter {
             record.remainingCorrectionDate = nil
         }
         record.calculationModeRaw = calculationMode.rawValue
-        record.notes = FeedStockRecordMetadata.notesWithCalculationMode(
-            "\(foodKind == .dry ? "干粮" : "湿粮")补粮 · \(Int(sanitizedTotal.rounded()))g",
-            mode: calculationMode
+        record.notes = FeedStockRecordMetadata.notesScrubbingLegacyCalculationMode(
+            stockRecordNote(foodKind: foodKind, totalGrams: sanitizedTotal)
         )
         if recordToUpdate == nil {
             context.insert(record)
@@ -217,6 +216,16 @@ enum FeedingPlanWriter {
             )
         }
         return record
+    }
+
+    private static func stockRecordNote(foodKind: FeedFoodKind, totalGrams: Double, l: L10n = L10n()) -> String {
+        let grams = Int(totalGrams.rounded())
+        let kindTitle = foodKind.title(l)
+        return l.tr(
+            zh: "\(kindTitle)补粮 · \(grams)g",
+            en: "\(kindTitle) refill · \(grams)g",
+            de: "\(kindTitle) aufgefüllt · \(grams)g"
+        )
     }
 
     @MainActor
@@ -274,9 +283,8 @@ enum FeedingPlanWriter {
             guard snapshot.totalGrams > 0,
                   let reminderDate = foodReminderDate(pet: pet, snapshot: snapshot, calendar: calendar),
                   reminderDate > now else { continue }
-            let kindTitle = foodKind == .dry ? "干粮" : "湿粮"
             let event = Event(
-                title: "\(pet.name) \(kindTitle)快要断粮了，记得补充粮仓",
+                title: stockReminderTitle(pet: pet, foodKind: foodKind),
                 startDate: reminderDate,
                 eventType: EventType.shoppingList.rawValue,
                 relatedEntityType: stockReminderEntityType,
@@ -290,6 +298,15 @@ enum FeedingPlanWriter {
         }
         context.safeSave()
         return reminders
+    }
+
+    private static func stockReminderTitle(pet: Pet, foodKind: FeedFoodKind, l: L10n = L10n()) -> String {
+        let kindTitle = foodKind.title(l)
+        return l.tr(
+            zh: "\(pet.name) \(kindTitle)快要断粮了，记得补充粮仓",
+            en: "\(pet.name)'s \(kindTitle) is almost out. Refill the food stock.",
+            de: "\(pet.name): \(kindTitle) ist bald leer. Bitte Vorrat auffuellen."
+        )
     }
 
     static func stockReminderEvents(pet: Pet, allEvents: [Event]) -> [Event] {

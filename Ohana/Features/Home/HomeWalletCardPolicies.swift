@@ -41,7 +41,7 @@ enum WalletPetCardTheme {
     }
 
     /// 与添加向导 `resolvedCoatColor` 一致，供首页剪影（`pet.coatColor` 存展示名而非 hex）
-    static func silhouetteCoatColor(for pet: Pet) -> Color {
+    nonisolated static func silhouetteCoatColor(for pet: Pet) -> Color {
         let name = pet.coatColor.trimmingCharacters(in: .whitespacesAndNewlines)
         if name.isEmpty { return Color(hex: "E8C49A") }
         if name == "自定义" { return Color(hex: "E8C49A") }
@@ -61,7 +61,7 @@ enum WalletPetCardTheme {
         return Color(hex: "E8C49A")
     }
 
-    static func silhouetteEyeColor(for pet: Pet) -> Color {
+    nonisolated static func silhouetteEyeColor(for pet: Pet) -> Color {
         let name = pet.eyeColor.trimmingCharacters(in: .whitespacesAndNewlines)
         if name.isEmpty { return Color(hex: "6B3A2A") }
         if name == "自定义" { return Color(hex: "6B3A2A") }
@@ -72,7 +72,7 @@ enum WalletPetCardTheme {
         return Color(hex: "6B3A2A")
     }
 
-    static func coatPatternName(for pet: Pet) -> String? {
+    nonisolated static func coatPatternName(for pet: Pet) -> String? {
         PetCoatPattern.allCases.first { $0.displayName == pet.coatColor }?.displayName
     }
 

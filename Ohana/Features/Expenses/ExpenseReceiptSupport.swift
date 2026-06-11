@@ -231,6 +231,7 @@ enum ExpenseReceiptDocumentBuilder {
         pet: Pet
     ) -> PetDocument {
         let document = PetDocument(title: title, category: category, pet: pet)
+        let sanitizedAttachments = attachments.map(sanitizedAttachment)
         document.issueDate = date
         document.cost = cost
         document.notes = ExpenseReceiptMetadata.notes(
@@ -238,12 +239,12 @@ enum ExpenseReceiptDocumentBuilder {
             expenseLogId: linkedExpenseLogId
         )
 
-        if let first = attachments.first {
+        if let first = sanitizedAttachments.first {
             document.attachmentData = first.data
             document.attachmentFilename = normalizedFilename(first, index: 1)
         }
 
-        document.attachments = attachments.enumerated().map { index, attachment in
+        document.attachments = sanitizedAttachments.enumerated().map { index, attachment in
             PetDocumentAttachment(
                 data: attachment.data,
                 filename: normalizedFilename(attachment, index: index + 1),
@@ -252,6 +253,18 @@ enum ExpenseReceiptDocumentBuilder {
         }
 
         return document
+    }
+
+    private nonisolated static func sanitizedAttachment(_ attachment: ExpenseReceiptAttachmentDraft) -> ExpenseReceiptAttachmentDraft {
+        ExpenseReceiptAttachmentDraft(
+            data: AttachmentPrivacySanitizer.sanitizedData(
+                attachment.data,
+                filename: attachment.filename,
+                isImage: attachment.isImage
+            ),
+            filename: attachment.filename,
+            isImage: attachment.isImage
+        )
     }
 
     private static func normalizedFilename(_ attachment: ExpenseReceiptAttachmentDraft, index: Int) -> String {

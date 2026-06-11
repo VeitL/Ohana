@@ -23,6 +23,7 @@ enum ExpandedQuickActionExecutor {
         executorId: String?,
         allEvents: [Event],
         allFeedCareLogs: [PetCareLog],
+        allFoodRecords: [PetFoodRecord],
         humans: [Human],
         modelContext: ModelContext,
         now: Date,
@@ -48,17 +49,21 @@ enum ExpandedQuickActionExecutor {
                     openFeedDetail(true)
                     return
                 }
-                let reward = careEvents.recordManualFeed(
+                let result = ManualFeedCommand.recordManual(
                     pet: pet,
-                    amountGrams: amount,
+                    targets: [pet],
+                    grams: amount,
+                    foodKind: pet.mainFoodKind,
+                    saveAsDefault: false,
+                    foodRecords: allFoodRecords,
+                    allEvents: allEvents,
                     context: modelContext,
                     executorId: executorId,
-                    quality: .none,
-                    date: now,
-                    foodKind: pet.mainFoodKind
+                    careEvents: careEvents,
+                    date: now
                 )
-                let coconutDelta = reward.humanGot + reward.petGot
-                feedback(Feedback(cardId: pet.id, coconutDelta: coconutDelta, label: coconutDelta > 0 ? "喂食 +\(coconutDelta)🥥" : nil))
+                let coconutDelta = result.coconutDelta
+                feedback(Feedback(cardId: pet.id, coconutDelta: coconutDelta, label: rewardLabel(actionType: "feed", delta: coconutDelta)))
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
             case .manualReminder:
                 if completePlannedFeed(pet) { return }
@@ -117,7 +122,7 @@ enum ExpandedQuickActionExecutor {
                     executorId: executorId
                 )
                 let delta = (reward?.humanGot ?? 0) + (reward?.petGot ?? 0)
-                feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "喂水 +\(delta)🥥" : nil))
+                feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta)))
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 return
             }
@@ -136,7 +141,7 @@ enum ExpandedQuickActionExecutor {
             date: now
         )
         let delta = got.humanGot + got.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "喂水 +\(delta)🥥" : nil))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
@@ -177,7 +182,7 @@ enum ExpandedQuickActionExecutor {
             medicationReminders: medicationReminders
         )
         medicationReminders.scheduleMedicationReminders(for: pet, context: modelContext)
-        feedback(Feedback(cardId: pet.id, coconutDelta: 1, label: "用药 +1🥥"))
+        feedback(Feedback(cardId: pet.id, coconutDelta: 1, label: rewardLabel(actionType: "medication", delta: 1)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
@@ -187,6 +192,7 @@ enum ExpandedQuickActionExecutor {
         executorId: String?,
         allEvents: [Event],
         allFeedCareLogs: [PetCareLog],
+        allFoodRecords: [PetFoodRecord],
         humans: [Human],
         modelContext: ModelContext,
         now: Date,
@@ -211,6 +217,7 @@ enum ExpandedQuickActionExecutor {
                 executorId: executorId,
                 allEvents: allEvents,
                 allFeedCareLogs: allFeedCareLogs,
+                allFoodRecords: allFoodRecords,
                 humans: humans,
                 modelContext: modelContext,
                 now: now,
@@ -248,7 +255,7 @@ enum ExpandedQuickActionExecutor {
                 date: now
             )
             let delta = got.humanGot + got.petGot
-            feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "铲屎 +\(delta)🥥" : nil))
+            feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "litter", delta: delta)))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         case "play":
             performSpecialCare(.play, pet: pet, executorId: executorId, modelContext: modelContext, feedback: feedback, careEvents: careEvents)
@@ -302,7 +309,15 @@ enum ExpandedQuickActionExecutor {
         }
 
         guard !pet.hygieneLogs.contains(where: { $0.type == type.rawValue && Calendar.current.isDateInToday($0.date) }) else {
-            showSingleUseNotice("今天已经完成了", "\(pet.name) 今天已经记录过\(type.rawValue)了，这类护理一天记录一次就够了。")
+            let l = L10n()
+            showSingleUseNotice(
+                l.tr(zh: "今天已经完成了", en: "Already done today", de: "Heute schon erledigt"),
+                l.tr(
+                    zh: "\(pet.name) 今天已经记录过\(l.hygieneTypeUILabel(type))了，这类护理一天记录一次就够了。",
+                    en: "\(pet.name) already has \(l.hygieneTypeUILabel(type)) logged today. Once a day is enough for this care type.",
+                    de: "\(pet.name) hat heute bereits \(l.hygieneTypeUILabel(type)) erfasst. Einmal pro Tag reicht fuer diese Pflege."
+                )
+            )
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             return
         }
@@ -315,7 +330,7 @@ enum ExpandedQuickActionExecutor {
             date: Date()
         )
         let delta = got.humanGot + got.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "\(type.emoji) +\(delta)🥥" : nil))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().hygieneTypeUILabel(type), delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
@@ -333,7 +348,7 @@ enum ExpandedQuickActionExecutor {
         }
         let got = careEvents.recordPotty(pet: pet, type: type, context: modelContext, executorId: executorId, date: Date())
         let delta = got.humanGot + got.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "\(type.emoji) +\(delta)🥥" : nil))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().pottyTypeUILabel(type), delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }
@@ -362,13 +377,13 @@ enum ExpandedQuickActionExecutor {
         let reward = careEvents.recordHealth(
             pet: pet,
             type: type,
-            note: "快捷打卡",
+            note: L10n().tr(zh: "快捷打卡", en: "Quick check-in", de: "Schnell-Check-in"),
             context: modelContext,
             executorId: executorId,
             date: Date()
         )
         let delta = reward.humanGot + reward.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "💉 +\(delta)🥥" : nil))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "health", delta: delta)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
@@ -380,24 +395,47 @@ enum ExpandedQuickActionExecutor {
         feedback: (Feedback) -> Void,
         careEvents: CareEventRecording
     ) {
-        let reward: QuestManager.OhanaActionType = switch type {
-        case .play:
-            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 互动奖励")
-        case .filterClean:
-            .general(humanReward: 25, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理滤材报酬")
-        case .cageCleaning:
-            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 清理鸟笼奖励")
-        case .freeFlight:
-            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 放飞互动奖励")
-        case .misting:
-            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 保湿打卡奖励")
-        case .substrateChange:
-            .general(humanReward: 10, petReward: 2, emoji: type.emoji, title: "\(pet.name) 环境清洁奖励")
-        default:
-            .general(humanReward: 3, petReward: 2, emoji: type.emoji, title: "\(pet.name) 打卡奖励")
+        let rewardAmounts: (human: Int, pet: Int) = switch type {
+        case .filterClean: (25, 2)
+        case .cageCleaning, .freeFlight, .substrateChange: (10, 2)
+        case .play, .misting: (3, 2)
+        default: (3, 2)
         }
+        let reward = QuestManager.OhanaActionType.general(
+            humanReward: rewardAmounts.human,
+            petReward: rewardAmounts.pet,
+            emoji: type.emoji,
+            title: specialCareRewardTitle(type, petName: pet.name)
+        )
         let got = careEvents.recordCare(pet: pet, type: type, amountMl: 0, context: modelContext, executorId: executorId, reward: reward, quality: .none, date: Date())
         let delta = got.humanGot + got.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: delta > 0 ? "\(type.emoji) +\(delta)🥥" : nil))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().careTypeUILabel(type), delta: delta)))
+    }
+
+    static func rewardLabel(actionType: String, delta: Int, l: L10n = L10n()) -> String? {
+        guard delta > 0 else { return nil }
+        let title = switch actionType {
+        case "feed": l.homeQAFeed
+        case "water": l.homeQAWater
+        case "medication": l.homeQAMeds
+        case "litter": l.homeQALitter
+        case "health": l.goFeatHealth
+        default: l.tr(zh: "打卡", en: "Check-in", de: "Check-in")
+        }
+        return rewardLabel(title: title, delta: delta)
+    }
+
+    static func rewardLabel(title: String, delta: Int) -> String? {
+        guard delta > 0 else { return nil }
+        return "\(title) +\(delta)🥥"
+    }
+
+    static func specialCareRewardTitle(_ type: CareType, petName: String, l: L10n = L10n()) -> String {
+        let careTitle = l.careTypeUILabel(type)
+        return l.tr(
+            zh: "\(petName) \(careTitle)奖励",
+            en: "\(petName) \(careTitle) reward",
+            de: "\(petName) \(careTitle) Belohnung"
+        )
     }
 }

@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum HomeSnapshotBuilder {
+nonisolated enum HomeSnapshotBuilder {
     static func buildCards(
         pets: [Pet],
         humans: [Human],

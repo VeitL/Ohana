@@ -114,6 +114,10 @@ extension SettingsView {
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .textContentType(.password)
+                            Text(backupPasswordMinimumLengthHint)
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium))
+                                .foregroundStyle(backupPasswordIsBelowMinimum ? Color.goYellow : tertiaryText)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     .font(OhanaFont.adaptive(size: 13, weight: .medium))
@@ -212,6 +216,9 @@ extension SettingsView {
         let password = backupPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         let confirmation = backupPasswordConfirmation.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !password.isEmpty else { throw BackupError.missingPassword }
+        guard password.count >= DataBackupEncryption.minimumPasswordLength else {
+            throw BackupError.weakPassword(minimum: DataBackupEncryption.minimumPasswordLength)
+        }
         guard password == confirmation else { throw BackupError.passwordMismatch }
         return password
     }
@@ -219,6 +226,19 @@ extension SettingsView {
     func backupPasswordForImport() -> String? {
         let password = backupPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         return password.isEmpty ? nil : password
+    }
+
+    var backupPasswordMinimumLengthHint: String {
+        l.tr(
+            zh: "至少 \(DataBackupEncryption.minimumPasswordLength) 位",
+            en: "At least \(DataBackupEncryption.minimumPasswordLength) characters",
+            de: "Mindestens \(DataBackupEncryption.minimumPasswordLength) Zeichen"
+        )
+    }
+
+    var backupPasswordIsBelowMinimum: Bool {
+        let password = backupPassword.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !password.isEmpty && password.count < DataBackupEncryption.minimumPasswordLength
     }
 
     func backupPill(_ label: String, icon: String, color: Color) -> some View {

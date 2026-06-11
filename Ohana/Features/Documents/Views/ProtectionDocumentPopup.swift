@@ -158,8 +158,13 @@ struct ProtectionDocumentContentPopup: View {
             guard let item else { return }
             Task {
                 if let data = try? await item.loadTransferable(type: Data.self) {
+                    let sanitized = AttachmentPrivacySanitizer.sanitizedData(
+                        data,
+                        filename: "document.jpg",
+                        isImage: true
+                    )
                     await MainActor.run {
-                        attachmentData = data
+                        attachmentData = sanitized
                         attachmentFilename = "document.jpg"
                         attachmentIsImage = true
                         hasNewAttachment = true
@@ -174,7 +179,11 @@ struct ProtectionDocumentContentPopup: View {
                 let isImage = UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
                 await MainActor.run {
                     if let data {
-                        attachmentData = data
+                        attachmentData = AttachmentPrivacySanitizer.sanitizedData(
+                            data,
+                            filename: url.lastPathComponent,
+                            isImage: isImage
+                        )
                         attachmentFilename = url.lastPathComponent
                         attachmentIsImage = isImage
                         hasNewAttachment = true
@@ -184,7 +193,10 @@ struct ProtectionDocumentContentPopup: View {
         }
         .sheet(isPresented: $showingCamera) {
             PetCameraPickerView(maxPixel: 1600) { image in
-                attachmentData = image.jpegData(compressionQuality: 0.82)
+                attachmentData = AttachmentPrivacySanitizer.sanitizedImageData(
+                    from: image,
+                    compressionQuality: 0.82
+                )
                 attachmentFilename = "camera.jpg"
                 attachmentIsImage = true
                 hasNewAttachment = true

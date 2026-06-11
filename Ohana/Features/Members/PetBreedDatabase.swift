@@ -8,7 +8,7 @@
 import SwiftUI
 
 // MARK: - Coat Color
-struct CoatColor: Identifiable, Hashable {
+nonisolated struct CoatColor: Identifiable, Hashable {
     let id = UUID()
     let name: String
     let hex: String
@@ -16,7 +16,7 @@ struct CoatColor: Identifiable, Hashable {
 }
 
 // MARK: - Eye Color
-struct EyeColor: Identifiable, Hashable {
+nonisolated struct EyeColor: Identifiable, Hashable {
     let id = UUID()
     let name: String
     let hex: String
@@ -24,7 +24,7 @@ struct EyeColor: Identifiable, Hashable {
 }
 
 // MARK: - Breed Info
-struct BreedInfo: Identifiable, Hashable {
+nonisolated struct BreedInfo: Identifiable, Hashable {
     let id = UUID()
     let name: String
     let coatColors: [CoatColor]
@@ -36,7 +36,7 @@ struct BreedInfo: Identifiable, Hashable {
 }
 
 // MARK: - Pet Breed Database
-enum PetBreedDatabase {
+nonisolated enum PetBreedDatabase {
 
     // MARK: - Common Colors
     static let genericCoatColors: [CoatColor] = [

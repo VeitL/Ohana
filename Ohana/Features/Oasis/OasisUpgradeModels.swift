@@ -208,7 +208,7 @@ final class OasisElectronicPet {
         set { rarityRaw = newValue.rawValue }
     }
 
-    var lifeState: OasisCritterLifeState {
+    nonisolated var lifeState: OasisCritterLifeState {
         get { OasisCritterLifeState(rawValue: lifeStateRaw) ?? .healthy }
         set { lifeStateRaw = newValue.rawValue }
     }
@@ -221,7 +221,7 @@ final class OasisElectronicPet {
         set { deathReasonRaw = newValue?.rawValue ?? "" }
     }
 
-    func displayName(_ l: L10n) -> String {
+    nonisolated func displayName(_ l: L10n) -> String {
         if !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return nickname
         }

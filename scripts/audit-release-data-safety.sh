@@ -70,8 +70,8 @@ reject_backup_pattern() {
   fi
 }
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV63\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV63 model set."
+require_pattern "$shared_container" 'Schema\(ArkSchemaV64\.models\)' \
+  "SharedModelContainer should open the current ArkSchemaV64 model set."
 
 require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 24' \
   "OhanaBackup.schemaVersion should be 24 after adding human gender identity backups."

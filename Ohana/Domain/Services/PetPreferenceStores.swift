@@ -73,7 +73,7 @@ enum PetHygieneCyclePreferenceStore {
     }
 }
 
-enum CustomPersonalityTagPreferenceStore {
+nonisolated enum CustomPersonalityTagPreferenceStore {
     private static let key = "ohana_custom_personality_tags_v1"
     private static let defaults = UserDefaults.standard
 
