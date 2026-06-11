@@ -145,9 +145,9 @@ view_command_executors() {
 }
 
 view_static_business_calls() {
-  local roots=(Ohana/ContentView.swift Ohana/App/RouteContainers Ohana/Features Ohana/Shared/Components)
+  local roots=(Ohana/App/ContentView.swift Ohana/App/RouteContainers Ohana/Features Ohana/Shared/Components)
   rg -n --pcre2 '\b[A-Z][A-Za-z0-9_]*(Service|Manager|Coordinator|Executor)\.' "${roots[@]}" --glob '*.swift' \
-    | rg '/Views/|Ohana/Shared/Components/|RouteContainers/|Ohana/ContentView\.swift:' \
+    | rg '/Views/|Ohana/Shared/Components/|RouteContainers/|Ohana/App/ContentView\.swift:' \
     | rg -v ':\s*//' \
     | rg -v '\bFileManager\.default\b' \
     | rg -v '\bExpandedQuickActionExecutor\.Feedback\b' || true

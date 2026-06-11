@@ -90,7 +90,7 @@
         "metrickit_metrics"
       ],
       "paths": [
-        "Ohana/OhanaApp.swift",
+        "Ohana/App/OhanaApp.swift",
         "Ohana/App/MetricKitObserver.swift",
         "OhanaTests/AppLifecycleCoordinatorTests.swift"
       ]
