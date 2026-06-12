@@ -230,6 +230,45 @@ struct OhanaNotificationsSchedulingTests {
         #expect(ledgerActions == ["scheduleSkippedBudget", "scheduleSuccess"])
     }
 
+    @Test func disabledNotificationPreferenceSkipsMatchingReminder() async throws {
+        let defaults = UserDefaults.standard
+        let preferenceKey = NotificationPreferenceGroup.hygiene.storageKey
+        let previousPreference = defaults.object(forKey: preferenceKey)
+        NotificationPreferenceStore.set(false, for: .hygiene, defaults: defaults)
+        defer {
+            if let previousPreference {
+                defaults.set(previousPreference, forKey: preferenceKey)
+            } else {
+                defaults.removeObject(forKey: preferenceKey)
+            }
+        }
+
+        let container = try makeContainer()
+        let context = container.mainContext
+        let fake = FakeScheduler()
+        OhanaNotifications.current = fake
+        defer { OhanaNotifications.useLive() }
+
+        let scheduledAt = futureDate(dayOffset: 2, hour: 10, minute: 0)
+        let reminder = makeReminder(
+            title: "梳毛",
+            eventType: .grooming,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: UUID().uuidString,
+            scheduledAt: scheduledAt,
+            context: context
+        )
+        try context.save()
+
+        await ReminderSchedulingService.scheduleManyIfNeeded(reminders: [reminder], context: context)
+
+        #expect(fake.scheduledIds.isEmpty)
+        #expect(reminder.statusEnum == .pending)
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(ledgerEvents.map(\.actionType) == ["scheduleUserDisabled"])
+        #expect(ledgerEvents.first?.metadataJSON.contains("\"reason\":\"userDisabled\"") == true)
+    }
+
     @Test func weeklyReportNotificationIsAmbientCareCopy() {
         let content = FamilyWeeklyReportService.makeWeeklyReportContent(l: L10n("zh"))
 
@@ -243,7 +282,7 @@ struct OhanaNotificationsSchedulingTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV70.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

@@ -204,7 +204,7 @@ private struct VividGlassVerticalTextRow: View {
         Text("0123456789  文字穿过玻璃  LENS")
             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
             .tracking(1.5)
-            .foregroundStyle(Color.white.opacity(mode == .dark ? 0.22 : 0.34)) // ui-v4: allow vivid glass lab text contrast
+            .foregroundStyle(Color.ohanaPrimaryActionText.opacity(mode == .dark ? 0.22 : 0.34)) // ui-v4: allow vivid glass lab text contrast
             .rotationEffect(.degrees(90))
             .offset(
                 x: CGFloat(index * 40) - 184 + CGFloat(wave) * 10,
@@ -250,7 +250,7 @@ private struct VividGlassPhraseTextRow: View {
     }
 
     private var foregroundColor: Color {
-        let baseColor = index.isMultiple(of: 2) ? Color.white : Color(hex: "C9FF27")
+        let baseColor = index.isMultiple(of: 2) ? Color.ohanaPrimaryActionText : Color(hex: "C9FF27")
         return baseColor.opacity(mode == .dark ? 0.33 : 0.46)
     }
 
@@ -310,7 +310,7 @@ private struct VividGlassGlareLayer: View {
     var body: some View {
         ZStack {
             RadialGradient(
-                colors: [Color.white.opacity(0.34), .clear], // ui-v4: allow vivid glass preview glare
+                colors: [Color.ohanaPrimaryActionText.opacity(0.34), .clear], // ui-v4: allow vivid glass preview glare
                 center: UnitPoint(x: 0.18 + 0.18 * CGFloat(drift), y: 0.12 + 0.10 * CGFloat(wave)),
                 startRadius: 8,
                 endRadius: 250

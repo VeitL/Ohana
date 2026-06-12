@@ -9,7 +9,9 @@ import SwiftUI
 struct PetHealthLogCard: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var showingAllLogs = false
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -17,21 +19,25 @@ struct PetHealthLogCard: View {
                 Image(systemName: "heart.text.clipboard").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.goRed)
-                Text("健康日志")
+                Text(l.tr(zh: "健康日志", en: "Health Log", de: "Gesundheitsprotokoll"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Text("\(pet.healthLogs.count) 条")
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
+                Text(l.tr(
+                    zh: "\(pet.activeHealthLogs.count) 条",
+                    en: "\(pet.activeHealthLogs.count) records",
+                    de: "\(pet.activeHealthLogs.count) Einträge"
+                ))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
 
-            let recentLogs = pet.healthLogs.sorted { $0.date > $1.date }.prefix(5)
+            let recentLogs = pet.activeHealthLogs.sorted { $0.date > $1.date }.prefix(5)
             ForEach(Array(recentLogs)) { log in
                 HStack(spacing: 10) {
                     Text(log.healthLogType.emoji)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(log.type)
+                        Text(healthLogTypeTitle(log.healthLogType, l: l))
                             .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         if !log.note.isEmpty {
@@ -49,7 +55,7 @@ struct PetHealthLogCard: View {
                             HStack(spacing: 4) {
                                 Image(systemName: isExpired ? "exclamationmark.triangle.fill" : "calendar")
                                     .font(OhanaFont.adaptive(size: 10))
-                                Text(isExpired ? "已过期" : (isUrgent ? "剩余\(daysUntil)天" : "有效期至\(expirationDate.formatted(.dateTime.month().day()))"))
+                                Text(expirationStatusText(daysUntil: daysUntil, expirationDate: expirationDate))
                                     .font(OhanaFont.adaptive(size: 10, weight: .medium))
                             }
                             .foregroundStyle(isExpired ? Color.goRed : (isUrgent ? Color.goYellow : .primary.opacity(0.5)))
@@ -66,7 +72,7 @@ struct PetHealthLogCard: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "bell.circle").accessibilityHidden(true)
                                     .font(OhanaFont.adaptive(size: 10))
-                                Text(isOverdue ? "体检已过期" : (isSoon ? "体检剩余\(daysUntil)天" : "下次体检\(nextCheckupDate.formatted(.dateTime.month().day()))"))
+                                Text(checkupStatusText(daysUntil: daysUntil, nextCheckupDate: nextCheckupDate))
                                     .font(OhanaFont.adaptive(size: 10, weight: .medium))
                             }
                             .foregroundStyle(isOverdue ? Color.goRed : (isSoon ? Color.goYellow : Color.goTeal))
@@ -88,20 +94,24 @@ struct PetHealthLogCard: View {
                 }
             }
 
-            if pet.healthLogs.isEmpty {
-                Text("暂无健康日志")
+            if pet.activeHealthLogs.isEmpty {
+                Text(l.tr(zh: "暂无健康日志", en: "No health logs yet", de: "Noch keine Gesundheitseinträge"))
                     .font(OhanaFont.adaptive(size: 13, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 8)
             }
 
-            if pet.healthLogs.count > 5 {
+            if pet.activeHealthLogs.count > 5 {
                 Button { showingAllLogs = true } label: {
                     HStack(spacing: 4) {
-                        Text("查看全部 \(pet.healthLogs.count) 条")
-                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goPrimary)
+                        Text(l.tr(
+                            zh: "查看全部 \(pet.activeHealthLogs.count) 条",
+                            en: "View all \(pet.activeHealthLogs.count)",
+                            de: "Alle \(pet.activeHealthLogs.count) anzeigen"
+                        ))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.goPrimary)
                         Image(systemName: "chevron.right").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 11, weight: .bold))
                             .foregroundStyle(Color.goPrimary)
@@ -117,16 +127,46 @@ struct PetHealthLogCard: View {
             HealthLogListView(pet: pet)
         }
     }
+
+    private func expirationStatusText(daysUntil: Int, expirationDate: Date) -> String {
+        if daysUntil <= 0 {
+            return l.tr(zh: "已过期", en: "Expired", de: "Abgelaufen")
+        }
+        if daysUntil <= 7 {
+            return l.tr(zh: "剩余\(daysUntil)天", en: "\(daysUntil)d left", de: "\(daysUntil) T. übrig")
+        }
+        return l.tr(
+            zh: "有效期至\(expirationDate.formatted(.dateTime.month().day()))",
+            en: "Valid until \(expirationDate.formatted(.dateTime.month().day()))",
+            de: "Gültig bis \(expirationDate.formatted(.dateTime.month().day()))"
+        )
+    }
+
+    private func checkupStatusText(daysUntil: Int, nextCheckupDate: Date) -> String {
+        if daysUntil <= 0 {
+            return l.tr(zh: "体检已过期", en: "Checkup overdue", de: "Check-up überfällig")
+        }
+        if daysUntil <= 30 {
+            return l.tr(zh: "体检剩余\(daysUntil)天", en: "\(daysUntil)d until checkup", de: "\(daysUntil) T. bis Check-up")
+        }
+        return l.tr(
+            zh: "下次体检\(nextCheckupDate.formatted(.dateTime.month().day()))",
+            en: "Next checkup \(nextCheckupDate.formatted(.dateTime.month().day()))",
+            de: "Nächster Check-up \(nextCheckupDate.formatted(.dateTime.month().day()))"
+        )
+    }
 }
 
 // MARK: - Full Health Log List
 struct HealthLogListView: View {
     let pet: Pet
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @State private var selectedType: HealthLogType? = nil
+    private var l: L10n { L10n(appLanguage) }
 
     private var filteredLogs: [PetHealthLog] {
-        let sorted = pet.healthLogs.sorted { $0.date > $1.date }
+        let sorted = pet.activeHealthLogs.sorted { $0.date > $1.date }
         guard let type = selectedType else { return sorted }
         return sorted.filter { $0.type == type.rawValue }
     }
@@ -143,7 +183,7 @@ struct HealthLogListView: View {
                             .padding(.horizontal, 16)
                     }
                     if filteredLogs.isEmpty {
-                        Text("暂无记录")
+                        Text(l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge"))
                             .font(OhanaFont.adaptive(size: 14, weight: .medium))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                             .padding(.top, 40)
@@ -153,18 +193,22 @@ struct HealthLogListView: View {
                 .padding(.top, 12)
             }
         }
-        .navigationTitle("\(pet.name) 健康日志")
+        .navigationTitle(l.tr(
+            zh: "\(pet.name) 健康日志",
+            en: "\(pet.name) Health Log",
+            de: "\(pet.name) Gesundheitsprotokoll"
+        ))
         .navigationBarTitleDisplayMode(.inline)
     }
 
     private var typeFilterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                filterChip(label: "全部", isSelected: selectedType == nil) {
+                filterChip(label: l.tr(zh: "全部", en: "All", de: "Alle"), isSelected: selectedType == nil) {
                     selectedType = nil
                 }
                 ForEach(HealthLogType.allCases, id: \.rawValue) { type in
-                    filterChip(label: "\(type.emoji) \(type.rawValue)", isSelected: selectedType == type) {
+                    filterChip(label: "\(type.emoji) \(healthLogTypeTitle(type, l: l))", isSelected: selectedType == type) {
                         selectedType = (selectedType == type) ? nil : type
                     }
                 }
@@ -196,7 +240,7 @@ struct HealthLogListView: View {
                     .font(OhanaFont.adaptive(size: 20))
             }
             VStack(alignment: .leading, spacing: 3) {
-                Text(log.type)
+                Text(healthLogTypeTitle(log.healthLogType, l: l))
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if !log.note.isEmpty {
@@ -220,5 +264,30 @@ struct HealthLogListView: View {
         }
         .padding(14)
         .goTranslucentCard(cornerRadius: OhanaRadius.control)
+    }
+}
+
+private func healthLogTypeTitle(_ type: HealthLogType, l: L10n = L10n(AppLanguage.code)) -> String {
+    switch type {
+    case .general:
+        l.tr(zh: "常规", en: "General", de: "Allgemein")
+    case .vaccine:
+        l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+    case .medication:
+        l.tr(zh: "用药", en: "Medication", de: "Medikation")
+    case .dewormingInternal:
+        l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+    case .dewormingExternal:
+        l.tr(zh: "体外驱虫", en: "External parasite care", de: "Äußerer Parasitenschutz")
+    case .surgery:
+        l.tr(zh: "手术", en: "Surgery", de: "Operation")
+    case .dental:
+        l.tr(zh: "牙科", en: "Dental", de: "Dental")
+    case .checkup:
+        l.tr(zh: "体检", en: "Checkup", de: "Check-up")
+    case .emergency:
+        l.tr(zh: "急诊", en: "Emergency", de: "Notfall")
+    case .other:
+        l.tr(zh: "其他", en: "Other", de: "Sonstiges")
     }
 }

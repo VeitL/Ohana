@@ -53,11 +53,11 @@ struct PetHealthDetailContentView: View {
     var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
 
     var sortedLogs: [PetHealthLog] {
-        pet.healthLogs.sorted { $0.date > $1.date }
+        pet.activeHealthLogs.sorted { $0.date > $1.date }
     }
 
     func latestLog(type: HealthLogType) -> PetHealthLog? {
-        pet.healthLogs.filter { $0.type == type.rawValue }.sorted { $0.date > $1.date }.first
+        pet.activeHealthLogs.filter { $0.type == type.rawValue }.sorted { $0.date > $1.date }.first
     }
 
     func dueDate(for type: HealthLogType) -> Date? {
@@ -225,7 +225,7 @@ struct PetHealthDetailContentView: View {
     // 散点数据：最近 12 个月每条记录一个点
     var scatterPoints: [HealthScatterPoint] {
         let cutoff = Calendar.current.date(byAdding: .month, value: -12, to: Date())!
-        return pet.healthLogs
+        return pet.activeHealthLogs
             .filter { $0.date >= cutoff }
             .map { HealthScatterPoint(date: $0.date, typeName: $0.type,
                                       typeEnum: HealthLogType(rawValue: $0.type) ?? .general) }
@@ -334,7 +334,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var latestSymptomLog: SymptomLog? {
-        pet.symptomLogs.sorted { $0.date > $1.date }.first
+        pet.activeSymptomLogs.sorted { $0.date > $1.date }.first
     }
 
     var preventiveTypes: [HealthLogType] {
@@ -398,7 +398,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var archiveStatusText: String {
-        let count = pet.healthLogs.count + pet.symptomLogs.count + pet.heatCycleLogs.count
+        let count = pet.activeHealthLogs.count + pet.activeSymptomLogs.count + pet.activeHeatCycleLogs.count
         return count == 0 ? l.tr(zh: "空", en: "Empty", de: "Leer") : l.tr(zh: "\(count) 条", en: "\(count) items", de: "\(count) Einträge")
     }
 
@@ -485,7 +485,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var latestVisitLog: PetHealthLog? {
-        pet.healthLogs
+        pet.activeHealthLogs
             .filter { visitTypes.contains($0.healthLogType) }
             .sorted { $0.date > $1.date }
             .first
@@ -496,7 +496,7 @@ struct PetHealthDetailContentView: View {
     }
 
     var recentHealthActivities: [HealthActivityItem] {
-        let logItems = pet.healthLogs.map { log in
+        let logItems = pet.activeHealthLogs.map { log in
             HealthActivityItem(
                 id: "health-\(log.id.uuidString)",
                 date: log.date,
@@ -506,7 +506,7 @@ struct PetHealthDetailContentView: View {
                 tint: colorForType(log.healthLogType)
             )
         }
-        let symptomItems = pet.symptomLogs.map { log in
+        let symptomItems = pet.activeSymptomLogs.map { log in
             HealthActivityItem(
                 id: "symptom-\(log.id.uuidString)",
                 date: log.date,
@@ -516,7 +516,7 @@ struct PetHealthDetailContentView: View {
                 tint: log.severity == .severe || log.severity == .critical ? Color.goRed : Color.goOrange
             )
         }
-        let heatItems = pet.heatCycleLogs.map { log in
+        let heatItems = pet.activeHeatCycleLogs.map { log in
             HealthActivityItem(
                 id: "heat-\(log.id.uuidString)",
                 date: log.startDate,

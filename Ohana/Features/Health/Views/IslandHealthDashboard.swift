@@ -74,7 +74,7 @@ struct IslandHealthDashboardContentView: View {
     private var l: L10n { L10n(appLanguage) }
 
     private var activePets: [Pet] {
-        pets.filter { !$0.hasPassedAway }
+        pets.filter(\.canWriteHealthFacts)
     }
 
     private var selectedPets: [Pet] {
@@ -83,7 +83,7 @@ struct IslandHealthDashboardContentView: View {
     }
 
     private var filteredLogs: [PetHealthLog] {
-        selectedPets.flatMap(\.healthLogs)
+        selectedPets.flatMap(\.activeHealthLogs)
     }
 
     private var periodLogs: [PetHealthLog] {
@@ -110,7 +110,7 @@ struct IslandHealthDashboardContentView: View {
     }
 
     private var noRecordCount: Int {
-        selectedPets.filter(\.healthLogs.isEmpty).count
+        selectedPets.filter(\.activeHealthLogs.isEmpty).count
     }
 
     private var attentionCount: Int {
@@ -150,13 +150,13 @@ struct IslandHealthDashboardContentView: View {
     private var petSummaries: [HealthPetSummary] {
         let cutoff = selectedRange.startDate() ?? .distantPast
         return selectedPets.map { pet in
-            let latest = pet.healthLogs.max { $0.date < $1.date }
+            let latest = pet.activeHealthLogs.max { $0.date < $1.date }
             let risk = riskStatus(for: pet)
             return HealthPetSummary(
                 id: pet.id,
                 pet: pet,
-                totalCount: pet.healthLogs.count,
-                periodCount: pet.healthLogs.count(where: { $0.date >= cutoff }),
+                totalCount: pet.activeHealthLogs.count,
+                periodCount: pet.activeHealthLogs.count(where: { $0.date >= cutoff }),
                 latestTitle: latest.map(\.healthLogType.rawValue) ?? l.tr(zh: "暂无健康记录", en: "No health logs", de: "Keine Gesundheitsdaten"),
                 latestDate: latest?.date,
                 riskText: risk.text,
@@ -545,7 +545,7 @@ struct IslandHealthDashboardContentView: View {
 
     private func dueItems(for pet: Pet) -> [(type: HealthLogType, date: Date)] {
         let fallbackTypes: [HealthLogType] = [.vaccine, .medication, .dewormingInternal, .dewormingExternal, .checkup]
-        let explicitDates = pet.healthLogs.compactMap { log -> (HealthLogType, Date)? in
+        let explicitDates = pet.activeHealthLogs.compactMap { log -> (HealthLogType, Date)? in
             if let expiration = log.expirationDate {
                 return (log.healthLogType, expiration)
             }
@@ -556,7 +556,7 @@ struct IslandHealthDashboardContentView: View {
         }
 
         let fallbackDates = fallbackTypes.compactMap { type -> (HealthLogType, Date)? in
-            guard let last = pet.healthLogs.filter({ $0.type == type.rawValue }).max(by: { $0.date < $1.date }) else {
+            guard let last = pet.activeHealthLogs.filter({ $0.type == type.rawValue }).max(by: { $0.date < $1.date }) else {
                 return nil
             }
             let next: Date? = switch type {
@@ -575,7 +575,7 @@ struct IslandHealthDashboardContentView: View {
     }
 
     private func riskStatus(for pet: Pet) -> (text: String, color: Color, rank: Int) {
-        if pet.healthLogs.isEmpty {
+        if pet.activeHealthLogs.isEmpty {
             return (l.tr(zh: "待建档", en: "Setup", de: "Anlegen"), Color.goRed, 3)
         }
 

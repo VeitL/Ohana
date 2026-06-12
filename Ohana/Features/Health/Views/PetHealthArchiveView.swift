@@ -62,7 +62,7 @@ struct PetHealthArchiveView: View {
     private var l: L10n { L10n(appLanguage) }
 
     private var items: [PetHealthArchiveItem] {
-        let healthItems = pet.healthLogs.map { log in
+        let healthItems = pet.activeHealthLogs.map { log in
             PetHealthArchiveItem(
                 id: "health-\(log.id.uuidString)",
                 date: log.date,
@@ -74,7 +74,7 @@ struct PetHealthArchiveView: View {
                 source: .health(log)
             )
         }
-        let symptomItems = pet.symptomLogs.map { log in
+        let symptomItems = pet.activeSymptomLogs.map { log in
             PetHealthArchiveItem(
                 id: "symptom-\(log.id.uuidString)",
                 date: log.date,
@@ -86,7 +86,7 @@ struct PetHealthArchiveView: View {
                 source: .symptom(log)
             )
         }
-        let heatItems = pet.heatCycleLogs.map { log in
+        let heatItems = pet.activeHeatCycleLogs.map { log in
             PetHealthArchiveItem(
                 id: "heat-\(log.id.uuidString)",
                 date: log.startDate,

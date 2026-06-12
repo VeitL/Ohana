@@ -48,13 +48,13 @@ struct PetImmunityCard: View {
     }
 
     private var rows: [ImmunityRow] {
-        let vaccineLogs = pet.healthLogs.filter { $0.type == HealthLogType.vaccine.rawValue }.sorted { $0.date > $1.date }
+        let vaccineLogs = pet.activeHealthLogs.filter { $0.type == HealthLogType.vaccine.rawValue }.sorted { $0.date > $1.date }
         // Bug8: 同时匹配旧 medication 和新 dewormingInternal
-        let dewormInternalLogs = pet.healthLogs.filter {
+        let dewormInternalLogs = pet.activeHealthLogs.filter {
             $0.type == HealthLogType.dewormingInternal.rawValue || $0.type == HealthLogType.medication.rawValue
         }.sorted { $0.date > $1.date }
-        let dewormExternalLogs = pet.healthLogs.filter { $0.type == HealthLogType.dewormingExternal.rawValue }.sorted { $0.date > $1.date }
-        let checkupLogs = pet.healthLogs.filter { $0.type == HealthLogType.checkup.rawValue }.sorted { $0.date > $1.date }
+        let dewormExternalLogs = pet.activeHealthLogs.filter { $0.type == HealthLogType.dewormingExternal.rawValue }.sorted { $0.date > $1.date }
+        let checkupLogs = pet.activeHealthLogs.filter { $0.type == HealthLogType.checkup.rawValue }.sorted { $0.date > $1.date }
 
         // Bug6: 优先使用 log.expirationDate，若无则按固定周期推算
         func nextDue(_ log: PetHealthLog?, fallback: (Date) -> Date?) -> Date? {

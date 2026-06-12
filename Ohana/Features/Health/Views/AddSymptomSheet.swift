@@ -25,7 +25,9 @@ struct AddSymptomSheet: View {
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
     private var l: L10n { L10n(appLanguage) }
-    private var canSave: Bool { !symptomName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSaving }
+    private var canSave: Bool {
+        pet.canWriteHealthFacts && !symptomName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSaving
+    }
 
     var body: some View {
         ZStack {

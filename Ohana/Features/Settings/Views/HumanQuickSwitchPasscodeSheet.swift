@@ -9,13 +9,16 @@ struct HumanQuickSwitchPasscodeSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage(MemberGateBiometricAuthStore.enabledKey) private var enableMemberGateBiometrics = MemberGateBiometricAuthStore.defaultEnabled
 
     @State private var pin = ""
-    @State private var message = "输入 4 位密码后切换到此账户"
+    @State private var message = ""
     @State private var isError = false
     @State private var biometricAvailability = MemberGateBiometricAuthenticator.availability()
     @State private var isAuthenticatingBiometrics = false
+
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         ZStack {
@@ -38,6 +41,13 @@ struct HumanQuickSwitchPasscodeSheet: View {
         }
         .onAppear {
             biometricAvailability = MemberGateBiometricAuthenticator.availability()
+            if message.isEmpty {
+                message = l.tr(
+                    zh: "输入 4 位密码后切换到此账户",
+                    en: "Enter the 4-digit PIN to switch to this account",
+                    de: "Gib die 4-stellige PIN ein, um zu diesem Konto zu wechseln"
+                )
+            }
         }
     }
 
@@ -45,14 +55,22 @@ struct HumanQuickSwitchPasscodeSheet: View {
         HStack(spacing: 12) {
             avatar
             VStack(alignment: .leading, spacing: 3) {
-                Text("切换到 \(displayName(human))")
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.76)
-                Text("此账户已开启 4 位密码")
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+                Text(l.tr(
+                    zh: "切换到 \(displayName(human))",
+                    en: "Switch to \(displayName(human))",
+                    de: "Zu \(displayName(human)) wechseln"
+                ))
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
+                Text(l.tr(
+                    zh: "此账户已开启 4 位密码",
+                    en: "This account uses a 4-digit PIN",
+                    de: "Dieses Konto nutzt eine 4-stellige PIN"
+                ))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
             Button { dismiss() } label: {
@@ -82,7 +100,9 @@ struct HumanQuickSwitchPasscodeSheet: View {
             authenticateWithBiometrics()
         } label: {
             Label(
-                isAuthenticatingBiometrics ? "正在验证 \(biometricAvailability.label)" : "使用 \(biometricAvailability.label)",
+                isAuthenticatingBiometrics
+                    ? l.tr(zh: "正在验证 \(biometricAvailability.label)", en: "Verifying \(biometricAvailability.label)", de: "\(biometricAvailability.label) wird geprüft")
+                    : l.tr(zh: "使用 \(biometricAvailability.label)", en: "Use \(biometricAvailability.label)", de: "\(biometricAvailability.label) verwenden"),
                 systemImage: biometricAvailability.symbolName
             )
             .font(OhanaFont.callout(.black))
@@ -114,17 +134,30 @@ struct HumanQuickSwitchPasscodeSheet: View {
         case let .incorrect(remaining):
             pin = ""
             isError = true
-            message = "密码不正确，还可尝试 \(remaining) 次"
+            message = l.tr(
+                zh: "密码不正确，还可尝试 \(remaining) 次",
+                en: "Incorrect PIN. \(remaining) attempts remaining.",
+                de: "Falsche PIN. Noch \(remaining) Versuche."
+            )
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case let .locked(until):
             pin = ""
             isError = true
-            message = "尝试过多，请 \(max(1, Int(ceil(until.timeIntervalSince(now))))) 秒后再试"
+            let seconds = max(1, Int(ceil(until.timeIntervalSince(now))))
+            message = l.tr(
+                zh: "尝试过多，请 \(seconds) 秒后再试",
+                en: "Too many attempts. Try again in \(seconds) seconds.",
+                de: "Zu viele Versuche. In \(seconds) Sekunden erneut versuchen."
+            )
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         case .invalidFormat:
             pin = ""
             isError = true
-            message = "请输入 4 位数字"
+            message = l.tr(
+                zh: "请输入 4 位数字",
+                en: "Enter 4 digits",
+                de: "Gib 4 Ziffern ein"
+            )
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
     }
@@ -137,10 +170,18 @@ struct HumanQuickSwitchPasscodeSheet: View {
         guard !isAuthenticatingBiometrics else { return }
         isAuthenticatingBiometrics = true
         isError = false
-        message = "正在验证 \(biometricAvailability.label)"
+        message = l.tr(
+            zh: "正在验证 \(biometricAvailability.label)",
+            en: "Verifying \(biometricAvailability.label)",
+            de: "\(biometricAvailability.label) wird geprüft"
+        )
         Task { @MainActor in
             let success = await MemberGateBiometricAuthenticator.authenticate(
-                reason: "验证后切换到 \(displayName(human))"
+                reason: l.tr(
+                    zh: "验证后切换到 \(displayName(human))",
+                    en: "Authenticate to switch to \(displayName(human))",
+                    de: "Authentifizieren, um zu \(displayName(human)) zu wechseln"
+                )
             )
             isAuthenticatingBiometrics = false
             if success {
@@ -149,7 +190,11 @@ struct HumanQuickSwitchPasscodeSheet: View {
                 dismiss()
             } else {
                 isError = true
-                message = "\(biometricAvailability.label) 未通过，可继续输入密码"
+                message = l.tr(
+                    zh: "\(biometricAvailability.label) 未通过，可继续输入密码",
+                    en: "\(biometricAvailability.label) failed. You can still enter the PIN.",
+                    de: "\(biometricAvailability.label) fehlgeschlagen. Du kannst weiter die PIN eingeben."
+                )
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
         }
@@ -157,6 +202,6 @@ struct HumanQuickSwitchPasscodeSheet: View {
 
     private func displayName(_ human: Human) -> String {
         let name = human.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "成员" : name
+        return name.isEmpty ? l.tr(zh: "成员", en: "Member", de: "Mitglied") : name
     }
 }

@@ -277,6 +277,8 @@ final nonisolated class DataBackupManager: @unchecked Sendable {
             weightLogs: weightLogs,
             expenseLogs: expLogs,
             healthLogs: healthLogs,
+            symptomLogs: symptoms,
+            heatCycleLogs: heatCycles,
             hygieneLogs: hygLogs,
             foodRecords: foodRecs,
             documents: docs,

@@ -26,6 +26,51 @@ enum NotificationDeliveryCategory: String, Equatable {
     case weeklyReport
 }
 
+nonisolated enum NotificationPreferenceGroup: String, CaseIterable, Equatable {
+    case medication
+    case feeding
+    case hygiene
+    case checkIn
+
+    var storageKey: String {
+        switch self {
+        case .medication: "notif_medication_enabled"
+        case .feeding: "notif_feeding_enabled"
+        case .hygiene: "notif_hygiene_enabled"
+        case .checkIn: "notif_checkin_enabled"
+        }
+    }
+
+    static func groups(for category: NotificationDeliveryCategory) -> [NotificationPreferenceGroup] {
+        switch category {
+        case .medication:
+            [.medication]
+        case .feeding, .foodStock:
+            [.feeding]
+        case .hygiene:
+            [.hygiene]
+        case .calendar, .weeklyReport:
+            [.checkIn]
+        case .health, .hydration, .plantCare, .insurance:
+            []
+        }
+    }
+}
+
+nonisolated enum NotificationPreferenceStore {
+    static func isEnabled(_ group: NotificationPreferenceGroup, defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: group.storageKey) == nil ? true : defaults.bool(forKey: group.storageKey)
+    }
+
+    static func set(_ value: Bool, for group: NotificationPreferenceGroup, defaults: UserDefaults = .standard) {
+        defaults.set(value, forKey: group.storageKey)
+    }
+
+    static func isCategoryEnabled(_ category: NotificationDeliveryCategory, defaults: UserDefaults = .standard) -> Bool {
+        NotificationPreferenceGroup.groups(for: category).allSatisfy { isEnabled($0, defaults: defaults) }
+    }
+}
+
 struct NotificationDeliveryClassification: Equatable {
     let tier: NotificationDeliveryTier
     let category: NotificationDeliveryCategory
@@ -36,12 +81,14 @@ enum NotificationDeliveryDecision: Equatable {
     case deliver(deliveryDate: Date, classification: NotificationDeliveryClassification, deferred: Bool)
     case skippedBudget(classification: NotificationDeliveryClassification, scheduledAt: Date)
     case merged(classification: NotificationDeliveryClassification, scheduledAt: Date, mergedInto: UUID)
+    case skippedUserDisabled(classification: NotificationDeliveryClassification, scheduledAt: Date)
 
     var classification: NotificationDeliveryClassification {
         switch self {
         case let .deliver(_, classification, _),
              let .skippedBudget(classification, _),
-             let .merged(classification, _, _):
+             let .merged(classification, _, _),
+             let .skippedUserDisabled(classification, _):
             classification
         }
     }
@@ -66,6 +113,8 @@ enum NotificationDeliveryDecision: Equatable {
             return "{\"tier\":\"\(tier)\",\"category\":\"\(category)\",\"scheduledAt\":\(scheduledAt.timeIntervalSince1970),\"reason\":\"budget\"}"
         case let .merged(_, scheduledAt, mergedInto):
             return "{\"tier\":\"\(tier)\",\"category\":\"\(category)\",\"scheduledAt\":\(scheduledAt.timeIntervalSince1970),\"reason\":\"merged\",\"mergedInto\":\"\(mergedInto.uuidString)\"}"
+        case let .skippedUserDisabled(_, scheduledAt):
+            return "{\"tier\":\"\(tier)\",\"category\":\"\(category)\",\"scheduledAt\":\(scheduledAt.timeIntervalSince1970),\"reason\":\"userDisabled\"}"
         }
     }
 }
@@ -137,6 +186,13 @@ nonisolated enum NotificationDeliveryPolicy {
         for reminder in reminders.sorted(by: reminderSort) {
             guard let event = reminder.event else { continue }
             let classification = classification(for: event)
+            guard NotificationPreferenceStore.isCategoryEnabled(classification.category) else {
+                decisions[reminder.id] = .skippedUserDisabled(
+                    classification: classification,
+                    scheduledAt: reminder.scheduledAt
+                )
+                continue
+            }
             let delivery = deliveryDate(for: reminder.scheduledAt, classification: classification, calendar: calendar)
             let deferred = delivery != reminder.scheduledAt
             let dayKey = dayKey(for: delivery, calendar: calendar)

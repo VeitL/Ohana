@@ -66,6 +66,10 @@ final class SymptomLog {
     var severityRaw: Int
     var note: String
     var photoData: Data?
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     var pet: Pet?
 

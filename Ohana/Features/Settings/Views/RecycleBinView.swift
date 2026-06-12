@@ -55,8 +55,8 @@ struct RecycleBinView: View {
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
-                    zh: "删除的成员、珍贵档案和批量清空记录会保留 30 天。",
-                    en: "Deleted members, precious archives, and bulk-cleared records stay here for 30 days.",
+                    zh: "删除的成员、珍贵档案、健康记录和批量清空记录会保留 30 天。",
+                    en: "Deleted members, precious archives, health records, and bulk-cleared records stay here for 30 days.",
                     de: "Gelöschte Mitglieder, Archive und geleerte Einträge bleiben 30 Tage hier."
                 ))
                 .font(OhanaFont.caption(.semibold))
@@ -168,6 +168,9 @@ struct RecycleBinView: View {
         case .petMilestone: "sparkles"
         case .petDocument: "doc.text.fill"
         case .petInsurance: "shield.fill"
+        case .petHealthLog: "heart.text.clipboard.fill"
+        case .symptomLog: "exclamationmark.triangle.fill"
+        case .heatCycleLog: "heart.text.square.fill"
         case .petActivityClearBatch: "tray.full.fill"
         }
     }
@@ -191,6 +194,9 @@ struct RecycleBinView: View {
         case .petMilestone: l.tr(zh: "里程碑", en: "Milestone", de: "Meilenstein")
         case .petDocument: l.tr(zh: "证件", en: "Document", de: "Dokument")
         case .petInsurance: l.tr(zh: "保单", en: "Policy", de: "Police")
+        case .petHealthLog: l.tr(zh: "健康记录", en: "Health record", de: "Gesundheitseintrag")
+        case .symptomLog: l.tr(zh: "症状记录", en: "Symptom record", de: "Symptomeintrag")
+        case .heatCycleLog: l.tr(zh: "发情记录", en: "Heat cycle record", de: "Läufigkeitseintrag")
         case .petActivityClearBatch: l.tr(zh: "批量清空记录", en: "Bulk-cleared records", de: "Geleerte Einträge")
         }
     }

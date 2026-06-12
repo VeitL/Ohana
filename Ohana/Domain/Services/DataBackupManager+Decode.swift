@@ -53,6 +53,10 @@ nonisolated extension DataBackupManager {
                 try applyTrashState(state, to: PetExpenseLog.self, context: context)
             case String(describing: PetHealthLog.self):
                 try applyTrashState(state, to: PetHealthLog.self, context: context)
+            case String(describing: SymptomLog.self):
+                try applyTrashState(state, to: SymptomLog.self, context: context)
+            case String(describing: HeatCycleLog.self):
+                try applyTrashState(state, to: HeatCycleLog.self, context: context)
             case String(describing: PetHygieneLog.self):
                 try applyTrashState(state, to: PetHygieneLog.self, context: context)
             case String(describing: PetFoodRecord.self):

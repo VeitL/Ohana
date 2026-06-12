@@ -76,6 +76,8 @@ struct PetActivityRecordCleanupService {
         deletedActivityRecordCount += recycleRecords(Array(pet.hygieneLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
         deletedActivityRecordCount += recycleRecords(Array(pet.walkLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
         deletedActivityRecordCount += recycleRecords(Array(pet.healthLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.symptomLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.heatCycleLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
         deletedActivityRecordCount += recycleRecords(Array(pet.foodRecords), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
         deletedActivityRecordCount += recycleRecords(Array(pet.milestones), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
         deletedActivityRecordCount += recycleRecords(Array(pet.medications), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)

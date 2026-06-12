@@ -69,7 +69,7 @@ extension PetHealthDetailContentView {
             }
 
             overviewSectionTitle(l.tr(zh: "最近记录", en: "Recent", de: "Zuletzt"))
-            let preventiveLogs = pet.healthLogs
+            let preventiveLogs = pet.activeHealthLogs
                 .filter { preventiveTypes.contains($0.healthLogType) }
                 .sorted { $0.date > $1.date }
                 .prefix(6)
@@ -162,7 +162,7 @@ extension PetHealthDetailContentView {
                 tint: symptomVisitTint
             )
 
-            if !pet.symptomLogs.isEmpty {
+            if !pet.activeSymptomLogs.isEmpty {
                 overviewSectionTitle(l.tr(zh: "严重程度", en: "Severity", de: "Schweregrad"))
                 symptomSeverityDistribution
             }
@@ -179,7 +179,7 @@ extension PetHealthDetailContentView {
             }
 
             overviewSectionTitle(l.tr(zh: "症状", en: "Symptoms", de: "Symptome"))
-            let symptoms = pet.symptomLogs.sorted { $0.date > $1.date }.prefix(6)
+            let symptoms = pet.activeSymptomLogs.sorted { $0.date > $1.date }.prefix(6)
             if symptoms.isEmpty {
                 emptyOverviewRow(l.tr(zh: "没有异常症状", en: "No symptoms", de: "Keine Symptome"))
             } else {
@@ -196,7 +196,7 @@ extension PetHealthDetailContentView {
             }
 
             overviewSectionTitle(l.tr(zh: "就诊/检查", en: "Visits & procedures", de: "Besuche & Eingriffe"))
-            let visits = pet.healthLogs
+            let visits = pet.activeHealthLogs
                 .filter { visitTypes.contains($0.healthLogType) }
                 .sorted { $0.date > $1.date }
                 .prefix(6)
@@ -397,10 +397,10 @@ extension PetHealthDetailContentView {
 
     var symptomSeverityDistribution: some View {
         let severities = SymptomSeverity.allCases
-        let total = max(1, pet.symptomLogs.count)
+        let total = max(1, pet.activeSymptomLogs.count)
         return VStack(spacing: 9) {
             ForEach(severities, id: \.rawValue) { severity in
-                let count = pet.symptomLogs.count(where: { $0.severity == severity })
+                let count = pet.activeSymptomLogs.count(where: { $0.severity == severity })
                 HStack(spacing: 10) {
                     Text(severity.label)
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))

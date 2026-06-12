@@ -83,7 +83,7 @@ final nonisolated class PetHealthAlertEngine {
         let now = Date()
         let cal = Calendar.current
 
-        for pet in pets where !pet.hasPassedAway {
+        for pet in pets where pet.canWriteHealthFacts {
             alerts += checkVaccines(pet: pet, now: now, cal: cal)
             alerts += checkDeworming(pet: pet, now: now, cal: cal)
             alerts += checkWeight(pet: pet, now: now, cal: cal)
@@ -106,7 +106,7 @@ final nonisolated class PetHealthAlertEngine {
 
     private func checkVaccines(pet: Pet, now: Date, cal: Calendar) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
-        let vaccineLogs = pet.healthLogs.filter { $0.healthLogType == .vaccine && $0.expirationDate != nil }
+        let vaccineLogs = pet.activeHealthLogs.filter { $0.healthLogType == .vaccine && $0.expirationDate != nil }
 
         for log in vaccineLogs {
             guard let expiry = log.expirationDate else { continue }
@@ -138,7 +138,7 @@ final nonisolated class PetHealthAlertEngine {
 
     private func checkDeworming(pet: Pet, now: Date, cal: Calendar) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
-        let dewormLogs = pet.healthLogs.filter {
+        let dewormLogs = pet.activeHealthLogs.filter {
             ($0.healthLogType == .dewormingInternal || $0.healthLogType == .dewormingExternal)
                 && $0.expirationDate != nil
         }
@@ -270,7 +270,7 @@ final nonisolated class PetHealthAlertEngine {
     // MARK: - 年度体检检测
 
     private func checkCheckup(pet: Pet, now: Date, cal: Calendar) -> [HealthAlert] {
-        let checkups = pet.healthLogs.filter { $0.healthLogType == .checkup }
+        let checkups = pet.activeHealthLogs.filter { $0.healthLogType == .checkup }
         guard let last = checkups.map(\.date).max() else {
             guard let birthday = pet.birthday,
                   (cal.dateComponents([.year], from: birthday, to: now).year ?? 0) >= 1 else { return [] }
@@ -331,7 +331,7 @@ final nonisolated class PetHealthAlertEngine {
 
     private func checkSymptoms(pet: Pet, now: Date, cal: Calendar) -> [HealthAlert] {
         var alerts: [HealthAlert] = []
-        let recentSymptoms = pet.symptomLogs.filter { cal.dateComponents([.day], from: $0.date, to: now).day ?? 0 <= 3 }
+        let recentSymptoms = pet.activeSymptomLogs.filter { cal.dateComponents([.day], from: $0.date, to: now).day ?? 0 <= 3 }
 
         let severeSymptoms = recentSymptoms.filter { $0.severity == .critical || $0.severity == .severe }
         for symptom in severeSymptoms {
@@ -352,7 +352,7 @@ final nonisolated class PetHealthAlertEngine {
         // 只对未绝育的宠物生效
         guard !pet.isNeutered else { return alerts }
 
-        if let latestCycle = pet.heatCycleLogs.sorted(by: { $0.startDate > $1.startDate }).first {
+        if let latestCycle = pet.activeHeatCycleLogs.sorted(by: { $0.startDate > $1.startDate }).first {
             let activeHeat = latestCycle.endDate == nil || latestCycle.endDate! > now
 
             // 孕期倒计时

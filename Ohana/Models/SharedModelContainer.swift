@@ -882,6 +882,12 @@ enum ArkSchemaV69: VersionedSchema {
     static var models: [any PersistentModel.Type] { ArkSchemaV68.models + [RecycleBinBatch.self] }
 }
 
+// MARK: - Schema V70（症状与发情记录回收站字段）
+enum ArkSchemaV70: VersionedSchema {
+    static var versionIdentifier = Schema.Version(70, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV69.models }
+}
+
 // MARK: - Migration Plan
 // NOTE: 只保留有真实 custom logic 的 stage。
 // SwiftData 的 lightweight migration 对于"只新增字段/模型"完全不需要显式 stage——
@@ -904,7 +910,8 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV50.self, ArkSchemaV51.self, ArkSchemaV52.self, ArkSchemaV53.self, ArkSchemaV54.self,
          ArkSchemaV55.self, ArkSchemaV56.self, ArkSchemaV57.self, ArkSchemaV58.self, ArkSchemaV59.self,
          ArkSchemaV60.self, ArkSchemaV61.self, ArkSchemaV62.self, ArkSchemaV63.self, ArkSchemaV64.self,
-         ArkSchemaV65.self, ArkSchemaV66.self, ArkSchemaV67.self, ArkSchemaV68.self, ArkSchemaV69.self]
+         ArkSchemaV65.self, ArkSchemaV66.self, ArkSchemaV67.self, ArkSchemaV68.self, ArkSchemaV69.self,
+         ArkSchemaV70.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -938,7 +945,7 @@ enum SharedModelContainer {
     }
 
     private static func createPersistentContainer() -> ModelContainer {
-        let schema = Schema(ArkSchemaV69.models)
+        let schema = Schema(ArkSchemaV70.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none

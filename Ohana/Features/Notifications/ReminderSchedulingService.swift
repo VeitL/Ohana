@@ -45,6 +45,10 @@ enum ReminderSchedulingService {
                 let result = ReminderNotificationScheduleResult.skippedMerged(policyDecision.metadataJSON)
                 recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger, careLedger: careLedger)
                 return result
+            case .skippedUserDisabled:
+                let result = ReminderNotificationScheduleResult.skippedUserDisabled(policyDecision.metadataJSON)
+                recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger, careLedger: careLedger)
+                return result
             case .deliver:
                 break
             }
@@ -261,6 +265,7 @@ enum ReminderSchedulingService {
         case .missingEvent: return "refillMissingEvent"
         case .skippedBudget: return "refillSkippedBudget"
         case .skippedMerged: return "refillMerged"
+        case .skippedUserDisabled: return "refillUserDisabled"
         case .failed: return "refillFailed"
         }
     }

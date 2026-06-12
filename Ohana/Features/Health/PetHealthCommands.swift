@@ -91,7 +91,8 @@ enum PetHealthCommandService {
         careLedger providedCareLedger: CareLedgerRecording? = nil,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil,
         oasisRewards providedOasisRewards: OasisRewardManaging? = nil
-    ) -> PetHealthCommandResult {
+    ) -> PetHealthCommandResult? {
+        guard pet.canWriteHealthFacts else { return nil }
         let careLedger = providedCareLedger ?? CareLedgerService()
         let reminderScheduling = providedReminderScheduling ?? ReminderSchedulingManager()
         let oasisRewards = providedOasisRewards ?? StaticOasisRewardManager(
@@ -288,6 +289,10 @@ enum PetHealthCommandService {
             nil
         }
     }
+
+    static func expirationEventTypeForDeletion(for type: HealthLogType) -> EventType? {
+        expirationEventType(for: type)
+    }
 }
 
 struct PetSymptomCommandInput: Equatable {
@@ -322,7 +327,7 @@ enum PetSymptomCommandService {
         context: ModelContext,
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> PetSymptomCommandResult? {
-        guard !input.cleanSymptomName.isEmpty else { return nil }
+        guard pet.canWriteHealthFacts, !input.cleanSymptomName.isEmpty else { return nil }
         let careLedger = providedCareLedger ?? CareLedgerService()
 
         let log = SymptomLog(
@@ -385,8 +390,33 @@ enum PetHealthDeleteCommandService {
         context: ModelContext
     ) -> PetHealthDeleteResult {
         let recordID = log.id
-        CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
-        context.delete(log)
+        let deletedAt = Date()
+        let batchId = RecycleBinService.aggregateTrashBatchId(kind: "petHealthLog", id: recordID)
+        let derived = derivedRecords(for: log, pet: pet, context: context)
+
+        for reminder in derived.reminders {
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            CloudSyncMutationRecorder.markDeleted(reminder, context: context, deletedAt: deletedAt)
+            context.delete(reminder)
+        }
+        for event in derived.events {
+            CloudSyncMutationRecorder.markDeleted(event, context: context, deletedAt: deletedAt)
+            context.delete(event)
+        }
+        for expense in derived.expenses {
+            RecycleBinService.moveToRecycleBin(
+                expense,
+                now: deletedAt,
+                batchId: batchId,
+                context: context
+            )
+        }
+        for ledger in derived.ledgerEvents {
+            CloudSyncMutationRecorder.markDeleted(ledger, context: context, deletedAt: deletedAt)
+            context.delete(ledger)
+        }
+
+        RecycleBinService.moveToRecycleBin(log, now: deletedAt, context: context)
         context.safeSave()
         return PetHealthDeleteResult(
             subjectID: pet.id,
@@ -404,7 +434,9 @@ enum PetHealthDeleteCommandService {
         context: ModelContext
     ) -> PetHealthDeleteResult {
         let recordID = log.id
-        context.delete(log)
+        let deletedAt = Date()
+        deleteLedgerEvents(modelName: "SymptomLog", modelId: recordID, context: context, deletedAt: deletedAt)
+        RecycleBinService.moveToRecycleBin(log, now: deletedAt, context: context)
         context.safeSave()
         return PetHealthDeleteResult(
             subjectID: pet.id,
@@ -422,7 +454,9 @@ enum PetHealthDeleteCommandService {
         context: ModelContext
     ) -> PetHealthDeleteResult {
         let recordID = log.id
-        context.delete(log)
+        let deletedAt = Date()
+        deleteLedgerEvents(modelName: "HeatCycleLog", modelId: recordID, context: context, deletedAt: deletedAt)
+        RecycleBinService.moveToRecycleBin(log, now: deletedAt, context: context)
         context.safeSave()
         return PetHealthDeleteResult(
             subjectID: pet.id,
@@ -430,6 +464,119 @@ enum PetHealthDeleteCommandService {
             kind: "heat",
             didDelete: true
         )
+    }
+
+    private static func derivedRecords(
+        for log: PetHealthLog,
+        pet: Pet,
+        context: ModelContext
+    ) -> (expenses: [PetExpenseLog], events: [Event], reminders: [Reminder], ledgerEvents: [CareLedgerEvent]) {
+        let allLedger = fetchAll(CareLedgerEvent.self, context: context)
+        let healthLogId = log.id.uuidString
+        let directHealthLedger = allLedger.filter {
+            $0.legacyModelName == "PetHealthLog" && $0.legacyModelId == healthLogId
+        }
+
+        var events = eventsLinkedToHealthLog(log, pet: pet, healthLedger: directHealthLedger, context: context)
+        let eventIds = Set(events.map(\.id.uuidString))
+        var reminders = events.flatMap(\.reminders)
+        reminders += fetchAll(Reminder.self, context: context).filter { reminder in
+            guard let eventId = reminder.event?.id.uuidString else { return false }
+            return eventIds.contains(eventId)
+        }
+        reminders = unique(reminders, by: \.id)
+        let reminderIds = Set(reminders.map(\.id.uuidString))
+
+        let expenses = expensesLinkedToHealthLog(log, pet: pet, context: context)
+        let expenseIds = Set(expenses.map(\.id.uuidString))
+
+        var ledgerEvents = directHealthLedger
+        ledgerEvents += allLedger.filter { ledger in
+            if ledger.legacyModelName == "PetExpenseLog",
+               let legacyModelId = ledger.legacyModelId,
+               expenseIds.contains(legacyModelId) {
+                return true
+            }
+            if let sourceEventId = ledger.sourceEventId, eventIds.contains(sourceEventId) {
+                return true
+            }
+            if let sourceReminderId = ledger.sourceReminderId, reminderIds.contains(sourceReminderId) {
+                return true
+            }
+            return false
+        }
+
+        events = unique(events, by: \.id)
+        ledgerEvents = unique(ledgerEvents, by: \.id)
+        return (expenses, events, reminders, ledgerEvents)
+    }
+
+    private static func eventsLinkedToHealthLog(
+        _ log: PetHealthLog,
+        pet: Pet,
+        healthLedger: [CareLedgerEvent],
+        context: ModelContext
+    ) -> [Event] {
+        let allEvents = fetchAll(Event.self, context: context)
+        let sourceEventIds = Set(healthLedger.compactMap(\.sourceEventId))
+        var linked = allEvents.filter { sourceEventIds.contains($0.id.uuidString) }
+
+        if let expirationDate = log.expirationDate,
+           let eventType = PetHealthCommandService.expirationEventTypeForDeletion(for: log.healthLogType) {
+            linked += allEvents.filter { event in
+                event.relatedEntityType == EntityKind.pet.rawValue &&
+                    event.relatedEntityId == pet.id.uuidString &&
+                    event.eventType == eventType.rawValue &&
+                    abs(event.startDate.timeIntervalSince(expirationDate)) < 1
+            }
+        }
+        return unique(linked, by: \.id)
+    }
+
+    private static func expensesLinkedToHealthLog(
+        _ log: PetHealthLog,
+        pet: Pet,
+        context: ModelContext
+    ) -> [PetExpenseLog] {
+        guard log.cost > 0 else { return [] }
+        return fetchAll(PetExpenseLog.self, context: context).filter { expense in
+            guard expense.trashedAt == nil,
+                  expense.pet?.id == pet.id,
+                  expense.category == ExpenseCategory.medical.rawValue,
+                  abs(expense.amount - log.cost) < 0.001,
+                  abs(expense.date.timeIntervalSince(log.date)) < 1
+            else { return false }
+            return expense.note.isEmpty ||
+                log.note.isEmpty ||
+                log.note.localizedCaseInsensitiveContains(expense.note) ||
+                expense.note.localizedCaseInsensitiveContains(log.note) ||
+                expense.note == log.healthLogType.rawValue
+        }
+    }
+
+    private static func deleteLedgerEvents(
+        modelName: String,
+        modelId: UUID,
+        context: ModelContext,
+        deletedAt: Date
+    ) {
+        let idString = modelId.uuidString
+        let events = fetchAll(CareLedgerEvent.self, context: context).filter {
+            $0.legacyModelName == modelName && $0.legacyModelId == idString
+        }
+        for event in events {
+            CloudSyncMutationRecorder.markDeleted(event, context: context, deletedAt: deletedAt)
+            context.delete(event)
+        }
+    }
+
+    private static func fetchAll<T: PersistentModel>(_: T.Type, context: ModelContext) -> [T] {
+        (try? context.fetch(FetchDescriptor<T>())) ?? []
+    }
+
+    private static func unique<T, ID: Hashable>(_ values: [T], by keyPath: KeyPath<T, ID>) -> [T] {
+        var seen: Set<ID> = []
+        return values.filter { seen.insert($0[keyPath: keyPath]).inserted }
     }
 }
 
@@ -508,8 +655,8 @@ struct PetHealthCommandExecutor {
         awardsReward: Bool = true,
         schedulesReminderNotification: Bool = true,
         note: String
-    ) -> PetHealthCommandResult {
-        let result = PetHealthCommandService.recordHealth(
+    ) -> PetHealthCommandResult? {
+        guard let result = PetHealthCommandService.recordHealth(
             pet: pet,
             input: input,
             context: context,
@@ -519,7 +666,17 @@ struct PetHealthCommandExecutor {
             careLedger: careLedger,
             reminderScheduling: reminderScheduling,
             oasisRewards: oasisRewards
-        )
+        ) else {
+            revisions.publish(
+                DomainMutationResult(
+                    command: .petHealthRecord(petID: pet.id, type: input.type.rawValue),
+                    affectedEntityIDs: [pet.id],
+                    wroteBusinessFact: false,
+                    note: "pet.health.readOnly"
+                )
+            )
+            return nil
+        }
         revisions.publishPetHealthRecord(result, type: input.type.rawValue, note: note)
         return result
     }
@@ -551,8 +708,18 @@ struct PetHealthCommandExecutor {
         pet: Pet,
         input: PetHeatCycleCommandInput,
         note: String
-    ) -> PetHeatCycleCommandResult {
-        let result = PetHeatCycleCommandService.recordHeatCycle(pet: pet, input: input, context: context)
+    ) -> PetHeatCycleCommandResult? {
+        guard let result = PetHeatCycleCommandService.recordHeatCycle(pet: pet, input: input, context: context) else {
+            revisions.publish(
+                DomainMutationResult(
+                    command: .petHealthRecord(petID: pet.id, type: "heat"),
+                    affectedEntityIDs: [pet.id],
+                    wroteBusinessFact: false,
+                    note: "pet.health.readOnly"
+                )
+            )
+            return nil
+        }
         revisions.publishPetHeatCycle(result, note: note)
         return result
     }

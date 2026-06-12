@@ -77,6 +77,9 @@ extension PetHealthDetailContentView {
     }
 
     var healthFabActionKinds: [HealthFabActionKind] {
+        guard pet.canWriteHealthFacts else {
+            return [.vaccinePassport, .archive, .pdf]
+        }
         var actions: [HealthFabActionKind] = [
             .preventive,
             .visit,
@@ -165,6 +168,7 @@ extension PetHealthDetailContentView {
     }
 
     func openHealthRecord(_ destination: HealthPlusDestination, feedback: Bool = true) {
+        guard pet.canWriteHealthFacts else { return }
         if feedback { OhanaFeedback.light() }
         activeHealthSheet = nil
         withAnimation(GoMotion.sheet) {
@@ -194,6 +198,7 @@ extension PetHealthDetailContentView {
     }
 
     func openMedicationPopup(feedback: Bool = true) {
+        guard pet.canWriteHealthFacts else { return }
         if feedback { OhanaFeedback.light() }
         activeHealthSheet = nil
         healthPlusDestination = nil

@@ -205,7 +205,7 @@ struct PetHealthRecordInlinePopup: View {
                 .background(isSaving ? Color.ohanaControlFill : accent, in: Capsule())
             }
             .buttonStyle(ScaleButtonStyle())
-            .disabled(isSaving)
+            .disabled(isSaving || !pet.canWriteHealthFacts)
             .padding(.horizontal, 18)
             .padding(.bottom, 14)
         }
@@ -333,7 +333,7 @@ struct PetHealthRecordInlinePopup: View {
     }
 
     private func save() {
-        guard !isSaving else { return }
+        guard !isSaving, pet.canWriteHealthFacts else { return }
         isSaving = true
         let input = PetHealthRecordCommandInput(
             type: selectedType,
@@ -352,11 +352,15 @@ struct PetHealthRecordInlinePopup: View {
 
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(command) {
-            PetHealthCommandExecutor(context: modelContext, services: appServices).recordHealth(
+            guard PetHealthCommandExecutor(context: modelContext, services: appServices).recordHealth(
                 pet: pet,
                 input: input,
                 note: "pet.health.inline.record"
-            )
+            ) != nil else {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             onSaved()
         }
     }

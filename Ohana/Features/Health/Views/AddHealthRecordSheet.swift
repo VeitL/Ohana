@@ -22,6 +22,7 @@ struct AddHealthRecordSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var selectedType: HealthLogType
@@ -37,6 +38,7 @@ struct AddHealthRecordSheet: View {
     @State private var nextCheckupDate: Date = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var isSaving = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    private var l: L10n { L10n(appLanguage) }
 
     init(pet: Pet, type: HealthLogType, entryMode: HealthRecordEntryMode? = nil) {
         self.pet = pet
@@ -58,10 +60,10 @@ struct AddHealthRecordSheet: View {
 
     private var expirationHint: String {
         switch selectedType {
-        case .vaccine: "推荐：1 年"
-        case .dewormingInternal: "推荐：3 个月"
-        case .dewormingExternal: "推荐：1 个月"
-        case .medication: "推荐：1 个月"
+        case .vaccine: l.tr(zh: "推荐：1 年", en: "Recommended: 1 year", de: "Empfohlen: 1 Jahr")
+        case .dewormingInternal: l.tr(zh: "推荐：3 个月", en: "Recommended: 3 months", de: "Empfohlen: 3 Monate")
+        case .dewormingExternal: l.tr(zh: "推荐：1 个月", en: "Recommended: 1 month", de: "Empfohlen: 1 Monat")
+        case .medication: l.tr(zh: "推荐：1 个月", en: "Recommended: 1 month", de: "Empfohlen: 1 Monat")
         default: ""
         }
     }
@@ -79,13 +81,13 @@ struct AddHealthRecordSheet: View {
 
     private var typeLabel: String {
         switch selectedType {
-        case .vaccine: "疫苗接种"
-        case .medication: "驱虫用药"
-        case .dewormingInternal: "体内驱虫"
-        case .dewormingExternal: "体外驱虫"
-        case .checkup: "体检记录"
-        case .surgery: "就诊记录"
-        default: selectedType.rawValue
+        case .vaccine: l.tr(zh: "疫苗接种", en: "Vaccination", de: "Impfung")
+        case .medication: l.tr(zh: "驱虫用药", en: "Medication", de: "Medikation")
+        case .dewormingInternal: l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .dewormingExternal: l.tr(zh: "体外驱虫", en: "External parasite care", de: "Äußerer Parasitenschutz")
+        case .checkup: l.tr(zh: "体检记录", en: "Checkup record", de: "Check-up-Eintrag")
+        case .surgery: l.tr(zh: "就诊记录", en: "Visit record", de: "Besuchseintrag")
+        default: healthLogTypeTitle(selectedType)
         }
     }
 
@@ -135,7 +137,7 @@ struct AddHealthRecordSheet: View {
                                         .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.goPrimary)
                                         .frame(width: 22)
-                                    TextField("名称（如：狂犬疫苗三联苗）", text: $name) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                    TextField(l.tr(zh: "名称（如：狂犬疫苗三联苗）", en: "Name (e.g. rabies vaccine)", de: "Name (z. B. Tollwutimpfung)"), text: $name) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                         .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                 }
@@ -144,7 +146,7 @@ struct AddHealthRecordSheet: View {
 
                         // 日期
                         fieldCard {
-                            DatePicker("记录日期", selection: $date, displayedComponents: .date)
+                            DatePicker(l.tr(zh: "记录日期", en: "Record date", de: "Eintragsdatum"), selection: $date, displayedComponents: .date)
                                 .datePickerStyle(.compact)
                                 .tint(Color.goPrimary)
                                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -157,7 +159,7 @@ struct AddHealthRecordSheet: View {
                                 VStack(spacing: 10) {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text("设置有效期")
+                                            Text(l.tr(zh: "设置有效期", en: "Set validity", de: "Gültigkeit setzen"))
                                                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(Color.ohanaPrimaryText)
                                             if !expirationHint.isEmpty {
@@ -172,7 +174,7 @@ struct AddHealthRecordSheet: View {
                                             .labelsHidden()
                                     }
                                     if hasExpiration {
-                                        DatePicker("有效期至", selection: $expirationDate, in: date..., displayedComponents: .date)
+                                        DatePicker(l.tr(zh: "有效期至", en: "Valid until", de: "Gültig bis"), selection: $expirationDate, in: date..., displayedComponents: .date)
                                             .datePickerStyle(.compact)
                                             .tint(Color.goYellow)
                                             .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -187,7 +189,7 @@ struct AddHealthRecordSheet: View {
                             fieldCard {
                                 VStack(spacing: 10) {
                                     HStack {
-                                        Text("下次体检提醒")
+                                        Text(l.tr(zh: "下次体检提醒", en: "Next checkup reminder", de: "Nächste Check-up-Erinnerung"))
                                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(Color.ohanaPrimaryText)
                                         Spacer()
@@ -196,7 +198,7 @@ struct AddHealthRecordSheet: View {
                                             .labelsHidden()
                                     }
                                     if hasNextCheckup {
-                                        DatePicker("提醒日期", selection: $nextCheckupDate, in: date..., displayedComponents: .date)
+                                        DatePicker(l.tr(zh: "提醒日期", en: "Reminder date", de: "Erinnerungsdatum"), selection: $nextCheckupDate, in: date..., displayedComponents: .date)
                                             .datePickerStyle(.compact)
                                             .tint(Color.goTeal)
                                             .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -213,7 +215,7 @@ struct AddHealthRecordSheet: View {
                                     .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.goTeal)
                                     .frame(width: 22)
-                                TextField("医生 / 诊所（可选）", text: $vetName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                TextField(l.tr(zh: "医生 / 诊所（可选）", en: "Vet / clinic (optional)", de: "Tierarzt / Praxis (optional)"), text: $vetName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                             }
@@ -250,7 +252,7 @@ struct AddHealthRecordSheet: View {
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                                     .frame(width: 22)
                                     .padding(.top, 2)
-                                TextField("备注 / 笔记（可选）", text: $note, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+                                TextField(l.tr(zh: "备注 / 笔记（可选）", en: "Notes (optional)", de: "Notizen (optional)"), text: $note, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                                     .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(3 ... 6)
@@ -262,7 +264,9 @@ struct AddHealthRecordSheet: View {
                             HStack(spacing: 8) {
                                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
                                     .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                Text(isSaving ? "保存中" : "保存记录")
+                                Text(isSaving
+                                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
+                                    : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern"))
                                     .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             }
                             .foregroundStyle(Color.arkInk)
@@ -274,7 +278,7 @@ struct AddHealthRecordSheet: View {
                             )
                         }
                         .buttonStyle(ScaleButtonStyle())
-                        .disabled(isSaving)
+                        .disabled(isSaving || !pet.canWriteHealthFacts)
 
                         Spacer(minLength: 40)
                     }
@@ -287,7 +291,7 @@ struct AddHealthRecordSheet: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                 }
             }
@@ -314,20 +318,20 @@ struct AddHealthRecordSheet: View {
         let options: [(HealthLogType, String)] = switch mode {
         case .preventive:
             [
-                (.vaccine, "💉 疫苗"),
-                (.dewormingInternal, "🐛 体内驱虫"),
-                (.dewormingExternal, "🛡️ 体外驱虫"),
-                (.checkup, "🩺 体检")
+                (.vaccine, "💉 \(l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung"))"),
+                (.dewormingInternal, "🐛 \(l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung"))"),
+                (.dewormingExternal, "🛡️ \(l.tr(zh: "体外驱虫", en: "External parasite care", de: "Äußerer Parasitenschutz"))"),
+                (.checkup, "🩺 \(l.tr(zh: "体检", en: "Checkup", de: "Check-up"))")
             ]
         case .visit:
             [
-                (.surgery, "🏥 就诊"),
-                (.general, "📋 常规记录")
+                (.surgery, "🏥 \(l.tr(zh: "就诊", en: "Visit", de: "Besuch"))"),
+                (.general, "📋 \(l.tr(zh: "常规记录", en: "General record", de: "Allgemeiner Eintrag"))")
             ]
         }
 
         VStack(alignment: .leading, spacing: 10) {
-            Text("记录类型")
+            Text(l.tr(zh: "记录类型", en: "Record Type", de: "Eintragstyp"))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 4)
@@ -356,7 +360,13 @@ struct AddHealthRecordSheet: View {
     private func applyDefaultsForSelectedType() {
         switch selectedType {
         case .vaccine:
-            if name.isEmpty { name = "\(pet.name)接种疫苗" }
+            if name.isEmpty {
+                name = l.tr(
+                    zh: "\(pet.name)接种疫苗",
+                    en: "\(pet.name) vaccination",
+                    de: "\(pet.name) Impfung"
+                )
+            }
             hasExpiration = true
             expirationDate = defaultExpirationDate(from: date)
         case .dewormingInternal, .dewormingExternal, .medication:
@@ -368,6 +378,31 @@ struct AddHealthRecordSheet: View {
         }
     }
 
+    private func healthLogTypeTitle(_ type: HealthLogType) -> String {
+        switch type {
+        case .general:
+            l.tr(zh: "常规", en: "General", de: "Allgemein")
+        case .vaccine:
+            l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung")
+        case .medication:
+            l.tr(zh: "用药", en: "Medication", de: "Medikation")
+        case .dewormingInternal:
+            l.tr(zh: "体内驱虫", en: "Internal deworming", de: "Innere Entwurmung")
+        case .dewormingExternal:
+            l.tr(zh: "体外驱虫", en: "External parasite care", de: "Äußerer Parasitenschutz")
+        case .surgery:
+            l.tr(zh: "手术", en: "Surgery", de: "Operation")
+        case .dental:
+            l.tr(zh: "牙科", en: "Dental", de: "Zahnmedizin")
+        case .checkup:
+            l.tr(zh: "体检", en: "Checkup", de: "Check-up")
+        case .emergency:
+            l.tr(zh: "急诊", en: "Emergency", de: "Notfall")
+        case .other:
+            l.tr(zh: "其他", en: "Other", de: "Sonstiges")
+        }
+    }
+
     private func fieldCard(@ViewBuilder content: @escaping () -> some View) -> some View {
         content()
             .padding(14)
@@ -376,7 +411,7 @@ struct AddHealthRecordSheet: View {
     }
 
     private func save() {
-        guard !isSaving else { return }
+        guard !isSaving, pet.canWriteHealthFacts else { return }
         isSaving = true
         let input = PetHealthRecordCommandInput(
             type: selectedType,
@@ -395,11 +430,15 @@ struct AddHealthRecordSheet: View {
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            PetHealthCommandExecutor(context: modelContext, services: appServices).recordHealth(
+            guard PetHealthCommandExecutor(context: modelContext, services: appServices).recordHealth(
                 pet: pet,
                 input: input,
                 note: "pet.health.record"
-            )
+            ) != nil else {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             dismiss()
         }
     }

@@ -22,7 +22,7 @@ struct VaccinePassportView: View {
     private var l: L10n { L10n(appLanguage) }
 
     private var vaccineLogs: [PetHealthLog] {
-        pet.healthLogs
+        pet.activeHealthLogs
             .filter { $0.type == HealthLogType.vaccine.rawValue }
             .sorted { $0.date > $1.date }
     }
@@ -419,7 +419,7 @@ struct AddVaccineSheet: View {
     private let reminderOptions = [3, 7, 14, 30]
     private var l: L10n { L10n(appLanguage) }
     private var canSave: Bool {
-        !isSaving && !vaccineName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        pet.canWriteHealthFacts && !isSaving && !vaccineName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var vaccineSuggestions: [String] {
@@ -725,11 +725,15 @@ struct AddVaccineSheet: View {
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(command) {
-            PetHealthCommandExecutor(context: modelContext, services: appServices).recordHealth(
+            guard PetHealthCommandExecutor(context: modelContext, services: appServices).recordHealth(
                 pet: pet,
                 input: input,
                 note: "pet.vaccine.record"
-            )
+            ) != nil else {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             dismiss()
         }
     }

@@ -18,6 +18,7 @@ enum ReminderNotificationScheduleResult: Equatable {
     case missingEvent
     case skippedBudget(String)
     case skippedMerged(String)
+    case skippedUserDisabled(String)
     case failed(String)
 
     var ledgerActionType: String {
@@ -29,6 +30,7 @@ enum ReminderNotificationScheduleResult: Equatable {
         case .missingEvent: "scheduleMissingEvent"
         case .skippedBudget: "scheduleSkippedBudget"
         case .skippedMerged: "scheduleMerged"
+        case .skippedUserDisabled: "scheduleUserDisabled"
         case .failed: "scheduleFailed"
         }
     }
@@ -37,7 +39,8 @@ enum ReminderNotificationScheduleResult: Equatable {
         switch self {
         case let .deferred(metadata),
              let .skippedBudget(metadata),
-             let .skippedMerged(metadata):
+             let .skippedMerged(metadata),
+             let .skippedUserDisabled(metadata):
             metadata
         case let .failed(message):
             "{\"error\":\"\(message.replacingOccurrences(of: "\"", with: "\\\""))\"}"
@@ -173,6 +176,8 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             completion?(.skippedBudget(policyDecision.metadataJSON))
         case .merged:
             completion?(.skippedMerged(policyDecision.metadataJSON))
+        case .skippedUserDisabled:
+            completion?(.skippedUserDisabled(policyDecision.metadataJSON))
         }
     }
 

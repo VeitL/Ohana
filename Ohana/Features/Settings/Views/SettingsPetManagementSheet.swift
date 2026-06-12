@@ -8,6 +8,7 @@ struct SettingsPetManagementSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @State private var showingDeletePetAlert = false
     @State private var petToDelete: Pet? = nil
@@ -19,6 +20,7 @@ struct SettingsPetManagementSheet: View {
     private var secondaryText: Color { Color.ohanaSecondaryText }
     private var tertiaryText: Color { Color.ohanaTertiaryText }
     private var dividerLine: Color { Color.ohanaDivider }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
@@ -37,39 +39,47 @@ struct SettingsPetManagementSheet: View {
             }
             .toolbar(.hidden, for: .navigationBar)
         }
-        .alert("删除 \(petToDelete?.name ?? "")", isPresented: $showingDeletePetAlert) {
-            TextField("输入宠物名字确认", text: $deleteConfirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            Button("取消", role: .cancel) {
+        .alert(l.tr(zh: "删除 \(petToDelete?.name ?? "")", en: "Delete \(petToDelete?.name ?? "")", de: "\(petToDelete?.name ?? "") löschen"), isPresented: $showingDeletePetAlert) {
+            TextField(l.tr(zh: "输入宠物名字确认", en: "Enter pet name to confirm", de: "Tiernamen zur Bestätigung eingeben"), text: $deleteConfirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {
                 petToDelete = nil
                 deleteConfirmName = ""
             }
-            Button("删除", role: .destructive) {
+            Button(l.tr(zh: "删除", en: "Delete", de: "Löschen"), role: .destructive) {
                 deleteSelectedPetIfConfirmed()
             }
         } message: {
             let name = petToDelete?.name ?? ""
-            Text("请输入「\(name)」确认删除。删除后可在回收站中保留 30 天。")
+            Text(l.tr(
+                zh: "请输入「\(name)」确认删除。删除后可在回收站中保留 30 天。",
+                en: "Enter \"\(name)\" to confirm. Deleted pets stay recoverable for 30 days.",
+                de: "Gib „\(name)“ zur Bestätigung ein. Gelöschte Tiere bleiben 30 Tage wiederherstellbar."
+            ))
         }
-        .alert("重置 \(petToReset?.name ?? "") 的数据", isPresented: $showingResetPetData) {
-            Button("取消", role: .cancel) { petToReset = nil }
-            Button("重置记录", role: .destructive) {
+        .alert(l.tr(zh: "重置 \(petToReset?.name ?? "") 的数据", en: "Reset \(petToReset?.name ?? "")'s data", de: "Daten von \(petToReset?.name ?? "") zurücksetzen"), isPresented: $showingResetPetData) {
+            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) { petToReset = nil }
+            Button(l.tr(zh: "重置记录", en: "Reset Records", de: "Einträge zurücksetzen"), role: .destructive) {
                 if let pet = petToReset {
                     resetPetLogs(pet)
                 }
                 petToReset = nil
             }
         } message: {
-            Text("将清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。清除记录会在回收站中保留 30 天。")
+            Text(l.tr(
+                zh: "将清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。清除记录会在回收站中保留 30 天。",
+                en: "All logs for this pet will be cleared, including weight, expenses, health, care, walks, and potty logs. Basic profile details stay. Cleared records remain recoverable for 30 days.",
+                de: "Alle Protokolle dieses Tiers werden geleert, darunter Gewicht, Ausgaben, Gesundheit, Pflege, Spaziergänge und Toiletteneinträge. Basisdaten bleiben erhalten. Geleerte Einträge bleiben 30 Tage wiederherstellbar."
+            ))
         }
     }
 
     private var header: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("宠物管理")
+                Text(l.tr(zh: "宠物管理", en: "Pet Management", de: "Tierverwaltung"))
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(primaryText)
-                Text("重置记录或删除成员")
+                Text(l.tr(zh: "重置记录或删除成员", en: "Reset records or delete members", de: "Einträge zurücksetzen oder Mitglieder löschen"))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(secondaryText)
             }
@@ -91,7 +101,7 @@ struct SettingsPetManagementSheet: View {
                 RoundedRectangle(cornerRadius: OhanaRadius.hairline, style: .continuous)
                     .fill(Color.goPrimary)
                     .frame(width: 3, height: 14) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                Text("成员")
+                Text(l.tr(zh: "成员", en: "Members", de: "Mitglieder"))
                     .font(OhanaFont.caption2(.bold))
                     .foregroundStyle(tertiaryText)
                     .tracking(1.2)
@@ -138,7 +148,7 @@ struct SettingsPetManagementSheet: View {
                 petToReset = pet
                 showingResetPetData = true
             } label: {
-                petActionPill("重置", color: Color.goYellow)
+                petActionPill(l.tr(zh: "重置", en: "Reset", de: "Zurücksetzen"), color: Color.goYellow)
             }
             .buttonStyle(ScaleButtonStyle())
             Button {
@@ -147,7 +157,7 @@ struct SettingsPetManagementSheet: View {
                 deleteConfirmName = ""
                 showingDeletePetAlert = true
             } label: {
-                petActionPill("删除", color: Color.goRed)
+                petActionPill(l.tr(zh: "删除", en: "Delete", de: "Löschen"), color: Color.goRed)
             }
             .buttonStyle(ScaleButtonStyle())
         }

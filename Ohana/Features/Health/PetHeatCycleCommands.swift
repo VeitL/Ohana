@@ -30,7 +30,8 @@ enum PetHeatCycleCommandService {
         pet: Pet,
         input: PetHeatCycleCommandInput,
         context: ModelContext
-    ) -> PetHeatCycleCommandResult {
+    ) -> PetHeatCycleCommandResult? {
+        guard pet.canWriteHealthFacts else { return nil }
         let log = HeatCycleLog(
             startDate: input.startDate,
             endDate: input.endDate,

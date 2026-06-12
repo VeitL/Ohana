@@ -788,7 +788,7 @@ struct HomeCommandExecutorTests {
 
         let date = makeDate(year: 2026, month: 6, day: 8)
         let expirationDate = makeDate(year: 2027, month: 6, day: 8)
-        let result = PetHealthCommandService.recordHealth(
+        let result = try #require(PetHealthCommandService.recordHealth(
             pet: pet,
             input: PetHealthRecordCommandInput(
                 type: .vaccine,
@@ -806,7 +806,7 @@ struct HomeCommandExecutorTests {
             context: context,
             awardsReward: false,
             questManager: makeQuestManager()
-        )
+        ))
 
         let healthLogs = try context.fetch(FetchDescriptor<PetHealthLog>())
         let expenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
@@ -851,7 +851,7 @@ struct HomeCommandExecutorTests {
         let date = makeDate(year: 2026, month: 6, day: 8)
         let expirationDate = makeDate(year: 2027, month: 6, day: 8)
         let reminderDate = makeDate(year: 2027, month: 5, day: 25)
-        let result = PetHealthCommandService.recordHealth(
+        let result = try #require(PetHealthCommandService.recordHealth(
             pet: pet,
             input: PetHealthRecordCommandInput(
                 type: .vaccine,
@@ -871,7 +871,7 @@ struct HomeCommandExecutorTests {
             awardsReward: false,
             schedulesReminderNotification: false,
             questManager: makeQuestManager()
-        )
+        ))
 
         let logs = try context.fetch(FetchDescriptor<PetHealthLog>())
         let expenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
@@ -1436,15 +1436,151 @@ struct HomeCommandExecutorTests {
         let deletedSymptom = PetHealthDeleteCommandService.deleteSymptomLog(symptom, pet: pet, context: context)
         let deletedHeat = PetHealthDeleteCommandService.deleteHeatCycleLog(heat, pet: pet, context: context)
 
-        #expect(try (context.fetch(FetchDescriptor<PetHealthLog>())).isEmpty)
-        #expect(try (context.fetch(FetchDescriptor<SymptomLog>())).isEmpty)
-        #expect(try (context.fetch(FetchDescriptor<HeatCycleLog>())).isEmpty)
+        let healthLogs = try context.fetch(FetchDescriptor<PetHealthLog>())
+        let symptomLogs = try context.fetch(FetchDescriptor<SymptomLog>())
+        let heatLogs = try context.fetch(FetchDescriptor<HeatCycleLog>())
+        #expect(healthLogs.activeRecycleBinItems.isEmpty)
+        #expect(symptomLogs.activeRecycleBinItems.isEmpty)
+        #expect(heatLogs.activeRecycleBinItems.isEmpty)
+        #expect(healthLogs.first?.trashedAt != nil)
+        #expect(symptomLogs.first?.trashedAt != nil)
+        #expect(heatLogs.first?.trashedAt != nil)
         #expect(deletedHealth.subjectID == pet.id)
         #expect(deletedHealth.kind == "health")
         #expect(deletedSymptom.subjectID == pet.id)
         #expect(deletedSymptom.kind == "symptom")
         #expect(deletedHeat.subjectID == pet.id)
         #expect(deletedHeat.kind == "heat")
+    }
+
+    @MainActor
+    @Test func petHealthDeleteServiceCleansDerivedExpenseReminderEventAndLedgerFacts() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let fakeNotifications = RecordingNotificationScheduler()
+        OhanaNotifications.current = fakeNotifications
+        defer { OhanaNotifications.useLive() }
+
+        let pet = Pet(name: "Momo", species: "狗")
+        context.insert(pet)
+        try context.save()
+
+        let date = makeDate(year: 2026, month: 6, day: 8)
+        let expirationDate = makeDate(year: 2027, month: 6, day: 8)
+        let result = try #require(PetHealthCommandService.recordHealth(
+            pet: pet,
+            input: PetHealthRecordCommandInput(
+                type: .vaccine,
+                date: date,
+                name: "Rabies",
+                note: "",
+                vetName: "Clinic",
+                cost: 20,
+                expirationDate: expirationDate,
+                nextCheckupDate: nil,
+                executorId: "human-1",
+                source: .detail,
+                includesNameInNote: true,
+                expirationReminderLeadDays: 14
+            ),
+            context: context,
+            awardsReward: false,
+            schedulesReminderNotification: false,
+            questManager: makeQuestManager()
+        ))
+        let healthLog = try #require(try context.fetch(FetchDescriptor<PetHealthLog>()).first)
+        let reminder = try #require(try context.fetch(FetchDescriptor<Reminder>()).first)
+        reminder.notificationId = "health-reminder"
+        try context.save()
+
+        let deleteResult = PetHealthDeleteCommandService.deleteHealthLog(healthLog, pet: pet, context: context)
+
+        let healthLogs = try context.fetch(FetchDescriptor<PetHealthLog>())
+        let expenses = try context.fetch(FetchDescriptor<PetExpenseLog>())
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+
+        #expect(deleteResult.recordID == result.logID)
+        #expect(healthLogs.count == 1)
+        #expect(healthLogs.first?.trashedAt != nil)
+        #expect(healthLogs.activeRecycleBinItems.isEmpty)
+        #expect(expenses.count == 1)
+        #expect(expenses.first?.id == result.expenseLogID)
+        #expect(expenses.first?.trashedAt != nil)
+        #expect(expenses.activeRecycleBinItems.isEmpty)
+        #expect(events.isEmpty)
+        #expect(reminders.isEmpty)
+        #expect(ledgerEvents.isEmpty)
+        #expect(fakeNotifications.cancelledIds == ["health-reminder"])
+    }
+
+    @MainActor
+    @Test func petHealthWriteCommandsRejectDeceasedAndRecycledPets() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let deceasedPet = Pet(name: "Momo", species: "狗")
+        deceasedPet.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
+        let recycledPet = Pet(name: "Nori", species: "猫")
+        context.insert(deceasedPet)
+        context.insert(recycledPet)
+        RecycleBinService.moveToRecycleBin(recycledPet, context: context)
+        try context.save()
+
+        for pet in [deceasedPet, recycledPet] {
+            let healthResult = PetHealthCommandService.recordHealth(
+                pet: pet,
+                input: PetHealthRecordCommandInput(
+                    type: .checkup,
+                    date: makeDate(year: 2026, month: 6, day: 8),
+                    name: "Annual",
+                    note: "",
+                    vetName: "",
+                    cost: 0,
+                    expirationDate: nil,
+                    nextCheckupDate: nil,
+                    executorId: nil,
+                    source: .detail,
+                    includesNameInNote: true
+                ),
+                context: context,
+                awardsReward: false,
+                questManager: makeQuestManager()
+            )
+            let symptomResult = PetSymptomCommandService.recordSymptom(
+                pet: pet,
+                input: PetSymptomCommandInput(
+                    date: makeDate(year: 2026, month: 6, day: 8),
+                    category: .other,
+                    symptomName: "cough",
+                    severity: .mild,
+                    note: "",
+                    photoData: nil
+                ),
+                context: context
+            )
+            let heatResult = PetHeatCycleCommandService.recordHeatCycle(
+                pet: pet,
+                input: PetHeatCycleCommandInput(
+                    startDate: makeDate(year: 2026, month: 6, day: 8),
+                    endDate: nil,
+                    status: .estrus,
+                    note: "",
+                    isMated: false,
+                    expectedDeliveryDate: nil
+                ),
+                context: context
+            )
+
+            #expect(healthResult == nil)
+            #expect(symptomResult == nil)
+            #expect(heatResult == nil)
+        }
+
+        #expect(try context.fetch(FetchDescriptor<PetHealthLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<SymptomLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HeatCycleLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @MainActor
@@ -1458,7 +1594,7 @@ struct HomeCommandExecutorTests {
         context.insert(pet)
         try context.save()
 
-        let result = PetHeatCycleCommandService.recordHeatCycle(
+        let result = try #require(PetHeatCycleCommandService.recordHeatCycle(
             pet: pet,
             input: PetHeatCycleCommandInput(
                 startDate: startDate,
@@ -1469,7 +1605,7 @@ struct HomeCommandExecutorTests {
                 expectedDeliveryDate: deliveryDate
             ),
             context: context
-        )
+        ))
 
         let logs = try context.fetch(FetchDescriptor<HeatCycleLog>())
         let log = try #require(logs.first)
@@ -4993,7 +5129,7 @@ struct HomeCommandExecutorTests {
 
         let executor = PetHealthCommandExecutor(context: context, revisionCenter: revisionCenter)
         let beforeRevision = revisionCenter.homeRevision.value
-        let health = executor.recordHealth(
+        let health = try #require(executor.recordHealth(
             pet: pet,
             input: PetHealthRecordCommandInput(
                 type: .vaccine,
@@ -5011,7 +5147,7 @@ struct HomeCommandExecutorTests {
             awardsReward: false,
             schedulesReminderNotification: false,
             note: "test.health.record"
-        )
+        ))
         let healthMutation = try #require(revisionCenter.lastMutation)
         #expect(healthMutation.command == .petHealthRecord(petID: pet.id, type: HealthLogType.vaccine.rawValue))
         #expect(healthMutation.affectedEntityIDs == [pet.id, health.logID])
@@ -5034,7 +5170,7 @@ struct HomeCommandExecutorTests {
         #expect(symptomMutation.affectedEntityIDs == [pet.id, symptom.logID, symptom.ledgerEventID])
         #expect(symptomMutation.note == "test.health.symptom")
 
-        let heat = executor.recordHeatCycle(
+        let heat = try #require(executor.recordHeatCycle(
             pet: pet,
             input: PetHeatCycleCommandInput(
                 startDate: makeDate(year: 2026, month: 6, day: 10),
@@ -5045,7 +5181,7 @@ struct HomeCommandExecutorTests {
                 expectedDeliveryDate: nil
             ),
             note: "test.health.heat"
-        )
+        ))
         let heatMutation = try #require(revisionCenter.lastMutation)
         #expect(heatMutation.command == .petHealthRecord(petID: pet.id, type: "heat"))
         #expect(heatMutation.affectedEntityIDs == [pet.id, heat.logID])
@@ -6962,9 +7098,44 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV69.models)
+        let schema = Schema(ArkSchemaV70.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private final class RecordingNotificationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
+        private(set) var cancelledIds: [String] = []
+        private(set) var scheduledIds: [String] = []
+
+        func schedule(reminder: Reminder) {
+            scheduledIds.append(reminder.notificationId)
+        }
+
+        func schedule(
+            reminder: Reminder,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            scheduledIds.append(reminder.notificationId)
+            completion?(.scheduled)
+        }
+
+        func schedule(
+            reminder: Reminder,
+            deliveryDate _: Date?,
+            existingNotificationIds _: Set<String>?,
+            completion: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {
+            scheduledIds.append(reminder.notificationId)
+            completion?(.scheduled)
+        }
+
+        func pendingNotificationIds() async -> Set<String> { [] }
+        func scheduleRollingWindow(reminders _: [Reminder]) {}
+        func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+        func cancel(notificationId: String) { cancelledIds.append(notificationId) }
+        func cancelAll(for _: String, reminders _: [Reminder]) {}
+        func compensate(reminders _: [Reminder]) {}
     }
 
     private func stockReminderEvents(for pet: Pet, context: ModelContext) -> [Event] {

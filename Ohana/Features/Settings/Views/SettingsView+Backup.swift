@@ -8,10 +8,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 extension SettingsView {
-    // MARK: - Backup Section（TASK 1）
+    // MARK: - Backup Section
     @ViewBuilder
     var backupSection: some View {
-        settingsSection(title: "数据备份") {
+        settingsSection(title: l.tr(zh: "数据备份", en: "Data Backup", de: "Datensicherung")) {
             VStack(spacing: 0) {
                 automaticBackupControls
 
@@ -21,10 +21,10 @@ extension SettingsView {
                 HStack(spacing: 10) {
                     settingsIcon("arrow.down.doc.fill", color: Color.goTeal)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("导出备份")
+                        Text(l.tr(zh: "导出备份", en: "Export Backup", de: "Backup exportieren"))
                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
-                        Text("全量 JSON")
+                        Text(l.tr(zh: "全量 JSON", en: "Full JSON", de: "Vollständiges JSON"))
                             .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
                     }
@@ -33,13 +33,13 @@ extension SettingsView {
                         ProgressView().tint(Color.goTeal).scaleEffect(0.8)
                     } else if let url = exportedJSONURL {
                         ShareLink(item: url,
-                                  subject: Text("Ohana 数据备份"),
+                                  subject: Text(l.tr(zh: "Ohana 数据备份", en: "Ohana Data Backup", de: "Ohana Datensicherung")),
                                   message: Text(l.tr(
                                       zh: "该备份包含健康、位置、用药和家庭资料等敏感信息，请只分享给可信对象。",
                                       en: "This backup contains sensitive health, location, medication, and family data. Share it only with trusted people.",
                                       de: "Dieses Backup enthält sensible Gesundheits-, Standort-, Medikamenten- und Familiendaten. Nur vertrauenswürdig teilen."
                                   ))) {
-                            backupPill("分享", icon: "square.and.arrow.up", color: Color.goTeal)
+                            backupPill(l.tr(zh: "分享", en: "Share", de: "Teilen"), icon: "square.and.arrow.up", color: Color.goTeal)
                         }
                         .buttonStyle(ScaleButtonStyle())
                     } else {
@@ -59,7 +59,7 @@ extension SettingsView {
                                 isExporting = false
                             }
                         } label: {
-                            backupPill("生成备份", icon: "archivebox", color: Color.goTeal)
+                            backupPill(l.tr(zh: "生成备份", en: "Create Backup", de: "Backup erstellen"), icon: "archivebox", color: Color.goTeal)
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
@@ -138,10 +138,10 @@ extension SettingsView {
                 HStack(spacing: 10) {
                     settingsIcon("square.and.arrow.down.fill", color: Color.goOrange)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("从备份恢复")
+                        Text(l.tr(zh: "从备份恢复", en: "Restore from Backup", de: "Aus Backup wiederherstellen"))
                             .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
-                        Text("选择 .json")
+                        Text(l.tr(zh: "选择 .json", en: "Choose .json", de: ".json auswählen"))
                             .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(tertiaryText)
                     }
@@ -152,7 +152,7 @@ extension SettingsView {
                         Button {
                             showingImportPicker = true
                         } label: {
-                            backupPill("选择文件", icon: "folder", color: Color.goOrange)
+                            backupPill(l.tr(zh: "选择文件", en: "Choose File", de: "Datei wählen"), icon: "folder", color: Color.goOrange)
                         }
                         .buttonStyle(ScaleButtonStyle())
                     }
@@ -166,7 +166,7 @@ extension SettingsView {
                     Image(systemName: "info.circle") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow.opacity(0.6))
-                    Text("恢复会自动去重。")
+                    Text(l.tr(zh: "恢复会自动去重。", en: "Restore automatically deduplicates records.", de: "Die Wiederherstellung entfernt Duplikate automatisch."))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText.opacity(0.7))
                         .fixedSize(horizontal: false, vertical: true)
@@ -203,15 +203,15 @@ extension SettingsView {
                 showingImportErrorAlert = true
             }
         }
-        .alert("恢复成功", isPresented: $showingImportSuccess) {
-            Button("好的") {}
+        .alert(l.tr(zh: "恢复成功", en: "Restore Complete", de: "Wiederherstellung abgeschlossen"), isPresented: $showingImportSuccess) {
+            Button(l.tr(zh: "好的", en: "OK", de: "OK")) {}
         } message: {
-            Text("数据已成功导入，请重新进入 App 主页查看。")
+            Text(l.tr(zh: "数据已成功导入，请重新进入 App 主页查看。", en: "Data was imported successfully. Reopen the app home to review it.", de: "Die Daten wurden erfolgreich importiert. Öffne die App-Startseite erneut, um sie zu prüfen."))
         }
-        .alert("操作失败", isPresented: $showingImportErrorAlert) {
-            Button("好的") {}
+        .alert(l.tr(zh: "操作失败", en: "Action Failed", de: "Aktion fehlgeschlagen"), isPresented: $showingImportErrorAlert) {
+            Button(l.tr(zh: "好的", en: "OK", de: "OK")) {}
         } message: {
-            Text(importError ?? "未知错误")
+            Text(importError ?? l.tr(zh: "未知错误", en: "Unknown error", de: "Unbekannter Fehler"))
         }
         .onAppear {
             refreshAutomaticBackupStatus()

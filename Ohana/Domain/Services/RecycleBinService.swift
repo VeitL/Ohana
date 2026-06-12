@@ -37,6 +37,8 @@ extension PetWeightLog: RecycleBinSoftDeletable {}
 extension PetExpenseLog: RecycleBinSoftDeletable {}
 extension PetHygieneLog: RecycleBinSoftDeletable {}
 extension PetHealthLog: RecycleBinSoftDeletable {}
+extension SymptomLog: RecycleBinSoftDeletable {}
+extension HeatCycleLog: RecycleBinSoftDeletable {}
 extension PetFoodRecord: RecycleBinSoftDeletable {}
 extension PetMedication: RecycleBinSoftDeletable {}
 extension PetPhotoLog: RecycleBinSoftDeletable {}
@@ -52,6 +54,9 @@ nonisolated enum RecycleBinEntryKind: String, Codable, CaseIterable {
     case petMilestone
     case petDocument
     case petInsurance
+    case petHealthLog
+    case symptomLog
+    case heatCycleLog
     case petActivityClearBatch
 }
 
@@ -165,6 +170,8 @@ enum RecycleBinService {
         result.purgedSourceCount += purgeExpiredSources(PetExpenseLog.self, context: context, now: now)
         result.purgedSourceCount += purgeExpiredSources(PetHygieneLog.self, context: context, now: now)
         result.purgedSourceCount += purgeExpiredSources(PetHealthLog.self, context: context, now: now)
+        result.purgedSourceCount += purgeExpiredSources(SymptomLog.self, context: context, now: now)
+        result.purgedSourceCount += purgeExpiredSources(HeatCycleLog.self, context: context, now: now)
         result.purgedSourceCount += purgeExpiredSources(PetFoodRecord.self, context: context, now: now)
         result.purgedSourceCount += purgeExpiredSources(PetMedication.self, context: context, now: now)
         result.purgedSourceCount += purgeExpiredSources(PetPhotoLog.self, context: context, now: now)
@@ -215,6 +222,15 @@ enum RecycleBinService {
             + trashed(PetInsurance.self, context: context)
             .filter(\.trashBatchId.isEmpty)
             .map { item(kind: .petInsurance, id: $0.id, title: $0.productName.isEmpty ? $0.companyName : $0.productName, subtitle: $0.pet?.name ?? "", source: $0) }
+            + trashed(PetHealthLog.self, context: context)
+            .filter(\.trashBatchId.isEmpty)
+            .map { item(kind: .petHealthLog, id: $0.id, title: $0.note.isEmpty ? $0.type : $0.note, subtitle: $0.pet?.name ?? "", source: $0) }
+            + trashed(SymptomLog.self, context: context)
+            .filter(\.trashBatchId.isEmpty)
+            .map { item(kind: .symptomLog, id: $0.id, title: $0.symptomName.isEmpty ? $0.categoryRaw : $0.symptomName, subtitle: $0.pet?.name ?? "", source: $0) }
+            + trashed(HeatCycleLog.self, context: context)
+            .filter(\.trashBatchId.isEmpty)
+            .map { item(kind: .heatCycleLog, id: $0.id, title: $0.statusRaw, subtitle: $0.pet?.name ?? "", source: $0) }
     }
 
     private static func trashedBatches(context: ModelContext) -> [RecycleBinListItem] {
@@ -283,6 +299,12 @@ enum RecycleBinService {
             restoreSource(PetDocument.self, id: id, context: context)
         case .petInsurance:
             restoreSource(PetInsurance.self, id: id, context: context)
+        case .petHealthLog:
+            restoreSource(PetHealthLog.self, id: id, context: context)
+        case .symptomLog:
+            restoreSource(SymptomLog.self, id: id, context: context)
+        case .heatCycleLog:
+            restoreSource(HeatCycleLog.self, id: id, context: context)
         case .petActivityClearBatch:
             0
         }
@@ -342,6 +364,8 @@ enum RecycleBinService {
         restoredCount += restoreBatchSources(PetExpenseLog.self, batchId: batchId, context: context)
         restoredCount += restoreBatchSources(PetHygieneLog.self, batchId: batchId, context: context)
         restoredCount += restoreBatchSources(PetHealthLog.self, batchId: batchId, context: context)
+        restoredCount += restoreBatchSources(SymptomLog.self, batchId: batchId, context: context)
+        restoredCount += restoreBatchSources(HeatCycleLog.self, batchId: batchId, context: context)
         restoredCount += restoreBatchSources(PetFoodRecord.self, batchId: batchId, context: context)
         restoredCount += restoreBatchSources(PetMedication.self, batchId: batchId, context: context)
         restoredCount += restoreBatchSources(PetPhotoLog.self, batchId: batchId, context: context)

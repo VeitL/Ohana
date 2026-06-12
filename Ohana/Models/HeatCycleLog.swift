@@ -38,6 +38,10 @@ final class HeatCycleLog {
     var note: String
     var isMated: Bool
     var expectedDeliveryDate: Date? // 如果确认交配/怀孕，记录预期产期
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     var pet: Pet?
 

@@ -11,7 +11,7 @@ extension SettingsView {
     // MARK: - Header
     var settingsHeader: some View {
         HStack(spacing: 12) {
-            Text("设置")
+            Text(l.tr(zh: "设置", en: "Settings", de: "Einstellungen"))
                 .font(OhanaFont.largeTitle(.black))
                 .foregroundStyle(primaryText)
             Spacer()
@@ -172,7 +172,7 @@ extension SettingsView {
         biometricGateAvailability = MemberGateBiometricAuthenticator.availability()
     }
 
-    func notificationToggleRow(icon: String, iconColor: Color, title: String, key: String) -> some View {
+    func notificationToggleRow(icon: String, iconColor: Color, title: String, group: NotificationPreferenceGroup) -> some View {
         HStack(spacing: 12) {
             settingsIcon(icon, color: iconColor)
             Text(title)
@@ -180,8 +180,8 @@ extension SettingsView {
                 .foregroundStyle(primaryText)
             Spacer()
             Toggle("", isOn: Binding(
-                get: { SettingsPreferenceStore.enabledByDefaultBool(forKey: key) },
-                set: { SettingsPreferenceStore.set($0, forKey: key) }
+                get: { NotificationPreferenceStore.isEnabled(group) },
+                set: { NotificationPreferenceStore.set($0, for: group) }
             ))
             .tint(accentColor)
             .labelsHidden()

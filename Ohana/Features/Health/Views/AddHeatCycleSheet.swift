@@ -13,6 +13,7 @@ struct AddHeatCycleSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @State private var startDate = Date()
@@ -25,37 +26,40 @@ struct AddHeatCycleSheet: View {
     @State private var isSaving = false
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
+    private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("当前阶段", selection: $status) {
+                    Picker(l.tr(zh: "当前阶段", en: "Current stage", de: "Aktuelle Phase"), selection: $status) {
                         ForEach(HeatCycleStatus.allCases, id: \.self) { s in
-                            Text(s.rawValue).tag(s)
+                            Text(statusTitle(s)).tag(s)
                         }
                     }
                     .tint(themeColor)
 
-                    DatePicker("开始时间", selection: $startDate, displayedComponents: .date)
+                    DatePicker(l.tr(zh: "开始时间", en: "Start date", de: "Startdatum"), selection: $startDate, displayedComponents: .date)
 
-                    Toggle("已知结束时间", isOn: $hasEndDate).tint(themeColor)
+                    Toggle(l.tr(zh: "已知结束时间", en: "Known end date", de: "Enddatum bekannt"), isOn: $hasEndDate).tint(themeColor)
                     if hasEndDate {
-                        DatePicker("结束时间", selection: $endDate, displayedComponents: .date)
+                        DatePicker(l.tr(zh: "结束时间", en: "End date", de: "Enddatum"), selection: $endDate, displayedComponents: .date)
                     }
                 } header: {
-                    Text("生理期状态").font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                    Text(l.tr(zh: "生理期状态", en: "Heat Cycle Status", de: "Läufigkeitsstatus"))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 }
 
                 if status == .estrus || status == .pregnant {
                     Section {
-                        Toggle("已发生交配", isOn: $isMated).tint(themeColor)
+                        Toggle(l.tr(zh: "已发生交配", en: "Mating occurred", de: "Deckakt erfolgt"), isOn: $isMated).tint(themeColor)
                         if isMated || status == .pregnant {
-                            DatePicker("预计产期", selection: $expectedDeliveryDate, displayedComponents: .date)
+                            DatePicker(l.tr(zh: "预计产期", en: "Expected delivery", de: "Voraussichtlicher Wurftermin"), selection: $expectedDeliveryDate, displayedComponents: .date)
                                 .tint(.pink)
                         }
                     } header: {
-                        Text("繁育记录").font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                        Text(l.tr(zh: "繁育记录", en: "Breeding Record", de: "Zuchtprotokoll"))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                     }
                 }
 
@@ -63,28 +67,31 @@ struct AddHeatCycleSheet: View {
                     TextEditor(text: $note)
                         .frame(minHeight: 80)
                 } header: {
-                    Text("备注说明 (可选)").font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                    Text(l.tr(zh: "备注说明（可选）", en: "Notes (optional)", de: "Notizen (optional)"))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 }
 
                 Section {
                     Button {
                         save()
                     } label: {
-                        Text(isSaving ? "保存中…" : "保存记录")
+                        Text(isSaving
+                            ? l.tr(zh: "保存中...", en: "Saving...", de: "Speichert...")
+                            : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern"))
                             .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                     }
                     .listRowBackground(themeColor)
-                    .disabled(isSaving)
+                    .disabled(isSaving || !pet.canWriteHealthFacts)
                 }
             }
-            .navigationTitle("记录生理期")
+            .navigationTitle(l.tr(zh: "记录生理期", en: "Log Heat Cycle", de: "Läufigkeit erfassen"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { dismiss() }
+                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -98,7 +105,7 @@ struct AddHeatCycleSheet: View {
     }
 
     private func save() {
-        guard !isSaving else { return }
+        guard !isSaving, pet.canWriteHealthFacts else { return }
         let input = PetHeatCycleCommandInput(
             startDate: startDate,
             endDate: hasEndDate ? endDate : nil,
@@ -112,13 +119,34 @@ struct AddHeatCycleSheet: View {
         isSaving = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(command) {
-            PetHealthCommandExecutor(context: modelContext, services: appServices).recordHeatCycle(
+            guard PetHealthCommandExecutor(context: modelContext, services: appServices).recordHeatCycle(
                 pet: pet,
                 input: input,
                 note: "pet.heat.record"
-            )
+            ) != nil else {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             dismiss()
+        }
+    }
+
+    private func statusTitle(_ status: HeatCycleStatus) -> String {
+        switch status {
+        case .proestrus:
+            l.tr(zh: "发情前期", en: "Proestrus", de: "Proöstrus")
+        case .estrus:
+            l.tr(zh: "发情期", en: "Estrus", de: "Östrus")
+        case .diestrus:
+            l.tr(zh: "发情后期", en: "Diestrus", de: "Diöstrus")
+        case .anestrus:
+            l.tr(zh: "休情期", en: "Anestrus", de: "Anöstrus")
+        case .pregnant:
+            l.tr(zh: "孕期", en: "Pregnancy", de: "Trächtigkeit")
+        case .nursing:
+            l.tr(zh: "哺乳期", en: "Nursing", de: "Säugezeit")
         }
     }
 }

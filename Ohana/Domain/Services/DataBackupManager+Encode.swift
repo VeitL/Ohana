@@ -32,6 +32,8 @@ nonisolated extension DataBackupManager {
         weightLogs: [PetWeightLog],
         expenseLogs: [PetExpenseLog],
         healthLogs: [PetHealthLog],
+        symptomLogs: [SymptomLog],
+        heatCycleLogs: [HeatCycleLog],
         hygieneLogs: [PetHygieneLog],
         foodRecords: [PetFoodRecord],
         documents: [PetDocument],
@@ -51,6 +53,8 @@ nonisolated extension DataBackupManager {
         appendTrashStates(weightLogs, entityName: String(describing: PetWeightLog.self), to: &states, snapshot: weightLogTrashSnapshot)
         appendTrashStates(expenseLogs, entityName: String(describing: PetExpenseLog.self), to: &states, snapshot: expenseLogTrashSnapshot)
         appendTrashStates(healthLogs, entityName: String(describing: PetHealthLog.self), to: &states, snapshot: healthLogTrashSnapshot)
+        appendTrashStates(symptomLogs, entityName: String(describing: SymptomLog.self), to: &states, snapshot: symptomLogTrashSnapshot)
+        appendTrashStates(heatCycleLogs, entityName: String(describing: HeatCycleLog.self), to: &states, snapshot: heatCycleLogTrashSnapshot)
         appendTrashStates(hygieneLogs, entityName: String(describing: PetHygieneLog.self), to: &states, snapshot: hygieneLogTrashSnapshot)
         appendTrashStates(foodRecords, entityName: String(describing: PetFoodRecord.self), to: &states, snapshot: foodRecordTrashSnapshot)
         appendTrashStates(documents, entityName: String(describing: PetDocument.self), to: &states, snapshot: documentTrashSnapshot)
@@ -135,6 +139,14 @@ nonisolated extension DataBackupManager {
     }
 
     private func healthLogTrashSnapshot(_ value: PetHealthLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func symptomLogTrashSnapshot(_ value: SymptomLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func heatCycleLogTrashSnapshot(_ value: HeatCycleLog) -> TrashSnapshot {
         trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
     }
 

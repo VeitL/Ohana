@@ -297,24 +297,28 @@ struct SettingsView: View {
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                             notificationToggleRow(
                                 icon: "pills.fill", iconColor: Color(hex: "FF5A00"),
-                                title: "用药提醒", key: "notif_medication_enabled"
+                                title: l.tr(zh: "用药提醒", en: "Medication reminders", de: "Medikamentenerinnerungen"),
+                                group: .medication
                             )
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                             petMedicationNotificationPrivacyRow
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                             notificationToggleRow(
                                 icon: "fork.knife", iconColor: Color.goPrimary,
-                                title: "喂食提醒", key: "notif_feeding_enabled"
+                                title: l.tr(zh: "喂食提醒", en: "Feeding reminders", de: "Fütterungserinnerungen"),
+                                group: .feeding
                             )
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                             notificationToggleRow(
                                 icon: "bubbles.and.sparkles.fill", iconColor: Color.goTeal,
-                                title: "护理提醒", key: "notif_hygiene_enabled"
+                                title: l.tr(zh: "护理提醒", en: "Care reminders", de: "Pflegeerinnerungen"),
+                                group: .hygiene
                             )
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                             notificationToggleRow(
                                 icon: "checkmark.seal.fill", iconColor: Color.goYellow,
-                                title: "打卡提醒", key: "notif_checkin_enabled"
+                                title: l.tr(zh: "打卡提醒", en: "Check-in reminders", de: "Check-in-Erinnerungen"),
+                                group: .checkIn
                             )
                         }
 
@@ -322,83 +326,39 @@ struct SettingsView: View {
                         backupSection
 
                         // 关于
-                        settingsSection(title: "关于") {
+                        settingsSection(title: l.tr(zh: "关于", en: "About", de: "Über")) {
                             VStack(spacing: 0) {
-                                settingsRow(icon: "info.circle", title: "版本", subtitle: "v4.5.0") {}
+                                settingsRow(
+                                    icon: "info.circle",
+                                    title: l.tr(zh: "版本", en: "Version", de: "Version"),
+                                    subtitle: "v4.5.0"
+                                ) {}
                                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-                                settingsRow(icon: "star.fill", title: "评价 App", subtitle: "") {
+                                settingsRow(
+                                    icon: "star.fill",
+                                    title: l.tr(zh: "评价 App", en: "Rate App", de: "App bewerten"),
+                                    subtitle: ""
+                                ) {
                                     if let url = URL(string: "https://apps.apple.com/app/id6742117937?action=write-review") {
                                         UIApplication.shared.open(url)
                                     }
                                 }
-                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-                                settingsRow(icon: "lock.shield", title: "隐私政策", subtitle: "") {}
-                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-                                settingsRow(icon: "envelope", title: "联系开发者", subtitle: "") {}
                             }
                         }
 
-                        // 开发者工具
-                        settingsSection(title: "开发者工具") {
-                            NavigationLink {
-                                UIGuidelinesView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    settingsIcon("rectangle.3.group.bubble.left.fill", color: Color.goTeal)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("UI/UX 规范查看")
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(primaryText)
-                                        Text("组件、页面、流程与验收")
-                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(tertiaryText)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
-                                }
-                                .frame(minHeight: 44)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-
-                            NavigationLink {
-                                NavigationBarStyleLabView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    settingsIcon("rectangle.bottomthird.inset.filled", color: Color.goPrimary)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(l.tr(zh: "导航栏样式测试", en: "Navigation bar style lab", de: "Navigationsleisten-Labor"))
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(primaryText)
-                                        Text(l.tr(zh: "3-tab、4-tab 与主题按钮候选", en: "3-tab, 4-tab, and theme button candidates", de: "3-Tab, 4-Tab und Designfarben-Taste"))
-                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(tertiaryText)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
-                                }
-                                .frame(minHeight: 44)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-
-                            if OnlineFeatureGate.allows(.onlineCollaboration) {
+                        #if DEBUG
+                            // 开发者工具
+                            settingsSection(title: l.tr(zh: "开发者工具", en: "Developer Tools", de: "Entwicklertools")) {
                                 NavigationLink {
-                                    FamilyCollaborationPlaygroundView()
+                                    UIGuidelinesView()
                                 } label: {
                                     HStack(spacing: 12) {
-                                        settingsIcon("person.3.sequence.fill", color: Color.goPurple)
+                                        settingsIcon("rectangle.3.group.bubble.left.fill", color: Color.goTeal)
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text(l.tr(zh: "家庭协作体验测试", en: "Family collab playground", de: "Familien-Testbereich"))
+                                            Text(l.tr(zh: "UI/UX 规范查看", en: "UI/UX guideline viewer", de: "UI/UX-Richtlinien"))
                                                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(primaryText)
-                                            Text(l.tr(zh: "任务盘、宠物地图、家人竞赛", en: "Board, pet map, family race", de: "Brett, Tierkarte, Familienrennen"))
+                                            Text(l.tr(zh: "组件、页面、流程与验收", en: "Components, pages, flows, and checks", de: "Komponenten, Seiten, Flows und Checks"))
                                                 .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(tertiaryText)
                                         }
@@ -412,160 +372,204 @@ struct SettingsView: View {
                                 .buttonStyle(ScaleButtonStyle())
 
                                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-                            }
 
-                            NavigationLink {
-                                WalletMotionLabView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    settingsIcon("creditcard.fill", color: Color.goPrimary)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(l.tr(zh: "Apple Wallet 动效实验室", en: "Apple Wallet motion lab", de: "Apple-Wallet-Bewegungslabor"))
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(primaryText)
-                                        Text(l.tr(zh: "卡片堆、抽出、收回与调试", en: "Stack, hero, collapse, and debug", de: "Stapel, Hero, Zurück und Debug"))
-                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(tertiaryText)
+                                NavigationLink {
+                                    NavigationBarStyleLabView()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        settingsIcon("rectangle.bottomthird.inset.filled", color: Color.goPrimary)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(l.tr(zh: "导航栏样式测试", en: "Navigation bar style lab", de: "Navigationsleisten-Labor"))
+                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(primaryText)
+                                            Text(l.tr(zh: "3-tab、4-tab 与主题按钮候选", en: "3-tab, 4-tab, and theme button candidates", de: "3-Tab, 4-Tab und Designfarben-Taste"))
+                                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(tertiaryText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(tertiaryText.opacity(0.6))
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                    .frame(minHeight: 44)
                                 }
-                                .frame(minHeight: 44)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
+                                .buttonStyle(ScaleButtonStyle())
 
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
-                            NavigationLink {
-                                MotionPreviewLabView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    settingsIcon("sparkles", color: Color.goPrimary)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(l.tr(zh: "全局动效预览", en: "Global motion preview", de: "Globale Bewegungs-Vorschau"))
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(primaryText)
-                                        Text(l.tr(zh: "Capsule 默认、Chart Flow、5 个原色", en: "Capsule default, Flow charts, 5 colors", de: "Capsule als Standard, Flow-Charts, 5 Farben"))
-                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(tertiaryText)
+                                if OnlineFeatureGate.allows(.onlineCollaboration) {
+                                    NavigationLink {
+                                        FamilyCollaborationPlaygroundView()
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            settingsIcon("person.3.sequence.fill", color: Color.goPurple)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(l.tr(zh: "家庭协作体验测试", en: "Family collab playground", de: "Familien-Testbereich"))
+                                                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                    .foregroundStyle(primaryText)
+                                                Text(l.tr(zh: "任务盘、宠物地图、家人竞赛", en: "Board, pet map, family race", de: "Brett, Tierkarte, Familienrennen"))
+                                                    .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                    .foregroundStyle(tertiaryText)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                                .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(tertiaryText.opacity(0.6))
+                                        }
+                                        .frame(minHeight: 44)
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                    .buttonStyle(ScaleButtonStyle())
+
+                                    OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                                 }
-                                .frame(minHeight: 44)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
 
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
-
-                            NavigationLink {
-                                VerticalGlassHomeLabView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    settingsIcon("rectangle.portrait.on.rectangle.portrait", color: Color.goPrimary)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(l.tr(zh: "竖版实色首页实验室", en: "Solid portrait home lab", de: "Solides Hochformat-Home-Labor"))
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(primaryText)
-                                        Text(l.tr(zh: "底部导航、竖卡片、内嵌快捷操作", en: "Bottom nav, portrait cards, embedded actions", de: "Untere Navigation, Hochformatkarten, Aktionen"))
-                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(tertiaryText)
+                                NavigationLink {
+                                    WalletMotionLabView()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        settingsIcon("creditcard.fill", color: Color.goPrimary)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(l.tr(zh: "Apple Wallet 动效实验室", en: "Apple Wallet motion lab", de: "Apple-Wallet-Bewegungslabor"))
+                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(primaryText)
+                                            Text(l.tr(zh: "卡片堆、抽出、收回与调试", en: "Stack, hero, collapse, and debug", de: "Stapel, Hero, Zurück und Debug"))
+                                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(tertiaryText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(tertiaryText.opacity(0.6))
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                    .frame(minHeight: 44)
                                 }
-                                .frame(minHeight: 44)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
+                                .buttonStyle(ScaleButtonStyle())
 
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
-                            NavigationLink {
-                                CoconutBalanceTestView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    settingsIcon("circle.hexagongrid.fill", color: Color.goYellow)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(l.tr(zh: "椰子数量测试", en: "Coconut balance test", de: "Kokosnuss-Teststand"))
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(primaryText)
-                                        Text(l.tr(zh: "手动设置当前用户余额", en: "Manually set current member balance", de: "Kontostand manuell setzen"))
-                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(tertiaryText)
+                                NavigationLink {
+                                    MotionPreviewLabView()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        settingsIcon("sparkles", color: Color.goPrimary)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(l.tr(zh: "全局动效预览", en: "Global motion preview", de: "Globale Bewegungs-Vorschau"))
+                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(primaryText)
+                                            Text(l.tr(zh: "Capsule 默认、Chart Flow、5 个原色", en: "Capsule default, Flow charts, 5 colors", de: "Capsule als Standard, Flow-Charts, 5 Farben"))
+                                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(tertiaryText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(tertiaryText.opacity(0.6))
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                    .frame(minHeight: 44)
                                 }
-                                .frame(minHeight: 44)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
+                                .buttonStyle(ScaleButtonStyle())
 
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
-                            NavigationLink {
-                                PerformanceDiagnosticsView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    settingsIcon("speedometer", color: Color.goPrimary)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("性能诊断面板")
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(primaryText)
-                                        Text("性能记录")
-                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(tertiaryText)
+                                NavigationLink {
+                                    VerticalGlassHomeLabView()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        settingsIcon("rectangle.portrait.on.rectangle.portrait", color: Color.goPrimary)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(l.tr(zh: "竖版实色首页实验室", en: "Solid portrait home lab", de: "Solides Hochformat-Home-Labor"))
+                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(primaryText)
+                                            Text(l.tr(zh: "底部导航、竖卡片、内嵌快捷操作", en: "Bottom nav, portrait cards, embedded actions", de: "Untere Navigation, Hochformatkarten, Aktionen"))
+                                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(tertiaryText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(tertiaryText.opacity(0.6))
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                    .frame(minHeight: 44)
                                 }
-                                .frame(minHeight: 44)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
+                                .buttonStyle(ScaleButtonStyle())
 
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
-                            NavigationLink {
-                                HumanPrivacyTestView(humans: homeHumans ?? [])
-                            } label: {
-                                HStack(spacing: 12) {
-                                    settingsIcon("lock.shield.fill", color: Color.goYellow)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("隐私测试面板")
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(primaryText)
-                                        Text("可见性检查")
-                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(tertiaryText)
+                                NavigationLink {
+                                    CoconutBalanceTestView()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        settingsIcon("circle.hexagongrid.fill", color: Color.goYellow)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(l.tr(zh: "椰子数量测试", en: "Coconut balance test", de: "Kokosnuss-Teststand"))
+                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(primaryText)
+                                            Text(l.tr(zh: "手动设置当前用户余额", en: "Manually set current member balance", de: "Kontostand manuell setzen"))
+                                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(tertiaryText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(tertiaryText.opacity(0.6))
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                    .frame(minHeight: 44)
                                 }
-                                .frame(minHeight: 44)
+                                .buttonStyle(ScaleButtonStyle())
+
+                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                                NavigationLink {
+                                    PerformanceDiagnosticsView()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        settingsIcon("speedometer", color: Color.goPrimary)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(l.tr(zh: "性能诊断面板", en: "Performance diagnostics", de: "Leistungsdiagnose"))
+                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(primaryText)
+                                            Text(l.tr(zh: "性能记录", en: "Performance samples", de: "Leistungsproben"))
+                                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(tertiaryText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(tertiaryText.opacity(0.6))
+                                    }
+                                    .frame(minHeight: 44)
+                                }
+                                .buttonStyle(ScaleButtonStyle())
+
+                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+
+                                NavigationLink {
+                                    HumanPrivacyTestView(humans: homeHumans ?? [])
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        settingsIcon("lock.shield.fill", color: Color.goYellow)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(l.tr(zh: "隐私测试面板", en: "Privacy test panel", de: "Datenschutz-Testbereich"))
+                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(primaryText)
+                                            Text(l.tr(zh: "可见性检查", en: "Visibility checks", de: "Sichtbarkeitschecks"))
+                                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(tertiaryText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(tertiaryText.opacity(0.6))
+                                    }
+                                    .frame(minHeight: 44)
+                                }
+                                .buttonStyle(ScaleButtonStyle())
                             }
-                            .buttonStyle(ScaleButtonStyle())
-                        }
+                        #endif
 
                         // 数据
                         settingsSection(title: l.tr(zh: "数据", en: "Data", de: "Daten")) {
                             VStack(spacing: 0) {
-                                settingsRow(
-                                    icon: "square.and.arrow.up",
-                                    title: l.tr(zh: "导出数据", en: "Export Data", de: "Daten exportieren"),
-                                    subtitle: l.tr(zh: "即将推出", en: "Coming soon", de: "Demnachst")
-                                ) {}
-                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                                 settingsRow(
                                     icon: "trash.circle.fill",
                                     title: l.tr(zh: "回收站", en: "Recycle Bin", de: "Papierkorb"),
@@ -631,9 +635,9 @@ struct SettingsView: View {
         }
         .fullScreenCover(isPresented: $showingOnboardingReplay) {
             ZStack(alignment: .topTrailing) {
-                OnboardingView(isReplay: true) {
+                OnboardingView(isReplay: true, onReplayFinished: {
                     showingOnboardingReplay = false
-                }
+                })
                 .preferredColorScheme(.dark)
 
                 Button {
