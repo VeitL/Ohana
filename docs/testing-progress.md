@@ -82,7 +82,7 @@
 | GAP-5 触顶感知 | P1 上架前 | 🟢 | 奖励触顶温和文案，九语言；recordOnly 记录照常完成且奖励反馈不暴露预算数字 | `1a775bc7c` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 长语言视觉追踪项见 `docs/planning/gap-5-economy-budget-cap-acceptance-track-list.md` |
 | GAP-6 通知分级 | P1 上架前 | 🟢 | 通知预算表 + 优先级/限额/合并/夜间免打扰 | `6bb766cc3` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真机通知到达 / 点击动作追踪项见 `docs/planning/gap-6-notifications-acceptance-track-list.md`；未启用远程推送或 CloudKit 通知 |
 | GAP-7 补记结算 | P1 上架前 | 🟢 | 补记历史日期的记录，奖励计入操作当日预算/冷却；不满足则修 | `528cf2cdd` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 补记路径追踪项见 `docs/planning/gap-7-economy-backdate-settlement-acceptance-track-list.md`；未改 schema / 路由 / 启动路径 / CloudKit |
-| GAP-8 单成员形态 | P1 上架前 | ⬜ | 单人单宠下排行榜、周报、心情、家人胶囊等逐面检查 | | 未开工 |
+| GAP-8 单成员形态 | P1 上架前 | 🟡 | 单人单宠下排行榜、周报、心情、家人胶囊等逐面检查 | | 开工：2026-06-12；梳理排行榜、周报、心情与家人胶囊的单成员形态 |
 | GAP-9 离世退场 | P1 上架前 | ⬜ | Memorial 规则书逐模块写明离世行为并测试 | | 未开工 |
 | GAP-10/11 合资+联机设计 | 1.x | ⬜ | 推迟，见 inventory | | |
 
