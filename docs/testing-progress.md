@@ -15,10 +15,11 @@
 | 4 | `Ohana/App` | 🟢 | 门禁通过并提交：`e48c13af7`；无 P1/P2 余留 |
 | 5 | Home + TodayFocus + QuickCare | 🟢 | 门禁通过并提交：`b8e8710e`；TFU-20260612-015 已关闭，无 P1/P2 余留 |
 | 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟡 | Feeding 门禁通过并提交：`b49134977`；Members 1a/1b 分析完成，规则书待确认：2026-06-12 |
+| 6.5 | 宪法差距建设（联机门/回收站/自动备份） | ⬜ | 见下方「建设工作」表与 `docs/planning/constitution-gap-inventory.md` |
 | 7 | 中小模块批量 | ⬜ | |
 | 8 | 横向集成与全量回归 | ⬜ | 需总览会话主持 |
 | 8.5 | 演进就绪审查（联网/订阅/账户地基） | ⬜ | 需总览会话主持；产出审查报告与少量铺垫，非新功能 |
-| 9 | 上架准备 | ⬜ | 需总览会话主持 + 人工操作 |
+| 9 | 上架工程（9A 前置/9B RC/9C 提审上线后） | ⬜ | 9A 前置项**现在就可并行启动**（开发者账号为最长前置）；详见手册 Phase 9 |
 
 ## 模块明细
 
@@ -70,6 +71,22 @@
 | FamilyReports | 7 | ⬜ | | | | |
 | FunctionMenu | 7 | ⬜ | | | | |
 
+## 建设工作（宪法差距，2026-06-12 盘点）
+
+| 工作项 | 优先级 | 状态 | 范围/验收 | 门禁 commit | 备注 |
+|---|---|---|---|---|---|
+| GAP-1 联机功能门 | P0 上架前 | ⬜ | FamilyTasks+云同步设置+CKShare 入口统一收进 `OnlineFeatureGate`；FamilyReports 留周报剥悬赏 | | 建议最先做（解锁 Members 复审前提） |
+| GAP-2 回收站 | P0 上架前 | ⬜ | 成员+珍贵档案软删 30 天可恢复；流水直删但写 tombstone；涉及 schema 升版 | | Members 删除语义依赖它 |
+| GAP-3 自动备份 | P0 上架前 | ⬜ | 自动备份至 iCloud Drive 文件+失败可见+恢复端到端测试 | | 可与 GAP-1/2 并行（独立 worktree） |
+| GAP-4~9 小改造/验证 | P1 上架前 | ⬜ | 并入 Economy/Notifications/Home/Memorial 模块会话，明细见 inventory | | 模块 1b 时作为已知差距列入 |
+| GAP-10/11 合资+联机设计 | 1.x | ⬜ | 推迟，见 inventory | | |
+
+## 待拍板问题（提问协议的异步兜底；产品主人答复后销项）
+
+| 编号 | 提出会话/模块 | 问题（含选项与推荐） | 状态 |
+|---|---|---|---|
+| | | （暂无） | |
+
 ## 填写规则
 
 - **状态**：模块会话开工时改 🟡 并填开工日期；`scripts/module-exit-gate.sh` 通过且 commit 后改 🟢 并填门禁 commit 哈希；全新会话对抗复审零 P0/P1 后改 🏁，复审轮次与最后一轮发现数记入交接备注。
@@ -82,3 +99,5 @@
 | 日期 | 对账范围 | 结论/动作 |
 |---|---|---|
 | 2026-06-12 | 初始化 | Phase 0 完成（`ff7ac89f`）；总账与门禁脚本建立 |
+| 2026-06-12 | 宪法差距盘点 | 产品宪法 v1.1（D1~D18/G1~G10）逐条对照代码：3 个 P0 建设模块（联机门/回收站/自动备份，已拍板都上架前做）、6 项 P1 并入模块会话、合资推 1.x；裁剪三项全部拍板（联机面全收进门、周报留悬赏剥）。明细见 `docs/planning/constitution-gap-inventory.md`，新增 Phase 6.5 |
+| 2026-06-12 | 9A 前置项 | **9A.1 付费 Apple Developer 账号已办妥** ✅。解锁：真机签名安装（dogfooding）、App Store Connect 建档、TestFlight（9B 时用）。注意：CloudKit 验证虽技术上解锁，但按 D4 仍属 1.x，不得因账号到位而提前开工。待办：App Store Connect 注册 Bundle ID + 建档抢注 app 名称 |
