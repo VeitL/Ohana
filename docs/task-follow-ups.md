@@ -25,6 +25,20 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260612-022 - Add final Settings privacy and support actions
+
+- Status: Open
+- Priority: P2
+- Area: Settings / About / Release Links
+- Source task: Settings + Health Phase 6 remediation, 2026-06-12
+- Blocker: The final public privacy-policy URL and owner-approved support
+  contact channel are not both available in the repository. The release
+  Settings screen now hides empty About actions instead of exposing dead rows.
+- Next step: Provide the final privacy URL and support contact route, then add
+  localized About rows that open real destinations.
+- Close when: Settings About shows only actionable privacy/support entries and
+  a lightweight validation proves each row opens the intended destination.
+
 ### TFU-20260612-021 - Audit deleted-human wallet and ledger visibility
 
 - Status: Open
