@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import ImageIO
 import UIKit
 import UniformTypeIdentifiers
 
@@ -22,8 +23,12 @@ nonisolated enum AttachmentPrivacySanitizer {
             return data
         }
 
-        // smoothness: allow persistence-side privacy scrub before saving attachments; not a view render path
-        guard let image = UIImage(data: data) else {
+        let sourceOptions = [
+            kCGImageSourceShouldCache: false
+        ] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions),
+              CGImageSourceGetType(source) != nil,
+              let image = CGImageSourceCreateImageAtIndex(source, 0, sourceOptions) else {
             OhanaLog.warning(
                 "Attachment sanitizer could not decode image bytes; preserving original data",
                 category: "Privacy"
@@ -31,7 +36,13 @@ nonisolated enum AttachmentPrivacySanitizer {
             return data
         }
 
-        guard let sanitized = image.jpegData(compressionQuality: jpegCompressionQuality) else {
+        let sanitized = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            sanitized,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+        ) else {
             OhanaLog.warning(
                 "Attachment sanitizer could not re-encode image bytes; preserving original data",
                 category: "Privacy"
@@ -39,7 +50,23 @@ nonisolated enum AttachmentPrivacySanitizer {
             return data
         }
 
-        return sanitized
+        var destinationProperties: [CFString: Any] = [
+            kCGImageDestinationLossyCompressionQuality: jpegCompressionQuality
+        ]
+        if let orientation = imageOrientation(from: source) {
+            destinationProperties[kCGImagePropertyOrientation] = orientation
+        }
+        CGImageDestinationAddImage(destination, image, destinationProperties as CFDictionary)
+
+        guard CGImageDestinationFinalize(destination) else {
+            OhanaLog.warning(
+                "Attachment sanitizer could not finalize image bytes; preserving original data",
+                category: "Privacy"
+            )
+            return data
+        }
+
+        return sanitized as Data
     }
 
     static func sanitizedImageData(
@@ -57,5 +84,13 @@ nonisolated enum AttachmentPrivacySanitizer {
 
     private static func shouldSanitize(filename: String, isImage: Bool) -> Bool {
         isImage || isImageFilename(filename)
+    }
+
+    private static func imageOrientation(from source: CGImageSource) -> Int? {
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let value = properties[kCGImagePropertyOrientation] as? NSNumber else {
+            return nil
+        }
+        return value.intValue
     }
 }
