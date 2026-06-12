@@ -47,9 +47,11 @@ enum MemberLifecycleCommandService {
     static func clearPetActivityRecords(
         _ pet: Pet,
         context: ModelContext,
-        questManager: QuestManager? = nil
+        questManager: QuestManager? = nil,
+        cleanupService: PetActivityRecordCleanupService? = nil
     ) -> MemberLifecycleCommandResult {
-        pet.clearAllActivityRecords(in: context)
+        let cleanupService = cleanupService ?? PetActivityRecordCleanupService()
+        cleanupService.clearActivityRecords(for: pet, context: context)
         let manager = questManager ?? QuestManager()
         manager.clearPerPetAuxiliaryState(forPetId: pet.id)
         CloudSyncMutationRecorder.markModified(pet, context: context)

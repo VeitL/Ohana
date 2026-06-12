@@ -291,7 +291,7 @@ final class QuestManager {
         shopInventory.clearDoubleRewardBoost()
     }
 
-    /// 清空某宠物的任务冷却 key，并从椰子流水中移除该 `actorId` 的条目（与 `Pet.clearAllActivityRecords` 配套）。
+    /// 清空某宠物的任务冷却 key，并从椰子流水中移除该 `actorId` 的条目（与宠物活动清理服务配套）。
     func clearPerPetAuxiliaryState(forPetId petId: UUID) {
         let pid = petId.uuidString
         if var dict = Self.defaults.dictionary(forKey: Keys.cooldownLogs) {
