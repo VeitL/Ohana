@@ -215,27 +215,44 @@ enum RecycleBinService {
     }
 
     private static func trashedPreciousArchives(context: ModelContext) -> [RecycleBinListItem] {
-        trashed(PetPhotoLog.self, context: context)
+        var items: [RecycleBinListItem] = []
+
+        let petPhotos: [RecycleBinListItem] = trashed(PetPhotoLog.self, context: context)
             .filter(\.trashBatchId.isEmpty)
             .map { item(kind: .petPhoto, id: $0.id, title: $0.note.isEmpty ? "Photo" : $0.note, subtitle: $0.pet?.name ?? "", source: $0) }
-            + trashed(PetMilestone.self, context: context)
+        items.append(contentsOf: petPhotos)
+
+        let petMilestones: [RecycleBinListItem] = trashed(PetMilestone.self, context: context)
             .filter(\.trashBatchId.isEmpty)
             .map { item(kind: .petMilestone, id: $0.id, title: $0.title, subtitle: $0.pet?.name ?? "", source: $0) }
-            + trashed(PetDocument.self, context: context)
+        items.append(contentsOf: petMilestones)
+
+        let petDocuments: [RecycleBinListItem] = trashed(PetDocument.self, context: context)
             .filter(\.trashBatchId.isEmpty)
             .map { item(kind: .petDocument, id: $0.id, title: $0.title, subtitle: $0.pet?.name ?? "", source: $0) }
-            + trashed(PetInsurance.self, context: context)
+        items.append(contentsOf: petDocuments)
+
+        let petInsurancePolicies: [RecycleBinListItem] = trashed(PetInsurance.self, context: context)
             .filter(\.trashBatchId.isEmpty)
             .map { item(kind: .petInsurance, id: $0.id, title: $0.productName.isEmpty ? $0.companyName : $0.productName, subtitle: $0.pet?.name ?? "", source: $0) }
-            + trashed(PetHealthLog.self, context: context)
+        items.append(contentsOf: petInsurancePolicies)
+
+        let petHealthLogs: [RecycleBinListItem] = trashed(PetHealthLog.self, context: context)
             .filter(\.trashBatchId.isEmpty)
             .map { item(kind: .petHealthLog, id: $0.id, title: $0.note.isEmpty ? $0.type : $0.note, subtitle: $0.pet?.name ?? "", source: $0) }
-            + trashed(SymptomLog.self, context: context)
+        items.append(contentsOf: petHealthLogs)
+
+        let symptomLogs: [RecycleBinListItem] = trashed(SymptomLog.self, context: context)
             .filter(\.trashBatchId.isEmpty)
             .map { item(kind: .symptomLog, id: $0.id, title: $0.symptomName.isEmpty ? $0.categoryRaw : $0.symptomName, subtitle: $0.pet?.name ?? "", source: $0) }
-            + trashed(HeatCycleLog.self, context: context)
+        items.append(contentsOf: symptomLogs)
+
+        let heatCycleLogs: [RecycleBinListItem] = trashed(HeatCycleLog.self, context: context)
             .filter(\.trashBatchId.isEmpty)
             .map { item(kind: .heatCycleLog, id: $0.id, title: $0.statusRaw, subtitle: $0.pet?.name ?? "", source: $0) }
+        items.append(contentsOf: heatCycleLogs)
+
+        return items
     }
 
     private static func trashedBatches(context: ModelContext) -> [RecycleBinListItem] {

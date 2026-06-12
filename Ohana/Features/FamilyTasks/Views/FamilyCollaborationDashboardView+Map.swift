@@ -3,6 +3,7 @@
 //  Ohana
 //
 
+import Darwin
 import SwiftData
 import SwiftUI
 
@@ -143,7 +144,9 @@ extension FamilyCollaborationDashboardView {
         let angle = (Double(index) / Double(count)) * (.pi * 2) - .pi / 2
         let radiusX: CGFloat = 112
         let radiusY: CGFloat = 86
-        return CGPoint(x: cos(angle) * radiusX, y: sin(angle) * radiusY)
+        let x = CGFloat(Darwin.cos(angle)) * radiusX
+        let y = CGFloat(Darwin.sin(angle)) * radiusY
+        return CGPoint(x: x, y: y)
     }
 
     func petMapNode(_ pet: Pet) -> some View {
