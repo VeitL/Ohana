@@ -75,14 +75,14 @@
 
 | 工作项 | 优先级 | 状态 | 范围/验收 | 门禁 commit | 备注 |
 |---|---|---|---|---|---|
-| GAP-1 联机功能门 | P0 上架前 | 🟢 | FamilyTasks+云同步设置+CKShare 入口统一收进 `OnlineFeatureGate`；FamilyReports 留周报剥悬赏 | `59b5ceedc` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；验收通过，真实设备 / 真实 UI 追踪项见 `docs/planning/gap-1-online-feature-gate-acceptance-track-list.md`；未做 CloudKit 启用 |
-| GAP-2 回收站 | P0 上架前 | 🟢 | 成员+珍贵档案软删 30 天可恢复；流水直删但写 tombstone；涉及 schema 升版 | `8bddfe1a6` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 追踪项见 `docs/planning/gap-2-recycle-bin-acceptance-track-list.md`；schema 升至 `ArkSchemaV69` |
-| GAP-3 自动备份 | P0 上架前 | 🟢 | 自动备份至 iCloud Drive 文件+失败可见+恢复端到端测试 | `9b1ac1be1` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实设备 / 真实 iCloud 追踪项见 `docs/planning/gap-3-automatic-backup-acceptance-track-list.md`；未启用 CloudKit 同步 |
-| GAP-4 总账恒等 | P1 上架前 | 🟢 | `QuestManager.coconutCount` 为钱包投影；正式岛屿总资产 ≡ 人类成员+宠物钱包；`system:legacy` 仅迁移兼容 | `1951f7834` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 正式包追踪项见 `docs/planning/gap-4-economy-ledger-acceptance-track-list.md` |
-| GAP-5 触顶感知 | P1 上架前 | 🟢 | 奖励触顶温和文案，九语言；recordOnly 记录照常完成且奖励反馈不暴露预算数字 | `1a775bc7c` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 长语言视觉追踪项见 `docs/planning/gap-5-economy-budget-cap-acceptance-track-list.md` |
-| GAP-6 通知分级 | P1 上架前 | 🟢 | 通知预算表 + 优先级/限额/合并/夜间免打扰 | `6bb766cc3` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真机通知到达 / 点击动作追踪项见 `docs/planning/gap-6-notifications-acceptance-track-list.md`；未启用远程推送或 CloudKit 通知 |
-| GAP-7 补记结算 | P1 上架前 | 🟢 | 补记历史日期的记录，奖励计入操作当日预算/冷却；不满足则修 | `528cf2cdd` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 补记路径追踪项见 `docs/planning/gap-7-economy-backdate-settlement-acceptance-track-list.md`；未改 schema / 路由 / 启动路径 / CloudKit |
-| GAP-8 单成员形态 | P1 上架前 | 🟢 | 单人单宠下排行榜、周报、心情、家人胶囊等逐面检查 | `6c4a98db2` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 单人单宠目检项见 `docs/planning/gap-8-single-member-family-shape-acceptance-track-list.md`；未改 schema / 路由 / 启动路径 / CloudKit |
+| GAP-1 联机功能门 | P0 上架前 | 🟢 | FamilyTasks+云同步设置+CKShare 入口统一收进 `OnlineFeatureGate`；FamilyReports 留周报剥悬赏 | `59b5ceedc` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；验收通过，真实设备 / 真实 UI 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-1-联机功能门`；未做 CloudKit 启用 |
+| GAP-2 回收站 | P0 上架前 | 🟢 | 成员+珍贵档案软删 30 天可恢复；流水直删但写 tombstone；涉及 schema 升版 | `8bddfe1a6` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-2-回收站`；schema 升至 `ArkSchemaV69` |
+| GAP-3 自动备份 | P0 上架前 | 🟢 | 自动备份至 iCloud Drive 文件+失败可见+恢复端到端测试 | `9b1ac1be1` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实设备 / 真实 iCloud 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-3-自动备份`；未启用 CloudKit 同步 |
+| GAP-4 总账恒等 | P1 上架前 | 🟢 | `QuestManager.coconutCount` 为钱包投影；正式岛屿总资产 ≡ 人类成员+宠物钱包；`system:legacy` 仅迁移兼容 | `1951f7834` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 正式包追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-4-总账恒等` |
+| GAP-5 触顶感知 | P1 上架前 | 🟢 | 奖励触顶温和文案，九语言；recordOnly 记录照常完成且奖励反馈不暴露预算数字 | `1a775bc7c` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 长语言视觉追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-5-触顶感知` |
+| GAP-6 通知分级 | P1 上架前 | 🟢 | 通知预算表 + 优先级/限额/合并/夜间免打扰 | `6bb766cc3` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真机通知到达 / 点击动作追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-6-通知分级`；未启用远程推送或 CloudKit 通知 |
+| GAP-7 补记结算 | P1 上架前 | 🟢 | 补记历史日期的记录，奖励计入操作当日预算/冷却；不满足则修 | `528cf2cdd` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 补记路径追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-7-补记结算`；未改 schema / 路由 / 启动路径 / CloudKit |
+| GAP-8 单成员形态 | P1 上架前 | 🟢 | 单人单宠下排行榜、周报、心情、家人胶囊等逐面检查 | `6c4a98db2` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 单人单宠目检项见 `docs/planning/gap-acceptance-track-list.md#gap-8-单成员形态`；未改 schema / 路由 / 启动路径 / CloudKit |
 | GAP-9 离世退场 | P1 上架前 | ⬜ | Memorial 规则书逐模块写明离世行为并测试 | | 未开工 |
 | GAP-10/11 合资+联机设计 | 1.x | ⬜ | 推迟，见 inventory | | |
 

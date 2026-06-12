@@ -35,8 +35,8 @@ actionable; long-term product ideas belong in planning docs instead.
   ledger visibility, and routing compile paths, but they cannot prove real iOS
   notification delivery, banners, permission prompts, Focus/DND interaction, or
   notification action behavior on physical devices.
-- Next step: Run the manual checklist in
-  `docs/planning/gap-6-notifications-acceptance-track-list.md` on a real device
+- Next step: Run the GAP-6 manual checklist in
+  `docs/planning/gap-acceptance-track-list.md#gap-6-通知分级` on a real device
   with notification permission enabled, including routine budget, quiet-hours
   deferral, health-critical delivery, merge behavior, notification actions, and
   weekly report copy.

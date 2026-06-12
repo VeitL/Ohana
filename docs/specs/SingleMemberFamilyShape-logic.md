@@ -36,4 +36,4 @@
 - 本轮不改 SwiftData schema。
 - 本轮不改启动路径、通知调度、CloudKit、联机或分享能力。
 - 本轮不处理 GAP-9 离世退场；离世成员是否计入家庭形态由 GAP-9 规则书继续细化。
-- 真机 UI 目检项记录在 GAP-8 验收 track list；自动测试覆盖展示策略不变量。
+- 真机 UI 目检项记录在统一验收总表 `docs/planning/gap-acceptance-track-list.md#gap-8-单成员形态`；自动测试覆盖展示策略不变量。
