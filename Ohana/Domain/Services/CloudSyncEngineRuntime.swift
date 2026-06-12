@@ -80,36 +80,34 @@ protocol CloudSyncManaging {
     func cancel()
 }
 
-#if OHANA_LOCAL_DEVICE
-    @MainActor
-    final class LocalDeviceCloudSyncService: CloudSyncManaging {
-        var isEnabled: Bool { false }
-        var isStarted: Bool { false }
-        var databaseScope: CloudSyncDatabaseScope { .privateCloudDatabase }
-        var hasSharedZoneAccessRevokedNotice: Bool { false }
-        var hasPendingTransientRetry: Bool { false }
-        var nextTransientRetryAt: Date? { nil }
+@MainActor
+final class LocalDeviceCloudSyncService: CloudSyncManaging {
+    var isEnabled: Bool { false }
+    var isStarted: Bool { false }
+    var databaseScope: CloudSyncDatabaseScope { .privateCloudDatabase }
+    var hasSharedZoneAccessRevokedNotice: Bool { false }
+    var hasPendingTransientRetry: Bool { false }
+    var nextTransientRetryAt: Date? { nil }
 
-        func setEnabled(_: Bool) {}
-        func setDatabaseScope(_: CloudSyncDatabaseScope, zoneOwnerName _: String?) {}
-        func clearSharedZoneAccessRevokedNotice() {}
-        func startAfterFirstRender(modelContainer _: ModelContainer) {}
-        func startIfNeeded(modelContainer _: ModelContainer) async {}
-        func registerDirtyLocalChanges() async -> CloudSyncPendingChangeSummary { .empty }
-        func sendPendingLocalChanges() async -> Bool { false }
-        func fetchRemoteChanges() async -> Bool { false }
-        func handleRemoteNotification(modelContainer _: ModelContainer) async -> CloudSyncRemoteNotificationResult { .ignored }
-        func handleAccountChanged(
-            availability _: CloudSyncAccountAvailability,
-            modelContainer _: ModelContainer
-        ) async -> CloudSyncAccountChangeResult {
-            .ignored
-        }
-
-        func retryPendingSyncNow(modelContainer _: ModelContainer) async {}
-        func cancel() {}
+    func setEnabled(_: Bool) {}
+    func setDatabaseScope(_: CloudSyncDatabaseScope, zoneOwnerName _: String?) {}
+    func clearSharedZoneAccessRevokedNotice() {}
+    func startAfterFirstRender(modelContainer _: ModelContainer) {}
+    func startIfNeeded(modelContainer _: ModelContainer) async {}
+    func registerDirtyLocalChanges() async -> CloudSyncPendingChangeSummary { .empty }
+    func sendPendingLocalChanges() async -> Bool { false }
+    func fetchRemoteChanges() async -> Bool { false }
+    func handleRemoteNotification(modelContainer _: ModelContainer) async -> CloudSyncRemoteNotificationResult { .ignored }
+    func handleAccountChanged(
+        availability _: CloudSyncAccountAvailability,
+        modelContainer _: ModelContainer
+    ) async -> CloudSyncAccountChangeResult {
+        .ignored
     }
-#endif
+
+    func retryPendingSyncNow(modelContainer _: ModelContainer) async {}
+    func cancel() {}
+}
 
 nonisolated enum CloudSyncEngineRuntime {
     static let containerIdentifier = "iCloud.HT.Ohana"

@@ -301,7 +301,7 @@ struct HomeRouteCoordinatorTests {
 
         coordinator.openCrewRoster(mode: .collaboration)
 
-        #expect(appSheets == [.appSheet(.crewRoster(.collaboration))])
+        #expect(appSheets == [.appSheet(.crewRoster(.members))])
         #expect(coordinator.modal == nil)
     }
 

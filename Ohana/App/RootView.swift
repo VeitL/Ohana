@@ -20,6 +20,7 @@ struct RootView: View {
     @State private var showDBFallbackAlert = DatabaseFallbackPreferenceStore.isFallbackActive()
     @State private var appSwitcherSnapshotCoverRequested = false
     @State private var isOnboardingHomePreflightActive = false
+    @State private var onlineGateNoticeReason: OnlineFeatureGateNoticeReason?
     @StateObject private var startupMaintenance = StartupMaintenanceCoordinator()
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -75,6 +76,9 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             appSwitcherSnapshotCoverRequested = false
         }
+        .onReceive(NotificationCenter.default.publisher(for: OnlineFeatureGateNoticeCenter.notificationName)) { notification in
+            onlineGateNoticeReason = OnlineFeatureGateNoticeCenter.reason(from: notification)
+        }
         .alert(Text(l.tr(zh: "数据异常", en: "Data issue", de: "Datenproblem")), isPresented: $showDBFallbackAlert) {
             Button(l.tr(zh: "我知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
                 DatabaseFallbackPreferenceStore.clearFallbackActive()
@@ -85,6 +89,13 @@ struct RootView: View {
                 en: "The database could not be loaded, so Ohana is running in temporary mode. Data from this session will not be saved. Please restart the app, and contact the developer if the issue continues.",
                 de: "Die Datenbank konnte nicht geladen werden. Ohana läuft vorübergehend im temporären Modus. Daten aus dieser Sitzung werden nicht gespeichert. Bitte starte die App neu und kontaktiere den Entwickler, falls das Problem weiterhin besteht."
             ))
+        }
+        .alert(Text(onlineGateNoticeTitle), isPresented: onlineGateNoticeBinding) {
+            Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
+                onlineGateNoticeReason = nil
+            }
+        } message: {
+            Text(onlineGateNoticeMessage)
         }
     }
 
@@ -107,6 +118,25 @@ struct RootView: View {
 
     private var l: L10n {
         L10n(appLanguage)
+    }
+
+    private var onlineGateNoticeBinding: Binding<Bool> {
+        Binding(
+            get: { onlineGateNoticeReason != nil },
+            set: { isPresented in
+                if !isPresented {
+                    onlineGateNoticeReason = nil
+                }
+            }
+        )
+    }
+
+    private var onlineGateNoticeTitle: String {
+        onlineGateNoticeReason?.title(l) ?? ""
+    }
+
+    private var onlineGateNoticeMessage: String {
+        onlineGateNoticeReason?.message(l) ?? ""
     }
 }
 

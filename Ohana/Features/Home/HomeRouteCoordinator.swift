@@ -295,13 +295,20 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openCrewRoster(mode: CrewRosterMode = .members) {
+        let resolvedMode: CrewRosterMode
+        if mode == .collaboration, !OnlineFeatureGate.allows(.onlineCollaboration) {
+            AppFeatureRouteGuard.recordIntercept("homeCrewRoster:onlineGate")
+            resolvedMode = .members
+        } else {
+            resolvedMode = mode
+        }
         if let appSheetRouteSink {
-            appSheetRouteSink(.appSheet(.crewRoster(mode)))
+            appSheetRouteSink(.appSheet(.crewRoster(resolvedMode)))
             modal = nil
             fullScreen = nil
             return
         }
-        modal = .crewRoster(mode)
+        modal = .crewRoster(resolvedMode)
     }
 
     func openAccountSwitcher() {

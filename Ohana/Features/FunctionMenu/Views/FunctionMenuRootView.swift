@@ -12,7 +12,6 @@ struct FunctionMenuRootView: View {
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter(\.shouldShowOnHome) }
-    private var showsFamilyCollaboration: Bool { visibleHumans.count > 1 }
     private var l: L10n { L10n(appLanguage) }
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
 
@@ -185,9 +184,7 @@ struct FunctionMenuRootView: View {
         case .archiveMemory:
             "成长 · 基本信息 · 证件 · 时刻"
         case .householdHub:
-            showsFamilyCollaboration
-                ? "花费 · 照护分析 · 提醒 · 周报"
-                : "花费 · 照护分析 · 提醒"
+            "花费 · 照护分析 · 提醒 · 周报"
         case .oasisRewards:
             "\(wealthSubtitle) · 商店 · 扭蛋"
         case .plants:

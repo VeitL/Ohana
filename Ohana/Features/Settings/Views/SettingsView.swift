@@ -129,7 +129,9 @@ struct SettingsView: View {
                         settingsHeader
 
                         settingsDataSections
-                        householdSyncSection
+                        if OnlineFeatureGate.allows(.onlineCollaboration) {
+                            householdSyncSection
+                        }
 
                         // 国家 / 语言 / 单位 / 货币
                         settingsSection(title: l.preferences) {
@@ -383,29 +385,31 @@ struct SettingsView: View {
 
                             OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
 
-                            NavigationLink {
-                                FamilyCollaborationPlaygroundView()
-                            } label: {
-                                HStack(spacing: 12) {
-                                    settingsIcon("person.3.sequence.fill", color: Color.goPurple)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(l.tr(zh: "家庭协作体验测试", en: "Family collab playground", de: "Familien-Testbereich"))
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(primaryText)
-                                        Text(l.tr(zh: "任务盘、宠物地图、家人竞赛", en: "Board, pet map, family race", de: "Brett, Tierkarte, Familienrennen"))
-                                            .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                            .foregroundStyle(tertiaryText)
+                            if OnlineFeatureGate.allows(.onlineCollaboration) {
+                                NavigationLink {
+                                    FamilyCollaborationPlaygroundView()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        settingsIcon("person.3.sequence.fill", color: Color.goPurple)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(l.tr(zh: "家庭协作体验测试", en: "Family collab playground", de: "Familien-Testbereich"))
+                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(primaryText)
+                                            Text(l.tr(zh: "任务盘、宠物地图、家人竞赛", en: "Board, pet map, family race", de: "Brett, Tierkarte, Familienrennen"))
+                                                .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .foregroundStyle(tertiaryText)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
+                                            .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .foregroundStyle(tertiaryText.opacity(0.6))
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                        .foregroundStyle(tertiaryText.opacity(0.6))
+                                    .frame(minHeight: 44)
                                 }
-                                .frame(minHeight: 44)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
+                                .buttonStyle(ScaleButtonStyle())
 
-                            OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                            }
 
                             NavigationLink {
                                 WalletMotionLabView()

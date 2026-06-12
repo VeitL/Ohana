@@ -113,7 +113,9 @@ struct FunctionMenuDestinationRouter: View {
         case .wealthDashboard:
             IslandWealthDashboardView()
         case .bountyBoard:
-            BountyBoardView()
+            if OnlineFeatureGate.allows(.onlineCollaboration) {
+                BountyBoardView()
+            }
         case .familyWeeklyReport:
             FamilyWeeklyReportDashboardView()
         case .careLedgerAnalysis:

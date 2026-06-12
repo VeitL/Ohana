@@ -267,15 +267,15 @@ struct AppRouteCoordinatorTests {
         coordinator.presentRequiredAccountSwitch()
         coordinator.presentCrewRoster(mode: .collaboration)
 
-        #expect(coordinator.sheet == .crewRoster(.collaboration))
+        #expect(coordinator.sheet == .crewRoster(.members))
         #expect(coordinator.fullScreen == nil)
         #expect(coordinator.overlay == nil)
         #expect(!coordinator.suppressesGlobalWalkBanner)
 
-        coordinator.dismissSheet(.crewRoster(.members))
-        #expect(coordinator.sheet == .crewRoster(.collaboration))
-
         coordinator.dismissSheet(.crewRoster(.collaboration))
+        #expect(coordinator.sheet == .crewRoster(.members))
+
+        coordinator.dismissSheet(.crewRoster(.members))
         #expect(coordinator.sheet == nil)
     }
 

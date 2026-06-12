@@ -103,8 +103,8 @@ struct FocusHomeHeaderView: View {
                             onAccountSwitcher()
                         }
                 )
-                .accessibilityLabel("家庭协作")
-                .accessibilityHint("点击打开家庭协作，长按切换人类账户")
+                .accessibilityLabel("Ohana 成员")
+                .accessibilityHint("点击打开成员名册，长按切换人类账户")
 
                 Button {
                     OhanaFeedback.light()

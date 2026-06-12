@@ -83,7 +83,10 @@ struct CrewRosterOverlay: View {
     private var filteredPlants: [Plant] { [] }
     private var isEmpty: Bool { pets.isEmpty && humans.isEmpty && filteredPlants.isEmpty }
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var showsFamilyCollaboration: Bool { humans.count > 1 && !activePets.isEmpty }
+    private var showsFamilyCollaboration: Bool {
+        OnlineFeatureGate.allows(.onlineCollaboration) && humans.count > 1 && !activePets.isEmpty
+    }
+
     private var resolvedInitialMode: CrewRosterMode {
         showsFamilyCollaboration ? initialMode : .members
     }

@@ -129,9 +129,9 @@ struct PetBondVaultContentView: View {
             }
 
             Text(l.tr(
-                zh: "只属于 \(pet.name)：用于宠物外观、成长故事和纪念装饰，不能兑换现金或支付家庭悬赏。",
-                en: "Only for \(pet.name): pet cosmetics, growth stories, and memorial decor. It cannot be cashed out or used for family bounties.",
-                de: "Nur für \(pet.name): Haustierdesigns, Wachstumsgeschichten und Erinnerungsdeko. Nicht auszahlbar und nicht für Familienprämien nutzbar."
+                zh: "只属于 \(pet.name)：用于宠物外观、成长故事和纪念装饰，不能兑换现金或转给他人。",
+                en: "Only for \(pet.name): pet cosmetics, growth stories, and memorial decor. It cannot be cashed out or transferred to others.",
+                de: "Nur für \(pet.name): Haustierdesigns, Wachstumsgeschichten und Erinnerungsdeko. Nicht auszahlbar oder übertragbar."
             ))
             .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)
@@ -268,9 +268,9 @@ struct PetBondVaultContentView: View {
     private var boundaryNote: some View {
         Label {
             Text(l.tr(
-                zh: "人类椰子用于商店、悬赏和货币兑换；宠物成长椰子只用于这个宠物自己的成长与纪念。",
-                en: "Human coconuts pay for the shop, bounties, and exchange records; pet bond coconuts stay with this pet.",
-                de: "Menschen-Kokos bezahlt Shop, Prämien und Umtausch; Haustier-Bindungskokos bleibt bei diesem Tier."
+                zh: "人类椰子用于商店、兑换和本地奖励记录；宠物成长椰子只用于这个宠物自己的成长与纪念。",
+                en: "Human coconuts pay for the shop, exchanges, and local reward records; pet bond coconuts stay with this pet.",
+                de: "Menschen-Kokos bezahlt Shop, Umtausch und lokale Belohnungen; Haustier-Bindungskokos bleibt bei diesem Tier."
             ))
             .font(OhanaFont.caption2(.black))
         } icon: {

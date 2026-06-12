@@ -29,11 +29,8 @@ struct FeatureGroupDashboardView: View {
         }
     }
 
-    /// 家模块中周报在多家人时才展示；悬赏已统一收进 Ohana 成员页协作。
-    private var hasMultipleHumans: Bool { visibleHumans.count > 1 }
-
     private var items: [FeatureGroupItem] {
-        FeatureGroupItem.items(for: group, hasDogs: hasDogs, hasMultipleHumans: hasMultipleHumans)
+        FeatureGroupItem.items(for: group, hasDogs: hasDogs)
             .filter {
                 AppFeatureRouteGuard.isVisibleFunctionDestination(
                     $0.destination,
@@ -165,7 +162,9 @@ struct FeatureGroupDashboardView: View {
         case .reminderObservability:
             ReminderObservabilityView()
         case .bountyBoard:
-            BountyBoardView()
+            if OnlineFeatureGate.allows(.onlineCollaboration) {
+                BountyBoardView()
+            }
         case .familyWeeklyReport:
             FamilyWeeklyReportDashboardView()
         default:
@@ -214,7 +213,7 @@ private struct FeatureGroupItem: Identifiable {
     let icon: String
     let destination: FMDest
 
-    static func items(for group: FeatureGroup, hasDogs: Bool, hasMultipleHumans: Bool) -> [FeatureGroupItem] {
+    static func items(for group: FeatureGroup, hasDogs: Bool) -> [FeatureGroupItem] {
         switch group {
         case .dailyCare:
             var items = [
@@ -243,9 +242,7 @@ private struct FeatureGroupItem: Identifiable {
                 destination(id: "care-ledger", title: "照护分析", icon: "list.bullet.rectangle.portrait.fill", .careLedgerAnalysis),
                 destination(id: "reminder-observability", title: "提醒健康", icon: "bell.badge.fill", .reminderObservability)
             ]
-            if hasMultipleHumans {
-                items.append(destination(id: "weekly-report", title: "家庭周报", icon: "chart.bar.doc.horizontal", .familyWeeklyReport))
-            }
+            items.append(destination(id: "weekly-report", title: "照护周报", icon: "chart.bar.doc.horizontal", .familyWeeklyReport))
             return items
         case .oasisRewards, .plants:
             return []

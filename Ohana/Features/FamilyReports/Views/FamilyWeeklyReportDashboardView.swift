@@ -246,9 +246,9 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var memberRankingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("成员贡献排行", icon: "person.2.fill")
+            sectionHeader("照护贡献排行", icon: "person.2.fill")
             if rankedMembers.isEmpty {
-                emptyText("本周还没有家庭协作记录")
+                emptyText("本周还没有照护记录")
             } else {
                 ForEach(Array(rankedMembers.prefix(5).enumerated()), id: \.element.id) { index, stat in
                     HStack(spacing: 10) {

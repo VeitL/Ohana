@@ -31,6 +31,9 @@ enum AppFeatureRouteGuard {
         currentLevel: Int
     ) -> FunctionDestinationDecision {
         guard let destination else { return .rootMenu }
+        guard allowsOnlineDestination(destination) else {
+            return .suppress(note: "onlineGate:\(destination)")
+        }
 
         switch GrowthUnlockPolicy.availability(for: destination, currentLevel: currentLevel) {
         case .visible:
@@ -146,6 +149,7 @@ enum AppFeatureRouteGuard {
     }
 
     static func allowsSheetRoute(_ route: AppSheetRoute, currentLevel: Int) -> Bool {
+        guard allowsOnlineSheetRoute(route) else { return false }
         guard let requiredLevel = requiredLevel(for: route) else { return true }
         return currentLevel >= requiredLevel
     }
@@ -156,6 +160,9 @@ enum AppFeatureRouteGuard {
     }
 
     static func lockedRouteNote(for route: AppSheetRoute, currentLevel: Int) -> String {
+        if !allowsOnlineSheetRoute(route) {
+            return "onlineGateSheet:\(route.id)"
+        }
         if let requiredLevel = requiredLevel(for: route) {
             return "lockedSheet:\(route.id):lv\(currentLevel):requires\(requiredLevel)"
         }
@@ -175,5 +182,31 @@ enum AppFeatureRouteGuard {
 
     private static var critterCodexUnlockLevel: Int {
         OasisUpgradeRewardCatalog.critter(id: OasisUpgradeRewardCatalog.firstCritterId)?.sourceLevel ?? 10
+    }
+
+    private static func allowsOnlineDestination(_ destination: FMDest) -> Bool {
+        !requiresOnlineCollaboration(destination) || OnlineFeatureGate.allows(.onlineCollaboration)
+    }
+
+    private static func requiresOnlineCollaboration(_ destination: FMDest) -> Bool {
+        switch destination {
+        case .bountyBoard:
+            true
+        default:
+            false
+        }
+    }
+
+    private static func allowsOnlineSheetRoute(_ route: AppSheetRoute) -> Bool {
+        !requiresOnlineCollaboration(route) || OnlineFeatureGate.allows(.onlineCollaboration)
+    }
+
+    private static func requiresOnlineCollaboration(_ route: AppSheetRoute) -> Bool {
+        switch route {
+        case .crewRoster(.collaboration):
+            true
+        default:
+            false
+        }
     }
 }

@@ -62,9 +62,9 @@ struct CoconutBalanceTestContentView: View {
                     }
 
                     Text(l.tr(
-                        zh: "测试工具会把所选成员余额和旧版全岛兼容总数同步到同一个值，便于验证商店、悬赏、财富页和首页椰子显示。",
-                        en: "This test tool syncs the selected member balance and legacy island total to the same value so shop, bounty, wealth, and home displays are easy to verify.",
-                        de: "Dieses Testwerkzeug setzt Mitgliedskonto und alten Insel-Gesamtwert auf denselben Wert, damit Shop, Aufgaben, Vermögen und Startseite leicht prüfbar sind."
+                        zh: "测试工具会把所选成员余额和旧版全岛兼容总数同步到同一个值，便于验证商店、财富页和首页椰子显示。",
+                        en: "This test tool syncs the selected member balance and legacy island total to the same value so shop, wealth, and home displays are easy to verify.",
+                        de: "Dieses Testwerkzeug setzt Mitgliedskonto und alten Insel-Gesamtwert auf denselben Wert, damit Shop, Vermögen und Startseite leicht prüfbar sind."
                     ))
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)

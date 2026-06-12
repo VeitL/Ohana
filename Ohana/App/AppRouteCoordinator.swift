@@ -293,7 +293,14 @@ final class AppRouteCoordinator: ObservableObject {
     }
 
     func presentCrewRoster(mode: CrewRosterMode = .members) {
-        presentSheet(.crewRoster(mode))
+        let resolvedMode: CrewRosterMode
+        if mode == .collaboration, !OnlineFeatureGate.allows(.onlineCollaboration) {
+            AppFeatureRouteGuard.recordIntercept("appCrewRoster:onlineGate")
+            resolvedMode = .members
+        } else {
+            resolvedMode = mode
+        }
+        presentSheet(.crewRoster(resolvedMode))
     }
 
     func presentCoconutLog(_ subject: CoconutLogSubject?) {

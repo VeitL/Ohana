@@ -13,6 +13,7 @@ extension VerticalSolidHomeView {
     }
 
     func handleNewHomeMemberSaved(id: UUID) {
+        cancelGrowthOnboardingPrompt()
         homeCardOrderRaw = FocusHomeCardDataSource.promotedOrderRaw(id: id, currentRaw: homeCardOrderRaw)
         arrivalClearTask?.cancel()
         arrivalClearTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: newMemberArrivalStartDelayMilliseconds) {
@@ -217,6 +218,11 @@ extension VerticalSolidHomeView {
     }
 
     func openTodayFocusFamilyTask(_: TodayFocusFamilyTaskSnapshot) {
+        guard OnlineFeatureGate.allows(.onlineCollaboration) else {
+            AppFeatureRouteGuard.recordIntercept("todayFocusFamilyTask:onlineGate")
+            routeCoordinator.openCrewRoster()
+            return
+        }
         routeCoordinator.openCrewRoster(mode: .collaboration)
     }
 

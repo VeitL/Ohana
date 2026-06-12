@@ -125,9 +125,9 @@ enum GrowthUnlockCatalog {
             titleZh: "家庭树冠",
             titleEn: "Family Canopy",
             titleDe: "Familien-Krone",
-            detailZh: "强化家庭事务、任务协作和照护分析，让管理从个人记录扩展到全家协同。",
-            detailEn: "Add household tasks, collaboration, and care analysis so management expands from one person to the family.",
-            detailDe: "Ergänzt Familienaufgaben, Zusammenarbeit und Pflegeanalyse.",
+            detailZh: "强化家庭事务、成员档案和照护分析，让单机管理更完整。",
+            detailEn: "Add household affairs, member profiles, and care analysis for a fuller local workspace.",
+            detailDe: "Ergänzt Haushalt, Mitgliederprofile und Pflegeanalyse lokal.",
             icon: "house.fill",
             tintHex: "8B5CF6"
         ),

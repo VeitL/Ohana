@@ -473,10 +473,10 @@ struct GrowthUnlockPopupView: View {
                 Spacer(minLength: 0)
 
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark")
+                    Image(systemName: "xmark") // a11y: allow close button has localized accessibilityLabel
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -541,7 +541,7 @@ struct GrowthUnlockPopupView: View {
 
     private func featureBullet(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 7) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: "checkmark.circle.fill") // a11y: allow decorative bullet marker hidden from VoiceOver
                 .font(OhanaFont.caption(.black))
                 .foregroundStyle(Color(hex: status.step.tintHex))
                 .padding(.top, 2)
@@ -597,9 +597,9 @@ struct GrowthUnlockPopupView: View {
             )
         case .household:
             localized(
-                zh: "家庭协作入口开放，把任务、事务和照护责任分给全家一起处理。",
-                en: "Household collaboration is open for shared tasks, chores, and care ownership.",
-                de: "Familienzusammenarbeit ist offen für Aufgaben, Alltag und Pflegeverteilung."
+                zh: "家庭事务入口开放，可以集中查看成员、花费和照护分析。",
+                en: "Household tools are open for members, expenses, and care analysis.",
+                de: "Haushaltswerkzeuge sind für Mitglieder, Ausgaben und Pflegeanalyse offen."
             )
         case .oasisPlants:
             localized(
@@ -643,52 +643,52 @@ struct GrowthUnlockPopupView: View {
     private var featureBullets: [String] {
         switch status.step.id {
         case .dailyCare:
-            return [
+            [
                 localized(zh: "成员、宠物档案、基础日历统一开放", en: "Members, pet profiles, and the basic calendar are available", de: "Mitglieder, Tierprofile und Basiskalender sind verfügbar"),
                 localized(zh: "喂食、喝水、便便、用药等日常记录可直接使用", en: "Food, water, potty, and medication logs are ready", de: "Futter, Wasser, Toilette und Medikamente sind bereit")
             ]
         case .bodyHealth:
-            return [
+            [
                 localized(zh: "查看健康概览、体重趋势和清洁护理", en: "View health overview, weight trends, and hygiene care", de: "Gesundheit, Gewichtstrends und Hygiene ansehen"),
                 localized(zh: "从快捷操作或功能菜单进入健康管理", en: "Open health tools from shortcuts or the feature menu", de: "Gesundheit über Schnellzugriff oder Menü öffnen")
             ]
         case .memory:
-            return [
+            [
                 localized(zh: "记录遛狗距离、互动玩耍和成长时刻", en: "Log walks, play, and growth moments", de: "Spaziergänge, Spiel und Wachstumsmomente erfassen"),
                 localized(zh: "在记忆墙里回看长期陪伴变化", en: "Review long-term changes on the memory wall", de: "Langzeitveränderungen auf der Erinnerungswand ansehen")
             ]
         case .household:
-            return [
-                localized(zh: "创建家庭任务，分配给不同成员", en: "Create household tasks and assign them to members", de: "Familienaufgaben erstellen und zuweisen"),
-                localized(zh: "查看照护协作和家庭事务进度", en: "Track care collaboration and household progress", de: "Pflegezusammenarbeit und Fortschritt verfolgen")
+            [
+                localized(zh: "查看成员、花费和家庭事务", en: "Review members, expenses, and household affairs", de: "Mitglieder, Ausgaben und Haushalt ansehen"),
+                localized(zh: "用照护分析回顾近期记录", en: "Use care analysis to review recent records", de: "Pflegeanalyse für aktuelle Einträge nutzen")
             ]
         case .oasisPlants:
-            return [
+            [
                 localized(zh: "领取生命树产生的椰子收益", en: "Collect coconuts produced by the Life Tree", de: "Kokosnüsse vom Lebensbaum einsammeln"),
                 localized(zh: "从 Oasis 查看成长进度和下一阶段", en: "Use Oasis to see growth progress and the next stage", de: "In Oasis Wachstum und nächste Stufe ansehen")
             ]
         case .rewards:
-            return [
+            [
                 localized(zh: "购买装饰、树能量包和实用消耗品", en: "Buy cosmetics, tree energy packs, and consumables", de: "Dekoration, Baumenergie und Verbrauchsartikel kaufen"),
                 localized(zh: "入口：Oasis 商店卡片与功能菜单", en: "Entry: Oasis shop card and the feature menu", de: "Einstieg: Oasis-Shopkarte und Funktionsmenü")
             ]
         case .advancedPlay:
-            return [
+            [
                 localized(zh: "用椰子抽取盲盒与收集奖励", en: "Spend coconuts on blind boxes and collection rewards", de: "Kokosnüsse für Blindboxen und Sammlung nutzen"),
                 localized(zh: "入口：Oasis 盲盒卡片与功能菜单", en: "Entry: Oasis blind box card and the feature menu", de: "Einstieg: Oasis-Blindbox und Funktionsmenü")
             ]
         case .advancedInsights:
-            return [
+            [
                 localized(zh: "查看长期照护趋势和异常提醒", en: "Review long-term care trends and anomaly prompts", de: "Langzeittrends und Auffälligkeiten ansehen"),
                 localized(zh: "用数据辅助饮食、运动和健康决策", en: "Use data to support food, activity, and health decisions", de: "Daten für Futter, Aktivität und Gesundheit nutzen")
             ]
         case .memoryReview:
-            return [
+            [
                 localized(zh: "整理成长回顾、记忆归档和家庭周报", en: "Organize growth reviews, memory archives, and weekly reports", de: "Rückblicke, Archive und Wochenberichte organisieren"),
                 localized(zh: "把长期记录变成更容易回看的故事", en: "Turn long-term records into easier-to-review stories", de: "Langzeitdaten in gut lesbare Geschichten verwandeln")
             ]
         case .mastery:
-            return [
+            [
                 localized(zh: "解锁大师树外观和长期荣誉", en: "Unlock master tree styling and long-term honors", de: "Meisterbaum und Langzeit-Ehren freischalten"),
                 localized(zh: "获得当前成长线的顶级被动收益", en: "Receive the top passive yield for the growth path", de: "Höchste passive Erträge dieser Wachstumslinie erhalten")
             ]

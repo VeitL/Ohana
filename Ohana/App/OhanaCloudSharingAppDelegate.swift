@@ -43,6 +43,15 @@ final class OhanaCloudSharingAppDelegate: NSObject, UIApplicationDelegate {
         _: UIApplication,
         userDidAcceptCloudKitShareWith cloudKitShareMetadata: CKShare.Metadata
     ) {
+        guard OnlineFeatureGate.allows(.onlineCollaboration) else {
+            OnlineFeatureGateNoticeCenter.post(.cloudShareInviteBlocked)
+            OhanaLog.info(
+                "Cloud sync share acceptance blocked by OnlineFeatureGate.",
+                category: "CloudSync"
+            )
+            return
+        }
+
         #if OHANA_LOCAL_DEVICE
             OhanaLog.info(
                 "Cloud sync share acceptance skipped in local device build.",

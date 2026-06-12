@@ -21,137 +21,146 @@ struct CloudSyncHouseholdSharePresentation: Identifiable {
 extension SettingsView {
     @ViewBuilder
     var householdSyncSection: some View {
-        settingsSection(title: l.tr(zh: "家庭同步", en: "Family Sync", de: "Familiensynchronisierung")) {
-            VStack(spacing: 0) {
-                settingsRow(
-                    icon: householdHasPreparedShare ? "person.2.wave.2.fill" : "person.2.badge.plus.fill",
-                    title: l.tr(zh: "邀请家人加入", en: "Invite Family", de: "Familie einladen"),
-                    subtitle: householdShareSubtitle,
-                    iconColor: Color.goPrimary
-                ) {
-                    prepareHouseholdShare()
+        if OnlineFeatureGate.allows(.onlineCollaboration) {
+            settingsSection(title: l.tr(zh: "家庭同步", en: "Family Sync", de: "Familiensynchronisierung")) {
+                VStack(spacing: 0) {
+                    householdSyncSectionContent
                 }
-                .disabled(isPreparingHouseholdShare)
+            }
+        }
+    }
 
-                if isPreparingHouseholdShare {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .tint(Color.goPrimary)
-                            .scaleEffect(0.8)
-                        Text(l.tr(zh: "正在准备 iCloud 分享...", en: "Preparing iCloud share...", de: "iCloud-Freigabe wird vorbereitet..."))
-                            .font(OhanaFont.footnote())
-                            .foregroundStyle(tertiaryText)
-                        Spacer()
-                    }
-                    .padding(.leading, 44)
-                    .padding(.top, 8)
+    @ViewBuilder
+    private var householdSyncSectionContent: some View {
+        VStack(spacing: 0) {
+            settingsRow(
+                icon: householdHasPreparedShare ? "person.2.wave.2.fill" : "person.2.badge.plus.fill",
+                title: l.tr(zh: "邀请家人加入", en: "Invite Family", de: "Familie einladen"),
+                subtitle: householdShareSubtitle,
+                iconColor: Color.goPrimary
+            ) {
+                prepareHouseholdShare()
+            }
+            .disabled(isPreparingHouseholdShare)
+
+            if isPreparingHouseholdShare {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(Color.goPrimary)
+                        .scaleEffect(0.8)
+                    Text(l.tr(zh: "正在准备 iCloud 分享...", en: "Preparing iCloud share...", de: "iCloud-Freigabe wird vorbereitet..."))
+                        .font(OhanaFont.footnote())
+                        .foregroundStyle(tertiaryText)
+                    Spacer()
                 }
+                .padding(.leading, 44)
+                .padding(.top, 8)
+            }
 
+            OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
+
+            settingsRow(
+                icon: activeHumanForCloudIdentity?.appleUserIdentifier.isEmpty == false ? "person.badge.shield.checkmark.fill" : "person.badge.key.fill",
+                title: l.tr(zh: "绑定本机 iCloud 身份", en: "Bind This iCloud Identity", de: "Diese iCloud-Identität binden"),
+                subtitle: cloudIdentitySubtitle,
+                iconColor: Color.goTeal
+            ) {
+                bindCurrentCloudIdentity()
+            }
+            .disabled(isBindingCloudIdentity || activeHumanForCloudIdentity == nil)
+
+            if isBindingCloudIdentity {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(Color.goTeal)
+                        .scaleEffect(0.8)
+                    Text(l.tr(zh: "正在读取当前 iCloud 身份...", en: "Reading current iCloud identity...", de: "Aktuelle iCloud-Identität wird gelesen..."))
+                        .font(OhanaFont.footnote())
+                        .foregroundStyle(tertiaryText)
+                    Spacer()
+                }
+                .padding(.leading, 44)
+                .padding(.top, 8)
+            }
+
+            if hasCloudSyncTransientRetry, !hasCloudSyncSharedZoneAccessRevokedNotice {
                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
-
-                settingsRow(
-                    icon: activeHumanForCloudIdentity?.appleUserIdentifier.isEmpty == false ? "person.badge.shield.checkmark.fill" : "person.badge.key.fill",
-                    title: l.tr(zh: "绑定本机 iCloud 身份", en: "Bind This iCloud Identity", de: "Diese iCloud-Identität binden"),
-                    subtitle: cloudIdentitySubtitle,
-                    iconColor: Color.goTeal
-                ) {
-                    bindCurrentCloudIdentity()
-                }
-                .disabled(isBindingCloudIdentity || activeHumanForCloudIdentity == nil)
-
-                if isBindingCloudIdentity {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .tint(Color.goTeal)
-                            .scaleEffect(0.8)
-                        Text(l.tr(zh: "正在读取当前 iCloud 身份...", en: "Reading current iCloud identity...", de: "Aktuelle iCloud-Identität wird gelesen..."))
-                            .font(OhanaFont.footnote())
-                            .foregroundStyle(tertiaryText)
-                        Spacer()
-                    }
-                    .padding(.leading, 44)
-                    .padding(.top, 8)
-                }
-
-                if hasCloudSyncTransientRetry, !hasCloudSyncSharedZoneAccessRevokedNotice {
-                    OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.clockwise.circle.fill") // a11y: allow decorative status icon covered by adjacent text
-                            .font(OhanaFont.footnote(.semibold))
-                            .foregroundStyle(Color.goTeal)
-                            .accessibilityHidden(true)
-                        Text(cloudSyncTransientRetryMessage)
-                            .font(OhanaFont.footnote())
-                            .foregroundStyle(tertiaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer()
-                        if isRetryingCloudSyncNow {
-                            ProgressView()
-                                .tint(Color.goTeal)
-                                .scaleEffect(0.75)
-                        } else {
-                            Button {
-                                retryCloudSyncNow()
-                            } label: {
-                                Image(systemName: "arrow.clockwise") // a11y: allow button has explicit accessibilityLabel
-                                    .font(OhanaFont.footnote(.semibold))
-                                    .foregroundStyle(Color.goTeal)
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                            .accessibilityLabel(l.tr(zh: "立即重试家庭同步", en: "Retry family sync now", de: "Familiensynchronisierung jetzt erneut versuchen"))
-                        }
-                    }
-                    .padding(.leading, 44)
-                    .padding(.top, 4)
-                }
-
-                if hasCloudSyncSharedZoneAccessRevokedNotice {
-                    OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.icloud.fill") // a11y: allow decorative status icon covered by adjacent text
-                            .font(OhanaFont.footnote(.semibold))
-                            .foregroundStyle(Color.goOrange)
-                            .accessibilityHidden(true)
-                        Text(l.tr(
-                            zh: "家庭共享权限已失效，同步已暂停。重新接受邀请或重新发起家庭分享后会恢复。",
-                            en: "Family sharing access changed, so sync is paused. Accept a new invite or start sharing again to resume.",
-                            de: "Der Zugriff auf die Familienfreigabe hat sich geändert; die Synchronisierung ist pausiert."
-                        ))
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise.circle.fill") // a11y: allow decorative status icon covered by adjacent text
+                        .font(OhanaFont.footnote(.semibold))
+                        .foregroundStyle(Color.goTeal)
+                        .accessibilityHidden(true)
+                    Text(cloudSyncTransientRetryMessage)
                         .font(OhanaFont.footnote())
                         .foregroundStyle(tertiaryText)
                         .fixedSize(horizontal: false, vertical: true)
-                        Spacer()
+                    Spacer()
+                    if isRetryingCloudSyncNow {
+                        ProgressView()
+                            .tint(Color.goTeal)
+                            .scaleEffect(0.75)
+                    } else {
                         Button {
-                            appServices.cloudSync.clearSharedZoneAccessRevokedNotice()
-                            hasCloudSyncSharedZoneAccessRevokedNotice = false
+                            retryCloudSyncNow()
                         } label: {
-                            Image(systemName: "xmark.circle.fill") // a11y: allow button has explicit accessibilityLabel
+                            Image(systemName: "arrow.clockwise") // a11y: allow button has explicit accessibilityLabel
                                 .font(OhanaFont.footnote(.semibold))
-                                .foregroundStyle(tertiaryText)
+                                .foregroundStyle(Color.goTeal)
                         }
                         .buttonStyle(ScaleButtonStyle())
-                        .accessibilityLabel(l.tr(zh: "关闭共享状态提示", en: "Dismiss sharing status notice", de: "Freigabehinweis schließen"))
+                        .accessibilityLabel(l.tr(zh: "立即重试家庭同步", en: "Retry family sync now", de: "Familiensynchronisierung jetzt erneut versuchen"))
                     }
-                    .padding(.leading, 44)
-                    .padding(.top, 4)
                 }
+                .padding(.leading, 44)
+                .padding(.top, 4)
+            }
 
-                if let householdSyncStatusMessage {
-                    OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill") // a11y: allow decorative status icon covered by adjacent text
+            if hasCloudSyncSharedZoneAccessRevokedNotice {
+                OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.icloud.fill") // a11y: allow decorative status icon covered by adjacent text
+                        .font(OhanaFont.footnote(.semibold))
+                        .foregroundStyle(Color.goOrange)
+                        .accessibilityHidden(true)
+                    Text(l.tr(
+                        zh: "家庭共享权限已失效，同步已暂停。重新接受邀请或重新发起家庭分享后会恢复。",
+                        en: "Family sharing access changed, so sync is paused. Accept a new invite or start sharing again to resume.",
+                        de: "Der Zugriff auf die Familienfreigabe hat sich geändert; die Synchronisierung ist pausiert."
+                    ))
+                    .font(OhanaFont.footnote())
+                    .foregroundStyle(tertiaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    Button {
+                        appServices.cloudSync.clearSharedZoneAccessRevokedNotice()
+                        hasCloudSyncSharedZoneAccessRevokedNotice = false
+                    } label: {
+                        Image(systemName: "xmark.circle.fill") // a11y: allow button has explicit accessibilityLabel
                             .font(OhanaFont.footnote(.semibold))
-                            .foregroundStyle(Color.goPrimary)
-                            .accessibilityHidden(true)
-                        Text(householdSyncStatusMessage)
-                            .font(OhanaFont.footnote())
                             .foregroundStyle(tertiaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer()
                     }
-                    .padding(.leading, 44)
-                    .padding(.top, 4)
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityLabel(l.tr(zh: "关闭共享状态提示", en: "Dismiss sharing status notice", de: "Freigabehinweis schließen"))
                 }
+                .padding(.leading, 44)
+                .padding(.top, 4)
+            }
+
+            if let householdSyncStatusMessage {
+                OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill") // a11y: allow decorative status icon covered by adjacent text
+                        .font(OhanaFont.footnote(.semibold))
+                        .foregroundStyle(Color.goPrimary)
+                        .accessibilityHidden(true)
+                    Text(householdSyncStatusMessage)
+                        .font(OhanaFont.footnote())
+                        .foregroundStyle(tertiaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                }
+                .padding(.leading, 44)
+                .padding(.top, 4)
             }
         }
     }
@@ -254,6 +263,7 @@ extension SettingsView {
     }
 
     func prepareHouseholdShare() {
+        guard canUseOnlineCollaborationForSettings() else { return }
         guard !isPreparingHouseholdShare else { return }
         isPreparingHouseholdShare = true
         householdSyncErrorMessage = nil
@@ -308,6 +318,7 @@ extension SettingsView {
     }
 
     func bindCurrentCloudIdentity() {
+        guard canUseOnlineCollaborationForSettings() else { return }
         guard !isBindingCloudIdentity,
               let human = activeHumanForCloudIdentity else { return }
         isBindingCloudIdentity = true
@@ -337,6 +348,7 @@ extension SettingsView {
     }
 
     func retryCloudSyncNow() {
+        guard canUseOnlineCollaborationForSettings() else { return }
         guard !isRetryingCloudSyncNow else { return }
         isRetryingCloudSyncNow = true
         householdSyncErrorMessage = nil
@@ -363,6 +375,7 @@ extension SettingsView {
     }
 
     func handleHouseholdShareSaved(_ share: CKShare?) {
+        guard canUseOnlineCollaborationForSettings() else { return }
         guard let share,
               let householdId = CloudSyncAcceptedShareStateUpdater.householdId(from: share.recordID.zoneID) else {
             return
@@ -380,6 +393,7 @@ extension SettingsView {
     }
 
     func handleHouseholdShareStopped(_ presentation: CloudSyncHouseholdSharePresentation) {
+        guard canUseOnlineCollaborationForSettings() else { return }
         do {
             let summary = try CloudSyncHouseholdShareStopRuntime.stopSharingLocally(
                 householdId: presentation.householdId,
@@ -411,6 +425,15 @@ extension SettingsView {
         let household = Household()
         modelContext.insert(household)
         return household
+    }
+
+    private func canUseOnlineCollaborationForSettings() -> Bool {
+        guard OnlineFeatureGate.allows(.onlineCollaboration) else {
+            householdSharePresentation = nil
+            OnlineFeatureGateNoticeCenter.post(.cloudShareInviteBlocked)
+            return false
+        }
+        return true
     }
 }
 

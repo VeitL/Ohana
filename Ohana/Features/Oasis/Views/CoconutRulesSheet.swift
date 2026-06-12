@@ -140,11 +140,11 @@ struct CoconutRulesSheet: View {
                 reward: l.tr(zh: "80🥥/次", en: "80🥥 each", de: "80🥥 je Öffnung")
             ),
             RuleCard(
-                icon: "target",
-                title: l.tr(zh: "悬赏任务", en: "Bounties", de: "Aufträge"),
-                desc: l.tr(zh: "发布、接单和奖励", en: "Post, accept, reward", de: "Erstellen, annehmen, belohnen"),
+                icon: "chart.bar.doc.horizontal.fill",
+                title: l.tr(zh: "照护周报", en: "Care reports", de: "Pflegeberichte"),
+                desc: l.tr(zh: "回顾照护、成长和奖励", en: "Review care, growth, and rewards", de: "Pflege, Wachstum und Belohnungen ansehen"),
                 glowColor: Color(hex: "FF8C42"),
-                reward: l.tr(zh: "转给完成者", en: "Paid to completer", de: "An Erlediger ausgezahlt")
+                reward: l.tr(zh: "本机统计", en: "Local recap", de: "Lokale Übersicht")
             )
         ]
     }

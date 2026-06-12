@@ -346,7 +346,7 @@ final class HomeReadModelStore: ObservableObject {
             petExpenseLedgerEntries: fetches.petExpenseQuickActionEntries(),
             petWeightLedgerEntries: fetches.petWeightQuickActionEntries(),
             humanWeightLogs: fetches.humanWeightLogs(),
-            familyTasks: fetches.familyTasks(),
+            familyTasks: OnlineFeatureGate.allows(.onlineCollaboration) ? fetches.familyTasks() : [],
             exchangeRequests: fetches.exchangeRequests(),
             activeHumanIdRaw: input.activeHumanIdRaw,
             hiddenPetIDsRaw: input.hiddenPetIDsRaw,
@@ -418,7 +418,7 @@ actor HomeReadModelActor {
         let humanWeightLogs = fetches.humanWeightLogs()
         try Task.checkCancellation()
 
-        let familyTasks = fetches.familyTasks()
+        let familyTasks = OnlineFeatureGate.allows(.onlineCollaboration) ? fetches.familyTasks() : []
         let exchangeRequests = fetches.exchangeRequests()
         try Task.checkCancellation()
 
