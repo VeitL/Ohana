@@ -18,7 +18,7 @@
 | GAP-6 通知分级 | 🟢 | `6bb766cc3` | 通知预算、夜间免打扰、合并、关键提醒豁免、周报语义、`scripts/module-exit-gate.sh` 均通过 | 待真机通知抽查 |
 | GAP-7 补记结算 | 🟢 | `528cf2cdd` | 补记历史日期与操作日奖励结算测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 补记路径抽查 |
 | GAP-8 单成员形态 | 🟢 | `6c4a98db2` | 单成员展示红绿测试、负面文案扫描、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待单人单宠真实 UI 抽查 |
-| GAP-9 离世退场 | 🟡 | 待提交 | 纪念模式规则书、未来计划可逆退场、离世成员活跃入口过滤、奖励冻结定向测试已通过；门禁待跑 | 待真实 UI / 真机通知抽查 |
+| GAP-9 离世退场 | 🟢 | `e6a45e72c` | 纪念模式规则书、未来计划可逆退场、离世成员活跃入口过滤、奖励冻结定向测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 真机通知抽查 |
 
 ## GAP-1 联机功能门
 
