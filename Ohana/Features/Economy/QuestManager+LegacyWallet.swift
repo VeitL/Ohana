@@ -84,7 +84,7 @@ extension QuestManager {
     ) throws -> Int {
         lastEconomyRewardResult = nil
         guard amount > 0 else { return 0 }
-        let delta = try specialCoconutDelta(
+        guard let delta = try specialCoconutDelta(
             amount: amount,
             emoji: emoji,
             title: title,
@@ -97,7 +97,7 @@ extension QuestManager {
             transactionKey: transactionKey,
             context: context,
             occurredAt: occurredAt
-        )
+        ) else { return 0 }
         let entries = try wallet.apply(
             deltas: [delta],
             context: context,
@@ -158,25 +158,24 @@ extension QuestManager {
         transactionKey: String,
         context: ModelContext,
         occurredAt: Date
-    ) throws -> CoconutWalletDelta {
+    ) throws -> CoconutWalletDelta? {
         guard let actorId, actorId != "system", let uuid = UUID(uuidString: actorId) else {
-            return .system(
-                delta: amount,
-                entryKind: .reward,
-                source: source,
-                title: title,
+            return activeHumanSpecialCoconutDelta(
+                amount: amount,
                 emoji: emoji,
-                actorId: actorId ?? "system",
-                actorName: actorName ?? "System",
+                title: title,
+                source: source,
                 sourceModelName: sourceModelName,
                 sourceModelId: sourceModelId,
                 metadataJSON: metadataJSON,
-                occurredAt: occurredAt,
-                transactionKey: transactionKey
+                transactionKey: transactionKey,
+                context: context,
+                occurredAt: occurredAt
             )
         }
 
         if let human = try fetchHuman(id: uuid, context: context) {
+            guard EconomyWalletWritePolicy.canWrite(human) else { return nil }
             return .human(
                 human,
                 delta: amount,
@@ -194,6 +193,7 @@ extension QuestManager {
             )
         }
         if let pet = try fetchPet(id: uuid, context: context) {
+            guard EconomyWalletWritePolicy.canWrite(pet) else { return nil }
             return .pet(
                 pet,
                 delta: amount,
@@ -210,14 +210,45 @@ extension QuestManager {
                 transactionKey: transactionKey
             )
         }
-        return .system(
+        return activeHumanSpecialCoconutDelta(
+            amount: amount,
+            emoji: emoji,
+            title: title,
+            source: source,
+            sourceModelName: sourceModelName,
+            sourceModelId: sourceModelId,
+            metadataJSON: metadataJSON,
+            transactionKey: transactionKey,
+            context: context,
+            occurredAt: occurredAt
+        )
+    }
+
+    private func activeHumanSpecialCoconutDelta(
+        amount: Int,
+        emoji: String,
+        title: String,
+        source: CoconutWalletSource,
+        sourceModelName: String,
+        sourceModelId: String,
+        metadataJSON: String,
+        transactionKey: String,
+        context: ModelContext,
+        occurredAt: Date
+    ) -> CoconutWalletDelta? {
+        guard let human = currentActiveHuman(context: context),
+              EconomyWalletWritePolicy.canWrite(human) else {
+            return nil
+        }
+        return .human(
+            human,
             delta: amount,
             entryKind: .reward,
             source: source,
             title: title,
             emoji: emoji,
-            actorId: actorId,
-            actorName: actorName,
+            actorId: human.id.uuidString,
+            actorName: human.name,
             sourceModelName: sourceModelName,
             sourceModelId: sourceModelId,
             metadataJSON: metadataJSON,

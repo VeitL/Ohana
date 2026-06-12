@@ -118,12 +118,22 @@ struct EconomyRewardResult: Equatable {
     }
 
     func feedbackMessage(l: L10n) -> String {
-        let coconutText = totalCoconuts > 0 ? "，+\(totalCoconuts)椰子" : ""
+        let coconutText = totalCoconuts > 0
+            ? l.tr(zh: "，+\(totalCoconuts)椰子", en: ", +\(totalCoconuts) coconuts", de: ", +\(totalCoconuts) Kokosnüsse")
+            : ""
         switch budgetStage {
         case .cooldown:
-            return "已记录，冷却内成长 +\(growthXP)XP"
+            return l.tr(
+                zh: "已记录，冷却内成长 +\(growthXP)XP",
+                en: "Recorded. Cooldown growth +\(growthXP)XP",
+                de: "Erfasst. Abklingzeit-Wachstum +\(growthXP)XP"
+            )
         case .fatigue:
-            return "今日进入疲劳收益，+\(growthXP)XP\(coconutText)"
+            return l.tr(
+                zh: "今日进入疲劳收益，+\(growthXP)XP\(coconutText)",
+                en: "Gentle rewards now. +\(growthXP)XP\(coconutText)",
+                de: "Sanfte Belohnung jetzt. +\(growthXP)XP\(coconutText)"
+            )
         case .recordOnly:
             return l.tr(
                 zh: "今日椰子已装满，明天继续～",
@@ -138,15 +148,31 @@ struct EconomyRewardResult: Equatable {
             )
         case .normal:
             if luck == .golden {
-                return "金色幸运，+\(growthXP)XP\(coconutText)"
+                return l.tr(
+                    zh: "金色幸运，+\(growthXP)XP\(coconutText)",
+                    en: "Golden luck, +\(growthXP)XP\(coconutText)",
+                    de: "Goldenes Glück, +\(growthXP)XP\(coconutText)"
+                )
             }
             if luck == .small {
-                return "小幸运，+\(growthXP)XP\(coconutText)"
+                return l.tr(
+                    zh: "小幸运，+\(growthXP)XP\(coconutText)",
+                    en: "Small luck, +\(growthXP)XP\(coconutText)",
+                    de: "Kleines Glück, +\(growthXP)XP\(coconutText)"
+                )
             }
             if bonusCoconuts > luckyCoconuts {
-                return "完整记录加成，+\(growthXP)XP\(coconutText)"
+                return l.tr(
+                    zh: "完整记录加成，+\(growthXP)XP\(coconutText)",
+                    en: "Complete log bonus, +\(growthXP)XP\(coconutText)",
+                    de: "Bonus für vollständigen Eintrag, +\(growthXP)XP\(coconutText)"
+                )
             }
-            return "成长 +\(growthXP)XP\(coconutText)"
+            return l.tr(
+                zh: "成长 +\(growthXP)XP\(coconutText)",
+                en: "Growth +\(growthXP)XP\(coconutText)",
+                de: "Wachstum +\(growthXP)XP\(coconutText)"
+            )
         }
     }
 

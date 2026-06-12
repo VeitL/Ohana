@@ -26,6 +26,10 @@ struct PetBondVaultContentView: View {
         appServices.coconutWallet.balance(for: pet, context: modelContext)
     }
 
+    private var petWalletFrozen: Bool {
+        !EconomyWalletWritePolicy.canWrite(pet)
+    }
+
     private var petLogs: [CoconutLogEntry] {
         walletLedgerEntries
             .filter { $0.ownerKind == .pet && $0.ownerId == pet.id.uuidString && $0.delta != 0 }
@@ -161,7 +165,7 @@ struct PetBondVaultContentView: View {
     private func unlockCard(_ item: PetBondVaultItem) -> some View {
         let unlocked = !item.isRepeatable && unlockedIDs.contains(item.id)
         let balance = petWalletBalance
-        let canUnlock = balance >= item.cost && !unlocked
+        let canUnlock = balance >= item.cost && !unlocked && !petWalletFrozen
         let tint = Color(hex: item.tintHex)
 
         return VStack(alignment: .leading, spacing: 11) {
@@ -207,7 +211,7 @@ struct PetBondVaultContentView: View {
                 Button {
                     unlock(item)
                 } label: {
-                    Text(actionTitle(for: item, unlocked: unlocked, balance: balance))
+                    Text(actionTitle(for: item, unlocked: unlocked, balance: balance, isFrozen: petWalletFrozen))
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(canUnlock ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .frame(maxWidth: .infinity)
@@ -248,7 +252,7 @@ struct PetBondVaultContentView: View {
                                     .font(OhanaFont.caption(.black))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1)
-                                Text(log.timeAgoString)
+                                Text(log.timeAgoString(l: l))
                                     .font(OhanaFont.caption2(.semibold))
                                     .foregroundStyle(Color.ohanaSecondaryText)
                             }
@@ -268,9 +272,9 @@ struct PetBondVaultContentView: View {
     private var boundaryNote: some View {
         Label {
             Text(l.tr(
-                zh: "人类椰子用于商店、兑换和本地奖励记录；宠物成长椰子只用于这个宠物自己的成长与纪念。",
-                en: "Human coconuts pay for the shop, exchanges, and local reward records; pet bond coconuts stay with this pet.",
-                de: "Menschen-Kokos bezahlt Shop, Umtausch und lokale Belohnungen; Haustier-Bindungskokos bleibt bei diesem Tier."
+                zh: "人类椰子用于商店和本地奖励记录；宠物成长椰子只用于这个宠物自己的成长与纪念。",
+                en: "Human coconuts pay for the shop and local reward records; pet bond coconuts stay with this pet.",
+                de: "Menschen-Kokos bezahlt Shop und lokale Belohnungen; Haustier-Bindungskokos bleibt bei diesem Tier."
             ))
             .font(OhanaFont.caption2(.black))
         } icon: {
@@ -293,9 +297,12 @@ struct PetBondVaultContentView: View {
         }
     }
 
-    private func actionTitle(for item: PetBondVaultItem, unlocked: Bool, balance: Int) -> String {
+    private func actionTitle(for item: PetBondVaultItem, unlocked: Bool, balance: Int, isFrozen: Bool) -> String {
         if unlocked {
             return l.tr(zh: "已拥有", en: "Owned", de: "Besitzt")
+        }
+        if isFrozen {
+            return l.tr(zh: "已冻结", en: "Frozen", de: "Eingefroren")
         }
         if balance >= item.cost {
             return item.isRepeatable
@@ -338,6 +345,9 @@ struct PetBondVaultContentView: View {
             } else if result.failure == .insufficientBalance {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 showToast(l.tr(zh: "椰子不足", en: "Not enough coconuts", de: "Nicht genug Kokosnüsse"))
+            } else if result.failure == .walletFrozen {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                showToast(l.tr(zh: "钱包已冻结", en: "Wallet frozen", de: "Wallet eingefroren"))
             }
         }
     }

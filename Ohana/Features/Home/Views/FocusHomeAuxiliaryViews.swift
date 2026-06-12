@@ -188,7 +188,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
                 }
                 .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
         }
-        let pendingExchanges: [CoconutExchangeRequest] = if activeHumanId.isEmpty {
+        let pendingExchanges: [CoconutExchangeRequest] = if activeHumanId.isEmpty || !CoconutExchangeFeatureGate.isEnabled {
             []
         } else {
             exchangeRequests
@@ -258,7 +258,7 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
                 }
                 .sorted { ($0.dueAt ?? $0.createdAt) < ($1.dueAt ?? $1.createdAt) }
         }
-        let pendingExchanges: [CoconutExchangeRequest] = if activeHumanId.isEmpty {
+        let pendingExchanges: [CoconutExchangeRequest] = if activeHumanId.isEmpty || !CoconutExchangeFeatureGate.isEnabled {
             []
         } else {
             exchangeRequests

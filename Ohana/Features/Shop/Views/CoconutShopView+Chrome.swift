@@ -37,7 +37,9 @@ extension CoconutShopView {
             HStack(spacing: 18) {
                 metric(label: l.tr(zh: "本人余额", en: "My balance", de: "Mein Guthaben"), value: "\(currentHumanBalance)", suffix: "🥥", tint: Color.goYellow)
                 metric(label: l.tr(zh: "已拥有", en: "Owned", de: "Besitzt"), value: "\(ownedCount)", suffix: "", tint: Color.goPrimary)
-                metric(label: l.tr(zh: "待确认", en: "Pending", de: "Offen"), value: "\(incomingPendingExchanges.count)", suffix: "", tint: Color.goTeal)
+                if CoconutExchangeFeatureGate.isEnabled {
+                    metric(label: l.tr(zh: "待确认", en: "Pending", de: "Offen"), value: "\(incomingPendingExchanges.count)", suffix: "", tint: Color.goTeal)
+                }
             }
         }
     }
@@ -75,7 +77,7 @@ extension CoconutShopView {
     var categoryRail: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(ShopItem.ShopCategory.allCases) { category in
+                ForEach(ShopItem.ShopCategory.visibleCases) { category in
                     Button {
                         withAnimation(GoMotion.feedback) {
                             selectedCategory = category

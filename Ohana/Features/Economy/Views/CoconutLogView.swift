@@ -45,14 +45,21 @@ private struct CoconutLogMemberSnapshot {
     let pets: [CoconutLogActorSnapshot]
     let visibleHumans: [CoconutLogActorSnapshot]
     let hiddenHumanIds: Set<String>
+    let frozenActorIds: Set<String>
+    let activePetBalanceTotal: Int
+    let activeHumanBalanceTotal: Int
 
     static let empty = CoconutLogMemberSnapshot(
         isReady: false,
         pets: [],
         visibleHumans: [],
-        hiddenHumanIds: []
+        hiddenHumanIds: [],
+        frozenActorIds: [],
+        activePetBalanceTotal: 0,
+        activeHumanBalanceTotal: 0
     )
 
+    @MainActor
     static func fetch(
         context: ModelContext,
         viewedBy activeHumanId: UUID?,
@@ -104,6 +111,10 @@ private struct CoconutLogMemberSnapshot {
                 ? human.id.uuidString
                 : nil
         })
+        let frozenActorIds = Set(
+            pets.filter { !EconomyWalletWritePolicy.canWrite($0) }.map(\.id.uuidString) +
+                humans.filter { !EconomyWalletWritePolicy.canWrite($0) }.map(\.id.uuidString)
+        )
         let petSnapshots = pets.map { pet in
             CoconutLogActorSnapshot(
                 id: pet.id.uuidString,
@@ -118,7 +129,14 @@ private struct CoconutLogMemberSnapshot {
             isReady: true,
             pets: petSnapshots,
             visibleHumans: visibleHumans,
-            hiddenHumanIds: hiddenHumanIds
+            hiddenHumanIds: hiddenHumanIds,
+            frozenActorIds: frozenActorIds,
+            activePetBalanceTotal: pets
+                .filter(EconomyWalletWritePolicy.canWrite)
+                .reduce(0) { $0 + $1.coconutBalance },
+            activeHumanBalanceTotal: humans
+                .filter(EconomyWalletWritePolicy.canWrite)
+                .reduce(0) { $0 + $1.coconutBalance }
         )
     }
 
@@ -231,14 +249,13 @@ struct CoconutLogContentView: View {
         if !walletAccounts.isEmpty {
             return walletAccounts.reduce(0) { total, account in
                 guard account.ownerKind != .system,
-                      !(account.ownerKind == .human && memberSnapshot.hiddenHumanIds.contains(account.ownerId)) else {
+                      !memberSnapshot.frozenActorIds.contains(account.ownerId) else {
                     return total
                 }
                 return total + account.balance
             }
         }
-        return memberSnapshot.pets.reduce(0) { $0 + $1.balance } +
-            memberSnapshot.visibleHumans.reduce(0) { $0 + $1.balance }
+        return memberSnapshot.activePetBalanceTotal + memberSnapshot.activeHumanBalanceTotal
     }
 
     private func balance(for actorId: String) -> Int {
@@ -516,7 +533,7 @@ struct CoconutLogContentView: View {
                 HStack(spacing: 6) {
                     if isSystem {
                         // 全局系统奖励
-                        Text("🏕️ 岛屿奖励")
+                        Text(l.tr(zh: "🏕️ 岛屿奖励", en: "🏕️ Island reward", de: "🏕️ Insel-Belohnung"))
                             .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -540,7 +557,7 @@ struct CoconutLogContentView: View {
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Color.goPrimary.opacity(0.1), in: Capsule())
                     }
-                    Text(log.timeAgoString)
+                    Text(log.timeAgoString(l: l))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 }

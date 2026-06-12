@@ -13,6 +13,19 @@ enum WealthTimeRange: String, CaseIterable, Identifiable {
     case month = "月"
     case all = "全部"
     var id: String { rawValue }
+
+    func title(_ l: L10n) -> String {
+        switch self {
+        case .day:
+            l.tr(zh: "日", en: "Day", de: "Tag")
+        case .week:
+            l.tr(zh: "周", en: "Week", de: "Woche")
+        case .month:
+            l.tr(zh: "月", en: "Month", de: "Monat")
+        case .all:
+            l.tr(zh: "全部", en: "All", de: "Alle")
+        }
+    }
 }
 
 // MARK: - Chart Bar（用于历史趋势：按时间桶聚合 log）
@@ -36,6 +49,102 @@ struct WealthTrendPoint: Identifiable {
     let amount: Int
 }
 
+enum WealthActorKind {
+    case pet
+    case human
+}
+
+struct WealthActorSnapshot: Identifiable, Equatable {
+    let id: String
+    let emoji: String
+    let name: String
+    let balance: Int
+    let kind: WealthActorKind
+}
+
+struct WealthAccountSnapshot: Equatable {
+    let ownerKind: CoconutWalletOwnerKind
+    let ownerId: String
+    let balance: Int
+}
+
+struct IslandWealthSnapshot {
+    let pets: [WealthActorSnapshot]
+    let visibleHumans: [WealthActorSnapshot]
+    let allHumanBalances: [String: Int]
+    let hiddenHumanIds: Set<String>
+    let formalAccounts: [WealthAccountSnapshot]
+    let visibleLogs: [CoconutLogEntry]
+
+    static let empty = IslandWealthSnapshot(
+        pets: [],
+        visibleHumans: [],
+        allHumanBalances: [:],
+        hiddenHumanIds: [],
+        formalAccounts: [],
+        visibleLogs: []
+    )
+
+    @MainActor
+    static func make(
+        pets: [Pet],
+        allHumans: [Human],
+        visibleHumans: [Human],
+        hiddenHumanIds: Set<String>,
+        walletAccounts: [CoconutAccount],
+        walletLedgerEntries: [CoconutLedgerEntry]
+    ) -> IslandWealthSnapshot {
+        let activePets = pets.filter(EconomyWalletWritePolicy.canWrite)
+        let activeAllHumans = allHumans.filter(EconomyWalletWritePolicy.canWrite)
+        let activeVisibleHumans = visibleHumans.filter(EconomyWalletWritePolicy.canWrite)
+        let frozenOwnerIds = Set(
+            pets.filter { !EconomyWalletWritePolicy.canWrite($0) }.map(\.id.uuidString) +
+                allHumans.filter { !EconomyWalletWritePolicy.canWrite($0) }.map(\.id.uuidString)
+        )
+        let petSnapshots = activePets.map { pet in
+            WealthActorSnapshot(
+                id: pet.id.uuidString,
+                emoji: pet.avatarEmoji,
+                name: pet.name,
+                balance: pet.coconutBalance,
+                kind: .pet
+            )
+        }
+        let visibleHumanSnapshots = activeVisibleHumans.map { human in
+            WealthActorSnapshot(
+                id: human.id.uuidString,
+                emoji: human.avatarEmoji,
+                name: human.name,
+                balance: human.coconutBalance,
+                kind: .human
+            )
+        }
+        let allHumanBalances = Dictionary(uniqueKeysWithValues: activeAllHumans.map { ($0.id.uuidString, $0.coconutBalance) })
+        let formalAccounts = walletAccounts.compactMap { account -> WealthAccountSnapshot? in
+            guard account.ownerKind != .system else { return nil }
+            guard !frozenOwnerIds.contains(account.ownerId) else { return nil }
+            return WealthAccountSnapshot(
+                ownerKind: account.ownerKind,
+                ownerId: account.ownerId,
+                balance: account.balance
+            )
+        }
+        let visibleLogs = walletLedgerEntries
+            .filter { $0.delta != 0 }
+            .map { $0.asCoconutLogEntry() }
+            .filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+            .filter { !frozenOwnerIds.contains($0.actorId ?? "") }
+        return IslandWealthSnapshot(
+            pets: petSnapshots,
+            visibleHumans: visibleHumanSnapshots,
+            allHumanBalances: allHumanBalances,
+            hiddenHumanIds: hiddenHumanIds,
+            formalAccounts: formalAccounts,
+            visibleLogs: visibleLogs
+        )
+    }
+}
+
 // MARK: - Leaderboard Row（直接用实体余额）
 struct WealthLeaderRow: Identifiable {
     let id = UUID()
@@ -56,17 +165,14 @@ final class IslandWealthScreenModel {
     var showSystemCoconuts: Bool = true
     var selectedActorId: String?
 
-    // 注入实体列表（由 View 从 @Query 传入）
-    var pets: [Pet] = []
-    var humans: [Human] = []
-    var hiddenHumanIds: Set<String> = []
-    var walletAccounts: [CoconutAccount] = []
-    var walletLedgerEntries: [CoconutLedgerEntry] = []
+    private var snapshot: IslandWealthSnapshot = .empty
     // 宠物 id → 主题色（由 View 注入）
     var petColorMap: [String: Color] = [:]
 
+    @MainActor
     func applyQuerySnapshot(
         pets: [Pet],
+        allHumans: [Human]? = nil,
         visibleHumans: [Human],
         hiddenHumanIds: Set<String>,
         walletAccounts: [CoconutAccount],
@@ -74,21 +180,25 @@ final class IslandWealthScreenModel {
         petColorMap: [String: Color],
         selectedActorId: String?
     ) {
-        self.pets = pets
-        self.humans = visibleHumans
-        self.hiddenHumanIds = hiddenHumanIds
-        self.walletAccounts = walletAccounts
-        self.walletLedgerEntries = walletLedgerEntries
+        snapshot = IslandWealthSnapshot.make(
+            pets: pets,
+            allHumans: allHumans ?? visibleHumans,
+            visibleHumans: visibleHumans,
+            hiddenHumanIds: hiddenHumanIds,
+            walletAccounts: walletAccounts,
+            walletLedgerEntries: walletLedgerEntries
+        )
         self.petColorMap = petColorMap
         self.selectedActorId = selectedActorId
     }
 
-    // 当前查看者可见的全岛总资产；隐私成员的个人椰子余额不计入展示。
+    // 正式岛屿总资产包含所有正式成员钱包；隐私只隐藏明细，不改变总数。
     var totalAssets: Int {
-        if !walletAccounts.isEmpty {
-            return visibleWalletAccounts.reduce(0) { $0 + $1.balance }
+        if !snapshot.formalAccounts.isEmpty {
+            return snapshot.formalAccounts.reduce(0) { $0 + $1.balance }
         }
-        return pets.reduce(0) { $0 + $1.coconutBalance } + humans.reduce(0) { $0 + $1.coconutBalance }
+        return snapshot.pets.reduce(0) { $0 + $1.balance } +
+            snapshot.allHumanBalances.values.reduce(0, +)
     }
 
     var displayedAssets: Int {
@@ -96,11 +206,11 @@ final class IslandWealthScreenModel {
         if let balance = walletBalance(ownerId: selectedActorId) {
             return balance
         }
-        if let pet = pets.first(where: { $0.id.uuidString == selectedActorId }) {
-            return pet.coconutBalance
+        if let pet = snapshot.pets.first(where: { $0.id == selectedActorId }) {
+            return pet.balance
         }
-        if let human = humans.first(where: { $0.id.uuidString == selectedActorId }) {
-            return human.coconutBalance
+        if let human = snapshot.visibleHumans.first(where: { $0.id == selectedActorId }) {
+            return human.balance
         }
         return 0
     }
@@ -109,19 +219,19 @@ final class IslandWealthScreenModel {
     var leaderboard: [WealthLeaderRow] {
         var all: [WealthLeaderRow] = []
         let total = max(1, totalAssets)
-        all += pets.map { pet in
-            let stats = periodStats(for: pet.id.uuidString)
-            let balance = walletBalance(ownerId: pet.id.uuidString) ?? pet.coconutBalance
-            return WealthLeaderRow(emoji: pet.avatarEmoji, name: pet.name,
-                                   entityId: pet.id.uuidString, amount: balance,
+        all += snapshot.pets.map { pet in
+            let stats = periodStats(for: pet.id)
+            let balance = walletBalance(ownerId: pet.id) ?? pet.balance
+            return WealthLeaderRow(emoji: pet.emoji, name: pet.name,
+                                   entityId: pet.id, amount: balance,
                                    periodIncome: stats.income, periodSpending: stats.spending, periodNet: stats.net,
                                    percentage: Double(balance) / Double(total))
         }
-        all += humans.map { h in
-            let stats = periodStats(for: h.id.uuidString)
-            let balance = walletBalance(ownerId: h.id.uuidString) ?? h.coconutBalance
-            return WealthLeaderRow(emoji: h.avatarEmoji, name: h.name,
-                                   entityId: h.id.uuidString, amount: balance,
+        all += snapshot.visibleHumans.map { h in
+            let stats = periodStats(for: h.id)
+            let balance = walletBalance(ownerId: h.id) ?? h.balance
+            return WealthLeaderRow(emoji: h.emoji, name: h.name,
+                                   entityId: h.id, amount: balance,
                                    periodIncome: stats.income, periodSpending: stats.spending, periodNet: stats.net,
                                    percentage: Double(balance) / Double(total))
         }
@@ -132,10 +242,7 @@ final class IslandWealthScreenModel {
 
     // MARK: - 图表数据（按时间桶聚合 log，仅用于趋势图）
     private var visibleLogs: [CoconutLogEntry] {
-        walletLedgerEntries
-            .filter { $0.delta != 0 }
-            .map { $0.asCoconutLogEntry() }
-            .filter { !hiddenHumanIds.contains($0.actorId ?? "") }
+        snapshot.visibleLogs
     }
 
     private var logs: [CoconutLogEntry] {
@@ -192,10 +299,9 @@ final class IslandWealthScreenModel {
         return (income, spending, income - spending)
     }
 
-    private var visibleWalletAccounts: [CoconutAccount] {
-        walletAccounts.filter { account in
-            account.ownerKind != .system &&
-                !(account.ownerKind == .human && hiddenHumanIds.contains(account.ownerId))
+    private var visibleWalletAccounts: [WealthAccountSnapshot] {
+        snapshot.formalAccounts.filter { account in
+            !(account.ownerKind == .human && snapshot.hiddenHumanIds.contains(account.ownerId))
         }
     }
 
@@ -314,18 +420,12 @@ final class IslandWealthScreenModel {
         var dict: [String: (bucket: Date, entity: String, eid: String, sum: Int)] = [:]
         for log in filteredIncome {
             let bucket = cal.dateInterval(of: component, for: log.date)?.start ?? log.date
-            // 严格按 actorId 分桶；未知实体归入 system
             let rawId = log.actorId ?? ""
-            let isPet = !rawId.isEmpty && pets.contains { $0.id.uuidString == rawId }
-            let isHuman = !rawId.isEmpty && humans.contains { $0.id.uuidString == rawId }
             let eid: String
             let name: String
-            if isPet {
-                eid = rawId
-                name = pets.first { $0.id.uuidString == rawId }?.name ?? (log.actorName ?? "宠物")
-            } else if isHuman {
-                eid = rawId
-                name = humans.first { $0.id.uuidString == rawId }?.name ?? (log.actorName ?? "家人")
+            if let actor = actor(id: rawId) {
+                eid = actor.id
+                name = actor.name
             } else {
                 eid = "system"
                 name = "其他/系统"
@@ -352,12 +452,8 @@ final class IslandWealthScreenModel {
     // 对应的颜色数组（与 chartEntityNames 严格一一对应）
     var chartEntityColors: [Color] {
         chartEntityNames.map { name -> Color in
-            // 优先从 petColorMap（以 entityId 为 key）查宠物色
-            if let pet = pets.first(where: { $0.name == name }) {
-                return petColorMap[pet.id.uuidString] ?? pet.themeColor.color
-            }
-            if humans.contains(where: { $0.name == name }) {
-                return Color.goLime
+            if let entityId = chartBars.first(where: { $0.entityName == name })?.entityId {
+                return color(for: entityId)
             }
             return Color.ohanaSecondaryText.opacity(0.7)
         }
@@ -390,6 +486,10 @@ final class IslandWealthScreenModel {
         // human：从调色板取稳定色
         let idx = abs(entityId.hashValue) % Self.palette.count
         return Self.palette[idx]
+    }
+
+    private func actor(id: String) -> WealthActorSnapshot? {
+        snapshot.pets.first { $0.id == id } ?? snapshot.visibleHumans.first { $0.id == id }
     }
 }
 

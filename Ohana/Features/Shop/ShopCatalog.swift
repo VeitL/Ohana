@@ -22,6 +22,14 @@ struct ShopItem: Identifiable, Equatable {
 
         var id: String { rawValue }
 
+        static var visibleCases: [ShopCategory] {
+            allCases.filter(\.isVisibleInFirstRelease)
+        }
+
+        var isVisibleInFirstRelease: Bool {
+            self != .cashExchange || CoconutExchangeFeatureGate.isEnabled
+        }
+
         func title(_ l: L10n = L10n()) -> String {
             switch self {
             case .appIcon:

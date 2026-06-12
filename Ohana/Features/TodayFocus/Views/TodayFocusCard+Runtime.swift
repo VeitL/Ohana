@@ -51,6 +51,7 @@ extension TodayFocusCard {
     }
 
     func confirmExchange(_ request: TodayFocusExchangeRequestSnapshot) {
+        guard CoconutExchangeFeatureGate.isEnabled else { return }
         onConfirmExchange(request)
     }
 
@@ -102,59 +103,67 @@ extension TodayFocusCard {
     }
 
     static func snapshotDeckDependencyKey(_ snapshot: TodayFocusSnapshot) -> String {
-        [
+        let questKey = snapshot.refreshedQuests.map { quest in
+            [
+                quest.id,
+                quest.title,
+                quest.subtitle,
+                quest.emoji,
+                "\(quest.isCompleted)",
+                quest.targetPetId?.uuidString ?? "",
+                quest.targetPlantId?.uuidString ?? ""
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+        let taskKey = snapshot.assignedFamilyTasks.map { task in
+            [
+                task.id.uuidString,
+                task.title,
+                task.statusRaw,
+                task.createdByName,
+                task.assignedToId ?? "",
+                task.assignedToName ?? "",
+                task.claimedById ?? "",
+                task.claimedByName ?? "",
+                task.completedByName ?? "",
+                "\(task.rewardCoconuts)",
+                "\(timestamp(task.updatedAt))"
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+        let exchangeRequests: [TodayFocusExchangeRequestSnapshot] = CoconutExchangeFeatureGate.isEnabled
+            ? snapshot.pendingExchangeRequests
+            : []
+        let exchangeKey = exchangeRequests.map { request in
+            [
+                request.id.uuidString,
+                request.senderName,
+                request.receiverId,
+                request.statusRaw,
+                request.currencyCode,
+                "\(request.localAmount)",
+                "\(request.coconutCost)",
+                "\(timestamp(request.updatedAt))"
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+        let negativeKey = snapshot.negativeSignals.map { signal in
+            [
+                negativeSkipKey(for: signal),
+                signal.title,
+                signal.detail,
+                signal.iconName,
+                "\(signal.severity)",
+                signal.petId?.uuidString ?? "",
+                signal.plantId?.uuidString ?? "",
+                signal.healthAlertType?.rawValue ?? "",
+                signal.routeHint?.rawValue ?? ""
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+
+        return [
             "day:\(snapshot.dayToken)",
-            snapshot.refreshedQuests.map { quest in
-                [
-                    quest.id,
-                    quest.title,
-                    quest.subtitle,
-                    quest.emoji,
-                    "\(quest.isCompleted)",
-                    quest.targetPetId?.uuidString ?? "",
-                    quest.targetPlantId?.uuidString ?? ""
-                ].joined(separator: ":")
-            }.joined(separator: "|"),
-            snapshot.assignedFamilyTasks.map { task in
-                [
-                    task.id.uuidString,
-                    task.title,
-                    task.statusRaw,
-                    task.createdByName,
-                    task.assignedToId ?? "",
-                    task.assignedToName ?? "",
-                    task.claimedById ?? "",
-                    task.claimedByName ?? "",
-                    task.completedByName ?? "",
-                    "\(task.rewardCoconuts)",
-                    "\(timestamp(task.updatedAt))"
-                ].joined(separator: ":")
-            }.joined(separator: "|"),
-            snapshot.pendingExchangeRequests.map { request in
-                [
-                    request.id.uuidString,
-                    request.senderName,
-                    request.receiverId,
-                    request.statusRaw,
-                    request.currencyCode,
-                    "\(request.localAmount)",
-                    "\(request.coconutCost)",
-                    "\(timestamp(request.updatedAt))"
-                ].joined(separator: ":")
-            }.joined(separator: "|"),
-            snapshot.negativeSignals.map { signal in
-                [
-                    negativeSkipKey(for: signal),
-                    signal.title,
-                    signal.detail,
-                    signal.iconName,
-                    "\(signal.severity)",
-                    signal.petId?.uuidString ?? "",
-                    signal.plantId?.uuidString ?? "",
-                    signal.healthAlertType?.rawValue ?? "",
-                    signal.routeHint?.rawValue ?? ""
-                ].joined(separator: ":")
-            }.joined(separator: "|"),
+            questKey,
+            taskKey,
+            exchangeKey,
+            negativeKey,
             "pets:\(snapshot.pets.map { "\($0.id.uuidString):\($0.name):\($0.currentStreak):\($0.coconutBalance):\($0.hasPassedAway)" }.joined(separator: "|"))",
             "plants:\(snapshot.plants.map { "\($0.id.uuidString):\($0.name):\($0.wateringIntervalDays):\($0.fertilizingIntervalDays):\(timestamp($0.lastWateredDate)):\(timestamp($0.lastFertilizedDate))" }.joined(separator: "|"))",
             "humans:\(snapshot.humans.map { "\($0.id.uuidString):\($0.name):\($0.coconutBalance)" }.joined(separator: "|"))"

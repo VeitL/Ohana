@@ -340,9 +340,10 @@ enum TodayFocusEconomyService {
         let visibleFamilyTasks = snapshot.assignedFamilyTasks.prefix(TodayFocusLimits.maxFamilyTaskCards).contains {
             !skippedFocusKeys.contains("familyTask:\($0.id.uuidString)")
         }
-        let visibleExchangeRequests = snapshot.pendingExchangeRequests.prefix(TodayFocusLimits.maxExchangeCards).contains {
-            !skippedFocusKeys.contains("coconutExchange:\($0.id.uuidString)")
-        }
+        let visibleExchangeRequests = CoconutExchangeFeatureGate.isEnabled &&
+            snapshot.pendingExchangeRequests.prefix(TodayFocusLimits.maxExchangeCards).contains {
+                !skippedFocusKeys.contains("coconutExchange:\($0.id.uuidString)")
+            }
         let visibleNegativeSignals = snapshot.negativeSignals.prefix(TodayFocusLimits.maxNegativeCards).contains {
             !closedNegativeKeys.contains($0.id)
         }

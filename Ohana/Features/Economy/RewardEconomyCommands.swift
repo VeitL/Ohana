@@ -11,6 +11,7 @@ import SwiftData
 enum PetBondVaultUnlockFailure: Equatable {
     case alreadyUnlocked
     case insufficientBalance
+    case walletFrozen
     case persistenceFailed
 }
 
@@ -72,6 +73,21 @@ enum AchievementRewardCommandService {
     ) -> AchievementRewardCommandResult {
         let entityID = human?.id ?? pet.id
         let entityKind = human == nil ? EntityKind.pet.rawValue : EntityKind.human.rawValue
+        let canWriteWallet = if let human {
+            EconomyWalletWritePolicy.canWrite(human)
+        } else {
+            EconomyWalletWritePolicy.canWrite(pet)
+        }
+        guard canWriteWallet else {
+            return AchievementRewardCommandResult(
+                entityID: entityID,
+                entityKind: entityKind,
+                badgeIDs: claims.map(\.badgeID),
+                totalAmount: 0,
+                updatedClaimedRewardRaw: claimedRewardRaw,
+                didClaim: false
+            )
+        }
         var claimedIDs = Set(claimedRewardRaw.split(separator: ",").map(String.init))
         let claimable = claims.filter { claim in
             claim.isUnlocked && !claimedIDs.contains(claim.rewardKey)
@@ -238,6 +254,7 @@ enum BackdateCheckInCommandService {
 enum ShopPurchaseFailure: Equatable {
     case missingActiveHuman
     case insufficientBalance(missing: Int)
+    case walletFrozen
     case persistenceFailed
 }
 
@@ -281,6 +298,17 @@ enum ShopPurchaseCommandService {
                 cost: item.cost,
                 didPurchase: false,
                 failure: .missingActiveHuman,
+                ledgerEventID: nil,
+                transactionKey: nil
+            )
+        }
+        guard EconomyWalletWritePolicy.canWrite(buyer) else {
+            return ShopPurchaseCommandResult(
+                humanID: buyer.id,
+                itemID: item.id,
+                cost: item.cost,
+                didPurchase: false,
+                failure: .walletFrozen,
                 ledgerEventID: nil,
                 transactionKey: nil
             )
@@ -362,6 +390,9 @@ enum ShopPurchaseCommandService {
             let failure: ShopPurchaseFailure = if let walletError = error as? CoconutWalletError,
                                                   case let .insufficientBalance(_, missing) = walletError {
                 .insufficientBalance(missing: missing)
+            } else if let walletError = error as? CoconutWalletError,
+                      case .walletFrozen = walletError {
+                .walletFrozen
             } else {
                 .persistenceFailed
             }
@@ -400,6 +431,16 @@ enum PetBondVaultUnlockCommandService {
         wallet: CoconutWalletManaging,
         careLedger: CareLedgerRecording
     ) -> PetBondVaultUnlockCommandResult {
+        guard EconomyWalletWritePolicy.canWrite(pet) else {
+            return PetBondVaultUnlockCommandResult(
+                petID: pet.id,
+                itemID: item.id,
+                cost: item.cost,
+                didUnlock: false,
+                failure: .walletFrozen,
+                ledgerEventID: nil
+            )
+        }
         guard item.isRepeatable || !PetBondVaultStore.isUnlocked(item.kind, for: pet.id) else {
             return PetBondVaultUnlockCommandResult(
                 petID: pet.id,
@@ -484,6 +525,9 @@ enum PetBondVaultUnlockCommandService {
             let failure: PetBondVaultUnlockFailure = if let walletError = error as? CoconutWalletError,
                                                         case .insufficientBalance = walletError {
                 .insufficientBalance
+            } else if let walletError = error as? CoconutWalletError,
+                      case .walletFrozen = walletError {
+                .walletFrozen
             } else {
                 .persistenceFailed
             }

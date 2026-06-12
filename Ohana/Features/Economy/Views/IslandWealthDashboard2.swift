@@ -44,14 +44,14 @@ struct IslandWealthDashboardContentView: View {
     }
 
     private var wealthScopeTitle: String {
-        guard let selectedCoconutActorId else { return "全岛" }
+        guard let selectedCoconutActorId else { return l.tr(zh: "全岛", en: "Island", de: "Insel") }
         if let pet = pets.first(where: { $0.id.uuidString == selectedCoconutActorId }) {
             return pet.name
         }
         if let human = visibleWealthHumans.first(where: { $0.id.uuidString == selectedCoconutActorId }) {
             return human.name
         }
-        return "已筛选"
+        return l.tr(zh: "已筛选", en: "Filtered", de: "Gefiltert")
     }
 
     private var safeTop: CGFloat {
@@ -120,6 +120,7 @@ struct IslandWealthDashboardContentView: View {
         }
         vm.applyQuerySnapshot(
             pets: pets,
+            allHumans: humans,
             visibleHumans: visibleWealthHumans,
             hiddenHumanIds: hiddenWealthHumanIds,
             walletAccounts: walletAccounts,
@@ -140,7 +141,7 @@ struct IslandWealthDashboardContentView: View {
 
     private var navBar: some View {
         HStack {
-            Text("Ohana财富")
+            Text(l.tr(zh: "Ohana 财富", en: "Ohana Wealth", de: "Ohana-Vermögen"))
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
@@ -181,7 +182,7 @@ struct IslandWealthDashboardContentView: View {
     private var timePicker: some View {
         Picker("", selection: $vm.timeRange) {
             ForEach(WealthTimeRange.allCases) { r in
-                Text(r.rawValue).tag(r)
+                Text(r.title(l)).tag(r)
             }
         }
         .pickerStyle(.segmented)
@@ -192,19 +193,19 @@ struct IslandWealthDashboardContentView: View {
     private var incomeVsSpendingRow: some View {
         HStack(spacing: 8) {
             summaryCell(
-                label: "本期收入",
+                label: l.tr(zh: "本期收入", en: "Income", de: "Einnahmen"),
                 value: "+\(vm.periodIncome)",
                 valueColor: Color.goLime,
                 icon: "arrow.down.circle.fill"
             )
             summaryCell(
-                label: "本期花费",
-                value: vm.periodSpending > 0 ? "-\(vm.periodSpending)" : "本期无花费",
+                label: l.tr(zh: "本期花费", en: "Spending", de: "Ausgaben"),
+                value: vm.periodSpending > 0 ? "-\(vm.periodSpending)" : l.tr(zh: "本期无花费", en: "No spending", de: "Keine Ausgaben"),
                 valueColor: vm.periodSpending > 0 ? Color.goRed : .primary.opacity(0.35),
                 icon: "arrow.up.circle.fill"
             )
             summaryCell(
-                label: "净变化",
+                label: l.tr(zh: "净变化", en: "Net", de: "Saldo"),
                 value: vm.periodNet >= 0 ? "+\(vm.periodNet)" : "\(vm.periodNet)",
                 valueColor: vm.periodNet >= 0 ? Color.goPrimary : Color.goRed,
                 icon: "equal.circle.fill"
@@ -260,10 +261,12 @@ struct IslandWealthDashboardContentView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("收支趋势")
+                    Text(l.tr(zh: "收支趋势", en: "Income and spending", de: "Einnahmen und Ausgaben"))
                         .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.62))
-                    Text(selectedCoconutActorId == nil ? "全岛收入 / 花费" : "\(wealthScopeTitle) 收入 / 花费")
+                    Text(selectedCoconutActorId == nil
+                        ? l.tr(zh: "全岛收入 / 花费", en: "Island income / spending", de: "Insel Einnahmen / Ausgaben")
+                        : l.tr(zh: "\(wealthScopeTitle) 收入 / 花费", en: "\(wealthScopeTitle) income / spending", de: "\(wealthScopeTitle) Einnahmen / Ausgaben"))
                         .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.36))
                 }
@@ -294,13 +297,13 @@ struct IslandWealthDashboardContentView: View {
             HStack(spacing: 10) {
                 HStack(spacing: 5) {
                     Circle().fill(incomeTint).frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    Text("+\(vm.periodIncome) 收入")
+                    Text(l.tr(zh: "+\(vm.periodIncome) 收入", en: "+\(vm.periodIncome) income", de: "+\(vm.periodIncome) Einnahmen"))
                         .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.58))
                 }
                 HStack(spacing: 5) {
                     Circle().fill(spendingTint.opacity(0.86)).frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    Text("-\(vm.periodSpending) 花费")
+                    Text(l.tr(zh: "-\(vm.periodSpending) 花费", en: "-\(vm.periodSpending) spending", de: "-\(vm.periodSpending) Ausgaben"))
                         .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.58))
                 }
@@ -314,7 +317,7 @@ struct IslandWealthDashboardContentView: View {
         VStack(spacing: 12) {
             Text("🥥")
                 .font(OhanaFont.adaptive(size: 52))
-            Text("立刻去打卡赚取第一桶金吧！")
+            Text(l.tr(zh: "立刻去打卡赚取第一桶金吧！", en: "Log a check-in to earn the first coconuts.", de: "Erfasse einen Check-in für die ersten Kokosnüsse."))
                 .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
         }

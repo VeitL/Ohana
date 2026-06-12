@@ -354,6 +354,240 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertEqual(Set(model.leaderboard.map(\.entityId)), Set([human.id.uuidString, pet.id.uuidString]))
     }
 
+    func testWealthTotalIncludesHiddenHumanWalletButHidesLeaderboardRow() {
+        let visibleHuman = Human(name: "Guan")
+        let hiddenHuman = Human(name: "Private")
+        let pet = Pet(name: "Miso")
+        let model = IslandWealthScreenModel()
+        let visibleAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.human(visibleHuman.id),
+            ownerKind: .human,
+            ownerId: visibleHuman.id.uuidString,
+            displayName: visibleHuman.name,
+            balance: 10
+        )
+        let hiddenAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.human(hiddenHuman.id),
+            ownerKind: .human,
+            ownerId: hiddenHuman.id.uuidString,
+            displayName: hiddenHuman.name,
+            balance: 40
+        )
+        let petAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.pet(pet.id),
+            ownerKind: .pet,
+            ownerId: pet.id.uuidString,
+            displayName: pet.name,
+            balance: 5
+        )
+
+        model.applyQuerySnapshot(
+            pets: [pet],
+            allHumans: [visibleHuman, hiddenHuman],
+            visibleHumans: [visibleHuman],
+            hiddenHumanIds: [hiddenHuman.id.uuidString],
+            walletAccounts: [visibleAccount, hiddenAccount, petAccount],
+            walletLedgerEntries: [],
+            petColorMap: [:],
+            selectedActorId: nil
+        )
+
+        XCTAssertEqual(model.totalAssets, 55)
+        XCTAssertEqual(model.displayedAssets, 55)
+        XCTAssertEqual(Set(model.leaderboard.map(\.entityId)), Set([visibleHuman.id.uuidString, pet.id.uuidString]))
+        XCTAssertFalse(model.leaderboard.contains { $0.entityId == hiddenHuman.id.uuidString })
+    }
+
+    func testWealthActiveAssetsExcludeFrozenWalletOwners() {
+        let activeHuman = Human(name: "Guan")
+        let hiddenHuman = Human(name: "Private")
+        let recycledHuman = Human(name: "Recycled")
+        recycledHuman.trashedAt = Date()
+        let activePet = Pet(name: "Miso")
+        let memorialPet = Pet(name: "Luna")
+        memorialPet.passedAwayDate = Date()
+        let model = IslandWealthScreenModel()
+        let accounts = [
+            CoconutAccount(
+                accountKey: CoconutAccountKey.human(activeHuman.id),
+                ownerKind: .human,
+                ownerId: activeHuman.id.uuidString,
+                displayName: activeHuman.name,
+                balance: 10
+            ),
+            CoconutAccount(
+                accountKey: CoconutAccountKey.human(hiddenHuman.id),
+                ownerKind: .human,
+                ownerId: hiddenHuman.id.uuidString,
+                displayName: hiddenHuman.name,
+                balance: 40
+            ),
+            CoconutAccount(
+                accountKey: CoconutAccountKey.human(recycledHuman.id),
+                ownerKind: .human,
+                ownerId: recycledHuman.id.uuidString,
+                displayName: recycledHuman.name,
+                balance: 80
+            ),
+            CoconutAccount(
+                accountKey: CoconutAccountKey.pet(activePet.id),
+                ownerKind: .pet,
+                ownerId: activePet.id.uuidString,
+                displayName: activePet.name,
+                balance: 5
+            ),
+            CoconutAccount(
+                accountKey: CoconutAccountKey.pet(memorialPet.id),
+                ownerKind: .pet,
+                ownerId: memorialPet.id.uuidString,
+                displayName: memorialPet.name,
+                balance: 12
+            )
+        ]
+
+        model.applyQuerySnapshot(
+            pets: [activePet, memorialPet],
+            allHumans: [activeHuman, hiddenHuman, recycledHuman],
+            visibleHumans: [activeHuman, recycledHuman],
+            hiddenHumanIds: [hiddenHuman.id.uuidString],
+            walletAccounts: accounts,
+            walletLedgerEntries: [],
+            petColorMap: [:],
+            selectedActorId: nil
+        )
+
+        XCTAssertEqual(model.totalAssets, 55)
+        XCTAssertEqual(Set(model.leaderboard.map(\.entityId)), Set([activeHuman.id.uuidString, activePet.id.uuidString]))
+        XCTAssertFalse(model.leaderboard.contains { $0.entityId == hiddenHuman.id.uuidString })
+        XCTAssertFalse(model.leaderboard.contains { $0.entityId == recycledHuman.id.uuidString })
+        XCTAssertFalse(model.leaderboard.contains { $0.entityId == memorialPet.id.uuidString })
+
+        model.selectedActorId = recycledHuman.id.uuidString
+        XCTAssertEqual(model.displayedAssets, 0)
+    }
+
+    func testExchangeGateHidesShopAndTodayFocusSurfaces() {
+        XCTAssertFalse(CoconutExchangeFeatureGate.isEnabled)
+        XCTAssertFalse(ShopItem.ShopCategory.visibleCases.contains(.cashExchange))
+
+        let receiver = Human(name: "Receiver")
+        let request = CoconutExchangeRequest(
+            senderId: UUID().uuidString,
+            senderName: "Sender",
+            receiverId: receiver.id.uuidString,
+            receiverName: receiver.name,
+            coconutCost: 500,
+            currencyCode: "USD",
+            localAmount: 0.5
+        )
+        let snapshot = TodayFocusSnapshot.make(
+            pets: [],
+            plants: [],
+            reminders: [],
+            events: [],
+            humans: [receiver],
+            activeHumanId: receiver.id.uuidString,
+            careLedgerEntries: [],
+            humanWeightLogs: [],
+            familyTasks: [],
+            exchangeRequests: [request],
+            questProgress: TodayFocusQuestProgress(
+                isPetWizardCompleted: true,
+                isFirstMealRecorded: true,
+                isThemeColorSet: true
+            ),
+            clinicalAlerts: [],
+            now: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+        XCTAssertTrue(snapshot.pendingExchangeRequests.isEmpty)
+
+        let staleSnapshot = TodayFocusSnapshot(
+            dayToken: TodayFocusSnapshot.dayToken(for: Date(timeIntervalSince1970: 1_800_000_000)),
+            pets: [],
+            plants: [],
+            humans: [],
+            refreshedQuests: [],
+            assignedFamilyTasks: [],
+            pendingExchangeRequests: [TodayFocusExchangeRequestSnapshot(request: request)],
+            negativeSignals: []
+        )
+        let deck = TodayFocusCard.TodayFocusRenderDeck.make(
+            snapshot: staleSnapshot,
+            skippedFocusKeys: [],
+            closedNegativeKeys: []
+        )
+
+        XCTAssertTrue(deck.pendingExchangeRequests.isEmpty)
+        XCTAssertFalse(deck.cards.contains { content in
+            if case .coconutExchange = content {
+                return true
+            }
+            return false
+        })
+    }
+
+    func testWalletApplyRejectsFrozenMemberWrites() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let human = Human(name: "Guan")
+        human.coconutBalance = 20
+        human.passedAwayDate = Date()
+        let pet = Pet(name: "Miso")
+        pet.coconutBalance = 20
+        pet.trashedAt = Date()
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        XCTAssertThrowsError(
+            try CoconutWalletService.apply(
+                deltas: [
+                    .human(
+                        human,
+                        delta: -1,
+                        entryKind: .spend,
+                        source: .shop,
+                        title: "Frozen spend",
+                        transactionKey: "frozen-human-spend"
+                    )
+                ],
+                context: context,
+                save: true,
+                postsRewardFeedback: false
+            )
+        ) { error in
+            guard case CoconutWalletError.walletFrozen = error else {
+                return XCTFail("Expected walletFrozen, got \(error)")
+            }
+        }
+
+        XCTAssertThrowsError(
+            try CoconutWalletService.apply(
+                deltas: [
+                    .pet(
+                        pet,
+                        delta: 1,
+                        entryKind: .reward,
+                        source: .service,
+                        title: "Frozen reward",
+                        transactionKey: "frozen-pet-reward"
+                    )
+                ],
+                context: context,
+                save: true,
+                postsRewardFeedback: false
+            )
+        ) { error in
+            guard case CoconutWalletError.walletFrozen = error else {
+                return XCTFail("Expected walletFrozen, got \(error)")
+            }
+        }
+
+        XCTAssertEqual(human.coconutBalance, 20)
+        XCTAssertEqual(pet.coconutBalance, 20)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+    }
+
     private var defaultsSuiteName: String {
         "CoconutWalletServiceTests"
     }

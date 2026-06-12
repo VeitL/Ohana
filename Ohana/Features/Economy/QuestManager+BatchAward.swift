@@ -25,7 +25,7 @@ extension QuestManager {
     ) -> (totalHuman: Int, totalPet: Int) {
         guard !pets.isEmpty else { return (0, 0) }
 
-        let livePets = pets.filter { !$0.hasPassedAway }
+        let livePets = pets.filter { EconomyWalletWritePolicy.canWrite($0) }
         guard !livePets.isEmpty else { return (0, 0) }
 
         let executorId = activeHumanSelection.currentHumanId

@@ -1,5 +1,19 @@
 import SwiftData
 
+nonisolated enum CoconutExchangeFeatureGate {
+    static let isEnabled = false
+}
+
+enum EconomyWalletWritePolicy {
+    static func canWrite(_ human: Human) -> Bool {
+        !human.hasPassedAway && human.trashedAt == nil
+    }
+
+    static func canWrite(_ pet: Pet) -> Bool {
+        !pet.hasPassedAway && pet.trashedAt == nil
+    }
+}
+
 @MainActor
 protocol CoconutExchangeManaging {
     @discardableResult

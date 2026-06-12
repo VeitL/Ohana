@@ -6049,6 +6049,33 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func shopPurchaseCommandServiceRejectsFrozenHumanWalletWithoutWrites() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        human.coconutBalance = 500
+        human.trashedAt = makeDate(year: 2026, month: 6, day: 1)
+        let item = try #require(ShopCatalog.item(id: "fx_lime_glow"))
+        context.insert(human)
+        try context.save()
+
+        let result = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: human,
+            itemName: "Redeemed Lime Glow",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        #expect(result.didPurchase == false)
+        #expect(result.failure == .walletFrozen)
+        #expect(human.coconutBalance == 500)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+    }
+
+    @MainActor
     @Test func questManagerDoesNotMutateProjectionWhenWalletWriteFails() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -6073,6 +6100,80 @@ struct HomeCommandExecutorTests {
         #expect(questManager.coconutCount == 7)
         #expect(questManager.coconutLogs.isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+    }
+
+    @MainActor
+    @Test func specialRewardWithoutActorUsesActiveHumanInsteadOfSystemWallet() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        context.insert(human)
+        try context.save()
+
+        let questManager = QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: SharedDomainRevisionPublisher())
+        let awarded = try questManager.stageSpecialCoconutReward(
+            amount: 7,
+            emoji: "✨",
+            title: "Special reward",
+            actorId: nil,
+            sourceModelName: "EconomyModuleTest",
+            sourceModelId: "active-human-fallback",
+            transactionKey: "economyModuleTest:activeHumanFallback",
+            context: context
+        )
+        try context.save()
+
+        let entries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(awarded == 7)
+        #expect(human.coconutBalance == 7)
+        #expect(entries.count == 1)
+        #expect(entries.first?.ownerKind == .human)
+        #expect(entries.first?.ownerId == human.id.uuidString)
+        #expect(entries.allSatisfy { $0.ownerKind != .system })
+        #expect(questManager.coconutCount == 7)
+    }
+
+    @MainActor
+    @Test func specialRewardWithoutActorDoesNotCreateSystemWalletWhenNoActiveHumanExists() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
+        let questManager = QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: SharedDomainRevisionPublisher())
+
+        let awarded = try questManager.stageSpecialCoconutReward(
+            amount: 7,
+            emoji: "✨",
+            title: "Special reward",
+            actorId: nil,
+            sourceModelName: "EconomyModuleTest",
+            sourceModelId: "no-active-human",
+            transactionKey: "economyModuleTest:noActiveHuman",
+            context: context
+        )
+
+        #expect(awarded == 0)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutAccount>()).isEmpty)
+        #expect(questManager.coconutCount == 0)
     }
 
     @MainActor
@@ -6150,6 +6251,51 @@ struct HomeCommandExecutorTests {
         #expect(human.coconutBalance == 10)
         #expect(questManager.coconutCount == 10)
         #expect(questManager.coconutLogs.count == 1)
+    }
+
+    @MainActor
+    @Test func achievementRewardCommandServiceDoesNotClaimFrozenWallet() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        human.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
+        let pet = Pet(name: "Momo", species: "猫")
+        let claim = AchievementRewardClaim(
+            badgeID: "human_first_record",
+            rewardKey: "\(human.id.uuidString)_human_first_record",
+            emoji: "🏅",
+            logTitle: "Badge reward · First record",
+            isUnlocked: true
+        )
+        let defaults = UserDefaults.standard
+        let oldClaimedRaw = defaults.object(forKey: "achievement_claimedRewardIDs")
+        defer {
+            if let oldClaimedRaw {
+                defaults.set(oldClaimedRaw, forKey: "achievement_claimedRewardIDs")
+            } else {
+                defaults.removeObject(forKey: "achievement_claimedRewardIDs")
+            }
+        }
+        defaults.removeObject(forKey: "achievement_claimedRewardIDs")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let result = AchievementRewardCommandService.claimRewards(
+            [claim],
+            claimedRewardRaw: "",
+            amountPerBadge: 10,
+            human: human,
+            pet: pet,
+            context: context,
+            wallet: SwiftDataCoconutWalletManager()
+        )
+
+        #expect(result.didClaim == false)
+        #expect(result.totalAmount == 0)
+        #expect(result.updatedClaimedRewardRaw.isEmpty)
+        #expect(human.coconutBalance == 0)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 
     @MainActor
@@ -6281,6 +6427,33 @@ struct HomeCommandExecutorTests {
         #expect(duplicate.failure == .alreadyUnlocked)
         #expect(pet.coconutBalance == 20)
         #expect(ledgerEventsAfterDuplicate.count == 1)
+    }
+
+    @MainActor
+    @Test func petBondVaultUnlockServiceRejectsFrozenPetWalletWithoutWrites() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let item = try #require(PetBondVaultCatalog.items.first)
+        pet.coconutBalance = item.cost + 20
+        pet.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
+        context.insert(pet)
+        try context.save()
+
+        let result = PetBondVaultUnlockCommandService.unlock(
+            item: item,
+            pet: pet,
+            title: "Unlocked \(item.id)",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        #expect(result.didUnlock == false)
+        #expect(result.failure == .walletFrozen)
+        #expect(pet.coconutBalance == item.cost + 20)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
     }
 
     @MainActor

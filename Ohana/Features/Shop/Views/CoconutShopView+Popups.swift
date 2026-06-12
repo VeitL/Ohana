@@ -209,6 +209,7 @@ extension CoconutShopView {
     }
 
     var canCreateExchange: Bool {
+        guard CoconutExchangeFeatureGate.isEnabled else { return false }
         guard let option = selectedExchangeOption else { return false }
         return selectedExchangeReceiver != nil && currentHumanBalance >= option.coconutCost
     }

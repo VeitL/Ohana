@@ -42,14 +42,33 @@ struct CoconutLogEntry: Codable, Identifiable {
     }
 
     var timeAgoString: String {
+        timeAgoString(l: .current)
+    }
+
+    func timeAgoString(l: L10n) -> String {
         let seconds = Int(Date().timeIntervalSince(date))
-        if seconds < 60 { return "刚刚" }
-        if seconds < 3600 { return "\(seconds / 60) 分钟前" }
-        if seconds < 86400 { return "\(seconds / 3600) 小时前" }
-        if seconds < 86400 * 2 { return "昨天" }
+        if seconds < 60 {
+            return l.tr(zh: "刚刚", en: "Just now", de: "Gerade eben")
+        }
+        if seconds < 3600 {
+            let minutes = seconds / 60
+            return l.tr(zh: "\(minutes) 分钟前", en: "\(minutes)m ago", de: "vor \(minutes) Min.")
+        }
+        if seconds < 86400 {
+            let hours = seconds / 3600
+            return l.tr(zh: "\(hours) 小时前", en: "\(hours)h ago", de: "vor \(hours) Std.")
+        }
+        if seconds < 86400 * 2 {
+            return l.tr(zh: "昨天", en: "Yesterday", de: "Gestern")
+        }
         let days = seconds / 86400
-        if days < 30 { return "\(days)天前" }
-        return date.formatted(.dateTime.month().day())
+        if days < 30 {
+            return l.tr(zh: "\(days)天前", en: "\(days)d ago", de: "vor \(days) Tagen")
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: AppLanguage.option(for: l.languageCode).localeIdentifier)
+        formatter.setLocalizedDateFormatFromTemplate("MMMd")
+        return formatter.string(from: date)
     }
 }
 
@@ -123,7 +142,7 @@ final class QuestManager {
     func recordWalletProjection(entries: [CoconutLedgerEntry], postsRewardFeedback: Bool) {
         guard !entries.isEmpty else { return }
         let totalDelta = entries
-            .filter(\.affectsBalance)
+            .filter { $0.affectsBalance && $0.ownerKind != .system }
             .reduce(0) { $0 + $1.delta }
         coconutCount = max(0, coconutCount + totalDelta)
 
@@ -251,7 +270,7 @@ final class QuestManager {
 
     func careObjectKeys(for pets: [Pet]) -> [String] {
         pets
-            .filter { !$0.hasPassedAway }
+            .filter { EconomyWalletWritePolicy.canWrite($0) }
             .map { "pet.\($0.id.uuidString)" }
     }
 
@@ -279,8 +298,8 @@ final class QuestManager {
         }
         if human == nil {
             OhanaLog.warning("[QuestManager] humanId=\(humanId) not found in context; skipping human share", category: "Economy")
-        } else if human?.hasPassedAway == true {
-            OhanaLog.warning("[QuestManager] active humanId=\(humanId) is memorialized; skipping human share", category: "Economy")
+        } else if let human, !EconomyWalletWritePolicy.canWrite(human) {
+            OhanaLog.warning("[QuestManager] active humanId=\(humanId) wallet is frozen; skipping human share", category: "Economy")
             return nil
         }
         return human

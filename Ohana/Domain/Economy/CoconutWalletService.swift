@@ -11,6 +11,7 @@ import SwiftData
 enum CoconutWalletError: LocalizedError {
     case insufficientBalance(accountName: String, missing: Int)
     case duplicateTransaction(String)
+    case walletFrozen(accountName: String)
 
     var errorDescription: String? {
         switch self {
@@ -18,6 +19,8 @@ enum CoconutWalletError: LocalizedError {
             "\(accountName) needs \(missing) more coconuts."
         case let .duplicateTransaction(key):
             "Duplicate coconut wallet transaction: \(key)."
+        case let .walletFrozen(accountName):
+            "\(accountName)'s coconut wallet is frozen."
         }
     }
 }
@@ -284,6 +287,9 @@ enum CoconutWalletService {
         var stagedBalances: [String: Int] = [:]
 
         for delta in meaningfulDeltas {
+            if isFrozenWrite(delta) {
+                throw CoconutWalletError.walletFrozen(accountName: delta.ownerName)
+            }
             let account = try existingAccount(for: delta, context: context, cache: &accountsByKey)
             let initialBalance = account?.balance ?? initialBalance(for: delta)
             let balanceBefore = stagedBalances[delta.accountKey] ?? initialBalance
@@ -657,6 +663,22 @@ enum CoconutWalletService {
 
     private static func initialBalance(for delta: CoconutWalletDelta) -> Int {
         delta.entryKind == .openingBalance ? 0 : max(0, delta.cachedBalance)
+    }
+
+    private static func isFrozenWrite(_ delta: CoconutWalletDelta) -> Bool {
+        guard delta.affectsBalance,
+              delta.entryKind != .openingBalance,
+              delta.entryKind != .legacyHistory else {
+            return false
+        }
+        switch delta.ownerKind {
+        case .human:
+            return delta.human.map { !EconomyWalletWritePolicy.canWrite($0) } ?? false
+        case .pet:
+            return delta.pet.map { !EconomyWalletWritePolicy.canWrite($0) } ?? false
+        case .system:
+            return false
+        }
     }
 
     private static func syncCache(for delta: CoconutWalletDelta, balance: Int) {

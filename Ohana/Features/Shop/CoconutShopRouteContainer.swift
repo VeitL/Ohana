@@ -17,7 +17,7 @@ struct CoconutShopRouteContainer: View {
             initialCategory: initialCategory,
             humans: humans,
             pets: pets,
-            exchangeRequests: exchangeRequests
+            exchangeRequests: CoconutExchangeFeatureGate.isEnabled ? exchangeRequests : []
         )
     }
 }

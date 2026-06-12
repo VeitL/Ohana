@@ -43,7 +43,7 @@ struct CoconutShopView: View {
         self.humans = humans
         self.pets = pets
         self.exchangeRequests = exchangeRequests
-        _selectedCategory = State(initialValue: initialCategory)
+        _selectedCategory = State(initialValue: initialCategory.isVisibleInFirstRelease ? initialCategory : .appIcon)
     }
 
     enum ShopPicker: Identifiable {
@@ -90,7 +90,11 @@ struct CoconutShopView: View {
     }
 
     var filteredItems: [ShopItem] {
-        allItems.filter { $0.category == selectedCategory }
+        allItems.filter { $0.category == effectiveSelectedCategory }
+    }
+
+    var effectiveSelectedCategory: ShopItem.ShopCategory {
+        selectedCategory.isVisibleInFirstRelease ? selectedCategory : .appIcon
     }
 
     var currentHuman: Human? {
@@ -107,7 +111,8 @@ struct CoconutShopView: View {
     }
 
     var exchangeOptions: [CoconutExchangeOption] {
-        CoconutExchangeOption.options()
+        guard CoconutExchangeFeatureGate.isEnabled else { return [] }
+        return CoconutExchangeOption.options()
     }
 
     var selectedExchangeOption: CoconutExchangeOption? {
@@ -119,11 +124,13 @@ struct CoconutShopView: View {
     }
 
     var incomingPendingExchanges: [CoconutExchangeRequest] {
+        guard CoconutExchangeFeatureGate.isEnabled else { return [] }
         guard let currentHuman else { return [] }
         return exchangeRequests.filter { $0.status == .pending && $0.receiverId == currentHuman.id.uuidString }
     }
 
     var outgoingPendingExchanges: [CoconutExchangeRequest] {
+        guard CoconutExchangeFeatureGate.isEnabled else { return [] }
         guard let currentHuman else { return [] }
         return exchangeRequests.filter { $0.status == .pending && $0.senderId == currentHuman.id.uuidString }
     }
@@ -151,7 +158,7 @@ struct CoconutShopView: View {
                     .padding(.bottom, 12)
 
                 ScrollView {
-                    if selectedCategory == .cashExchange {
+                    if effectiveSelectedCategory == .cashExchange {
                         cashExchangeSection
                             .padding(.horizontal, 20)
                             .padding(.bottom, 36)
@@ -204,6 +211,9 @@ struct CoconutShopView: View {
                 .presentationDragIndicator(.hidden)
         }
         .onAppear {
+            if !selectedCategory.isVisibleInFirstRelease {
+                selectedCategory = .appIcon
+            }
             selectedAppIcon = appServices.appIcons.currentDescriptor.itemId
         }
     }

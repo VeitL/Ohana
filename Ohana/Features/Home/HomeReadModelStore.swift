@@ -944,6 +944,7 @@ private nonisolated struct HomeReadModelFetches {
     }
 
     func exchangeRequests() -> [CoconutExchangeRequest] {
+        guard CoconutExchangeFeatureGate.isEnabled else { return [] }
         let pendingStatus = CoconutExchangeRequestStatus.pending.rawValue
         var descriptor = FetchDescriptor<CoconutExchangeRequest>(
             predicate: #Predicate<CoconutExchangeRequest> { request in

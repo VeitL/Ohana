@@ -227,6 +227,7 @@ extension VerticalSolidHomeView {
     }
 
     func openTodayFocusExchange(_ request: TodayFocusExchangeRequestSnapshot) {
+        guard CoconutExchangeFeatureGate.isEnabled else { return }
         if let receiverId = UUID(uuidString: request.receiverId),
            let receiver = humans.first(where: { $0.id == receiverId }) {
             routeCoordinator.openCoconutLog(.human(receiver.id))
@@ -242,6 +243,7 @@ extension VerticalSolidHomeView {
     }
 
     func confirmTodayFocusExchange(_ request: TodayFocusExchangeRequestSnapshot) {
+        guard CoconutExchangeFeatureGate.isEnabled else { return }
         guard let receiver = activeHuman else {
             routeCoordinator.openAccountSwitcher()
             return

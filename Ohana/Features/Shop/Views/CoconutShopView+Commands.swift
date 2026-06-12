@@ -8,6 +8,10 @@ import SwiftUI
 
 extension CoconutShopView {
     func openCashExchangeForm() {
+        guard CoconutExchangeFeatureGate.isEnabled else {
+            activePicker = nil
+            return
+        }
         if exchangeReceiverId.isEmpty {
             exchangeReceiverId = otherHumans.first?.id.uuidString ?? ""
         }
@@ -18,6 +22,7 @@ extension CoconutShopView {
     }
 
     func createExchange() {
+        guard CoconutExchangeFeatureGate.isEnabled else { return }
         guard let sender = currentHuman, let receiver = selectedExchangeReceiver, let option = selectedExchangeOption else { return }
         do {
             try appServices.coconutExchange.createRequest(
@@ -37,6 +42,7 @@ extension CoconutShopView {
     }
 
     func confirmExchange(_ request: CoconutExchangeRequest) {
+        guard CoconutExchangeFeatureGate.isEnabled else { return }
         guard let currentHuman else { return }
         do {
             try appServices.coconutExchange.confirm(request, by: currentHuman, context: modelContext)
@@ -48,6 +54,7 @@ extension CoconutShopView {
     }
 
     func cancelExchange(_ request: CoconutExchangeRequest) {
+        guard CoconutExchangeFeatureGate.isEnabled else { return }
         guard let currentHuman else { return }
         do {
             try appServices.coconutExchange.cancel(request, by: currentHuman, context: modelContext)
@@ -196,6 +203,16 @@ extension CoconutShopView {
                         de: "Noch \(missing)🥥 nötig"
                     ),
                     icon: "exclamationmark.triangle.fill",
+                    tint: Color.goOrange
+                )
+            case .walletFrozen:
+                showToast(
+                    l.tr(
+                        zh: "该钱包已冻结，历史仍可查看。",
+                        en: "This wallet is frozen. History remains available.",
+                        de: "Dieses Wallet ist eingefroren. Der Verlauf bleibt sichtbar."
+                    ),
+                    icon: "lock.fill",
                     tint: Color.goOrange
                 )
             case .persistenceFailed:

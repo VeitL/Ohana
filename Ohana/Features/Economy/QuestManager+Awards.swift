@@ -22,7 +22,7 @@ extension QuestManager {
         date: Date = Date(),
         executorId: String? = nil
     ) -> (humanGot: Int, petGot: Int) {
-        if pet?.hasPassedAway == true {
+        if let pet, !EconomyWalletWritePolicy.canWrite(pet) {
             lastEconomyRewardResult = .empty
             return (0, 0)
         }
@@ -161,8 +161,8 @@ extension QuestManager {
         )
         do {
             let human = try context.fetch(desc).first
-            if human?.hasPassedAway == true {
-                OhanaLog.warning("[QuestManager] reward humanId=\(humanId) is memorialized; skipping human share", category: "Economy")
+            if let human, !EconomyWalletWritePolicy.canWrite(human) {
+                OhanaLog.warning("[QuestManager] reward humanId=\(humanId) wallet is frozen; skipping human share", category: "Economy")
                 return nil
             }
             return human
@@ -182,7 +182,7 @@ extension QuestManager {
         quality: QualityBonus = .none,
         title: String? = nil
     ) -> (humanGot: Int, petGot: Int) {
-        let livePets = pets.filter { !$0.hasPassedAway }
+        let livePets = pets.filter { EconomyWalletWritePolicy.canWrite($0) }
         guard !livePets.isEmpty else { return (0, 0) }
 
         let human = currentActiveHuman(context: context)

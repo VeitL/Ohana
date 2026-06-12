@@ -7,78 +7,81 @@ import SwiftData
 import SwiftUI
 
 extension CoconutShopView {
+    @ViewBuilder
     var cashExchangeSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Button {
-                openCashExchangeForm()
-            } label: {
-                HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
-                            .fill(Color.goYellow.opacity(colorScheme == .dark ? 0.2 : 0.16))
-                        Image(systemName: "banknote.fill") // a11y: allow decorative icon covered by surrounding text or control
+        if CoconutExchangeFeatureGate.isEnabled {
+            VStack(alignment: .leading, spacing: 14) {
+                Button {
+                    openCashExchangeForm()
+                } label: {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
+                                .fill(Color.goYellow.opacity(colorScheme == .dark ? 0.2 : 0.16))
+                            Image(systemName: "banknote.fill") // a11y: allow decorative icon covered by surrounding text or control
+                                .font(OhanaFont.adaptive(size: 25, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(Color.goYellow)
+                        }
+                        .frame(width: 64, height: 64)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(l.tr(zh: "家庭线下兑现", en: "Family cash note", de: "Familien-Auszahlung"))
+                                .font(OhanaFont.headline(.black))
+                                .foregroundStyle(primaryText)
+                            Text(l.tr(
+                                zh: "只记录谁兑换给谁，不处理真实支付。",
+                                en: "Records who should pay whom offline. No real payment in app.",
+                                de: "Notiert nur, wer offline zahlt. Keine echte Zahlung in der App."
+                            ))
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer()
+                        Image(systemName: "plus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                             .font(OhanaFont.adaptive(size: 25, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.goYellow)
+                            .foregroundStyle(Color.goPrimary)
+                            .ohanaSymbolPulse(trigger: activePicker?.id ?? "")
+                            .ohanaPing(
+                                trigger: incomingPendingExchanges.count,
+                                accent: Color.goYellow,
+                                isEnabled: !incomingPendingExchanges.isEmpty
+                            )
                     }
-                    .frame(width: 64, height: 64)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(l.tr(zh: "家庭线下兑现", en: "Family cash note", de: "Familien-Auszahlung"))
-                            .font(OhanaFont.headline(.black))
-                            .foregroundStyle(primaryText)
-                        Text(l.tr(
-                            zh: "只记录谁兑换给谁，不处理真实支付。",
-                            en: "Records who should pay whom offline. No real payment in app.",
-                            de: "Notiert nur, wer offline zahlt. Keine echte Zahlung in der App."
-                        ))
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-                    Image(systemName: "plus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 25, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.goPrimary)
-                        .ohanaSymbolPulse(trigger: activePicker?.id ?? "")
-                        .ohanaPing(
-                            trigger: incomingPendingExchanges.count,
-                            accent: Color.goYellow,
-                            isEnabled: !incomingPendingExchanges.isEmpty
-                        )
+                    .padding(14)
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
                 }
-                .padding(14)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
-            }
-            .buttonStyle(ScaleButtonStyle())
+                .buttonStyle(ScaleButtonStyle())
 
-            if !incomingPendingExchanges.isEmpty {
-                exchangeList(
-                    title: l.tr(zh: "待你确认", en: "Waiting for you", de: "Wartet auf dich"),
-                    requests: incomingPendingExchanges,
-                    mode: .incoming
-                )
-            }
+                if !incomingPendingExchanges.isEmpty {
+                    exchangeList(
+                        title: l.tr(zh: "待你确认", en: "Waiting for you", de: "Wartet auf dich"),
+                        requests: incomingPendingExchanges,
+                        mode: .incoming
+                    )
+                }
 
-            if !outgoingPendingExchanges.isEmpty {
-                exchangeList(
-                    title: l.tr(zh: "已发出", en: "Sent", de: "Gesendet"),
-                    requests: outgoingPendingExchanges,
-                    mode: .outgoing
-                )
-            }
+                if !outgoingPendingExchanges.isEmpty {
+                    exchangeList(
+                        title: l.tr(zh: "已发出", en: "Sent", de: "Gesendet"),
+                        requests: outgoingPendingExchanges,
+                        mode: .outgoing
+                    )
+                }
 
-            if incomingPendingExchanges.isEmpty, outgoingPendingExchanges.isEmpty {
-                Text(l.tr(
-                    zh: "暂无待处理兑换。兑换是家庭内部的线下兑现记录，确认收到后才完成。",
-                    en: "No pending exchanges. Exchanges are offline family notes and finish after the receiver confirms.",
-                    de: "Keine offenen Tausche. Sie sind Offline-Notizen und werden erst nach Bestätigung abgeschlossen."
-                ))
-                .font(OhanaFont.callout(.bold))
-                .foregroundStyle(secondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(18)
-                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+                if incomingPendingExchanges.isEmpty, outgoingPendingExchanges.isEmpty {
+                    Text(l.tr(
+                        zh: "暂无待处理兑换。兑换是家庭内部的线下兑现记录，确认收到后才完成。",
+                        en: "No pending exchanges. Exchanges are offline family notes and finish after the receiver confirms.",
+                        de: "Keine offenen Tausche. Sie sind Offline-Notizen und werden erst nach Bestätigung abgeschlossen."
+                    ))
+                    .font(OhanaFont.callout(.bold))
+                    .foregroundStyle(secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(18)
+                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+                }
             }
         }
     }

@@ -27,9 +27,11 @@ extension TodayFocusCard {
             let assignedFamilyTasks = snapshot.assignedFamilyTasks.filter {
                 !skippedFocusKeys.contains(TodayFocusCard.familyTaskSkipKey(for: $0))
             }.prefix(TodayFocusLimits.maxFamilyTaskCards)
-            let pendingExchangeRequests = snapshot.pendingExchangeRequests.filter {
-                !skippedFocusKeys.contains(TodayFocusCard.exchangeSkipKey(for: $0))
-            }.prefix(TodayFocusLimits.maxExchangeCards)
+            let pendingExchangeRequests = CoconutExchangeFeatureGate.isEnabled
+                ? snapshot.pendingExchangeRequests.filter {
+                    !skippedFocusKeys.contains(TodayFocusCard.exchangeSkipKey(for: $0))
+                }.prefix(TodayFocusLimits.maxExchangeCards)
+                : ArraySlice<TodayFocusExchangeRequestSnapshot>()
             let negativeSignals = snapshot.negativeSignals.filter {
                 !closedNegativeKeys.contains(TodayFocusCard.negativeSkipKey(for: $0))
             }.prefix(TodayFocusLimits.maxNegativeCards)

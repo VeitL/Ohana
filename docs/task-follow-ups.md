@@ -41,7 +41,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260612-021 - Audit deleted-human wallet and ledger visibility
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Economy / Members / Recycle Bin
 - Source task: Members Phase 6 remediation, 2026-06-12
@@ -55,6 +55,12 @@ actionable; long-term product ideas belong in planning docs instead.
 - Close when: Economy tests and real UI checks prove deleted humans are excluded
   from active asset/ranking/reward surfaces and historical ledger visibility has
   the intended product treatment.
+- Closed: 2026-06-12 in Economy Phase 6. `CoconutWalletServiceTests` now prove
+  recycled / memorial wallet owners are excluded from active wealth total,
+  rankings, and selected balances while hidden privacy wallets still count;
+  `CoconutWalletService` and reward command tests reject frozen wallet writes.
+  Remaining real UI inspection lives in
+  `docs/planning/gap-acceptance-track-list.md#phase-6-economy`.
 
 ### TFU-20260612-020 - Finish Members localization coverage
 
