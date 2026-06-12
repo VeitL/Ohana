@@ -341,6 +341,11 @@ struct OasisCritterDailyWishTests {
         context.insert(balance)
         context.insert(human)
         try context.save()
+        try CoconutEconomyBootstrapService.bootstrapIfNeeded(
+            context: context,
+            legacyIslandCount: human.coconutBalance,
+            legacyLogsJSON: "[]"
+        )
         let wallet = ProjectionSpyWallet()
         let questManager = QuestManager(wallet: wallet)
 
@@ -397,6 +402,11 @@ struct OasisCritterDailyWishTests {
         context.insert(balance)
         context.insert(human)
         try context.save()
+        try CoconutEconomyBootstrapService.bootstrapIfNeeded(
+            context: context,
+            legacyIslandCount: human.coconutBalance,
+            legacyLogsJSON: "[]"
+        )
         let wallet = ProjectionSpyWallet()
         let questManager = QuestManager(wallet: wallet)
 

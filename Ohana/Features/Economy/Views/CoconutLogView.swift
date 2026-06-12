@@ -230,7 +230,8 @@ struct CoconutLogContentView: View {
         }
         if !walletAccounts.isEmpty {
             return walletAccounts.reduce(0) { total, account in
-                guard !(account.ownerKind == .human && memberSnapshot.hiddenHumanIds.contains(account.ownerId)) else {
+                guard account.ownerKind != .system,
+                      !(account.ownerKind == .human && memberSnapshot.hiddenHumanIds.contains(account.ownerId)) else {
                     return total
                 }
                 return total + account.balance

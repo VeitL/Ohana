@@ -194,7 +194,8 @@ final class IslandWealthScreenModel {
 
     private var visibleWalletAccounts: [CoconutAccount] {
         walletAccounts.filter { account in
-            !(account.ownerKind == .human && hiddenHumanIds.contains(account.ownerId))
+            account.ownerKind != .system &&
+                !(account.ownerKind == .human && hiddenHumanIds.contains(account.ownerId))
         }
     }
 

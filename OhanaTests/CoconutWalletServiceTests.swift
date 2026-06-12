@@ -9,7 +9,7 @@ final class CoconutWalletServiceTests: XCTestCase {
         _ = ModelContext(container)
 
         let schemaNames = ArkMigrationPlan.schemas.map { String(describing: $0) }
-        XCTAssertTrue(schemaNames.contains("ArkSchemaV64"))
+        XCTAssertTrue(schemaNames.contains("ArkSchemaV69"))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
     }
 
@@ -51,6 +51,35 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertEqual(legacyHistory.count, 1)
         XCTAssertFalse(try XCTUnwrap(legacyHistory.first).affectsBalance)
         XCTAssertEqual(entries.filter(\.affectsBalance).reduce(0) { $0 + $1.delta }, 20)
+    }
+
+    func testFormalIslandTotalExcludesLegacySystemCompatibilityBalance() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let defaults = try makeDefaults()
+        defer { defaults.removePersistentDomain(forName: defaultsSuiteName) }
+
+        let human = Human(name: "Guan")
+        human.coconutBalance = 10
+        let pet = Pet(name: "Miso")
+        pet.coconutBalance = 5
+        let projection = QuestManager()
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+        defaults.set(20, forKey: "quest_coconutCount")
+
+        try CoconutEconomyBootstrapService.bootstrapIfNeeded(
+            context: context,
+            defaults: defaults,
+            projectionManager: projection
+        )
+
+        let accounts = try context.fetch(FetchDescriptor<CoconutAccount>())
+        XCTAssertEqual(accounts.reduce(0) { $0 + $1.balance }, 20)
+        XCTAssertEqual(accounts.first { $0.accountKey == CoconutAccountKey.legacySystem }?.balance, 5)
+        XCTAssertEqual(CoconutWalletService.totalBalance(context: context), 15)
+        XCTAssertEqual(projection.coconutCount, 15)
     }
 
     func testBootstrapPreservesMemberBalancesWhenLegacyIslandCountIsLower() throws {
@@ -238,6 +267,93 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertEqual(CoconutWalletService.balance(for: human, context: context), 18)
     }
 
+    func testRefreshProjectionRepairsDriftedFormalAccountFromLedgerReplay() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let human = Human(name: "Guan")
+        context.insert(human)
+        try context.save()
+
+        try CoconutWalletService.apply(
+            deltas: [
+                .human(
+                    human,
+                    delta: 12,
+                    entryKind: .openingBalance,
+                    source: .service,
+                    title: "Opening",
+                    transactionKey: "test-drift-opening"
+                ),
+                .human(
+                    human,
+                    delta: -4,
+                    entryKind: .spend,
+                    source: .shop,
+                    title: "Spend",
+                    transactionKey: "test-drift-spend"
+                )
+            ],
+            context: context,
+            save: true,
+            postsRewardFeedback: false,
+            updatesProjection: false
+        )
+
+        let accountKey = CoconutAccountKey.human(human.id)
+        let account = try XCTUnwrap(fetchAccount(accountKey: accountKey, context: context))
+        account.balance = 99
+        human.coconutBalance = 99
+        try context.save()
+
+        let projection = QuestManager()
+        CoconutWalletService.refreshQuestProjection(context: context, manager: projection)
+
+        XCTAssertEqual(account.balance, 8)
+        XCTAssertEqual(human.coconutBalance, 8)
+        XCTAssertEqual(CoconutWalletService.totalBalance(context: context), 8)
+        XCTAssertEqual(projection.coconutCount, 8)
+    }
+
+    func testWealthTotalsAndLeaderboardExcludeLegacySystemAccount() {
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Miso")
+        let model = IslandWealthScreenModel()
+        let humanAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            displayName: human.name,
+            balance: 10
+        )
+        let petAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.pet(pet.id),
+            ownerKind: .pet,
+            ownerId: pet.id.uuidString,
+            displayName: pet.name,
+            balance: 5
+        )
+        let legacySystemAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.legacySystem,
+            ownerKind: .system,
+            ownerId: "",
+            displayName: "Legacy island total",
+            balance: 99
+        )
+
+        model.applyQuerySnapshot(
+            pets: [pet],
+            visibleHumans: [human],
+            hiddenHumanIds: [],
+            walletAccounts: [humanAccount, petAccount, legacySystemAccount],
+            walletLedgerEntries: [],
+            petColorMap: [:],
+            selectedActorId: nil
+        )
+
+        XCTAssertEqual(model.totalAssets, 15)
+        XCTAssertEqual(Set(model.leaderboard.map(\.entityId)), Set([human.id.uuidString, pet.id.uuidString]))
+    }
+
     private var defaultsSuiteName: String {
         "CoconutWalletServiceTests"
     }
@@ -249,8 +365,16 @@ final class CoconutWalletServiceTests: XCTestCase {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV69.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func fetchAccount(accountKey: String, context: ModelContext) throws -> CoconutAccount? {
+        var descriptor = FetchDescriptor<CoconutAccount>(
+            predicate: #Predicate<CoconutAccount> { $0.accountKey == accountKey }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 }

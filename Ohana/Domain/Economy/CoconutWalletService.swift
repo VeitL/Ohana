@@ -22,6 +22,15 @@ enum CoconutWalletError: LocalizedError {
     }
 }
 
+struct CoconutWalletReconciliationSummary: Equatable {
+    let correctedAccountCount: Int
+    let createdAccountCount: Int
+
+    var didChange: Bool {
+        correctedAccountCount > 0 || createdAccountCount > 0
+    }
+}
+
 struct CoconutWalletDelta {
     var accountKey: String
     var ownerKind: CoconutWalletOwnerKind
@@ -383,7 +392,9 @@ enum CoconutWalletService {
             FetchDescriptor<CoconutAccount>(),
             context: context,
             operation: "fetch coconut accounts for total balance"
-        ).reduce(0) { $0 + $1.balance }
+        )
+        .filter { isFormalMemberAccount($0.ownerKind) }
+        .reduce(0) { $0 + $1.balance }
     }
 
     static func balance(accountKey: String, context: ModelContext, fallback: Int = 0) -> Int {
@@ -440,10 +451,79 @@ enum CoconutWalletService {
     }
 
     static func refreshQuestProjection(context: ModelContext, manager: QuestManager? = nil) {
+        _ = reconcileFormalAccountBalancesWithLedger(context: context)
         manager?.replaceCoconutProjection(
             count: totalBalance(context: context),
             logs: recentLogProjection(context: context)
         )
+    }
+
+    @discardableResult
+    static func reconcileFormalAccountBalancesWithLedger(context: ModelContext) -> CoconutWalletReconciliationSummary {
+        let entries = fetchOrLog(
+            FetchDescriptor<CoconutLedgerEntry>(),
+            context: context,
+            operation: "fetch coconut ledger entries for replay reconciliation"
+        )
+        var replayedBalances: [String: Int] = [:]
+        var replayMetadata: [String: CoconutLedgerEntry] = [:]
+        for entry in entries where entry.affectsBalance && isFormalMemberAccount(entry.ownerKind) {
+            replayedBalances[entry.accountKey, default: 0] += entry.delta
+            replayMetadata[entry.accountKey] = entry
+        }
+
+        let accounts = fetchOrLog(
+            FetchDescriptor<CoconutAccount>(),
+            context: context,
+            operation: "fetch coconut accounts for replay reconciliation"
+        )
+        var accountsByKey: [String: CoconutAccount] = [:]
+        for account in accounts where accountsByKey[account.accountKey] == nil {
+            accountsByKey[account.accountKey] = account
+        }
+
+        var correctedCount = 0
+        var createdCount = 0
+        let now = Date()
+
+        for (accountKey, replayedBalance) in replayedBalances where accountsByKey[accountKey] == nil {
+            guard let entry = replayMetadata[accountKey] else { continue }
+            let account = CoconutAccount(
+                accountKey: accountKey,
+                ownerKind: entry.ownerKind,
+                ownerId: entry.ownerId,
+                displayName: entry.ownerName,
+                balance: max(0, replayedBalance),
+                createdAt: now,
+                updatedAt: now,
+                metadataJSON: "{\"createdBy\":\"ledgerReconciliation\"}"
+            )
+            context.insert(account)
+            accountsByKey[accountKey] = account
+            createdCount += 1
+            syncMemberCache(for: account, balance: account.balance, context: context)
+        }
+
+        for account in accounts where isFormalMemberAccount(account.ownerKind) {
+            let replayedBalance = max(0, replayedBalances[account.accountKey] ?? 0)
+            if account.balance != replayedBalance {
+                account.balance = replayedBalance
+                account.updatedAt = now
+                correctedCount += 1
+            }
+            if syncMemberCache(for: account, balance: replayedBalance, context: context) {
+                correctedCount += 1
+            }
+        }
+
+        let summary = CoconutWalletReconciliationSummary(
+            correctedAccountCount: correctedCount,
+            createdAccountCount: createdCount
+        )
+        if summary.didChange {
+            context.safeSave()
+        }
+        return summary
     }
 
     private static func makeActorDelta(
@@ -587,6 +667,44 @@ enum CoconutWalletService {
             delta.pet?.coconutBalance = balance
         case .system:
             break
+        }
+    }
+
+    private static func isFormalMemberAccount(_ ownerKind: CoconutWalletOwnerKind) -> Bool {
+        switch ownerKind {
+        case .human, .pet:
+            true
+        case .system:
+            false
+        }
+    }
+
+    @discardableResult
+    private static func syncMemberCache(for account: CoconutAccount, balance: Int, context: ModelContext) -> Bool {
+        guard let id = UUID(uuidString: account.ownerId) else { return false }
+        do {
+            switch account.ownerKind {
+            case .human:
+                guard let human = try fetchHuman(id: id, context: context), human.coconutBalance != balance else {
+                    return false
+                }
+                human.coconutBalance = balance
+                return true
+            case .pet:
+                guard let pet = try fetchPet(id: id, context: context), pet.coconutBalance != balance else {
+                    return false
+                }
+                pet.coconutBalance = balance
+                return true
+            case .system:
+                return false
+            }
+        } catch {
+            OhanaLog.warning(
+                "CoconutWalletService failed to sync member cache during reconciliation: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return false
         }
     }
 
