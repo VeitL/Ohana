@@ -25,6 +25,40 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260613-007 - Fix CI FamilyTasks map trigonometry compile failure
+
+- Status: Open
+- Priority: P1
+- Area: FamilyTasks / CI Build
+- Source task: Economy adversarial P1 remediation close-out, 2026-06-13
+- Blocker: The Economy remediation head `006ae323e` passed the local module
+  exit gate, but GitHub Actions `build-test` fails before tests with
+  `Ambiguous use of 'cos'` in
+  `Ohana/Features/FamilyTasks/Views/FamilyCollaborationDashboardView+Map.swift`.
+  The failing line predates this Economy diff and belongs to the hidden
+  FamilyTasks surface.
+- Next step: In a FamilyTasks or CI unblock pass, qualify the trigonometry call
+  for Swift/Xcode 26.3 and run the full CI build-test job again.
+- Close when: GitHub Actions `build-test` reaches and completes the simulator
+  test suite on the iPhone 17 destination for the current main branch.
+
+### TFU-20260613-006 - Refresh CI tool-version pins or install pinned tools
+
+- Status: Open
+- Priority: P1
+- Area: CI / Tooling
+- Source task: Economy adversarial P1 remediation close-out, 2026-06-13
+- Blocker: GitHub Actions `audits` and `lint` stop at
+  `scripts/check-tool-versions.sh` before repository audits/lints run because
+  Homebrew installs newer major/minor tools than `scripts/ci-tool-versions.env`
+  allows: `rg 15.1.0` vs pin `14`, `swiftlint 0.63.2` vs pin `0.61`, and
+  `swiftformat 0.61.1` vs pin `0.57`.
+- Next step: Either install the pinned CI tool versions explicitly or review
+  the changelogs and deliberately bump `scripts/ci-tool-versions.env` with
+  fixture/audit confirmation.
+- Close when: GitHub Actions `audits` and `lint` pass their tool-version step
+  and run the real repository gates on main.
+
 ### TFU-20260613-005 - Add V68/V69 recycle-bin migration coverage
 
 - Status: Open
