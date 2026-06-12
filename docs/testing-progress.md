@@ -12,7 +12,7 @@
 | 2 | `Ohana/Domain` | 🟢 | 门禁通过并提交：`304971af`；P1 余留见 TFU-20260612-014 |
 | 3 | `Ohana/Shared` | 🟢 | 门禁通过并提交：`fcf998088`；P1 余留见 TFU-20260612-015 |
 | 4 | `Ohana/App` | 🟢 | 门禁通过并提交：`e48c13af7`；无 P1/P2 余留 |
-| 5 | Home + TodayFocus + QuickCare | ⬜ | |
+| 5 | Home + TodayFocus + QuickCare | 🟢 | 门禁通过并提交：`b8e8710e`；TFU-20260612-015 已关闭，无 P1/P2 余留 |
 | 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | ⬜ | |
 | 7 | 中小模块批量 | ⬜ | |
 | 8 | 横向集成与全量回归 | ⬜ | 需总览会话主持 |
@@ -26,9 +26,9 @@
 | Domain | 2 | 🟢 | 2026-06-12 | P1 余留见 TFU-20260612-014 | `304971af` | 删除未引用的 `BatchAction` UI/奖励绕行路径；宠物活动清理由 `PetActivityRecordCleanupService` 负责，Members 调用点已迁移，`Pet` 模型不再执行清理副作用 |
 | Shared | 3 | 🟢 | 2026-06-12 | P1 余留见 TFU-20260612-015 | `fcf998088` | 附件隐私清理器已改为 ImageIO 重编码，Shared smoothness 阻塞解除；QuickCare 阶段迁移 executor picker 的 Shared `@Query` |
 | App | 4 | 🟢 | 2026-06-12 | 无 | `e48c13af7` | 启动/路由/运行时策略审计通过；隐私快照遮罩 a11y 与 shell 文案本地化已修复 |
-| Home | 5 | ⬜ | | | | |
-| TodayFocus | 5 | ⬜ | | | | |
-| QuickCare | 5 | ⬜ | | | | |
+| Home | 5 | 🟢 | 2026-06-12 | 无 | `b8e8710e` | Phase 5 审计与门禁通过；本轮未发现需修改的 Home P0/P1 项 |
+| TodayFocus | 5 | 🟢 | 2026-06-12 | 无 | `b8e8710e` | Phase 5 审计与门禁通过；本轮未发现需修改的 TodayFocus P0/P1 项 |
+| QuickCare | 5 | 🟢 | 2026-06-12 | 无 | `b8e8710e` | `ExecutorPickerBar` 的 SwiftData 查询已迁入 QuickCare feature 容器，Shared 只保留纯展示组件；空/多成员 picker smoke tests 已补 |
 | Feeding | 6 | ⬜ | | | | |
 | Members | 6 | ⬜ | | | | |
 | Oasis | 6 | ⬜ | | | | |
