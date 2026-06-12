@@ -50,7 +50,7 @@ struct QuickPottySheet: View {
 
                 // 执行人胶囊
                 HStack {
-                    ExecutorPickerBarRouteContainer(tint: Color.goYellow)
+                    QuickCareExecutorPickerBarContainer(tint: Color.goYellow)
                     Spacer()
                 }
                 .padding(.horizontal, 20)

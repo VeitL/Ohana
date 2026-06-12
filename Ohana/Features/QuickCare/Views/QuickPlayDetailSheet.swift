@@ -182,7 +182,7 @@ struct QuickPlayDetailSheet: View {
                         headerRow
                         playSummaryMetrics
                         primaryPlayCard
-                        ExecutorPickerBarRouteContainer(tint: playTint)
+                        QuickCareExecutorPickerBarContainer(tint: playTint)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         playFrequencySection
                         playPlanModule
