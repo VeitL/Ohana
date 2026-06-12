@@ -279,30 +279,11 @@ final class QuestManager {
     }
 
     func currentActiveHuman(context: ModelContext) -> Human? {
-        guard let humanId = activeHumanSelection.currentHumanId else { return nil }
-        guard let id = UUID(uuidString: humanId) else {
-            OhanaLog.warning("[QuestManager] active humanId=\(humanId) is invalid; skipping human share", category: "Economy")
-            return nil
-        }
-        let desc = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { human in
-                human.id == id
-            }
+        EconomyRewardOwnerResolver.activeHuman(
+            selection: activeHumanSelection,
+            context: context,
+            logPrefix: "QuestManager"
         )
-        let human: Human?
-        do {
-            human = try context.fetch(desc).first
-        } catch {
-            OhanaLog.warning("[QuestManager] failed to fetch active humanId=\(humanId): \(error.localizedDescription)", category: "Economy")
-            return nil
-        }
-        if human == nil {
-            OhanaLog.warning("[QuestManager] humanId=\(humanId) not found in context; skipping human share", category: "Economy")
-        } else if let human, !EconomyWalletWritePolicy.canWrite(human) {
-            OhanaLog.warning("[QuestManager] active humanId=\(humanId) wallet is frozen; skipping human share", category: "Economy")
-            return nil
-        }
-        return human
     }
 
     func isDoubleRewardBoostActive() -> Bool {

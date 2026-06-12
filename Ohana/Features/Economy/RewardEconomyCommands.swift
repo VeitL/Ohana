@@ -275,11 +275,6 @@ struct ShopPurchaseFundingContribution: Equatable {
 }
 
 enum ShopPurchaseCommandService {
-    private struct ShopPurchaseFundingSlice {
-        let human: Human
-        let amount: Int
-    }
-
     @discardableResult
     @MainActor
     static func purchase(
@@ -327,7 +322,12 @@ enum ShopPurchaseCommandService {
                 fundingContributions: []
             )
         }
-        let fundingPlan = cofundingPlan(cost: item.cost, buyer: buyer, context: context)
+        let fundingPlan = CoconutWalletFundingPlanner.humanCofundingPlan(
+            cost: item.cost,
+            primaryHuman: buyer,
+            context: context,
+            logPrefix: "ShopPurchaseCommandService"
+        )
         guard fundingPlan.missing == 0 else {
             return ShopPurchaseCommandResult(
                 humanID: buyer.id,
@@ -345,8 +345,8 @@ enum ShopPurchaseCommandService {
         let transactionKey = item.isConsumable
             ? "shop:\(item.id):\(buyer.id.uuidString):\(purchaseID.uuidString)"
             : "shop:\(item.id):\(buyer.id.uuidString)"
-        let cofundingMetadata = fundingPlan.slices.count > 1
-            ? ",\"cofunded\":true,\"fundingSourceCount\":\(fundingPlan.slices.count)"
+        let cofundingMetadata = fundingPlan.contributions.count > 1
+            ? ",\"cofunded\":true,\"fundingSourceCount\":\(fundingPlan.contributions.count)"
             : ""
         let metadataJSON = item.isConsumable
             ? "{\"shopItemId\":\"\(item.id)\",\"purchaseId\":\"\(purchaseID.uuidString)\",\"consumable\":true\(cofundingMetadata)}"
@@ -374,31 +374,32 @@ enum ShopPurchaseCommandService {
             context: context,
             save: false
         )
-        let walletDeltas = fundingPlan.slices.map { slice in
-            let isBuyer = slice.human.id == buyer.id
-            return CoconutWalletDelta.human(
-                slice.human,
-                delta: -slice.amount,
+        let walletMutations = fundingPlan.contributions.map { contribution in
+            let isBuyer = contribution.human.id == buyer.id
+            return CoconutHumanWalletMutation(
+                human: contribution.human,
+                delta: -contribution.amount,
                 entryKind: isBuyer ? .spend : .transferOut,
                 source: .shop,
                 title: isBuyer ? itemName : "合资补差：\(itemName)",
                 emoji: item.emoji,
-                actorId: slice.human.id.uuidString,
-                actorName: slice.human.name,
+                actorId: contribution.human.id.uuidString,
+                actorName: contribution.human.name,
                 subjectKind: isBuyer ? .system : .human,
                 subjectId: isBuyer ? nil : buyer.id.uuidString,
                 sourceModelName: "ShopCatalog",
                 sourceModelId: item.id,
                 careLedgerEventId: ledger.id.uuidString,
                 metadataJSON: metadataJSON,
-                transactionKey: fundingPlan.slices.count == 1
+                transactionKey: fundingPlan.contributions.count == 1
                     ? transactionKey
-                    : "\(transactionKey):\(slice.human.id.uuidString)"
+                    : "\(transactionKey):\(contribution.human.id.uuidString)"
             )
         }
         do {
-            try wallet.apply(
-                deltas: walletDeltas,
+            try CoconutWalletMutationWriter.applyHumanMutations(
+                walletMutations,
+                wallet: wallet,
                 context: context,
                 save: false,
                 postsRewardFeedback: true,
@@ -438,52 +439,10 @@ enum ShopPurchaseCommandService {
             failure: nil,
             ledgerEventID: ledger.id,
             transactionKey: transactionKey,
-            fundingContributions: fundingPlan.slices.map { ShopPurchaseFundingContribution(humanID: $0.human.id, amount: $0.amount) }
-        )
-    }
-
-    @MainActor
-    private static func cofundingPlan(
-        cost: Int,
-        buyer: Human,
-        context: ModelContext
-    ) -> (slices: [ShopPurchaseFundingSlice], missing: Int) {
-        var remaining = cost
-        var slices: [ShopPurchaseFundingSlice] = []
-        let buyerContribution = min(remaining, max(0, CoconutWalletService.balance(for: buyer, context: context)))
-        if buyerContribution > 0 {
-            slices.append(ShopPurchaseFundingSlice(human: buyer, amount: buyerContribution))
-            remaining -= buyerContribution
-        }
-        guard remaining > 0 else { return (slices, 0) }
-
-        let otherHumans: [Human]
-        do {
-            otherHumans = try context.fetch(FetchDescriptor<Human>())
-        } catch {
-            OhanaLog.warning(
-                "[ShopPurchaseCommandService] failed to fetch cofunding humans: \(error.localizedDescription)",
-                category: "Economy"
-            )
-            return (slices, remaining)
-        }
-
-        let contributors = otherHumans
-            .filter { $0.id != buyer.id && EconomyWalletWritePolicy.canWrite($0) }
-            .sorted { lhs, rhs in
-                if lhs.createdAt != rhs.createdAt {
-                    return lhs.createdAt < rhs.createdAt
-                }
-                return lhs.id.uuidString < rhs.id.uuidString
+            fundingContributions: fundingPlan.contributions.map {
+                ShopPurchaseFundingContribution(humanID: $0.human.id, amount: $0.amount)
             }
-        for human in contributors where remaining > 0 {
-            let available = max(0, CoconutWalletService.balance(for: human, context: context))
-            let contribution = min(remaining, available)
-            guard contribution > 0 else { continue }
-            slices.append(ShopPurchaseFundingSlice(human: human, amount: contribution))
-            remaining -= contribution
-        }
-        return (slices, remaining)
+        )
     }
 }
 

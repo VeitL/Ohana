@@ -28,7 +28,12 @@ extension QuestManager {
         }
 
         // ── 1. 人类账户（从 context fetch，安全降级）
-        let human = human(withId: executorId, context: context) ?? currentActiveHuman(context: context)
+        let human = EconomyRewardOwnerResolver.rewardHuman(
+            executorId: executorId,
+            activeHumanSelection: activeHumanSelection,
+            context: context,
+            logPrefix: "QuestManager"
+        )
         let consumesBoost = isDoubleRewardBoostActive()
         let isCoolingDown = isOnCooldown(petId: pet?.id, type: type)
         let budgetKeys = economyBudgetKeys(for: human, context: context)
@@ -149,27 +154,7 @@ extension QuestManager {
     }
 
     func human(withId humanId: String?, context: ModelContext) -> Human? {
-        guard let humanId, !humanId.isEmpty else { return nil }
-        guard let id = UUID(uuidString: humanId) else {
-            OhanaLog.warning("[QuestManager] reward humanId=\(humanId) is invalid", category: "Economy")
-            return nil
-        }
-        let desc = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { human in
-                human.id == id
-            }
-        )
-        do {
-            let human = try context.fetch(desc).first
-            if let human, !EconomyWalletWritePolicy.canWrite(human) {
-                OhanaLog.warning("[QuestManager] reward humanId=\(humanId) wallet is frozen; skipping human share", category: "Economy")
-                return nil
-            }
-            return human
-        } catch {
-            OhanaLog.warning("[QuestManager] failed to fetch reward humanId=\(humanId): \(error.localizedDescription)", category: "Economy")
-            return nil
-        }
+        EconomyRewardOwnerResolver.explicitHuman(id: humanId, context: context, logPrefix: "QuestManager")
     }
 
     /// 多宠共同照护奖励：人类奖励只发一次，每只在世目标宠物各自获得成长椰子。
@@ -186,7 +171,12 @@ extension QuestManager {
         let livePets = pets.filter { EconomyWalletWritePolicy.canWrite($0) }
         guard !livePets.isEmpty else { return (0, 0) }
 
-        let human = human(withId: executorId, context: context) ?? currentActiveHuman(context: context)
+        let human = EconomyRewardOwnerResolver.rewardHuman(
+            executorId: executorId,
+            activeHumanSelection: activeHumanSelection,
+            context: context,
+            logPrefix: "QuestManager"
+        )
         let consumesBoost = isDoubleRewardBoostActive()
         let isCoolingDown = livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) }
         let budgetKeys = economyBudgetKeys(for: human, context: context)

@@ -236,8 +236,11 @@ extension QuestManager {
         context: ModelContext,
         occurredAt: Date
     ) -> CoconutWalletDelta? {
-        guard let human = currentActiveHuman(context: context),
-              EconomyWalletWritePolicy.canWrite(human) else {
+        guard let human = EconomyRewardOwnerResolver.activeHuman(
+            selection: activeHumanSelection,
+            context: context,
+            logPrefix: "QuestManager"
+        ) else {
             return nil
         }
         return .human(

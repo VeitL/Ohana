@@ -690,10 +690,10 @@ enum FamilyTaskService {
             save: false
         )
         do {
-            try wallet.apply(
-                deltas: [
-                    .human(
-                        payer,
+            try CoconutWalletMutationWriter.applyHumanMutations(
+                [
+                    CoconutHumanWalletMutation(
+                        human: payer,
                         delta: -task.rewardCoconuts,
                         entryKind: .transferOut,
                         source: .familyTask,
@@ -709,8 +709,8 @@ enum FamilyTaskService {
                         metadataJSON: "\(marker):payer",
                         transactionKey: payerTransactionKey
                     ),
-                    .human(
-                        receiver,
+                    CoconutHumanWalletMutation(
+                        human: receiver,
                         delta: task.rewardCoconuts,
                         entryKind: .transferIn,
                         source: .familyTask,
@@ -727,6 +727,7 @@ enum FamilyTaskService {
                         transactionKey: receiverTransactionKey
                     )
                 ],
+                wallet: wallet,
                 context: context,
                 save: false,
                 postsRewardFeedback: true,
