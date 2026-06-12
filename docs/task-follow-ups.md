@@ -69,21 +69,22 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260611-004 - Add cloud-sync mutation marks for feeding writes
 
-- Status: Open
+- Status: Done
 - Priority: P1
 - Area: Cloud Sync / Feeding
 - Source task: Feeding quick-action and stock-reminder repair follow-up,
   2026-06-11
-- Blocker: Cloud sync is being changed in a separate active workflow with many
-  uncommitted edits; patching it from the feeding thread risks crossing worktree
-  ownership.
-- Next step: In the CloudSync workflow, add `CloudSyncMutationRecorder` coverage
-  for `PetFoodRecord`, feeding `Event`, and `Reminder` writes/deletes, including
-  stock records, feed plan rules, stock reminders, and `FeedAutoLogMaterializer`
-  auto-log inserts.
+- Blocker: Resolved in Feeding Phase 6 by adding CloudSync upload-pipeline
+  support and mutation recorder coverage for feeding-owned sync facts.
+- Next step: No remaining action for this follow-up. `Reminder` remains outside
+  the current upload pipeline by design; feeding reminder sync is represented by
+  the owning `Event` facts.
 - Close when: Feeding stock records, feed rules, stock reminders, and auto-log
   materialized records enqueue upload/delete mutations, with focused CloudSync
   tests proving the registered entities are recorded.
+- Closed: 2026-06-12 in Feeding Phase 6; `Event` and `PetFoodRecord` now have
+  upload/apply support, Feeding write/delete paths call `CloudSyncMutationRecorder`,
+  and focused CloudSync + Feeding command tests cover the dirty-state writes.
 
 ### TFU-20260611-005 - Route shared walk writes through an owning command/service
 

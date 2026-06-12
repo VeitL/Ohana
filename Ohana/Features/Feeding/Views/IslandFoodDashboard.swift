@@ -19,11 +19,14 @@ struct IslandFoodDashboardContentView: View {
     let allSharedCareSessions: [SharedCareSession]
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.fallbackCode
 
     @State private var selectedPetId: UUID? = nil
     @State private var sheetPet: Pet? = nil
     @State private var chartRevealProgress: CGFloat = 0
     @StateObject private var snapshotStore = IslandFoodDashboardSnapshotStore()
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var activePets: [Pet] {
         snapshot.activePets
@@ -49,6 +52,18 @@ struct IslandFoodDashboardContentView: View {
         snapshotStore.snapshot
     }
 
+    private var inputRevision: IslandFoodDashboardInputRevision {
+        IslandFoodDashboardInputRevision.make(
+            pets: pets,
+            selectedPetId: selectedPetId,
+            allEvents: allEvents,
+            allFeedingLedgerEvents: allFeedingLedgerEvents,
+            legacyStockCareLogs: legacyStockCareLogs,
+            allFoodRecords: allFoodRecords,
+            allSharedCareSessions: allSharedCareSessions
+        )
+    }
+
     var body: some View {
         dashboardBody
             .sheet(item: $sheetPet) { pet in
@@ -58,19 +73,12 @@ struct IslandFoodDashboardContentView: View {
                 rebuildSnapshot(force: true)
                 playChartReveal()
             }
-            .onChange(of: selectedPetId) { _, _ in
-                rebuildSnapshot(force: true)
-                playChartReveal()
+            .onChange(of: inputRevision) { oldValue, newValue in
+                rebuildSnapshot()
+                if newValue.shouldReplayChart(comparedTo: oldValue) {
+                    playChartReveal()
+                }
             }
-            .onChange(of: pets.count) { _, _ in rebuildSnapshot(force: true) }
-            .onChange(of: allEvents.count) { _, _ in rebuildSnapshot(force: true) }
-            .onChange(of: allFeedingLedgerEvents.count) { _, _ in
-                rebuildSnapshot(force: true)
-                playChartReveal()
-            }
-            .onChange(of: legacyStockCareLogs.count) { _, _ in rebuildSnapshot(force: true) }
-            .onChange(of: allFoodRecords.count) { _, _ in rebuildSnapshot(force: true) }
-            .onChange(of: allSharedCareSessions.count) { _, _ in rebuildSnapshot(force: true) }
     }
 
     @ViewBuilder
@@ -117,7 +125,7 @@ struct IslandFoodDashboardContentView: View {
             .buttonStyle(ScaleButtonStyle())
 
             Spacer()
-            Text("饮食总览")
+            Text(l.tr(zh: "饮食总览", en: "Food overview"))
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
@@ -129,7 +137,7 @@ struct IslandFoodDashboardContentView: View {
     private var memberSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                selectorChip(title: "全部", icon: "square.grid.2x2.fill", isSelected: selectedPetId == nil) {
+                selectorChip(title: l.tr(zh: "全部", en: "All"), icon: "square.grid.2x2.fill", isSelected: selectedPetId == nil) {
                     selectedPetId = nil
                 }
                 ForEach(activePets) { pet in
@@ -183,10 +191,34 @@ struct IslandFoodDashboardContentView: View {
 
     private var overviewCards: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            metricCard(title: "今日喂食", value: "\(snapshot.todayFeedCount)", unit: "次", icon: "fork.knife", accent: Color.foodDry)
-            metricCard(title: "今日总量", value: compactFoodWeight(snapshot.todayGrams), unit: "", icon: "scalemass.fill", accent: Color.goPrimary)
-            metricCard(title: "7 天总量", value: compactFoodWeight(snapshot.weekGrams), unit: "", icon: "chart.bar.fill", accent: Color.goTeal)
-            metricCard(title: "余粮风险", value: foodRiskValue, unit: foodRiskUnit, icon: "shippingbox.fill", accent: foodRiskAccent)
+            metricCard(
+                title: l.tr(zh: "今日喂食", en: "Today's feeds"),
+                value: "\(snapshot.todayFeedCount)",
+                unit: l.tr(zh: "次", en: "x"),
+                icon: "fork.knife",
+                accent: Color.foodDry
+            )
+            metricCard(
+                title: l.tr(zh: "今日总量", en: "Today total"),
+                value: compactFoodWeight(snapshot.todayGrams),
+                unit: "",
+                icon: "scalemass.fill",
+                accent: Color.goPrimary
+            )
+            metricCard(
+                title: l.tr(zh: "7 天总量", en: "7-day total"),
+                value: compactFoodWeight(snapshot.weekGrams),
+                unit: "",
+                icon: "chart.bar.fill",
+                accent: Color.goTeal
+            )
+            metricCard(
+                title: l.tr(zh: "余粮风险", en: "Stock risk"),
+                value: foodRiskValue,
+                unit: foodRiskUnit,
+                icon: "shippingbox.fill",
+                accent: foodRiskAccent
+            )
         }
     }
 
@@ -207,13 +239,13 @@ struct IslandFoodDashboardContentView: View {
             .frame(width: 104, height: 104)
 
             VStack(alignment: .leading, spacing: 7) {
-                Text("喂食节奏")
+                Text(l.tr(zh: "喂食节奏", en: "Feeding rhythm"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                Text(snapshot.todayFeedCount == 0 ? "今天还没开饭" : "今天 \(snapshot.todayFeedCount) 次")
+                Text(todayFeedText)
                     .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("7 天 \(snapshot.weekFeedCount) 次 · \(compactFoodWeight(snapshot.weekGrams))")
+                Text(weekFeedText)
                     .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -229,17 +261,17 @@ struct IslandFoodDashboardContentView: View {
                 Image(systemName: "chart.bar.xaxis").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 12, weight: .bold))
                     .foregroundStyle(Color.goPrimary)
-                Text("近 7 天喂食")
+                Text(l.tr(zh: "近 7 天喂食", en: "Last 7 days"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
-                Text("克数")
+                Text(l.tr(zh: "克数", en: "Grams"))
                     .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
 
             if dailyPoints.allSatisfy({ $0.count == 0 }) {
-                emptyState("暂无喂食数据\n打卡后即可看到趋势")
+                emptyState(l.tr(zh: "暂无喂食数据\n打卡后即可看到趋势", en: "No feeding data yet\nTrends appear after check-ins"))
                     .frame(height: 150)
             } else {
                 OhanaMinimalBarChart(
@@ -258,13 +290,13 @@ struct IslandFoodDashboardContentView: View {
 
     private var foodRows: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("成员饮食状态")
+            Text(l.tr(zh: "成员饮食状态", en: "Member food status"))
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 2)
 
             if petSummaries.isEmpty {
-                emptyState("还没有可显示的成员")
+                emptyState(l.tr(zh: "还没有可显示的成员", en: "No members to show yet"))
                     .frame(height: 140)
             } else {
                 ForEach(petSummaries) { summary in
@@ -293,7 +325,7 @@ struct IslandFoodDashboardContentView: View {
                             .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
-                        Text(pet.species.isEmpty ? "成员" : pet.species)
+                        Text(pet.species.isEmpty ? l.tr(zh: "成员", en: "Member") : pet.species)
                             .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaTertiaryText)
                             .lineLimit(1)
@@ -302,7 +334,7 @@ struct IslandFoodDashboardContentView: View {
                         .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(accent)
                         .lineLimit(1)
-                    Text("今日 \(summary.todayCount) 次 · \(compactFoodWeight(summary.todayGrams)) / 7天 \(summary.weekCount) 次")
+                    Text(summaryText(summary))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .lineLimit(1)
@@ -381,7 +413,7 @@ struct IslandFoodDashboardContentView: View {
     }
 
     private var foodRiskUnit: String {
-        lowestFoodDaysPet == nil ? "天" : "天"
+        l.tr(zh: "天", en: "d")
     }
 
     private var foodRiskAccent: Color {
@@ -408,12 +440,38 @@ struct IslandFoodDashboardContentView: View {
 
     private func foodStatusText(for pet: Pet) -> String {
         guard let stock = snapshot.stock(for: pet), stock.hasStock else {
-            return "未设置粮仓"
+            return l.tr(zh: "未设置粮仓", en: "Food stock not set")
         }
         if let days = stock.remainingDays {
-            return "余粮 \(compactFoodWeight(stock.remainingGrams)) · 可用 \(days) 天"
+            return l.tr(
+                zh: "余粮 \(compactFoodWeight(stock.remainingGrams)) · 可用 \(days) 天",
+                en: "\(compactFoodWeight(stock.remainingGrams)) left · \(days)d available"
+            )
         }
-        return "余粮 \(compactFoodWeight(stock.remainingGrams)) · 未估算"
+        return l.tr(
+            zh: "余粮 \(compactFoodWeight(stock.remainingGrams)) · 未估算",
+            en: "\(compactFoodWeight(stock.remainingGrams)) left · not estimated"
+        )
+    }
+
+    private var todayFeedText: String {
+        snapshot.todayFeedCount == 0
+            ? l.tr(zh: "今天还没开饭", en: "No feeds yet today")
+            : l.tr(zh: "今天 \(snapshot.todayFeedCount) 次", en: "\(snapshot.todayFeedCount) feeds today")
+    }
+
+    private var weekFeedText: String {
+        l.tr(
+            zh: "7 天 \(snapshot.weekFeedCount) 次 · \(compactFoodWeight(snapshot.weekGrams))",
+            en: "7 days · \(snapshot.weekFeedCount) feeds · \(compactFoodWeight(snapshot.weekGrams))"
+        )
+    }
+
+    private func summaryText(_ summary: FoodPetSummary) -> String {
+        l.tr(
+            zh: "今日 \(summary.todayCount) 次 · \(compactFoodWeight(summary.todayGrams)) / 7天 \(summary.weekCount) 次",
+            en: "Today \(summary.todayCount)x · \(compactFoodWeight(summary.todayGrams)) / 7 days \(summary.weekCount)x"
+        )
     }
 
     private func rebuildSnapshot(force: Bool = false) {

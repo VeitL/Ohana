@@ -45,6 +45,7 @@ enum FeedAutoLogMaterializer {
                     executorId: nil
                 )
                 context.insert(log)
+                CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: dueDate)
                 careLedger.recordPetCare(
                     log: log,
                     pet: pet,

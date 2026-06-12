@@ -222,6 +222,8 @@ nonisolated enum CloudSyncRecordApplier {
             try applyPet(record, metadata: metadata, context: context)
         case String(describing: Human.self):
             try applyHuman(record, metadata: metadata, context: context)
+        case String(describing: Event.self):
+            try applyEvent(record, metadata: metadata, context: context)
         case String(describing: PetCareLog.self):
             try applyPetCareLog(record, metadata: metadata, context: context)
         case String(describing: PetPottyLog.self):
@@ -234,6 +236,8 @@ nonisolated enum CloudSyncRecordApplier {
             try applyPetWalkLog(record, metadata: metadata, context: context)
         case String(describing: PetExpenseLog.self):
             try applyPetExpenseLog(record, metadata: metadata, context: context)
+        case String(describing: PetFoodRecord.self):
+            try applyPetFoodRecord(record, metadata: metadata, context: context)
         case String(describing: PetWeightLog.self):
             try applyPetWeightLog(record, metadata: metadata, context: context)
         case String(describing: SharedCareSession.self):
@@ -374,6 +378,51 @@ nonisolated enum CloudSyncRecordApplier {
         human.heightCm = record.double(for: "heightCm") ?? human.heightCm
         human.mbti = record.string(for: "mbti") ?? human.mbti
         human.passedAwayDate = record.date(for: "passedAwayDate")
+        return result
+    }
+
+    private static func applyEvent(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        let event: Event
+        let result: CloudSyncRecordApplyResult
+        if let existing = try fetchEvent(id: metadata.localRecordUUID, context: context) {
+            event = existing
+            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        } else {
+            event = Event(
+                title: record.string(for: "title") ?? "",
+                startDate: record.date(for: "startDate") ?? metadata.lastModifiedAt,
+                endDate: record.date(for: "endDate"),
+                isAllDay: record.bool(for: "isAllDay") ?? false,
+                eventType: record.string(for: "eventType") ?? EventType.daily.rawValue,
+                relatedEntityType: record.string(for: "relatedEntityType") ?? "",
+                relatedEntityId: record.string(for: "relatedEntityId") ?? ""
+            )
+            event.id = metadata.localRecordUUID
+            context.insert(event)
+            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        event.title = record.string(for: "title") ?? event.title
+        event.startDate = record.date(for: "startDate") ?? event.startDate
+        event.endDate = record.date(for: "endDate")
+        event.isAllDay = record.bool(for: "isAllDay") ?? event.isAllDay
+        event.eventType = record.string(for: "eventType") ?? event.eventType
+        event.relatedEntityType = record.string(for: "relatedEntityType") ?? event.relatedEntityType
+        event.relatedEntityId = record.string(for: "relatedEntityId") ?? event.relatedEntityId
+        event.recurrenceDays = record.int(for: "recurrenceDays") ?? event.recurrenceDays
+        event.recurrenceEndDate = record.date(for: "recurrenceEndDate")
+        event.isCompleted = record.bool(for: "isCompleted") ?? event.isCompleted
+        event.completedOccurrences = record.stringList(for: "completedOccurrences") ?? event.completedOccurrences
+        event.createdAt = record.date(for: "createdAt") ?? event.createdAt
+        event.assigneeId = record.string(for: "assigneeId")
+        event.feedRuleKindRaw = record.string(for: "feedRuleKindRaw") ?? event.feedRuleKindRaw
+        event.foodKindRaw = record.string(for: "foodKindRaw") ?? event.foodKindRaw
+        event.feedAmountGrams = record.double(for: "feedAmountGrams") ?? event.feedAmountGrams
+        event.feedPlanGroupId = record.string(for: "feedPlanGroupId") ?? event.feedPlanGroupId
         return result
     }
 
@@ -537,6 +586,50 @@ nonisolated enum CloudSyncRecordApplier {
         log.id = metadata.localRecordUUID
         context.insert(log)
         return .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+    }
+
+    private static func applyPetFoodRecord(
+        _ record: CKRecord,
+        metadata: RemoteMetadata,
+        context: ModelContext
+    ) throws -> CloudSyncRecordApplyResult {
+        let foodRecord: PetFoodRecord
+        let result: CloudSyncRecordApplyResult
+        if let existing = try fetchPetFoodRecord(id: metadata.localRecordUUID, context: context) {
+            foodRecord = existing
+            result = .updated(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        } else {
+            foodRecord = try PetFoodRecord(
+                brand: record.string(for: "brand") ?? "",
+                dailyGrams: record.double(for: "dailyGrams") ?? 0,
+                totalGrams: record.double(for: "totalGrams") ?? 0,
+                foodKind: FeedFoodKind(rawValue: record.string(for: "foodKindRaw") ?? "") ?? .dry,
+                purchaseDate: record.date(for: "purchaseDate"),
+                startDate: record.date(for: "startDate") ?? metadata.lastModifiedAt,
+                pet: petReference(from: record, context: context),
+                executorId: record.string(for: "executorId"),
+                expenseId: record.string(for: "expenseId").flatMap(UUID.init(uuidString:)),
+                calculationMode: FeedStockCalculationMode(rawValue: record.string(for: "calculationModeRaw") ?? "") ?? .manualOrPlan
+            )
+            foodRecord.id = metadata.localRecordUUID
+            context.insert(foodRecord)
+            result = .inserted(entityName: metadata.entityName, localRecordId: metadata.localRecordId)
+        }
+
+        foodRecord.brand = record.string(for: "brand") ?? foodRecord.brand
+        foodRecord.dailyGrams = record.double(for: "dailyGrams") ?? foodRecord.dailyGrams
+        foodRecord.totalGrams = record.double(for: "totalGrams") ?? foodRecord.totalGrams
+        foodRecord.foodKindRaw = record.string(for: "foodKindRaw") ?? foodRecord.foodKindRaw
+        foodRecord.purchaseDate = record.date(for: "purchaseDate")
+        foodRecord.startDate = record.date(for: "startDate") ?? foodRecord.startDate
+        foodRecord.remainingCorrectionGrams = record.double(for: "remainingCorrectionGrams")
+        foodRecord.remainingCorrectionDate = record.date(for: "remainingCorrectionDate")
+        foodRecord.notes = record.string(for: "notes") ?? foodRecord.notes
+        foodRecord.expenseId = record.string(for: "expenseId").flatMap(UUID.init(uuidString:))
+        foodRecord.calculationModeRaw = record.string(for: "calculationModeRaw") ?? foodRecord.calculationModeRaw
+        foodRecord.executorId = record.string(for: "executorId")
+        foodRecord.pet = try petReference(from: record, context: context)
+        return result
     }
 
     private static func applyPetWeightLog(
@@ -761,6 +854,10 @@ nonisolated enum CloudSyncRecordApplier {
             if let model = try fetchHuman(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
+        case String(describing: Event.self):
+            if let model = try fetchEvent(id: localRecordUUID, context: context) {
+                context.delete(model)
+            }
         case String(describing: PetCareLog.self):
             if let model = try fetchPetCareLog(id: localRecordUUID, context: context) {
                 context.delete(model)
@@ -783,6 +880,10 @@ nonisolated enum CloudSyncRecordApplier {
             }
         case String(describing: PetExpenseLog.self):
             if let model = try fetchPetExpenseLog(id: localRecordUUID, context: context) {
+                context.delete(model)
+            }
+        case String(describing: PetFoodRecord.self):
+            if let model = try fetchPetFoodRecord(id: localRecordUUID, context: context) {
                 context.delete(model)
             }
         case String(describing: PetWeightLog.self):
@@ -825,6 +926,14 @@ nonisolated enum CloudSyncRecordApplier {
     private static func fetchHuman(id: UUID, context: ModelContext) throws -> Human? {
         var descriptor = FetchDescriptor<Human>(
             predicate: #Predicate<Human> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchEvent(id: UUID, context: ModelContext) throws -> Event? {
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
@@ -873,6 +982,14 @@ nonisolated enum CloudSyncRecordApplier {
     private static func fetchPetExpenseLog(id: UUID, context: ModelContext) throws -> PetExpenseLog? {
         var descriptor = FetchDescriptor<PetExpenseLog>(
             predicate: #Predicate<PetExpenseLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetFoodRecord(id: UUID, context: ModelContext) throws -> PetFoodRecord? {
+        var descriptor = FetchDescriptor<PetFoodRecord>(
+            predicate: #Predicate<PetFoodRecord> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
@@ -1036,6 +1153,16 @@ private extension CKRecord {
         }
         if let value = self[key] as? NSDate {
             return value as Date
+        }
+        return nil
+    }
+
+    nonisolated func stringList(for key: String) -> [String]? {
+        if let value = self[key] as? [String] {
+            return value
+        }
+        if let value = self[key] as? NSArray {
+            return value.compactMap { $0 as? String }
         }
         return nil
     }

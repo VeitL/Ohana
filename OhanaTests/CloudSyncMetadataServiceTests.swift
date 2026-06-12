@@ -553,6 +553,72 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordSerializerBuildsFeedingScheduleAndFoodRecordPayloads() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let pet = Pet(name: "Momo")
+        pet.id = uuid("33333333-3333-4333-8333-333333333333")
+        let event = Event(
+            title: "Breakfast",
+            startDate: Date(timeIntervalSinceReferenceDate: 45),
+            endDate: Date(timeIntervalSinceReferenceDate: 60),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        event.id = uuid("44444444-4444-4444-8444-444444444444")
+        event.recurrenceDays = 1
+        event.completedOccurrences = ["100", "200"]
+        event.assigneeId = "human-1"
+        event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        event.foodKindRaw = FeedFoodKind.dry.rawValue
+        event.feedAmountGrams = 45
+        event.feedPlanGroupId = "plan-1"
+        let foodRecord = PetFoodRecord(
+            brand: "Acme",
+            dailyGrams: 45,
+            totalGrams: 1200,
+            foodKind: .dry,
+            purchaseDate: Date(timeIntervalSinceReferenceDate: 35),
+            startDate: Date(timeIntervalSinceReferenceDate: 40),
+            pet: pet,
+            executorId: "human-1",
+            expenseId: uuid("55555555-5555-4555-8555-555555555555"),
+            calculationMode: .autoFeeder
+        )
+        foodRecord.id = uuid("66666666-6666-4666-8666-666666666666")
+        foodRecord.remainingCorrectionGrams = 900
+        foodRecord.remainingCorrectionDate = Date(timeIntervalSinceReferenceDate: 50)
+        foodRecord.notes = "structured stock"
+
+        let eventState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: Event.self),
+            localRecordId: event.id,
+            householdId: householdId,
+            context: context
+        )
+        let recordState = try CloudSyncMetadataService.markModified(
+            entityName: String(describing: PetFoodRecord.self),
+            localRecordId: foodRecord.id,
+            householdId: householdId,
+            context: context
+        )
+        let eventPayload = try CloudSyncRecordSerializer.payload(for: event, state: eventState)
+        let foodPayload = try CloudSyncRecordSerializer.payload(for: foodRecord, state: recordState)
+
+        #expect(CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: Event.self)))
+        #expect(CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: PetFoodRecord.self)))
+        #expect(eventPayload.fields["title"]?.stringValue == "Breakfast")
+        #expect(eventPayload.fields["completedOccurrences"]?.stringListValue == ["100", "200"])
+        #expect(eventPayload.fields["feedRuleKindRaw"]?.stringValue == FeedRuleKind.manualReminder.rawValue)
+        #expect(foodPayload.fields["brand"]?.stringValue == "Acme")
+        #expect(foodPayload.fields["petId"]?.stringValue == normalized(pet.id))
+        #expect(foodPayload.fields["expenseId"]?.stringValue == "55555555-5555-4555-8555-555555555555")
+        #expect(foodPayload.fields["calculationModeRaw"]?.stringValue == FeedStockCalculationMode.autoFeeder.rawValue)
+    }
+
+    @MainActor
     @Test func recordSerializerBuildsPetScopedCareLogPayloads() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -2353,6 +2419,115 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
+    @Test func recordApplierInsertsAndUpdatesRemoteFeedingScheduleAndFoodRecord() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petId = uuid("33333333-3333-4333-8333-333333333333")
+        let eventId = uuid("44444444-4444-4444-8444-444444444444")
+        let recordId = uuid("66666666-6666-4666-8666-666666666666")
+        let pet = Pet(name: "Momo")
+        pet.id = petId
+        context.insert(pet)
+        let startDate = Date(timeIntervalSinceReferenceDate: 2470)
+        let correctionDate = Date(timeIntervalSinceReferenceDate: 2480)
+
+        let eventRecord = try makeRecordPayload(
+            entityName: String(describing: Event.self),
+            recordType: String(describing: Event.self),
+            localRecordId: eventId,
+            householdId: householdId,
+            fields: [
+                "title": .string("Remote breakfast"),
+                "startDate": .date(startDate),
+                "isAllDay": .bool(false),
+                "eventType": .string(EventType.foodChange.rawValue),
+                "relatedEntityType": .string(EntityKind.pet.rawValue),
+                "relatedEntityId": .string(normalized(petId)),
+                "recurrenceDays": .int(1),
+                "isCompleted": .bool(false),
+                "completedOccurrences": .stringList(["2470"]),
+                "createdAt": .date(startDate),
+                "feedRuleKindRaw": .string(FeedRuleKind.manualReminder.rawValue),
+                "foodKindRaw": .string(FeedFoodKind.dry.rawValue),
+                "feedAmountGrams": .double(45),
+                "feedPlanGroupId": .string("plan-remote")
+            ]
+        ).makeCKRecord()
+        let foodRecord = try makeRecordPayload(
+            entityName: String(describing: PetFoodRecord.self),
+            recordType: String(describing: PetFoodRecord.self),
+            localRecordId: recordId,
+            householdId: householdId,
+            fields: [
+                "brand": .string("Acme"),
+                "dailyGrams": .double(45),
+                "totalGrams": .double(1200),
+                "foodKindRaw": .string(FeedFoodKind.dry.rawValue),
+                "startDate": .date(startDate),
+                "remainingCorrectionGrams": .double(900),
+                "remainingCorrectionDate": .date(correctionDate),
+                "notes": .string("remote stock"),
+                "expenseId": .string("55555555-5555-4555-8555-555555555555"),
+                "calculationModeRaw": .string(FeedStockCalculationMode.autoFeeder.rawValue),
+                "executorId": .string("human-1"),
+                "petId": .string(normalized(petId))
+            ]
+        ).makeCKRecord()
+
+        let eventInsert = try CloudSyncRecordApplier.apply(eventRecord, context: context)
+        let foodInsert = try CloudSyncRecordApplier.apply(foodRecord, context: context)
+        let event = try #require(try fetchEvent(id: eventId, context: context))
+        let stock = try #require(try fetchPetFoodRecord(id: recordId, context: context))
+
+        #expect(eventInsert == .inserted(entityName: "Event", localRecordId: normalized(eventId)))
+        #expect(foodInsert == .inserted(entityName: "PetFoodRecord", localRecordId: normalized(recordId)))
+        #expect(event.title == "Remote breakfast")
+        #expect(event.completedOccurrences == ["2470"])
+        #expect(event.feedAmountGrams == 45)
+        #expect(stock.brand == "Acme")
+        #expect(stock.remainingCorrectionGrams == 900)
+        #expect(stock.expenseId == uuid("55555555-5555-4555-8555-555555555555"))
+        #expect(stock.pet?.id == petId)
+
+        let updatedEventRecord = try makeRecordPayload(
+            entityName: String(describing: Event.self),
+            recordType: String(describing: Event.self),
+            localRecordId: eventId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 2490),
+            fields: [
+                "title": .string("Remote dinner"),
+                "feedAmountGrams": .double(60),
+                "completedOccurrences": .stringList(["2470", "2490"])
+            ]
+        ).makeCKRecord()
+        let updatedFoodRecord = try makeRecordPayload(
+            entityName: String(describing: PetFoodRecord.self),
+            recordType: String(describing: PetFoodRecord.self),
+            localRecordId: recordId,
+            householdId: householdId,
+            lastModifiedAt: Date(timeIntervalSinceReferenceDate: 2491),
+            fields: [
+                "brand": .string("Acme Plus"),
+                "remainingCorrectionGrams": .double(700),
+                "petId": .string(normalized(petId))
+            ]
+        ).makeCKRecord()
+
+        let eventUpdate = try CloudSyncRecordApplier.apply(updatedEventRecord, context: context)
+        let foodUpdate = try CloudSyncRecordApplier.apply(updatedFoodRecord, context: context)
+
+        #expect(eventUpdate == .updated(entityName: "Event", localRecordId: normalized(eventId)))
+        #expect(foodUpdate == .updated(entityName: "PetFoodRecord", localRecordId: normalized(recordId)))
+        #expect(event.title == "Remote dinner")
+        #expect(event.feedAmountGrams == 60)
+        #expect(event.completedOccurrences == ["2470", "2490"])
+        #expect(stock.brand == "Acme Plus")
+        #expect(stock.remainingCorrectionGrams == 700)
+    }
+
+    @MainActor
     @Test func cloudSyncAppliedLegacySharedCareRecordsCleanOnceAndUploadCleanPayloads() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -2910,6 +3085,14 @@ struct CloudSyncMetadataServiceTests {
         return try context.fetch(descriptor).first
     }
 
+    private func fetchEvent(id: UUID, context: ModelContext) throws -> Event? {
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     private func fetchPetCareLog(id: UUID, context: ModelContext) throws -> PetCareLog? {
         var descriptor = FetchDescriptor<PetCareLog>(
             predicate: #Predicate<PetCareLog> { $0.id == id }
@@ -2929,6 +3112,14 @@ struct CloudSyncMetadataServiceTests {
     private func fetchPetWalkLog(id: UUID, context: ModelContext) throws -> PetWalkLog? {
         var descriptor = FetchDescriptor<PetWalkLog>(
             predicate: #Predicate<PetWalkLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private func fetchPetFoodRecord(id: UUID, context: ModelContext) throws -> PetFoodRecord? {
+        var descriptor = FetchDescriptor<PetFoodRecord>(
+            predicate: #Predicate<PetFoodRecord> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

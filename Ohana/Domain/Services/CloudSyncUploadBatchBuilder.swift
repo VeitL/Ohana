@@ -75,6 +75,8 @@ nonisolated enum CloudSyncUploadBatchBuilder {
             try fetchPet(id: localRecordId, context: context)
         case String(describing: Human.self):
             try fetchHuman(id: localRecordId, context: context)
+        case String(describing: Event.self):
+            try fetchEvent(id: localRecordId, context: context)
         case String(describing: PetCareLog.self):
             try fetchPetCareLog(id: localRecordId, context: context)
         case String(describing: PetPottyLog.self):
@@ -87,6 +89,8 @@ nonisolated enum CloudSyncUploadBatchBuilder {
             try fetchPetWalkLog(id: localRecordId, context: context)
         case String(describing: PetExpenseLog.self):
             try fetchPetExpenseLog(id: localRecordId, context: context)
+        case String(describing: PetFoodRecord.self):
+            try fetchPetFoodRecord(id: localRecordId, context: context)
         case String(describing: PetWeightLog.self):
             try fetchPetWeightLog(id: localRecordId, context: context)
         case String(describing: SharedCareSession.self):
@@ -119,6 +123,14 @@ nonisolated enum CloudSyncUploadBatchBuilder {
     private static func fetchHuman(id: UUID, context: ModelContext) throws -> Human? {
         var descriptor = FetchDescriptor<Human>(
             predicate: #Predicate<Human> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchEvent(id: UUID, context: ModelContext) throws -> Event? {
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
@@ -167,6 +179,14 @@ nonisolated enum CloudSyncUploadBatchBuilder {
     private static func fetchPetExpenseLog(id: UUID, context: ModelContext) throws -> PetExpenseLog? {
         var descriptor = FetchDescriptor<PetExpenseLog>(
             predicate: #Predicate<PetExpenseLog> { $0.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func fetchPetFoodRecord(id: UUID, context: ModelContext) throws -> PetFoodRecord? {
+        var descriptor = FetchDescriptor<PetFoodRecord>(
+            predicate: #Predicate<PetFoodRecord> { $0.id == id }
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first

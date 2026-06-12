@@ -255,7 +255,7 @@ struct IslandFoodDashboardSnapshot {
     }
 }
 
-struct IslandFoodDashboardSnapshotRevision: Equatable {
+struct IslandFoodDashboardInputRevision: Equatable {
     let petRevision: Int
     let eventRevision: Int
     let feedingLedgerRevision: Int
@@ -263,7 +263,6 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
     let foodRecordRevision: Int
     let sharedSessionRevision: Int
     let selectedPetRawValue: String
-    let timeRevision: Int
 
     static func make(
         pets: [Pet],
@@ -272,10 +271,9 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
         allFeedingLedgerEvents: [CareLedgerEvent],
         legacyStockCareLogs: [PetCareLog],
         allFoodRecords: [PetFoodRecord],
-        allSharedCareSessions: [SharedCareSession],
-        now: Date
-    ) -> IslandFoodDashboardSnapshotRevision {
-        IslandFoodDashboardSnapshotRevision(
+        allSharedCareSessions: [SharedCareSession]
+    ) -> IslandFoodDashboardInputRevision {
+        IslandFoodDashboardInputRevision(
             petRevision: revisionHash(pets.prefix(80)) { hasher, pet in
                 hasher.combine(pet.id)
                 hasher.combine(pet.name)
@@ -328,9 +326,13 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
                 hasher.combine(session.stockOwnerPetId)
                 hasher.combine(session.totalAmountGrams)
             },
-            selectedPetRawValue: selectedPetId?.uuidString ?? "all",
-            timeRevision: Int(now.timeIntervalSince1970 / 60)
+            selectedPetRawValue: selectedPetId?.uuidString ?? "all"
         )
+    }
+
+    func shouldReplayChart(comparedTo oldValue: IslandFoodDashboardInputRevision) -> Bool {
+        selectedPetRawValue != oldValue.selectedPetRawValue ||
+            feedingLedgerRevision != oldValue.feedingLedgerRevision
     }
 
     private static func revisionHash<Element>(
@@ -345,6 +347,35 @@ struct IslandFoodDashboardSnapshotRevision: Equatable {
         }
         hasher.combine(count)
         return hasher.finalize()
+    }
+}
+
+struct IslandFoodDashboardSnapshotRevision: Equatable {
+    let inputRevision: IslandFoodDashboardInputRevision
+    let timeRevision: Int
+
+    static func make(
+        pets: [Pet],
+        selectedPetId: UUID?,
+        allEvents: [Event],
+        allFeedingLedgerEvents: [CareLedgerEvent],
+        legacyStockCareLogs: [PetCareLog],
+        allFoodRecords: [PetFoodRecord],
+        allSharedCareSessions: [SharedCareSession],
+        now: Date
+    ) -> IslandFoodDashboardSnapshotRevision {
+        IslandFoodDashboardSnapshotRevision(
+            inputRevision: IslandFoodDashboardInputRevision.make(
+                pets: pets,
+                selectedPetId: selectedPetId,
+                allEvents: allEvents,
+                allFeedingLedgerEvents: allFeedingLedgerEvents,
+                legacyStockCareLogs: legacyStockCareLogs,
+                allFoodRecords: allFoodRecords,
+                allSharedCareSessions: allSharedCareSessions
+            ),
+            timeRevision: Int(now.timeIntervalSince1970 / 60)
+        )
     }
 }
 

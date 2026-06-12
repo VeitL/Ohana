@@ -290,6 +290,26 @@ struct ManualFeedCommandTests {
         #expect(FeedStockExpenseLink.expenseId(for: record) == record.expenseId)
         #expect(!record.notes.contains("stockCalculationMode:"))
         #expect(!record.notes.contains("stockExpense:"))
+
+        let expenseId = try #require(record.expenseId)
+        let recordState = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: PetFoodRecord.self),
+            localRecordId: record.id,
+            context: context
+        ))
+        let expenseState = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: PetExpenseLog.self),
+            localRecordId: expenseId,
+            context: context
+        ))
+        let petState = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: Pet.self),
+            localRecordId: pet.id,
+            context: context
+        ))
+        #expect(recordState.hasPendingLocalChanges)
+        #expect(expenseState.hasPendingLocalChanges)
+        #expect(petState.hasPendingLocalChanges)
     }
 
     @Test func legacyFoodStockMetadataStillReadsFromNotes() throws {
@@ -347,6 +367,12 @@ struct ManualFeedCommandTests {
         #expect(log.autoFeedDedupKey == FeedLogMetadata.autoDedupKey(eventId: event.id, scheduledAt: event.startDate))
         #expect(log.isAutoFeedLogEntry)
         #expect(!log.note.contains(FeedLogMetadata.autoFeedNotePrefix))
+        let state = try #require(try CloudSyncMetadataService.state(
+            entityName: String(describing: PetCareLog.self),
+            localRecordId: log.id,
+            context: context
+        ))
+        #expect(state.hasPendingLocalChanges)
     }
 
     @Test func legacyAutoFeedDedupKeyStillReadsFromNote() throws {
@@ -401,6 +427,19 @@ struct ManualFeedCommandTests {
         #expect(events.allSatisfy { !$0.feedPlanGroupId.isEmpty })
         #expect(FeedOperatingMode.resolved(pet: petA, allEvents: events, now: now) == .manualReminder)
         #expect(FeedOperatingMode.resolved(pet: petB, allEvents: events, now: now) == .manualReminder)
+
+        let feedEvents = events.filter {
+            FeedRuleMetadata.isManualReminderEvent($0, pet: petA) ||
+                FeedRuleMetadata.isManualReminderEvent($0, pet: petB)
+        }
+        for event in feedEvents {
+            let state = try #require(try CloudSyncMetadataService.state(
+                entityName: String(describing: Event.self),
+                localRecordId: event.id,
+                context: context
+            ))
+            #expect(state.hasPendingLocalChanges)
+        }
     }
 
     @Test func switchFeedModeToAutoFeederDeactivatesManualReminders() throws {

@@ -48,6 +48,7 @@ enum FeedingPlanWriter {
             event.feedAmountGrams = meal.grams
             event.feedPlanGroupId = feedPlanGroupId
             context.insert(event)
+            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: startDate)
             createdEvents.append(event)
 
             if draft.kind == .manualReminder {
@@ -57,6 +58,7 @@ enum FeedingPlanWriter {
 
         if let firstAmount = meals.first(where: { $0.grams > 0 })?.grams {
             pet.dailyPortionGrams = firstAmount
+            CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: now)
         }
 
         context.safeSave()
@@ -206,6 +208,8 @@ enum FeedingPlanWriter {
         if recordToUpdate == nil {
             context.insert(record)
         }
+        CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: now)
+        CloudSyncMutationRecorder.markModified(record, context: context, modifiedAt: finalOpenDate)
         context.safeSave()
 
         if rebuildReminder {
@@ -243,6 +247,7 @@ enum FeedingPlanWriter {
     ) -> Reminder? {
         record.remainingCorrectionGrams = max(0, remainingGrams)
         record.remainingCorrectionDate = now
+        CloudSyncMutationRecorder.markModified(record, context: context, modifiedAt: now)
         context.safeSave()
         guard let pet = record.pet else { return nil }
         guard rebuildReminder else { return nil }
@@ -295,6 +300,7 @@ enum FeedingPlanWriter {
             event.foodKindRaw = foodKind.rawValue
             let reminder = Reminder(event: event, scheduledAt: reminderDate)
             context.insert(event)
+            CloudSyncMutationRecorder.markModified(event, context: context, modifiedAt: reminderDate)
             context.insert(reminder)
             reminders.append(reminder)
         }
@@ -361,6 +367,7 @@ enum FeedingPlanWriter {
 
     @MainActor
     private static func deleteEvent(_ event: Event, context: ModelContext) {
+        CloudSyncMutationRecorder.markDeleted(event, context: context)
         for reminder in event.reminders {
             OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
             context.delete(reminder)

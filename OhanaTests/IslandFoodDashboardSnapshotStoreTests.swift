@@ -60,6 +60,54 @@ struct IslandFoodDashboardSnapshotStoreTests {
         #expect(selectedSnapshot.petSummaries.map(\.id) == [momo.id])
     }
 
+    @Test func dashboardInputRevisionChangesWhenContentChangesWithoutCountChanges() {
+        let now = fixedDate()
+        let pet = Pet(name: "Momo", species: "猫")
+        let ledger = feedingLedgerEvent(pet: pet, date: now, grams: 40)
+        let foodRecord = PetFoodRecord(
+            brand: "Dry",
+            totalGrams: 1000,
+            foodKind: .dry,
+            startDate: now,
+            pet: pet
+        )
+        let original = IslandFoodDashboardInputRevision.make(
+            pets: [pet],
+            selectedPetId: nil,
+            allEvents: [],
+            allFeedingLedgerEvents: [ledger],
+            legacyStockCareLogs: [],
+            allFoodRecords: [foodRecord],
+            allSharedCareSessions: []
+        )
+
+        ledger.amountValue = 55
+        let changedLedger = IslandFoodDashboardInputRevision.make(
+            pets: [pet],
+            selectedPetId: nil,
+            allEvents: [],
+            allFeedingLedgerEvents: [ledger],
+            legacyStockCareLogs: [],
+            allFoodRecords: [foodRecord],
+            allSharedCareSessions: []
+        )
+        foodRecord.remainingCorrectionGrams = 700
+        let changedStock = IslandFoodDashboardInputRevision.make(
+            pets: [pet],
+            selectedPetId: nil,
+            allEvents: [],
+            allFeedingLedgerEvents: [ledger],
+            legacyStockCareLogs: [],
+            allFoodRecords: [foodRecord],
+            allSharedCareSessions: []
+        )
+
+        #expect(changedLedger != original)
+        #expect(changedStock != changedLedger)
+        #expect(changedLedger.shouldReplayChart(comparedTo: original))
+        #expect(!changedStock.shouldReplayChart(comparedTo: changedLedger))
+    }
+
     private func fixedDate() -> Date {
         Date(timeIntervalSince1970: 1_800_000_000)
     }

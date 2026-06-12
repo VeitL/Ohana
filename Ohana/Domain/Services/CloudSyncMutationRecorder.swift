@@ -59,6 +59,22 @@ enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markModified(
+        _ event: Event,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markModified(
+            entityName: String(describing: Event.self),
+            localRecordId: event.id,
+            householdId: sharedHouseholdId(context: context, now: modifiedAt),
+            fallbackHouseholdId: uuid(from: event.relatedEntityId) ?? event.id,
+            modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markModified(
         _ log: PetCareLog,
         context: ModelContext,
         modifiedAt: Date = Date()
@@ -152,6 +168,15 @@ enum CloudSyncMutationRecorder {
         modifiedAt: Date = Date()
     ) -> CloudSyncRecordState? {
         markPetScopedModified(PetExpenseLog.self, id: log.id, petId: log.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ record: PetFoodRecord,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(PetFoodRecord.self, id: record.id, petId: record.pet?.id, context: context, modifiedAt: modifiedAt)
     }
 
     @discardableResult
@@ -288,6 +313,24 @@ enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markDeleted(
+        _ event: Event,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: Event.self),
+            localRecordId: event.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: uuid(from: event.relatedEntityId) ?? event.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
         _ log: PetCareLog,
         pet: Pet?,
         context: ModelContext,
@@ -388,6 +431,24 @@ enum CloudSyncMutationRecorder {
             PetExpenseLog.self,
             id: log.id,
             petId: pet?.id ?? log.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ record: PetFoodRecord,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            PetFoodRecord.self,
+            id: record.id,
+            petId: pet?.id ?? record.pet?.id,
             context: context,
             deletedAt: deletedAt,
             deletedByHumanId: deletedByHumanId

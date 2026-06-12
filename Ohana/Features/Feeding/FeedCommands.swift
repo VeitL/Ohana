@@ -29,6 +29,7 @@ enum ManualFeedCommand {
     ) {
         pet.mainFoodKind = foodKind
         pet.dailyPortionGrams = defaultEnabled ? grams : 0
+        CloudSyncMutationRecorder.markModified(pet, context: context)
         context.safeSave()
     }
 
@@ -351,6 +352,8 @@ enum SaveFoodStockCommand {
             expense.executorId = payerId
             expense.pet = pet
             FeedStockExpenseLink.applyExpenseLink(to: record, expenseId: expense.id)
+            CloudSyncMutationRecorder.markModified(expense, context: context, modifiedAt: date)
+            CloudSyncMutationRecorder.markModified(record, context: context, modifiedAt: date)
             context.safeSave()
             if createdExpense {
                 careLedger.record(
@@ -379,6 +382,7 @@ enum SaveFoodStockCommand {
             }
         } else if let previousExpenseId {
             FeedStockExpenseLink.applyExpenseLink(to: record, expenseId: previousExpenseId)
+            CloudSyncMutationRecorder.markModified(record, context: context)
             context.safeSave()
         }
     }
@@ -445,6 +449,7 @@ enum StockReminderSettingsCommand {
     ) -> FeedStockCommandResult {
         pet.foodReminderEnabled = enabled
         pet.foodReminderAdvanceDays = advanceDays
+        CloudSyncMutationRecorder.markModified(pet, context: context)
         context.safeSave()
         return FeedStockCommandResult(
             stockReminders: FeedingPlanWriter.rebuildFoodStockReminders(
@@ -535,6 +540,7 @@ enum FeedRecordCommand {
         allEvents: [Event],
         context: ModelContext
     ) -> FeedStockCommandResult {
+        CloudSyncMutationRecorder.markDeleted(record, pet: pet, context: context)
         context.delete(record)
         context.safeSave()
         return FeedStockCommandResult(
@@ -580,6 +586,7 @@ enum SetMainFoodKindCommand {
     static func run(pet: Pet, foodKind: FeedFoodKind, context: ModelContext) {
         guard pet.mainFoodKind != foodKind else { return }
         pet.mainFoodKind = foodKind
+        CloudSyncMutationRecorder.markModified(pet, context: context)
         context.safeSave()
     }
 }

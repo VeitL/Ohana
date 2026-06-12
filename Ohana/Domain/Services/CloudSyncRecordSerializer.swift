@@ -41,6 +41,7 @@ nonisolated enum CloudSyncRecordFieldValue: Equatable, Sendable {
     case double(Double)
     case bool(Bool)
     case date(Date)
+    case stringList([String])
     case assetData(Data)
 
     var stringValue: String? {
@@ -60,6 +61,11 @@ nonisolated enum CloudSyncRecordFieldValue: Equatable, Sendable {
 
     var dateValue: Date? {
         guard case let .date(value) = self else { return nil }
+        return value
+    }
+
+    var stringListValue: [String]? {
+        guard case let .stringList(value) = self else { return nil }
         return value
     }
 }
@@ -98,6 +104,8 @@ nonisolated struct CloudSyncRecordPayload: Equatable, Sendable {
                 record[fieldName] = bool as CKRecordValue
             case let .date(date):
                 record[fieldName] = date as CKRecordValue
+            case let .stringList(strings):
+                record[fieldName] = strings as NSArray
             case let .assetData(data):
                 guard let assetFileURLProvider else {
                     throw CloudSyncRecordSerializationError.missingAssetFileURL(fieldName: fieldName)
@@ -242,6 +250,8 @@ nonisolated enum CloudSyncRecordSerializer {
             CloudSyncRecordState.normalizedRecordId(pet.id)
         case let human as Human:
             CloudSyncRecordState.normalizedRecordId(human.id)
+        case let event as Event:
+            CloudSyncRecordState.normalizedRecordId(event.id)
         case let log as PetCareLog:
             CloudSyncRecordState.normalizedRecordId(log.id)
         case let log as PetPottyLog:
@@ -254,6 +264,8 @@ nonisolated enum CloudSyncRecordSerializer {
             CloudSyncRecordState.normalizedRecordId(log.id)
         case let log as PetExpenseLog:
             CloudSyncRecordState.normalizedRecordId(log.id)
+        case let record as PetFoodRecord:
+            CloudSyncRecordState.normalizedRecordId(record.id)
         case let log as PetWeightLog:
             CloudSyncRecordState.normalizedRecordId(log.id)
         case let session as SharedCareSession:
@@ -278,6 +290,8 @@ nonisolated enum CloudSyncRecordSerializer {
             petFields(pet)
         case let human as Human:
             humanFields(human)
+        case let event as Event:
+            eventFields(event)
         case let log as PetCareLog:
             petCareLogFields(log)
         case let log as PetPottyLog:
@@ -290,6 +304,8 @@ nonisolated enum CloudSyncRecordSerializer {
             petWalkLogFields(log)
         case let log as PetExpenseLog:
             petExpenseLogFields(log)
+        case let record as PetFoodRecord:
+            petFoodRecordFields(record)
         case let log as PetWeightLog:
             petWeightLogFields(log)
         case let session as SharedCareSession:
@@ -404,6 +420,29 @@ nonisolated enum CloudSyncRecordSerializer {
         return fields
     }
 
+    private static func eventFields(_ event: Event) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(event.id)),
+            "title": .string(event.title),
+            "startDate": .date(event.startDate),
+            "endDate": optionalDate(event.endDate),
+            "isAllDay": .bool(event.isAllDay),
+            "eventType": .string(event.eventType),
+            "relatedEntityType": .string(event.relatedEntityType),
+            "relatedEntityId": .string(event.relatedEntityId),
+            "recurrenceDays": .int(event.recurrenceDays),
+            "recurrenceEndDate": optionalDate(event.recurrenceEndDate),
+            "isCompleted": .bool(event.isCompleted),
+            "completedOccurrences": .stringList(event.completedOccurrences),
+            "createdAt": .date(event.createdAt),
+            "assigneeId": optionalString(event.assigneeId),
+            "feedRuleKindRaw": .string(event.feedRuleKindRaw),
+            "foodKindRaw": .string(event.foodKindRaw),
+            "feedAmountGrams": .double(event.feedAmountGrams),
+            "feedPlanGroupId": .string(event.feedPlanGroupId)
+        ]
+    }
+
     private static func petCareLogFields(_ log: PetCareLog) -> [String: CloudSyncRecordFieldValue] {
         [
             "id": .string(CloudSyncRecordState.normalizedRecordId(log.id)),
@@ -494,6 +533,25 @@ nonisolated enum CloudSyncRecordSerializer {
             "sharedSessionId": .string(log.sharedSessionId),
             "executorId": optionalString(log.executorId),
             "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
+        ]
+    }
+
+    private static func petFoodRecordFields(_ record: PetFoodRecord) -> [String: CloudSyncRecordFieldValue] {
+        [
+            "id": .string(CloudSyncRecordState.normalizedRecordId(record.id)),
+            "brand": .string(record.brand),
+            "dailyGrams": .double(record.dailyGrams),
+            "totalGrams": .double(record.totalGrams),
+            "foodKindRaw": .string(record.foodKindRaw),
+            "purchaseDate": optionalDate(record.purchaseDate),
+            "startDate": .date(record.startDate),
+            "remainingCorrectionGrams": optionalDouble(record.remainingCorrectionGrams),
+            "remainingCorrectionDate": optionalDate(record.remainingCorrectionDate),
+            "notes": .string(record.notes),
+            "expenseId": optionalString(record.expenseId.map(CloudSyncRecordState.normalizedRecordId)),
+            "calculationModeRaw": .string(record.calculationModeRaw),
+            "executorId": optionalString(record.executorId),
+            "petId": optionalString(record.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
         ]
     }
 
