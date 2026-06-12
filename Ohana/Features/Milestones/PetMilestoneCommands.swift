@@ -163,17 +163,13 @@ enum PetMilestoneCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetMilestoneDeleteCommandResult {
-        let ledgerEvents = ledgerEvents(for: milestone, context: context)
-        for event in ledgerEvents {
-            context.delete(event)
-        }
         let milestoneID = milestone.id
-        context.delete(milestone)
+        RecycleBinService.moveToRecycleBin(milestone, context: context)
         context.safeSave()
         return PetMilestoneDeleteCommandResult(
             petID: pet.id,
             milestoneID: milestoneID,
-            removedLedgerEventIDs: ledgerEvents.map(\.id)
+            removedLedgerEventIDs: []
         )
     }
 

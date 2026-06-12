@@ -69,10 +69,10 @@ struct PetProtectionDashboardState {
     let nextInsuranceDate: Date?
 
     init(pet: Pet, calendar: Calendar = .current, now: Date = Date()) {
-        let documents = pet.documents.filter { doc in
+        let documents = pet.documents.activeRecycleBinItems.filter { doc in
             doc.documentCategory != .vaccine && doc.documentCategory != .insurance
         }
-        let insurances = pet.insurances
+        let insurances = pet.insurances.activeRecycleBinItems
 
         documentCount = documents.count
         insuranceCount = insurances.count

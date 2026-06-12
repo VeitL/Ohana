@@ -130,6 +130,10 @@ final class PetMedication {
     var isActive: Bool
     var remainingAmount: Double = 0
     var createdAt: Date
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     @Relationship(inverse: \Pet.medications) var pet: Pet?
 

@@ -1060,7 +1060,11 @@ struct HomeCommandExecutorTests {
         #expect(deletedPolicy.policyID == policyID)
         #expect(deletedPolicy.petID == petID)
         #expect(try (context.fetch(FetchDescriptor<InsuranceClaim>())).isEmpty)
-        #expect(try (context.fetch(FetchDescriptor<PetInsurance>())).isEmpty)
+        let policies = try context.fetch(FetchDescriptor<PetInsurance>())
+        #expect(policies.count == 1)
+        #expect(policies.first?.id == policyID)
+        #expect(policies.first?.trashedAt != nil)
+        #expect(policies.activeRecycleBinItems.isEmpty)
     }
 
     @MainActor
@@ -1698,8 +1702,13 @@ struct HomeCommandExecutorTests {
         #expect(result.kind == EntityKind.pet.rawValue)
         #expect(result.removedRelatedEventIDs == [relatedEvent.id])
         #expect(result.removedQuickActionCount == 2)
-        #expect(pets.isEmpty)
-        #expect(events.map(\.id) == [unrelatedEvent.id])
+        #expect(pets.count == 1)
+        #expect(pets.first?.id == pet.id)
+        #expect(pets.first?.trashedAt != nil)
+        #expect(pets.activeRecycleBinItems.isEmpty)
+        #expect(events.count == 2)
+        #expect(relatedEvent.trashedAt != nil)
+        #expect(Set(events.activeRecycleBinItems.map(\.id)) == Set([unrelatedEvent.id]))
         #expect(quickActionJSON.contains("\"id\":\"keep\"") || quickActionJSON.contains("\"id\": \"keep\""))
         #expect(!quickActionJSON.contains("remove-pet"))
         #expect(!quickActionJSON.contains("remove-entity"))
@@ -1727,8 +1736,9 @@ struct HomeCommandExecutorTests {
         #expect(result.clearsActiveHumanID == true)
         #expect(result.requiresAccountSwitch == true)
         #expect(result.requiresReplacementHuman == false)
-        #expect(humans.count == 1)
-        #expect(humans.first?.id == remainingHuman.id)
+        #expect(humans.count == 2)
+        #expect(activeHuman.trashedAt != nil)
+        #expect(Set(humans.activeRecycleBinItems.map(\.id)) == Set([remainingHuman.id]))
     }
 
     @MainActor
@@ -1749,7 +1759,9 @@ struct HomeCommandExecutorTests {
         #expect(result.clearsActiveHumanID == true)
         #expect(result.requiresAccountSwitch == false)
         #expect(result.requiresReplacementHuman == true)
-        #expect(humans.isEmpty)
+        #expect(humans.count == 1)
+        #expect(human.trashedAt != nil)
+        #expect(humans.activeRecycleBinItems.isEmpty)
     }
 
     @MainActor
@@ -1766,7 +1778,9 @@ struct HomeCommandExecutorTests {
         #expect(result.entityID == plant.id)
         #expect(result.kind == EntityKind.plant.rawValue)
         #expect(result.removedRelatedEventIDs.isEmpty)
-        #expect(plants.isEmpty)
+        #expect(plants.count == 1)
+        #expect(plant.trashedAt != nil)
+        #expect(plants.activeRecycleBinItems.isEmpty)
     }
 
     @MainActor
@@ -2170,13 +2184,21 @@ struct HomeCommandExecutorTests {
 
         let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
         let events = try context.fetch(FetchDescriptor<Event>())
+        let batches = try context.fetch(FetchDescriptor<RecycleBinBatch>())
+        let batch = try #require(batches.first)
+        let expectedBatchID = RecycleBinService.petActivityClearBatchId(batch.id)
         #expect(humanResult.entityID == human.id)
         #expect(humanResult.action == "passed.mark")
         #expect(human.passedAwayDate == passedDate)
         #expect(clearResult.entityID == pet.id)
         #expect(clearResult.action == "records.clear")
-        #expect(careLogs.isEmpty)
-        #expect(events.isEmpty)
+        #expect(careLogs.count == 1)
+        #expect(events.count == 1)
+        #expect(careLogs.first?.trashedAt != nil)
+        #expect(events.first?.trashedAt != nil)
+        #expect(careLogs.first?.trashBatchId == expectedBatchID)
+        #expect(events.first?.trashBatchId == expectedBatchID)
+        #expect(batches.count == 1)
     }
 
     @MainActor
@@ -2678,8 +2700,10 @@ struct HomeCommandExecutorTests {
         logs = try context.fetch(FetchDescriptor<PetPhotoLog>())
         #expect(deleteResult.petID == pet.id)
         #expect(deleteResult.photoID == photo.id)
-        #expect(logs.count == 1)
-        #expect(!logs.contains { $0.id == photo.id })
+        #expect(logs.count == 2)
+        #expect(photo.trashedAt != nil)
+        #expect(logs.activeRecycleBinItems.count == 1)
+        #expect(!logs.activeRecycleBinItems.contains { $0.id == photo.id })
     }
 
     @MainActor
@@ -2716,7 +2740,11 @@ struct HomeCommandExecutorTests {
         let deleted = executor.deletePhoto(photo, pet: pet, note: "test.photo.delete")
         let deleteMutation = try #require(revisionCenter.lastMutation)
         #expect(deleted.photoID == photo.id)
-        #expect(try context.fetch(FetchDescriptor<PetPhotoLog>()).isEmpty)
+        let photos = try context.fetch(FetchDescriptor<PetPhotoLog>())
+        #expect(photos.count == 1)
+        #expect(photos.first?.id == photo.id)
+        #expect(photos.first?.trashedAt != nil)
+        #expect(photos.activeRecycleBinItems.isEmpty)
         #expect(deleteMutation.command == .petPhotoDelete(petID: pet.id, photoID: photo.id))
         #expect(deleteMutation.note == "test.photo.delete")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 3)
@@ -4844,7 +4872,11 @@ struct HomeCommandExecutorTests {
         let deleted = executor.deleteDocument(document, pet: pet, note: "test.document.delete")
         let deleteMutation = try #require(revisionCenter.lastMutation)
         #expect(deleted.documentID == document.id)
-        #expect(try context.fetch(FetchDescriptor<PetDocument>()).isEmpty)
+        let documents = try context.fetch(FetchDescriptor<PetDocument>())
+        #expect(documents.count == 1)
+        #expect(documents.first?.id == document.id)
+        #expect(documents.first?.trashedAt != nil)
+        #expect(documents.activeRecycleBinItems.isEmpty)
         #expect(deleteMutation.command == .petDocumentDelete(petID: pet.id, documentID: document.id))
         #expect(deleteMutation.note == "test.document.delete")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 3)
@@ -5289,9 +5321,12 @@ struct HomeCommandExecutorTests {
         ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(deleteResult.petID == pet.id)
         #expect(deleteResult.milestoneID == createdMilestone.id)
-        #expect(deleteResult.removedLedgerEventIDs == [ledger.id])
-        #expect(milestones.isEmpty)
-        #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
+        #expect(deleteResult.removedLedgerEventIDs.isEmpty)
+        #expect(milestones.count == 1)
+        #expect(milestones.first?.id == createdMilestone.id)
+        #expect(milestones.first?.trashedAt != nil)
+        #expect(milestones.activeRecycleBinItems.isEmpty)
+        #expect(Set(ledgerEvents.map(\.id)) == Set([ledger.id, unrelatedLedger.id]))
     }
 
     @MainActor
@@ -5470,9 +5505,12 @@ struct HomeCommandExecutorTests {
         let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
         #expect(deleteResult.petID == pet.id)
         #expect(deleteResult.documentID == document.id)
-        #expect(deleteResult.removedLedgerEventIDs == [ledger.id])
-        #expect(documents.isEmpty)
-        #expect(ledgerEvents.map(\.id) == [unrelatedLedger.id])
+        #expect(deleteResult.removedLedgerEventIDs.isEmpty)
+        #expect(documents.count == 1)
+        #expect(documents.first?.id == document.id)
+        #expect(documents.first?.trashedAt != nil)
+        #expect(documents.activeRecycleBinItems.isEmpty)
+        #expect(Set(ledgerEvents.map(\.id)) == Set([ledger.id, unrelatedLedger.id]))
     }
 
     @MainActor
@@ -6924,7 +6962,7 @@ struct HomeCommandExecutorTests {
     }
 
     private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV69.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

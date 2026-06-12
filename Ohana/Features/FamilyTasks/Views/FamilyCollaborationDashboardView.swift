@@ -156,7 +156,7 @@ struct FamilyCollaborationDashboardView: View {
     var latestActivity: [CollaborationActivity] {
         pets.flatMap { pet in
             var rows: [CollaborationActivity] = []
-            rows += pet.careLogs.map {
+            rows += pet.careLogs.activeRecycleBinItems.map {
                 CollaborationActivity(
                     title: careTitle($0.careType),
                     petName: pet.name,
@@ -166,7 +166,7 @@ struct FamilyCollaborationDashboardView: View {
                     tint: Color(hex: $0.careType.accentColorHex)
                 )
             }
-            rows += pet.pottyLogs.map {
+            rows += pet.pottyLogs.activeRecycleBinItems.map {
                 CollaborationActivity(
                     title: pottyTitle($0.pottyType),
                     petName: pet.name,
@@ -176,7 +176,7 @@ struct FamilyCollaborationDashboardView: View {
                     tint: Color.goYellow
                 )
             }
-            rows += pet.walkLogs.map {
+            rows += pet.walkLogs.activeRecycleBinItems.map {
                 CollaborationActivity(
                     title: l.tr(zh: "遛狗", en: "Walk", de: "Gassi"),
                     petName: pet.name,

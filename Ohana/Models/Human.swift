@@ -169,6 +169,10 @@ final class Human {
     var appleUserIdentifier: String
     var notes: String
     var createdAt: Date
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
     // U13: 国籍 / 城市字段
     var nationality: String
     var city: String

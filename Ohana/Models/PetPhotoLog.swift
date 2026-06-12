@@ -15,6 +15,10 @@ final class PetPhotoLog {
     var date: Date
     var note: String // 可选备注（最多 140 字）
     var createdAt: Date
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
     /// 记录位置（0,0 表示未记录）
     var locationLatitude: Double
     var locationLongitude: Double

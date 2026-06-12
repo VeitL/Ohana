@@ -843,22 +843,26 @@ struct SharedPetActionRecorderTests {
 
         let sessions = try context.fetch(FetchDescriptor<SharedCareSession>())
         let session = try #require(sessions.first)
-        let remainingFeedLogs = try context.fetch(FetchDescriptor<PetCareLog>()).filter { $0.careType == .feeding }
-        let remainingLog = try #require(remainingFeedLogs.first)
-        let sessionState = try CloudSyncMetadataService.state(
-            entityName: "SharedCareSession",
-            localRecordId: session.id,
+        let feedLogs = try context.fetch(FetchDescriptor<PetCareLog>()).filter { $0.careType == .feeding }
+        let visibleFeedLogs = feedLogs.filter { $0.trashedAt == nil && $0.pet?.trashedAt == nil }
+        let visibleLog = try #require(visibleFeedLogs.first)
+        let petState = try #require(try CloudSyncMetadataService.state(
+            entityName: "Pet",
+            localRecordId: first.id,
             context: context
-        )
+        ))
 
         #expect(sessions.count == 1)
-        #expect(session.targetPetIds == [second.id.uuidString])
-        #expect(session.stockOwnerPetId == second.id.uuidString)
-        #expect(session.totalAmountGrams == remainingLog.amountGrams)
-        #expect(remainingFeedLogs.count == 1)
-        #expect(second.remainingFoodGrams == 940)
-        #expect(sessionState?.hasPendingLocalChanges == true)
-        #expect(sessionState?.isDeletionTombstone == false)
+        #expect(session.targetPetIds == [first.id.uuidString, second.id.uuidString])
+        #expect(session.stockOwnerPetId == first.id.uuidString)
+        #expect(session.totalAmountGrams == 120)
+        #expect(feedLogs.count == 2)
+        #expect(visibleFeedLogs.count == 1)
+        #expect(visibleLog.pet?.id == second.id)
+        #expect(FeedStockCalculator.stockDeductionAmount(for: visibleLog, pet: second, sharedCareSessions: sessions) == 0)
+        #expect(second.remainingFoodGrams == 1000)
+        #expect(petState.hasPendingLocalChanges)
+        #expect(petState.isDeletionTombstone == false)
     }
 
     @Test func deletingSharedSessionCascadeRemovesChildrenLedgerAndMarksTombstone() throws {

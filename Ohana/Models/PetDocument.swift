@@ -60,6 +60,10 @@ final class PetDocument {
     var notes: String
     var reminderDate: Date?
     var cost: Double
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
     @Attribute(.externalStorage) var attachmentData: Data? // Keeping for backward compatibility temporarily
     var attachmentFilename: String // Keeping for backward compatibility temporarily
 

@@ -101,8 +101,20 @@ struct PetAllFeaturesSheet: View {
     }
 
     private var archiveSnapshot: ArchiveMemorySnapshot { ArchiveMemorySnapshot(pet: pet) }
+    private var activeCareLogs: [PetCareLog] { pet.careLogs.activeRecycleBinItems }
+    private var activePottyLogs: [PetPottyLog] { pet.pottyLogs.activeRecycleBinItems }
+    private var activeWalkLogs: [PetWalkLog] { pet.walkLogs.activeRecycleBinItems }
+    private var activeWeightLogs: [PetWeightLog] { pet.weightLogs.activeRecycleBinItems }
+    private var activeExpenseLogs: [PetExpenseLog] { pet.expenseLogs.activeRecycleBinItems }
+    private var activeHealthLogs: [PetHealthLog] { pet.healthLogs.activeRecycleBinItems }
+    private var activePhotoLogs: [PetPhotoLog] { pet.photoLogs.activeRecycleBinItems }
+    private var activeMilestones: [PetMilestone] { pet.milestones.activeRecycleBinItems }
+    private var activeMedications: [PetMedication] { pet.medications.activeRecycleBinItems }
+    private var activeInsurances: [PetInsurance] { pet.insurances.activeRecycleBinItems }
+    private var activeDocuments: [PetDocument] { pet.documents.activeRecycleBinItems }
+
     private var protectionDocumentCount: Int {
-        pet.documents.count(where: { doc in
+        activeDocuments.count(where: { doc in
             doc.documentCategory != .vaccine && doc.documentCategory != .insurance
         })
     }
@@ -194,7 +206,7 @@ struct PetAllFeaturesSheet: View {
             item(
                 id: "hygiene",
                 title: l.tr(zh: "清洁护理", en: "Care", de: "Pflege"),
-                value: "\(pet.careLogs.count(where: { $0.careType != .feeding }))",
+                value: "\(activeCareLogs.count(where: { $0.careType != .feeding }))",
                 subtitle: hygieneSub,
                 icon: "bubbles.and.sparkles.fill",
                 tint: Color.goTeal,
@@ -232,7 +244,7 @@ struct PetAllFeaturesSheet: View {
             item(
                 id: "health",
                 title: l.tr(zh: "健康", en: "Health", de: "Gesundheit"),
-                value: "\(pet.healthLogs.count)",
+                value: "\(activeHealthLogs.count)",
                 subtitle: healthSub,
                 icon: "cross.fill",
                 tint: Color.goRed,
@@ -264,7 +276,7 @@ struct PetAllFeaturesSheet: View {
             item(
                 id: "moments",
                 title: l.tr(zh: "记录中心", en: "Moments", de: "Momente"),
-                value: "\(pet.photoLogs.count)",
+                value: "\(activePhotoLogs.count)",
                 subtitle: momentsSub,
                 icon: "sparkles",
                 tint: Color(hex: "EC4899"),
@@ -273,7 +285,7 @@ struct PetAllFeaturesSheet: View {
             item(
                 id: "documents",
                 title: l.tr(zh: "证件保障", en: "Documents", de: "Dokumente"),
-                value: "\(protectionDocumentCount + pet.insurances.count)",
+                value: "\(protectionDocumentCount + activeInsurances.count)",
                 subtitle: documentsSub,
                 icon: "doc.fill",
                 tint: Color(hex: "94A3B8"),
@@ -344,61 +356,61 @@ struct PetAllFeaturesSheet: View {
     }
 
     private var healthSub: String {
-        pet.healthLogs.isEmpty
+        activeHealthLogs.isEmpty
             ? l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge")
-            : l.tr(zh: "\(pet.healthLogs.count)条记录", en: "\(pet.healthLogs.count) records", de: "\(pet.healthLogs.count) Einträge")
+            : l.tr(zh: "\(activeHealthLogs.count)条记录", en: "\(activeHealthLogs.count) records", de: "\(activeHealthLogs.count) Einträge")
     }
 
     private var weightSub: String {
-        pet.weightLogs.isEmpty
+        activeWeightLogs.isEmpty
             ? l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge")
-            : l.tr(zh: "\(pet.weightLogs.count)条记录", en: "\(pet.weightLogs.count) records", de: "\(pet.weightLogs.count) Einträge")
+            : l.tr(zh: "\(activeWeightLogs.count)条记录", en: "\(activeWeightLogs.count) records", de: "\(activeWeightLogs.count) Einträge")
     }
 
     private var medSub: String {
-        let count = pet.medications.count(where: { $0.isActiveToday })
+        let count = activeMedications.count(where: { $0.isActiveToday })
         return count > 0
             ? l.tr(zh: "当前\(count)种药物", en: "\(count) active meds", de: "\(count) aktive Medikamente")
             : l.tr(zh: "暂无用药", en: "No medication", de: "Keine Medikamente")
     }
 
     private var foodSub: String {
-        let count = pet.careLogs.count(where: { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) })
+        let count = activeCareLogs.count(where: { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) })
         return count > 0
             ? l.tr(zh: "今日喂食\(count)次", en: "\(count) feeds today", de: "\(count) Fütterungen heute")
             : l.tr(zh: "今日未喂食", en: "No feed today", de: "Heute kein Futter")
     }
 
     private var hygieneSub: String {
-        let count = pet.careLogs.count(where: { $0.careType != .feeding })
+        let count = activeCareLogs.count(where: { $0.careType != .feeding })
         return count > 0
             ? l.tr(zh: "\(count)条护理记录", en: "\(count) care logs", de: "\(count) Pflegeeinträge")
             : l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge")
     }
 
     private var walkSub: String {
-        pet.walkLogs.isEmpty
+        activeWalkLogs.isEmpty
             ? l.tr(zh: "暂无记录", en: "No walks yet", de: "Noch keine Gassi-Runden")
-            : l.tr(zh: "\(pet.walkLogs.count)次遛狗", en: "\(pet.walkLogs.count) walks", de: "\(pet.walkLogs.count) Runden")
+            : l.tr(zh: "\(activeWalkLogs.count)次遛狗", en: "\(activeWalkLogs.count) walks", de: "\(activeWalkLogs.count) Runden")
     }
 
     private var pottySub: String {
-        let count = pet.pottyLogs.count(where: { Calendar.current.isDateInToday($0.date) })
+        let count = activePottyLogs.count(where: { Calendar.current.isDateInToday($0.date) })
         return count > 0
             ? l.tr(zh: "今日\(count)次", en: "\(count) today", de: "\(count) heute")
             : l.tr(zh: "今日暂无记录", en: "No logs today", de: "Heute keine Einträge")
     }
 
     private var expenseSub: String {
-        pet.expenseLogs.isEmpty
+        activeExpenseLogs.isEmpty
             ? l.tr(zh: "暂无记录", en: "No expenses", de: "Keine Ausgaben")
-            : l.tr(zh: "\(pet.expenseLogs.count)条花费记录", en: "\(pet.expenseLogs.count) expense logs", de: "\(pet.expenseLogs.count) Ausgaben")
+            : l.tr(zh: "\(activeExpenseLogs.count)条花费记录", en: "\(activeExpenseLogs.count) expense logs", de: "\(activeExpenseLogs.count) Ausgaben")
     }
 
     private var momentsSub: String {
-        pet.photoLogs.isEmpty
+        activePhotoLogs.isEmpty
             ? l.tr(zh: "暂无时刻", en: "No moments", de: "Keine Momente")
-            : l.tr(zh: "\(pet.photoLogs.count)个时刻", en: "\(pet.photoLogs.count) moments", de: "\(pet.photoLogs.count) Momente")
+            : l.tr(zh: "\(activePhotoLogs.count)个时刻", en: "\(activePhotoLogs.count) moments", de: "\(activePhotoLogs.count) Momente")
     }
 
     private var basicInfoSub: String {
@@ -409,7 +421,7 @@ struct PetAllFeaturesSheet: View {
 
     private var documentsSub: String {
         let documentCount = protectionDocumentCount
-        let insuranceCount = pet.insurances.count
+        let insuranceCount = activeInsurances.count
         if documentCount > 0 || insuranceCount > 0 {
             return l.tr(zh: "\(documentCount)份证件 · \(insuranceCount)份保险", en: "\(documentCount) docs · \(insuranceCount) policies", de: "\(documentCount) Dokumente · \(insuranceCount) Policen")
         }
@@ -423,45 +435,45 @@ struct PetAllFeaturesSheet: View {
     }
 
     private var achievementsSub: String {
-        pet.milestones.isEmpty
+        activeMilestones.isEmpty
             ? l.tr(zh: "暂无成就", en: "No awards", de: "Keine Erfolge")
-            : l.tr(zh: "\(pet.milestones.count)个里程碑", en: "\(pet.milestones.count) milestones", de: "\(pet.milestones.count) Meilensteine")
+            : l.tr(zh: "\(activeMilestones.count)个里程碑", en: "\(activeMilestones.count) milestones", de: "\(activeMilestones.count) Meilensteine")
     }
 
     private var todayFeedMetric: String {
-        "\(pet.careLogs.count(where: { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) }))"
+        "\(activeCareLogs.count(where: { $0.careType == .feeding && Calendar.current.isDateInToday($0.date) }))"
     }
 
     private var todayPottyMetric: String {
-        "\(pet.pottyLogs.count(where: { Calendar.current.isDateInToday($0.date) }))"
+        "\(activePottyLogs.count(where: { Calendar.current.isDateInToday($0.date) }))"
     }
 
     private var latestWeightText: String {
-        guard let latest = pet.weightLogs.max(by: { $0.date < $1.date }) else { return "--" }
+        guard let latest = activeWeightLogs.max(by: { $0.date < $1.date }) else { return "--" }
         return String(format: "%.1f", latest.weightInKg)
     }
 
     private var weekWalkText: String {
         let start = Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date()
-        let km = pet.walkLogs
+        let km = activeWalkLogs
             .filter { $0.startDate >= start }
             .reduce(0.0) { $0 + $1.distanceMeters } / 1000
         return km >= 10 ? String(format: "%.0fkm", km) : String(format: "%.1fkm", km)
     }
 
     private var expenseMetric: String {
-        AppCurrency.formatCompact(pet.expenseLogs.reduce(0.0) { $0 + $1.amount })
+        AppCurrency.formatCompact(activeExpenseLogs.reduce(0.0) { $0 + $1.amount })
     }
 
     private var timelineCount: Int {
-        pet.photoLogs.count + pet.milestones.count + pet.healthLogs.count + pet.weightLogs.count
+        activePhotoLogs.count + activeMilestones.count + activeHealthLogs.count + activeWeightLogs.count
     }
 
     private var todayCareCount: Int {
         let calendar = Calendar.current
-        return pet.careLogs.count(where: { calendar.isDateInToday($0.date) })
-            + pet.pottyLogs.count(where: { calendar.isDateInToday($0.date) })
-            + pet.walkLogs.count(where: { calendar.isDateInToday($0.startDate) })
+        return activeCareLogs.count(where: { calendar.isDateInToday($0.date) })
+            + activePottyLogs.count(where: { calendar.isDateInToday($0.date) })
+            + activeWalkLogs.count(where: { calendar.isDateInToday($0.startDate) })
     }
 
     private var archiveScore: Int { archiveSnapshot.score }
@@ -498,19 +510,26 @@ struct ArchiveMemorySnapshot {
     let nextStep: ArchiveMemoryNextStep
 
     init(pet: Pet) {
+        let healthLogs = pet.healthLogs.activeRecycleBinItems
+        let weightLogs = pet.weightLogs.activeRecycleBinItems
+        let photoLogs = pet.photoLogs.activeRecycleBinItems
+        let milestones = pet.milestones.activeRecycleBinItems
+        let documents = pet.documents.activeRecycleBinItems
+        let insurances = pet.insurances.activeRecycleBinItems
+        let medications = pet.medications.activeRecycleBinItems
         let hasBasicProfile = Self.hasBasicProfile(pet)
-        let hasHealthOrWeight = !pet.healthLogs.isEmpty || !pet.weightLogs.isEmpty
-        let hasMemory = !pet.photoLogs.isEmpty || !pet.milestones.isEmpty
-        let hasProtectionDocument = !pet.documents.isEmpty
-        let hasProtection = hasProtectionDocument || !pet.insurances.isEmpty || !pet.medications.isEmpty
-        let hasContinuity = pet.currentStreak > 0 || !pet.milestones.isEmpty
+        let hasHealthOrWeight = !healthLogs.isEmpty || !weightLogs.isEmpty
+        let hasMemory = !photoLogs.isEmpty || !milestones.isEmpty
+        let hasProtectionDocument = !documents.isEmpty
+        let hasProtection = hasProtectionDocument || !insurances.isEmpty || !medications.isEmpty
+        let hasContinuity = pet.currentStreak > 0 || !milestones.isEmpty
         let checks = [hasBasicProfile, hasHealthOrWeight, hasMemory, hasProtection, hasContinuity]
 
         self.score = checks.count(where: { $0 })
         self.total = checks.count
         self.nextStep = Self.nextStep(
             hasBasicProfile: hasBasicProfile,
-            hasDocumentsOrInsurance: hasProtectionDocument || !pet.insurances.isEmpty,
+            hasDocumentsOrInsurance: hasProtectionDocument || !insurances.isEmpty,
             hasMemory: hasMemory,
             hasHealthOrWeight: hasHealthOrWeight
         )

@@ -25,12 +25,12 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
     }
 
     func testCloudSyncTombstoneDefaultLandsOnLatestLightweightSchema() {
-        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV68.self))
+        XCTAssertEqual(ObjectIdentifier(ArkMigrationPlan.schemas.last!), ObjectIdentifier(ArkSchemaV69.self))
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
     }
 
     @MainActor
-    func testV67StoreOpensThroughV68LightweightMigrationWithoutLosingCloudSyncRecord() throws {
+    func testV67StoreOpensThroughLatestLightweightMigrationWithoutLosingCloudSyncRecord() throws {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("OhanaModelsMigrationTests-\(UUID().uuidString)", isDirectory: true)
         let storeURL = directoryURL.appendingPathComponent("Models.sqlite")
@@ -53,7 +53,7 @@ final class SharedModelContainerRecoveryTests: XCTestCase {
         }
 
         do {
-            let schema = Schema(ArkSchemaV68.models)
+            let schema = Schema(ArkSchemaV69.models)
             let config = ModelConfiguration("ModelsMigrationTarget", schema: schema, url: storeURL, cloudKitDatabase: .none)
             let container = try ModelContainer(
                 for: schema,

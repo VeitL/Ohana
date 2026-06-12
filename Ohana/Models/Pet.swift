@@ -129,6 +129,10 @@ final class Pet {
     var isShared: Bool
     var ckRecordName: String
     var createdAt: Date
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
     var notes: String
     // Phase 9 扩展字段
     var coatColor: String

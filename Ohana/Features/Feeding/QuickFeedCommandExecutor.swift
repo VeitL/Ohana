@@ -69,7 +69,10 @@ struct QuickFeedCommandExecutor {
     func fullCareLogs(petID: UUID, feedingType: String, fallback: [PetCareLog]) -> [PetCareLog] {
         var descriptor = FetchDescriptor<PetCareLog>(
             predicate: #Predicate<PetCareLog> { log in
-                log.type == feedingType && log.pet?.id == petID
+                log.type == feedingType &&
+                    log.pet?.id == petID &&
+                    log.trashedAt == nil &&
+                    log.pet?.trashedAt == nil
             },
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
@@ -108,7 +111,9 @@ struct QuickFeedCommandExecutor {
     func fullFoodRecords(petID: UUID, fallback: [PetFoodRecord]) -> [PetFoodRecord] {
         var descriptor = FetchDescriptor<PetFoodRecord>(
             predicate: #Predicate<PetFoodRecord> { record in
-                record.pet?.id == petID
+                record.pet?.id == petID &&
+                    record.trashedAt == nil &&
+                    record.pet?.trashedAt == nil
             },
             sortBy: [SortDescriptor(\.startDate, order: .reverse)]
         )
@@ -123,6 +128,9 @@ struct QuickFeedCommandExecutor {
 
     func latestAllEvents(fallback: [Event]) -> [Event] {
         let descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.trashedAt == nil
+            },
             sortBy: [SortDescriptor(\Event.startDate)]
         )
         return fetchQuickFeedModelsOrLog(

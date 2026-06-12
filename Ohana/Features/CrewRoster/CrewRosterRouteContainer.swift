@@ -21,8 +21,8 @@ struct CrewRosterOverlayRouteContainer: View {
         if OnlineFeatureGate.allows(.onlineCollaboration) {
             CrewRosterCollaborationRouteDataContainer(
                 initialMode: initialMode,
-                pets: pets,
-                humans: humans,
+                pets: pets.activeRecycleBinItems,
+                humans: humans.activeRecycleBinItems,
                 onSelectPet: onSelectPet,
                 onSelectHuman: onSelectHuman,
                 onAddEntity: onAddEntity,
@@ -37,8 +37,8 @@ struct CrewRosterOverlayRouteContainer: View {
         } else {
             CrewRosterOverlay(
                 initialMode: .members,
-                pets: pets,
-                humans: humans,
+                pets: pets.activeRecycleBinItems,
+                humans: humans.activeRecycleBinItems,
                 plants: [],
                 pendingReminders: [],
                 familyTasks: [],

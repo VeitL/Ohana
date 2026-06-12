@@ -271,10 +271,10 @@ extension FamilyCollaborationDashboardView {
     func missingCareLabels(for pet: Pet) -> [String] {
         let cal = Calendar.current
         func careDone(_ type: CareType) -> Bool {
-            pet.careLogs.contains { $0.careType == type && cal.isDateInToday($0.date) }
+            pet.careLogs.activeRecycleBinItems.contains { $0.careType == type && cal.isDateInToday($0.date) }
         }
         func pottyDone() -> Bool {
-            pet.pottyLogs.contains { cal.isDateInToday($0.date) } || careDone(.litter)
+            pet.pottyLogs.activeRecycleBinItems.contains { cal.isDateInToday($0.date) } || careDone(.litter)
         }
 
         let species = pet.species.lowercased()
@@ -292,7 +292,7 @@ extension FamilyCollaborationDashboardView {
             [
                 (careTitle(.feeding), careDone(.feeding)),
                 (careTitle(.watering), careDone(.watering)),
-                (l.tr(zh: "遛狗", en: "Walk", de: "Gassi"), pet.walkLogs.contains { cal.isDateInToday($0.startDate) })
+                (l.tr(zh: "遛狗", en: "Walk", de: "Gassi"), pet.walkLogs.activeRecycleBinItems.contains { cal.isDateInToday($0.startDate) })
             ]
         } else if isCat {
             [

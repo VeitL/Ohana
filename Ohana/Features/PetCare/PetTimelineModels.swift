@@ -76,7 +76,7 @@ enum PetTimelineItemsBuilder {
         var list: [UnifiedLogItem] = []
         let sessionsById = sharedSessionLookup(sharedCareSessions)
 
-        for w in pet.walkLogs {
+        for w in pet.walkLogs.activeRecycleBinItems {
             let session = sharedSession(for: w.sharedSessionId, in: sessionsById)
             list.append(UnifiedLogItem(id: session?.id ?? w.id, date: w.startDate, type: "walk",
                                        title: walkTitle(for: w, session: session, l: l),
@@ -84,20 +84,20 @@ enum PetTimelineItemsBuilder {
                                        iconName: "figure.walk", color: .goPrimary,
                                        sharedSessionID: session?.id))
         }
-        for p in pet.pottyLogs {
+        for p in pet.pottyLogs.activeRecycleBinItems {
             let session = sharedSession(for: p.sharedSessionId, in: sessionsById)
             list.append(UnifiedLogItem(id: session?.id ?? p.id, date: p.date, type: "potty",
                                        title: "噗噗 · \(p.pottyType.emoji)\(p.pottyType.rawValue)", subtitle: "",
                                        iconName: "drop.fill", color: .goOrange,
                                        sharedSessionID: session?.id))
         }
-        for h in pet.healthLogs {
+        for h in pet.healthLogs.activeRecycleBinItems {
             list.append(UnifiedLogItem(id: h.id, date: h.date, type: "health",
                                        title: "\(h.healthLogType.emoji) \(h.type)",
                                        subtitle: h.note.isEmpty ? (h.vetName.isEmpty ? "" : h.vetName) : h.note,
                                        iconName: "heart.text.clipboard", color: .goTeal))
         }
-        for e in pet.expenseLogs {
+        for e in pet.expenseLogs.activeRecycleBinItems {
             let session = sharedSession(for: e.sharedSessionId, in: sessionsById)
             let visibleNote = SharedCareMetadata.visibleNote(e.note)
             list.append(UnifiedLogItem(id: session?.id ?? e.id, date: e.date, type: "expense",
@@ -106,12 +106,12 @@ enum PetTimelineItemsBuilder {
                                        iconName: "\(AppCurrency.systemIconName).fill", color: .goYellow,
                                        sharedSessionID: session?.id))
         }
-        for w in pet.weightLogs {
+        for w in pet.weightLogs.activeRecycleBinItems {
             list.append(UnifiedLogItem(id: w.id, date: w.date, type: "weight",
                                        title: String(format: "体重 %.1f kg", w.weight), subtitle: "",
                                        iconName: "scalemass.fill", color: .goTeal))
         }
-        for c in pet.careLogs {
+        for c in pet.careLogs.activeRecycleBinItems {
             let session = sharedSession(for: c.sharedSessionId, in: sessionsById)
             list.append(UnifiedLogItem(id: session?.id ?? c.id, date: c.date, type: "care",
                                        title: careTitle(for: c, session: session, l: l),
@@ -366,7 +366,7 @@ enum PetTimelineItemsBuilder {
             )
         }
 
-        let milestoneItems = pet.milestones
+        let milestoneItems = pet.milestones.activeRecycleBinItems
             .filter { isVisiblePast($0.date, now: now) }
             .map { milestone in
                 UnifiedLogItem(
@@ -386,7 +386,7 @@ enum PetTimelineItemsBuilder {
     }
 
     private static func groupedPhotoLogs(for pet: Pet, now: Date) -> [[PetPhotoLog]] {
-        let sorted = pet.photoLogs
+        let sorted = pet.photoLogs.activeRecycleBinItems
             .filter { isVisiblePast($0.date, now: now) }
             .sorted { $0.date < $1.date }
         var groups: [[PetPhotoLog]] = []
@@ -411,7 +411,7 @@ enum PetTimelineItemsBuilder {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: now)
         let lifeEnd = pet.passedAwayDate.map { min($0, now) } ?? now
-        let existingMilestones = pet.milestones.filter { isVisiblePast($0.date, now: now) }
+        let existingMilestones = pet.milestones.activeRecycleBinItems.filter { isVisiblePast($0.date, now: now) }
 
         if let birthday = pet.birthday,
            let birthYear = calendar.dateComponents([.year], from: birthday).year,

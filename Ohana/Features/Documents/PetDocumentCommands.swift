@@ -216,17 +216,13 @@ enum PetDocumentCommandService {
         pet: Pet,
         context: ModelContext
     ) -> PetDocumentDeleteCommandResult {
-        let ledgerEvents = ledgerEvents(forLegacyModelName: "PetDocument", id: document.id, context: context)
-        for event in ledgerEvents {
-            context.delete(event)
-        }
         let documentID = document.id
-        context.delete(document)
+        RecycleBinService.moveToRecycleBin(document, context: context)
         context.safeSave()
         return PetDocumentDeleteCommandResult(
             petID: pet.id,
             documentID: documentID,
-            removedLedgerEventIDs: ledgerEvents.map(\.id)
+            removedLedgerEventIDs: []
         )
     }
 

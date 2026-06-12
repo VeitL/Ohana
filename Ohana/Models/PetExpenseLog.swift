@@ -52,6 +52,10 @@ final class PetExpenseLog {
     var sharedSessionId: String = ""
     var executorId: String? // ArkSchemaV11: 花费支付者的 Human.id.uuidString
     var pet: Pet?
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     init(date: Date = Date(), amount: Double = 0, category: ExpenseCategory = .other, note: String = "", pet: Pet? = nil, executorId: String? = nil, sharedSessionId: String = "") {
         self.id = UUID()

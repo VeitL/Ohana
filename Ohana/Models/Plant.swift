@@ -24,6 +24,10 @@ final class Plant {
     var lastFertilizedDate: Date?
     var notes: String
     var createdAt: Date
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     @Relationship(deleteRule: .cascade) var careLogs: [PlantCareLog]
 

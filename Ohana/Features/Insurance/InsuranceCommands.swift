@@ -201,7 +201,7 @@ enum InsurancePolicyCommandService {
     ) -> InsurancePolicyCommandResult {
         let policyID = insurance.id
         let petID = pet.id
-        context.delete(insurance)
+        RecycleBinService.moveToRecycleBin(insurance, context: context)
         context.safeSave()
         return InsurancePolicyCommandResult(
             policyID: policyID,

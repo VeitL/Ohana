@@ -24,6 +24,10 @@ final class PetFoodRecord {
     var calculationModeRaw: String = FeedStockCalculationMode.manualOrPlan.rawValue
     var executorId: String? // ArkSchemaV11: 执行该动作的 Human.id.uuidString
     var pet: Pet?
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     init(
         brand: String = "",

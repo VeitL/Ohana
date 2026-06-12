@@ -57,6 +57,10 @@ final class PetHealthLog {
     var nextCheckupDate: Date? // 下次体检提醒日期（仅体检记录使用）
     var executorId: String? // ArkSchemaV38: 执行该记录的 Human.id.uuidString
     var pet: Pet?
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     init(date: Date = Date(), type: HealthLogType = .general, note: String = "", pet: Pet? = nil, executorId: String? = nil) {
         self.id = UUID()

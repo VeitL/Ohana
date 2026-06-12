@@ -14,7 +14,7 @@ struct AppPetRouteContainer: View {
 
     init(id: UUID, initialTab: PetDetailTab) {
         _pets = Query(filter: #Predicate<Pet> { pet in
-            pet.id == id
+            pet.id == id && pet.trashedAt == nil
         })
         self.initialTab = initialTab
     }
@@ -50,7 +50,7 @@ struct AppHumanRouteContainer: View {
         let humanType = "Human"
         let pendingStatus = "pending"
         _humans = Query(filter: #Predicate<Human> { human in
-            human.id == id
+            human.id == id && human.trashedAt == nil
         })
         _allPendingReminders = Query(
             filter: #Predicate<Reminder> { reminder in
@@ -80,8 +80,8 @@ struct AppHumanRouteContainer: View {
         if let human = humans.first {
             HumanDetailView(
                 human: human,
-                allPets: allPets,
-                allHumans: allHumans,
+                allPets: allPets.activeRecycleBinItems,
+                allHumans: allHumans.activeRecycleBinItems,
                 allPendingReminders: allPendingReminders,
                 allMeds: allMeds,
                 allReports: allReports,

@@ -507,7 +507,7 @@ struct HomeCommandExecutor {
     private func fetchPet(id: UUID) -> Pet? {
         var descriptor = FetchDescriptor<Pet>(
             predicate: #Predicate<Pet> { pet in
-                pet.id == id
+                pet.id == id && pet.trashedAt == nil
             }
         )
         descriptor.fetchLimit = 1
@@ -521,7 +521,7 @@ struct HomeCommandExecutor {
     private func fetchPlant(id: UUID) -> Plant? {
         var descriptor = FetchDescriptor<Plant>(
             predicate: #Predicate<Plant> { plant in
-                plant.id == id
+                plant.id == id && plant.trashedAt == nil
             }
         )
         descriptor.fetchLimit = 1
@@ -549,7 +549,7 @@ struct HomeCommandExecutor {
     private func fetchHuman(id: UUID) -> Human? {
         var descriptor = FetchDescriptor<Human>(
             predicate: #Predicate<Human> { human in
-                human.id == id
+                human.id == id && human.trashedAt == nil
             }
         )
         descriptor.fetchLimit = 1
@@ -565,7 +565,7 @@ struct HomeCommandExecutor {
             FetchDescriptor<Human>(),
             context: modelContext,
             operation: "fetch humans"
-        )
+        ).activeRecycleBinItems
     }
 
     private func fetchCoconutExchangeRequest(id: UUID) -> CoconutExchangeRequest? {

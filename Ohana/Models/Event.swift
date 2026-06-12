@@ -110,6 +110,10 @@ final class Event {
     var foodKindRaw: String = FeedFoodKind.dry.rawValue
     var feedAmountGrams: Double = 0
     var feedPlanGroupId: String = ""
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     @Relationship(deleteRule: .cascade) var reminders: [Reminder]
 

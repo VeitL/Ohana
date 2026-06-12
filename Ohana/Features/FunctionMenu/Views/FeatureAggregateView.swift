@@ -297,36 +297,36 @@ struct FeatureAggregateView: View {
     private func subtitle(for pet: Pet) -> String {
         switch feature {
         case .health:
-            let n = pet.healthLogs.count
+            let n = pet.healthLogs.activeRecycleBinItems.count
             return n > 0 ? "\(n)条记录" : "暂无记录"
         case .medications:
-            let n = pet.medications.count(where: { $0.isActiveToday })
+            let n = pet.medications.activeRecycleBinItems.count(where: { $0.isActiveToday })
             return n > 0 ? "当前\(n)种药物" : "暂无用药"
         case .food:
-            let n = pet.careLogs.count(where: {
+            let n = pet.careLogs.activeRecycleBinItems.count(where: {
                 $0.careType == .feeding && Calendar.current.isDateInToday($0.date)
             })
             return n > 0 ? "今日喂食\(n)次" : "今日未喂食"
         case .hygiene:
-            let n = pet.careLogs.count(where: { $0.careType != .feeding })
+            let n = pet.careLogs.activeRecycleBinItems.count(where: { $0.careType != .feeding })
             return n > 0 ? "\(n)条护理记录" : "暂无记录"
         case .potty:
-            let n = pet.pottyLogs.count(where: { Calendar.current.isDateInToday($0.date) })
+            let n = pet.pottyLogs.activeRecycleBinItems.count(where: { Calendar.current.isDateInToday($0.date) })
             return n > 0 ? "今日\(n)次" : "今日暂无记录"
         case .basicInfo:
             return pet.breed.isEmpty ? pet.species : pet.breed
         case .documents:
-            return "\(pet.documents.count)份证件"
+            return "\(pet.documents.activeRecycleBinItems.count)份证件"
         case .moments:
-            return "\(pet.photoLogs.count)个时刻"
+            return "\(pet.photoLogs.activeRecycleBinItems.count)个时刻"
         case .achievements:
-            return "\(pet.milestones.count)个里程碑"
+            return "\(pet.milestones.activeRecycleBinItems.count)个里程碑"
         case .retention:
             let score = [
-                !pet.weightLogs.isEmpty || !pet.healthLogs.isEmpty,
-                !pet.photoLogs.isEmpty || !pet.milestones.isEmpty,
-                !pet.expenseLogs.isEmpty,
-                !pet.documents.isEmpty || !pet.insurances.isEmpty || !pet.medications.isEmpty,
+                !pet.weightLogs.activeRecycleBinItems.isEmpty || !pet.healthLogs.activeRecycleBinItems.isEmpty,
+                !pet.photoLogs.activeRecycleBinItems.isEmpty || !pet.milestones.activeRecycleBinItems.isEmpty,
+                !pet.expenseLogs.activeRecycleBinItems.isEmpty,
+                !pet.documents.activeRecycleBinItems.isEmpty || !pet.insurances.activeRecycleBinItems.isEmpty || !pet.medications.activeRecycleBinItems.isEmpty,
                 pet.currentStreak > 0
             ].count(where: { $0 })
             return "已完善 \(score)/5 个长期模块"

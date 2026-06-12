@@ -116,6 +116,7 @@ enum PetHygieneCommandService {
         for event in ledgerEvents {
             context.delete(event)
         }
+        CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
         context.delete(log)
         context.safeSave()
         return PetHygieneDeleteCommandResult(

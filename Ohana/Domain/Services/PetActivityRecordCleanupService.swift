@@ -14,6 +14,7 @@ struct PetActivityRecordCleanupResult: Equatable {
     let deletedEventCount: Int
     let cancelledNotificationIDs: [String]
     let didResetStreak: Bool
+    let recycleBatchID: UUID?
 }
 
 @MainActor
@@ -25,9 +26,17 @@ struct PetActivityRecordCleanupService {
     }
 
     @discardableResult
-    func clearActivityRecords(for pet: Pet, context: ModelContext) -> PetActivityRecordCleanupResult {
+    func clearActivityRecords(
+        for pet: Pet,
+        context: ModelContext,
+        now: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> PetActivityRecordCleanupResult {
         let petId = pet.id
         let petIdString = petId.uuidString
+        let batchID = UUID()
+        let batchKey = RecycleBinService.petActivityClearBatchId(batchID)
+        let expiresAt = RecycleBinService.expirationDate(from: now)
         var deletedEventCount = 0
         var cancelledNotificationIDs: [String] = []
 
@@ -38,12 +47,18 @@ struct PetActivityRecordCleanupService {
         )
         do {
             let events = try context.fetch(descriptor)
-            for event in events where event.relatedEntityId == petIdString {
+            for event in events where event.relatedEntityId == petIdString && event.trashedAt == nil {
                 for reminder in event.reminders {
                     notifications.cancel(notificationId: reminder.notificationId)
                     cancelledNotificationIDs.append(reminder.notificationId)
                 }
-                context.delete(event)
+                RecycleBinService.moveToRecycleBin(
+                    event,
+                    now: now,
+                    trashedByHumanId: deletedByHumanId,
+                    batchId: batchKey,
+                    context: context
+                )
                 deletedEventCount += 1
             }
         } catch {
@@ -54,38 +69,66 @@ struct PetActivityRecordCleanupService {
         }
 
         var deletedActivityRecordCount = 0
-        deletedActivityRecordCount += deleteRecords(Array(pet.careLogs), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.pottyLogs), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.weightLogs), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.expenseLogs), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.hygieneLogs), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.walkLogs), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.healthLogs), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.foodRecords), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.milestones), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.medications), context: context)
-        deletedActivityRecordCount += deleteRecords(Array(pet.photoLogs), context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.careLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.pottyLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.weightLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.expenseLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.hygieneLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.walkLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.healthLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.foodRecords), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.milestones), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.medications), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
+        deletedActivityRecordCount += recycleRecords(Array(pet.photoLogs), batchId: batchKey, now: now, deletedByHumanId: deletedByHumanId, context: context)
 
         let didResetStreak = pet.currentStreak != 0 || pet.lastCheckInDate != nil
+        let metadata = PetActivityClearBatchMetadata(pet: pet)
         pet.currentStreak = 0
         pet.lastCheckInDate = nil
+        CloudSyncMutationRecorder.markModified(pet, context: context, modifiedAt: now)
+
+        if deletedEventCount > 0 || deletedActivityRecordCount > 0 || didResetStreak {
+            context.insert(RecycleBinBatch(
+                id: batchID,
+                kindRaw: RecycleBinService.petActivityClearBatchKind,
+                title: "\(pet.name) records cleared",
+                subtitle: "\(deletedActivityRecordCount) records",
+                sourceEntityName: String(describing: Pet.self),
+                sourceEntityId: petId.uuidString,
+                trashedAt: now,
+                trashExpiresAt: expiresAt,
+                trashedByHumanId: deletedByHumanId ?? "",
+                metadataJSON: (try? String(data: JSONEncoder().encode(metadata), encoding: .utf8)) ?? ""
+            ))
+        }
 
         return PetActivityRecordCleanupResult(
             petID: petId,
             deletedActivityRecordCount: deletedActivityRecordCount,
             deletedEventCount: deletedEventCount,
             cancelledNotificationIDs: cancelledNotificationIDs,
-            didResetStreak: didResetStreak
+            didResetStreak: didResetStreak,
+            recycleBatchID: (deletedEventCount > 0 || deletedActivityRecordCount > 0 || didResetStreak) ? batchID : nil
         )
     }
 
-    private func deleteRecords(
-        _ records: [some PersistentModel],
+    private func recycleRecords(
+        _ records: [some PersistentModel & RecycleBinSoftDeletable],
+        batchId: String,
+        now: Date,
+        deletedByHumanId: String?,
         context: ModelContext
     ) -> Int {
-        for record in records {
-            context.delete(record)
+        let activeRecords = records.filter { $0.trashedAt == nil }
+        for record in activeRecords {
+            RecycleBinService.moveToRecycleBin(
+                record,
+                now: now,
+                trashedByHumanId: deletedByHumanId,
+                batchId: batchId,
+                context: context
+            )
         }
-        return records.count
+        return activeRecords.count
     }
 }

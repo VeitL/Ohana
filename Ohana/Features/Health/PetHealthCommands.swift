@@ -385,6 +385,7 @@ enum PetHealthDeleteCommandService {
         context: ModelContext
     ) -> PetHealthDeleteResult {
         let recordID = log.id
+        CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
         context.delete(log)
         context.safeSave()
         return PetHealthDeleteResult(

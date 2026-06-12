@@ -138,6 +138,7 @@ enum PetCareTrackingCommandService {
             context.delete(event)
         }
         if let linkedPotty {
+            CloudSyncMutationRecorder.markDeleted(linkedPotty, pet: pet, context: context)
             context.delete(linkedPotty)
         }
         let sharedSessionId = log.sharedSessionId
@@ -235,6 +236,7 @@ enum PetPottyCommandService {
             context.delete(event)
         }
         let sharedSessionId = log.sharedSessionId
+        CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
         context.delete(log)
         SharedCareSessionMaintenance.reconcileAfterDeletingChild(sharedSessionId: sharedSessionId, context: context)
         context.safeSave()

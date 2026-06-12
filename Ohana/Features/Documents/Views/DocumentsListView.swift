@@ -27,13 +27,13 @@ struct DocumentsListView: View {
     private var state: PetProtectionDashboardState { PetProtectionDashboardState(pet: pet) }
 
     private var sortedDocs: [PetDocument] {
-        pet.documents
+        pet.documents.activeRecycleBinItems
             .filter { $0.documentCategory != .vaccine && $0.documentCategory != .insurance }
             .sorted { ($0.expiryDate ?? .distantFuture) < ($1.expiryDate ?? .distantFuture) }
     }
 
     private var sortedInsurances: [PetInsurance] {
-        pet.insurances.sorted { $0.renewalDate < $1.renewalDate }
+        pet.insurances.activeRecycleBinItems.sorted { $0.renewalDate < $1.renewalDate }
     }
 
     private var showingInlinePopup: Bool {

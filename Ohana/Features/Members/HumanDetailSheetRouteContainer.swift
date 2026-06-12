@@ -37,7 +37,7 @@ struct HumanAllFeaturesRouteContainer: View {
     ) {
         let humanKey = id.uuidString
         _humans = Query(filter: #Predicate<Human> { human in
-            human.id == id
+            human.id == id && human.trashedAt == nil
         })
         _allMeds = Query(
             filter: #Predicate<HumanMedication> { med in
@@ -94,7 +94,7 @@ struct AppHumanDetailSheetRouteContainer: View {
         onHumanDoseTaken: @escaping (UUID) -> Void = { _ in }
     ) {
         _humans = Query(filter: #Predicate<Human> { human in
-            human.id == id
+            human.id == id && human.trashedAt == nil
         })
         self.destination = destination
         self.onMissing = onMissing

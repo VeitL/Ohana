@@ -27,7 +27,7 @@ struct PetMilestoneListView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var sortedMilestones: [PetMilestone] {
-        pet.milestones.sorted { $0.date > $1.date }
+        pet.milestones.activeRecycleBinItems.sorted { $0.date > $1.date }
     }
 
     var body: some View {

@@ -9,8 +9,12 @@ import SwiftUI
 struct PetDocumentsCard: View {
     let pet: Pet
 
+    private var documents: [PetDocument] {
+        pet.documents.activeRecycleBinItems
+    }
+
     private var expiringSoon: [PetDocument] {
-        pet.documents.filter { $0.isExpiringSoon || $0.isExpired }
+        documents.filter { $0.isExpiringSoon || $0.isExpired }
             .sorted { ($0.expiryDate ?? .distantFuture) < ($1.expiryDate ?? .distantFuture) }
     }
 
@@ -29,7 +33,7 @@ struct PetDocumentsCard: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     HStack(spacing: 6) {
-                        Text("\(pet.documents.count) 份")
+                        Text("\(documents.count) 份")
                             .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         Image(systemName: "chevron.right").accessibilityHidden(true)
@@ -56,7 +60,7 @@ struct PetDocumentsCard: View {
                             }
                         }
                     }
-                } else if pet.documents.isEmpty {
+                } else if documents.isEmpty {
                     Text("暂无证件，点击添加")
                         .font(OhanaFont.adaptive(size: 13, weight: .medium))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
@@ -65,14 +69,14 @@ struct PetDocumentsCard: View {
                 } else {
                     // 显示前3份证件概览
                     HStack(spacing: 8) {
-                        ForEach(pet.documents.prefix(5)) { doc in
+                        ForEach(documents.prefix(5)) { doc in
                             Text(doc.documentCategory.emoji)
                                 .font(OhanaFont.adaptive(size: 20))
                                 .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                                 .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous))
                         }
-                        if pet.documents.count > 5 {
-                            Text("+\(pet.documents.count - 5)")
+                        if documents.count > 5 {
+                            Text("+\(documents.count - 5)")
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         }

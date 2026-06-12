@@ -17,6 +17,10 @@ final class PetWeightLog {
     var bcsScore: Int // ArkSchemaV24：BCS 体型评分 1-9，0 = 未评
     var executorId: String? // ArkSchemaV38: 执行该记录的 Human.id.uuidString
     var pet: Pet?
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     init(date: Date = Date(), weight: Double = 0, weightUnit: String = "kg", bcsScore: Int = 0, pet: Pet? = nil, executorId: String? = nil) {
         self.id = UUID()

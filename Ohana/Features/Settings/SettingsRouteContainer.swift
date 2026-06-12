@@ -10,9 +10,9 @@ struct AppAccountSwitcherRouteContainer: View {
 
     var body: some View {
         HumanAccountSwitcherSheet(
-            humans: humans,
-            homePets: pets,
-            homeHumans: humans,
+            humans: humans.activeRecycleBinItems,
+            homePets: pets.activeRecycleBinItems,
+            homeHumans: humans.activeRecycleBinItems,
             homeElectronicPets: electronicPets,
             onSwitched: onSwitched
         )
@@ -30,8 +30,8 @@ struct AppSettingsSheetRouteContainer: View {
     var body: some View {
         SettingsView(
             homeHouseholds: households,
-            homePets: pets,
-            homeHumans: humans,
+            homePets: pets.activeRecycleBinItems,
+            homeHumans: humans.activeRecycleBinItems,
             homeElectronicPets: electronicPets,
             onClose: onClose
         )

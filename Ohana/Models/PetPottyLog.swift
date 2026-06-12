@@ -59,6 +59,10 @@ final class PetPottyLog {
     var walkLogId: String?
     var sharedSessionId: String = ""
     var pet: Pet?
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
 
     init(
         date: Date = Date(),

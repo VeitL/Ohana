@@ -48,7 +48,7 @@ struct SettingsPetManagementSheet: View {
             }
         } message: {
             let name = petToDelete?.name ?? ""
-            Text("请输入「\(name)」确认删除。此操作不可撤销。")
+            Text("请输入「\(name)」确认删除。删除后可在回收站中保留 30 天。")
         }
         .alert("重置 \(petToReset?.name ?? "") 的数据", isPresented: $showingResetPetData) {
             Button("取消", role: .cancel) { petToReset = nil }
@@ -59,7 +59,7 @@ struct SettingsPetManagementSheet: View {
                 petToReset = nil
             }
         } message: {
-            Text("将清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。此操作不可撤销。")
+            Text("将清除该宠物所有日志记录（体重、花费、健康、护理、遛狗、噗噗等），基础信息保留。清除记录会在回收站中保留 30 天。")
         }
     }
 

@@ -16,6 +16,10 @@ final class PetMilestone {
     var emoji: String
     var notes: String
     var pet: Pet?
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
     // FIX 7 (ArkSchemaV17): 里程碑配图
     var photoData: Data?
     // P5: 地址文本（手动填写 或 定位后写入）

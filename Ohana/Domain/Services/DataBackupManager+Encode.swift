@@ -9,9 +9,178 @@ import SwiftData
 nonisolated extension DataBackupManager {
     // MARK: - Encode helpers
 
+    private typealias TrashSnapshot = (
+        id: UUID,
+        trashedAt: Date?,
+        trashExpiresAt: Date?,
+        trashBatchId: String,
+        trashedByHumanId: String
+    )
+
     func d(_ date: Date?) -> String? { date.map { iso.string(from: $0) } }
     func d(_ date: Date) -> String { iso.string(from: date) }
     func nilIfEmpty(_ value: String) -> String? { value.isEmpty ? nil : value }
+
+    func encodeTrashStates(
+        pets: [Pet],
+        humans: [Human],
+        events: [Event],
+        plants: [Plant],
+        careLogs: [PetCareLog],
+        pottyLogs: [PetPottyLog],
+        walkLogs: [PetWalkLog],
+        weightLogs: [PetWeightLog],
+        expenseLogs: [PetExpenseLog],
+        healthLogs: [PetHealthLog],
+        hygieneLogs: [PetHygieneLog],
+        foodRecords: [PetFoodRecord],
+        documents: [PetDocument],
+        milestones: [PetMilestone],
+        photoLogs: [PetPhotoLog],
+        insurances: [PetInsurance],
+        petMedications: [PetMedication]
+    ) -> [TrashStateBackup] {
+        var states: [TrashStateBackup] = []
+        appendTrashStates(pets, entityName: String(describing: Pet.self), to: &states, snapshot: petTrashSnapshot)
+        appendTrashStates(humans, entityName: String(describing: Human.self), to: &states, snapshot: humanTrashSnapshot)
+        appendTrashStates(events, entityName: String(describing: Event.self), to: &states, snapshot: eventTrashSnapshot)
+        appendTrashStates(plants, entityName: String(describing: Plant.self), to: &states, snapshot: plantTrashSnapshot)
+        appendTrashStates(careLogs, entityName: String(describing: PetCareLog.self), to: &states, snapshot: careLogTrashSnapshot)
+        appendTrashStates(pottyLogs, entityName: String(describing: PetPottyLog.self), to: &states, snapshot: pottyLogTrashSnapshot)
+        appendTrashStates(walkLogs, entityName: String(describing: PetWalkLog.self), to: &states, snapshot: walkLogTrashSnapshot)
+        appendTrashStates(weightLogs, entityName: String(describing: PetWeightLog.self), to: &states, snapshot: weightLogTrashSnapshot)
+        appendTrashStates(expenseLogs, entityName: String(describing: PetExpenseLog.self), to: &states, snapshot: expenseLogTrashSnapshot)
+        appendTrashStates(healthLogs, entityName: String(describing: PetHealthLog.self), to: &states, snapshot: healthLogTrashSnapshot)
+        appendTrashStates(hygieneLogs, entityName: String(describing: PetHygieneLog.self), to: &states, snapshot: hygieneLogTrashSnapshot)
+        appendTrashStates(foodRecords, entityName: String(describing: PetFoodRecord.self), to: &states, snapshot: foodRecordTrashSnapshot)
+        appendTrashStates(documents, entityName: String(describing: PetDocument.self), to: &states, snapshot: documentTrashSnapshot)
+        appendTrashStates(milestones, entityName: String(describing: PetMilestone.self), to: &states, snapshot: milestoneTrashSnapshot)
+        appendTrashStates(photoLogs, entityName: String(describing: PetPhotoLog.self), to: &states, snapshot: photoLogTrashSnapshot)
+        appendTrashStates(insurances, entityName: String(describing: PetInsurance.self), to: &states, snapshot: insuranceTrashSnapshot)
+        appendTrashStates(petMedications, entityName: String(describing: PetMedication.self), to: &states, snapshot: medicationTrashSnapshot)
+        return states
+    }
+
+    func encodeRecycleBinBatch(_ batch: RecycleBinBatch) -> RecycleBinBatchBackup {
+        RecycleBinBatchBackup(
+            id: batch.id.uuidString,
+            kindRaw: batch.kindRaw,
+            title: batch.title,
+            subtitle: batch.subtitle,
+            sourceEntityName: batch.sourceEntityName,
+            sourceEntityId: batch.sourceEntityId,
+            trashedAt: d(batch.trashedAt),
+            trashExpiresAt: d(batch.trashExpiresAt),
+            trashedByHumanId: batch.trashedByHumanId,
+            metadataJSON: batch.metadataJSON
+        )
+    }
+
+    private func appendTrashStates<T>(
+        _ values: [T],
+        entityName: String,
+        to states: inout [TrashStateBackup],
+        snapshot: (T) -> TrashSnapshot
+    ) {
+        for value in values {
+            let trash = snapshot(value)
+            guard trash.trashedAt != nil || trash.trashExpiresAt != nil || !trash.trashBatchId.isEmpty else {
+                continue
+            }
+            states.append(TrashStateBackup(
+                entityName: entityName,
+                id: trash.id.uuidString,
+                trashedAt: d(trash.trashedAt),
+                trashExpiresAt: d(trash.trashExpiresAt),
+                trashBatchId: trash.trashBatchId,
+                trashedByHumanId: trash.trashedByHumanId
+            ))
+        }
+    }
+
+    private func petTrashSnapshot(_ value: Pet) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func humanTrashSnapshot(_ value: Human) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func eventTrashSnapshot(_ value: Event) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func plantTrashSnapshot(_ value: Plant) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func careLogTrashSnapshot(_ value: PetCareLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func pottyLogTrashSnapshot(_ value: PetPottyLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func walkLogTrashSnapshot(_ value: PetWalkLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func weightLogTrashSnapshot(_ value: PetWeightLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func expenseLogTrashSnapshot(_ value: PetExpenseLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func healthLogTrashSnapshot(_ value: PetHealthLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func hygieneLogTrashSnapshot(_ value: PetHygieneLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func foodRecordTrashSnapshot(_ value: PetFoodRecord) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func documentTrashSnapshot(_ value: PetDocument) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func milestoneTrashSnapshot(_ value: PetMilestone) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func photoLogTrashSnapshot(_ value: PetPhotoLog) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func insuranceTrashSnapshot(_ value: PetInsurance) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func medicationTrashSnapshot(_ value: PetMedication) -> TrashSnapshot {
+        trashSnapshot(id: value.id, trashedAt: value.trashedAt, trashExpiresAt: value.trashExpiresAt, trashBatchId: value.trashBatchId, trashedByHumanId: value.trashedByHumanId)
+    }
+
+    private func trashSnapshot(
+        id: UUID,
+        trashedAt: Date?,
+        trashExpiresAt: Date?,
+        trashBatchId: String,
+        trashedByHumanId: String
+    ) -> TrashSnapshot {
+        (
+            id: id,
+            trashedAt: trashedAt,
+            trashExpiresAt: trashExpiresAt,
+            trashBatchId: trashBatchId,
+            trashedByHumanId: trashedByHumanId
+        )
+    }
 
     func encodePet(_ p: Pet) -> PetBackup {
         PetBackup(

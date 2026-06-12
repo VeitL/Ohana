@@ -417,6 +417,7 @@ enum DashboardRecordCommandService {
         for event in ledgerEvents {
             context.delete(event)
         }
+        CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context)
         context.delete(log)
         SharedCareSessionMaintenance.reconcileAfterDeletingChild(sharedSessionId: sharedSessionId, context: context)
         context.safeSave()
@@ -460,6 +461,7 @@ enum DashboardRecordCommandService {
         for event in ledgerEvents {
             context.delete(event)
         }
+        markSyncedRecordDeletedIfNeeded(record, context: context)
         context.delete(record)
         context.safeSave()
         return DashboardRecordDeleteCommandResult(
@@ -469,6 +471,21 @@ enum DashboardRecordCommandService {
             recordKind: recordKind,
             removedLedgerEventIDs: ledgerEvents.map(\.id)
         )
+    }
+
+    @MainActor
+    private static func markSyncedRecordDeletedIfNeeded(
+        _ record: some PersistentModel,
+        context: ModelContext
+    ) {
+        switch record {
+        case let log as PetExpenseLog:
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context)
+        case let log as PetWeightLog:
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context)
+        default:
+            break
+        }
     }
 
     @MainActor

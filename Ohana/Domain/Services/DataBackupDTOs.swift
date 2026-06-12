@@ -58,6 +58,8 @@ nonisolated struct OhanaBackup: Codable {
     var gachaDrawLogs: [GachaDrawLogBackup]?
     // App 状态
     var appState: AppStateBackup
+    var trashStates: [TrashStateBackup]? = nil
+    var recycleBinBatches: [RecycleBinBatchBackup]? = nil
 }
 
 // MARK: - AppState
@@ -77,6 +79,28 @@ nonisolated struct ShopConsumableInventoryBackup: Codable {
     var avatar2DExtraPassCount: Int
     var doubleRewardBoostActive: Bool
     var streakShieldExpiry: String?
+}
+
+nonisolated struct TrashStateBackup: Codable {
+    var entityName: String
+    var id: String
+    var trashedAt: String?
+    var trashExpiresAt: String?
+    var trashBatchId: String
+    var trashedByHumanId: String
+}
+
+nonisolated struct RecycleBinBatchBackup: Codable {
+    var id: String
+    var kindRaw: String
+    var title: String
+    var subtitle: String
+    var sourceEntityName: String
+    var sourceEntityId: String
+    var trashedAt: String
+    var trashExpiresAt: String
+    var trashedByHumanId: String
+    var metadataJSON: String
 }
 
 // MARK: - 实体 Backup DTOs

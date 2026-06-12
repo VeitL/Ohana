@@ -37,15 +37,16 @@ struct IslandFoodDashboard: View {
 
         _pets = Query(
             filter: #Predicate<Pet> { pet in
-                pet.passedAwayDate == nil
+                pet.passedAwayDate == nil && pet.trashedAt == nil
             },
             sort: \.name
         )
         _allEvents = Query(
             filter: #Predicate<Event> { event in
-                event.eventType == feedingEventType ||
+                (event.eventType == feedingEventType ||
                     event.relatedEntityType == stockReminderEntityType ||
-                    event.relatedEntityType == autoFeederEntityType
+                    event.relatedEntityType == autoFeederEntityType) &&
+                    event.trashedAt == nil
             },
             sort: \.startDate
         )
@@ -61,14 +62,19 @@ struct IslandFoodDashboard: View {
         )
         _legacyStockCareLogs = Query(
             filter: #Predicate<PetCareLog> { log in
-                log.type == feedingCareType && log.date >= careLogWindowStart
+                log.type == feedingCareType &&
+                    log.date >= careLogWindowStart &&
+                    log.trashedAt == nil &&
+                    log.pet?.trashedAt == nil
             },
             sort: \.date,
             order: .reverse
         )
         _allFoodRecords = Query(
             filter: #Predicate<PetFoodRecord> { record in
-                record.pet?.passedAwayDate == nil
+                record.pet?.passedAwayDate == nil &&
+                    record.pet?.trashedAt == nil &&
+                    record.trashedAt == nil
             },
             sort: \.startDate,
             order: .reverse

@@ -21,6 +21,10 @@ final class PetInsurance {
     var notes: String // 备注（承保范围、排除项等）
     var isActive: Bool
     var createdAt: Date
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
     var paymentFrequencyRaw: String // ArkSchemaV30: InsurancePaymentFrequency.rawValue，默认"按年"
     // ArkSchemaV31：必须在属性上写默认值，否则旧库轻量迁移会失败 → 容器回退内存库、数据「丢失」
     var paymentDayOfMonth: Int = 1

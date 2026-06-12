@@ -9,6 +9,10 @@ import SwiftUI
 struct PetMilestonesCard: View {
     let pet: Pet
 
+    private var milestones: [PetMilestone] {
+        pet.milestones.activeRecycleBinItems
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -19,12 +23,12 @@ struct PetMilestonesCard: View {
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Text("\(pet.milestones.count) 个")
+                Text("\(milestones.count) 个")
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
 
-            let sorted = pet.milestones.sorted { $0.date > $1.date }
+            let sorted = milestones.sorted { $0.date > $1.date }
             let recent = Array(sorted.prefix(6))
             let total = recent.count
 
@@ -34,7 +38,7 @@ struct PetMilestonesCard: View {
                 }
             }
 
-            if pet.milestones.isEmpty {
+            if milestones.isEmpty {
                 Text("暂无里程碑")
                     .font(OhanaFont.adaptive(size: 13, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))

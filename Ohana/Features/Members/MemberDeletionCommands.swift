@@ -45,21 +45,27 @@ enum MemberDeletionCommandService {
         context: ModelContext,
         userDefaults: UserDefaults = .standard
     ) -> MemberDeletionCommandResult {
+        let now = Date()
         let petID = pet.id
         let petIDString = petID.uuidString
-        let relatedEvents = fetchEvents(relatedEntityID: petIDString, context: context)
-        let affectedSharedSessions = SharedCareSessionMaintenance.sessionsReferencingPet(id: petID, context: context)
+        let relatedEvents = fetchEvents(relatedEntityID: petIDString, context: context).activeRecycleBinItems
+        let batchId = RecycleBinService.aggregateTrashBatchId(kind: EntityKind.pet.rawValue, id: petID)
         for event in relatedEvents {
-            context.delete(event)
+            RecycleBinService.moveToRecycleBin(
+                event,
+                now: now,
+                batchId: batchId,
+                context: context
+            )
         }
 
         let removedQuickActionCount = removeQuickAccessItems(forPetID: petID, userDefaults: userDefaults)
-        CloudSyncMutationRecorder.markDeleted(pet, context: context)
-        context.delete(pet)
-        context.safeSave()
-        for session in affectedSharedSessions {
-            SharedCareSessionMaintenance.reconcile(session, context: context)
-        }
+        RecycleBinService.moveToRecycleBin(
+            pet,
+            now: now,
+            batchId: batchId,
+            context: context
+        )
         context.safeSave()
 
         return MemberDeletionCommandResult(
@@ -84,7 +90,7 @@ enum MemberDeletionCommandService {
         let humanIDString = humanID.uuidString
         let remainingHumanDescriptor = FetchDescriptor<Human>(
             predicate: #Predicate<Human> { candidate in
-                candidate.id != humanID
+                candidate.id != humanID && candidate.trashedAt == nil
             }
         )
         let remainingHumans = fetchMemberDeletionModelsOrLog(
@@ -97,14 +103,31 @@ enum MemberDeletionCommandService {
         let requiresReplacementHuman = !hasRemainingHuman
         let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
-        CloudSyncMutationRecorder.markDeleted(human, context: context, deletedByHumanId: activeHumanID)
-        context.delete(human)
+        let now = Date()
+        let relatedEvents = fetchEvents(relatedEntityID: humanIDString, context: context).activeRecycleBinItems
+        let batchId = RecycleBinService.aggregateTrashBatchId(kind: EntityKind.human.rawValue, id: humanID)
+        for event in relatedEvents {
+            RecycleBinService.moveToRecycleBin(
+                event,
+                now: now,
+                trashedByHumanId: activeHumanID,
+                batchId: batchId,
+                context: context
+            )
+        }
+        RecycleBinService.moveToRecycleBin(
+            human,
+            now: now,
+            trashedByHumanId: activeHumanID,
+            batchId: batchId,
+            context: context
+        )
         context.safeSave()
 
         return MemberDeletionCommandResult(
             entityID: humanID,
             kind: EntityKind.human.rawValue,
-            removedRelatedEventIDs: [],
+            removedRelatedEventIDs: relatedEvents.map(\.id),
             removedQuickActionCount: 0,
             requiresReplacementHuman: requiresReplacementHuman,
             requiresAccountSwitch: requiresAccountSwitch,
@@ -115,14 +138,30 @@ enum MemberDeletionCommandService {
     @discardableResult
     @MainActor
     static func deletePlant(_ plant: Plant, context: ModelContext) -> MemberDeletionCommandResult {
+        let now = Date()
         let plantID = plant.id
-        context.delete(plant)
+        let relatedEvents = fetchEvents(relatedEntityID: plantID.uuidString, context: context).activeRecycleBinItems
+        let batchId = RecycleBinService.aggregateTrashBatchId(kind: EntityKind.plant.rawValue, id: plantID)
+        for event in relatedEvents {
+            RecycleBinService.moveToRecycleBin(
+                event,
+                now: now,
+                batchId: batchId,
+                context: context
+            )
+        }
+        RecycleBinService.moveToRecycleBin(
+            plant,
+            now: now,
+            batchId: batchId,
+            context: context
+        )
         context.safeSave()
 
         return MemberDeletionCommandResult(
             entityID: plantID,
             kind: EntityKind.plant.rawValue,
-            removedRelatedEventIDs: [],
+            removedRelatedEventIDs: relatedEvents.map(\.id),
             removedQuickActionCount: 0,
             requiresReplacementHuman: false,
             requiresAccountSwitch: false,

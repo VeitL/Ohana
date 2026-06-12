@@ -5,7 +5,7 @@ import Testing
 
 @MainActor
 struct PetActivityRecordCleanupServiceTests {
-    @Test func cleanupDeletesPetActivityFactsAndCancelsRelatedNotifications() throws {
+    @Test func cleanupMovesPetActivityFactsToSingleRecycleBatchAndRestoresThem() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let pet = Pet(name: "Momo", species: "狗")
@@ -61,26 +61,46 @@ struct PetActivityRecordCleanupServiceTests {
         let documents = try context.fetch(FetchDescriptor<PetDocument>())
         let insurances = try context.fetch(FetchDescriptor<PetInsurance>())
         let events = try context.fetch(FetchDescriptor<Event>())
+        let batches = try context.fetch(FetchDescriptor<RecycleBinBatch>())
 
         #expect(result.petID == pet.id)
         #expect(result.deletedActivityRecordCount == 4)
         #expect(result.deletedEventCount == 1)
+        let batchID = try #require(result.recycleBatchID)
         #expect(result.cancelledNotificationIDs == ["notification-momo"])
         #expect(result.didResetStreak)
         #expect(notifications.cancelledIDs == ["notification-momo"])
         #expect(pet.currentStreak == 0)
         #expect(pet.lastCheckInDate == nil)
-        #expect(careLogs.map { $0.pet?.id } == [otherPet.id])
-        #expect(pottyLogs.isEmpty)
-        #expect(walkLogs.isEmpty)
-        #expect(weightLogs.isEmpty)
+        #expect(careLogs.count == 2)
+        #expect(careLog.trashedAt != nil)
+        #expect(careLog.trashBatchId == RecycleBinService.petActivityClearBatchId(batchID))
+        #expect(careLogs.activeRecycleBinItems.map { $0.pet?.id } == [otherPet.id])
+        #expect(pottyLogs.activeRecycleBinItems.isEmpty)
+        #expect(walkLogs.activeRecycleBinItems.isEmpty)
+        #expect(weightLogs.activeRecycleBinItems.isEmpty)
         #expect(documents.map { $0.pet?.id } == [pet.id])
         #expect(insurances.map { $0.pet?.id } == [pet.id])
-        #expect(events.map(\.relatedEntityId) == [otherPet.id.uuidString])
+        #expect(events.activeRecycleBinItems.map(\.relatedEntityId) == [otherPet.id.uuidString])
+        #expect(batches.map(\.id) == [batchID])
+
+        let recycleItem = try #require(RecycleBinService.listItems(context: context).first {
+            $0.kind == .petActivityClearBatch && $0.batchID == batchID
+        })
+        let restore = RecycleBinService.restoreItem(recycleItem, context: context)
+        try context.save()
+
+        #expect(restore.restoredBatchCount == 1)
+        #expect(restore.restoredSourceCount == 5)
+        #expect(pet.currentStreak == 5)
+        #expect(pet.lastCheckInDate == Date(timeIntervalSince1970: 1_800_000_000))
+        #expect(try context.fetch(FetchDescriptor<RecycleBinBatch>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).activeRecycleBinItems.count == 2)
+        #expect(try context.fetch(FetchDescriptor<Event>()).activeRecycleBinItems.count == 2)
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV68.models)
+        let schema = Schema(ArkSchemaV69.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }

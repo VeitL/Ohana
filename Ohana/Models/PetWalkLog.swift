@@ -21,6 +21,10 @@ final class PetWalkLog {
     @Attribute(.externalStorage) var mapSnapshotData: Data?
     @Attribute(.externalStorage) var routeLocationsData: Data?
     var pet: Pet?
+    var trashedAt: Date?
+    var trashExpiresAt: Date?
+    var trashBatchId: String = ""
+    var trashedByHumanId: String = ""
     // P1: 遛狗行为备注
     var behaviorNotes: String? // 如"今天很兴奋，追了一只猫"
     var moodRating: Int = 0 // 1-5颗星，0 = 未评价

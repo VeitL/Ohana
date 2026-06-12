@@ -432,9 +432,11 @@ struct QuickWaterCommandExecutor {
         } else {
             .other
         }
+        let petID = log.pet?.id
+        CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context)
         context.delete(log)
         context.safeSave()
-        if let petID = log.pet?.id {
+        if let petID {
             publishWaterMutation(.waterLog(petID: petID, source: "delete"), affectedEntityIDs: [petID], note: "\(kind)")
         }
         return kind

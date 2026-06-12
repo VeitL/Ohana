@@ -172,6 +172,15 @@ enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markModified(
+        _ log: PetWeightLog,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markPetScopedModified(PetWeightLog.self, id: log.id, petId: log.pet?.id, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
         _ record: PetFoodRecord,
         context: ModelContext,
         modifiedAt: Date = Date()
@@ -429,6 +438,24 @@ enum CloudSyncMutationRecorder {
     ) -> CloudSyncRecordState? {
         markPetScopedDeleted(
             PetExpenseLog.self,
+            id: log.id,
+            petId: pet?.id ?? log.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ log: PetWeightLog,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            PetWeightLog.self,
             id: log.id,
             petId: pet?.id ?? log.pet?.id,
             context: context,

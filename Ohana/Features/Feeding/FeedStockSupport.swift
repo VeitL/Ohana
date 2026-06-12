@@ -33,6 +33,8 @@ enum FeedStockCalculator {
         let source = careLogs ?? pet.careLogs
         return source.filter { log in
             (careLogs == nil || log.pet?.id == pet.id) &&
+                log.trashedAt == nil &&
+                log.pet?.trashedAt == nil &&
                 log.careType == .feeding &&
                 FeedLogMetadata.isMainFoodLog(log) &&
                 (foodKind.map { log.foodKind == $0 } ?? true) &&
@@ -44,6 +46,8 @@ enum FeedStockCalculator {
         let source = careLogs ?? pet.careLogs
         return source.filter { log in
             (careLogs == nil || log.pet?.id == pet.id) &&
+                log.trashedAt == nil &&
+                log.pet?.trashedAt == nil &&
                 log.careType == .feeding &&
                 FeedLogMetadata.isTreatLog(log) &&
                 (startDate.map { log.date >= $0 } ?? true)
@@ -169,6 +173,7 @@ enum FeedStockCalculator {
     private static func dailyTotalGrams(for events: [Event], foodKind: FeedFoodKind?) -> Double {
         events
             .filter { event in foodKind.map { $0 == event.foodKind } ?? true }
+            .filter { event in event.trashedAt == nil }
             .reduce(0) { total, event in
                 total + max(0, FeedRuleMetadata.amountGrams(from: event))
             }
@@ -313,6 +318,8 @@ enum FeedStockCalculator {
         return source
             .filter { record in
                 (foodRecords == nil || record.pet?.id == pet.id) &&
+                    record.trashedAt == nil &&
+                    record.pet?.trashedAt == nil &&
                     record.foodKind == foodKind &&
                     stockOpenDay(for: record) <= today
             }

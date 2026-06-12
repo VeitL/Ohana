@@ -13,7 +13,9 @@ enum FeedCommandFetch {
     static func foodRecords(petID: UUID, context: ModelContext, fallback: [PetFoodRecord]) -> [PetFoodRecord] {
         var descriptor = FetchDescriptor<PetFoodRecord>(
             predicate: #Predicate<PetFoodRecord> { record in
-                record.pet?.id == petID
+                record.pet?.id == petID &&
+                    record.trashedAt == nil &&
+                    record.pet?.trashedAt == nil
             },
             sortBy: [SortDescriptor(\.startDate, order: .reverse)]
         )
@@ -29,6 +31,9 @@ enum FeedCommandFetch {
     @MainActor
     static func latestEvents(context: ModelContext, fallback: [Event]) -> [Event] {
         let descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.trashedAt == nil
+            },
             sortBy: [SortDescriptor(\Event.startDate)]
         )
         return fetchOrLog(

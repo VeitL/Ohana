@@ -56,6 +56,7 @@ struct SettingsView: View {
     @State var showingAccountSwitcher = false
     @State var showingBackgroundPicker = false
     @State var showingPetManagement = false
+    @State var showingRecycleBin = false
     @State var quickSwitchHuman: Human? = nil
     @State var householdSharePresentation: CloudSyncHouseholdSharePresentation? = nil
     @State var isPreparingHouseholdShare = false
@@ -564,6 +565,15 @@ struct SettingsView: View {
                                 ) {}
                                 OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
                                 settingsRow(
+                                    icon: "trash.circle.fill",
+                                    title: l.tr(zh: "回收站", en: "Recycle Bin", de: "Papierkorb"),
+                                    subtitle: l.tr(zh: "30 天内可恢复", en: "Recoverable for 30 days", de: "30 Tage wiederherstellbar"),
+                                    iconColor: Color.goYellow
+                                ) {
+                                    showingRecycleBin = true
+                                }
+                                OhanaDashedDivider(color: dividerLine).padding(.leading, 44)
+                                settingsRow(
                                     icon: "arrow.counterclockwise.circle.fill",
                                     title: l.tr(zh: "重置 App", en: "Reset App", de: "App zurucksetzen"),
                                     subtitle: l.tr(zh: "删除数据并回到引导页", en: "Delete data and restart onboarding", de: "Daten loschen und Onboarding starten"),
@@ -652,6 +662,10 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingPetManagement) {
             SettingsPetManagementSheet(pets: homePets ?? [])
+                .ohanaCompactSheetPresentation(detents: [.medium, .large])
+        }
+        .sheet(isPresented: $showingRecycleBin) {
+            RecycleBinView()
                 .ohanaCompactSheetPresentation(detents: [.medium, .large])
         }
         .sheet(item: $quickSwitchHuman) { human in
