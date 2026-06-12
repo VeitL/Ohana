@@ -22,7 +22,7 @@
 | Phase 6 Members | 🟢 | `ead1e5fe4` | 创建派生日历事实 sync metadata、成员删除回收站聚合、Human 侧过期清理、RequiredHumanProfileView a11y、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 | Phase 6 Oasis | 🟢 | `87423afd8` | Oasis 当前主人钱包门、预算 / 冷却、休眠态救援、UI/a11y/smoothness/runtime 审计、Oasis 窄测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 | Phase 6 Settings + Health | 🟢 | `5d4e71928` | Debug-only 设置开发工具、真实通知开关策略、Health 删除/回收/schema V70/read-only 不变量、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待 Release 真机 / 真实 UI 抽查 |
-| Phase 6 Economy | 🟢 | 待提交 | 兑换入口首发门禁、冻结钱包写入拒绝、特殊奖励 active human 归属、隐私 / 冻结财富口径、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
+| Phase 6 Economy | 🟢 | `662852a01` | 兑换入口首发门禁、冻结钱包写入拒绝、特殊奖励 active human 归属、隐私 / 冻结财富口径、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 
 ## GAP-1 联机功能门
 
@@ -354,7 +354,7 @@
 
 人工验收目标：首发 Economy 是纯单机、可理解、不可刷的轻量经济；正式用户不可达线下兑现入口；隐私只隐藏明细，离世 / 回收钱包退出活跃财富但历史保留。
 
-自动验收已完成（2026-06-12，门禁 commit 待提交）：目标测试覆盖 `system:legacy` 不进正式资产、隐私隐藏钱包计入总额但不出明细、离世 / 回收钱包拒绝写入并退出活跃财富、特殊奖励无 actor 时归属 active human 且不写 system、成就 / 商店 / 宠物金库冻结钱包拒绝、Shop / Today Focus 兑换门关闭不变量、补记操作日结算与经济模拟；`scripts/dev-check-changed.sh`、`scripts/module-exit-gate.sh` 均通过。
+自动验收已完成（2026-06-12，门禁 commit `662852a01`）：目标测试覆盖 `system:legacy` 不进正式资产、隐私隐藏钱包计入总额但不出明细、离世 / 回收钱包拒绝写入并退出活跃财富、特殊奖励无 actor 时归属 active human 且不写 system、成就 / 商店 / 宠物金库冻结钱包拒绝、Shop / Today Focus 兑换门关闭不变量、补记操作日结算与经济模拟；`scripts/dev-check-changed.sh`、`scripts/module-exit-gate.sh` 均通过。
 
 - [ ] 用真实 UI 打开商店并遍历所有分类。
   - 预期：不出现“货币兑换 / 家庭线下兑现 / Cash Exchange”分类、卡片、表单或待处理兑换区块；普通外观 / 头像 / 特效 / 称号 / 加成道具仍可浏览。
