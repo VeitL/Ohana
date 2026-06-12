@@ -8,8 +8,8 @@
 | Phase | 范围 | 状态 | 备注 |
 |---|---|---|---|
 | 0 | 基线收尾（提交未完成改动） | 🟢 | 已于 2026-06-12 提交（`ff7ac89f`）；后续模块工作可能使当前工作区非空 |
-| 1 | `Ohana/Models` | 🟢 | 门禁通过并提交：`db44afe1`；P0 余留跨范围项见 TFU-20260612-012，TFU-20260612-013 已由 `e16e6953` 关闭 |
-| 2 | `Ohana/Domain` | ⬜ | |
+| 1 | `Ohana/Models` | 🟢 | 门禁通过并提交：`db44afe1`；P0 余留跨范围项 TFU-20260612-012 已由 Domain gate commit `304971af` 关闭，TFU-20260612-013 已由 `e16e6953` 关闭 |
+| 2 | `Ohana/Domain` | 🟢 | 门禁通过并提交：`304971af`；P1 余留见 TFU-20260612-014 |
 | 3 | `Ohana/Shared` | ⬜ | |
 | 4 | `Ohana/App` | ⬜ | |
 | 5 | Home + TodayFocus + QuickCare | ⬜ | |
@@ -22,8 +22,8 @@
 
 | 模块 | Phase | 状态 | 开工日期 | 余留项（P1/P2 指针） | 门禁 commit | 交接备注 |
 |---|---|---|---|---|---|---|
-| Models | 1 | 🟢 | 2026-06-12 | P0 余留跨范围项见 TFU-20260612-012；TFU-20260612-013 已关闭 | `db44afe1` | V68 tombstone 默认值、fallback indicator、V67→V68 临时磁盘迁移测试已补并执行；`Pet.clearAllActivityRecords` 需归 Domain/Members phase 迁移 |
-| Domain | 2 | ⬜ | | | | |
+| Models | 1 | 🟢 | 2026-06-12 | TFU-20260612-012 已由 Domain gate commit `304971af` 关闭；TFU-20260612-013 已关闭 | `db44afe1` | V68 tombstone 默认值、fallback indicator、V67→V68 临时磁盘迁移测试已补并执行 |
+| Domain | 2 | 🟢 | 2026-06-12 | P1 余留见 TFU-20260612-014 | `304971af` | 删除未引用的 `BatchAction` UI/奖励绕行路径；宠物活动清理由 `PetActivityRecordCleanupService` 负责，Members 调用点已迁移，`Pet` 模型不再执行清理副作用 |
 | Shared | 3 | ⬜ | | | | |
 | App | 4 | ⬜ | | | | |
 | Home | 5 | ⬜ | | | | |

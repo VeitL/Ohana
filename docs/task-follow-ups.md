@@ -406,7 +406,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260612-012 - Move pet activity cleanup out of the Pet model
 
-- Status: Open
+- Status: Done
 - Priority: P0
 - Area: Models / Members / Domain Commands
 - Source task: Models Phase 1 P0 remediation, 2026-06-12
@@ -419,9 +419,14 @@ actionable; long-term product ideas belong in planning docs instead.
 - Next step: In a cross-scope repair, add a command/service that owns the
   activity cleanup transaction, updates the Members caller to use it, then
   remove the persistence/notification side effects from `Pet`.
-- Current task disposition: Deferred as a cross-scope P0; do not patch
-  `Ohana/Features` or `Ohana/Domain` from the Models-only session without
-  explicit authorization.
+- Current task disposition: Closed during Domain Phase 2. The cleanup is now
+  owned by `PetActivityRecordCleanupService`, the Members command delegates to
+  that service, and `Pet` no longer owns `ModelContext` fetch/delete/save or
+  notification cancellation.
+- Closed: 2026-06-12 with
+  `OhanaTests/PetActivityRecordCleanupServiceTests.swift` covering related
+  event/reminder deletion, notification cancellation, activity-log deletion,
+  unrelated-pet preservation, document/insurance preservation, and streak reset.
 - Close when: `Pet` no longer owns `ModelContext` fetch/delete/save or
   notification cancellation, the Members cleanup path calls the new command or
   service, and in-memory SwiftData tests cover event/reminder/log deletion plus
@@ -450,6 +455,32 @@ actionable; long-term product ideas belong in planning docs instead.
   `scripts/test-simulator.sh -only-testing:OhanaTests/SharedModelContainerRecoveryTests`
   plus `scripts/module-exit-gate.sh` run without excluding DashboardRecords
   sources.
+
+### TFU-20260612-014 - Finish Domain presentation and infrastructure boundary cleanup
+
+- Status: Open
+- Priority: P1
+- Area: Domain / Architecture / Localization / Notifications
+- Source task: Domain Phase 2 analysis, 2026-06-12
+- Blocker: The remaining Domain issues are broad architectural cleanup rather
+  than the P0 activity-cleanup/blocking-build repair. Fixing them cleanly should
+  happen as a dedicated pass so adapters can move without disturbing service
+  behavior.
+- Next step: Move app/feature infrastructure adapters out of
+  `Ohana/Domain/Services/AppInfrastructureAdapters.swift` or invert them behind
+  Domain-owned protocols; replace Domain `SwiftUI.Color` outputs in
+  `CareLedgerStatsService` and `HealthMetricCatalog` with semantic tokens; move
+  user-visible generated titles/status text onto the localization path; and
+  make reminder notification scheduling dependency-injected instead of relying
+  on the mutable `OhanaNotifications.current` global from static service paths.
+- Current task disposition: Accepted P1 follow-up for Domain Phase 2. The P0
+  production path violations were removed or moved behind a Domain service; the
+  remaining items do not block the current module exit gate but should be
+  resolved before release-hardening freeze.
+- Close when: Domain app-code contains no `import SwiftUI`, Domain services no
+  longer instantiate App/Feature infrastructure concrete types directly, generated
+  user-visible Domain strings are localized, and notification side effects in
+  reminder/care static paths are covered through injected fakes.
 
 ## Done
 
