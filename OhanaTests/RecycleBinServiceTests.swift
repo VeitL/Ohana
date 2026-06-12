@@ -38,6 +38,104 @@ struct RecycleBinServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).activeRecycleBinItems.map(\.id) == [pet.id])
     }
 
+    @Test func memberDeletionSuppressesRelatedRemindersAndRestoreReactivatesThem() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Ava")
+        let event = Event(
+            title: "Ava birthday",
+            startDate: Date().addingTimeInterval(86400),
+            eventType: EventType.birthday.rawValue,
+            relatedEntityType: EntityKind.human.rawValue,
+            relatedEntityId: human.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        context.insert(human)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        _ = MemberDeletionCommandService.deleteHuman(
+            human,
+            activeHumanID: human.id.uuidString,
+            context: context
+        )
+        try context.save()
+
+        #expect(human.trashedAt != nil)
+        #expect(event.trashedAt != nil)
+        #expect(reminder.statusEnum == .skipped)
+        #expect(reminder.completedBy.hasPrefix("system:recycle:"))
+        #expect(try cloudSyncState(for: reminder, context: context)?.hasPendingLocalChanges == true)
+
+        let item = try #require(RecycleBinService.listItems(context: context).first { $0.kind == .human && $0.sourceID == human.id })
+        let restore = RecycleBinService.restoreItem(item, context: context)
+        try context.save()
+
+        #expect(restore.restoredSourceCount == 3)
+        #expect(human.trashedAt == nil)
+        #expect(event.trashedAt == nil)
+        #expect(reminder.statusEnum == .pending)
+        #expect(reminder.completedBy.isEmpty)
+    }
+
+    @Test func expiredHumanPurgeDeletesHumanScopedStringRecordsWithTombstones() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let human = Human(name: "Ava")
+        let medication = HumanMedication(humanId: human.id.uuidString, name: "Vitamin")
+        let medicationLog = HumanMedicationLog(
+            humanId: human.id.uuidString,
+            medicationId: medication.id.uuidString,
+            scheduledTime: now,
+            status: .taken,
+            recordedTime: now
+        )
+        let report = HumanHealthReport(humanId: human.id.uuidString, hospitalName: "Clinic")
+        let wish = WishlistItem(title: "Trip", cost: 200, creatorId: human.id.uuidString)
+        let directExpense = PetExpenseLog(date: now, amount: 42, category: .medical, note: "Self", pet: nil, executorId: human.id.uuidString)
+        context.insert(human)
+        context.insert(medication)
+        context.insert(medicationLog)
+        context.insert(report)
+        context.insert(wish)
+        context.insert(directExpense)
+        try context.save()
+
+        RecycleBinService.moveToRecycleBin(
+            human,
+            now: now,
+            trashedByHumanId: human.id.uuidString,
+            context: context
+        )
+        try context.save()
+
+        #expect(try context.fetch(FetchDescriptor<HumanMedication>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<HumanHealthReport>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<WishlistItem>()).count == 1)
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).count == 1)
+
+        _ = RecycleBinService.purgeExpired(
+            context: context,
+            now: now.addingTimeInterval(TimeInterval((RecycleBinService.retentionDays + 1) * 24 * 60 * 60))
+        )
+        try context.save()
+
+        #expect(try context.fetch(FetchDescriptor<Human>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanMedication>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<HumanHealthReport>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<WishlistItem>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: HumanMedication.self), id: medication.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: HumanMedicationLog.self), id: medicationLog.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: HumanHealthReport.self), id: report.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: WishlistItem.self), id: wish.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: PetExpenseLog.self), id: directExpense.id, context: context)?.isDeletionTombstone == true)
+    }
+
     @Test func preciousArchiveDeletesStayRecoverableWithSourcePayloads() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -163,6 +261,17 @@ struct RecycleBinServiceTests {
         try context.fetch(FetchDescriptor<CloudSyncRecordState>()).first {
             $0.entityName == String(describing: Pet.self)
                 && $0.localRecordId == pet.id.uuidString.lowercased()
+        }
+    }
+
+    private func cloudSyncState(for reminder: Reminder, context: ModelContext) throws -> CloudSyncRecordState? {
+        try cloudSyncState(entityName: String(describing: Reminder.self), id: reminder.id, context: context)
+    }
+
+    private func cloudSyncState(entityName: String, id: UUID, context: ModelContext) throws -> CloudSyncRecordState? {
+        try context.fetch(FetchDescriptor<CloudSyncRecordState>()).first {
+            $0.entityName == entityName
+                && $0.localRecordId == id.uuidString.lowercased()
         }
     }
 }

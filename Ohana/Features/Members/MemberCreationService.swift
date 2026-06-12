@@ -352,6 +352,7 @@ final class MemberCreationService: MemberCreating {
             )
             event.recurrenceDays = 365
             context.insert(event)
+            CloudSyncMutationRecorder.markModified(event, context: context)
         }
         do {
             try context.save()
@@ -403,7 +404,10 @@ final class MemberCreationService: MemberCreating {
             )
             birthdayEvent.recurrenceDays = 365
             context.insert(birthdayEvent)
-            context.insert(Reminder(event: birthdayEvent, scheduledAt: draft.birthday))
+            CloudSyncMutationRecorder.markModified(birthdayEvent, context: context)
+            let reminder = Reminder(event: birthdayEvent, scheduledAt: draft.birthday)
+            context.insert(reminder)
+            CloudSyncMutationRecorder.markModified(reminder, context: context)
         }
         if draft.hasHomeDate {
             let event = Event(
@@ -416,6 +420,7 @@ final class MemberCreationService: MemberCreating {
             )
             event.recurrenceDays = 365
             context.insert(event)
+            CloudSyncMutationRecorder.markModified(event, context: context)
         }
         if draft.hasHomeDate {
             let milestones = [100, 365, 500, 730, 1000, 1095]

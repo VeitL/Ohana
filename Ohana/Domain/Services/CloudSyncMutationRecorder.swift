@@ -75,6 +75,49 @@ enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markModified(
+        _ reminder: Reminder,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markModified(
+            entityName: String(describing: Reminder.self),
+            localRecordId: reminder.id,
+            householdId: sharedHouseholdId(context: context, now: modifiedAt),
+            fallbackHouseholdId: reminder.event.flatMap { uuid(from: $0.relatedEntityId) } ?? reminder.id,
+            modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markModified(
+        _ medication: HumanMedication,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markHumanScopedModified(HumanMedication.self, id: medication.id, humanId: medication.humanId, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ report: HumanHealthReport,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markHumanScopedModified(HumanHealthReport.self, id: report.id, humanId: report.humanId, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
+        _ item: WishlistItem,
+        context: ModelContext,
+        modifiedAt: Date = Date()
+    ) -> CloudSyncRecordState? {
+        markHumanScopedModified(WishlistItem.self, id: item.id, humanId: item.creatorId, context: context, modifiedAt: modifiedAt)
+    }
+
+    @discardableResult
+    static func markModified(
         _ log: PetCareLog,
         context: ModelContext,
         modifiedAt: Date = Date()
@@ -340,6 +383,143 @@ enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markDeleted(
+        _ reminder: Reminder,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: Reminder.self),
+            localRecordId: reminder.id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: reminder.event.flatMap { uuid(from: $0.relatedEntityId) } ?? reminder.id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ medication: HumanMedication,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markHumanScopedDeleted(
+            HumanMedication.self,
+            id: medication.id,
+            humanId: medication.humanId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ log: HumanMedicationLog,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markHumanScopedDeleted(
+            HumanMedicationLog.self,
+            id: log.id,
+            humanId: log.humanId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ report: HumanHealthReport,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markHumanScopedDeleted(
+            HumanHealthReport.self,
+            id: report.id,
+            humanId: report.humanId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ item: WishlistItem,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markHumanScopedDeleted(
+            WishlistItem.self,
+            id: item.id,
+            humanId: item.creatorId,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ log: HumanWeightLog,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markHumanScopedDeleted(
+            HumanWeightLog.self,
+            id: log.id,
+            humanId: log.human?.id.uuidString ?? log.executorId ?? "",
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ log: HumanWorkoutLog,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markHumanScopedDeleted(
+            HumanWorkoutLog.self,
+            id: log.id,
+            humanId: log.human?.id.uuidString ?? "",
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ log: HumanHealthMetricLog,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markHumanScopedDeleted(
+            HumanHealthMetricLog.self,
+            id: log.id,
+            humanId: log.human?.id.uuidString ?? "",
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
         _ log: PetCareLog,
         pet: Pet?,
         context: ModelContext,
@@ -490,7 +670,7 @@ enum CloudSyncMutationRecorder {
         deletedByHumanId: String? = nil
     ) -> CloudSyncRecordState? {
         let entityName = String(describing: SharedCareSession.self)
-        guard supportsSyncPipeline(for: entityName) else {
+        guard supportsLocalMutationRecording(for: entityName) else {
             return nil
         }
 
@@ -538,7 +718,7 @@ enum CloudSyncMutationRecorder {
         modifiedAt: Date,
         context: ModelContext
     ) -> CloudSyncRecordState? {
-        guard supportsSyncPipeline(for: entityName) else {
+        guard supportsLocalMutationRecording(for: entityName) else {
             return nil
         }
         do {
@@ -567,7 +747,7 @@ enum CloudSyncMutationRecorder {
         deletedByHumanId: UUID?,
         context: ModelContext
     ) -> CloudSyncRecordState? {
-        guard supportsSyncPipeline(for: entityName) else {
+        guard supportsLocalMutationRecording(for: entityName) else {
             return nil
         }
         do {
@@ -588,9 +768,8 @@ enum CloudSyncMutationRecorder {
         }
     }
 
-    private static func supportsSyncPipeline(for entityName: String) -> Bool {
+    private static func supportsLocalMutationRecording(for entityName: String) -> Bool {
         CloudSyncEntityRegistry.descriptor(for: entityName)?.uploadsToCloudKit == true
-            && CloudSyncEntityRegistry.supportsUploadPipeline(for: entityName)
     }
 
     private static func markPetScopedModified<T>(
@@ -643,6 +822,42 @@ enum CloudSyncMutationRecorder {
             localRecordId: id,
             householdId: sharedHouseholdId(context: context, now: deletedAt),
             fallbackHouseholdId: petId ?? id,
+            deletedAt: deletedAt,
+            deletedByHumanId: uuid(from: deletedByHumanId),
+            context: context
+        )
+    }
+
+    private static func markHumanScopedModified<T>(
+        _: T.Type,
+        id: UUID,
+        humanId: String,
+        context: ModelContext,
+        modifiedAt: Date
+    ) -> CloudSyncRecordState? {
+        markModified(
+            entityName: String(describing: T.self),
+            localRecordId: id,
+            householdId: sharedHouseholdId(context: context, now: modifiedAt),
+            fallbackHouseholdId: uuid(from: humanId) ?? id,
+            modifiedAt: modifiedAt,
+            context: context
+        )
+    }
+
+    private static func markHumanScopedDeleted<T>(
+        _: T.Type,
+        id: UUID,
+        humanId: String,
+        context: ModelContext,
+        deletedAt: Date,
+        deletedByHumanId: String?
+    ) -> CloudSyncRecordState? {
+        markDeleted(
+            entityName: String(describing: T.self),
+            localRecordId: id,
+            householdId: sharedHouseholdId(context: context, now: deletedAt),
+            fallbackHouseholdId: uuid(from: humanId) ?? id,
             deletedAt: deletedAt,
             deletedByHumanId: uuid(from: deletedByHumanId),
             context: context

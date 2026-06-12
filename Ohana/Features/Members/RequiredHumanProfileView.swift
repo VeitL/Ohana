@@ -168,12 +168,12 @@ struct RequiredHumanProfileView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous)
                     .fill(Color(hex: "0C1640"))
-                    .frame(width: 38, height: 38)
-                Image(systemName: "heart.text.square.fill")
+                Image(systemName: "heart.text.square.fill").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 18, weight: .black))
                     .foregroundStyle(Color.goLime)
-                    .accessibilityHidden(true)
             }
+            .frame(width: 44, height: 44)
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(localized(

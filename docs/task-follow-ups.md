@@ -25,6 +25,69 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260612-021 - Audit deleted-human wallet and ledger visibility
+
+- Status: Open
+- Priority: P1
+- Area: Economy / Members / Recycle Bin
+- Source task: Members Phase 6 remediation, 2026-06-12
+- Blocker: Members now preserves human-scoped data during the 30-day recycle
+  period and purges confirmed human-owned side rows at expiry, but deleting
+  CoconutAccount / CoconutLedgerEntry ownership or hiding purged humans from
+  formal asset and ledger projections belongs to the Economy module boundary.
+- Next step: In the Economy phase, verify that recycled or permanently purged
+  humans do not appear as active wallet owners, asset rows, rankings, or reward
+  write targets, while historical ledger entries remain understandable.
+- Close when: Economy tests and real UI checks prove deleted humans are excluded
+  from active asset/ranking/reward surfaces and historical ledger visibility has
+  the intended product treatment.
+
+### TFU-20260612-020 - Finish Members localization coverage
+
+- Status: Open
+- Priority: P2
+- Area: Members / Localization
+- Source task: Members Phase 6 remediation, 2026-06-12
+- Blocker: Members still has a broad set of user-visible hardcoded Chinese
+  strings in detail, edit, privacy, and read-only profile surfaces. Fixing it
+  cleanly is a larger localization pass outside the P0 deletion/sync repair.
+- Next step: Move Members detail/edit/privacy/Pet read content strings onto the
+  registered localization path, authoring Chinese and English at minimum and
+  preserving the existing fallback chain for other app languages.
+- Close when: Members user-facing strings pass the localization audit and the
+  main detail/edit/privacy screens remain visually clean in long languages.
+
+### TFU-20260612-019 - Enforce human memorial read-only boundaries
+
+- Status: Open
+- Priority: P1
+- Area: Members / Memorial / Command Boundaries
+- Source task: Members Phase 6 remediation, 2026-06-12
+- Blocker: GAP-9 removed active-flow participation for deceased humans, but
+  the Members command layer still allows profile edit, privacy toggles, and
+  deletion routes while the UI says "纪念模式 · 只读". A hard boundary needs a
+  focused route/command pass to avoid changing memorial behavior by accident.
+- Next step: Define the allowed actions for deceased humans, then enforce the
+  read-only boundary in Members routes and command services with focused tests.
+- Close when: Deceased human profiles cannot be mutated through Members edit /
+  privacy / destructive paths unless the action is explicitly allowed, and the
+  UI copy matches the command behavior.
+
+### TFU-20260612-018 - Remove duplicate member profile revision publishes
+
+- Status: Open
+- Priority: P2
+- Area: Members / Domain Revisions / Smoothness
+- Source task: Members Phase 6 remediation, 2026-06-12
+- Blocker: `MemberCommandExecutor.update*Profile` already publishes member
+  profile revisions, but several view callers publish another revision after
+  the executor returns. This is not part of the P0 deletion/sync repair and
+  should be fixed as a narrow smoothness/invalidations pass.
+- Next step: Remove duplicate view-level revision publishes after confirming the
+  executor emits the single intended mutation for Pet/Human edit paths.
+- Close when: Each profile save publishes exactly one member profile revision
+  and focused tests or an audit prevent the duplicate pattern from returning.
+
 ### TFU-20260612-017 - Validate GAP-9 memorial mode on real UI and device notifications
 
 - Status: Open

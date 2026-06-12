@@ -386,10 +386,38 @@ struct MemberCreationServiceTests {
         #expect(anniversaryEvent.recurrenceDays == 365)
         #expect(milestones.count == 6)
         #expect(milestones.allSatisfy { $0.pet?.id == pet.id })
+        #expect(try cloudSyncState(for: birthdayEvent, context: context)?.hasPendingLocalChanges == true)
+        #expect(try cloudSyncState(for: anniversaryEvent, context: context)?.hasPendingLocalChanges == true)
+        #expect(try reminders.first.flatMap { try cloudSyncState(for: $0, context: context) }?.hasPendingLocalChanges == true)
         #expect(TestQuestManagerProjection.manager.isThemeColorSet == true)
         #expect(revisionCenter.homeRevision.value == beforeRevision + 2)
         #expect(mutation.command == .memberCreation(entityID: pet.id, kind: "pet"))
         #expect(mutation.affectedEntityIDs == [pet.id])
+    }
+
+    @Test func humanCreationWritesBirthdayEventCloudSyncState() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+        var draft = humanDraft(name: "Ava", source: .placeholder)
+        draft.avatarImageData = nil
+        draft.hasBirthday = true
+        draft.birthday = makeDate(year: 1992, month: 4, day: 12)
+
+        let result = try saveMember(
+            draft: draft,
+            existingPets: [],
+            existingHumans: [],
+            context: context,
+            countryCode: "CN"
+        )
+
+        let human = try #require(result.human)
+        let event = try #require(try context.fetch(FetchDescriptor<Event>()).first)
+        #expect(event.relatedEntityType == EntityKind.human.rawValue)
+        #expect(event.relatedEntityId == human.id.uuidString)
+        #expect(event.recurrenceDays == 365)
+        #expect(try cloudSyncState(for: event, context: context)?.hasPendingLocalChanges == true)
     }
 
     private var avatarData: Data { Data([0x89, 0x50, 0x4E, 0x47]) }
@@ -467,9 +495,23 @@ struct MemberCreationServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV69.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func cloudSyncState(for event: Event, context: ModelContext) throws -> CloudSyncRecordState? {
+        try context.fetch(FetchDescriptor<CloudSyncRecordState>()).first {
+            $0.entityName == String(describing: Event.self)
+                && $0.localRecordId == event.id.uuidString.lowercased()
+        }
+    }
+
+    private func cloudSyncState(for reminder: Reminder, context: ModelContext) throws -> CloudSyncRecordState? {
+        try context.fetch(FetchDescriptor<CloudSyncRecordState>()).first {
+            $0.entityName == String(describing: Reminder.self)
+                && $0.localRecordId == reminder.id.uuidString.lowercased()
+        }
     }
 
     private func makeDate(year: Int, month: Int, day: Int) -> Date {

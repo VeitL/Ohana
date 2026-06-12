@@ -88,6 +88,7 @@ struct RecycleBinRestoreResult: Equatable {
 enum RecycleBinService {
     static let retentionDays = 30
     static let petActivityClearBatchKind = RecycleBinEntryKind.petActivityClearBatch.rawValue
+    private static let aggregateReminderActorPrefix = "system:recycle:"
 
     static func expirationDate(from date: Date, calendar: Calendar = .current) -> Date {
         calendar.date(byAdding: .day, value: retentionDays, to: date)
@@ -108,6 +109,9 @@ enum RecycleBinService {
         item.trashedByHumanId = normalizedHumanId(trashedByHumanId)
         if let context {
             markModifiedForSync(item, context: context, modifiedAt: now)
+            if let event = item as? Event {
+                suppressAggregateReminders(for: event, batchId: batchId, context: context, now: now)
+            }
         }
     }
 
@@ -151,7 +155,7 @@ enum RecycleBinService {
     static func purgeExpired(context: ModelContext, now: Date = Date()) -> RecycleBinPurgeResult {
         var result = RecycleBinPurgeResult()
         result.purgedSourceCount += purgeExpiredSources(Pet.self, context: context, now: now)
-        result.purgedSourceCount += purgeExpiredSources(Human.self, context: context, now: now)
+        result.purgedSourceCount += purgeExpiredHumans(context: context, now: now)
         result.purgedSourceCount += purgeExpiredSources(Plant.self, context: context, now: now)
         result.purgedSourceCount += purgeExpiredSources(Event.self, context: context, now: now)
         result.purgedSourceCount += purgeExpiredSources(PetCareLog.self, context: context, now: now)
@@ -292,8 +296,9 @@ enum RecycleBinService {
         guard let source = fetchAll(T.self, context: context).first(where: { $0.id == id && $0.trashedAt != nil }) else {
             return 0
         }
+        let batchId = source.trashBatchId
         restore(source, context: context)
-        return 1
+        return 1 + restoreAggregateReminders(batchId: batchId, context: context)
     }
 
     private static func restoreAggregateSource<T: PersistentModel & RecycleBinSoftDeletable>(
@@ -306,7 +311,9 @@ enum RecycleBinService {
         }
         let batchId = source.trashBatchId
         restore(source, context: context)
-        return 1 + restoreAggregateEvents(batchId: batchId, context: context)
+        let restoredEvents = restoreAggregateEvents(batchId: batchId, context: context)
+        let restoredReminders = restoreAggregateReminders(batchId: batchId, context: context)
+        return 1 + restoredEvents + restoredReminders
     }
 
     private static func restoreAggregateEvents(batchId: String, context: ModelContext) -> Int {
@@ -327,6 +334,7 @@ enum RecycleBinService {
         let batchId = petActivityClearBatchId(id)
         var restoredCount = 0
         restoredCount += restoreBatchSources(Event.self, batchId: batchId, context: context)
+        restoredCount += restoreAggregateReminders(batchId: batchId, context: context)
         restoredCount += restoreBatchSources(PetCareLog.self, batchId: batchId, context: context)
         restoredCount += restoreBatchSources(PetPottyLog.self, batchId: batchId, context: context)
         restoredCount += restoreBatchSources(PetWalkLog.self, batchId: batchId, context: context)
@@ -370,6 +378,21 @@ enum RecycleBinService {
             context.delete(source)
         }
         return expired.count
+    }
+
+    private static func purgeExpiredHumans(context: ModelContext, now: Date) -> Int {
+        let expired = fetchAll(Human.self, context: context).filter { source in
+            guard let expiresAt = source.trashExpiresAt else { return false }
+            return expiresAt <= now
+        }
+        var purgedCount = 0
+        for human in expired {
+            purgedCount += purgeHumanScopedRows(for: human, context: context, deletedAt: now)
+            markDeletedForSync(human, context: context, deletedAt: now)
+            context.delete(human)
+            purgedCount += 1
+        }
+        return purgedCount
     }
 
     private static func purgeExpiredBatches(context: ModelContext, now: Date) -> Int {
@@ -459,6 +482,116 @@ enum RecycleBinService {
     private static func normalizedHumanId(_ raw: String?) -> String {
         guard let raw else { return "" }
         return raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func aggregateReminderActorId(batchId: String) -> String {
+        aggregateReminderActorPrefix + batchId
+    }
+
+    private static func suppressAggregateReminders(
+        for event: Event,
+        batchId: String,
+        context: ModelContext,
+        now: Date
+    ) {
+        guard !batchId.isEmpty else { return }
+        let actorId = aggregateReminderActorId(batchId: batchId)
+        for reminder in event.reminders where reminder.statusEnum == .pending || reminder.statusEnum == .failed || reminder.statusEnum == .snoozed {
+            OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
+            reminder.statusEnum = .skipped
+            reminder.completedAt = nil
+            reminder.completedBy = actorId
+            CloudSyncMutationRecorder.markModified(reminder, context: context, modifiedAt: now)
+        }
+    }
+
+    private static func restoreAggregateReminders(batchId: String, context: ModelContext) -> Int {
+        guard !batchId.isEmpty else { return 0 }
+        let actorId = aggregateReminderActorId(batchId: batchId)
+        let reminders = fetchAll(Reminder.self, context: context).filter {
+            $0.completedBy == actorId && $0.statusEnum == .skipped
+        }
+        for reminder in reminders {
+            reminder.statusEnum = .pending
+            reminder.completedAt = nil
+            reminder.completedBy = ""
+            reminder.event?.setOccurrenceMarkedComplete(false, on: reminder.scheduledAt)
+            CloudSyncMutationRecorder.markModified(reminder, context: context)
+        }
+        return reminders.count
+    }
+
+    private static func purgeHumanScopedRows(
+        for human: Human,
+        context: ModelContext,
+        deletedAt: Date
+    ) -> Int {
+        let humanId = human.id.uuidString
+        let deletedBy = human.trashedByHumanId
+        var purgedCount = 0
+
+        purgedCount += deleteHumanScopedRows(
+            fetchAll(HumanMedication.self, context: context).filter { $0.humanId == humanId },
+            context: context
+        ) { medication in
+            CloudSyncMutationRecorder.markDeleted(medication, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        purgedCount += deleteHumanScopedRows(
+            fetchAll(HumanMedicationLog.self, context: context).filter { $0.humanId == humanId },
+            context: context
+        ) { log in
+            CloudSyncMutationRecorder.markDeleted(log, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        purgedCount += deleteHumanScopedRows(
+            fetchAll(HumanHealthReport.self, context: context).filter { $0.humanId == humanId },
+            context: context
+        ) { report in
+            CloudSyncMutationRecorder.markDeleted(report, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        purgedCount += deleteHumanScopedRows(
+            fetchAll(WishlistItem.self, context: context).filter { $0.creatorId == humanId },
+            context: context
+        ) { item in
+            CloudSyncMutationRecorder.markDeleted(item, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        purgedCount += deleteHumanScopedRows(
+            fetchAll(PetExpenseLog.self, context: context).filter { $0.executorId == humanId && $0.pet == nil },
+            context: context
+        ) { log in
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        purgedCount += deleteHumanScopedRows(
+            fetchAll(HumanWeightLog.self, context: context).filter { $0.human?.id == human.id },
+            context: context
+        ) { log in
+            CloudSyncMutationRecorder.markDeleted(log, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        purgedCount += deleteHumanScopedRows(
+            fetchAll(HumanWorkoutLog.self, context: context).filter { $0.human?.id == human.id },
+            context: context
+        ) { log in
+            CloudSyncMutationRecorder.markDeleted(log, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        purgedCount += deleteHumanScopedRows(
+            fetchAll(HumanHealthMetricLog.self, context: context).filter { $0.human?.id == human.id },
+            context: context
+        ) { log in
+            CloudSyncMutationRecorder.markDeleted(log, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+
+        return purgedCount
+    }
+
+    private static func deleteHumanScopedRows<T: PersistentModel>(
+        _ rows: [T],
+        context: ModelContext,
+        markDeleted: (T) -> Void
+    ) -> Int {
+        for row in rows {
+            markDeleted(row)
+            context.delete(row)
+        }
+        return rows.count
     }
 }
 

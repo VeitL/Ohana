@@ -82,6 +82,8 @@ struct PetActivityRecordCleanupServiceTests {
         #expect(documents.map { $0.pet?.id } == [pet.id])
         #expect(insurances.map { $0.pet?.id } == [pet.id])
         #expect(events.activeRecycleBinItems.map(\.relatedEntityId) == [otherPet.id.uuidString])
+        #expect(reminder.statusEnum == .skipped)
+        #expect(reminder.completedBy.hasPrefix("system:recycle:"))
         #expect(batches.map(\.id) == [batchID])
 
         let recycleItem = try #require(RecycleBinService.listItems(context: context).first {
@@ -91,12 +93,14 @@ struct PetActivityRecordCleanupServiceTests {
         try context.save()
 
         #expect(restore.restoredBatchCount == 1)
-        #expect(restore.restoredSourceCount == 5)
+        #expect(restore.restoredSourceCount == 6)
         #expect(pet.currentStreak == 5)
         #expect(pet.lastCheckInDate == Date(timeIntervalSince1970: 1_800_000_000))
         #expect(try context.fetch(FetchDescriptor<RecycleBinBatch>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).activeRecycleBinItems.count == 2)
         #expect(try context.fetch(FetchDescriptor<Event>()).activeRecycleBinItems.count == 2)
+        #expect(reminder.statusEnum == .pending)
+        #expect(reminder.completedBy.isEmpty)
     }
 
     private func makeContainer() throws -> ModelContainer {
