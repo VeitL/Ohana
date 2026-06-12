@@ -25,20 +25,23 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
-### TFU-20260613-007 - Fix CI FamilyTasks map trigonometry compile failure
+### TFU-20260613-007 - Fix CI build-test compiler failures outside Economy
 
 - Status: Open
 - Priority: P1
-- Area: FamilyTasks / CI Build
+- Area: CI Build / Recycle Bin / FamilyTasks
 - Source task: Economy adversarial P1 remediation close-out, 2026-06-13
-- Blocker: The Economy remediation head `006ae323e` passed the local module
-  exit gate, but GitHub Actions `build-test` fails before tests with
-  `Ambiguous use of 'cos'` in
-  `Ohana/Features/FamilyTasks/Views/FamilyCollaborationDashboardView+Map.swift`.
-  The failing line predates this Economy diff and belongs to the hidden
-  FamilyTasks surface.
-- Next step: In a FamilyTasks or CI unblock pass, qualify the trigonometry call
-  for Swift/Xcode 26.3 and run the full CI build-test job again.
+- Blocker: The Economy remediation head passed the local module exit gate, but
+  GitHub Actions `build-test` still fails before tests on pre-existing
+  non-Economy compiler surfaces. Observed failures include `Ambiguous use of
+  'cos'` in
+  `Ohana/Features/FamilyTasks/Views/FamilyCollaborationDashboardView+Map.swift`
+  on `006ae323e`, and a Swift type-check timeout at
+  `trashed(PetPhotoLog.self, context: context)` in
+  `Ohana/Domain/Services/RecycleBinService.swift` on `af316974f`.
+- Next step: In a CI unblock pass, repair the currently surfaced compiler
+  blocker, rerun `build-test`, and repeat until the job reaches the simulator
+  test suite rather than stopping at Swift compile.
 - Close when: GitHub Actions `build-test` reaches and completes the simulator
   test suite on the iPhone 17 destination for the current main branch.
 
