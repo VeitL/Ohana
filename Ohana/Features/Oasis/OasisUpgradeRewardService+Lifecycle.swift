@@ -54,8 +54,8 @@ extension OasisUpgradeRewardService {
         return OasisCritterLifecycleSnapshot(
             state: state,
             deathReason: critter.deathReason,
-            recommendedAction: recommendedCareAction(for: critter),
-            isRescuable: state == .atRisk || state == .sick || state == .critical,
+            recommendedAction: state == .dead ? .rescue : recommendedCareAction(for: critter),
+            isRescuable: state == .atRisk || state == .sick || state == .critical || state == .dead,
             hoursUntilDeath: remainingHours,
             ageDays: ageDays(for: critter, now: now),
             urgencyScore: urgency
@@ -104,11 +104,10 @@ extension OasisUpgradeRewardService {
                 de: "\(name) braucht dich wirklich. Pflege innerhalb von etwa \(hours) Std. kann es retten."
             )
         case .dead:
-            let reason = snapshot.deathReason?.name(l) ?? l.tr(zh: "生命结束", en: "life ended", de: "das Leben endete")
             return l.tr(
-                zh: "\(name) 已经安静地回到纪念册里，原因是\(reason)。",
-                en: "\(name) is resting in the memorial album because of \(reason).",
-                de: "\(name) ruht im Erinnerungsalbum wegen \(reason)."
+                zh: "\(name) 正在纪念册里安静休息，轻轻照顾一下就能回来打招呼。",
+                en: "\(name) is quietly resting in the memorial album. Gentle care can bring it back to say hello.",
+                de: "\(name) ruht leise im Erinnerungsalbum. Sanfte Pflege kann es zurückbringen."
             )
         }
     }
@@ -118,9 +117,6 @@ extension OasisUpgradeRewardService {
         normalizeLifecycle(for: critter, context: context, now: now)
         let snapshot = lifecycleSnapshot(for: critter, context: context, now: now)
         let wish = dailyWish(for: .rescue)
-        guard critter.lifeState != .dead else {
-            return deadInteractionOutcome(for: critter, action: .rescue)
-        }
         guard snapshot.isRescuable else {
             return OasisCritterInteractionOutcome(
                 success: false,
@@ -146,6 +142,7 @@ extension OasisUpgradeRewardService {
         critter.criticalStartedAt = nil
         critter.lifeState = .healthy
         critter.deathReason = nil
+        critter.diedAt = nil
         critter.lastInteractionAt = now
         critter.lastStateRefreshAt = now
         critter.lastGentlePromptAt = now

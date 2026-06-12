@@ -40,7 +40,15 @@ enum OasisCritterEconomyService {
         )
         descriptor.fetchLimit = 1
         do {
-            return try context.fetch(descriptor).first
+            let human = try context.fetch(descriptor).first
+            if human?.hasPassedAway == true {
+                OhanaLog.warning(
+                    "[OasisCritterEconomyService] active human id=\(id) is memorialized; skipping Oasis wallet access",
+                    category: "Oasis"
+                )
+                return nil
+            }
+            return human
         } catch {
             OhanaLog.warning(
                 "[OasisCritterEconomyService] failed to fetch active human id=\(id): \(error.localizedDescription)",
@@ -63,10 +71,11 @@ enum OasisCritterEconomyService {
         activeHumanSelection: ActiveHumanSelecting,
         questManager: QuestManager
     ) -> Int {
+        _ = questManager
         if let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) {
             return CoconutWalletService.balance(for: human, context: context)
         }
-        return CoconutWalletService.legacySystemBalance(context: context, fallback: questManager.coconutCount)
+        return 0
     }
 
     static func canSpendCurrentHumanCoconuts(_ amount: Int, context: ModelContext) -> Bool {
@@ -84,11 +93,227 @@ enum OasisCritterEconomyService {
         activeHumanSelection: ActiveHumanSelecting,
         questManager: QuestManager
     ) -> Bool {
-        guard amount > 0 else { return true }
-        if let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) {
-            return CoconutWalletService.balance(for: human, context: context) >= amount
+        _ = questManager
+        guard let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) else {
+            return false
         }
-        return CoconutWalletService.legacySystemBalance(context: context, fallback: questManager.coconutCount) >= amount
+        guard amount > 0 else { return true }
+        return CoconutWalletService.balance(for: human, context: context) >= amount
+    }
+
+    @discardableResult
+    static func awardBudgetedCurrentHumanCoconuts(
+        _ amount: Int,
+        emoji: String,
+        title: String,
+        context: ModelContext,
+        postsRewardFeedback: Bool = true,
+        date: Date = Date()
+    ) -> Int? {
+        awardBudgetedCurrentHumanCoconuts(
+            amount,
+            emoji: emoji,
+            title: title,
+            context: context,
+            postsRewardFeedback: postsRewardFeedback,
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            wallet: SwiftDataCoconutWalletManager(),
+            questManager: QuestManager(),
+            date: date
+        )
+    }
+
+    @discardableResult
+    static func awardBudgetedCurrentHumanCoconuts(
+        _ amount: Int,
+        emoji: String,
+        title: String,
+        context: ModelContext,
+        postsRewardFeedback: Bool = true,
+        activeHumanSelection: ActiveHumanSelecting,
+        wallet: CoconutWalletManaging,
+        questManager: QuestManager,
+        date: Date = Date()
+    ) -> Int? {
+        guard let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) else {
+            return nil
+        }
+        guard amount > 0 else { return 0 }
+
+        let action = QuestManager.OhanaActionType.general(
+            humanReward: amount,
+            petReward: 0,
+            emoji: emoji,
+            title: title
+        )
+        let wasOnCooldown = questManager.isOnCooldown(petId: nil, type: action)
+        let householdKey = CoconutEconomyPolicyV2.householdBudgetKey(context: context)
+        let memberKey = human.id.uuidString
+        let result = CoconutEconomyPolicyV2.reward(
+            for: action,
+            quality: .none,
+            isOnCooldown: wasOnCooldown,
+            userKey: householdKey,
+            memberKey: memberKey,
+            careObjectKeys: [],
+            careObjectCount: CoconutEconomyPolicyV2.careObjectCount(context: context),
+            hasHumanAccount: true,
+            hasPetAccount: false,
+            date: date,
+            forcedLuck: EconomyLuckTier.none,
+            context: context
+        )
+        questManager.lastEconomyRewardResult = result
+
+        let awarded = result.humanCoconuts
+        let walletDeltas: [CoconutWalletDelta] = awarded > 0
+            ? [
+                .human(
+                    human,
+                    delta: awarded,
+                    entryKind: .reward,
+                    source: .oasis,
+                    title: title,
+                    emoji: emoji,
+                    actorId: human.id.uuidString,
+                    actorName: human.name,
+                    subjectKind: .human,
+                    subjectId: human.id.uuidString,
+                    metadataJSON: result.metadataJSON,
+                    occurredAt: date
+                )
+            ]
+            : []
+
+        do {
+            try wallet.apply(
+                deltas: walletDeltas,
+                context: context,
+                save: false,
+                postsRewardFeedback: false,
+                updatesProjection: true,
+                projectionManager: questManager
+            )
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: householdKey,
+                memberKey: memberKey,
+                careObjectKeys: [],
+                date: date,
+                context: context,
+                save: false,
+                writeDefaults: false
+            )
+            try context.save()
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: householdKey,
+                memberKey: memberKey,
+                careObjectKeys: [],
+                date: date,
+                context: nil,
+                save: false
+            )
+            if postsRewardFeedback {
+                questManager.postEconomyFeedback(
+                    result,
+                    type: action,
+                    title: title,
+                    actorId: human.id.uuidString,
+                    actorName: human.name
+                )
+            }
+            if !wasOnCooldown {
+                questManager.recordCooldown(petId: nil, type: action)
+            }
+            return awarded
+        } catch {
+            context.rollback()
+            questManager.lastEconomyRewardResult = .empty
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            #if DEBUG
+                OhanaLog.error("[OasisCritterEconomyService] budgeted award failed: \(error.localizedDescription)", category: "Oasis")
+            #endif
+            return nil
+        }
+    }
+
+    @discardableResult
+    static func awardSpecialCurrentHumanCoconuts(
+        _ amount: Int,
+        emoji: String,
+        title: String,
+        sourceModelName: String,
+        sourceModelId: String,
+        transactionKey: String,
+        metadataJSON: String = "",
+        context: ModelContext,
+        postsRewardFeedback: Bool = true,
+        activeHumanSelection: ActiveHumanSelecting,
+        wallet: CoconutWalletManaging,
+        questManager: QuestManager,
+        occurredAt: Date = Date()
+    ) -> Int? {
+        guard let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) else {
+            return nil
+        }
+        guard amount > 0 else { return 0 }
+        do {
+            let awarded = try questManager.stageSpecialCoconutReward(
+                amount: amount,
+                emoji: emoji,
+                title: title,
+                actorId: human.id.uuidString,
+                actorName: human.name,
+                source: .oasis,
+                sourceModelName: sourceModelName,
+                sourceModelId: sourceModelId,
+                metadataJSON: metadataJSON,
+                transactionKey: transactionKey,
+                context: context,
+                occurredAt: occurredAt,
+                postsRewardFeedback: postsRewardFeedback
+            )
+            try context.save()
+            return awarded
+        } catch {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            #if DEBUG
+                OhanaLog.error("[OasisCritterEconomyService] special award failed: \(error.localizedDescription)", category: "Oasis")
+            #endif
+            return nil
+        }
+    }
+
+    @discardableResult
+    static func awardSpecialCurrentHumanCoconuts(
+        _ amount: Int,
+        emoji: String,
+        title: String,
+        sourceModelName: String,
+        sourceModelId: String,
+        transactionKey: String,
+        metadataJSON: String = "",
+        context: ModelContext,
+        postsRewardFeedback: Bool = true,
+        occurredAt: Date = Date()
+    ) -> Int? {
+        awardSpecialCurrentHumanCoconuts(
+            amount,
+            emoji: emoji,
+            title: title,
+            sourceModelName: sourceModelName,
+            sourceModelId: sourceModelId,
+            transactionKey: transactionKey,
+            metadataJSON: metadataJSON,
+            context: context,
+            postsRewardFeedback: postsRewardFeedback,
+            activeHumanSelection: UserDefaultsActiveHumanSelection(),
+            wallet: SwiftDataCoconutWalletManager(),
+            questManager: QuestManager(),
+            occurredAt: occurredAt
+        )
     }
 
     @discardableResult
@@ -115,51 +340,25 @@ enum OasisCritterEconomyService {
         questManager: QuestManager,
         updatesProjection: Bool = true
     ) -> Bool {
-        guard amount > 0 else { return true }
-        if let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) {
-            guard CoconutWalletService.balance(for: human, context: context) >= amount else { return false }
-            do {
-                try wallet.apply(
-                    deltas: [
-                        .human(
-                            human,
-                            delta: -amount,
-                            entryKind: .spend,
-                            source: .oasis,
-                            title: title,
-                            emoji: emoji,
-                            actorId: human.id.uuidString,
-                            actorName: human.name,
-                            subjectKind: .system,
-                            subjectId: nil
-                        )
-                    ],
-                    context: context,
-                    save: false,
-                    postsRewardFeedback: true,
-                    updatesProjection: updatesProjection,
-                    projectionManager: questManager
-                )
-                return true
-            } catch {
-                #if DEBUG
-                    OhanaLog.error("[OasisCritterEconomyService] spend failed: \(error.localizedDescription)", category: "Oasis")
-                #endif
-                return false
-            }
+        guard let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) else {
+            return false
         }
-        guard CoconutWalletService.legacySystemBalance(context: context, fallback: questManager.coconutCount) >= amount else { return false }
+        guard amount > 0 else { return true }
+        guard CoconutWalletService.balance(for: human, context: context) >= amount else { return false }
         do {
             try wallet.apply(
                 deltas: [
-                    .system(
+                    .human(
+                        human,
                         delta: -amount,
                         entryKind: .spend,
                         source: .oasis,
                         title: title,
                         emoji: emoji,
-                        actorId: "system",
-                        actorName: "Oasis"
+                        actorId: human.id.uuidString,
+                        actorName: human.name,
+                        subjectKind: .system,
+                        subjectId: nil
                     )
                 ],
                 context: context,
@@ -171,102 +370,9 @@ enum OasisCritterEconomyService {
             return true
         } catch {
             #if DEBUG
-                OhanaLog.error("[OasisCritterEconomyService] system spend failed: \(error.localizedDescription)", category: "Oasis")
+                OhanaLog.error("[OasisCritterEconomyService] spend failed: \(error.localizedDescription)", category: "Oasis")
             #endif
             return false
-        }
-    }
-
-    @discardableResult
-    static func awardCurrentHumanCoconuts(
-        _ amount: Int,
-        emoji: String,
-        title: String,
-        context: ModelContext,
-        postsRewardFeedback: Bool = true
-    ) -> Bool {
-        guard amount > 0 else { return true }
-        return awardCurrentHumanCoconuts(
-            amount,
-            emoji: emoji,
-            title: title,
-            context: context,
-            postsRewardFeedback: postsRewardFeedback,
-            activeHumanSelection: UserDefaultsActiveHumanSelection(),
-            wallet: SwiftDataCoconutWalletManager(),
-            questManager: QuestManager()
-        )
-    }
-
-    @discardableResult
-    static func awardCurrentHumanCoconuts(
-        _ amount: Int,
-        emoji: String,
-        title: String,
-        context: ModelContext,
-        postsRewardFeedback: Bool = true,
-        activeHumanSelection: ActiveHumanSelecting,
-        wallet: CoconutWalletManaging,
-        questManager: QuestManager
-    ) -> Bool {
-        guard amount > 0 else { return true }
-        if let human = currentHuman(context: context, activeHumanSelection: activeHumanSelection) {
-            do {
-                try wallet.apply(
-                    deltas: [
-                        .human(
-                            human,
-                            delta: amount,
-                            entryKind: .reward,
-                            source: .oasis,
-                            title: title,
-                            emoji: emoji,
-                            actorId: human.id.uuidString,
-                            actorName: human.name,
-                            subjectKind: .system,
-                            subjectId: nil
-                        )
-                    ],
-                    context: context,
-                    save: false,
-                    postsRewardFeedback: postsRewardFeedback,
-                    updatesProjection: true,
-                    projectionManager: questManager
-                )
-                return true
-            } catch {
-                #if DEBUG
-                    OhanaLog.error("[OasisCritterEconomyService] human award failed: \(error.localizedDescription)", category: "Oasis")
-                #endif
-                return false
-            }
-        } else {
-            do {
-                try wallet.apply(
-                    deltas: [
-                        .system(
-                            delta: amount,
-                            entryKind: .reward,
-                            source: .oasis,
-                            title: title,
-                            emoji: emoji,
-                            actorId: "system",
-                            actorName: "Oasis"
-                        )
-                    ],
-                    context: context,
-                    save: false,
-                    postsRewardFeedback: postsRewardFeedback,
-                    updatesProjection: true,
-                    projectionManager: questManager
-                )
-                return true
-            } catch {
-                #if DEBUG
-                    OhanaLog.error("[OasisCritterEconomyService] system award failed: \(error.localizedDescription)", category: "Oasis")
-                #endif
-                return false
-            }
         }
     }
 }

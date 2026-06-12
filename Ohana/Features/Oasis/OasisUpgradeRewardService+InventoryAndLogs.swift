@@ -246,9 +246,9 @@ extension OasisUpgradeRewardService {
             action: action,
             completedDailyWish: false,
             wish: nil,
-            messageZh: "它已经进入纪念册，原因是\(reasonZh)。",
-            messageEn: "It is now in the memorial album because of \(reasonEn).",
-            messageDe: "Es ist jetzt im Erinnerungsalbum wegen \(reasonDe).",
+            messageZh: "它正在纪念册里安静休息，因为\(reasonZh)。可以用一键照顾把它带回来。",
+            messageEn: "It is resting in the memorial album because of \(reasonEn). One-tap care can bring it back.",
+            messageDe: "Es ruht im Erinnerungsalbum wegen \(reasonDe). Ein-Klick-Pflege kann es zurückholen.",
             rewardXP: 0,
             rewardBond: 0,
             rewardFragments: 0,
@@ -256,7 +256,12 @@ extension OasisUpgradeRewardService {
         )
     }
 
-    static func interactionOutcome(action: OasisCritterAction, wish: OasisCritterDailyWish, completedWish: Bool) -> OasisCritterInteractionOutcome {
+    static func interactionOutcome(
+        action: OasisCritterAction,
+        wish: OasisCritterDailyWish,
+        completedWish: Bool,
+        awardedWishCoconuts: Int? = nil
+    ) -> OasisCritterInteractionOutcome {
         if completedWish {
             return OasisCritterInteractionOutcome(
                 success: true,
@@ -269,7 +274,7 @@ extension OasisUpgradeRewardService {
                 rewardXP: wish.rewardXP,
                 rewardBond: wish.rewardBond,
                 rewardFragments: wish.rewardFragments,
-                rewardCoconuts: wish.rewardCoconuts
+                rewardCoconuts: awardedWishCoconuts ?? wish.rewardCoconuts
             )
         }
 

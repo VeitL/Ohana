@@ -81,15 +81,20 @@ extension OasisUpgradeRewardService {
             coconut.descriptionDe = "Dieser Begleiter ist bei Lebensbaum Lv.\(entry.sourceLevel) garantiert."
         }
 
-        guard OasisCritterEconomyService.awardCurrentHumanCoconuts(
+        guard OasisCritterEconomyService.awardSpecialCurrentHumanCoconuts(
             coconut.coconutAmount,
             emoji: "🥥",
             title: "升级椰子 Lv.\(coconut.level)",
+            sourceModelName: "OasisUpgradeCoconut",
+            sourceModelId: coconut.id.uuidString,
+            transactionKey: "oasis:upgradeCoconut:\(coconut.id.uuidString):coconuts",
+            metadataJSON: "{\"kind\":\"oasisUpgradeCoconut\",\"level\":\(coconut.level)}",
             context: context,
+            postsRewardFeedback: true,
             activeHumanSelection: activeHumanSelection,
             wallet: wallet,
             questManager: questManager
-        ) else {
+        ) != nil else {
             context.rollback()
             wallet.refreshQuestProjection(context: context, manager: questManager)
             throw OasisRewardWriteError.coconutAwardFailed

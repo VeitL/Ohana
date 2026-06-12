@@ -95,7 +95,7 @@ struct OasisBentoGridView: View {
     let snapshot: OasisBentoSnapshot
     let localization: L10n
     var shopLockedLevel: Int?
-    var achievementsLockedLevel: Int? = nil
+    var achievementsLockedLevel: Int?
     var crittersLockedLevel: Int?
     var gachaLockedLevel: Int?
     var isCompact: Bool = false
@@ -267,9 +267,8 @@ struct OasisBentoGridView: View {
 
     private func unavailableBadge(title: String) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: "minus.circle.fill") // a11y: decorative; badge text carries the state.
+            Image(systemName: "minus.circle.fill").accessibilityHidden(true)
                 .font(OhanaFont.caption2(.black))
-                .accessibilityHidden(true)
             Text(title)
                 .font(isCompact ? OhanaFont.caption2(.black) : OhanaFont.caption(.black))
                 .lineLimit(1)
@@ -346,10 +345,10 @@ struct OasisBentoFeatureInfoOverlay: View {
                 Button {
                     onDismiss()
                 } label: {
-                    Image(systemName: "xmark")
+                    Image(systemName: "xmark").accessibilityHidden(true)
                         .font(OhanaFont.caption(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(Color.ohanaControlFill, in: Circle())
                 }
                 .buttonStyle(ScaleButtonStyle())

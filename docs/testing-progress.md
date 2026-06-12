@@ -14,7 +14,7 @@
 | 3 | `Ohana/Shared` | 🟢 | 门禁通过并提交：`fcf998088`；P1 余留见 TFU-20260612-015 |
 | 4 | `Ohana/App` | 🟢 | 门禁通过并提交：`e48c13af7`；无 P1/P2 余留 |
 | 5 | Home + TodayFocus + QuickCare | 🟢 | 门禁通过并提交：`b8e8710e`；TFU-20260612-015 已关闭，无 P1/P2 余留 |
-| 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟡 | Feeding 门禁通过并提交：`b49134977`；Members 门禁通过并提交：`ead1e5fe4`；Oasis/Settings/Health/Economy 待启动 |
+| 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟡 | Feeding 门禁通过并提交：`b49134977`；Members 门禁通过并提交：`ead1e5fe4`；Oasis 门禁通过，提交待回填；Settings/Health/Economy 待启动 |
 | 6.5 | 宪法差距建设（联机门/回收站/自动备份） | ⬜ | 见下方「建设工作」表与 `docs/planning/constitution-gap-inventory.md` |
 | 7 | 中小模块批量 | ⬜ | |
 | 8 | 横向集成与全量回归 | ⬜ | 需总览会话主持 |
@@ -34,7 +34,7 @@
 | QuickCare | 5 | 🟢 | 2026-06-12 | 无 | `b8e8710e` | `ExecutorPickerBar` 的 SwiftData 查询已迁入 QuickCare feature 容器，Shared 只保留纯展示组件；空/多成员 picker smoke tests 已补 |
 | Feeding | 6 | 🟢 | 2026-06-12 | 跨模块 read-model 余留见 TFU-20260612-006 | `b49134977` | CloudSync `Event` / `PetFoodRecord` 上传与 apply 支持已补；Feeding 计划、粮仓、断粮提醒、自动投喂日志会写入 dirty/tombstone；dashboard 内容 revision 与本地化已修复；模块门禁通过 |
 | Members | 6 | 🟢 | 2026-06-12 | P1/P2 余留见 TFU-20260612-018~021 | `ead1e5fe4` | Human/Pet 删除聚合进入回收站并可恢复相关 Event/Reminder；Human 侧私密记录回收期保留、过期清理写 tombstone；成员创建生日/到家日 Event 与 Reminder 写 sync metadata；RequiredHumanProfileView a11y 修复；`scripts/module-exit-gate.sh` PASS；真实 UI 抽查见统一 track list |
-| Oasis | 6 | ⬜ | | | | |
+| Oasis | 6 | 🟢 | 2026-06-12 | 无 | 待提交 | 开工：2026-06-12；规则书见 `docs/specs/Oasis-logic.md`；当前主人钱包门、预算/冷却产出、一次性幂等奖励、休眠可唤回语义已落地；`scripts/module-exit-gate.sh` PASS；真实 UI 抽查见 `docs/planning/gap-acceptance-track-list.md#phase-6-oasis`；未改 schema / 路由 / 启动路径 / CloudKit |
 | Settings | 6 | ⬜ | | | | |
 | Health | 6 | ⬜ | | | | |
 | Economy | 6 | ⬜ | | | | |

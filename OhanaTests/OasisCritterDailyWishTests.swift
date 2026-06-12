@@ -35,6 +35,10 @@ struct OasisCritterDailyWishTests {
             mood: 80,
             sourceLevel: 10
         )
+        let human = Human(name: "Ava")
+        UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
+        context.insert(human)
         context.insert(critter)
         try context.save()
 
@@ -212,7 +216,7 @@ struct OasisCritterDailyWishTests {
     }
 
     @MainActor
-    @Test func criticalWindowKillsWithReasonAfterGracePeriod() throws {
+    @Test func criticalWindowSettlesIntoRememberedRestingStateAfterGracePeriod() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let now = Date()
@@ -230,7 +234,7 @@ struct OasisCritterDailyWishTests {
     }
 
     @MainActor
-    @Test func oldAgeDeathIsArchivedAsMemorialState() throws {
+    @Test func oldAgeRestingStateIsArchivedAsMemorialState() throws {
         let container = try makeContainer()
         let context = container.mainContext
         let now = Date()
@@ -244,6 +248,28 @@ struct OasisCritterDailyWishTests {
         #expect(critter.lifeState == .dead)
         #expect(critter.deathReason == .oldAge)
         #expect(!critter.isFeaturedOnOasis)
+    }
+
+    @MainActor
+    @Test func rememberedRestingCritterCanBeRescued() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let critter = makeCritter(hunger: 0, mood: 0, health: 0, lastStateRefreshAt: now)
+        critter.lifeState = .dead
+        critter.deathReason = .hungry
+        critter.diedAt = Calendar.current.date(byAdding: .day, value: -1, to: now)
+        context.insert(critter)
+
+        let outcome = try OasisUpgradeRewardService.rescueIfNeeded(for: critter, context: context, now: now)
+
+        #expect(outcome.success)
+        #expect(critter.lifeState == .healthy)
+        #expect(critter.deathReason == nil)
+        #expect(critter.diedAt == nil)
+        #expect(critter.hunger >= 58)
+        #expect(critter.mood >= 58)
+        #expect(critter.health >= 74)
     }
 
     @MainActor
@@ -471,8 +497,135 @@ struct OasisCritterDailyWishTests {
     }
 
     @MainActor
+    @Test func oasisEconomyDoesNotFallBackToLegacySystemWalletWithoutActiveHuman() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let legacy = CoconutAccount(
+            accountKey: CoconutAccountKey.legacySystem,
+            ownerKind: .system,
+            ownerId: "legacy",
+            displayName: "Legacy",
+            balance: 99
+        )
+        context.insert(legacy)
+        try context.save()
+
+        let selection = StubActiveHumanSelection(currentHumanId: nil)
+        let questManager = QuestManager()
+
+        #expect(OasisCritterEconomyService.currentHumanBalance(
+            context: context,
+            activeHumanSelection: selection,
+            questManager: questManager
+        ) == 0)
+        #expect(!OasisCritterEconomyService.canSpendCurrentHumanCoconuts(
+            1,
+            context: context,
+            activeHumanSelection: selection,
+            questManager: questManager
+        ))
+        #expect(!OasisCritterEconomyService.spendCurrentHumanCoconuts(
+            1,
+            emoji: "✨",
+            title: "No active human",
+            context: context,
+            activeHumanSelection: selection,
+            wallet: SwiftDataCoconutWalletManager(),
+            questManager: questManager
+        ))
+        #expect(OasisCritterEconomyService.awardBudgetedCurrentHumanCoconuts(
+            1,
+            emoji: "🥥",
+            title: "No active human reward",
+            context: context,
+            postsRewardFeedback: false,
+            activeHumanSelection: selection,
+            wallet: SwiftDataCoconutWalletManager(),
+            questManager: questManager,
+            date: Date(timeIntervalSince1970: 1_802_000_000)
+        ) == nil)
+        #expect(OasisCritterEconomyService.awardSpecialCurrentHumanCoconuts(
+            1,
+            emoji: "🥥",
+            title: "No active special reward",
+            sourceModelName: "Test",
+            sourceModelId: "no-active-human",
+            transactionKey: "test:no-active-human",
+            context: context,
+            postsRewardFeedback: false,
+            activeHumanSelection: selection,
+            wallet: SwiftDataCoconutWalletManager(),
+            questManager: questManager
+        ) == nil)
+        #expect(legacy.balance == 99)
+    }
+
+    @MainActor
+    @Test func repeatedOasisRewardsUseBudgetAndCooldown() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Ava")
+        let selection = StubActiveHumanSelection(currentHumanId: human.id.uuidString)
+        let date = Date(timeIntervalSince1970: 1_802_000_000)
+        let householdKey = CoconutEconomyPolicyV2.householdBudgetKey(context: context)
+        let oldCooldown = UserDefaults.standard.object(forKey: QuestManager.Keys.cooldownLogs)
+        defer {
+            if let oldCooldown {
+                UserDefaults.standard.set(oldCooldown, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                UserDefaults.standard.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
+            EconomyDailyBudgetStore.reset(
+                householdKey: householdKey,
+                memberKey: human.id.uuidString,
+                date: date
+            )
+        }
+        UserDefaults.standard.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        context.insert(human)
+        try context.save()
+        EconomyDailyBudgetStore.reset(
+            householdKey: householdKey,
+            memberKey: human.id.uuidString,
+            date: date
+        )
+
+        let questManager = QuestManager()
+        let first = OasisCritterEconomyService.awardBudgetedCurrentHumanCoconuts(
+            1,
+            emoji: "📅",
+            title: "Oasis daily check-in",
+            context: context,
+            postsRewardFeedback: false,
+            activeHumanSelection: selection,
+            wallet: SwiftDataCoconutWalletManager(),
+            questManager: questManager,
+            date: date
+        )
+        let second = OasisCritterEconomyService.awardBudgetedCurrentHumanCoconuts(
+            1,
+            emoji: "📅",
+            title: "Oasis daily check-in",
+            context: context,
+            postsRewardFeedback: false,
+            activeHumanSelection: selection,
+            wallet: SwiftDataCoconutWalletManager(),
+            questManager: questManager,
+            date: date.addingTimeInterval(60)
+        )
+
+        #expect(first == 1)
+        #expect(second == 0)
+        #expect(CoconutWalletService.balance(for: human, context: context) == 1)
+
+        let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        #expect(budgetEvents.contains { $0.actionKey.contains("Oasis daily") && $0.coconutUsed == 1 })
+        #expect(budgetEvents.contains { $0.actionKey.contains("Oasis daily") && $0.coconutUsed == 0 })
+    }
+
+    @MainActor
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV64.models)
+        let schema = Schema(ArkSchemaV69.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -500,6 +653,15 @@ struct OasisCritterDailyWishTests {
             lastInteractionAt: lastInteractionAt,
             lastStateRefreshAt: lastStateRefreshAt
         )
+    }
+
+    @MainActor
+    private struct StubActiveHumanSelection: ActiveHumanSelecting {
+        let currentHumanId: String?
+
+        var currentHumanIdRaw: String {
+            currentHumanId ?? ""
+        }
     }
 
     @MainActor

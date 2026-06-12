@@ -44,13 +44,27 @@ protocol OasisRewardManaging {
     func currentHumanBalance(context: ModelContext) -> Int
     func canSpendCurrentHumanCoconuts(_ amount: Int, context: ModelContext) -> Bool
     @discardableResult
-    func awardCurrentHumanCoconuts(
+    func awardBudgetedCurrentHumanCoconuts(
         _ amount: Int,
         emoji: String,
         title: String,
         context: ModelContext,
-        postsRewardFeedback: Bool
-    ) -> Bool
+        postsRewardFeedback: Bool,
+        date: Date
+    ) -> Int?
+    @discardableResult
+    func awardSpecialCurrentHumanCoconuts(
+        _ amount: Int,
+        emoji: String,
+        title: String,
+        sourceModelName: String,
+        sourceModelId: String,
+        transactionKey: String,
+        metadataJSON: String,
+        context: ModelContext,
+        postsRewardFeedback: Bool,
+        occurredAt: Date
+    ) -> Int?
     func refreshCoconutProjection(context: ModelContext)
 
     func lifecycleSnapshot(for critter: OasisElectronicPet, context: ModelContext) -> OasisCritterLifecycleSnapshot
@@ -124,14 +138,15 @@ final class StaticOasisRewardManager: OasisRewardManaging {
     }
 
     @discardableResult
-    func awardCurrentHumanCoconuts(
+    func awardBudgetedCurrentHumanCoconuts(
         _ amount: Int,
         emoji: String,
         title: String,
         context: ModelContext,
-        postsRewardFeedback: Bool
-    ) -> Bool {
-        OasisCritterEconomyService.awardCurrentHumanCoconuts(
+        postsRewardFeedback: Bool,
+        date: Date = Date()
+    ) -> Int? {
+        OasisCritterEconomyService.awardBudgetedCurrentHumanCoconuts(
             amount,
             emoji: emoji,
             title: title,
@@ -139,7 +154,38 @@ final class StaticOasisRewardManager: OasisRewardManaging {
             postsRewardFeedback: postsRewardFeedback,
             activeHumanSelection: activeHumanSelection,
             wallet: wallet,
-            questManager: questManager
+            questManager: questManager,
+            date: date
+        )
+    }
+
+    @discardableResult
+    func awardSpecialCurrentHumanCoconuts(
+        _ amount: Int,
+        emoji: String,
+        title: String,
+        sourceModelName: String,
+        sourceModelId: String,
+        transactionKey: String,
+        metadataJSON: String,
+        context: ModelContext,
+        postsRewardFeedback: Bool,
+        occurredAt: Date = Date()
+    ) -> Int? {
+        OasisCritterEconomyService.awardSpecialCurrentHumanCoconuts(
+            amount,
+            emoji: emoji,
+            title: title,
+            sourceModelName: sourceModelName,
+            sourceModelId: sourceModelId,
+            transactionKey: transactionKey,
+            metadataJSON: metadataJSON,
+            context: context,
+            postsRewardFeedback: postsRewardFeedback,
+            activeHumanSelection: activeHumanSelection,
+            wallet: wallet,
+            questManager: questManager,
+            occurredAt: occurredAt
         )
     }
 

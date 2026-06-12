@@ -19,7 +19,7 @@ extension OasisUpgradeRewardService {
         now: Date = Date()
     ) -> OasisCritterDailyWish {
         if snapshot.state == .dead {
-            return dailyWish(for: .rest)
+            return dailyWish(for: .rescue)
         }
         if snapshot.state == .atRisk || snapshot.state == .sick || snapshot.state == .critical {
             return dailyWish(for: .rescue)

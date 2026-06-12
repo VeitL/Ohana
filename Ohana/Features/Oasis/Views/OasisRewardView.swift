@@ -508,16 +508,18 @@ struct OasisRewardView: View {
     }
 
     var activeHuman: Human? {
-        humans.first { $0.id.uuidString == currentActiveHumanId }
+        humans.first { $0.id.uuidString == currentActiveHumanId && !$0.hasPassedAway }
     }
 
     var activeHumanCoconutBalance: Int {
         if let coconutBalanceVisualOverride {
             return coconutBalanceVisualOverride
         }
-        return actionSnapshot.activeCoconutBalance > 0
-            ? actionSnapshot.activeCoconutBalance
-            : (activeHuman?.coconutBalance ?? humans.reduce(0) { $0 + $1.coconutBalance })
+        guard let activeHuman else { return 0 }
+        if actionSnapshot.activeCoconutBalance > 0 || actionSnapshot.canInjectCoconuts != nil {
+            return actionSnapshot.activeCoconutBalance
+        }
+        return activeHuman.coconutBalance
     }
 
     var canInjectTreeEnergy: Bool {

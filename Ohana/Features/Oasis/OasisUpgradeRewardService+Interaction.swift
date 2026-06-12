@@ -38,12 +38,13 @@ extension OasisUpgradeRewardService {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let questManager = providedQuestManager ?? QuestManager()
         normalizeLifecycle(for: critter, context: context)
-        if critter.lifeState == .dead {
+        if critter.lifeState == .dead, action != .rescue {
             return deadInteractionOutcome(for: critter, action: action)
         }
         let wish = dailyWish(for: critter, context: context)
         let wasWishCompleted = isDailyWishCompleted(for: critter, wish: wish, context: context)
         var interactionOverride: OasisCritterInteractionOutcome?
+        var awardedWishCoconuts: Int?
 
         switch action {
         case .feed:
@@ -137,24 +138,27 @@ extension OasisUpgradeRewardService {
             let wishXPDelta = addXP(wish.rewardXP, to: critter)
             critter.bond = min(999, critter.bond + wish.rewardBond)
             addFragments(critterId: critter.catalogId, amount: wish.rewardFragments, context: context)
-            guard OasisCritterEconomyService.awardCurrentHumanCoconuts(
+            guard let awardedCoconuts = OasisCritterEconomyService.awardBudgetedCurrentHumanCoconuts(
                 wish.rewardCoconuts,
                 emoji: "💌",
                 title: "电子宠物小愿望",
                 context: context,
+                postsRewardFeedback: true,
                 activeHumanSelection: activeHumanSelection,
                 wallet: wallet,
-                questManager: questManager
+                questManager: questManager,
+                date: Date()
             ) else {
                 context.rollback()
                 wallet.refreshQuestProjection(context: context, manager: questManager)
                 throw OasisRewardWriteError.coconutAwardFailed
             }
+            awardedWishCoconuts = awardedCoconuts
             context.insert(OasisCritterActionLog(
                 critterId: critter.id,
                 critterCatalogId: critter.catalogId,
                 action: .careEcho,
-                coconutDelta: wish.rewardCoconuts,
+                coconutDelta: awardedCoconuts,
                 fragmentDelta: wish.rewardFragments,
                 xpDelta: wishXPDelta,
                 sourceLevel: critter.sourceLevel,
@@ -179,7 +183,12 @@ extension OasisUpgradeRewardService {
         if !completedWish, let interactionOverride {
             return interactionOverride
         }
-        return interactionOutcome(action: action, wish: wish, completedWish: completedWish)
+        return interactionOutcome(
+            action: action,
+            wish: wish,
+            completedWish: completedWish,
+            awardedWishCoconuts: awardedWishCoconuts
+        )
     }
 
     static func canInteract(

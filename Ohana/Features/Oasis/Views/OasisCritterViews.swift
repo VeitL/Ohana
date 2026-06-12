@@ -287,11 +287,11 @@ struct OasisCritterCodexView: View {
     }
 
     var activeHuman: Human? {
-        humans.first { $0.id.uuidString == currentActiveHumanId }
+        humans.first { $0.id.uuidString == currentActiveHumanId && !$0.hasPassedAway }
     }
 
     var currentCoconutBalance: Int {
-        activeHuman?.coconutBalance ?? humans.reduce(0) { $0 + $1.coconutBalance }
+        activeHuman?.coconutBalance ?? 0
     }
 
     var body: some View {

@@ -146,9 +146,8 @@ extension OasisRewardView {
 
     func lockedCritterCodexLabel(level: Int) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: "lock.fill")
+            Image(systemName: "lock.fill").accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 9, weight: .black))
-                .accessibilityHidden(true)
             Text(l.tr(zh: "Lv.\(level) 解锁", en: "Lv.\(level)", de: "Lv.\(level)"))
                 .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
                 .lineLimit(1)

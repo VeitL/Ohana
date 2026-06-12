@@ -18,7 +18,7 @@ struct OasisRewardCommandExecutor {
     }
 
     func currentHumanCoconutBalance(humans: [Human], currentActiveHumanId: String) -> Int {
-        guard let human = humans.first(where: { $0.id.uuidString == currentActiveHumanId }) else {
+        guard let human = humans.first(where: { $0.id.uuidString == currentActiveHumanId && !$0.hasPassedAway }) else {
             return rewards.currentHumanBalance(context: context)
         }
         return CoconutWalletService.balance(for: human, context: context)
@@ -129,22 +129,17 @@ struct OasisRewardCommandExecutor {
 
     func awardHarvestedTreeCoconuts(_ amount: Int) {
         guard amount > 0 else { return }
-        guard rewards.awardCurrentHumanCoconuts(
+        guard rewards.awardBudgetedCurrentHumanCoconuts(
             amount,
             emoji: "🥥",
             title: "摘下椰子 +\(amount)🥥",
             context: context,
-            postsRewardFeedback: false
-        ) else {
+            postsRewardFeedback: false,
+            date: Date()
+        ) != nil else {
             context.rollback()
             rewards.refreshCoconutProjection(context: context)
             return
-        }
-        do {
-            try context.save()
-        } catch {
-            context.rollback()
-            rewards.refreshCoconutProjection(context: context)
         }
     }
 
@@ -153,20 +148,14 @@ struct OasisRewardCommandExecutor {
         let amount = treeManager.passiveIncomeAmount
         guard amount > 0 else { return false }
         let harvestDate = Date()
-        guard rewards.awardCurrentHumanCoconuts(
+        guard rewards.awardBudgetedCurrentHumanCoconuts(
             amount,
             emoji: "🌳",
             title: "生命之树的馈赠 +\(amount)🥥",
             context: context,
-            postsRewardFeedback: false
-        ) else {
-            context.rollback()
-            rewards.refreshCoconutProjection(context: context)
-            return false
-        }
-        do {
-            try context.save()
-        } catch {
+            postsRewardFeedback: false,
+            date: harvestDate
+        ) != nil else {
             context.rollback()
             rewards.refreshCoconutProjection(context: context)
             return false
@@ -237,20 +226,14 @@ struct OasisRewardCommandExecutor {
         guard !checkedInDates.contains(today) else { return nil }
         var updatedDates = checkedInDates
         updatedDates.insert(today)
-        guard rewards.awardCurrentHumanCoconuts(
+        guard rewards.awardBudgetedCurrentHumanCoconuts(
             1,
             emoji: "📅",
             title: "每日打卡奖励",
             context: context,
-            postsRewardFeedback: true
-        ) else {
-            context.rollback()
-            rewards.refreshCoconutProjection(context: context)
-            return nil
-        }
-        do {
-            try context.save()
-        } catch {
+            postsRewardFeedback: true,
+            date: Date()
+        ) != nil else {
             context.rollback()
             rewards.refreshCoconutProjection(context: context)
             return nil
@@ -276,20 +259,19 @@ struct OasisRewardCommandExecutor {
     }
 
     func claimMilestone(days: Int, reward: Int, emoji: String, currentActiveHumanId: String) {
-        guard rewards.awardCurrentHumanCoconuts(
+        guard CheckInStreakStore.lastClaimedMilestone(for: currentActiveHumanId) < days else { return }
+        guard rewards.awardSpecialCurrentHumanCoconuts(
             reward,
             emoji: emoji,
             title: "\(days)天连胜奖励",
+            sourceModelName: "OasisCheckInMilestone",
+            sourceModelId: "\(currentActiveHumanId):\(days)",
+            transactionKey: "oasis:checkInMilestone:\(currentActiveHumanId):\(days)",
+            metadataJSON: "{\"kind\":\"oasisCheckInMilestone\",\"days\":\(days)}",
             context: context,
-            postsRewardFeedback: true
-        ) else {
-            context.rollback()
-            rewards.refreshCoconutProjection(context: context)
-            return
-        }
-        do {
-            try context.save()
-        } catch {
+            postsRewardFeedback: true,
+            occurredAt: Date()
+        ) != nil else {
             context.rollback()
             rewards.refreshCoconutProjection(context: context)
             return

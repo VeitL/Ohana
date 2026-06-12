@@ -227,7 +227,7 @@ final class OasisTreeManager {
         let wallet = providedWallet ?? SwiftDataCoconutWalletManager()
         let questManager = providedQuestManager ?? QuestManager()
         let harvestDate = Date()
-        guard OasisCritterEconomyService.awardCurrentHumanCoconuts(
+        guard OasisCritterEconomyService.awardBudgetedCurrentHumanCoconuts(
             passiveIncomeAmount,
             emoji: "🌳",
             title: "生命之树的馈赠 +\(passiveIncomeAmount)🥥",
@@ -235,15 +235,9 @@ final class OasisTreeManager {
             postsRewardFeedback: true,
             activeHumanSelection: activeHumanSelection,
             wallet: wallet,
-            questManager: questManager
-        ) else {
-            modelContext.rollback()
-            wallet.refreshQuestProjection(context: modelContext, manager: questManager)
-            return false
-        }
-        do {
-            try modelContext.save()
-        } catch {
+            questManager: questManager,
+            date: harvestDate
+        ) != nil else {
             modelContext.rollback()
             wallet.refreshQuestProjection(context: modelContext, manager: questManager)
             return false
