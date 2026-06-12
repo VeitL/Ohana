@@ -23,7 +23,7 @@ struct AppPrivacySnapshotCover: View {
             OhanaStaticAppBackground()
 
             VStack(spacing: 14) {
-                Image(systemName: "lock.shield.fill")
+                Image(systemName: "lock.shield.fill").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 44, weight: .black))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 86, height: 86)

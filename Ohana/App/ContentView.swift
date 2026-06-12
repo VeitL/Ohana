@@ -56,8 +56,11 @@ struct ContentView: View {
                             Button {
                                 dismissKeyboard()
                             } label: {
-                                Label("隐藏键盘", systemImage: "keyboard.chevron.compact.down")
-                                    .font(OhanaFont.callout(.semibold))
+                                Label(
+                                    l.tr(zh: "隐藏键盘", en: "Hide keyboard", de: "Tastatur ausblenden"),
+                                    systemImage: "keyboard.chevron.compact.down"
+                                )
+                                .font(OhanaFont.callout(.semibold))
                             }
                         }
                     }
@@ -192,6 +195,10 @@ struct ContentView: View {
             return nil
         }
         return amount
+    }
+
+    private var l: L10n {
+        L10n(appLanguage)
     }
 
     private func scheduleRootAppearHandoff() {
