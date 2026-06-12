@@ -35,7 +35,7 @@ final class CloudSyncRecordState {
     var conflictPolicyRaw: String
     // Legacy column: SwiftData does not reliably persist this name as sync tombstone state.
     var isDeleted: Bool
-    var isDeletionTombstone: Bool
+    var isDeletionTombstone: Bool = false
     var deletedAt: Date?
     var deletedByHumanId: String
     var hasPendingLocalChanges: Bool

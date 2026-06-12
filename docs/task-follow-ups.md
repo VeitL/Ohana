@@ -404,6 +404,29 @@ actionable; long-term product ideas belong in planning docs instead.
   them, and CloudKit two-device validation confirms the cleanup does not
   produce repeated remote modifications.
 
+### TFU-20260612-012 - Move pet activity cleanup out of the Pet model
+
+- Status: Open
+- Priority: P0
+- Area: Models / Members / Domain Commands
+- Source task: Models Phase 1 P0 remediation, 2026-06-12
+- Blocker: The Models session is scoped to `Ohana/Models`; fully fixing this
+  requires changing the caller in `Ohana/Features/Members/MemberInteractionCommands.swift`
+  and likely moving `Pet.clearAllActivityRecords(in:)` into a feature command
+  or domain service. The current model method fetches/deletes SwiftData records,
+  cancels notifications, resets streak state, and saves the context from inside
+  an `@Model`, which violates the model-layer boundary.
+- Next step: In a cross-scope repair, add a command/service that owns the
+  activity cleanup transaction, updates the Members caller to use it, then
+  remove the persistence/notification side effects from `Pet`.
+- Current task disposition: Deferred as a cross-scope P0; do not patch
+  `Ohana/Features` or `Ohana/Domain` from the Models-only session without
+  explicit authorization.
+- Close when: `Pet` no longer owns `ModelContext` fetch/delete/save or
+  notification cancellation, the Members cleanup path calls the new command or
+  service, and in-memory SwiftData tests cover event/reminder/log deletion plus
+  preserved documents/insurances.
+
 ### TFU-20260612-013 - Remove duplicate WeightHistoryView source file
 
 - Status: Closed

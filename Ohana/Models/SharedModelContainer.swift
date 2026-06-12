@@ -870,6 +870,12 @@ enum ArkSchemaV67: VersionedSchema {
     static var models: [any PersistentModel.Type] { ArkSchemaV66.models }
 }
 
+// MARK: - Schema V68（CloudSync tombstone 默认值）
+enum ArkSchemaV68: VersionedSchema {
+    static var versionIdentifier = Schema.Version(68, 0, 0)
+    static var models: [any PersistentModel.Type] { ArkSchemaV67.models }
+}
+
 // MARK: - Migration Plan
 // NOTE: 只保留有真实 custom logic 的 stage。
 // SwiftData 的 lightweight migration 对于"只新增字段/模型"完全不需要显式 stage——
@@ -892,7 +898,7 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV50.self, ArkSchemaV51.self, ArkSchemaV52.self, ArkSchemaV53.self, ArkSchemaV54.self,
          ArkSchemaV55.self, ArkSchemaV56.self, ArkSchemaV57.self, ArkSchemaV58.self, ArkSchemaV59.self,
          ArkSchemaV60.self, ArkSchemaV61.self, ArkSchemaV62.self, ArkSchemaV63.self, ArkSchemaV64.self,
-         ArkSchemaV65.self, ArkSchemaV66.self, ArkSchemaV67.self]
+         ArkSchemaV65.self, ArkSchemaV66.self, ArkSchemaV67.self, ArkSchemaV68.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -904,6 +910,13 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
 /// 1. **内存库降级**：若两次磁盘打开失败，旧逻辑会退回 `isStoredInMemoryOnly`，进程一结束 SwiftData 全丢；`ohana_has_onboarded` 等仍在 UserDefaults，表现像「又要建岛 / 数据没了」。
 /// 2. **模拟器**：换了一台 Simulator、Reset Content、或删掉 App，会换沙盒路径，数据自然空。
 /// 3. **重复 ModelContainer**：后台任务若再 `make()` 出新容器，可能与主进程争用同一 SQLite，行为异常；现改为**单例**。
+enum SharedModelContainerStoreKind {
+    case primaryWithMigrationPlan
+    case defaultStoreWithoutMigrationPlan
+    case diskFallback
+    case memoryFallback
+}
+
 enum SharedModelContainer {
     private static let lock = NSLock()
     private static var _shared: ModelContainer?
@@ -919,7 +932,7 @@ enum SharedModelContainer {
     }
 
     private static func createPersistentContainer() -> ModelContainer {
-        let schema = Schema(ArkSchemaV67.models)
+        let schema = Schema(ArkSchemaV68.models)
         let defaultConfig = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none
@@ -931,7 +944,7 @@ enum SharedModelContainer {
                 migrationPlan: ArkMigrationPlan.self,
                 configurations: [defaultConfig]
             )
-            DatabaseFallbackPreferenceStore.clearFallbackActive()
+            recordStoreOpen(.primaryWithMigrationPlan)
             #if DEBUG
                 OhanaLog.info("SwiftData: primary store opened with migrationPlan", category: "SwiftData")
             #endif
@@ -948,7 +961,7 @@ enum SharedModelContainer {
                 for: schema,
                 configurations: [defaultConfig]
             )
-            DatabaseFallbackPreferenceStore.clearFallbackActive()
+            recordStoreOpen(.defaultStoreWithoutMigrationPlan)
             #if DEBUG
                 OhanaLog.info("SwiftData: default store opened without migrationPlan", category: "SwiftData")
             #endif
@@ -967,7 +980,7 @@ enum SharedModelContainer {
         )
         do {
             let container = try ModelContainer(for: schema, configurations: [diskFallback])
-            DatabaseFallbackPreferenceStore.clearFallbackActive()
+            recordStoreOpen(.diskFallback)
             #if DEBUG
                 OhanaLog.warning("SwiftData: using disk fallback store ohana_disk_fallback", category: "SwiftData")
             #endif
@@ -978,7 +991,6 @@ enum SharedModelContainer {
             #endif
         }
 
-        DatabaseFallbackPreferenceStore.markFallbackActive()
         #if DEBUG
             OhanaLog.error("SwiftData: all disk stores failed; falling back to in-memory store", category: "SwiftData")
         #endif
@@ -987,12 +999,31 @@ enum SharedModelContainer {
             cloudKitDatabase: .none
         )
         do {
-            return try ModelContainer(for: schema, configurations: [memoryConfig])
+            let container = try ModelContainer(for: schema, configurations: [memoryConfig])
+            recordStoreOpen(.memoryFallback)
+            return container
         } catch {
             #if DEBUG
                 OhanaLog.error("SwiftData: in-memory fallback failed - \(error)", category: "SwiftData")
             #endif
             fatalError("Could not create ModelContainer: \(error)")
+        }
+    }
+
+    static func fallbackIndicatorIsActive(for storeKind: SharedModelContainerStoreKind) -> Bool {
+        switch storeKind {
+        case .primaryWithMigrationPlan, .defaultStoreWithoutMigrationPlan:
+            false
+        case .diskFallback, .memoryFallback:
+            true
+        }
+    }
+
+    private static func recordStoreOpen(_ storeKind: SharedModelContainerStoreKind) {
+        if fallbackIndicatorIsActive(for: storeKind) {
+            DatabaseFallbackPreferenceStore.markFallbackActive()
+        } else {
+            DatabaseFallbackPreferenceStore.clearFallbackActive()
         }
     }
 }
