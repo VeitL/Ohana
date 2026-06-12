@@ -25,6 +25,54 @@ struct MemberCreationServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).count == 1)
     }
 
+    @Test func firstPetWelcomeRewardUsesActiveHumanWallet() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Ava")
+        context.insert(human)
+        try context.save()
+        UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        TestQuestManagerProjection.manager.isPetWizardCompleted = false
+
+        _ = try saveMember(
+            draft: petDraft(name: "Momo", source: .placeholder),
+            existingPets: [],
+            existingHumans: [human],
+            context: context,
+            countryCode: "CN"
+        )
+
+        let accounts = try context.fetch(FetchDescriptor<CoconutAccount>())
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let ledgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+        #expect(human.coconutBalance == 50)
+        #expect(accounts.contains { $0.ownerKind == .human && $0.ownerId == human.id.uuidString && $0.balance == 50 })
+        #expect(!accounts.contains { $0.ownerKind == .system })
+        #expect(walletEntries.allSatisfy { $0.ownerKind != .system })
+        #expect(ledgerEvents.contains { $0.actorId == human.id.uuidString && $0.coconutDelta == 50 })
+    }
+
+    @Test func firstPetWelcomeRewardSkipsWalletWhenNoActiveHumanExists() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+        UserDefaults.standard.removeObject(forKey: "currentActiveHumanId")
+        TestQuestManagerProjection.manager.isPetWizardCompleted = false
+
+        _ = try saveMember(
+            draft: petDraft(name: "Momo", source: .placeholder),
+            existingPets: [],
+            existingHumans: [],
+            context: context,
+            countryCode: "CN"
+        )
+
+        #expect(try context.fetch(FetchDescriptor<CoconutAccount>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
+    }
+
     @Test func secondHumanUsingInventoryPassConsumesOnePass() throws {
         resetGlobalState()
         Avatar2DAccess.addExtraPasses(1)

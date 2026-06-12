@@ -25,6 +25,87 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260613-005 - Add V68/V69 recycle-bin migration coverage
+
+- Status: Open
+- Priority: P2
+- Area: Models / Migration / Recycle Bin
+- Source task: RecycleBin adversarial P1 remediation, 2026-06-13
+- Blocker: The V69 schema shape and empty migration stages remain acceptable,
+  but current disk-migration coverage does not prove old V68/V69 stores receive
+  usable recycle-bin soft-delete defaults or that `RecycleBinBatch` is available
+  after migration.
+- Next step: Add a disk migration fixture/test from pre-recycle-bin stores that
+  opens through the latest `ArkMigrationPlan`, checks member/archive soft-delete
+  default values, and creates/restores a `RecycleBinBatch`.
+- Close when: The migration test proves V68/V69-era stores open cleanly with
+  recycle-bin fields defaulted and batch rows usable.
+
+### TFU-20260613-004 - Restore pet quick-access derived state
+
+- Status: Open
+- Priority: P2
+- Area: Recycle Bin / Members / Quick Actions
+- Source task: RecycleBin adversarial P1 remediation, 2026-06-13
+- Blocker: Member deletion removes pet quick-access entries, while recycle-bin
+  restoration currently restores source objects, events, reminders, and
+  notifications, but does not restore or recompute that quick-access derived
+  state.
+- Next step: Define the intended product behavior for restored pets, then either
+  recreate the previous quick-access entry or explicitly recompute the default
+  quick-access set during pet restore.
+- Close when: A restored pet has the approved quick-action availability and a
+  focused test prevents regression.
+
+### TFU-20260613-003 - Round-trip recycle-bin soft-delete fields in CloudSync
+
+- Status: Open
+- Priority: P2
+- Area: Recycle Bin / CloudSync / Future Online Unlock
+- Source task: RecycleBin adversarial P1 remediation, 2026-06-13
+- Blocker: First release keeps CloudKit off, but future sync still needs
+  recycle-bin soft-delete fields (`trashedAt`, `trashExpiresAt`,
+  `trashBatchId`, `trashedByHumanId`) to serialize, apply, and reconcile
+  consistently across devices.
+- Next step: Before CloudKit unlock, extend `CloudSyncRecordSerializer`,
+  apply/import paths, and registry tests so soft-delete state round-trips for
+  recoverable entities and bulk-clear batches.
+- Close when: A remote soft delete and a remote restore both reproduce the same
+  recycle-bin state locally without premature tombstones.
+
+### TFU-20260613-002 - Re-audit FamilyTasks bounty wallet transfer before unlock
+
+- Status: Open
+- Priority: P2
+- Area: Economy / FamilyTasks / Online Unlock
+- Source task: Economy adversarial P1 remediation, 2026-06-13
+- Blocker: FamilyTasks is hidden behind the first-release online feature gate,
+  but its bounty completion path still owns wallet-transfer behavior and
+  rollback/error handling that was not repaired in the Economy P1 scope.
+- Next step: Before any future FamilyTasks/online unlock, re-review the bounty
+  transfer command boundary, rollback semantics, idempotency key, and user-visible
+  failure behavior with focused tests.
+- Close when: FamilyTasks bounty transfer either passes the same economy wallet
+  invariants as shop / care rewards or is replaced by a safer service boundary
+  before the feature becomes reachable.
+
+### TFU-20260613-001 - Retire legacy economy system-wallet write fallbacks
+
+- Status: Open
+- Priority: P2
+- Area: Economy / Legacy Wallet APIs
+- Source task: Economy adversarial P1 remediation, 2026-06-13
+- Blocker: The active P1 repeatable reward paths no longer use legacy special
+  rewards, but `QuestManager+LegacyWallet` still contains compatibility APIs
+  whose fallback semantics can write to system/fallback wallets if future code
+  reuses them carelessly.
+- Next step: Run a focused legacy API retirement pass: remove unused entry
+  points where possible, add compile/test guardrails for the remaining migration
+  paths, and document the approved owner-resolution rule.
+- Close when: No production reward caller can accidentally create or credit a
+  system/fallback wallet through legacy helpers, and focused tests cover the
+  intentionally retained compatibility cases.
+
 ### TFU-20260612-022 - Add final Settings privacy and support actions
 
 - Status: Open

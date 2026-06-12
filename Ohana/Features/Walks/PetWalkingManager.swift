@@ -205,18 +205,20 @@ final class PetWalkingManager {
             let walkLog = PetWalkLog(startDate: startedAt, pet: pet, executorId: executorId, executorIds: executorIds)
             walkLog.endDate = endedAt
             walkLog.distanceMeters = distanceMeters
+            modelContext.insert(walkLog)
+            modelContext.safeSave()
 
             var earnedCoconuts = 0
             if !isTooShortForReward {
                 let reward = questManager.awardAction(
                     type: .walk(distanceMeters: distanceMeters),
                     pet: pet,
-                    context: modelContext
+                    context: modelContext,
+                    executorId: executorId
                 )
                 earnedCoconuts = reward.humanGot + reward.petGot
             }
             walkLog.coconutsEarned = earnedCoconuts
-            modelContext.insert(walkLog)
             walkLogs = [walkLog]
         }
 
@@ -257,7 +259,8 @@ final class PetWalkingManager {
                 questManager.awardAction(
                     type: .potty(isLitter: false),
                     pet: pet,
-                    context: modelContext
+                    context: modelContext,
+                    executorId: executorId
                 )
             }
         }

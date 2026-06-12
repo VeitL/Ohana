@@ -116,7 +116,7 @@ extension CoconutShopView {
             if item.isPurchased {
                 return .init(label: l.tr(zh: "点击切换", en: "Tap to switch", de: "Zum Wechseln tippen"), tint: Color.goTeal)
             }
-            let missing = max(0, item.cost - currentHumanBalance)
+            let missing = max(0, item.cost - islandSpendableHumanBalance)
             return .init(label: canAfford(item) ? l.tr(zh: "买断", en: "Unlock", de: "Freischalten") : l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥", de: "Noch \(missing)🥥"), tint: canAfford(item) ? Color.goYellow : tertiaryText, showCost: true)
         }
 
@@ -144,7 +144,7 @@ extension CoconutShopView {
     }
 
     func canAfford(_ item: ShopItem) -> Bool {
-        item.cost <= 0 || currentHumanBalance >= item.cost
+        item.cost <= 0 || islandSpendableHumanBalance >= item.cost
     }
 
     func handleItemTap(_ item: ShopItem) {
@@ -169,7 +169,7 @@ extension CoconutShopView {
         }
 
         guard canAfford(item) else {
-            let missing = max(0, item.cost - currentHumanBalance)
+            let missing = max(0, item.cost - islandSpendableHumanBalance)
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             showToast(l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig"), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             return
@@ -190,7 +190,7 @@ extension CoconutShopView {
         }
 
         guard canAfford(item) else {
-            let missing = max(0, item.cost - currentHumanBalance)
+            let missing = max(0, item.cost - islandSpendableHumanBalance)
             showToast(l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig"), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
             return
         }

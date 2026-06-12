@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 
 enum CoconutExchangeError: LocalizedError {
+    case featureDisabled
     case sameReceiver
     case insufficientBalance
     case invalidReceiver
@@ -11,6 +12,8 @@ enum CoconutExchangeError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .featureDisabled:
+            "货币兑换暂未开放。"
         case .sameReceiver:
             "不能发给自己。"
         case .insufficientBalance:
@@ -42,6 +45,7 @@ enum CoconutExchangeService {
     ) throws -> CoconutExchangeRequest {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
+        guard CoconutExchangeFeatureGate.isEnabled else { throw CoconutExchangeError.featureDisabled }
         guard sender.id != receiver.id else { throw CoconutExchangeError.sameReceiver }
         guard CoconutWalletService.balance(for: sender, context: context) >= option.coconutCost else {
             throw CoconutExchangeError.insufficientBalance
@@ -112,6 +116,7 @@ enum CoconutExchangeService {
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) throws {
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
+        guard CoconutExchangeFeatureGate.isEnabled else { throw CoconutExchangeError.featureDisabled }
         guard request.status == .pending else { throw CoconutExchangeError.notPending }
         guard request.receiverId == receiver.id.uuidString else { throw CoconutExchangeError.notReceiver }
 
@@ -146,6 +151,7 @@ enum CoconutExchangeService {
     ) throws {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
+        guard CoconutExchangeFeatureGate.isEnabled else { throw CoconutExchangeError.featureDisabled }
         guard request.status == .pending else { throw CoconutExchangeError.notPending }
         guard request.senderId == sender.id.uuidString else { throw CoconutExchangeError.notSender }
 

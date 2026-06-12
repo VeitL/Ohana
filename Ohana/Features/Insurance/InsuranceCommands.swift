@@ -301,6 +301,7 @@ enum InsurancePolicyCommandService {
         context: ModelContext
     ) -> InsuranceClaimCommandResult {
         let claimID = claim.id
+        CloudSyncMutationRecorder.markDeleted(claim, pet: pet, context: context)
         context.delete(claim)
         context.safeSave()
         return InsuranceClaimCommandResult(

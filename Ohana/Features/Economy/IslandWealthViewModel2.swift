@@ -129,8 +129,10 @@ struct IslandWealthSnapshot {
                 balance: account.balance
             )
         }
+        let formalOwnerIds = Set(formalAccounts.map(\.ownerId))
         let visibleLogs = walletLedgerEntries
-            .filter { $0.delta != 0 }
+            .filter { $0.delta != 0 && $0.ownerKind != .system }
+            .filter { formalOwnerIds.contains($0.ownerId) }
             .map { $0.asCoconutLogEntry() }
             .filter { !hiddenHumanIds.contains($0.actorId ?? "") }
             .filter { !frozenOwnerIds.contains($0.actorId ?? "") }
@@ -162,7 +164,7 @@ struct WealthLeaderRow: Identifiable {
 @Observable
 final class IslandWealthScreenModel {
     var timeRange: WealthTimeRange = .week
-    var showSystemCoconuts: Bool = true
+    var showSystemCoconuts: Bool = false
     var selectedActorId: String?
 
     private var snapshot: IslandWealthSnapshot = .empty

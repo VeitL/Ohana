@@ -266,9 +266,20 @@ struct ShopPurchaseCommandResult: Equatable {
     let failure: ShopPurchaseFailure?
     let ledgerEventID: UUID?
     let transactionKey: String?
+    let fundingContributions: [ShopPurchaseFundingContribution]
+}
+
+struct ShopPurchaseFundingContribution: Equatable {
+    let humanID: UUID
+    let amount: Int
 }
 
 enum ShopPurchaseCommandService {
+    private struct ShopPurchaseFundingSlice {
+        let human: Human
+        let amount: Int
+    }
+
     @discardableResult
     @MainActor
     static func purchase(
@@ -288,7 +299,8 @@ enum ShopPurchaseCommandService {
                 didPurchase: true,
                 failure: nil,
                 ledgerEventID: nil,
-                transactionKey: nil
+                transactionKey: nil,
+                fundingContributions: []
             )
         }
         guard let buyer else {
@@ -299,7 +311,8 @@ enum ShopPurchaseCommandService {
                 didPurchase: false,
                 failure: .missingActiveHuman,
                 ledgerEventID: nil,
-                transactionKey: nil
+                transactionKey: nil,
+                fundingContributions: []
             )
         }
         guard EconomyWalletWritePolicy.canWrite(buyer) else {
@@ -310,19 +323,21 @@ enum ShopPurchaseCommandService {
                 didPurchase: false,
                 failure: .walletFrozen,
                 ledgerEventID: nil,
-                transactionKey: nil
+                transactionKey: nil,
+                fundingContributions: []
             )
         }
-        let buyerBalance = CoconutWalletService.balance(for: buyer, context: context)
-        guard buyerBalance >= item.cost else {
+        let fundingPlan = cofundingPlan(cost: item.cost, buyer: buyer, context: context)
+        guard fundingPlan.missing == 0 else {
             return ShopPurchaseCommandResult(
                 humanID: buyer.id,
                 itemID: item.id,
                 cost: item.cost,
                 didPurchase: false,
-                failure: .insufficientBalance(missing: item.cost - buyerBalance),
+                failure: .insufficientBalance(missing: fundingPlan.missing),
                 ledgerEventID: nil,
-                transactionKey: nil
+                transactionKey: nil,
+                fundingContributions: []
             )
         }
 
@@ -330,9 +345,12 @@ enum ShopPurchaseCommandService {
         let transactionKey = item.isConsumable
             ? "shop:\(item.id):\(buyer.id.uuidString):\(purchaseID.uuidString)"
             : "shop:\(item.id):\(buyer.id.uuidString)"
+        let cofundingMetadata = fundingPlan.slices.count > 1
+            ? ",\"cofunded\":true,\"fundingSourceCount\":\(fundingPlan.slices.count)"
+            : ""
         let metadataJSON = item.isConsumable
-            ? "{\"shopItemId\":\"\(item.id)\",\"purchaseId\":\"\(purchaseID.uuidString)\",\"consumable\":true}"
-            : "{\"shopItemId\":\"\(item.id)\"}"
+            ? "{\"shopItemId\":\"\(item.id)\",\"purchaseId\":\"\(purchaseID.uuidString)\",\"consumable\":true\(cofundingMetadata)}"
+            : "{\"shopItemId\":\"\(item.id)\"\(cofundingMetadata)}"
         let ledger = careLedger.record(
             occurredAt: Date(),
             actorKind: .human,
@@ -356,27 +374,31 @@ enum ShopPurchaseCommandService {
             context: context,
             save: false
         )
+        let walletDeltas = fundingPlan.slices.map { slice in
+            let isBuyer = slice.human.id == buyer.id
+            return CoconutWalletDelta.human(
+                slice.human,
+                delta: -slice.amount,
+                entryKind: isBuyer ? .spend : .transferOut,
+                source: .shop,
+                title: isBuyer ? itemName : "合资补差：\(itemName)",
+                emoji: item.emoji,
+                actorId: slice.human.id.uuidString,
+                actorName: slice.human.name,
+                subjectKind: isBuyer ? .system : .human,
+                subjectId: isBuyer ? nil : buyer.id.uuidString,
+                sourceModelName: "ShopCatalog",
+                sourceModelId: item.id,
+                careLedgerEventId: ledger.id.uuidString,
+                metadataJSON: metadataJSON,
+                transactionKey: fundingPlan.slices.count == 1
+                    ? transactionKey
+                    : "\(transactionKey):\(slice.human.id.uuidString)"
+            )
+        }
         do {
             try wallet.apply(
-                deltas: [
-                    .human(
-                        buyer,
-                        delta: -item.cost,
-                        entryKind: .spend,
-                        source: .shop,
-                        title: itemName,
-                        emoji: item.emoji,
-                        actorId: buyer.id.uuidString,
-                        actorName: buyer.name,
-                        subjectKind: .system,
-                        subjectId: nil,
-                        sourceModelName: "ShopCatalog",
-                        sourceModelId: item.id,
-                        careLedgerEventId: ledger.id.uuidString,
-                        metadataJSON: metadataJSON,
-                        transactionKey: transactionKey
-                    )
-                ],
+                deltas: walletDeltas,
                 context: context,
                 save: false,
                 postsRewardFeedback: true,
@@ -403,7 +425,8 @@ enum ShopPurchaseCommandService {
                 didPurchase: false,
                 failure: failure,
                 ledgerEventID: nil,
-                transactionKey: nil
+                transactionKey: nil,
+                fundingContributions: []
             )
         }
 
@@ -414,8 +437,53 @@ enum ShopPurchaseCommandService {
             didPurchase: true,
             failure: nil,
             ledgerEventID: ledger.id,
-            transactionKey: transactionKey
+            transactionKey: transactionKey,
+            fundingContributions: fundingPlan.slices.map { ShopPurchaseFundingContribution(humanID: $0.human.id, amount: $0.amount) }
         )
+    }
+
+    @MainActor
+    private static func cofundingPlan(
+        cost: Int,
+        buyer: Human,
+        context: ModelContext
+    ) -> (slices: [ShopPurchaseFundingSlice], missing: Int) {
+        var remaining = cost
+        var slices: [ShopPurchaseFundingSlice] = []
+        let buyerContribution = min(remaining, max(0, CoconutWalletService.balance(for: buyer, context: context)))
+        if buyerContribution > 0 {
+            slices.append(ShopPurchaseFundingSlice(human: buyer, amount: buyerContribution))
+            remaining -= buyerContribution
+        }
+        guard remaining > 0 else { return (slices, 0) }
+
+        let otherHumans: [Human]
+        do {
+            otherHumans = try context.fetch(FetchDescriptor<Human>())
+        } catch {
+            OhanaLog.warning(
+                "[ShopPurchaseCommandService] failed to fetch cofunding humans: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return (slices, remaining)
+        }
+
+        let contributors = otherHumans
+            .filter { $0.id != buyer.id && EconomyWalletWritePolicy.canWrite($0) }
+            .sorted { lhs, rhs in
+                if lhs.createdAt != rhs.createdAt {
+                    return lhs.createdAt < rhs.createdAt
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+        for human in contributors where remaining > 0 {
+            let available = max(0, CoconutWalletService.balance(for: human, context: context))
+            let contribution = min(remaining, available)
+            guard contribution > 0 else { continue }
+            slices.append(ShopPurchaseFundingSlice(human: human, amount: contribution))
+            remaining -= contribution
+        }
+        return (slices, remaining)
     }
 }
 

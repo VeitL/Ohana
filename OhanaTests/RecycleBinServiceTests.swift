@@ -39,6 +39,10 @@ struct RecycleBinServiceTests {
     }
 
     @Test func memberDeletionSuppressesRelatedRemindersAndRestoreReactivatesThem() throws {
+        let scheduler = FakeRecycleBinNotificationScheduler()
+        OhanaNotifications.current = scheduler
+        defer { OhanaNotifications.useLive() }
+
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Ava")
@@ -66,6 +70,7 @@ struct RecycleBinServiceTests {
         #expect(event.trashedAt != nil)
         #expect(reminder.statusEnum == .skipped)
         #expect(reminder.completedBy.hasPrefix("system:recycle:"))
+        #expect(scheduler.cancelledIDs == [reminder.notificationId])
         #expect(try cloudSyncState(for: reminder, context: context)?.hasPendingLocalChanges == true)
 
         let item = try #require(RecycleBinService.listItems(context: context).first { $0.kind == .human && $0.sourceID == human.id })
@@ -77,6 +82,35 @@ struct RecycleBinServiceTests {
         #expect(event.trashedAt == nil)
         #expect(reminder.statusEnum == .pending)
         #expect(reminder.completedBy.isEmpty)
+        #expect(scheduler.scheduledIDs == [reminder.notificationId])
+    }
+
+    @Test func restoreExpiredItemPurgesInsteadOfReactivating() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let deletedByHumanId = UUID()
+        let deletedAt = Date().addingTimeInterval(TimeInterval(-(RecycleBinService.retentionDays + 1) * 24 * 60 * 60))
+        let pet = Pet(name: "Momo", species: "狗")
+        context.insert(pet)
+        try context.save()
+
+        RecycleBinService.moveToRecycleBin(
+            pet,
+            now: deletedAt,
+            trashedByHumanId: deletedByHumanId.uuidString,
+            context: context
+        )
+        try context.save()
+
+        let item = try #require(RecycleBinService.listItems(context: context).first { $0.kind == .pet && $0.sourceID == pet.id })
+        let restore = RecycleBinService.restoreItem(item, context: context)
+        try context.save()
+
+        #expect(!restore.didChange)
+        #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
+        let tombstone = try #require(try cloudSyncState(for: pet, context: context))
+        #expect(tombstone.isDeletionTombstone)
+        #expect(tombstone.deletedByHumanId == deletedByHumanId.uuidString.lowercased())
     }
 
     @Test func expiredHumanPurgeDeletesHumanScopedStringRecordsWithTombstones() throws {
@@ -214,6 +248,123 @@ struct RecycleBinServiceTests {
         #expect(tombstone.deletedByHumanId == deletedByHumanId.uuidString.lowercased())
     }
 
+    @Test func petPurgeWritesTombstonesForCascadeDeletedChildren() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let deletedByHumanId = UUID()
+        let pet = Pet(name: "Momo", species: "狗")
+        let careLog = PetCareLog(date: now, type: .feeding, pet: pet)
+        let expenseLog = PetExpenseLog(date: now, amount: 42, category: .medical, note: "Vet", pet: pet)
+        let foodRecord = PetFoodRecord(brand: "Kibble", dailyGrams: 120, totalGrams: 1000, startDate: now, pet: pet)
+        context.insert(pet)
+        context.insert(careLog)
+        context.insert(expenseLog)
+        context.insert(foodRecord)
+        try context.save()
+
+        RecycleBinService.moveToRecycleBin(
+            pet,
+            now: now,
+            trashedByHumanId: deletedByHumanId.uuidString,
+            context: context
+        )
+        try context.save()
+
+        _ = RecycleBinService.purgeExpired(
+            context: context,
+            now: now.addingTimeInterval(TimeInterval((RecycleBinService.retentionDays + 1) * 24 * 60 * 60))
+        )
+        try context.save()
+
+        #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PetFoodRecord>()).isEmpty)
+        #expect(try cloudSyncState(entityName: String(describing: PetCareLog.self), id: careLog.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: PetExpenseLog.self), id: expenseLog.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: PetFoodRecord.self), id: foodRecord.id, context: context)?.isDeletionTombstone == true)
+    }
+
+    @Test func directDeleteCommandsWriteCloudSyncTombstones() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "狗")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let metric = try #require(HumanHealthMetricCommandService.recordMetric(
+            human: human,
+            metricKey: "heartRate",
+            unitCode: "bpm",
+            value: 72,
+            date: now,
+            notes: "",
+            context: context
+        )?.log)
+        _ = HumanHealthMetricCommandService.deleteMetricLog(metric, human: human, context: context)
+
+        let workout = WorkoutCommandService.recordHumanWorkout(
+            human: human,
+            type: .walking,
+            durationMinutes: 30,
+            date: now,
+            context: context
+        )
+        let workoutLog = try #require(try context.fetch(FetchDescriptor<HumanWorkoutLog>()).first { $0.id == workout.logID })
+        _ = WorkoutCommandService.deleteHumanWorkout(workoutLog, human: human, context: context)
+
+        let medication = PetMedication(name: "Meds", dosage: "1 pill", pet: pet)
+        let event = Event(
+            title: "Meds",
+            startDate: now.addingTimeInterval(3600),
+            eventType: EventType.medication.rawValue,
+            relatedEntityType: MedicationEventLink.petMedicationPlan,
+            relatedEntityId: medication.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        context.insert(medication)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+        _ = PetMedicationPlanCommandService.deletePlan(
+            pet: pet,
+            medication: medication,
+            context: context,
+            scheduleReminders: false
+        )
+
+        let insurance = PetInsurance(companyName: "Care", policyNumber: "P-1", pet: pet)
+        let claim = InsuranceClaim(claimDate: now, totalExpense: 100, claimedAmount: 80, insurance: insurance)
+        context.insert(insurance)
+        context.insert(claim)
+        try context.save()
+        _ = InsurancePolicyCommandService.deleteClaim(claim, insurance: insurance, pet: pet, context: context)
+
+        _ = try HumanWishlistCommandService.createItem(
+            input: HumanWishlistCommandInput(title: "Trip", cost: 10, createdAt: now),
+            for: human,
+            context: context
+        )
+        let wish = try #require(try context.fetch(FetchDescriptor<WishlistItem>()).first)
+        _ = try HumanWishlistCommandService.deleteItem(wish, for: human, context: context)
+        try context.save()
+
+        #expect(try cloudSyncState(entityName: String(describing: HumanHealthMetricLog.self), id: metric.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: HumanWorkoutLog.self), id: workout.logID, context: context)?.isDeletionTombstone == true)
+        if let ledgerEventID = workout.ledgerEventID {
+            #expect(try cloudSyncState(entityName: String(describing: CareLedgerEvent.self), id: ledgerEventID, context: context)?.isDeletionTombstone == true)
+        }
+        #expect(try cloudSyncState(entityName: String(describing: PetMedication.self), id: medication.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: Event.self), id: event.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: Reminder.self), id: reminder.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: InsuranceClaim.self), id: claim.id, context: context)?.isDeletionTombstone == true)
+        #expect(try cloudSyncState(entityName: String(describing: WishlistItem.self), id: wish.id, context: context)?.isDeletionTombstone == true)
+    }
+
     @Test func backupPreservesTrashStatesAndRecycleBatches() throws {
         let sourceContainer = try makeContainer()
         let source = sourceContainer.mainContext
@@ -277,28 +428,39 @@ struct RecycleBinServiceTests {
 }
 
 private final class FakeRecycleBinNotificationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
-    func schedule(reminder _: Reminder) {}
+    private(set) var scheduledIDs: [String] = []
+    private(set) var cancelledIDs: [String] = []
+
+    func schedule(reminder: Reminder) {
+        scheduledIDs.append(reminder.notificationId)
+    }
+
     func schedule(
-        reminder _: Reminder,
+        reminder: Reminder,
         existingNotificationIds _: Set<String>?,
         completion: ((ReminderNotificationScheduleResult) -> Void)?
     ) {
+        scheduledIDs.append(reminder.notificationId)
         completion?(.scheduled)
     }
 
     func schedule(
-        reminder _: Reminder,
+        reminder: Reminder,
         deliveryDate _: Date?,
         existingNotificationIds _: Set<String>?,
         completion: ((ReminderNotificationScheduleResult) -> Void)?
     ) {
+        scheduledIDs.append(reminder.notificationId)
         completion?(.scheduled)
     }
 
     func pendingNotificationIds() async -> Set<String> { [] }
     func scheduleRollingWindow(reminders _: [Reminder]) {}
     func refillWindowIfNeeded(allReminders _: [Reminder]) {}
-    func cancel(notificationId _: String) {}
+    func cancel(notificationId: String) {
+        cancelledIDs.append(notificationId)
+    }
+
     func cancelAll(for _: String, reminders _: [Reminder]) {}
     func compensate(reminders _: [Reminder]) {}
 }

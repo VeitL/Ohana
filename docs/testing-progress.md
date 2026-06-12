@@ -37,7 +37,7 @@
 | Oasis | 6 | 🟢 | 2026-06-12 | 无 | `87423afd8` | 开工：2026-06-12；规则书见 `docs/specs/Oasis-logic.md`；当前主人钱包门、预算/冷却产出、一次性幂等奖励、休眠可唤回语义已落地；`scripts/module-exit-gate.sh` PASS；真实 UI 抽查见 `docs/planning/gap-acceptance-track-list.md#phase-6-oasis`；未改 schema / 路由 / 启动路径 / CloudKit |
 | Settings | 6 | 🟢 | 2026-06-12 | P2 余留见 TFU-20260612-022 | `5d4e71928` | 规则书见 `docs/specs/Settings-logic.md`；开发/测试入口收进 Debug-only，通知开关接入 `NotificationDeliveryPolicy`，空 About 入口隐藏；目标测试、UI/a11y/smoothness/runtime 审计与 `scripts/module-exit-gate.sh` PASS；真实 UI / 真机通知抽查见统一 track list |
 | Health | 6 | 🟢 | 2026-06-12 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list | `5d4e71928` | 规则书见 `docs/specs/Health-logic.md`；健康记录删除清理派生费用/日历事件/提醒/ledger，健康/症状/发情记录进回收站并可恢复，已故/回收宠物只读；schema 升至 `ArkSchemaV70`；目标测试与 `scripts/module-exit-gate.sh` PASS；未启用 CloudKit、未改路由或启动路径 |
-| Economy | 6 | 🟢 | 2026-06-12 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list | `662852a01` | 规则书见 `docs/specs/Economy-logic.md`；线下兑现入口首发门关闭，冻结钱包拒绝成就 / 商店 / 金库 / 奖励写入，特殊奖励无 actor 时归属 active human 且不写 system，隐私钱包计入总额但隐藏明细，离世 / 回收钱包退出活跃财富且历史保留；目标测试与 `scripts/module-exit-gate.sh` PASS；未改 schema / 路由 / 启动路径 / CloudKit |
+| Economy | 6 | 🏁 | 2026-06-12 | P2 余留见 TFU-20260613-001~002；真实 UI 抽查见统一 track list | `662852a01` | 规则书见 `docs/specs/Economy-logic.md`；线下兑现入口首发门关闭，冻结钱包拒绝成就 / 商店 / 金库 / 奖励写入，特殊奖励无 actor 时归属 active human 且不写 system，隐私钱包计入总额但隐藏明细，离世 / 回收钱包退出活跃财富且历史保留；2026-06-13 对抗复审 P1 已修：重复喂药 / 时刻奖励进入预算冷却管线，照护 / 花费 / 遛狗奖励按 executor 归属，首宠欢迎奖励不写 system，商店支持岛屿合资，兑换服务层硬门，财富趋势排除 system，遛狗先存事实再发奖；本轮 `scripts/module-exit-gate.sh` PASS，P0/P1 清零，P2 已进 follow-up；未改 schema / 路由 / 启动路径 / CloudKit |
 | Medication | 7 | ⬜ | | | | |
 | Walks | 7 | ⬜ | | | | |
 | FamilyTasks | 7 | ⬜ | | | | |
@@ -76,7 +76,7 @@
 | 工作项 | 优先级 | 状态 | 范围/验收 | 门禁 commit | 备注 |
 |---|---|---|---|---|---|
 | GAP-1 联机功能门 | P0 上架前 | 🟢 | FamilyTasks+云同步设置+CKShare 入口统一收进 `OnlineFeatureGate`；FamilyReports 留周报剥悬赏 | `59b5ceedc` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；验收通过，真实设备 / 真实 UI 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-1-联机功能门`；未做 CloudKit 启用 |
-| GAP-2 回收站 | P0 上架前 | 🟢 | 成员+珍贵档案软删 30 天可恢复；流水直删但写 tombstone；涉及 schema 升版 | `8bddfe1a6` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-2-回收站`；schema 升至 `ArkSchemaV69` |
+| GAP-2 回收站 | P0 上架前 | 🏁 | 成员+珍贵档案软删 30 天可恢复；流水直删但写 tombstone；涉及 schema 升版 | `8bddfe1a6` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-2-回收站`；schema 升至 `ArkSchemaV69`；2026-06-13 对抗复审 P1 已修：30 天到期改为服务层硬边界，恢复 Event/Reminder 后重新排未来本地通知，Pet 期满 purge 为级联子记录写 tombstone，单条流水直删路径写 CloudSync tombstone；本轮 `scripts/module-exit-gate.sh` PASS；P2 余留见 TFU-20260613-003~005；未改路由 / 启动路径 / CloudKit |
 | GAP-3 自动备份 | P0 上架前 | 🟢 | 自动备份至 iCloud Drive 文件+失败可见+恢复端到端测试 | `9b1ac1be1` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实设备 / 真实 iCloud 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-3-自动备份`；未启用 CloudKit 同步 |
 | GAP-4 总账恒等 | P1 上架前 | 🟢 | `QuestManager.coconutCount` 为钱包投影；正式岛屿总资产 ≡ 人类成员+宠物钱包；`system:legacy` 仅迁移兼容 | `1951f7834` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 正式包追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-4-总账恒等` |
 | GAP-5 触顶感知 | P1 上架前 | 🟢 | 奖励触顶温和文案，九语言；recordOnly 记录照常完成且奖励反馈不暴露预算数字 | `1a775bc7c` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI / 长语言视觉追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-5-触顶感知` |

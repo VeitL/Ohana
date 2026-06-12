@@ -16,7 +16,9 @@
 - 首发版本隐藏“家庭线下兑现 / cash exchange”所有用户可达入口；`CoconutExchangeRequest` model、服务、备份兼容代码保留给 1.x 合资 / 转账事实，不作为首发用户经济面。
 - 隐私锁住的人类钱包仍计入正式“岛屿总资产”；财富页与椰子历史隐藏该成员的个人行、流水与明细，但总资产数字继续满足 D3/G2。
 - 特殊奖励必须归属到正式成员钱包：优先使用明确 actor；没有 actor 时归到当前 active human；若没有可用当前主人则不写钱包奖励，只保留业务事实。首发新奖励不得落入 `system` / `system:legacy`。
+- 照护、花费、喂药、遛狗、时刻等可重复用户动作奖励必须先按明确执行人 `executorId` 归属；只有没有明确执行人时，才允许回退到当前 active human。
 - 离世或回收成员的钱包冻结：不再获得奖励、不再消费、不再领取成就，也不计入活跃财富总额 / 榜单 / 趋势；历史流水可见。撤销离世或从回收站恢复后才恢复钱包写入能力。
+- 商店正式消费支持岛屿合资：买家钱包不足但全岛未冻结人类钱包总额足够时，可由其他人类钱包补差额；总额仍不足时必须整体拒绝且不写任何钱包或购买事实。
 - Economy 首发可见 UI、奖励反馈、钱包流水标题与时间文案必须走已注册语言 fallback；Debug / Preview / 内部测试文案不作为本轮首发阻塞。
 - 财富页使用 Economy screen snapshot / read model 聚合，SwiftUI 视图不直接在 body 中重放账本或扫描成员模型；后续若大数据仍卡顿，再继续拆后台 snapshot store。
 
@@ -33,12 +35,14 @@
 - ECO-009：补记历史照护记录时，`PetCareLog` / `CareLedgerEvent` 的照护事实时间必须保持用户选择的历史日期；不得为了经济防刷改写事实时间。
 - ECO-010：补记历史照护记录获得的椰子奖励必须按操作日进入 `EconomyBudgetUsageEvent` 与冷却判断。历史日期已经触顶不得阻止今天的诚实补记获得今天预算内的奖励；今天已经触顶或处于冷却时，历史补记只记录事实，不额外产出椰子。
 - ECO-011：补记产生的钱包奖励流水应按操作日显示在椰子历史中；照护历史仍按照护事实日期显示。两条时间轴不得互相污染。
-- ECO-012：首发版 `CoconutExchangeFeatureGate` 恒为关闭；Shop 分类、兑换表单、Today Focus 兑换卡、Home 待读模型中的待确认兑换入口均不可达。直接调用 UI 命令也必须 no-op，不产生兑换请求或钱包写入。
+- ECO-012：首发版 `CoconutExchangeFeatureGate` 恒为关闭；Shop 分类、兑换表单、Today Focus 兑换卡、Home 待读模型中的待确认兑换入口均不可达。直接调用 UI 命令或 `CoconutExchangeService` 创建 / 确认 / 取消也必须 no-op / 抛 feature-disabled，不产生兑换请求或钱包写入。
 - ECO-013：财富页活跃总资产 = 所有未冻结正式成员钱包余额之和，包含隐私锁住的人类成员；排行榜、筛选器、流水列表和个人余额不得泄漏隐私锁住成员的明细，也不得把离世 / 回收成员当作活跃财富 owner 展示。
 - ECO-014：特殊奖励不得创建新的 `system` 正式影响余额流水。`system:legacy` 仅可由迁移兼容和明确非余额历史承接使用。
 - ECO-015：`Human.hasPassedAway` / `Pet.hasPassedAway` / `trashedAt != nil` 的成员钱包为冻结状态；成就领奖、宠物金库消费、特殊奖励、商店消费、兑换创建 / 确认 / 取消等 Economy 命令不得写入冻结钱包。
 - ECO-016：宠物成长椰子只能用于该宠物自己的成长 / 外观 / 纪念历史。宠物离世或回收时金库展示历史和预览，但购买 / 投喂按钮必须不可执行。
 - ECO-017：财富页 screen model 只吃不可变快照值。图表、榜单、总资产、筛选和颜色计算不得在 SwiftUI body 中直接依赖 SwiftData 模型对象。
+- ECO-018：奖励归属以业务事实执行人为准。已有 `executorId` 的照护 / 花费 / 遛狗 / 喂药 / 时刻记录不得把奖励发给当前 active human；active human 只作为无明确执行人的兜底。
+- ECO-019：商店购买以全岛未冻结人类钱包作为可支配池；买家优先出资，其他人类钱包只补差额并记录各自支出流水。任何一笔出资失败时必须回滚整笔购买。
 
 ## 当前代码来源
 
@@ -53,7 +57,8 @@
 - 奖励反馈 UI 通过 `CoconutRewardFeedbackOverlay` 展示事件标题：`Ohana/Features/TodayFocus/Views/CheckInRewardFeedback.swift:89`。
 - 普通照护记录先用用户选择的 `date` 写照护事实，再调用经济奖励入口；奖励入口默认以当前操作时间做预算 / 冷却裁决：`Ohana/Domain/Services/CareEventService.swift:82`、`Ohana/Domain/Services/CareEventRecording.swift:567`、`Ohana/Features/Economy/QuestManager+Awards.swift:17`。
 - 预算使用事件的 `dayKey` 来自经济奖励裁决日期，`createdAt` 保留真实写入时间：`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:653`。
-- 首发兑换入口由 `CoconutExchangeFeatureGate` 统一关闭；Shop、Home read model、Today Focus snapshot 均必须读取同一判定点。
+- 首发兑换入口由 `CoconutExchangeFeatureGate` 统一关闭；Shop、Home read model、Today Focus snapshot 与 `CoconutExchangeService` 写命令均必须读取同一判定点。
+- 商店合资出资计划由 `ShopPurchaseCommandService` 在购买命令边界内计算，UI 只显示全岛可支配余额。
 - 财富页以 `IslandWealthSnapshot` / `IslandWealthScreenModel` 为 UI 聚合边界。
 
 ## 状态机

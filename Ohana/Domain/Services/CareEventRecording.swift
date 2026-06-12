@@ -568,9 +568,16 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
         type: QuestManager.OhanaActionType,
         pet: Pet?,
         context: ModelContext,
-        quality: QuestManager.QualityBonus
+        quality: QuestManager.QualityBonus,
+        executorId: String?
     ) -> (humanGot: Int, petGot: Int) {
-        let reward = questManager.awardAction(type: type, pet: pet, context: context, quality: quality)
+        let reward = questManager.awardAction(
+            type: type,
+            pet: pet,
+            context: context,
+            quality: quality,
+            executorId: executorId
+        )
         oasisRewards.rewardFeaturedCritterFromCare(type: type, context: context)
         return reward
     }
@@ -580,14 +587,16 @@ final class StaticCareEventEconomyAwarder: CareEventEconomyAwarding {
         pets: [Pet],
         context: ModelContext,
         quality: QuestManager.QualityBonus,
-        title: String?
+        title: String?,
+        executorId: String?
     ) -> (humanGot: Int, petGot: Int) {
         let reward = questManager.awardSharedCareAction(
             type: type,
             pets: pets,
             context: context,
             quality: quality,
-            title: title
+            title: title,
+            executorId: executorId
         )
         oasisRewards.rewardFeaturedCritterFromCare(type: type, context: context)
         return reward

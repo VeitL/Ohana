@@ -15,7 +15,8 @@ protocol CareEventEconomyAwarding {
         type: QuestManager.OhanaActionType,
         pet: Pet?,
         context: ModelContext,
-        quality: QuestManager.QualityBonus
+        quality: QuestManager.QualityBonus,
+        executorId: String?
     ) -> (humanGot: Int, petGot: Int)
 
     @discardableResult
@@ -24,7 +25,8 @@ protocol CareEventEconomyAwarding {
         pets: [Pet],
         context: ModelContext,
         quality: QuestManager.QualityBonus,
-        title: String?
+        title: String?,
+        executorId: String?
     ) -> (humanGot: Int, petGot: Int)
 }
 
@@ -129,7 +131,13 @@ final class CareEventService: CareEventRecording {
         context.safeSave()
 
         dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
-        let reward = dependencies.economy.awardCareAction(type: .feed, pet: pet, context: context, quality: quality)
+        let reward = dependencies.economy.awardCareAction(
+            type: .feed,
+            pet: pet,
+            context: context,
+            quality: quality,
+            executorId: executorId
+        )
         dependencies.careLedger.recordPetCare(
             log: log,
             pet: pet,
@@ -263,7 +271,13 @@ final class CareEventService: CareEventRecording {
         }
 
         dependencies.questManager.recordFirstMeal(actorId: executorId, context: context)
-        let reward = dependencies.economy.awardCareAction(type: .feed, pet: pet, context: context, quality: quality)
+        let reward = dependencies.economy.awardCareAction(
+            type: .feed,
+            pet: pet,
+            context: context,
+            quality: quality,
+            executorId: executorId
+        )
         dependencies.careLedger.recordPetCare(
             log: log,
             pet: pet,
@@ -340,7 +354,13 @@ final class CareEventService: CareEventRecording {
             return (0, 0)
         }
 
-        let reward = dependencies.economy.awardCareAction(type: .water, pet: pet, context: context, quality: .none)
+        let reward = dependencies.economy.awardCareAction(
+            type: .water,
+            pet: pet,
+            context: context,
+            quality: .none,
+            executorId: executorId
+        )
         dependencies.careLedger.recordPetCare(
             log: log,
             pet: pet,
@@ -417,7 +437,13 @@ final class CareEventService: CareEventRecording {
         }
         context.safeSave()
 
-        let award = dependencies.economy.awardCareAction(type: reward, pet: pet, context: context, quality: quality)
+        let award = dependencies.economy.awardCareAction(
+            type: reward,
+            pet: pet,
+            context: context,
+            quality: quality,
+            executorId: executorId
+        )
         dependencies.careLedger.recordPetCare(
             log: log,
             pet: pet,
@@ -477,7 +503,13 @@ final class CareEventService: CareEventRecording {
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
-        let reward = dependencies.economy.awardCareAction(type: .potty(isLitter: false), pet: pet, context: context, quality: .none)
+        let reward = dependencies.economy.awardCareAction(
+            type: .potty(isLitter: false),
+            pet: pet,
+            context: context,
+            quality: .none,
+            executorId: executorId
+        )
         dependencies.careLedger.recordPetPotty(
             log: log,
             pet: pet,
@@ -539,7 +571,13 @@ final class CareEventService: CareEventRecording {
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
-        let reward = dependencies.economy.awardCareAction(type: .care(type: type), pet: pet, context: context, quality: .none)
+        let reward = dependencies.economy.awardCareAction(
+            type: .care(type: type),
+            pet: pet,
+            context: context,
+            quality: .none,
+            executorId: executorId
+        )
         let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
         dependencies.careLedger.record(
             occurredAt: log.date,
@@ -598,7 +636,13 @@ final class CareEventService: CareEventRecording {
         CloudSyncMutationRecorder.markModified(log, context: context, modifiedAt: date)
         context.safeSave()
 
-        let reward = dependencies.economy.awardCareAction(type: .health, pet: pet, context: context, quality: .none)
+        let reward = dependencies.economy.awardCareAction(
+            type: .health,
+            pet: pet,
+            context: context,
+            quality: .none,
+            executorId: executorId
+        )
         let metadataJSON = dependencies.careLedger.rewardMetadata(reward, questManager: dependencies.questManager)
         dependencies.careLedger.record(
             occurredAt: log.date,

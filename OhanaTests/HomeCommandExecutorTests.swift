@@ -42,6 +42,59 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func manualCareRewardUsesExecutorWalletInsteadOfActiveHuman() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let executor = Human(name: "Executor")
+        let pet = Pet(name: "Momo", species: "猫")
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldCooldownLogs {
+                defaults.set(oldCooldownLogs, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
+        }
+        defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(),
+            memberKey: executor.id.uuidString,
+            careObjectKeys: [pet.id.uuidString]
+        )
+        context.insert(activeHuman)
+        context.insert(executor)
+        context.insert(pet)
+        try context.save()
+        let dependencies = CareEventServiceDependencies.live()
+
+        let result = CareEventService.recordManualFeedFact(
+            pet: pet,
+            amountGrams: 30,
+            context: context,
+            executorId: executor.id.uuidString,
+            date: makeDate(year: 2026, month: 6, day: 13, hour: 8, minute: 30),
+            dependencies: dependencies
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let careRewardEntries = walletEntries.filter { $0.source == .careEvent && $0.ownerKind == .human && $0.delta > 0 }
+        #expect(result.reward.humanGot > 0)
+        #expect(executor.coconutBalance >= result.reward.humanGot)
+        #expect(activeHuman.coconutBalance == 0)
+        #expect(careRewardEntries.contains { $0.ownerId == executor.id.uuidString && $0.delta == result.reward.humanGot })
+        #expect(!careRewardEntries.contains { $0.ownerId == activeHuman.id.uuidString })
+    }
+
+    @MainActor
     @Test func quickFeedByIdDoesNotDuplicateFoodStockReminderEvents() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -5927,6 +5980,51 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func shopPurchaseCommandServiceCofundsFromOtherHumanWallets() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let buyer = Human(name: "Ava")
+        buyer.coconutBalance = 10
+        let contributor = Human(name: "Guan")
+        contributor.coconutBalance = 100
+        contributor.createdAt = buyer.createdAt.addingTimeInterval(1)
+        let item = ShopItem(
+            id: "test_cofund_shop_item",
+            emoji: "🥥",
+            nameText: .init(zh: "合资测试", en: "Cofund Test", de: "Mitfinanzierungstest"),
+            descriptionText: .init(zh: "测试合资扣款。", en: "Tests cofunded spend.", de: "Testet mitfinanzierte Ausgabe."),
+            cost: 50,
+            category: .effect
+        )
+        context.insert(buyer)
+        context.insert(contributor)
+        try context.save()
+
+        let result = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: buyer,
+            itemName: "Redeemed Cofund Test",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(result.didPurchase)
+        #expect(result.failure == nil)
+        #expect(result.fundingContributions == [
+            ShopPurchaseFundingContribution(humanID: buyer.id, amount: 10),
+            ShopPurchaseFundingContribution(humanID: contributor.id, amount: 40)
+        ])
+        #expect(buyer.coconutBalance == 0)
+        #expect(contributor.coconutBalance == 60)
+        #expect(walletEntries.count(where: { $0.ownerId == buyer.id.uuidString && $0.delta == -10 }) == 1)
+        #expect(walletEntries.count(where: { $0.ownerId == contributor.id.uuidString && $0.delta == -40 }) == 1)
+        #expect(walletEntries.allSatisfy { $0.balanceAfter >= 0 })
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).count == 1)
+    }
+
+    @MainActor
     @Test func shopPurchaseUsesWalletAccountBalanceWhenCachedHumanBalanceIsStale() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -6174,6 +6272,72 @@ struct HomeCommandExecutorTests {
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutAccount>()).isEmpty)
         #expect(questManager.coconutCount == 0)
+    }
+
+    @MainActor
+    @Test func repeatableMomentRewardUsesBudgetAndCooldownPipeline() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "猫")
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldCooldownLogs {
+                defaults.set(oldCooldownLogs, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(),
+            memberKey: human.id.uuidString,
+            careObjectKeys: [pet.id.uuidString]
+        )
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+        let questManager = QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: SharedDomainRevisionPublisher())
+        let now = makeDate(year: 2026, month: 6, day: 13, hour: 9, minute: 0)
+
+        let first = MomentCommandService.recordMoment(
+            pet: pet,
+            note: "first",
+            photoData: [],
+            locationLatitude: 0,
+            locationLongitude: 0,
+            locationPlacename: "",
+            context: context,
+            executorId: human.id.uuidString,
+            date: now,
+            questManager: questManager
+        )
+        let second = MomentCommandService.recordMoment(
+            pet: pet,
+            note: "second",
+            photoData: [],
+            locationLatitude: 0,
+            locationLongitude: 0,
+            locationPlacename: "",
+            context: context,
+            executorId: human.id.uuidString,
+            date: now.addingTimeInterval(60),
+            questManager: questManager
+        )
+
+        let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        #expect(first.coconutDelta > 0)
+        #expect(second.coconutDelta == 0)
+        #expect(human.coconutBalance == first.coconutDelta)
+        #expect(budgetEvents.contains { $0.actionKey.contains("记录时刻") })
     }
 
     @MainActor

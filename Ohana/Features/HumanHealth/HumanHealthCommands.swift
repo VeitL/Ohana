@@ -64,6 +64,7 @@ enum HumanHealthMetricCommandService {
         let logID = log.id
         let metricKey = log.metricKey
         human.healthMetricLogs.removeAll { $0.id == logID }
+        CloudSyncMutationRecorder.markDeleted(log, context: context)
         context.delete(log)
         context.safeSave()
         return HumanHealthMetricDeleteCommandResult(
@@ -153,6 +154,7 @@ enum HumanHealthReportCommandService {
     ) -> HumanHealthReportCommandResult {
         let reportID = report.id
         let reportType = report.reportTypeRaw
+        CloudSyncMutationRecorder.markDeleted(report, context: context)
         context.delete(report)
         context.safeSave()
         return HumanHealthReportCommandResult(

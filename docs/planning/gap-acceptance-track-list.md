@@ -1,6 +1,6 @@
 # 人工验收总 Track List
 
-更新日期：2026-06-12
+更新日期：2026-06-13
 
 本文件是 GAP 建设阶段与模块门禁阶段唯一的人工验收 track list。后续不再新增 `gap-*-acceptance-track-list.md` 或模块单独 track list；需要人工目检、真机、真实 iCloud、真实通知或真实数据确认的项目，都追加到本文对应小节。
 
@@ -11,7 +11,7 @@
 | 项目 | 状态 | 门禁 commit | 自动验收摘要 | 人工验收状态 |
 |---|---|---|---|---|
 | GAP-1 联机功能门 | 🟢 | `59b5ceedc` | `OnlineFeatureGate` 不变量、路由/设置/CKShare 接受路径、`scripts/module-exit-gate.sh` 均通过 | 待真实设备 / 真实 UI 抽查 |
-| GAP-2 回收站 | 🟢 | `8bddfe1a6` | 回收站服务、schema V69 轻量迁移、备份往返、普通入口隐藏、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
+| GAP-2 回收站 | 🟢 | `8bddfe1a6` | 回收站服务、schema V69 轻量迁移、备份往返、普通入口隐藏、对抗复审 P1 修复、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 真机通知抽查 |
 | GAP-3 自动备份 | 🟢 | `9b1ac1be1` | 自动备份服务、生命周期触发、App reset、plist/entitlements、Debug build、`scripts/module-exit-gate.sh` 均通过 | 待真机 iCloud Drive 抽查 |
 | GAP-4 总账恒等 | 🟢 | `1951f7834` | 钱包总账恒等、`system:legacy` 排除、账本重放修复、Oasis 夹具、`scripts/module-exit-gate.sh` 均通过 | 待真实迁移样本 / 正式包抽查 |
 | GAP-5 触顶感知 | 🟢 | `1a775bc7c` | `recordOnly` 九语言文案、反馈中心、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 长语言抽查 |
@@ -54,6 +54,10 @@
 
 - [ ] 删除并恢复成员：宠物、家庭成员、植物。
   - 预期：删除后普通首页 / 成员入口不再显示该对象；回收站显示条目；恢复后原对象回到原入口。
+  - 记录：
+
+- [ ] 真机允许通知后，删除并恢复带未来提醒的成员或事件。
+  - 预期：删除后对应未来本地通知被取消或不再到达；从回收站恢复后，未来 pending 提醒重新注册并可按计划到达。
   - 记录：
 
 - [ ] 删除并恢复珍贵档案：照片、文档、里程碑、保单。

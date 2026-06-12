@@ -180,12 +180,13 @@ extension QuestManager {
         pets: [Pet],
         context: ModelContext,
         quality: QualityBonus = .none,
-        title: String? = nil
+        title: String? = nil,
+        executorId: String? = nil
     ) -> (humanGot: Int, petGot: Int) {
         let livePets = pets.filter { EconomyWalletWritePolicy.canWrite($0) }
         guard !livePets.isEmpty else { return (0, 0) }
 
-        let human = currentActiveHuman(context: context)
+        let human = human(withId: executorId, context: context) ?? currentActiveHuman(context: context)
         let consumesBoost = isDoubleRewardBoostActive()
         let isCoolingDown = livePets.allSatisfy { isOnCooldown(petId: $0.id, type: type) }
         let budgetKeys = economyBudgetKeys(for: human, context: context)

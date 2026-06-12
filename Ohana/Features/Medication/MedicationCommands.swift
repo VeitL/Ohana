@@ -356,6 +356,7 @@ enum PetMedicationPlanCommandService {
     ) -> PetMedicationPlanDeleteCommandResult {
         let medicationID = medication.id
         let removedEventIDs = removeCalendarEvents(for: medicationID, context: context)
+        CloudSyncMutationRecorder.markDeleted(medication, pet: pet, context: context)
         context.delete(medication)
         context.safeSave()
         userDefaults.removeObject(forKey: PetMedicationPlanStorageKeys.remainingAmount(medicationID: medicationID))
@@ -523,6 +524,10 @@ enum PetMedicationPlanCommandService {
         )
         let removedEventIDs = events.map(\.id)
         for event in events {
+            for reminder in event.reminders {
+                CloudSyncMutationRecorder.markDeleted(reminder, context: context)
+            }
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         return removedEventIDs
@@ -752,6 +757,7 @@ enum HumanMedicationPlanCommandService {
     ) -> HumanMedicationPlanDeleteCommandResult {
         let medicationID = medication.id
         let removedEventIDs = removeCalendarEvents(for: medicationID, context: context)
+        CloudSyncMutationRecorder.markDeleted(medication, context: context)
         context.delete(medication)
         context.safeSave()
 
@@ -911,6 +917,10 @@ enum HumanMedicationPlanCommandService {
         )
         let removedEventIDs = events.map(\.id)
         for event in events {
+            for reminder in event.reminders {
+                CloudSyncMutationRecorder.markDeleted(reminder, context: context)
+            }
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         return removedEventIDs

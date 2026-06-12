@@ -80,19 +80,13 @@ nonisolated enum PetMedicationDoseLogging {
         do {
             var coconutDelta = 0
             if awardCoconut {
-                coconutDelta = try questManager.stageSpecialCoconutReward(
-                    amount: 1,
-                    emoji: "💊",
-                    title: "记录喂药 +1🥥",
-                    actorId: event.assigneeId,
-                    source: .careEvent,
-                    sourceModelName: "Event",
-                    sourceModelId: event.id.uuidString,
-                    metadataJSON: "{\"kind\":\"petMedicationDose\",\"medicationId\":\"\(medication.id.uuidString)\"}",
-                    transactionKey: "petMedicationDose:\(event.id.uuidString):reward",
+                let reward = questManager.awardAction(
+                    type: .general(humanReward: 1, petReward: 0, emoji: "💊", title: "记录喂药 +1🥥"),
+                    pet: pet,
                     context: modelContext,
-                    occurredAt: event.startDate
+                    executorId: event.assigneeId
                 )
+                coconutDelta = reward.humanGot + reward.petGot
             }
             careLedger.record(
                 occurredAt: event.startDate,

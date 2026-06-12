@@ -254,33 +254,41 @@ final class MemberCreationService: MemberCreating {
         if isFirstPet {
             questManager.isPetWizardCompleted = true
             questManager.persistQuestFlags()
-            do {
-                try wallet.applyActorDelta(
-                    amount: 50,
-                    emoji: "🎉",
-                    title: "新家人入住欢迎奖励",
-                    actorId: nil,
-                    actorName: nil,
-                    entryKind: .reward,
-                    source: .onboarding,
-                    context: context,
-                    save: false,
-                    postsRewardFeedback: true,
-                    projectionManager: questManager
-                )
-                careLedger.recordCoconut(
-                    delta: 50,
-                    title: "新家人入住欢迎奖励",
-                    actorId: nil,
-                    actorName: nil,
-                    source: .economy,
-                    context: context
-                )
-            } catch {
+            if let welcomeHuman = activeHumanForWelcomeReward(existingHumans: existingHumans, context: context) {
+                do {
+                    try wallet.applyActorDelta(
+                        amount: 50,
+                        emoji: "🎉",
+                        title: "新家人入住欢迎奖励",
+                        actorId: welcomeHuman.id.uuidString,
+                        actorName: welcomeHuman.name,
+                        entryKind: .reward,
+                        source: .onboarding,
+                        context: context,
+                        save: false,
+                        postsRewardFeedback: true,
+                        projectionManager: questManager
+                    )
+                    careLedger.recordCoconut(
+                        delta: 50,
+                        title: "新家人入住欢迎奖励",
+                        actorId: welcomeHuman.id.uuidString,
+                        actorName: welcomeHuman.name,
+                        source: .economy,
+                        context: context
+                    )
+                } catch {
+                    AppPerformanceMonitor.shared.record(
+                        "memberCreation.welcomeReward.walletFailed",
+                        valueMS: 0,
+                        note: error.localizedDescription
+                    )
+                }
+            } else {
                 AppPerformanceMonitor.shared.record(
-                    "memberCreation.welcomeReward.walletFailed",
+                    "memberCreation.welcomeReward.noActiveHuman",
                     valueMS: 0,
-                    note: error.localizedDescription
+                    note: "Skipped first-pet welcome wallet reward because no active human wallet is available."
                 )
             }
         }
@@ -446,6 +454,35 @@ final class MemberCreationService: MemberCreating {
     ) {
         guard draft.normalizedThemeHex != draft.kind.fallbackThemeHex else { return }
         questManager.recordThemeColorSet(actorId: actorId, actorName: actorName, context: context)
+    }
+
+    private func activeHumanForWelcomeReward(existingHumans: [Human], context: ModelContext) -> Human? {
+        guard let activeId = activeHumanSelection.currentHumanId,
+              let uuid = UUID(uuidString: activeId) else {
+            return nil
+        }
+        if let existing = existingHumans.first(where: { $0.id == uuid }) {
+            return EconomyWalletWritePolicy.canWrite(existing) ? existing : nil
+        }
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.id == uuid
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            guard let human = try context.fetch(descriptor).first,
+                  EconomyWalletWritePolicy.canWrite(human) else {
+                return nil
+            }
+            return human
+        } catch {
+            OhanaLog.warning(
+                "[MemberCreationService] failed to fetch active human for welcome reward: \(error.localizedDescription)",
+                category: "Economy"
+            )
+            return nil
+        }
     }
 
     private func publishMemberCreation(id: UUID, kind: String, revisions: DomainRevisionPublishing) {

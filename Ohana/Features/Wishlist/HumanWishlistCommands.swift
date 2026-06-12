@@ -204,9 +204,11 @@ enum HumanWishlistCommandService {
         }
         let ledgerEvents = ledgerEvents(for: item, context: context)
         for event in ledgerEvents {
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         let itemID = item.id
+        CloudSyncMutationRecorder.markDeleted(item, context: context)
         context.delete(item)
         context.safeSave()
         return HumanWishlistDeleteCommandResult(

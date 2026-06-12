@@ -70,6 +70,8 @@ extension CoconutShopView {
             return error.localizedDescription
         }
         switch exchangeError {
+        case .featureDisabled:
+            return l.tr(zh: "货币兑换暂未开放。", en: "Cash exchange is not available yet.", de: "Geldtausch ist noch nicht verfügbar.")
         case .sameReceiver:
             return l.tr(zh: "不能发给自己。", en: "You cannot send this to yourself.", de: "Du kannst es nicht an dich selbst senden.")
         case .insufficientBalance:
@@ -304,7 +306,6 @@ extension CoconutShopView {
     }
 
     func refundPurchasedConsumable(_ item: ShopItem, purchase: ShopPurchaseCommandResult) {
-        guard let currentHuman else { return }
         let title = l.tr(
             zh: "退回「\(item.name(l))」",
             en: "Refunded \(item.name(l))",
@@ -313,27 +314,34 @@ extension CoconutShopView {
         let refundSource = purchase.transactionKey
             ?? purchase.ledgerEventID?.uuidString
             ?? UUID().uuidString
+        let contributions = purchase.fundingContributions.isEmpty
+            ? currentHuman.map { [ShopPurchaseFundingContribution(humanID: $0.id, amount: item.cost)] } ?? []
+            : purchase.fundingContributions
+        let refundDeltas: [CoconutWalletDelta] = contributions.compactMap { contribution in
+            guard contribution.amount > 0 else { return nil }
+            guard let recipient = humans.first(where: { $0.id == contribution.humanID }) else { return nil }
+            return .human(
+                recipient,
+                delta: contribution.amount,
+                entryKind: .refund,
+                source: .shop,
+                title: title,
+                emoji: item.emoji,
+                actorId: recipient.id.uuidString,
+                actorName: recipient.name,
+                subjectKind: .system,
+                subjectId: nil,
+                sourceModelName: "ShopCatalog",
+                sourceModelId: item.id,
+                careLedgerEventId: purchase.ledgerEventID?.uuidString,
+                metadataJSON: "{\"shopItemId\":\"\(item.id)\",\"refund\":true,\"purchaseTransactionKey\":\"\(refundSource)\"}",
+                transactionKey: "shop:\(item.id):refund:\(recipient.id.uuidString):\(refundSource)"
+            )
+        }
+        guard !refundDeltas.isEmpty else { return }
         do {
             try appServices.coconutWallet.apply(
-                deltas: [
-                    .human(
-                        currentHuman,
-                        delta: item.cost,
-                        entryKind: .refund,
-                        source: .shop,
-                        title: title,
-                        emoji: item.emoji,
-                        actorId: currentHuman.id.uuidString,
-                        actorName: currentHuman.name,
-                        subjectKind: .system,
-                        subjectId: nil,
-                        sourceModelName: "ShopCatalog",
-                        sourceModelId: item.id,
-                        careLedgerEventId: purchase.ledgerEventID?.uuidString,
-                        metadataJSON: "{\"shopItemId\":\"\(item.id)\",\"refund\":true,\"purchaseTransactionKey\":\"\(refundSource)\"}",
-                        transactionKey: "shop:\(item.id):refund:\(currentHuman.id.uuidString):\(refundSource)"
-                    )
-                ],
+                deltas: refundDeltas,
                 context: modelContext,
                 save: false,
                 postsRewardFeedback: true,

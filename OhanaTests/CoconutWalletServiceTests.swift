@@ -354,6 +354,71 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertEqual(Set(model.leaderboard.map(\.entityId)), Set([human.id.uuidString, pet.id.uuidString]))
     }
 
+    func testWealthTrendsExcludeLegacySystemLedgerEntries() {
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Miso")
+        let model = IslandWealthScreenModel()
+        let humanAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            displayName: human.name,
+            balance: 10
+        )
+        let petAccount = CoconutAccount(
+            accountKey: CoconutAccountKey.pet(pet.id),
+            ownerKind: .pet,
+            ownerId: pet.id.uuidString,
+            displayName: pet.name,
+            balance: 5
+        )
+        let formalLedger = CoconutLedgerEntry(
+            transactionKey: "wealth:human",
+            accountKey: CoconutAccountKey.human(human.id),
+            ownerKind: .human,
+            ownerId: human.id.uuidString,
+            ownerName: human.name,
+            delta: 10,
+            balanceBefore: 0,
+            balanceAfter: 10,
+            entryKind: .reward,
+            source: .careEvent,
+            title: "Care",
+            emoji: "🥥"
+        )
+        let systemLedger = CoconutLedgerEntry(
+            transactionKey: "wealth:system",
+            accountKey: CoconutAccountKey.legacySystem,
+            ownerKind: .system,
+            ownerId: "",
+            ownerName: "System",
+            delta: 99,
+            balanceBefore: 0,
+            balanceAfter: 99,
+            entryKind: .reward,
+            source: .service,
+            title: "Legacy",
+            emoji: "🥥",
+            actorId: "system",
+            actorName: "System"
+        )
+
+        model.timeRange = .all
+        model.applyQuerySnapshot(
+            pets: [pet],
+            visibleHumans: [human],
+            hiddenHumanIds: [],
+            walletAccounts: [humanAccount, petAccount],
+            walletLedgerEntries: [formalLedger, systemLedger],
+            petColorMap: [:],
+            selectedActorId: nil
+        )
+
+        XCTAssertEqual(model.periodIncome, 10)
+        XCTAssertFalse(model.chartBars.contains { $0.entityId == "system" || $0.entityName == "其他/系统" })
+        XCTAssertFalse(model.activeEntityNames.contains("System"))
+    }
+
     func testWealthTotalIncludesHiddenHumanWalletButHidesLeaderboardRow() {
         let visibleHuman = Human(name: "Guan")
         let hiddenHuman = Human(name: "Private")
@@ -524,6 +589,49 @@ final class CoconutWalletServiceTests: XCTestCase {
             }
             return false
         })
+    }
+
+    func testExchangeGateBlocksServiceWrites() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let sender = Human(name: "Sender")
+        sender.coconutBalance = 500
+        let receiver = Human(name: "Receiver")
+        context.insert(sender)
+        context.insert(receiver)
+        try context.save()
+        let option = try XCTUnwrap(CoconutExchangeOption.options(for: "US").first)
+
+        XCTAssertThrowsError(
+            try CoconutExchangeService.createRequest(
+                sender: sender,
+                receiver: receiver,
+                option: option,
+                note: "",
+                context: context
+            )
+        )
+        XCTAssertTrue(try context.fetch(FetchDescriptor<CoconutExchangeRequest>()).isEmpty)
+
+        let request = CoconutExchangeRequest(
+            senderId: sender.id.uuidString,
+            senderName: sender.name,
+            receiverId: receiver.id.uuidString,
+            receiverName: receiver.name,
+            coconutCost: option.coconutCost,
+            currencyCode: option.currencyCode,
+            localAmount: option.localAmount
+        )
+        context.insert(request)
+        try context.save()
+
+        XCTAssertThrowsError(try CoconutExchangeService.confirm(request, by: receiver, context: context))
+        XCTAssertEqual(request.status, .pending)
+        XCTAssertThrowsError(try CoconutExchangeService.cancel(request, by: sender, context: context))
+        XCTAssertEqual(request.status, .pending)
+        XCTAssertEqual(sender.coconutBalance, 500)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        XCTAssertTrue(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     func testWalletApplyRejectsFrozenMemberWrites() throws {

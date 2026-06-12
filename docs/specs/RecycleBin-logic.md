@@ -1,6 +1,6 @@
 # GAP-2 Recycle Bin Logic
 
-> Status: confirmed on 2026-06-12. Product choices: Q1=A source-model soft delete, Q2=A full constitutional scope, Q3=A one recycle-bin item per bulk clear, Q4=A aggregate-hide member children, Q5=A CloudSync tombstone on final purge, Q6=A keep current active-human routing semantics.
+> Status: confirmed on 2026-06-12; adversarial P1 remediation completed on 2026-06-13. Product choices: Q1=A source-model soft delete, Q2=A full constitutional scope, Q3=A one recycle-bin item per bulk clear, Q4=A aggregate-hide member children, Q5=A CloudSync tombstone on final purge, Q6=A keep current active-human routing semantics.
 
 ## Purpose
 
@@ -27,15 +27,17 @@ RB-002. Recoverable objects keep their original `id`, relationships, external-st
 
 RB-003. Normal app surfaces must exclude trashed members and precious archives. A member in the recycle bin also aggregate-hides its child data from normal member, home, settings, document, insurance, milestone, and photo surfaces.
 
-RB-004. Restoring a member or precious archive clears its trash fields and makes the same original object visible again. Restoring a bulk-clear batch clears trash fields on every item in the batch.
+RB-004. Restoring a member or precious archive clears its trash fields and makes the same original object visible again only before `trashExpiresAt`. The 30-day retention is a service-layer hard boundary: expired items must be purged instead of reactivated, even if the user has not tapped a manual cleanup button. Restoring a bulk-clear batch clears trash fields on every item in the batch.
 
-RB-005. Final purge after the retention window physically deletes the source object and writes CloudSync deletion tombstones for sync-pipeline entities at purge time. Moving an object into the recycle bin is a local modification, not a final deletion tombstone.
+RB-005. Final purge after the retention window physically deletes the source object and writes CloudSync deletion tombstones for sync-pipeline entities at purge time, including syncable child records that will be removed by SwiftData cascade deletion. Moving an object into the recycle bin is a local modification, not a final deletion tombstone.
 
 RB-006. Deleting the active human or the last human keeps the existing route/account semantics: deleting the active human clears `currentActiveHumanId` or asks for account switching; restoration does not automatically switch the active human back.
 
 RB-007. A bulk pet-record clear appears as one recycle-bin batch item. Individual records in that batch do not appear as separate recycle-bin rows.
 
 RB-008. App reset is the G6 privacy path and must remain immediate physical deletion with no recycle-bin retention.
+
+RB-009. Restoring an aggregate member also restores its derived active reminders. Future pending reminders must be scheduled again through the app notification scheduler after their source event is restored.
 
 ## State Machine
 

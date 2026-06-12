@@ -102,9 +102,11 @@ enum WorkoutCommandService {
     ) -> WorkoutDeleteCommandResult {
         let ledgerEvents = ledgerEvents(for: log.id, context: context)
         for event in ledgerEvents {
+            CloudSyncMutationRecorder.markDeleted(event, context: context)
             context.delete(event)
         }
         let logID = log.id
+        CloudSyncMutationRecorder.markDeleted(log, context: context)
         context.delete(log)
         context.safeSave()
         return WorkoutDeleteCommandResult(

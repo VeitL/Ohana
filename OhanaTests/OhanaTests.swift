@@ -4808,7 +4808,8 @@ struct OhanaTests {
             type: QuestManager.OhanaActionType,
             pet: Pet?,
             context _: ModelContext,
-            quality: QuestManager.QualityBonus
+            quality: QuestManager.QualityBonus,
+            executorId _: String?
         ) -> (humanGot: Int, petGot: Int) {
             careAwardCalls.append(
                 CareAwardCall(
@@ -4825,7 +4826,8 @@ struct OhanaTests {
             pets _: [Pet],
             context _: ModelContext,
             quality _: QuestManager.QualityBonus,
-            title _: String?
+            title _: String?,
+            executorId _: String?
         ) -> (humanGot: Int, petGot: Int) {
             reward
         }

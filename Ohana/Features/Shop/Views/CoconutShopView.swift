@@ -110,6 +110,12 @@ struct CoconutShopView: View {
         currentHuman?.coconutBalance ?? 0
     }
 
+    var islandSpendableHumanBalance: Int {
+        humans
+            .filter { !$0.hasPassedAway && $0.trashedAt == nil }
+            .reduce(0) { $0 + max(0, $1.coconutBalance) }
+    }
+
     var exchangeOptions: [CoconutExchangeOption] {
         guard CoconutExchangeFeatureGate.isEnabled else { return [] }
         return CoconutExchangeOption.options()

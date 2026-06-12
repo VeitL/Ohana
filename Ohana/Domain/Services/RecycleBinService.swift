@@ -145,6 +145,11 @@ enum RecycleBinService {
 
     @discardableResult
     static func restoreItem(_ item: RecycleBinListItem, context: ModelContext) -> RecycleBinRestoreResult {
+        if item.trashExpiresAt <= Date() {
+            _ = purgeExpired(context: context)
+            return RecycleBinRestoreResult(restoredSourceCount: 0, restoredBatchCount: 0)
+        }
+
         if item.kind == .petActivityClearBatch, let batchID = item.batchID {
             return restoreBatch(id: batchID, context: context)
         }
@@ -398,6 +403,7 @@ enum RecycleBinService {
             return expiresAt <= now
         }
         for source in expired {
+            markCascadeDeletedForSync(source, context: context, deletedAt: now)
             markDeletedForSync(source, context: context, deletedAt: now)
             context.delete(source)
         }
@@ -498,6 +504,20 @@ enum RecycleBinService {
             CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: log.trashedByHumanId)
         case let log as PetFoodRecord:
             CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: log.trashedByHumanId)
+        case let medication as PetMedication:
+            CloudSyncMutationRecorder.markDeleted(medication, pet: medication.pet, context: context, deletedAt: deletedAt, deletedByHumanId: medication.trashedByHumanId)
+        case let photo as PetPhotoLog:
+            CloudSyncMutationRecorder.markDeleted(photo, pet: photo.pet, context: context, deletedAt: deletedAt, deletedByHumanId: photo.trashedByHumanId)
+        case let milestone as PetMilestone:
+            CloudSyncMutationRecorder.markDeleted(milestone, pet: milestone.pet, context: context, deletedAt: deletedAt, deletedByHumanId: milestone.trashedByHumanId)
+        case let document as PetDocument:
+            CloudSyncMutationRecorder.markDeleted(document, pet: document.pet, context: context, deletedAt: deletedAt, deletedByHumanId: document.trashedByHumanId)
+        case let insurance as PetInsurance:
+            CloudSyncMutationRecorder.markDeleted(insurance, pet: insurance.pet, context: context, deletedAt: deletedAt, deletedByHumanId: insurance.trashedByHumanId)
+        case let log as SymptomLog:
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: log.trashedByHumanId)
+        case let log as HeatCycleLog:
+            CloudSyncMutationRecorder.markDeleted(log, pet: log.pet, context: context, deletedAt: deletedAt, deletedByHumanId: log.trashedByHumanId)
         default:
             break
         }
@@ -541,8 +561,87 @@ enum RecycleBinService {
             reminder.completedBy = ""
             reminder.event?.setOccurrenceMarkedComplete(false, on: reminder.scheduledAt)
             CloudSyncMutationRecorder.markModified(reminder, context: context)
+            if reminder.scheduledAt > Date() {
+                OhanaNotifications.current.schedule(reminder: reminder)
+            }
         }
         return reminders.count
+    }
+
+    private static func markCascadeDeletedForSync(
+        _ source: RecycleBinSoftDeletable,
+        context: ModelContext,
+        deletedAt: Date
+    ) {
+        if let pet = source as? Pet {
+            markPetCascadeDeletedForSync(pet, context: context, deletedAt: deletedAt)
+        } else if let event = source as? Event {
+            let deletedBy = event.trashedByHumanId
+            for reminder in event.reminders {
+                CloudSyncMutationRecorder.markDeleted(reminder, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+            }
+        } else if let insurance = source as? PetInsurance {
+            let deletedBy = insurance.trashedByHumanId
+            for claim in insurance.claims {
+                CloudSyncMutationRecorder.markDeleted(claim, pet: insurance.pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+            }
+        }
+    }
+
+    private static func markPetCascadeDeletedForSync(
+        _ pet: Pet,
+        context: ModelContext,
+        deletedAt: Date
+    ) {
+        let deletedBy = pet.trashedByHumanId
+        for log in pet.careLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for log in pet.pottyLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for log in pet.hygieneLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for log in pet.healthLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for log in pet.walkLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for log in pet.expenseLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for log in pet.weightLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for record in pet.foodRecords {
+            CloudSyncMutationRecorder.markDeleted(record, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for medication in pet.medications {
+            CloudSyncMutationRecorder.markDeleted(medication, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for photo in pet.photoLogs {
+            CloudSyncMutationRecorder.markDeleted(photo, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for milestone in pet.milestones {
+            CloudSyncMutationRecorder.markDeleted(milestone, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for document in pet.documents {
+            CloudSyncMutationRecorder.markDeleted(document, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for insurance in pet.insurances {
+            for claim in insurance.claims {
+                CloudSyncMutationRecorder.markDeleted(claim, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+            }
+            CloudSyncMutationRecorder.markDeleted(insurance, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for log in pet.symptomLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
+        for log in pet.heatCycleLogs {
+            CloudSyncMutationRecorder.markDeleted(log, pet: pet, context: context, deletedAt: deletedAt, deletedByHumanId: deletedBy)
+        }
     }
 
     private static func purgeHumanScopedRows(

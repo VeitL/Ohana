@@ -309,7 +309,8 @@ enum SharedPetActionRecorder {
                 pets: targets,
                 context: context,
                 quality: descriptor.rewardQuality,
-                title: descriptor.rewardTitle
+                title: descriptor.rewardTitle,
+                executorId: descriptor.executorId
             )
         } else {
             (0, 0)

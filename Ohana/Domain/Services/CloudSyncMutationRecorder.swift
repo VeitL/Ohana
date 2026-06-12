@@ -664,6 +664,150 @@ enum CloudSyncMutationRecorder {
 
     @discardableResult
     static func markDeleted(
+        _ medication: PetMedication,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            PetMedication.self,
+            id: medication.id,
+            petId: pet?.id ?? medication.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ photo: PetPhotoLog,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            PetPhotoLog.self,
+            id: photo.id,
+            petId: pet?.id ?? photo.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ milestone: PetMilestone,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            PetMilestone.self,
+            id: milestone.id,
+            petId: pet?.id ?? milestone.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ document: PetDocument,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            PetDocument.self,
+            id: document.id,
+            petId: pet?.id ?? document.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ insurance: PetInsurance,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            PetInsurance.self,
+            id: insurance.id,
+            petId: pet?.id ?? insurance.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ claim: InsuranceClaim,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            InsuranceClaim.self,
+            id: claim.id,
+            petId: pet?.id ?? claim.insurance?.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ log: SymptomLog,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            SymptomLog.self,
+            id: log.id,
+            petId: pet?.id ?? log.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
+        _ log: HeatCycleLog,
+        pet: Pet?,
+        context: ModelContext,
+        deletedAt: Date = Date(),
+        deletedByHumanId: String? = nil
+    ) -> CloudSyncRecordState? {
+        markPetScopedDeleted(
+            HeatCycleLog.self,
+            id: log.id,
+            petId: pet?.id ?? log.pet?.id,
+            context: context,
+            deletedAt: deletedAt,
+            deletedByHumanId: deletedByHumanId
+        )
+    }
+
+    @discardableResult
+    static func markDeleted(
         _ session: SharedCareSession,
         context: ModelContext,
         deletedAt: Date = Date(),
