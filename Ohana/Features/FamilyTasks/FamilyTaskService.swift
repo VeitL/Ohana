@@ -387,8 +387,9 @@ enum FamilyTaskService {
         context.safeSave()
     }
 
+    @discardableResult
     @MainActor
-    static func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) {
+    static func confirmCompletion(_ task: FamilyCollaborationTask, by reviewer: Human?, context: ModelContext) -> Bool {
         confirmCompletion(
             task,
             by: reviewer,
@@ -398,6 +399,7 @@ enum FamilyTaskService {
         )
     }
 
+    @discardableResult
     @MainActor
     static func confirmCompletion(
         _ task: FamilyCollaborationTask,
@@ -406,9 +408,11 @@ enum FamilyTaskService {
         wallet: CoconutWalletManaging,
         careLedger: CareLedgerRecording,
         projectionManager: QuestManager? = nil
-    ) {
+    ) -> Bool {
         guard task.status == .pendingReview,
-              reviewer?.id.uuidString == task.createdById else { return }
+              reviewer?.id.uuidString == task.createdById else { return false }
+        let originalStatus = task.status
+        let originalCompletedAt = task.completedAt
         task.status = .completed
         if task.completedAt == nil { task.completedAt = Date() }
         task.touch()
@@ -420,15 +424,20 @@ enum FamilyTaskService {
             OhanaNotifications.current.cancel(notificationId: reminder.notificationId)
         }
 
-        transferRewardIfNeeded(
+        guard transferRewardIfNeeded(
             task,
             reviewer: reviewer,
             context: context,
             wallet: wallet,
             careLedger: careLedger,
             projectionManager: projectionManager
-        )
+        ) else {
+            task.status = originalStatus
+            task.completedAt = originalCompletedAt
+            return false
+        }
         context.safeSave()
+        return true
     }
 
     @MainActor
@@ -631,17 +640,19 @@ enum FamilyTaskService {
         wallet: CoconutWalletManaging,
         careLedger: CareLedgerRecording,
         projectionManager: QuestManager?
-    ) {
-        guard task.rewardCoconuts > 0,
-              let receiver = human(id: task.completedById, context: context),
+    ) -> Bool {
+        guard task.rewardCoconuts > 0 else { return true }
+        guard let receiver = human(id: task.completedById, context: context),
               let payer = human(id: task.createdById, context: context),
-              task.completedById == receiver.id.uuidString,
-              payer.id != receiver.id else { return }
+              task.completedById == receiver.id.uuidString else {
+            return false
+        }
+        guard payer.id != receiver.id else { return true }
         let marker = "familyTaskRewardTransfer:\(task.id.uuidString)"
         let payerTransactionKey = "\(marker):payer"
         let receiverTransactionKey = "\(marker):receiver"
         guard !hasWalletTransaction(payerTransactionKey, context: context),
-              !hasWalletTransaction(receiverTransactionKey, context: context) else { return }
+              !hasWalletTransaction(receiverTransactionKey, context: context) else { return true }
 
         let payerLedger = careLedger.record(
             occurredAt: Date(),
@@ -734,11 +745,13 @@ enum FamilyTaskService {
                 updatesProjection: true,
                 projectionManager: projectionManager
             )
+            return true
         } catch {
             context.rollback()
             #if DEBUG
                 OhanaLog.error("[FamilyTaskService] transfer wallet write failed: \(error.localizedDescription)", category: "FamilyTasks")
             #endif
+            return false
         }
     }
 

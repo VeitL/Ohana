@@ -75,7 +75,7 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ### TFU-20260613-002 - Re-audit FamilyTasks bounty wallet transfer before unlock
 
-- Status: Open
+- Status: Done
 - Priority: P2
 - Area: Economy / FamilyTasks / Online Unlock
 - Source task: Economy adversarial P1 remediation, 2026-06-13
@@ -88,10 +88,16 @@ actionable; long-term product ideas belong in planning docs instead.
 - Close when: FamilyTasks bounty transfer either passes the same economy wallet
   invariants as shop / care rewards or is replaced by a safer service boundary
   before the feature becomes reachable.
+- Closed: 2026-06-13 in the Economy P1 remediation round. FamilyTasks bounty
+  completion now calls the shared human wallet mutation writer, returns `false`
+  on transfer failure, restores the task to pending review, and leaves no wallet
+  or care-ledger rows; `familyTaskBountyTransferFailureLeavesReviewPendingWithoutLedger`
+  covers the failure path. Future online unlock still requires product/UI review,
+  but this Economy P2 code debt is closed.
 
 ### TFU-20260613-001 - Retire legacy economy system-wallet write fallbacks
 
-- Status: Open
+- Status: Done
 - Priority: P2
 - Area: Economy / Legacy Wallet APIs
 - Source task: Economy adversarial P1 remediation, 2026-06-13
@@ -105,6 +111,11 @@ actionable; long-term product ideas belong in planning docs instead.
 - Close when: No production reward caller can accidentally create or credit a
   system/fallback wallet through legacy helpers, and focused tests cover the
   intentionally retained compatibility cases.
+- Closed: 2026-06-13 in the Economy P1 remediation round. Legacy wallet helpers
+  now resolve to a writable human/pet, fall back only to the current active
+  human, and no-op when no formal writable owner exists. The old `ActionType`
+  compatibility fallback no longer credits system wallets. Regression tests
+  cover actor-less legacy grants with and without an active human.
 
 ### TFU-20260612-022 - Add final Settings privacy and support actions
 

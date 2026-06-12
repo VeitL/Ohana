@@ -6325,6 +6325,77 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func legacyAddCoconutsWithoutActorUsesActiveHumanInsteadOfSystemWallet() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        context.insert(human)
+        try context.save()
+        let questManager = QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: SharedDomainRevisionPublisher())
+
+        let awarded = questManager.addCoconuts(
+            9,
+            emoji: "🥥",
+            title: "Legacy reward",
+            actorId: nil,
+            actorName: nil,
+            context: context,
+            save: true
+        )
+
+        let entries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(awarded == 9)
+        #expect(human.coconutBalance == 9)
+        #expect(entries.count == 1)
+        #expect(entries.first?.ownerKind == .human)
+        #expect(entries.first?.ownerId == human.id.uuidString)
+        #expect(entries.allSatisfy { $0.ownerKind != .system })
+        #expect(questManager.coconutCount == 9)
+    }
+
+    @MainActor
+    @Test func legacyAddCoconutsWithoutActorDoesNotCreateSystemWalletWhenNoActiveHumanExists() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
+        let questManager = QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: SharedDomainRevisionPublisher())
+
+        let awarded = questManager.addCoconuts(
+            9,
+            emoji: "🥥",
+            title: "Legacy reward",
+            actorId: nil,
+            actorName: nil,
+            context: context,
+            save: true
+        )
+
+        #expect(awarded == 0)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CoconutAccount>()).isEmpty)
+        #expect(questManager.coconutCount == 0)
+    }
+
+    @MainActor
     @Test func specialRewardWithoutActorUsesActiveHumanInsteadOfSystemWallet() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -6799,6 +6870,47 @@ struct HomeCommandExecutorTests {
         #expect(ledgerEvents.count == 2)
         #expect(CoconutWalletService.balance(for: payer, context: context) == 120)
         #expect(CoconutWalletService.balance(for: receiver, context: context) == 40)
+    }
+
+    @MainActor
+    @Test func familyTaskBountyTransferFailureLeavesReviewPendingWithoutLedger() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let payer = Human(name: "Parent")
+        let receiver = Human(name: "Kid")
+        payer.coconutBalance = 10
+        let task = FamilyCollaborationTask(
+            title: "Water plants",
+            kind: .bounty,
+            status: .pendingReview,
+            createdById: payer.id.uuidString,
+            createdByName: payer.name,
+            assignedToId: receiver.id.uuidString,
+            assignedToName: receiver.name,
+            rewardCoconuts: 40
+        )
+        task.completedById = receiver.id.uuidString
+        task.completedByName = receiver.name
+        task.completedAt = makeDate(year: 2026, month: 6, day: 11)
+        context.insert(payer)
+        context.insert(receiver)
+        context.insert(task)
+        try context.save()
+
+        let didComplete = FamilyTaskService.confirmCompletion(
+            task,
+            by: payer,
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        #expect(didComplete == false)
+        #expect(task.status == .pendingReview)
+        #expect(CoconutWalletService.balance(for: payer, context: context) == 10)
+        #expect(CoconutWalletService.balance(for: receiver, context: context) == 0)
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @MainActor

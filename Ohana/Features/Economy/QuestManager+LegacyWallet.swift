@@ -40,12 +40,15 @@ extension QuestManager {
         lastEconomyRewardResult = nil
         guard amount != 0 else { return 0 }
         do {
+            guard let actor = try legacyWalletActor(actorId: actorId, actorName: actorName, context: context) else {
+                return 0
+            }
             try wallet.applyActorDelta(
                 amount: amount,
                 emoji: emoji,
                 title: title,
-                actorId: actorId,
-                actorName: actorName,
+                actorId: actor.id,
+                actorName: actor.name,
                 entryKind: amount > 0 ? .reward : .spend,
                 source: .service,
                 context: context,
@@ -123,12 +126,15 @@ extension QuestManager {
         guard amount != 0 else { return }
         let context = ModelContext(SharedModelContainer.make())
         do {
+            guard let actor = try legacyWalletActor(actorId: actorId, actorName: actorName, context: context) else {
+                return
+            }
             try wallet.applyActorDelta(
                 amount: amount,
                 emoji: emoji,
                 title: title,
-                actorId: actorId,
-                actorName: actorName,
+                actorId: actor.id,
+                actorName: actor.name,
                 entryKind: amount > 0 ? .refund : .spend,
                 source: .service,
                 context: context,
@@ -302,10 +308,18 @@ extension QuestManager {
             humanGet = 0
             petGet = 0
         }
+        let context = ModelContext(SharedModelContainer.make())
+        let fallbackHuman = (human == nil && pet == nil)
+            ? EconomyRewardOwnerResolver.activeHuman(
+                selection: activeHumanSelection,
+                context: context,
+                logPrefix: "QuestManager"
+            )
+            : nil
 
         let islandDelta = (petGet > 0 && pet != nil ? petGet : 0)
             + (humanGet > 0 && human != nil ? humanGet : 0)
-        let fallback = (islandDelta == 0) ? amount : 0 // potty/general 无实体时保底给全岛
+        let fallback = (islandDelta == 0 && fallbackHuman != nil) ? amount : 0
 
         let titleStr: String
         let emojiStr = type.emoji
@@ -317,7 +331,6 @@ extension QuestManager {
         case .water: titleStr = "\(pet?.name ?? "") 喂水奖励"
         case .general: titleStr = "打卡奖励"
         }
-        let context = ModelContext(SharedModelContainer.make())
         do {
             if let pet, petGet > 0 {
                 try wallet.applyActorDelta(
@@ -354,8 +367,8 @@ extension QuestManager {
                     amount: fallback,
                     emoji: emojiStr,
                     title: titleStr,
-                    actorId: aId,
-                    actorName: aName,
+                    actorId: fallbackHuman?.id.uuidString ?? aId,
+                    actorName: fallbackHuman?.name ?? aName,
                     entryKind: .reward,
                     source: .service,
                     context: context,
@@ -372,5 +385,29 @@ extension QuestManager {
                 OhanaLog.error("[QuestManager] legacy award wallet write failed: \(error.localizedDescription)", category: "Economy")
             #endif
         }
+    }
+
+    private func legacyWalletActor(
+        actorId: String?,
+        actorName: String?,
+        context: ModelContext
+    ) throws -> (id: String, name: String)? {
+        guard let actorId, actorId != "system", let uuid = UUID(uuidString: actorId) else {
+            guard let human = EconomyRewardOwnerResolver.activeHuman(
+                selection: activeHumanSelection,
+                context: context,
+                logPrefix: "QuestManager"
+            ) else {
+                return nil
+            }
+            return (human.id.uuidString, human.name)
+        }
+        if let human = try fetchHuman(id: uuid, context: context), EconomyWalletWritePolicy.canWrite(human) {
+            return (human.id.uuidString, actorName ?? human.name)
+        }
+        if let pet = try fetchPet(id: uuid, context: context), EconomyWalletWritePolicy.canWrite(pet) {
+            return (pet.id.uuidString, actorName ?? pet.name)
+        }
+        return nil
     }
 }
