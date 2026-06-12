@@ -239,9 +239,12 @@ struct ReminderObservabilityContentView: View {
     private func actionDisplayName(_ action: String) -> String {
         switch action {
         case "scheduleSuccess", "scheduled": "调度成功"
+        case "scheduleDeferred", "refillDeferred": "夜间延后"
         case "scheduleFailed", "failed", "refillFailed": "调度失败"
         case "scheduleSkippedDuplicate", "skippedDuplicate", "refillSkippedExisting": "重复跳过"
         case "scheduleSkippedPastDue", "skippedPastDue", "refillSkippedPastDue": "过期跳过"
+        case "scheduleSkippedBudget", "refillSkippedBudget": "预算跳过"
+        case "scheduleMerged", "refillMerged": "同类合并"
         case "refillSuccess": "补注册成功"
         case "compensateFailed": "过期失败补偿"
         case "compensateSkipped": "过期跳过补偿"

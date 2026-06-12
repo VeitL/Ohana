@@ -118,6 +118,15 @@ private final class FakeReminderNotificationScheduler: ReminderNotificationSched
         completion?(.scheduled)
     }
 
+    func schedule(
+        reminder _: Reminder,
+        deliveryDate _: Date?,
+        existingNotificationIds _: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        completion?(.scheduled)
+    }
+
     func pendingNotificationIds() async -> Set<String> { [] }
     func scheduleRollingWindow(reminders _: [Reminder]) {}
     func refillWindowIfNeeded(allReminders _: [Reminder]) {}

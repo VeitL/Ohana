@@ -12,27 +12,46 @@ import UserNotifications
 
 enum ReminderNotificationScheduleResult: Equatable {
     case scheduled
+    case deferred(String)
     case skippedDuplicate
     case skippedPastDue
     case missingEvent
+    case skippedBudget(String)
+    case skippedMerged(String)
     case failed(String)
 
     var ledgerActionType: String {
         switch self {
         case .scheduled: "scheduleSuccess"
+        case .deferred: "scheduleDeferred"
         case .skippedDuplicate: "scheduleDuplicate"
         case .skippedPastDue: "scheduleSkippedPastDue"
         case .missingEvent: "scheduleMissingEvent"
+        case .skippedBudget: "scheduleSkippedBudget"
+        case .skippedMerged: "scheduleMerged"
         case .failed: "scheduleFailed"
         }
     }
 
     var metadataJSON: String {
         switch self {
+        case let .deferred(metadata),
+             let .skippedBudget(metadata),
+             let .skippedMerged(metadata):
+            metadata
         case let .failed(message):
             "{\"error\":\"\(message.replacingOccurrences(of: "\"", with: "\\\""))\"}"
         default:
             ""
+        }
+    }
+
+    var didRegisterNotification: Bool {
+        switch self {
+        case .scheduled, .deferred:
+            true
+        default:
+            false
         }
     }
 }
@@ -112,7 +131,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
 
     // MARK: - Schedule（单条，原有接口保持不变）
     func schedule(reminder: Reminder) {
-        schedule(reminder: reminder, existingNotificationIds: nil, completion: nil)
+        scheduleWithPolicy(reminder: reminder, existingNotificationIds: nil, completion: nil)
     }
 
     func schedule(
@@ -120,11 +139,69 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         existingNotificationIds: Set<String>? = nil,
         completion: ((ReminderNotificationScheduleResult) -> Void)? = nil
     ) {
+        scheduleWithPolicy(
+            reminder: reminder,
+            existingNotificationIds: existingNotificationIds,
+            completion: completion
+        )
+    }
+
+    private func scheduleWithPolicy(
+        reminder: Reminder,
+        existingNotificationIds: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    ) {
+        guard let policyDecision = NotificationDeliveryPolicy.plan(reminders: [reminder])[reminder.id] else {
+            schedule(
+                reminder: reminder,
+                deliveryDate: nil,
+                existingNotificationIds: existingNotificationIds,
+                completion: completion
+            )
+            return
+        }
+
+        switch policyDecision {
+        case let .deliver(deliveryDate, _, _):
+            schedule(
+                reminder: reminder,
+                deliveryDate: deliveryDate,
+                existingNotificationIds: existingNotificationIds,
+                completion: completion
+            )
+        case .skippedBudget:
+            completion?(.skippedBudget(policyDecision.metadataJSON))
+        case .merged:
+            completion?(.skippedMerged(policyDecision.metadataJSON))
+        }
+    }
+
+    func schedule(
+        reminder: Reminder,
+        deliveryDate: Date? = nil,
+        existingNotificationIds: Set<String>? = nil,
+        completion: ((ReminderNotificationScheduleResult) -> Void)? = nil
+    ) {
+        scheduleDirect(
+            reminder: reminder,
+            deliveryDate: deliveryDate,
+            existingNotificationIds: existingNotificationIds,
+            completion: completion
+        )
+    }
+
+    private func scheduleDirect(
+        reminder: Reminder,
+        deliveryDate: Date? = nil,
+        existingNotificationIds: Set<String>? = nil,
+        completion: ((ReminderNotificationScheduleResult) -> Void)? = nil
+    ) {
         guard let event = reminder.event else {
             completion?(.missingEvent)
             return
         }
-        guard reminder.scheduledAt > Date() else {
+        let fireDate = deliveryDate ?? reminder.scheduledAt
+        guard fireDate > Date() else {
             completion?(.skippedPastDue)
             return
         }
@@ -136,7 +213,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         let content = makeContent(event: event, reminder: reminder)
         let components = Calendar.current.dateComponents(
             [.year, .month, .day, .hour, .minute],
-            from: reminder.scheduledAt
+            from: fireDate
         )
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         let request = UNNotificationRequest(
@@ -168,23 +245,13 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         let now = Date()
         let windowEnd = Calendar.current.date(byAdding: .day, value: rollingWindowDays, to: now)!
 
-        for reminder in reminders {
-            guard reminder.isPending else { continue }
-            guard reminder.scheduledAt > now, reminder.scheduledAt <= windowEnd else { continue }
-            guard let event = reminder.event else { continue }
-
-            let content = makeContent(event: event, reminder: reminder)
-            let components = Calendar.current.dateComponents(
-                [.year, .month, .day, .hour, .minute],
-                from: reminder.scheduledAt
-            )
-            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-            let request = UNNotificationRequest(
-                identifier: reminder.notificationId,
-                content: content,
-                trigger: trigger
-            )
-            center.add(request)
+        let candidates = reminders.filter { reminder in
+            reminder.isPending && reminder.scheduledAt > now && reminder.scheduledAt <= windowEnd
+        }
+        let policyDecisions = NotificationDeliveryPolicy.plan(reminders: candidates)
+        for reminder in candidates {
+            guard case let .deliver(deliveryDate, _, _) = policyDecisions[reminder.id] else { continue }
+            scheduleDirect(reminder: reminder, deliveryDate: deliveryDate)
         }
     }
 
@@ -194,18 +261,28 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         let now = Date()
         let windowEnd = Calendar.current.date(byAdding: .day, value: rollingWindowDays, to: now)!
 
+        let candidates = allReminders.filter { reminder in
+            reminder.isPending && reminder.scheduledAt > now && reminder.scheduledAt <= windowEnd
+        }
+
         center.getPendingNotificationRequests { existing in
             let existingIds = Set(existing.map(\.identifier))
-            let toSchedule = allReminders.filter { r in
-                guard r.isPending else { return false }
-                guard r.scheduledAt > now, r.scheduledAt <= windowEnd else { return false }
-                return !existingIds.contains(r.notificationId)
+            let toSchedule = candidates.filter { reminder in
+                !existingIds.contains(reminder.notificationId)
             }
+            let policyDecisions = NotificationDeliveryPolicy.plan(reminders: toSchedule)
+            var added = 0
             for reminder in toSchedule {
-                self.schedule(reminder: reminder)
+                guard case let .deliver(deliveryDate, _, _) = policyDecisions[reminder.id] else { continue }
+                self.scheduleDirect(
+                    reminder: reminder,
+                    deliveryDate: deliveryDate,
+                    existingNotificationIds: existingIds
+                )
+                added += 1
             }
             #if DEBUG
-                OhanaLog.debug("refillWindow: existing=\(existingIds.count), added=\(toSchedule.count)", category: "Notifications")
+                OhanaLog.debug("refillWindow: existing=\(existingIds.count), added=\(added)", category: "Notifications")
             #endif
         }
     }
@@ -247,6 +324,8 @@ final class NotificationManager: NSObject, @unchecked Sendable {
         content.body = "\(event.emoji) \(localizedEventTitle)"
         content.sound = .default
         content.categoryIdentifier = categoryID
+        let classification = NotificationDeliveryPolicy.classification(for: event)
+        let policyUserInfo = NotificationDeliveryPolicy.userInfo(for: classification)
         content.userInfo = [
             "reminderId": reminder.id.uuidString,
             "notificationId": reminder.notificationId,
@@ -255,7 +334,7 @@ final class NotificationManager: NSObject, @unchecked Sendable {
             "eventType": event.eventType,
             "relatedEntityType": event.relatedEntityType,
             "relatedEntityId": event.relatedEntityId
-        ]
+        ].merging(policyUserInfo) { _, new in new }
         return content
     }
 }

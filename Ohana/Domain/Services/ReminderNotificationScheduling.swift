@@ -25,6 +25,12 @@ protocol ReminderNotificationScheduling: Sendable {
         existingNotificationIds: Set<String>?,
         completion: ((ReminderNotificationScheduleResult) -> Void)?
     )
+    func schedule(
+        reminder: Reminder,
+        deliveryDate: Date?,
+        existingNotificationIds: Set<String>?,
+        completion: ((ReminderNotificationScheduleResult) -> Void)?
+    )
     func pendingNotificationIds() async -> Set<String>
     func scheduleRollingWindow(reminders: [Reminder])
     func refillWindowIfNeeded(allReminders: [Reminder])

@@ -20,7 +20,8 @@ enum ReminderSchedulingService {
         existingNotificationIds: Set<String>? = nil,
         operation: String = "schedule",
         saveLedger: Bool = true,
-        careLedger providedCareLedger: CareLedgerRecording? = nil
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        policyDecision providedPolicyDecision: NotificationDeliveryDecision? = nil
     ) async -> ReminderNotificationScheduleResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         if reminder.event == nil {
@@ -33,6 +34,23 @@ enum ReminderSchedulingService {
             recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger, careLedger: careLedger)
             return result
         }
+        let policyDecision = providedPolicyDecision ?? NotificationDeliveryPolicy.plan(reminders: [reminder])[reminder.id]
+        if let policyDecision {
+            switch policyDecision {
+            case .skippedBudget:
+                let result = ReminderNotificationScheduleResult.skippedBudget(policyDecision.metadataJSON)
+                recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger, careLedger: careLedger)
+                return result
+            case .merged:
+                let result = ReminderNotificationScheduleResult.skippedMerged(policyDecision.metadataJSON)
+                recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger, careLedger: careLedger)
+                return result
+            case .deliver:
+                break
+            }
+        }
+        let deliveryDate = policyDecision?.deliveryDate
+        let shouldRecordDeferred = policyDecision?.isDeferred == true
         let existingIds: Set<String> = if let existingNotificationIds {
             existingNotificationIds
         } else {
@@ -41,13 +59,21 @@ enum ReminderSchedulingService {
         let result = await withCheckedContinuation { continuation in
             OhanaNotifications.current.schedule(
                 reminder: reminder,
+                deliveryDate: deliveryDate,
                 existingNotificationIds: existingIds
             ) { result in
                 continuation.resume(returning: result)
             }
         }
-        recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger, careLedger: careLedger)
-        return result
+        let finalResult: ReminderNotificationScheduleResult = if result == .scheduled,
+                                                                 shouldRecordDeferred,
+                                                                 let metadata = policyDecision?.metadataJSON {
+            .deferred(metadata)
+        } else {
+            result
+        }
+        recordScheduleResult(finalResult, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger, careLedger: careLedger)
+        return finalResult
     }
 
     @MainActor
@@ -192,6 +218,7 @@ enum ReminderSchedulingService {
         let remindersToKeep = deduplicate(reminders: reminders, context: context, careLedger: careLedger)
         guard !remindersToKeep.isEmpty else { return }
 
+        let policyDecisions = NotificationDeliveryPolicy.plan(reminders: remindersToKeep)
         var knownNotificationIds = await OhanaNotifications.current.pendingNotificationIds()
         for (index, reminder) in remindersToKeep.enumerated() {
             guard !Task.isCancelled else {
@@ -205,9 +232,10 @@ enum ReminderSchedulingService {
                 existingNotificationIds: knownNotificationIds,
                 operation: operation,
                 saveLedger: false,
-                careLedger: careLedger
+                careLedger: careLedger,
+                policyDecision: policyDecisions[reminder.id]
             )
-            if result == .scheduled {
+            if result.didRegisterNotification {
                 knownNotificationIds.insert(reminder.notificationId)
             }
             if index > 0, index.isMultiple(of: 8) {
@@ -227,9 +255,12 @@ enum ReminderSchedulingService {
         guard operation == "refill" else { return result.ledgerActionType }
         switch result {
         case .scheduled: return "refillSuccess"
+        case .deferred: return "refillDeferred"
         case .skippedDuplicate: return "refillSkippedExisting"
         case .skippedPastDue: return "refillSkippedPastDue"
         case .missingEvent: return "refillMissingEvent"
+        case .skippedBudget: return "refillSkippedBudget"
+        case .skippedMerged: return "refillMerged"
         case .failed: return "refillFailed"
         }
     }

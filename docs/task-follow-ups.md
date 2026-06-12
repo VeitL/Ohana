@@ -25,6 +25,25 @@ actionable; long-term product ideas belong in planning docs instead.
 
 ## Open Items
 
+### TFU-20260612-016 - Validate GAP-6 notification delivery on real devices
+
+- Status: Open
+- Priority: P1
+- Area: Notifications / Release Validation
+- Source task: GAP-6 notification classification, 2026-06-12
+- Blocker: Repository tests and simulator UI tests can prove scheduling policy,
+  ledger visibility, and routing compile paths, but they cannot prove real iOS
+  notification delivery, banners, permission prompts, Focus/DND interaction, or
+  notification action behavior on physical devices.
+- Next step: Run the manual checklist in
+  `docs/planning/gap-6-notifications-acceptance-track-list.md` on a real device
+  with notification permission enabled, including routine budget, quiet-hours
+  deferral, health-critical delivery, merge behavior, notification actions, and
+  weekly report copy.
+- Close when: The GAP-6 track list's manual section is checked off on a real
+  device and any device-specific delivery or routing defect is either fixed or
+  recorded as its own scoped follow-up.
+
 ### TFU-20260611-001 - App Store Connect privacy setup
 
 - Status: Done

@@ -175,6 +175,7 @@ final class MedicationReminderService {
                     ? l.tr(zh: "请打开 Ohana 查看用药详情。", en: "Open Ohana to view medication details.", de: "Öffne Ohana, um Medikamentendetails anzusehen.")
                     : "\(pet.name) · \(med.name) · \(med.dosage)"
                 content.sound = .default
+                let classification = NotificationDeliveryClassification(tier: .healthCritical, category: .medication, mergeAllowed: false)
                 content.userInfo = [
                     "medicationId": med.id.uuidString,
                     "petId": pet.id.uuidString,
@@ -183,7 +184,7 @@ final class MedicationReminderService {
                     "eventType": EventType.petMedication.rawValue,
                     "relatedEntityType": MedicationEventLink.petMedicationPlan,
                     "relatedEntityId": med.id.uuidString
-                ]
+                ].merging(NotificationDeliveryPolicy.userInfo(for: classification)) { _, new in new }
                 content.categoryIdentifier = "MED_REMINDER"
 
                 let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
@@ -234,13 +235,14 @@ final class MedicationReminderService {
                 de: "\(pet.name) · \(med.name) endet in 3 Tagen. Bitte Verlängerung prüfen."
             )
         content.sound = .default
+        let classification = NotificationDeliveryClassification(tier: .healthCritical, category: .medication, mergeAllowed: false)
         content.userInfo = [
             "medicationId": med.id.uuidString,
             "petId": pet.id.uuidString,
             "eventType": EventType.petMedication.rawValue,
             "relatedEntityType": MedicationEventLink.petMedicationPlan,
             "relatedEntityId": med.id.uuidString
-        ]
+        ].merging(NotificationDeliveryPolicy.userInfo(for: classification)) { _, new in new }
 
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: alertDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
@@ -305,6 +307,7 @@ final class MedicationReminderService {
                 ? l.tr(zh: "该记录已设为隐私，请打开 Ohana 查看。", en: "This medication is private. Open Ohana to view it.", de: "Dieser Eintrag ist privat. Öffne Ohana, um ihn anzusehen.")
                 : "\(med.name) · \(med.dosage)"
             content.sound = .default
+            let classification = NotificationDeliveryClassification(tier: .healthCritical, category: .medication, mergeAllowed: false)
             content.userInfo = [
                 "humanMedicationId": med.id.uuidString,
                 "humanId": human.id.uuidString,
@@ -313,7 +316,7 @@ final class MedicationReminderService {
                 "eventType": EventType.medication.rawValue,
                 "relatedEntityType": MedicationEventLink.humanMedicationPlan,
                 "relatedEntityId": med.id.uuidString
-            ]
+            ].merging(NotificationDeliveryPolicy.userInfo(for: classification)) { _, new in new }
             content.categoryIdentifier = "HUMAN_MED_REMINDER"
 
             let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
