@@ -20,7 +20,7 @@
 | GAP-8 单成员形态 | 🟢 | `6c4a98db2` | 单成员展示红绿测试、负面文案扫描、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待单人单宠真实 UI 抽查 |
 | GAP-9 离世退场 | 🟢 | `e6a45e72c` | 纪念模式规则书、未来计划可逆退场、离世成员活跃入口过滤、奖励冻结定向测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 真机通知抽查 |
 | Phase 6 Members | 🟢 | `ead1e5fe4` | 创建派生日历事实 sync metadata、成员删除回收站聚合、Human 侧过期清理、RequiredHumanProfileView a11y、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
-| Phase 6 Oasis | 🟢 | 待提交 | Oasis 当前主人钱包门、预算 / 冷却、休眠态救援、UI/a11y/smoothness/runtime 审计、Oasis 窄测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
+| Phase 6 Oasis | 🟢 | `87423afd8` | Oasis 当前主人钱包门、预算 / 冷却、休眠态救援、UI/a11y/smoothness/runtime 审计、Oasis 窄测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 
 ## GAP-1 联机功能门
 
