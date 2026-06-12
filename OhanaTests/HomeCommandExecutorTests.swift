@@ -95,6 +95,85 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func petMedicationDoseRewardUsesExecutorBudgetAndCooldownPipeline() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let activeHuman = Human(name: "Active")
+        let executor = Human(name: "Executor")
+        let pet = Pet(name: "Momo", species: "狗")
+        let medication = PetMedication(
+            name: "Apoquel",
+            dosage: "1 tablet",
+            frequency: .daily,
+            remainingAmount: 2,
+            pet: pet
+        )
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        defer {
+            if let oldActiveHumanID {
+                defaults.set(oldActiveHumanID, forKey: "currentActiveHumanId")
+            } else {
+                defaults.removeObject(forKey: "currentActiveHumanId")
+            }
+            if let oldCooldownLogs {
+                defaults.set(oldCooldownLogs, forKey: QuestManager.Keys.cooldownLogs)
+            } else {
+                defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+            }
+            EconomyDailyBudgetStore.reset(
+                householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+                memberKey: executor.id.uuidString,
+                careObjectKeys: [pet.id.uuidString]
+            )
+        }
+        defaults.set(activeHuman.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+            memberKey: executor.id.uuidString,
+            careObjectKeys: [pet.id.uuidString]
+        )
+        context.insert(activeHuman)
+        context.insert(executor)
+        context.insert(pet)
+        context.insert(medication)
+        try context.save()
+        let questManager = QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: SharedDomainRevisionPublisher())
+        let medicationReminders = MedicationReminderManagerSpy()
+
+        let first = PetMedicationDoseLogging.recordDose(
+            medication: medication,
+            pet: pet,
+            modelContext: context,
+            awardCoconut: true,
+            questManager: questManager,
+            activeHumanSelection: FixedActiveHumanSelection(currentHumanId: executor.id.uuidString),
+            medicationReminders: medicationReminders
+        )
+        let second = PetMedicationDoseLogging.recordDose(
+            medication: medication,
+            pet: pet,
+            modelContext: context,
+            awardCoconut: true,
+            questManager: questManager,
+            activeHumanSelection: FixedActiveHumanSelection(currentHumanId: executor.id.uuidString),
+            medicationReminders: medicationReminders
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        let budgetEvents = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
+        #expect(first.assigneeId == executor.id.uuidString)
+        #expect(second.assigneeId == executor.id.uuidString)
+        #expect(executor.coconutBalance > 0)
+        #expect(activeHuman.coconutBalance == 0)
+        #expect(walletEntries.count(where: { $0.ownerId == executor.id.uuidString && $0.delta > 0 }) == 1)
+        #expect(budgetEvents.contains { $0.memberKey == executor.id.uuidString && $0.actionKey.contains("记录喂药") })
+        #expect(medicationReminders.recordedMedicationIDs == [medication.id, medication.id])
+    }
+
+    @MainActor
     @Test func quickFeedByIdDoesNotDuplicateFoodStockReminderEvents() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -6025,6 +6104,51 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
+    @Test func shopPurchaseCofundingSkipsFrozenHumanWallets() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let buyer = Human(name: "Ava")
+        buyer.coconutBalance = 10
+        let frozenContributor = Human(name: "Frozen")
+        frozenContributor.coconutBalance = 100
+        frozenContributor.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
+        let activeContributor = Human(name: "Guan")
+        activeContributor.coconutBalance = 100
+        let item = ShopItem(
+            id: "test_cofund_skip_frozen_item",
+            emoji: "🥥",
+            nameText: .init(zh: "冻结跳过测试", en: "Frozen Skip Test", de: "Frozen-Skip-Test"),
+            descriptionText: .init(zh: "测试合资跳过冻结钱包。", en: "Tests skipping frozen cofunders.", de: "Testet eingefrorene Mitfinanzierer."),
+            cost: 50,
+            category: .effect
+        )
+        context.insert(buyer)
+        context.insert(frozenContributor)
+        context.insert(activeContributor)
+        try context.save()
+
+        let result = ShopPurchaseCommandService.purchase(
+            item: item,
+            buyer: buyer,
+            itemName: "Redeemed Frozen Skip Test",
+            context: context,
+            wallet: SwiftDataCoconutWalletManager(),
+            careLedger: CareLedgerService()
+        )
+
+        let walletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        #expect(result.didPurchase)
+        #expect(result.fundingContributions == [
+            ShopPurchaseFundingContribution(humanID: buyer.id, amount: 10),
+            ShopPurchaseFundingContribution(humanID: activeContributor.id, amount: 40)
+        ])
+        #expect(buyer.coconutBalance == 0)
+        #expect(frozenContributor.coconutBalance == 100)
+        #expect(activeContributor.coconutBalance == 60)
+        #expect(!walletEntries.contains { $0.ownerId == frozenContributor.id.uuidString })
+    }
+
+    @MainActor
     @Test func shopPurchaseUsesWalletAccountBalanceWhenCachedHumanBalanceIsStale() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
@@ -7438,6 +7562,32 @@ struct HomeCommandExecutorTests {
         let schema = Schema(ArkSchemaV70.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private struct FixedActiveHumanSelection: ActiveHumanSelecting {
+        let currentHumanId: String?
+
+        var currentHumanIdRaw: String {
+            currentHumanId ?? ""
+        }
+    }
+
+    private final class MedicationReminderManagerSpy: MedicationReminderManaging {
+        private(set) var recordedMedicationIDs: [UUID] = []
+
+        func dosesTakenToday(for _: UUID) -> Int {
+            0
+        }
+
+        func recordDose(for medicationId: UUID) {
+            recordedMedicationIDs.append(medicationId)
+        }
+
+        func undoDose(for _: UUID) {}
+
+        func scheduleMedicationReminders(for _: Pet, context _: ModelContext?) {}
+
+        func scheduleHumanMedicationReminders(for _: Human, meds _: [HumanMedication], context _: ModelContext?) {}
     }
 
     private final class RecordingNotificationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
