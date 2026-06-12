@@ -14,6 +14,17 @@ struct FamilyWeeklyReportDashboardContentView: View {
     let ledgerEvents: [CareLedgerEvent]
 
     @Environment(AppServices.self) private var appServices
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
+
+    private var visibleHumanCount: Int {
+        humans.count
+    }
+
+    private var isSingleVisibleHumanFamily: Bool {
+        SingleMemberFamilyShapePresentation.isSingleVisibleHumanFamily(humanCount: visibleHumanCount)
+    }
 
     private var weekInterval: DateInterval {
         Calendar.current.dateInterval(of: .weekOfYear, for: Date())
@@ -114,7 +125,9 @@ struct FamilyWeeklyReportDashboardContentView: View {
         guard !allEntries.isEmpty else {
             return "完成一次喂食、陪玩、照片或健康记录后，周报会自动整理成可分享的家庭故事。"
         }
-        let leader = rankedMembers.first.map { "\($0.name) 照顾最多" } ?? "照护记录已同步"
+        let leader = rankedMembers.first.map {
+            SingleMemberFamilyShapePresentation.weeklyReportLeaderStory(name: $0.name, humanCount: visibleHumanCount, l: l)
+        } ?? "照护记录已同步"
         let day = mostActiveDay.map { "\($0.date.formatted(.dateTime.weekday(.wide))) 最活跃" } ?? "每天都有记录"
         return "\(leader)，\(day)。\(weightStoryText) \(photoStoryText) \(healthStoryText)"
     }
@@ -151,7 +164,8 @@ struct FamilyWeeklyReportDashboardContentView: View {
     private var shareText: String {
         let leader = rankedMembers.first.map { "\($0.emoji) \($0.name) \($0.count) 次" } ?? "暂无"
         let petLine = topPet.map { "\($0.name) 被照顾 \($0.count) 次" } ?? "暂无宠物记录"
-        return "Ohana 本周家庭周报\n\(storyHeadline)\n\(storyBody)\n总照护 \(allEntries.count) 次\n本周之星：\(leader)\n最受关注：\(petLine)"
+        let leaderLabel = SingleMemberFamilyShapePresentation.weeklyReportShareLeaderLabel(humanCount: visibleHumanCount, l: l)
+        return "Ohana 本周家庭周报\n\(storyHeadline)\n\(storyBody)\n总照护 \(allEntries.count) 次\n\(leaderLabel)：\(leader)\n最受关注：\(petLine)"
     }
 
     var body: some View {
@@ -221,9 +235,12 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
             HStack(spacing: 8) {
                 storyPill(
-                    icon: "crown.fill",
+                    icon: isSingleVisibleHumanFamily ? "person.fill.checkmark" : "crown.fill",
                     title: rankedMembers.first?.name ?? "暂无",
-                    subtitle: "照顾最多",
+                    subtitle: SingleMemberFamilyShapePresentation.weeklyReportLeaderPillSubtitle(
+                        humanCount: visibleHumanCount,
+                        l: l
+                    ),
                     color: .goPrimary
                 )
                 storyPill(
@@ -246,17 +263,19 @@ struct FamilyWeeklyReportDashboardContentView: View {
 
     private var memberRankingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("照护贡献排行", icon: "person.2.fill")
+            sectionHeader(
+                SingleMemberFamilyShapePresentation.weeklyReportContributionSectionTitle(
+                    humanCount: visibleHumanCount,
+                    l: l
+                ),
+                icon: isSingleVisibleHumanFamily ? "person.fill.checkmark" : "person.2.fill"
+            )
             if rankedMembers.isEmpty {
                 emptyText("本周还没有照护记录")
             } else {
                 ForEach(Array(rankedMembers.prefix(5).enumerated()), id: \.element.id) { index, stat in
                     HStack(spacing: 10) {
-                        Text("\(index + 1)")
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.arkInk)
-                            .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                            .background(index == 0 ? Color.goPrimary : Color.primary.opacity(0.08), in: Circle())
+                        memberContributionBadge(index: index)
                         Text(stat.emoji)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(stat.name).font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -347,7 +366,10 @@ struct FamilyWeeklyReportDashboardContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("最近发生了什么", icon: "clock.arrow.circlepath")
             if allEntries.isEmpty {
-                emptyText("完成一次快捷打卡后，这里会出现全家动态")
+                emptyText(SingleMemberFamilyShapePresentation.weeklyReportRecentActivityEmptyText(
+                    humanCount: visibleHumanCount,
+                    l: l
+                ))
             } else {
                 ForEach(allEntries.prefix(8)) { entry in
                     HStack(spacing: 10) {
@@ -409,6 +431,24 @@ struct FamilyWeeklyReportDashboardContentView: View {
             Image(systemName: icon).foregroundStyle(Color.goPrimary)
             Text(title).font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private func memberContributionBadge(index: Int) -> some View {
+        if isSingleVisibleHumanFamily {
+            Image(systemName: "checkmark.seal.fill") // a11y: allow decorative contribution badge; row text carries the accessible meaning
+                .accessibilityHidden(true)
+                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .foregroundStyle(Color.arkInk)
+                .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                .background(Color.goPrimary, in: Circle())
+        } else {
+            Text("\(index + 1)")
+                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .foregroundStyle(Color.arkInk)
+                .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                .background(index == 0 ? Color.goPrimary : Color.primary.opacity(0.08), in: Circle())
         }
     }
 

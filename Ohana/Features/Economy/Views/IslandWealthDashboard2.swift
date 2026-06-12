@@ -21,6 +21,9 @@ struct IslandWealthDashboardContentView: View {
     @State private var selectedCoconutActorId: String? = nil
     @State private var chartProgress: Double = 0
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.code
+
+    private var l: L10n { L10n(appLanguage) }
 
     private var activeHumanId: UUID? {
         UUID(uuidString: activeHumanIdStr)
@@ -329,9 +332,12 @@ struct IslandWealthDashboardContentView: View {
                     Image(systemName: "trophy").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 36))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
-                    Text("完成打卡即可解锁财富榜 ✨")
-                        .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
+                    Text(SingleMemberFamilyShapePresentation.wealthEmptyText(
+                        visibleMemberCount: visibleWealthHumans.count,
+                        l: l
+                    ))
+                    .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 32)
@@ -339,9 +345,12 @@ struct IslandWealthDashboardContentView: View {
             } else {
                 VStack(spacing: 10) {
                     HStack {
-                        Text("财富榜")
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
+                        Text(SingleMemberFamilyShapePresentation.wealthSectionTitle(
+                            rowCount: vm.leaderboard.count,
+                            l: l
+                        ))
+                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         Spacer()
                     }
                     .padding(.horizontal, 4)
@@ -349,7 +358,7 @@ struct IslandWealthDashboardContentView: View {
 
                     LazyVStack(spacing: 10) {
                         ForEach(Array(vm.leaderboard.enumerated()), id: \.element.entityId) { idx, row in
-                            leaderRow(rank: idx + 1, row: row)
+                            leaderRow(rank: idx + 1, row: row, rowCount: vm.leaderboard.count)
                         }
                     }
                 }
@@ -358,9 +367,10 @@ struct IslandWealthDashboardContentView: View {
     }
 
     // MARK: - Leader Row
-    private func leaderRow(rank: Int, row: WealthLeaderRow) -> some View {
+    private func leaderRow(rank: Int, row: WealthLeaderRow, rowCount: Int) -> some View {
         let accent = vm.color(for: row.entityId)
-        let isFirst = rank == 1
+        let showsRank = SingleMemberFamilyShapePresentation.showsWealthRank(rowCount: rowCount)
+        let isFirst = showsRank && rank == 1
         let isSelected = selectedCoconutActorId == row.entityId
         return Button {
             withAnimation(GoMotion.feedback) {
@@ -370,14 +380,22 @@ struct IslandWealthDashboardContentView: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(rank == 1 ? Color.goPrimary :
+                        .fill(!showsRank ? Color.goPrimary :
+                            rank == 1 ? Color.goPrimary :
                             rank == 2 ? Color(hex: "FFF44F").opacity(0.55) :
                             rank == 3 ? Color.goTeal.opacity(0.5) :
                             Color.ohanaCardSurface.opacity(0.74))
                         .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                    Text("\(rank)")
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(rank <= 3 ? Color.arkInk : Color.ohanaSecondaryText)
+                    if showsRank {
+                        Text("\(rank)")
+                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(rank <= 3 ? Color.arkInk : Color.ohanaSecondaryText)
+                    } else {
+                        Image(systemName: "checkmark.seal.fill") // a11y: allow decorative account badge; row text carries the accessible meaning
+                            .accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
+                            .foregroundStyle(Color.arkInk)
+                    }
                 }
 
                 ZStack {

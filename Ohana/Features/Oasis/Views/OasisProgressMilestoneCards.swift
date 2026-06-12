@@ -58,7 +58,10 @@ struct OasisProgressCard: View {
                     color: passiveIncomeAmount > 0 ? Color.goPrimary : Color.ohanaSecondaryText.opacity(0.6)
                 )
                 progressStatCell(
-                    value: localization.tr(zh: "\(memberCount)成员", en: "\(memberCount) members", de: "\(memberCount) Mitglieder"),
+                    value: SingleMemberFamilyShapePresentation.familyMemberCountText(
+                        memberCount: memberCount,
+                        l: localization
+                    ),
                     label: localization.tr(zh: "家庭贡献", en: "Family input", de: "Familienbeitrag"),
                     color: Color(hex: "5B6AFF")
                 )
