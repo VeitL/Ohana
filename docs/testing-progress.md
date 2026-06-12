@@ -14,7 +14,7 @@
 | 3 | `Ohana/Shared` | 🟢 | 门禁通过并提交：`fcf998088`；P1 余留见 TFU-20260612-015 |
 | 4 | `Ohana/App` | 🟢 | 门禁通过并提交：`e48c13af7`；无 P1/P2 余留 |
 | 5 | Home + TodayFocus + QuickCare | 🟢 | 门禁通过并提交：`b8e8710e`；TFU-20260612-015 已关闭，无 P1/P2 余留 |
-| 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟢 | Feeding 门禁通过并提交：`b49134977`；Members 门禁通过并提交：`ead1e5fe4`；Oasis 门禁通过并提交：`87423afd8`；Settings/Health 门禁通过并提交：`5d4e71928`；Economy 门禁通过并提交：`662852a01` |
+| 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟢 | Feeding 门禁通过并提交：`b49134977`；Members 门禁通过并提交：`ead1e5fe4`；Oasis 门禁通过并提交：`87423afd8`；Settings/Health 门禁通过并提交：`5d4e71928`；Economy 原门禁：`662852a01`，复审修复轮门禁：`1679ddd66` |
 | 6.5 | 宪法差距建设（联机门/回收站/自动备份/植物门） | 🟢* | GAP-1~9 与 GAP-12 全部过门禁并提交；*带验收债：人工/真机验收项见 `docs/planning/gap-acceptance-track-list.md`，必须在 🏁 复审与 Phase 9B 前清完 |
 | 7 | 中小模块批量 | ⬜ | |
 | 8 | 横向集成与全量回归 | ⬜ | 需总览会话主持 |
@@ -37,7 +37,7 @@
 | Oasis | 6 | 🟢 | 2026-06-12 | 无 | `87423afd8` | 开工：2026-06-12；规则书见 `docs/specs/Oasis-logic.md`；当前主人钱包门、预算/冷却产出、一次性幂等奖励、休眠可唤回语义已落地；`scripts/module-exit-gate.sh` PASS；真实 UI 抽查见 `docs/planning/gap-acceptance-track-list.md#phase-6-oasis`；未改 schema / 路由 / 启动路径 / CloudKit |
 | Settings | 6 | 🟢 | 2026-06-12 | P2 余留见 TFU-20260612-022 | `5d4e71928` | 规则书见 `docs/specs/Settings-logic.md`；开发/测试入口收进 Debug-only，通知开关接入 `NotificationDeliveryPolicy`，空 About 入口隐藏；目标测试、UI/a11y/smoothness/runtime 审计与 `scripts/module-exit-gate.sh` PASS；真实 UI / 真机通知抽查见统一 track list |
 | Health | 6 | 🟢 | 2026-06-12 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list | `5d4e71928` | 规则书见 `docs/specs/Health-logic.md`；健康记录删除清理派生费用/日历事件/提醒/ledger，健康/症状/发情记录进回收站并可恢复，已故/回收宠物只读；schema 升至 `ArkSchemaV70`；目标测试与 `scripts/module-exit-gate.sh` PASS；未启用 CloudKit、未改路由或启动路径 |
-| Economy | 6 | 🏁 | 2026-06-12 | P2 余留见 TFU-20260613-001~002；真实 UI 抽查见统一 track list | `662852a01` | 规则书见 `docs/specs/Economy-logic.md`；线下兑现入口首发门关闭，冻结钱包拒绝成就 / 商店 / 金库 / 奖励写入，特殊奖励无 actor 时归属 active human 且不写 system，隐私钱包计入总额但隐藏明细，离世 / 回收钱包退出活跃财富且历史保留；2026-06-13 对抗复审 P1 已修：重复喂药 / 时刻奖励进入预算冷却管线，照护 / 花费 / 遛狗奖励按 executor 归属，首宠欢迎奖励不写 system，商店支持岛屿合资，兑换服务层硬门，财富趋势排除 system，遛狗先存事实再发奖；本轮 `scripts/module-exit-gate.sh` PASS，P0/P1 清零，P2 已进 follow-up；未改 schema / 路由 / 启动路径 / CloudKit |
+| Economy | 6 | 🟢 | 2026-06-12 | 无 P1/P2 代码余留；真实 UI 抽查见统一 track list；需重新对抗复审后才可标 🏁 | `1679ddd66` | 规则书见 `docs/specs/Economy-logic.md`；线下兑现入口首发门关闭，冻结钱包拒绝成就 / 商店 / 金库 / 奖励写入，特殊奖励与 legacy 兼容奖励无 actor 时归属 active human 且不写 system，隐私钱包计入总额但隐藏明细，离世 / 回收钱包退出活跃财富且历史保留；2026-06-13 复审修复轮已完成：重复喂药 / 时刻奖励进入预算冷却管线，照护 / 花费 / 遛狗奖励按 executor 归属，首宠欢迎奖励不写 system，商店支持岛屿合资，兑换服务层硬门，财富趋势排除 system，遛狗先存事实再发奖；本轮追加根因边界：`EconomyRewardOwnerResolver`、`CoconutWalletFundingPlanner` / `CoconutWalletMutationWriter`；TFU-20260613-001~002 已关闭；`scripts/module-exit-gate.sh` PASS；未改 schema / 路由 / 启动路径 / CloudKit |
 | Medication | 7 | ⬜ | | | | |
 | Walks | 7 | ⬜ | | | | |
 | FamilyTasks | 7 | ⬜ | | | | |
@@ -109,3 +109,4 @@
 | 2026-06-12 | 9A 前置项 | **9A.1 付费 Apple Developer 账号已办妥** ✅。解锁：真机签名安装（dogfooding）、App Store Connect 建档、TestFlight（9B 时用）。注意：CloudKit 验证虽技术上解锁，但按 D4 仍属 1.x，不得因账号到位而提前开工。待办：App Store Connect 注册 Bundle ID + 建档抢注 app 名称 |
 | 2026-06-12 | GAP 批次对账 | 账实核对：GAP-1~9、Members、Oasis 共 11 项的门禁 commit 全部存在且成对（fix+gate 记录）、工作区干净、AGENTS.md schema 行已同步 V69、九本规则书在 `docs/specs/`。发现：① main 领先 origin 9 个提交未推送→CI（含 SwiftLint 严格）未验证最近批次；② 64 项人工/真机验收债集中在 track list，已在 Phase 6.5 行标注 🟢*；③ 总览会话重跑 `module-exit-gate.sh` 抽查 **PASS**（全量单测+审计绿）。流程修正：验收债规则与 🟢* 状态入手册、收工协议加推送+CI 要求、复审采样节奏入手册 |
 | 2026-06-12 | Phase 6 收尾检验 + 宪法 v1.3 | Settings/Health（`5d4e71928`）与 Economy（`662852a01`）账实一致、schema V70 已同步、工作区干净。**违规两项**：① main 领先 origin 14 提交未推送（收工协议第 5 条连续未执行，CI 空转）；② 对抗复审为零（采样规则被跨过两次）。**裁定：Phase 7 开工前必须先 push+CI 绿 + 完成 Economy 与 RecycleBin 两个复审采样**。新决策入宪：D19 植物功能门（GAP-12 登记，P0）、D20 多语言扩展就绪（8.5 增审查项） |
+| 2026-06-13 | Economy 复审修复轮 | 对 7 条 P1 + 2 条 P2 按根因归组执行：表征测试提交 `7c7f18b08`，纯重构提交 `67afc59a7`，行为修复提交 `1679ddd66`。新增 legacy 无 actor 不写 system、FamilyTasks 悬赏失败保持待审核且无半笔账测试；`scripts/module-exit-gate.sh` PASS。Economy 状态降回 🟢，需下一轮重新对抗复审清零后才可回 🏁 |
