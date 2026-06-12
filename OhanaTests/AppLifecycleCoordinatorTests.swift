@@ -14,7 +14,8 @@ struct AppLifecycleCoordinatorTests {
             .allowSystemAutoLock,
             .updateWorkloadPhase(.active),
             .walkForeground,
-            .refreshWorkload(reason: "contentAppear")
+            .refreshWorkload(reason: "contentAppear"),
+            .runAutomaticBackupIfDue(reason: "rootAppeared")
         ])
         #expect(duplicateScenePhase == [.allowSystemAutoLock])
     }
@@ -43,7 +44,10 @@ struct AppLifecycleCoordinatorTests {
             .updateWorkloadPhase(.background),
             .walkBackground
         ])
-        #expect(notificationCommands == [.scheduleReminderRefill])
+        #expect(notificationCommands == [
+            .scheduleReminderRefill,
+            .runAutomaticBackupIfDue(reason: "didEnterBackground")
+        ])
     }
 
     @Test func backgroundNotificationHandlesWorkWhenScenePhaseHasNotArrived() {
@@ -55,7 +59,8 @@ struct AppLifecycleCoordinatorTests {
         #expect(notificationCommands == [
             .updateWorkloadPhase(.background),
             .walkBackground,
-            .scheduleReminderRefill
+            .scheduleReminderRefill,
+            .runAutomaticBackupIfDue(reason: "didEnterBackground")
         ])
         #expect(duplicateScenePhase.isEmpty)
     }

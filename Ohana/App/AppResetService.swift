@@ -9,6 +9,7 @@ enum AppResetService {
         var cancelPendingNotifications = true
         var deleteCustomBackground = true
         var resetSharedRuntimeState = true
+        var cleanUpAutomaticBackups = true
     }
 
     static func reset(
@@ -47,6 +48,10 @@ enum AppResetService {
         try context.save()
 
         resetLocalDefaults(defaults, preservedValues: preservedDefaults)
+        if options.cleanUpAutomaticBackups {
+            AutomaticBackupStatusStore(defaults: defaults).resetAfterAppReset()
+            try? ICloudDriveAutomaticBackupFileStore().removeManagedAutomaticBackupsSynchronously()
+        }
         if options.deleteCustomBackground {
             CustomAppBackgroundStore.deleteImage()
         }
@@ -190,6 +195,7 @@ enum AppResetService {
         "achievement_",
         "appBackground",
         "appCustomBackground",
+        "automaticBackup.",
         "appPowerSavingMode",
         "avatar2d_",
         "calendar_",

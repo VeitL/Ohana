@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -27,6 +28,7 @@ enum AppLifecycleCommand: Equatable {
     case walkForeground
     case pauseWalkingForTermination
     case scheduleReminderRefill
+    case runAutomaticBackupIfDue(reason: String)
 }
 
 @MainActor
@@ -42,11 +44,17 @@ struct AppLifecycleReducer {
         case let .rootAppeared(scenePhase):
             [.allowSystemAutoLock]
                 + transitionCommands(to: scenePhase)
-                + [.refreshWorkload(reason: "contentAppear")]
+                + [
+                    .refreshWorkload(reason: "contentAppear"),
+                    .runAutomaticBackupIfDue(reason: "rootAppeared")
+                ]
         case let .scenePhaseChanged(phase):
             activeCommandsIfNeeded(for: phase) + transitionCommands(to: phase)
         case .didEnterBackground:
-            transitionCommands(to: .background) + [.scheduleReminderRefill]
+            transitionCommands(to: .background) + [
+                .scheduleReminderRefill,
+                .runAutomaticBackupIfDue(reason: "didEnterBackground")
+            ]
         case .willResignActive:
             transitionCommands(to: .inactive)
         case .didBecomeActive:
@@ -90,8 +98,13 @@ final class AppLifecycleCoordinator: AppLifecycleHandling {
         var handleWalkForeground: () -> Void
         var pauseWalkForTermination: () -> Void
         var scheduleReminderRefill: () -> Void
+        var runAutomaticBackupIfDue: (String) -> Void
 
-        static func live(walkingManager: PetWalkingManager) -> Dependencies {
+        static func live(
+            walkingManager: PetWalkingManager,
+            automaticBackups: AutomaticBackupManaging? = nil,
+            modelContainer: ModelContainer? = nil
+        ) -> Dependencies {
             Dependencies(
                 allowSystemAutoLock: {
                     UIApplication.shared.isIdleTimerDisabled = false
@@ -116,6 +129,15 @@ final class AppLifecycleCoordinator: AppLifecycleHandling {
                 },
                 scheduleReminderRefill: {
                     BackgroundTaskCoordinator.scheduleReminderRefill()
+                },
+                runAutomaticBackupIfDue: { reason in
+                    guard let automaticBackups, let modelContainer else { return }
+                    Task { @MainActor in
+                        await automaticBackups.runIfDue(
+                            container: modelContainer,
+                            trigger: .lifecycle(reason)
+                        )
+                    }
                 }
             )
         }
@@ -152,6 +174,8 @@ final class AppLifecycleCoordinator: AppLifecycleHandling {
                 dependencies.pauseWalkForTermination()
             case .scheduleReminderRefill:
                 dependencies.scheduleReminderRefill()
+            case let .runAutomaticBackupIfDue(reason):
+                dependencies.runAutomaticBackupIfDue(reason)
             }
         }
     }

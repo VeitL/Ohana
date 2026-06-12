@@ -58,6 +58,18 @@
 	<string>仅当你开始遛狗时，用于切到后台或锁屏后继续记录本次路线。</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>仅当你开始遛狗并需要锁屏或后台继续记录路线时使用。</string>
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.com.guanchen.li.Ohana</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>Ohana</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>com.guanchen.li.Ohana.reminderRefill</string>

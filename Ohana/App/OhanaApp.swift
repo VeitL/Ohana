@@ -31,7 +31,7 @@ struct OhanaApp: App {
         BackgroundTaskCoordinator.registerTasks()
         let containerStartedAt = CFAbsoluteTimeGetCurrent()
         modelContainer = SharedModelContainer.make()
-        let services = AppServices()
+        let services = AppServices(modelContainer: modelContainer)
         appServices = services
         cloudSharingAppDelegate.configure(modelContainer: modelContainer, cloudSync: services.cloudSync)
         let metricKit = services.metricKit

@@ -45,6 +45,8 @@ struct SettingsView: View {
     @State var exportedJSONURL: URL? = nil
     @State var isExporting = false
     @State var isImporting = false
+    @State var automaticBackupStatus = AutomaticBackupStatusStore().snapshot()
+    @State var isRunningAutomaticBackup = false
     @State var backupEncryptionEnabled = false
     @State var backupPassword = ""
     @State var backupPasswordConfirmation = ""

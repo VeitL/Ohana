@@ -13,6 +13,10 @@ extension SettingsView {
     var backupSection: some View {
         settingsSection(title: "数据备份") {
             VStack(spacing: 0) {
+                automaticBackupControls
+
+                OhanaDashedDivider(color: dividerLine).padding(.leading, 44).padding(.vertical, 2)
+
                 // ── 导出行
                 HStack(spacing: 10) {
                     settingsIcon("arrow.down.doc.fill", color: Color.goTeal)
@@ -209,6 +213,81 @@ extension SettingsView {
         } message: {
             Text(importError ?? "未知错误")
         }
+        .onAppear {
+            refreshAutomaticBackupStatus()
+            showAutomaticBackupReminderIfNeeded()
+        }
+    }
+
+    @ViewBuilder
+    var automaticBackupControls: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                settingsIcon("icloud.and.arrow.up.fill", color: Color.goBlue)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(l.tr(zh: "自动备份", en: "Automatic backup", de: "Automatisches Backup"))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(primaryText)
+                    Text(automaticBackupSubtitle)
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium))
+                        .foregroundStyle(tertiaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { automaticBackupStatus.isEnabled },
+                    set: { enabled in
+                        appServices.automaticBackups.setEnabled(enabled, now: Date())
+                        refreshAutomaticBackupStatus()
+                    }
+                ))
+                .tint(Color.goBlue)
+                .labelsHidden()
+            }
+            .frame(minHeight: 44)
+
+            HStack(spacing: 8) {
+                Image(systemName: automaticBackupStatusIcon)
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
+                    .foregroundStyle(automaticBackupStatusColor.opacity(0.85))
+                Text(automaticBackupStatusText)
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
+                    .foregroundStyle(tertiaryText.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                if isRunningAutomaticBackup {
+                    ProgressView().tint(Color.goBlue).scaleEffect(0.8)
+                } else {
+                    Button {
+                        runAutomaticBackupNow()
+                    } label: {
+                        backupPill(l.tr(zh: "立即备份", en: "Back Up Now", de: "Jetzt sichern"), icon: "arrow.clockwise", color: Color.goBlue)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .disabled(!automaticBackupStatus.isEnabled)
+                    .opacity(automaticBackupStatus.isEnabled ? 1 : 0.45)
+                }
+            }
+            .frame(minHeight: 34)
+
+            if automaticBackupHasCurrentFailure {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative icon covered by failure message text
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.goYellow.opacity(0.9))
+                        .accessibilityHidden(true)
+                    Text(automaticBackupStatus.lastFailureMessage ?? l.tr(
+                        zh: "自动备份失败，请稍后重试。",
+                        en: "Automatic backup failed. Try again later.",
+                        de: "Das automatische Backup ist fehlgeschlagen."
+                    ))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium))
+                    .foregroundStyle(tertiaryText.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 
     func backupPasswordForExport() throws -> String? {
@@ -239,6 +318,119 @@ extension SettingsView {
     var backupPasswordIsBelowMinimum: Bool {
         let password = backupPassword.trimmingCharacters(in: .whitespacesAndNewlines)
         return !password.isEmpty && password.count < DataBackupEncryption.minimumPasswordLength
+    }
+
+    var automaticBackupSubtitle: String {
+        automaticBackupStatus.isEnabled
+            ? l.tr(zh: "每天自动保存到 iCloud Drive 文件", en: "Daily file in iCloud Drive", de: "Tägliche Datei in iCloud Drive")
+            : l.tr(zh: "已关闭", en: "Off", de: "Aus")
+    }
+
+    var automaticBackupStatusText: String {
+        if !automaticBackupStatus.isEnabled {
+            return l.tr(zh: "自动备份已关闭。", en: "Automatic backup is off.", de: "Automatisches Backup ist aus.")
+        }
+        if automaticBackupHasCurrentFailure, let failureDate = automaticBackupStatus.lastFailureAt {
+            return l.tr(
+                zh: "上次尝试失败：\(automaticBackupDateText(failureDate))",
+                en: "Last attempt failed: \(automaticBackupDateText(failureDate))",
+                de: "Letzter Versuch fehlgeschlagen: \(automaticBackupDateText(failureDate))"
+            )
+        }
+        if let successDate = automaticBackupStatus.lastSuccessAt {
+            return l.tr(
+                zh: "上次成功：\(automaticBackupDateText(successDate))",
+                en: "Last success: \(automaticBackupDateText(successDate))",
+                de: "Letzter Erfolg: \(automaticBackupDateText(successDate))"
+            )
+        }
+        return l.tr(zh: "尚未完成首次自动备份。", en: "No automatic backup yet.", de: "Noch kein automatisches Backup.")
+    }
+
+    var automaticBackupStatusIcon: String {
+        if !automaticBackupStatus.isEnabled { return "pause.circle.fill" }
+        if automaticBackupHasCurrentFailure { return "exclamationmark.circle.fill" }
+        if automaticBackupStatus.lastSuccessAt != nil { return "checkmark.circle.fill" }
+        return "clock.fill"
+    }
+
+    var automaticBackupStatusColor: Color {
+        if !automaticBackupStatus.isEnabled { return tertiaryText }
+        if automaticBackupHasCurrentFailure { return Color.goYellow }
+        if automaticBackupStatus.lastSuccessAt != nil { return Color.goTeal }
+        return Color.goBlue
+    }
+
+    var automaticBackupHasCurrentFailure: Bool {
+        guard let failureDate = automaticBackupStatus.lastFailureAt else { return false }
+        guard let successDate = automaticBackupStatus.lastSuccessAt else { return true }
+        return failureDate >= successDate
+    }
+
+    func automaticBackupDateText(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    func refreshAutomaticBackupStatus() {
+        automaticBackupStatus = appServices.automaticBackups.snapshot(now: Date())
+    }
+
+    func runAutomaticBackupNow() {
+        guard !isRunningAutomaticBackup else { return }
+        isRunningAutomaticBackup = true
+        Task {
+            let result = await appServices.automaticBackups.runNow(
+                container: modelContext.container,
+                trigger: .settingsManual
+            )
+            refreshAutomaticBackupStatus()
+            switch result {
+            case .success:
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                appServices.islandToasts.show(l.tr(
+                    zh: "自动备份已完成",
+                    en: "Automatic backup completed",
+                    de: "Automatisches Backup abgeschlossen"
+                ))
+            case let .failure(_, message):
+                importError = message
+                showingImportErrorAlert = true
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+            case .skipped(.alreadyRunning):
+                appServices.islandToasts.show(l.tr(
+                    zh: "自动备份正在进行",
+                    en: "Automatic backup is already running",
+                    de: "Automatisches Backup läuft bereits"
+                ))
+            case .skipped(.disabled):
+                appServices.islandToasts.show(l.tr(
+                    zh: "请先打开自动备份",
+                    en: "Turn on automatic backup first",
+                    de: "Automatisches Backup zuerst aktivieren"
+                ))
+            case .skipped(.notDue):
+                appServices.islandToasts.show(l.tr(
+                    zh: "今天已经备份过",
+                    en: "Already backed up today",
+                    de: "Heute bereits gesichert"
+                ))
+            }
+            isRunningAutomaticBackup = false
+        }
+    }
+
+    func showAutomaticBackupReminderIfNeeded() {
+        let now = Date()
+        let status = appServices.automaticBackups.snapshot(now: now)
+        automaticBackupStatus = status
+        guard status.shouldShowGentleReminder(now: now) else { return }
+        appServices.islandToasts.show(l.tr(
+            zh: "自动备份需要你看一眼",
+            en: "Automatic backup needs attention",
+            de: "Automatisches Backup braucht Aufmerksamkeit"
+        ))
+        appServices.automaticBackups.markReminderShown(now: now)
+        refreshAutomaticBackupStatus()
     }
 
     func backupPill(_ label: String, icon: String, color: Color) -> some View {

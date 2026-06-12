@@ -29,6 +29,7 @@ final class AppServices {
     let islandToasts: IslandToastManager
     let metricKit: MetricKitObserving
     let backups: DataBackupManaging
+    let automaticBackups: AutomaticBackupManaging
     let appReset: AppResetting
     let medicationReminders: MedicationReminderManaging
     let userNotifications: UserNotificationManaging
@@ -48,7 +49,7 @@ final class AppServices {
     let lifecycle: AppLifecycleHandling
     let cloudSync: CloudSyncManaging
 
-    convenience init() {
+    convenience init(modelContainer: ModelContainer? = nil) {
         let activeHumanSelection = UserDefaultsActiveHumanSelection()
         let notificationRouteCenter = OhanaNotificationRouteCenter()
         let notificationManager = NotificationManager(routeCenter: notificationRouteCenter)
@@ -60,6 +61,7 @@ final class AppServices {
         let questManager = QuestManager(wallet: coconutWallet, revisions: domainRevisions)
         let walkingManager = PetWalkingManager(locationManager: locationManager, questManager: questManager)
         let careLedger = CareLedgerService()
+        let automaticBackups = AutomaticBackupService()
         let oasisRewardManager = StaticOasisRewardManager(
             activeHumanSelection: activeHumanSelection,
             wallet: coconutWallet,
@@ -112,6 +114,7 @@ final class AppServices {
             islandToasts: IslandToastManager(),
             metricKit: MetricKitObserver(),
             backups: SharedDataBackupManagerAdapter(questManager: questManager),
+            automaticBackups: automaticBackups,
             appReset: StaticAppResetter(questManager: questManager),
             medicationReminders: SharedMedicationReminderManager(careLedger: careLedger),
             userNotifications: SharedUserNotificationManager(manager: notificationManager),
@@ -132,7 +135,11 @@ final class AppServices {
             location: SharedLocationProvider(manager: locationManager),
             careLedgerStats: CareLedgerStatsReader(),
             domainRevisions: domainRevisions,
-            lifecycle: AppLifecycleCoordinator(dependencies: .live(walkingManager: walkingManager)),
+            lifecycle: AppLifecycleCoordinator(dependencies: .live(
+                walkingManager: walkingManager,
+                automaticBackups: automaticBackups,
+                modelContainer: modelContainer
+            )),
             cloudSync: AppServices.makeCloudSyncService()
         )
         OasisTreeManagerRegistry.current = oasisTreeManager
@@ -170,6 +177,7 @@ final class AppServices {
         islandToasts: IslandToastManager,
         metricKit: MetricKitObserving,
         backups: DataBackupManaging,
+        automaticBackups: AutomaticBackupManaging,
         appReset: AppResetting,
         medicationReminders: MedicationReminderManaging,
         userNotifications: UserNotificationManaging,
@@ -206,6 +214,7 @@ final class AppServices {
         self.islandToasts = islandToasts
         self.metricKit = metricKit
         self.backups = backups
+        self.automaticBackups = automaticBackups
         self.appReset = appReset
         self.medicationReminders = medicationReminders
         self.userNotifications = userNotifications
