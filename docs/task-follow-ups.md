@@ -482,6 +482,26 @@ actionable; long-term product ideas belong in planning docs instead.
   user-visible Domain strings are localized, and notification side effects in
   reminder/care static paths are covered through injected fakes.
 
+### TFU-20260612-015 - Move executor picker queries out of Shared
+
+- Status: Open
+- Priority: P1
+- Area: Shared / QuickCare / Architecture / Smoothness
+- Source task: Shared Phase 3 analysis, 2026-06-12
+- Blocker: `Ohana/Shared/Components/ExecutorPickerBarRouteContainer.swift`
+  keeps a SwiftData `@Query` inside a reusable Shared route container. It is
+  currently used by QuickCare sheets, so fixing it cleanly crosses the Shared
+  boundary into the QuickCare feature owner.
+- Next step: During the QuickCare phase, move the `Human` fetch into a
+  feature-owned screen/container or route-scoped snapshot builder, then pass a
+  lightweight `[Human]`/executor snapshot into the pure `ExecutorPickerBar`.
+- Current task disposition: Accepted P1 follow-up for Phase 5. Shared Phase 3
+  removes the active smoothness audit blocker without changing QuickCare
+  feature ownership.
+- Close when: Shared reusable components no longer own SwiftData `@Query` for
+  executor picking, QuickCare sheets still render executor choices, and a
+  focused validation covers empty and multi-human picker states.
+
 ## Done
 
 Move completed entries here instead of deleting them when the history is useful.
