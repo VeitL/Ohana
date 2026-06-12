@@ -1,0 +1,269 @@
+import Foundation
+import SwiftData
+import Testing
+@testable import Ohana
+
+@MainActor
+@Suite(.serialized)
+struct EconomyBackdateSettlementTests {
+    @MainActor
+    @Test func backdatedCareRecordUsesOperationDayForBudget() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let operationBefore = Date()
+        let historicalDate = Calendar.current.date(byAdding: .day, value: -30, to: operationBefore)!
+        let historicalDayKey = EconomyDailyBudgetStore.dayKey(for: historicalDate)
+        let objectKeys = ["pet.\(pet.id.uuidString)"]
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        let oldBoostDouble = defaults.object(forKey: "shop_boostDoubleActive")
+        let dependencies = makeDependencies()
+        let oldFirstMeal = dependencies.questManager.isFirstMealRecorded
+        let oldCoconutCount = dependencies.questManager.coconutCount
+        let oldCoconutLogs = dependencies.questManager.coconutLogs
+        let oldLastReward = dependencies.questManager.lastEconomyRewardResult
+        defer {
+            restoreDefaults(
+                activeHumanID: oldActiveHumanID,
+                cooldownLogs: oldCooldownLogs,
+                boostDouble: oldBoostDouble
+            )
+            dependencies.questManager.isFirstMealRecorded = oldFirstMeal
+            dependencies.questManager.coconutCount = oldCoconutCount
+            dependencies.questManager.coconutLogs = oldCoconutLogs
+            dependencies.questManager.lastEconomyRewardResult = oldLastReward
+            dependencies.questManager.persistQuestFlags()
+            resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationBefore)
+            resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: historicalDate)
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        defaults.removeObject(forKey: "shop_boostDoubleActive")
+        dependencies.questManager.isFirstMealRecorded = true
+        dependencies.questManager.coconutCount = 0
+        dependencies.questManager.coconutLogs = []
+        dependencies.questManager.lastEconomyRewardResult = nil
+        dependencies.questManager.persistQuestFlags()
+        resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationBefore)
+        resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: historicalDate)
+        fillBudgetToRecordOnly(
+            memberKey: human.id.uuidString,
+            careObjectKeys: objectKeys,
+            date: historicalDate,
+            context: context
+        )
+        let historicalUsageCountBefore = usageEvents(
+            context: context,
+            dayKey: historicalDayKey,
+            actionKey: "feed"
+        ).count
+
+        let record = CareEventService.recordManualFeedFact(
+            pet: pet,
+            amountGrams: 80,
+            context: context,
+            executorId: human.id.uuidString,
+            date: historicalDate,
+            dependencies: dependencies
+        )
+        let operationAfter = Date()
+        let operationDayKeys = Set([
+            EconomyDailyBudgetStore.dayKey(for: operationBefore),
+            EconomyDailyBudgetStore.dayKey(for: operationAfter)
+        ])
+
+        #expect(record.log.date == historicalDate)
+        #expect(record.reward.humanGot + record.reward.petGot > 0)
+        #expect(dependencies.questManager.lastEconomyRewardResult?.budgetStage != .recordOnly)
+        #expect(usageEvents(context: context, dayKey: historicalDayKey, actionKey: "feed").count == historicalUsageCountBefore)
+        #expect(usageEvents(context: context, dayKeys: operationDayKeys, actionKey: "feed").isEmpty == false)
+
+        let careLedgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+            .filter { $0.legacyModelId == record.log.id.uuidString }
+        #expect(careLedgerEvents.map(\.occurredAt) == [historicalDate])
+
+        let rewardLedgerEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+            .filter { $0.source == .careEvent }
+        #expect(rewardLedgerEntries.isEmpty == false)
+        #expect(rewardLedgerEntries.allSatisfy { operationDayKeys.contains(EconomyDailyBudgetStore.dayKey(for: $0.occurredAt)) })
+    }
+
+    @MainActor
+    @Test func backdatedCareRecordUsesOperationTimeForCooldown() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "猫")
+        context.insert(human)
+        context.insert(pet)
+        try context.save()
+
+        let operationDate = Date()
+        let firstHistoricalDate = Calendar.current.date(byAdding: .day, value: -20, to: operationDate)!
+        let secondHistoricalDate = Calendar.current.date(byAdding: .day, value: -19, to: operationDate)!
+        let objectKeys = ["pet.\(pet.id.uuidString)"]
+        let defaults = UserDefaults.standard
+        let oldActiveHumanID = defaults.object(forKey: "currentActiveHumanId")
+        let oldCooldownLogs = defaults.object(forKey: QuestManager.Keys.cooldownLogs)
+        let oldBoostDouble = defaults.object(forKey: "shop_boostDoubleActive")
+        let dependencies = makeDependencies()
+        let oldFirstMeal = dependencies.questManager.isFirstMealRecorded
+        let oldCoconutCount = dependencies.questManager.coconutCount
+        let oldCoconutLogs = dependencies.questManager.coconutLogs
+        let oldLastReward = dependencies.questManager.lastEconomyRewardResult
+        defer {
+            restoreDefaults(
+                activeHumanID: oldActiveHumanID,
+                cooldownLogs: oldCooldownLogs,
+                boostDouble: oldBoostDouble
+            )
+            dependencies.questManager.isFirstMealRecorded = oldFirstMeal
+            dependencies.questManager.coconutCount = oldCoconutCount
+            dependencies.questManager.coconutLogs = oldCoconutLogs
+            dependencies.questManager.lastEconomyRewardResult = oldLastReward
+            dependencies.questManager.persistQuestFlags()
+            resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationDate)
+        }
+        defaults.set(human.id.uuidString, forKey: "currentActiveHumanId")
+        defaults.removeObject(forKey: QuestManager.Keys.cooldownLogs)
+        defaults.removeObject(forKey: "shop_boostDoubleActive")
+        dependencies.questManager.isFirstMealRecorded = true
+        dependencies.questManager.coconutCount = 0
+        dependencies.questManager.coconutLogs = []
+        dependencies.questManager.lastEconomyRewardResult = nil
+        dependencies.questManager.persistQuestFlags()
+        resetBudget(memberKey: human.id.uuidString, careObjectKeys: objectKeys, date: operationDate)
+
+        let first = CareEventService.recordManualFeedFact(
+            pet: pet,
+            amountGrams: 80,
+            context: context,
+            executorId: human.id.uuidString,
+            date: firstHistoricalDate,
+            dependencies: dependencies
+        )
+        let firstReward = dependencies.questManager.lastEconomyRewardResult
+        let second = CareEventService.recordManualFeedFact(
+            pet: pet,
+            amountGrams: 90,
+            context: context,
+            executorId: human.id.uuidString,
+            date: secondHistoricalDate,
+            dependencies: dependencies
+        )
+        let secondReward = dependencies.questManager.lastEconomyRewardResult
+
+        #expect(first.reward.humanGot + first.reward.petGot > 0)
+        #expect(firstReward?.isOnCooldown == false)
+        #expect(second.reward.humanGot + second.reward.petGot == 0)
+        #expect(secondReward?.isOnCooldown == true)
+        #expect(secondReward?.budgetStage == .cooldown)
+
+        let careLogs = try context.fetch(FetchDescriptor<PetCareLog>())
+        #expect(careLogs.map(\.date).sorted() == [firstHistoricalDate, secondHistoricalDate].sorted())
+    }
+
+    private func makeContainer() throws -> ModelContainer {
+        let schema = Schema(ArkSchemaV69.models)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private func makeDependencies() -> CareEventServiceDependencies {
+        let wallet = SwiftDataCoconutWalletManager()
+        let revisions = SharedDomainRevisionPublisher()
+        let questManager = QuestManager(wallet: wallet, revisions: revisions)
+        let careLedger = CareLedgerService()
+        let familyTasks = StaticFamilyTaskManager(wallet: wallet, careLedger: careLedger, questManager: questManager)
+        let reminderCompletion = ReminderCompletionService(careLedger: careLedger, familyTasks: familyTasks)
+        return CareEventServiceDependencies(
+            questManager: questManager,
+            economy: StaticCareEventEconomyAwarder(questManager: questManager),
+            careLedger: careLedger,
+            reminderCompletion: reminderCompletion,
+            quickActionReminderCompletion: QuickActionReminderCompletionSyncService(reminderCompletion: reminderCompletion),
+            familyTasks: familyTasks,
+            revisions: revisions
+        )
+    }
+
+    private func fillBudgetToRecordOnly(
+        memberKey: String,
+        careObjectKeys: [String],
+        date: Date,
+        context: ModelContext
+    ) {
+        for _ in 0 ..< 40 {
+            let result = CoconutEconomyPolicyV2.reward(
+                for: .feed,
+                quality: .none,
+                isOnCooldown: false,
+                userKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+                memberKey: memberKey,
+                careObjectKeys: careObjectKeys,
+                careObjectCount: 1,
+                hasHumanAccount: true,
+                hasPetAccount: true,
+                date: date,
+                forcedLuck: EconomyLuckTier.none,
+                context: context
+            )
+            EconomyDailyBudgetStore.commit(
+                result,
+                householdKey: CoconutEconomyPolicyV2.householdBudgetKey(context: context),
+                memberKey: memberKey,
+                careObjectKeys: careObjectKeys,
+                date: date,
+                context: context,
+                save: true
+            )
+        }
+    }
+
+    private func usageEvents(
+        context: ModelContext,
+        dayKey: String,
+        actionKey: String
+    ) -> [EconomyBudgetUsageEvent] {
+        usageEvents(context: context, dayKeys: [dayKey], actionKey: actionKey)
+    }
+
+    private func usageEvents(
+        context: ModelContext,
+        dayKeys: Set<String>,
+        actionKey: String
+    ) -> [EconomyBudgetUsageEvent] {
+        let events = (try? context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())) ?? []
+        return events.filter { dayKeys.contains($0.dayKey) && $0.actionKey == actionKey }
+    }
+
+    private func resetBudget(memberKey: String, careObjectKeys: [String], date: Date) {
+        EconomyDailyBudgetStore.reset(
+            householdKey: CoconutEconomyPolicyV2.householdBudgetKey(),
+            memberKey: memberKey,
+            careObjectKeys: careObjectKeys,
+            date: date
+        )
+    }
+
+    private func restoreDefaults(activeHumanID: Any?, cooldownLogs: Any?, boostDouble: Any?) {
+        restoreDefault(activeHumanID, key: "currentActiveHumanId")
+        restoreDefault(cooldownLogs, key: QuestManager.Keys.cooldownLogs)
+        restoreDefault(boostDouble, key: "shop_boostDoubleActive")
+    }
+
+    private func restoreDefault(_ value: Any?, key: String) {
+        if let value {
+            UserDefaults.standard.set(value, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+}
