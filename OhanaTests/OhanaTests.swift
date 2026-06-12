@@ -180,6 +180,37 @@ struct OhanaTests {
         #expect(recordOnly.growthXP == 2)
         #expect(recordOnly.budgetStage == .recordOnly)
         #expect(recordOnly.reason == "dailyBudgetRecordOnly")
+        #expect(recordOnly.feedbackMessage(l: L10n("zh")) == "今日椰子已装满，明天继续～")
+        #expect(recordOnly.feedbackMessage(l: L10n("en")) == "Coconuts are full today. More tomorrow.")
+        #expect(recordOnly.feedbackMessage(l: L10n("de")) == "Kokosnüsse heute voll. Morgen weiter.")
+        #expect(recordOnly.feedbackMessage(l: L10n("es")) == "Cocos llenos por hoy. Mañana seguimos.")
+        #expect(recordOnly.feedbackMessage(l: L10n("pt")) == "Cocos cheios hoje. Amanhã seguimos.")
+        #expect(recordOnly.feedbackMessage(l: L10n("fr")) == "Cocos pleins pour aujourd’hui. À demain.")
+        #expect(recordOnly.feedbackMessage(l: L10n("ja")) == "今日のココナッツは満タン。続きは明日。")
+        #expect(recordOnly.feedbackMessage(l: L10n("ko")) == "오늘 코코넛은 가득 찼어요. 내일 이어가요.")
+        #expect(recordOnly.feedbackMessage(l: L10n("it")) == "Cocco pieno per oggi. Si continua domani.")
+        #expect(!recordOnly.feedbackMessage(l: L10n("zh")).contains("预算"))
+        #expect(!recordOnly.feedbackMessage(l: L10n("zh")).contains("2"))
+    }
+
+    @MainActor
+    @Test func coconutRewardFeedbackCenterSurfacesRecordOnlyMessageWithoutCoconuts() {
+        let event = OhanaCoconutRewardEvent(entry: CoconutLogEntry(
+            emoji: "🥥",
+            title: "今日椰子已装满，明天继续～",
+            amount: 0,
+            growthXP: 2,
+            economyReason: "dailyBudgetRecordOnly",
+            budgetStage: EconomyBudgetStage.recordOnly.rawValue,
+            feedbackMessage: "今日椰子已装满，明天继续～"
+        ))
+        let center = CoconutRewardFeedbackCenter()
+
+        center.enqueue(event)
+
+        #expect(center.activeEvent == event)
+        #expect(center.coalescedAmount == 0)
+        #expect(center.coalescedGrowthXP == 2)
     }
 
     @MainActor

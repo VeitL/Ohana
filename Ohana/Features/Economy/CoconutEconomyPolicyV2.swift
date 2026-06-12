@@ -114,6 +114,10 @@ struct EconomyRewardResult: Equatable {
     }
 
     var feedbackMessage: String {
+        feedbackMessage(l: .current)
+    }
+
+    func feedbackMessage(l: L10n) -> String {
         let coconutText = totalCoconuts > 0 ? "，+\(totalCoconuts)椰子" : ""
         switch budgetStage {
         case .cooldown:
@@ -121,7 +125,17 @@ struct EconomyRewardResult: Equatable {
         case .fatigue:
             return "今日进入疲劳收益，+\(growthXP)XP\(coconutText)"
         case .recordOnly:
-            return "今日椰子预算已满，记录已保存 +\(growthXP)XP"
+            return l.tr(
+                zh: "今日椰子已装满，明天继续～",
+                en: "Coconuts are full today. More tomorrow.",
+                de: "Kokosnüsse heute voll. Morgen weiter.",
+                es: "Cocos llenos por hoy. Mañana seguimos.",
+                pt: "Cocos cheios hoje. Amanhã seguimos.",
+                fr: "Cocos pleins pour aujourd’hui. À demain.",
+                ja: "今日のココナッツは満タン。続きは明日。",
+                ko: "오늘 코코넛은 가득 찼어요. 내일 이어가요.",
+                it: "Cocco pieno per oggi. Si continua domani."
+            )
         case .normal:
             if luck == .golden {
                 return "金色幸运，+\(growthXP)XP\(coconutText)"

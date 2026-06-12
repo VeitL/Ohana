@@ -1,8 +1,8 @@
-# Economy 规则书（GAP-4 总账恒等）
+# Economy 规则书（GAP-4 总账恒等 / GAP-5 触顶感知）
 
 确认日期：2026-06-12
 
-本规则书覆盖宪法 D3/G2 在 Economy 钱包与总账中的首发语义。GAP-5 与 GAP-7 仍在 `docs/planning/constitution-gap-inventory.md` 中登记，后续 Economy 小轮次处理。
+本规则书覆盖宪法 D3/G2 在 Economy 钱包与总账中的首发语义，并补充 D14 预算触顶感知。GAP-7 仍在 `docs/planning/constitution-gap-inventory.md` 中登记，后续 Economy 小轮次处理。
 
 ## 已确认产品决定
 
@@ -10,6 +10,7 @@
 - 当账户余额与账本事实重放结果不一致时，以账本为准，自动修正账户余额与 `QuestManager.coconutCount` 投影。
 - 排行榜只显示正式成员钱包（人类成员 / 宠物）余额与贡献，不显示系统账户。
 - `legacyHistory` 只用于历史展示，不影响余额；旧余额由 `openingBalance` 承接。
+- 椰子预算触顶进入 `recordOnly` 后，照护记录照常保存；奖励反馈只提示温和满载文案，不展示预算数字、剩余额度或惩罚式解释。
 
 ## 业务不变量
 
@@ -20,6 +21,7 @@
 - ECO-005：`legacyHistory` 流水永不影响余额，它只作为历史展示资料存在；迁移期的旧余额由 `openingBalance` 事实承接。
 - ECO-006：排行榜与财富页正式资产展示不得显示 `system:legacy`，也不得把系统兼容余额伪装成成员贡献。
 - ECO-007：开发 / 设置余额测试工具属于非正式测试工具。它不得作为首发用户经济语义的依据；正式发布前该入口必须不可达，由 release hardening / 开发者工具隐藏检查覆盖。
+- ECO-008：当每日椰子预算进入 `recordOnly` 触顶状态时，照护记录必须照常完成；奖励反馈位置显示温和文案“今日椰子已装满，明天继续～”的九语言版本，不展示剩余额度、预算数字或说教式解释。
 
 ## 当前代码来源
 
@@ -30,6 +32,8 @@
 - 启动路径在首帧后调度钱包 bootstrap：`Ohana/App/ContentView.swift:250`。
 - 迁移导入会创建 `system:legacy` 兼容账户承接旧全岛总数差额：`Ohana/Domain/Economy/CoconutWalletService.swift:842`。
 - `legacyHistory` 迁移流水以 `affectsBalance == false` 写入：`Ohana/Domain/Economy/CoconutWalletService.swift:888`。
+- 每日预算裁决与 `recordOnly` 反馈文案定义在 `CoconutEconomyPolicyV2`：`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:55`、`Ohana/Features/Economy/CoconutEconomyPolicyV2.swift:120`。
+- 奖励反馈 UI 通过 `CoconutRewardFeedbackOverlay` 展示事件标题：`Ohana/Features/TodayFocus/Views/CheckInRewardFeedback.swift:89`。
 
 ## 状态机
 
@@ -52,5 +56,5 @@
 
 - 本轮不改 SwiftData schema。
 - 本轮不启用 CloudKit，不修改联机同步语义。
-- 本轮不处理 GAP-5 预算触顶文案与 GAP-7 补记结算；它们后续在 Economy 轮次中按本规则书补充。
+- 本轮不处理 GAP-7 补记结算；它后续在 Economy 轮次中按本规则书补充。
 - `system:legacy` 可继续保留在数据库中用于迁移兼容与开发测试，但正式资产总数、财富页排行榜、椰子历史总额不计入它。

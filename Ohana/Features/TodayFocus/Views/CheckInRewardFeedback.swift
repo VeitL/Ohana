@@ -89,7 +89,9 @@ struct CoconutRewardFeedbackOverlay: View {
                     .contentTransition(.numericText())
                 Text(event.title)
                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.86)
+                    .multilineTextAlignment(.leading)
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .foregroundStyle(Color.ohanaPrimaryText)
