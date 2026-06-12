@@ -137,22 +137,24 @@ nonisolated enum IslandNegativeFeedback {
             }
         }
 
-        for plant in plants {
-            if let lastWatered = plant.lastWateredDate, now.timeIntervalSince(lastWatered) > 7 * 86400 {
-                let days = Int(now.timeIntervalSince(lastWatered) / 86400)
-                result.append(IslandNegativeSignal(
-                    iconName: "drop.triangle.fill",
-                    emoji: "🥀",
-                    title: localized(zh: "\(plant.name) 叶子发黄", en: "\(plant.name)'s leaves are yellowing"),
-                    detail: localized(
-                        zh: "已 \(days) 天未浇水",
-                        en: "\(days) day(s) since watering"
-                    ),
-                    severity: .warning,
-                    plantId: plant.id,
-                    routeHint: .plant
-                ))
-                break
+        if PlantFeatureGate.allows(.plants) {
+            for plant in plants {
+                if let lastWatered = plant.lastWateredDate, now.timeIntervalSince(lastWatered) > 7 * 86400 {
+                    let days = Int(now.timeIntervalSince(lastWatered) / 86400)
+                    result.append(IslandNegativeSignal(
+                        iconName: "drop.triangle.fill",
+                        emoji: "🥀",
+                        title: localized(zh: "\(plant.name) 叶子发黄", en: "\(plant.name)'s leaves are yellowing"),
+                        detail: localized(
+                            zh: "已 \(days) 天未浇水",
+                            en: "\(days) day(s) since watering"
+                        ),
+                        severity: .warning,
+                        plantId: plant.id,
+                        routeHint: .plant
+                    ))
+                    break
+                }
             }
         }
 

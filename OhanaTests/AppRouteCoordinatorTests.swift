@@ -153,7 +153,7 @@ struct AppRouteCoordinatorTests {
         #expect(coordinator.sheet == .addEntity(.pet))
     }
 
-    @Test func plantRoutesAreSuppressedWhilePlantsAreOutOfScope() {
+    @Test func plantRoutesAreSuppressedWhilePlantGateIsClosed() {
         let coordinator = AppRouteCoordinator()
         let plantID = UUID()
 

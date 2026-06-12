@@ -158,6 +158,7 @@ enum TodayFocusEconomyService {
         now: Date,
         calendar: Calendar = .current
     ) -> Bool {
+        guard PlantFeatureGate.allows(.plants) else { return false }
         guard let plantId = quest.targetPlantId,
               let plant = plants.first(where: { $0.id == plantId }) else {
             return false
@@ -362,7 +363,7 @@ enum TodayFocusEconomyService {
         init(context: ModelContext, now: Date, calendar: Calendar = .current) {
             pets = TodayFocusEconomyService.fetchPets(context: context)
             humans = TodayFocusEconomyService.fetchHumans(context: context)
-            plants = TodayFocusEconomyService.fetchPlants(context: context)
+            plants = PlantFeatureGate.allows(.plants) ? TodayFocusEconomyService.fetchPlants(context: context) : []
             reminders = TodayFocusEconomyService.fetchTodayReminders(context: context, now: now, calendar: calendar)
             events = TodayFocusEconomyService.fetchTodayFocusEvents(context: context, now: now, calendar: calendar)
             careLedgerEntries = TodayFocusEconomyService.fetchTodayCareLedgerEntries(context: context, now: now, calendar: calendar)

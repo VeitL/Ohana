@@ -318,16 +318,16 @@ struct RequiredHumanProfileView: View {
             introPage(
                 title: localized(zh: "家庭成员管理", en: "Family care", de: "Familienpflege"),
                 subtitle: localized(
-                    zh: "人类、宠物、植物，都放在同一个家里管理。",
-                    en: "Humans, pets, and plants live in one shared care home.",
-                    de: "Menschen, Tiere und Pflanzen bleiben in einem Pflegezuhause."
+                    zh: "人类、宠物和提醒，都放在同一个家里管理。",
+                    en: "Humans, pets, and reminders live in one shared care home.",
+                    de: "Menschen, Tiere und Erinnerungen bleiben in einem Pflegezuhause."
                 ),
                 heroIcon: "house.fill",
                 tint: Color.goBlue,
                 badges: [
                     (icon: "person.fill", title: localized(zh: "人类", en: "Humans", de: "Menschen")),
                     (icon: "pawprint.fill", title: localized(zh: "宠物", en: "Pets", de: "Tiere")),
-                    (icon: "leaf.fill", title: localized(zh: "植物", en: "Plants", de: "Pflanzen"))
+                    (icon: "calendar.badge.checkmark", title: localized(zh: "提醒", en: "Reminders", de: "Erinnerungen"))
                 ]
             )
         }

@@ -649,12 +649,13 @@ final class OasisTreeManager {
         pets: [Pet],
         humans: [Human]
     ) -> Int {
-        if let legacyBaseline = OasisTreePreferenceStore.legacyBaselineXP() {
+        if PlantFeatureGate.allows(.plants), let legacyBaseline = OasisTreePreferenceStore.legacyBaselineXP() {
             return legacyBaseline
         }
 
         let legacyLedgerCount = ledgerEvents.count(where: {
             !$0.metadataJSON.contains("\"economyVersion\":2") &&
+                ($0.eventKindEnum != .plantCare || PlantFeatureGate.allows(.plants)) &&
                 [.care, .potty, .walk, .hygiene, .health, .weight, .medication, .workout, .plantCare, .milestone].contains($0.eventKindEnum)
         })
         let fallbackCount = legacyLedgerCount > 0
@@ -681,15 +682,19 @@ final class OasisTreeManager {
             total += human.workoutLogs.count
         }
         let plantEventCount: Int
-        do {
-            plantEventCount = try modelContext.fetchCount(
-                FetchDescriptor<Event>(predicate: #Predicate { $0.relatedEntityType == "Plant" })
-            )
-        } catch {
-            OhanaLog.warning(
-                "[OasisTreeManager] failed to fetch legacy plant event count: \(error.localizedDescription)",
-                category: "Oasis"
-            )
+        if PlantFeatureGate.allows(.plants) {
+            do {
+                plantEventCount = try modelContext.fetchCount(
+                    FetchDescriptor<Event>(predicate: #Predicate { $0.relatedEntityType == "Plant" })
+                )
+            } catch {
+                OhanaLog.warning(
+                    "[OasisTreeManager] failed to fetch legacy plant event count: \(error.localizedDescription)",
+                    category: "Oasis"
+                )
+                plantEventCount = 0
+            }
+        } else {
             plantEventCount = 0
         }
         return total + plantEventCount

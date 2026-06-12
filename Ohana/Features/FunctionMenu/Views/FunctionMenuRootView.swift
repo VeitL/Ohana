@@ -120,7 +120,7 @@ struct FunctionMenuRootView: View {
 
     private var functionMenuGroups: [FeatureGroup] {
         AppFeatureRouteGuard.visibleFeatureGroups(
-            from: [.dailyCare, .healthBody, .archiveMemory, .householdHub],
+            from: [.dailyCare, .healthBody, .archiveMemory, .householdHub, .plants],
             currentLevel: currentTreeLevel
         )
     }
@@ -188,7 +188,7 @@ struct FunctionMenuRootView: View {
         case .oasisRewards:
             "\(wealthSubtitle) · 商店 · 扭蛋"
         case .plants:
-            l.tr(zh: "当前版本暂不开放", en: "Hidden for this version", de: "In dieser Version verborgen")
+            l.tr(zh: "浇水 · 施肥 · 状态", en: "Watering · Fertilizing · Status", de: "Gießen · Düngen · Status")
         }
     }
 

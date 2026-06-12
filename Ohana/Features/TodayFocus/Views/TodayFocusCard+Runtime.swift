@@ -99,10 +99,15 @@ extension TodayFocusCard {
     }
 
     static func negativeSkipKey(for signal: IslandNegativeSignal) -> String {
-        signal.id
+        if !PlantFeatureGate.allows(.plants), signal.plantId != nil || signal.routeHint == .plant {
+            return "negative:plantGate"
+        }
+        return signal.id
     }
 
     static func snapshotDeckDependencyKey(_ snapshot: TodayFocusSnapshot) -> String {
+        let includesPlants = PlantFeatureGate.allows(.plants)
+        let visiblePlants = includesPlants ? snapshot.plants : []
         let questKey = snapshot.refreshedQuests.map { quest in
             [
                 quest.id,
@@ -111,7 +116,7 @@ extension TodayFocusCard {
                 quest.emoji,
                 "\(quest.isCompleted)",
                 quest.targetPetId?.uuidString ?? "",
-                quest.targetPlantId?.uuidString ?? ""
+                includesPlants ? quest.targetPlantId?.uuidString ?? "" : ""
             ].joined(separator: ":")
         }.joined(separator: "|")
         let taskKey = snapshot.assignedFamilyTasks.map { task in
@@ -152,9 +157,9 @@ extension TodayFocusCard {
                 signal.iconName,
                 "\(signal.severity)",
                 signal.petId?.uuidString ?? "",
-                signal.plantId?.uuidString ?? "",
+                includesPlants ? signal.plantId?.uuidString ?? "" : "",
                 signal.healthAlertType?.rawValue ?? "",
-                signal.routeHint?.rawValue ?? ""
+                includesPlants ? signal.routeHint?.rawValue ?? "" : ""
             ].joined(separator: ":")
         }.joined(separator: "|")
 
@@ -165,7 +170,7 @@ extension TodayFocusCard {
             exchangeKey,
             negativeKey,
             "pets:\(snapshot.pets.map { "\($0.id.uuidString):\($0.name):\($0.currentStreak):\($0.coconutBalance):\($0.hasPassedAway)" }.joined(separator: "|"))",
-            "plants:\(snapshot.plants.map { "\($0.id.uuidString):\($0.name):\($0.wateringIntervalDays):\($0.fertilizingIntervalDays):\(timestamp($0.lastWateredDate)):\(timestamp($0.lastFertilizedDate))" }.joined(separator: "|"))",
+            "plants:\(visiblePlants.map { "\($0.id.uuidString):\($0.name):\($0.wateringIntervalDays):\($0.fertilizingIntervalDays):\(timestamp($0.lastWateredDate)):\(timestamp($0.lastFertilizedDate))" }.joined(separator: "|"))",
             "humans:\(snapshot.humans.map { "\($0.id.uuidString):\($0.name):\($0.coconutBalance)" }.joined(separator: "|"))"
         ].joined(separator: "#")
     }

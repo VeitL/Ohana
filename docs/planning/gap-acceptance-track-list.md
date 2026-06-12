@@ -19,6 +19,7 @@
 | GAP-7 补记结算 | 🟢 | `528cf2cdd` | 补记历史日期与操作日奖励结算测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 补记路径抽查 |
 | GAP-8 单成员形态 | 🟢 | `6c4a98db2` | 单成员展示红绿测试、负面文案扫描、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待单人单宠真实 UI 抽查 |
 | GAP-9 离世退场 | 🟢 | `e6a45e72c` | 纪念模式规则书、未来计划可逆退场、离世成员活跃入口过滤、奖励冻结定向测试、changed gate、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI / 真机通知抽查 |
+| GAP-12 植物功能门 | 🟢 | `本次提交` | `PlantFeatureGate` 不变量、添加/路由/FunctionMenu、quest 引擎、心情信号、Oasis 植物历史隔离、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 | Phase 6 Members | 🟢 | `ead1e5fe4` | 创建派生日历事实 sync metadata、成员删除回收站聚合、Human 侧过期清理、RequiredHumanProfileView a11y、`scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 | Phase 6 Oasis | 🟢 | `87423afd8` | Oasis 当前主人钱包门、预算 / 冷却、休眠态救援、UI/a11y/smoothness/runtime 审计、Oasis 窄测试与 `scripts/module-exit-gate.sh` 均通过 | 待真实 UI 抽查 |
 | Phase 6 Settings + Health | 🟢 | `5d4e71928` | Debug-only 设置开发工具、真实通知开关策略、Health 删除/回收/schema V70/read-only 不变量、目标测试与 `scripts/module-exit-gate.sh` 均通过 | 待 Release 真机 / 真实 UI 抽查 |
@@ -296,6 +297,32 @@
 
 - [ ] 打开回收站。
   - 预期：纪念退场的未来安排不作为“待删除 / 30 天后清理”项目出现；回收站只显示真正删除或清空记录的内容。
+  - 记录：
+
+## GAP-12 植物功能门
+
+人工验收目标：首发版本无任何可达植物功能面；历史植物数据不影响今日焦点、心情、Oasis；植物代码与数据仍保留给未来解锁。
+
+自动验收已完成（2026-06-13，门禁 commit `本次提交`）：`PlantFeatureGate` 首发恒关；添加植物、植物路由、首页植物 tab、FunctionMenu 植物集合全部不可达；quest 引擎不产植物任务；心情信号不读取植物状态；历史植物照护不喂给 Oasis 当前成长；`scripts/dev-check-changed.sh` 与 `scripts/module-exit-gate.sh` 均通过。
+
+- [ ] 真实 UI 遍历首页底部 tab、首页卡片、Today Focus 与心情提示。
+  - 预期：不出现植物 tab、植物卡、浇水 / 施肥 quest、植物缺水或植物心情信号；有历史植物数据时也不出现。
+  - 记录：
+
+- [ ] 真实 UI 遍历添加入口、首页 FAB / 中央添加、全功能菜单与功能分组页。
+  - 预期：不出现“添加植物”、植物集合、植物看板、植物详情、植物护理等入口。
+  - 记录：
+
+- [ ] 真实 UI 打开 Onboarding 与必填主人资料页。
+  - 预期：首发引导文案只表达主人、宠物、提醒 / 本地照护，不出现植物 badge、植物承诺或植物作为首发能力的暗示。
+  - 记录：
+
+- [ ] 真实 UI 打开成长解锁 / 等级提示相关页面。
+  - 预期：不出现“植物暂不开放 / Plants hidden”之类负面隐藏文案；若有成长提示，应保持中性未来节奏表达。
+  - 记录：
+
+- [ ] 使用带历史植物数据的本地样本打开 Oasis。
+  - 预期：Oasis 当前生命树 / 情绪 / 奖励不因历史植物照护记录改变；植物历史不会作为当前首发成长信号露出。
   - 记录：
 
 ## Phase 6 Members

@@ -4518,7 +4518,7 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func todayFocusNegativeSkipKeyTracksSignalRevisionAndPlantIdentity() async throws {
+    @Test func todayFocusNegativeSkipKeyTracksSignalRevisionAndPlantGate() async throws {
         let petId = UUID()
         let first = IslandNegativeSignal(
             iconName: "scalemass.fill",
@@ -4546,9 +4546,19 @@ struct OhanaTests {
         let plantSignal = IslandNegativeFeedback.signals(pets: [], plants: [plant], clinicalAlerts: [])
             .first { $0.plantId == plant.id }
 
-        #expect(plantSignal?.plantId == plant.id)
-        #expect(plantSignal?.routeHint == .plant)
-        #expect(plantSignal.map { TodayFocusCard.negativeSkipKey(for: $0).contains("plant:\(plant.id.uuidString)") } == true)
+        #expect(plantSignal == nil)
+
+        let stalePlantSignal = IslandNegativeSignal(
+            iconName: "drop.triangle.fill",
+            emoji: "🥀",
+            title: "Fern",
+            detail: "stale",
+            severity: .warning,
+            plantId: plant.id,
+            routeHint: .plant
+        )
+        #expect(TodayFocusCard.negativeSkipKey(for: stalePlantSignal) == "negative:plantGate")
+        #expect(!TodayFocusCard.negativeSkipKey(for: stalePlantSignal).contains(plant.id.uuidString))
     }
 
     @MainActor

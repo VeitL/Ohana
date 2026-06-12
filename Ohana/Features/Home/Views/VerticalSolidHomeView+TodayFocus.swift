@@ -48,6 +48,10 @@ extension VerticalSolidHomeView {
     }
 
     func openPlant(_ plant: VerticalSolidHomePlantSnapshot) {
+        guard PlantFeatureGate.allows(.plants) else {
+            AppFeatureRouteGuard.recordIntercept("plantGate:homePlantCard")
+            return
+        }
         onOpenPlant(plant.id)
     }
 
@@ -76,7 +80,7 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if let plant = targetPlant(for: quest) {
+        if PlantFeatureGate.allows(.plants), let plant = targetPlant(for: quest) {
             openTodayFocusPlant(plant)
             return
         }
@@ -115,7 +119,8 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if quest.id == "q_water_plant" || quest.id.hasPrefix("q_water_plant_"),
+        if PlantFeatureGate.allows(.plants),
+           quest.id == "q_water_plant" || quest.id.hasPrefix("q_water_plant_"),
            let plant = targetPlant(for: quest) {
             let plantID = plant.id
             enqueueHomeCommand(.plantCare(plantID: plantID, action: PlantCareType.watering.rawValue)) {
@@ -126,7 +131,8 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if quest.id == "q_fertilize_plant" || quest.id.hasPrefix("q_fertilize_plant_"),
+        if PlantFeatureGate.allows(.plants),
+           quest.id == "q_fertilize_plant" || quest.id.hasPrefix("q_fertilize_plant_"),
            let plant = targetPlant(for: quest) {
             let plantID = plant.id
             enqueueHomeCommand(.plantCare(plantID: plantID, action: PlantCareType.fertilizing.rawValue)) {
@@ -188,7 +194,8 @@ extension VerticalSolidHomeView {
             return
         }
 
-        if let plantId = signal.plantId,
+        if PlantFeatureGate.allows(.plants),
+           let plantId = signal.plantId,
            plants.contains(where: { $0.id == plantId }) {
             onOpenPlant(plantId)
             return
@@ -318,6 +325,7 @@ extension VerticalSolidHomeView {
     }
 
     func targetPlant(for quest: IslandQuest) -> Plant? {
+        guard PlantFeatureGate.allows(.plants) else { return nil }
         if let targetPlantId = quest.targetPlantId {
             return plants.first(where: { $0.id == targetPlantId })
         }

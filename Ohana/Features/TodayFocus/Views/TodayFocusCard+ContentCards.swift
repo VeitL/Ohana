@@ -190,7 +190,8 @@ extension TodayFocusCard {
            let pet = snapshot.pets.first(where: { $0.id == petId }) {
             return pet.name
         }
-        if let plantId = quest.targetPlantId,
+        if PlantFeatureGate.allows(.plants),
+           let plantId = quest.targetPlantId,
            let plant = snapshot.plants.first(where: { $0.id == plantId }) {
             return plant.name
         }

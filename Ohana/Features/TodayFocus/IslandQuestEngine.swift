@@ -224,30 +224,32 @@ nonisolated enum IslandQuestEngine {
             }
         }
 
-        // ── 植物浇水（需要浇水的植物）
-        if quests.count < maxQuests, let thirstyPlant = plants.first(where: { $0.needsWatering(on: now, calendar: cal) }) {
-            quests.append(IslandQuest(
-                id: "q_water_plant_\(thirstyPlant.id.uuidString)",
-                emoji: "💧",
-                title: localized(zh: "给 \(thirstyPlant.name) 浇水", en: "Water \(thirstyPlant.name)"),
-                subtitle: localized(zh: "植物渴了，快去浇水", en: "This plant needs water today"),
-                isCompleted: false,
-                targetPetId: nil,
-                targetPlantId: thirstyPlant.id
-            ))
-        }
+        if PlantFeatureGate.allows(.plants) {
+            // ── 植物浇水（需要浇水的植物）
+            if quests.count < maxQuests, let thirstyPlant = plants.first(where: { $0.needsWatering(on: now, calendar: cal) }) {
+                quests.append(IslandQuest(
+                    id: "q_water_plant_\(thirstyPlant.id.uuidString)",
+                    emoji: "💧",
+                    title: localized(zh: "给 \(thirstyPlant.name) 浇水", en: "Water \(thirstyPlant.name)"),
+                    subtitle: localized(zh: "植物渴了，快去浇水", en: "This plant needs water today"),
+                    isCompleted: false,
+                    targetPetId: nil,
+                    targetPlantId: thirstyPlant.id
+                ))
+            }
 
-        // ── 植物施肥（需要施肥的植物）
-        if quests.count < maxQuests, let hungryPlant = plants.first(where: { $0.needsFertilizing(on: now, calendar: cal) }) {
-            quests.append(IslandQuest(
-                id: "q_fertilize_plant_\(hungryPlant.id.uuidString)",
-                emoji: "🌿",
-                title: localized(zh: "给 \(hungryPlant.name) 施肥", en: "Fertilize \(hungryPlant.name)"),
-                subtitle: localized(zh: "植物需要补充养分", en: "This plant needs nutrients"),
-                isCompleted: false,
-                targetPetId: nil,
-                targetPlantId: hungryPlant.id
-            ))
+            // ── 植物施肥（需要施肥的植物）
+            if quests.count < maxQuests, let hungryPlant = plants.first(where: { $0.needsFertilizing(on: now, calendar: cal) }) {
+                quests.append(IslandQuest(
+                    id: "q_fertilize_plant_\(hungryPlant.id.uuidString)",
+                    emoji: "🌿",
+                    title: localized(zh: "给 \(hungryPlant.name) 施肥", en: "Fertilize \(hungryPlant.name)"),
+                    subtitle: localized(zh: "植物需要补充养分", en: "This plant needs nutrients"),
+                    isCompleted: false,
+                    targetPetId: nil,
+                    targetPlantId: hungryPlant.id
+                ))
+            }
         }
 
         // ── 今日提醒（仅在有真实提醒时显示）
@@ -1003,8 +1005,8 @@ nonisolated enum IslandQuestEngine {
         default:
             if id.hasPrefix("q_med_") { return 2 }
             if id.hasPrefix("q_feed_") { return 2 }
-            if id.hasPrefix("q_water_plant") { return 1 }
-            if id.hasPrefix("q_fertilize_plant") { return 1 }
+            if id.hasPrefix("q_water_plant") { return PlantFeatureGate.allows(.plants) ? 1 : 0 }
+            if id.hasPrefix("q_fertilize_plant") { return PlantFeatureGate.allows(.plants) ? 1 : 0 }
             if id.hasPrefix("q_water_") { return 1 }
             if id.hasPrefix("q_play_") { return 2 }
             if id.hasPrefix("q_weight_") { return 2 }

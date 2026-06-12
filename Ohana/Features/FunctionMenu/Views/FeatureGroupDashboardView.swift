@@ -244,7 +244,9 @@ private struct FeatureGroupItem: Identifiable {
             ]
             items.append(destination(id: "weekly-report", title: "照护周报", icon: "chart.bar.doc.horizontal", .familyWeeklyReport))
             return items
-        case .oasisRewards, .plants:
+        case .plants:
+            return [destination(id: "plants-dashboard", title: "植物", icon: "leaf.fill", .plantsDashboard)]
+        case .oasisRewards:
             return []
         }
     }

@@ -301,8 +301,7 @@ enum GrowthUnlockPolicy {
     }
 
     static func availability(for group: FeatureGroup, currentLevel: Int) -> AppFeatureAvailability {
-        if group == .plants { return .outOfScope }
-        return availability(for: status(for: group, currentLevel: currentLevel))
+        availability(for: status(for: group, currentLevel: currentLevel))
     }
 
     static func availability(for feature: PetFeature, currentLevel: Int) -> AppFeatureAvailability {
@@ -321,15 +320,8 @@ enum GrowthUnlockPolicy {
         availability(for: destination, currentLevel: currentLevel).isVisibleInApp
     }
 
-    static func isOutOfScope(_ destination: FMDest) -> Bool {
-        switch destination {
-        case .plantsDashboard, .plantDetail:
-            plantsAreOutOfScope
-        case .featureGroup(.plants):
-            plantsAreOutOfScope
-        default:
-            false
-        }
+    static func isOutOfScope(_: FMDest) -> Bool {
+        false
     }
 
     private static func availability(for status: GrowthUnlockStatus) -> AppFeatureAvailability {
@@ -390,8 +382,6 @@ enum GrowthUnlockPolicy {
             .advancedPlay
         }
     }
-
-    private static let plantsAreOutOfScope = true
 
     private static func localized(zh: String, en: String, de: String, language: String) -> String {
         switch language {

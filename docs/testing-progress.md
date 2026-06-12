@@ -15,7 +15,7 @@
 | 4 | `Ohana/App` | 🟢 | 门禁通过并提交：`e48c13af7`；无 P1/P2 余留 |
 | 5 | Home + TodayFocus + QuickCare | 🟢 | 门禁通过并提交：`b8e8710e`；TFU-20260612-015 已关闭，无 P1/P2 余留 |
 | 6 | 大模块（Feeding/Members/Oasis/Settings/Health/Economy） | 🟢 | Feeding 门禁通过并提交：`b49134977`；Members 门禁通过并提交：`ead1e5fe4`；Oasis 门禁通过并提交：`87423afd8`；Settings/Health 门禁通过并提交：`5d4e71928`；Economy 门禁通过并提交：`662852a01` |
-| 6.5 | 宪法差距建设（联机门/回收站/自动备份） | 🟢* | GAP-1~9 全部过门禁并提交；*带验收债：64 项人工/真机验收项待清，见 `docs/planning/gap-acceptance-track-list.md`，必须在 🏁 复审与 Phase 9B 前清完 |
+| 6.5 | 宪法差距建设（联机门/回收站/自动备份/植物门） | 🟢* | GAP-1~9 与 GAP-12 全部过门禁并提交；*带验收债：人工/真机验收项见 `docs/planning/gap-acceptance-track-list.md`，必须在 🏁 复审与 Phase 9B 前清完 |
 | 7 | 中小模块批量 | ⬜ | |
 | 8 | 横向集成与全量回归 | ⬜ | 需总览会话主持 |
 | 8.5 | 演进就绪审查（联网/订阅/账户地基） | ⬜ | 需总览会话主持；产出审查报告与少量铺垫，非新功能 |
@@ -84,7 +84,7 @@
 | GAP-7 补记结算 | P1 上架前 | 🟢 | 补记历史日期的记录，奖励计入操作当日预算/冷却；不满足则修 | `528cf2cdd` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 补记路径追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-7-补记结算`；未改 schema / 路由 / 启动路径 / CloudKit |
 | GAP-8 单成员形态 | P1 上架前 | 🟢 | 单人单宠下排行榜、周报、心情、家人胶囊等逐面检查 | `6c4a98db2` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 单人单宠目检项见 `docs/planning/gap-acceptance-track-list.md#gap-8-单成员形态`；未改 schema / 路由 / 启动路径 / CloudKit |
 | GAP-9 离世退场 | P1 上架前 | 🟢 | Memorial 规则书逐模块写明离世行为并测试 | `e6a45e72c` | 开工：2026-06-12；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，未来计划可逆退场、离世成员活跃入口过滤、奖励冻结已补；真实 UI / 真机通知验收项见 `docs/planning/gap-acceptance-track-list.md#gap-9-离世退场`；未改 schema / 路由 / 启动路径 / CloudKit |
-| GAP-12 植物功能门 | P0 上架前 | ⬜ | D19：植物全部表面收进独立功能门（添加植物/植物卡/植物 quest/心情信号/FunctionMenu 与路由入口），代码与 Plant 模型保留；已知表面分布：ContentView、AppRouteCoordinator、FunctionMenuSheet+Router、OnboardingView、TodayFocusService、IslandQuestEngine、TodayFocusCard+Runtime、Home snapshot builder/components、Plants 模块本体 | | 机制复用 OnlineFeatureGate 模式但独立开关；解锁形态 O8 待定 |
+| GAP-12 植物功能门 | P0 上架前 | 🟢 | D19：植物全部表面收进独立功能门（添加植物/植物卡/植物 quest/心情信号/FunctionMenu 与路由入口），代码与 Plant 模型保留；已知表面分布：AppFeatureRouteGuard、AddEntityRoute、FunctionMenu、Onboarding/必填主人页、GrowthUnlock、TodayFocusService/QuestEngine/Card、Home snapshot/components、Oasis、Plants 模块本体 | `本次提交` | 开工：2026-06-13；机制复用 OnlineFeatureGate 模式但独立开关；Q1~Q6 全选 A；规则书见 `docs/specs/PlantFeatureGate-logic.md`；门禁：`scripts/module-exit-gate.sh` PASS；自动验收通过，真实 UI 追踪项见 `docs/planning/gap-acceptance-track-list.md#gap-12-植物功能门`；未删 Plant 模型或 Plants 模块，未启用 CloudKit |
 | GAP-10/11 合资+联机设计 | 1.x | ⬜ | 推迟，见 inventory | | |
 
 ## 待拍板问题（提问协议的异步兜底；产品主人答复后销项）

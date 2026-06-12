@@ -34,6 +34,9 @@ enum AppFeatureRouteGuard {
         guard allowsOnlineDestination(destination) else {
             return .suppress(note: "onlineGate:\(destination)")
         }
+        guard allowsPlantDestination(destination) else {
+            return .suppress(note: "plantGate:\(destination)")
+        }
 
         switch GrowthUnlockPolicy.availability(for: destination, currentLevel: currentLevel) {
         case .visible:
@@ -46,11 +49,13 @@ enum AppFeatureRouteGuard {
     }
 
     static func availability(for destination: FMDest, currentLevel: Int) -> AppFeatureAvailability {
-        GrowthUnlockPolicy.availability(for: destination, currentLevel: currentLevel)
+        guard allowsPlantDestination(destination) else { return .outOfScope }
+        return GrowthUnlockPolicy.availability(for: destination, currentLevel: currentLevel)
     }
 
     static func availability(for group: FeatureGroup, currentLevel: Int) -> AppFeatureAvailability {
-        GrowthUnlockPolicy.availability(for: group, currentLevel: currentLevel)
+        guard allowsPlantGroup(group) else { return .outOfScope }
+        return GrowthUnlockPolicy.availability(for: group, currentLevel: currentLevel)
     }
 
     static func visibleFeatureGroups(
@@ -78,7 +83,10 @@ enum AppFeatureRouteGuard {
     }
 
     static func allowsAddEntity(_ type: EntityType) -> Bool {
-        type.isAvailable
+        if type == .plant {
+            return PlantFeatureGate.allows(.plants)
+        }
+        return type.isAvailable
     }
 
     static func addEntityFallbackDestination(for type: EntityType) -> FMDest? {
@@ -88,7 +96,7 @@ enum AppFeatureRouteGuard {
     static func allowsAppRoute(_ route: AppRoute) -> Bool {
         switch route {
         case .plantProfile:
-            false
+            PlantFeatureGate.allows(.plants)
         case .petProfile, .humanProfile:
             true
         }
@@ -97,18 +105,18 @@ enum AppFeatureRouteGuard {
     static func allowsHomeTab(_ tab: VerticalSolidHomeTab) -> Bool {
         switch tab {
         case .plants:
-            false
+            PlantFeatureGate.allows(.plants)
         case .home, .calendar, .oasis:
             true
         }
     }
 
     static var visibleHomeTabs: [VerticalSolidHomeTab] {
-        [.home, .calendar, .oasis]
+        VerticalSolidHomeTab.allCases.filter { allowsHomeTab($0) }
     }
 
     static var shouldLoadPlantData: Bool {
-        !GrowthUnlockPolicy.isOutOfScope(.plantsDashboard)
+        PlantFeatureGate.allows(.plants)
     }
 
     static func currentGrowthStep(currentLevel: Int) -> GrowthUnlockStep {
@@ -208,5 +216,28 @@ enum AppFeatureRouteGuard {
         default:
             false
         }
+    }
+
+    private static func allowsPlantDestination(_ destination: FMDest) -> Bool {
+        !requiresPlantFeature(destination) || PlantFeatureGate.allows(.plants)
+    }
+
+    private static func requiresPlantFeature(_ destination: FMDest) -> Bool {
+        switch destination {
+        case .plantsDashboard, .plantDetail:
+            true
+        case .featureGroup(.plants):
+            true
+        default:
+            false
+        }
+    }
+
+    private static func allowsPlantGroup(_ group: FeatureGroup) -> Bool {
+        !requiresPlantFeature(group) || PlantFeatureGate.allows(.plants)
+    }
+
+    private static func requiresPlantFeature(_ group: FeatureGroup) -> Bool {
+        group == .plants
     }
 }

@@ -294,7 +294,9 @@ struct VerticalGlassHomeLabView: View {
                     .frame(width: 58, height: 1)
 
                 labTabButton(.oasis)
-                labTabButton(.plants)
+                if PlantFeatureGate.allows(.plants) {
+                    labTabButton(.plants)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.top, 14)

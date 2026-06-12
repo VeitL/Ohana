@@ -41,7 +41,7 @@ enum EntityType: String, CaseIterable, Hashable, Identifiable {
     var isAvailable: Bool {
         switch self {
         case .plant:
-            false
+            PlantFeatureGate.allows(.plants)
         case .pet, .human:
             true
         }

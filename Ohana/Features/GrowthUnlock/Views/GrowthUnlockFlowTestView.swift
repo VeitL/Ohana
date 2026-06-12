@@ -497,17 +497,20 @@ struct GrowthUnlockFlowTestView: View {
     }
 
     private var previewDestinations: [(title: String, icon: String, destination: FMDest)] {
-        [
+        var destinations: [(title: String, icon: String, destination: FMDest)] = [
             ("每日照护", "sun.max.fill", .featureGroup(.dailyCare)),
             ("健康", "cross.fill", .featureGroup(.healthBody)),
             ("成长档案", "folder.fill", .featureGroup(.archiveMemory)),
             ("家庭事务", "house.fill", .featureGroup(.householdHub)),
             ("Oasis 收益", "tree.fill", .wealthDashboard),
-            ("植物", "leaf.fill", .plantsDashboard),
             ("椰子商店", "bag.fill", .coconutShop),
             ("扭蛋机", "circle.grid.cross.fill", .gacha),
             ("家庭周报", "chart.bar.doc.horizontal", .familyWeeklyReport)
         ]
+        if PlantFeatureGate.allows(.plants) {
+            destinations.insert(("植物", "leaf.fill", .plantsDashboard), at: 5)
+        }
+        return destinations
     }
 
     private func featureIcon(defaultIcon: String, availability: AppFeatureAvailability) -> String {

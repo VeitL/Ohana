@@ -40,19 +40,18 @@ struct GrowthUnlockPolicyTests {
         #expect(GrowthUnlockPolicy.roadmapStages().map(\.id).contains(.advancedPlay))
     }
 
-    @Test func plantsAreOutOfCurrentScope() {
-        if case .outOfScope = GrowthUnlockPolicy.availability(for: FMDest.plantsDashboard, currentLevel: 10) {
-            #expect(Bool(true))
-        } else {
-            Issue.record("Expected plants dashboard to be out of scope")
-        }
+    @Test func plantGateOwnsCurrentScopeWhileGrowthUnlockKeepsFutureSemantics() {
+        #expect(!PlantFeatureGate.allows(.plants))
+        #expect(GrowthUnlockPolicy.availability(for: FMDest.plantsDashboard, currentLevel: 10).isVisibleInApp)
+        #expect(GrowthUnlockPolicy.availability(for: FeatureGroup.plants, currentLevel: 10).isVisibleInApp)
 
-        if case .outOfScope = GrowthUnlockPolicy.availability(for: FeatureGroup.plants, currentLevel: 10) {
+        if case .suppress = AppFeatureRouteGuard.functionDestinationDecision(.plantsDashboard, currentLevel: 10) {
             #expect(Bool(true))
         } else {
-            Issue.record("Expected plants feature group to be out of scope")
+            Issue.record("Expected plant dashboard destination to be suppressed by PlantFeatureGate")
         }
-        #expect(!GrowthUnlockPolicy.isVisibleInApp(.plantsDashboard, currentLevel: 10))
+        #expect(!AppFeatureRouteGuard.availability(for: FMDest.plantsDashboard, currentLevel: 10).isVisibleInApp)
+        #expect(!AppFeatureRouteGuard.availability(for: FeatureGroup.plants, currentLevel: 10).isVisibleInApp)
     }
 
     @Test func growthRoadmapIsAlwaysVisible() {
@@ -60,7 +59,7 @@ struct GrowthUnlockPolicyTests {
         #expect(GrowthUnlockPolicy.availability(for: FMDest.growthRoadmap, currentLevel: 10).isVisibleInApp)
     }
 
-    @Test func featureRouteGuardRedirectsLockedAndSuppressesOutOfScopeDestinations() {
+    @Test func featureRouteGuardRedirectsLockedAndSuppressesGatedDestinations() {
         if case .redirectToRoadmap = AppFeatureRouteGuard.functionDestinationDecision(.gacha, currentLevel: 3) {
         } else {
             Issue.record("Expected locked gacha destination to redirect to the growth roadmap")

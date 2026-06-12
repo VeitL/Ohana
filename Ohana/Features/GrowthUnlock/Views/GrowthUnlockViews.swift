@@ -449,7 +449,7 @@ struct GrowthUnlockRoadmapView: View {
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                Text(localized(zh: "植物暂不开放", en: "Plants hidden for now", de: "Pflanzen vorerst verborgen"))
+                Text(localized(zh: "本地成长节奏", en: "Local growth pace", de: "Lokales Wachstum"))
                     .font(OhanaFont.caption2(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .padding(.horizontal, 8)

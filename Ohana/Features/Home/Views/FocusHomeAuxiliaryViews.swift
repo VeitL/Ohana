@@ -158,10 +158,11 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         healthAlerts: PetHealthAlerting,
         now: Date = Date()
     ) -> TodayFocusSnapshot {
+        let visiblePlants = PlantFeatureGate.allows(.plants) ? plants : []
         let quests = IslandQuestEngine.todayQuests(
             pets: pets,
             reminders: reminders,
-            plants: plants,
+            plants: visiblePlants,
             events: events,
             humans: humans,
             careLedgerEntries: careLedgerEntries,
@@ -197,14 +198,14 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         }
         return make(
             pets: pets,
-            plants: plants,
+            plants: visiblePlants,
             humans: humans,
             refreshedQuests: refreshedQuests,
             assignedTasks: assignedTasks,
             pendingExchanges: pendingExchanges,
             negativeSignals: IslandNegativeFeedback.signals(
                 pets: pets,
-                plants: plants,
+                plants: visiblePlants,
                 healthAlerts: healthAlerts
             ),
             dayToken: dayToken(for: now)
@@ -226,10 +227,11 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         clinicalAlerts: [HealthAlert],
         now: Date = Date()
     ) -> TodayFocusSnapshot {
+        let visiblePlants = PlantFeatureGate.allows(.plants) ? plants : []
         let quests = IslandQuestEngine.todayQuests(
             pets: pets,
             reminders: reminders,
-            plants: plants,
+            plants: visiblePlants,
             events: events,
             humans: humans,
             careLedgerEntries: careLedgerEntries,
@@ -267,14 +269,14 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         }
         return make(
             pets: pets,
-            plants: plants,
+            plants: visiblePlants,
             humans: humans,
             refreshedQuests: refreshedQuests,
             assignedTasks: assignedTasks,
             pendingExchanges: pendingExchanges,
             negativeSignals: IslandNegativeFeedback.signals(
                 pets: pets,
-                plants: plants,
+                plants: visiblePlants,
                 clinicalAlerts: clinicalAlerts
             ),
             dayToken: dayToken(for: now)
@@ -291,10 +293,11 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
         negativeSignals: [IslandNegativeSignal],
         dayToken: Int
     ) -> TodayFocusSnapshot {
-        TodayFocusSnapshot(
+        let visiblePlants = PlantFeatureGate.allows(.plants) ? plants : []
+        return TodayFocusSnapshot(
             dayToken: dayToken,
             pets: pets.map(TodayFocusPetSnapshot.init),
-            plants: plants.map(TodayFocusPlantSnapshot.init),
+            plants: visiblePlants.map(TodayFocusPlantSnapshot.init),
             humans: humans.map(TodayFocusHumanSnapshot.init),
             refreshedQuests: refreshedQuests,
             assignedFamilyTasks: assignedTasks.map(TodayFocusFamilyTaskSnapshot.init),

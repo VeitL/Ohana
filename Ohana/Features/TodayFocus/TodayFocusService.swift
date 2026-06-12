@@ -215,7 +215,10 @@ nonisolated enum TodayFocusService {
 
     static func quest(_ quest: IslandQuest, matchesCompletedEntity entityId: UUID) -> Bool {
         // This is only a refresh trigger match. The reward gate re-checks the latest visible snapshot.
-        if quest.targetPetId == entityId || quest.targetPlantId == entityId {
+        if quest.targetPetId == entityId {
+            return true
+        }
+        if PlantFeatureGate.allows(.plants), quest.targetPlantId == entityId {
             return true
         }
         if IslandQuestEngine.eventId(fromQuestId: quest.id) == entityId {

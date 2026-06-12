@@ -207,9 +207,10 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             equippedTitleRaw: source.equippedTitleRaw,
             language: source.language
         )
+        let visiblePlants = PlantFeatureGate.allows(.plants) ? source.plants : []
         let todayFocus = makeTodayFocus(
             source.pets.filter { !$0.hasPassedAway },
-            source.plants,
+            visiblePlants,
             source.pendingReminders,
             source.events,
             weightVisibleHumans,
@@ -227,7 +228,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             coconutText: "\(source.pets.reduce(0) { $0 + $1.coconutBalance } + source.humans.reduce(0) { $0 + $1.coconutBalance })",
             todayFocus: todayFocus,
             cards: cards,
-            plants: source.plants.sorted { $0.createdAt > $1.createdAt }.map { plant in
+            plants: visiblePlants.sorted { $0.createdAt > $1.createdAt }.map { plant in
                 VerticalSolidHomePlantSnapshot(
                     id: plant.id,
                     name: plant.name.isEmpty ? l.tr(zh: "植物", en: "Plant", de: "Pflanze") : plant.name,
@@ -242,11 +243,12 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
     }
 
     static func signature(for source: VerticalSolidHomeSourceState, now: Date = Date()) -> String {
-        [
+        let visiblePlants = PlantFeatureGate.allows(.plants) ? source.plants : []
+        return [
             "day:\(dayToken(for: now))",
             petSignature(source.pets),
             humanSignature(source.humans),
-            plantSignature(source.plants, now: now),
+            plantSignature(visiblePlants, now: now),
             electronicPetSignature(source.electronicPets),
             eventSignature(source.events),
             reminderSignature(source.pendingReminders),
